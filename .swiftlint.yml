@@ -1,0 +1,108 @@
+# SwiftLint config — enforces constitution §10
+# Warnings fail the build (run with --strict)
+
+included:
+  - App
+  - Packages
+
+excluded:
+  - .build
+  - .swiftpm
+  - DerivedData
+  - Packages/*/.build
+  - Packages/*/.swiftpm
+
+# Opt-in rules we want
+opt_in_rules:
+  - array_init
+  - closure_end_indentation
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - explicit_init
+  - fatal_error_message
+  - file_header
+  - first_where
+  - flatmap_over_map_reduce
+  - force_unwrapping
+  - implicit_return
+  - joined_default_parameter
+  - last_where
+  - literal_expression_end_indentation
+  - multiline_arguments
+  - multiline_function_chains
+  - multiline_literal_brackets
+  - multiline_parameters
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - sorted_first_last
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - unused_import
+  - vertical_parameter_alignment_on_call
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+  - yoda_condition
+
+disabled_rules:
+  - todo  # we use a stricter custom rule below
+  - line_length  # enforced by swift-format instead
+
+# Custom rule: TODOs must have a date and an owner (constitution §10)
+custom_rules:
+  todo_with_owner:
+    name: "TODO needs date + owner"
+    regex: '(?i)//\s*(TODO|FIXME)(?!.*\(\d{4}-\d{2}-\d{2},\s*\w+\))'
+    message: "TODO/FIXME must include (YYYY-MM-DD, owner) — e.g. // TODO(2026-06-01, nadams): ..."
+    severity: warning
+
+  force_try_banned:
+    name: "force-try banned"
+    regex: 'try!'
+    message: "force-try banned outside tests (constitution §10). Use try? or do/catch."
+    excluded: ".*Tests\\.swift"
+    severity: error
+
+# Tunables
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - id
+    - x
+    - y
+    - to
+    - in
+    - or
+
+type_name:
+  min_length:
+    warning: 3
+
+file_length:
+  warning: 400
+  error: 600
+
+function_body_length:
+  warning: 50
+  error: 80
+
+cyclomatic_complexity:
+  warning: 10
+  error: 15
+
+nesting:
+  type_level:
+    warning: 2
+
+reporter: "xcode"

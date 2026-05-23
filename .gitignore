@@ -1,0 +1,49 @@
+# Xcode
+build/
+DerivedData/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcworkspace/contents.xcworkspacedata
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+timeline.xctimeline
+playground.xcworkspace
+
+# XcodeGen — the project file is generated; we don't commit it
+DODApp.xcodeproj/
+
+# Swift Package Manager
+.swiftpm/
+.build/
+Packages/*/.build/
+Packages/*/.swiftpm/
+Package.resolved
+
+# Secrets (constitution §9)
+*.xcconfig
+!*.xcconfig.example
+
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Coverage / profiling
+*.profraw
+*.profdata
+
+# Fastlane (in case it gets added later)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/

@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: macos-14
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint (strict)
+        run: bin/lint.sh
+
+  format:
+    name: Format check
+    runs-on: macos-14
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install swift-format
+        run: brew install swift-format
+
+      - name: Check formatting (no diff allowed)
+        run: |
+          swift-format format --recursive --configuration .swift-format App Packages > /dev/null
+          # Lint mode: exits non-zero on style diffs
+          swift-format lint --recursive --strict --configuration .swift-format App Packages
+
+  test-packages:
+    name: Test SPM packages
+    runs-on: macos-14
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - DODDomain
+          - DODSupport
+          - DODDesignSystem
+          - DODAnalytics
+          - DODNetworking
+          - DODPersistence
+          - DODFeatureFeed
+          - DODFeatureCategories
+          - DODFeatureSearch
+          - DODFeatureRecipeDetail
+          - DODFeatureSaved
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            Packages/${{ matrix.package }}/.build
+          key: ${{ runner.os }}-spm-${{ matrix.package }}-${{ hashFiles(format('Packages/{0}/Package.swift', matrix.package)) }}
+          restore-keys: |
+            ${{ runner.os }}-spm-${{ matrix.package }}-
+
+      - name: Test
+        working-directory: Packages/${{ matrix.package }}
+        run: swift test --parallel
+
+  build-app:
+    name: Build app (iOS Simulator)
+    runs-on: macos-14
+    timeout-minutes: 25
+    needs: [lint, format]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build for iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project DODApp.xcodeproj \
+            -scheme DODApp \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -configuration Debug \
+            build | xcpretty
