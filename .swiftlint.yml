@@ -48,7 +48,6 @@ opt_in_rules:
   - sorted_first_last
   - toggle_bool
   - unneeded_parentheses_in_closure_argument
-  - unused_import
   - vertical_parameter_alignment_on_call
   - vertical_whitespace_closing_braces
   - vertical_whitespace_opening_braces
@@ -57,6 +56,7 @@ opt_in_rules:
 disabled_rules:
   - todo  # we use a stricter custom rule below
   - line_length  # enforced by swift-format instead
+  - trailing_comma  # swift-format requires trailing commas; let it own this style
 
 # Custom rule: TODOs must have a date and an owner (constitution §10)
 custom_rules:
@@ -104,5 +104,8 @@ cyclomatic_complexity:
 nesting:
   type_level:
     warning: 2
+
+analyzer_rules:
+  - unused_import
 
 reporter: "xcode"

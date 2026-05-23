@@ -9,17 +9,17 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../DODDomain"),
-        .package(path: "../DODSupport")
+        .package(path: "../DODSupport"),
     ],
     targets: [
         .target(
             name: "DODNetworking",
             dependencies: ["DODDomain", "DODSupport"]
         ),
+        // Fixtures resource directive added back in T-061 with real HTML files.
         .testTarget(
             name: "DODNetworkingTests",
-            dependencies: ["DODNetworking"],
-            resources: [.process("Fixtures")]
-        )
+            dependencies: ["DODNetworking"]
+        ),
     ]
 )

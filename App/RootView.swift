@@ -1,18 +1,17 @@
-import SwiftUI
-
+import DODAnalytics
+import DODDesignSystem
 // Linkage proof for T-006. Each module exposes a placeholder namespace enum;
 // the real composition root lands in T-140.
 import DODDomain
-import DODSupport
-import DODDesignSystem
-import DODAnalytics
-import DODNetworking
-import DODPersistence
-import DODFeatureFeed
 import DODFeatureCategories
-import DODFeatureSearch
+import DODFeatureFeed
 import DODFeatureRecipeDetail
 import DODFeatureSaved
+import DODFeatureSearch
+import DODNetworking
+import DODPersistence
+import DODSupport
+import SwiftUI
 
 struct RootView: View {
     var body: some View {

@@ -11,7 +11,9 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     SWIFT_STRICT_CONCURRENCY: complete
-    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # SwiftLint build-phase needs to read .swiftlint.yml outside its sandbox.
+    # CI still runs lint via bin/lint.sh as a separate job, which is the real gate.
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
     CODE_SIGN_STYLE: Automatic
     GENERATE_INFOPLIST_FILE: NO
     MARKETING_VERSION: "1.0"

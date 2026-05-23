@@ -13,6 +13,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "DODAnalytics"),
-        .testTarget(name: "DODAnalyticsTests", dependencies: ["DODAnalytics"])
+        .testTarget(name: "DODAnalyticsTests", dependencies: ["DODAnalytics"]),
     ]
 )

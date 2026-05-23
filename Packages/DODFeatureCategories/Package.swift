@@ -13,7 +13,7 @@ let package = Package(
         .package(path: "../DODDesignSystem"),
         .package(path: "../DODAnalytics"),
         .package(path: "../DODNetworking"),
-        .package(path: "../DODPersistence")
+        .package(path: "../DODPersistence"),
     ],
     targets: [
         .target(
@@ -24,9 +24,9 @@ let package = Package(
                 "DODDesignSystem",
                 "DODAnalytics",
                 "DODNetworking",
-                "DODPersistence"
+                "DODPersistence",
             ]
         ),
-        .testTarget(name: "DODFeatureCategoriesTests", dependencies: ["DODFeatureCategories"])
+        .testTarget(name: "DODFeatureCategoriesTests", dependencies: ["DODFeatureCategories"]),
     ]
 )

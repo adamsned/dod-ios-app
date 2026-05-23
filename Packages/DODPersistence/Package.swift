@@ -15,6 +15,6 @@ let package = Package(
             name: "DODPersistence",
             dependencies: ["DODDomain"]
         ),
-        .testTarget(name: "DODPersistenceTests", dependencies: ["DODPersistence"])
+        .testTarget(name: "DODPersistenceTests", dependencies: ["DODPersistence"]),
     ]
 )
