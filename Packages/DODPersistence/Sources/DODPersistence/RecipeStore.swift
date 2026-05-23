@@ -105,6 +105,10 @@ public actor RecipeStore {
 
     // MARK: - Save / unsave (AC-5.1)
 
+    public func isSaved(id: Int) throws -> Bool {
+        try fetchRecipe(id: id)?.isSaved ?? false
+    }
+
     @discardableResult
     public func toggleSaved(id: Int) throws -> Bool {
         guard let row = try fetchRecipe(id: id) else { return false }
