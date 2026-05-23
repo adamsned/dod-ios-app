@@ -5,6 +5,7 @@ import SwiftUI
 public struct SearchView: View {
 
     @State private var viewModel: SearchViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (RecipeListItem) -> Void
 
     public init(viewModel: SearchViewModel, onSelect: @escaping (RecipeListItem) -> Void) {
@@ -73,7 +74,10 @@ public struct SearchView: View {
             )
         case .results:
             ScrollView {
-                LazyVStack(spacing: DODSpacing.md) {
+                LazyVGrid(
+                    columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+                    spacing: DODSpacing.md
+                ) {
                     ForEach(viewModel.items) { item in
                         RecipeCard(
                             title: item.title,

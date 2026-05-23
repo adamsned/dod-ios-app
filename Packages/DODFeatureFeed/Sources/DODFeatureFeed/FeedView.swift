@@ -10,6 +10,7 @@ import SwiftUI
 public struct FeedView: View {
 
     @State private var viewModel: FeedViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (RecipeListItem) -> Void
 
     public init(viewModel: FeedViewModel, onSelect: @escaping (RecipeListItem) -> Void) {
@@ -56,7 +57,7 @@ public struct FeedView: View {
 
     private var list: some View {
         ScrollView {
-            LazyVStack(spacing: DODSpacing.md) {
+            LazyVGrid(columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: DODSpacing.md) {
                 ForEach(viewModel.items) { item in
                     FeedRow(item: item)
                         .onTapGesture { onSelect(item) }
@@ -64,14 +65,14 @@ public struct FeedView: View {
                             await viewModel.loadMoreIfNeeded(currentItem: item)
                         }
                 }
-                if viewModel.loadState == .loadingMore {
-                    ProgressView()
-                        .padding(.vertical, DODSpacing.lg)
-                }
             }
             .padding(.horizontal, DODSpacing.md)
             .padding(.top, viewModel.isOffline ? DODSpacing.xl : DODSpacing.md)
-            .padding(.bottom, DODSpacing.lg)
+
+            if viewModel.loadState == .loadingMore {
+                ProgressView()
+                    .padding(.vertical, DODSpacing.lg)
+            }
         }
     }
 

@@ -5,6 +5,7 @@ import SwiftUI
 public struct CategoryRecipesView: View {
 
     @State private var viewModel: CategoryRecipesViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (RecipeListItem) -> Void
 
     public init(
@@ -45,16 +46,20 @@ public struct CategoryRecipesView: View {
             )
         case .loaded, .loadingMore:
             ScrollView {
-                LazyVStack(spacing: DODSpacing.md) {
+                LazyVGrid(
+                    columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+                    spacing: DODSpacing.md
+                ) {
                     ForEach(viewModel.items) { item in
                         recipeRow(item)
                     }
-                    if viewModel.loadState == .loadingMore {
-                        ProgressView()
-                            .padding(.vertical, DODSpacing.lg)
-                    }
                 }
                 .padding(DODSpacing.md)
+
+                if viewModel.loadState == .loadingMore {
+                    ProgressView()
+                        .padding(.vertical, DODSpacing.lg)
+                }
             }
         }
     }

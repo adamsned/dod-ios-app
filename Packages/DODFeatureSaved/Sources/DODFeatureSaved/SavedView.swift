@@ -5,6 +5,7 @@ import SwiftUI
 public struct SavedView: View {
 
     @State private var viewModel: SavedViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (Recipe) -> Void
 
     public init(viewModel: SavedViewModel, onSelect: @escaping (Recipe) -> Void) {
@@ -42,7 +43,10 @@ public struct SavedView: View {
             )
         case .loaded:
             ScrollView {
-                LazyVStack(spacing: DODSpacing.md) {
+                LazyVGrid(
+                    columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+                    spacing: DODSpacing.md
+                ) {
                     ForEach(viewModel.recipes) { recipe in
                         RecipeCard(
                             title: recipe.title,
