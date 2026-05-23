@@ -86,7 +86,8 @@ extension WPDTO.Post {
             excerpt: HTMLSanitizer.plainText(from: excerpt.rendered),
             heroImage: heroImage,
             publishedAt: WPDTO.parseWPDate(date),
-            totalTimeDisplay: nil
+            totalTimeDisplay: nil,
+            canonicalURL: link
         )
     }
 }

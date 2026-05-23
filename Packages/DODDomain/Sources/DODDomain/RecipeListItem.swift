@@ -13,6 +13,10 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
     public let publishedAt: Date
     /// "30 min" if known from REST; nil pre-detail-fetch.
     public let totalTimeDisplay: String?
+    /// Optional so older Codable payloads (pre-this-field) decode cleanly.
+    /// New REST responses populate it from `post.link` — required for
+    /// recipe-detail navigation (spec.md AC-4.* + CL-4).
+    public let canonicalURL: URL?
 
     public init(
         id: Int,
@@ -20,7 +24,8 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
         excerpt: String,
         heroImage: URL? = nil,
         publishedAt: Date,
-        totalTimeDisplay: String? = nil
+        totalTimeDisplay: String? = nil,
+        canonicalURL: URL? = nil
     ) {
         self.id = id
         self.title = title
@@ -28,5 +33,6 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
         self.heroImage = heroImage
         self.publishedAt = publishedAt
         self.totalTimeDisplay = totalTimeDisplay
+        self.canonicalURL = canonicalURL
     }
 }

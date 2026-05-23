@@ -1,6 +1,85 @@
+import DODAnalytics
+import DODFeatureCategories
+import DODFeatureFeed
+import DODFeatureRecipeDetail
+import DODFeatureSaved
+import DODFeatureSearch
+import DODNetworking
+import DODPersistence
 import Foundation
+import SwiftData
+import SwiftUI
 
-/// Composition root for the app. Concrete service initialization lands in T-140.
-/// For Cluster A this is a placeholder so the symbol exists before features wire up.
+/// Composition root. Constructs every long-lived service once and hands
+/// per-feature `…Dependencies` views to view models on demand.
+///
+/// Singletons by design: `WPRestClient`, `RecipePageFetcher`, `ImageLoader`,
+/// `NetworkMonitor.shared`, `RecipeStore`, `Telemetry.shared`. All process-
+/// wide infrastructure; constitution carveout applies.
 @MainActor
-struct AppDependencies {}
+final class AppDependencies {
+
+    let store: RecipeStore
+    let modelContainer: ModelContainer
+
+    private let restClient: WPRestClient
+    private let pageFetcher: RecipePageFetcher
+    private let imageLoader: ImageLoader
+    private let networkMonitor: NetworkMonitor
+
+    init() {
+        do {
+            self.modelContainer = try RecipeStore.productionContainer()
+        } catch {
+            // Schema migration failure must surface to the user (MIGRATION.md
+            // discipline rule 4). For v1 we crash early so the issue is
+            // unambiguous in TestFlight feedback.
+            fatalError("SwiftData migration failed: \(error)")
+        }
+        self.store = RecipeStore(modelContainer: modelContainer)
+        self.restClient = WPRestClient()
+        self.pageFetcher = RecipePageFetcher()
+        self.imageLoader = ImageLoader()
+        self.networkMonitor = NetworkMonitor.shared
+    }
+
+    /// Called once from `@main` at app launch.
+    func bootstrap() async {
+        await networkMonitor.start()
+        // TelemetryDeck app ID lives in DODApp.xcconfig (gitignored per
+        // constitution §9). For v1 we read from Info.plist; if unset we
+        // skip telemetry rather than fail launch.
+        let appID = Bundle.main.object(forInfoDictionaryKey: "TelemetryDeckAppID") as? String
+        if let appID, !appID.isEmpty {
+            Telemetry.shared.start(appID: appID)
+        }
+        Telemetry.shared.send(.appOpen)
+    }
+
+    // MARK: - Per-feature dependency views
+
+    func feedDependencies() -> some FeedDependencies {
+        LiveFeedDependencies(client: restClient, store: store, monitor: networkMonitor)
+    }
+
+    func categoriesDependencies() -> some CategoriesDependencies {
+        LiveCategoriesDependencies(client: restClient, store: store)
+    }
+
+    func searchDependencies() -> some SearchDependencies {
+        LiveSearchDependencies(client: restClient, store: store, monitor: networkMonitor)
+    }
+
+    func recipeDetailDependencies() -> some RecipeDetailDependencies {
+        LiveRecipeDetailDependencies(
+            client: restClient,
+            fetcher: pageFetcher,
+            store: store,
+            monitor: networkMonitor
+        )
+    }
+
+    func savedDependencies() -> some SavedDependencies {
+        LiveSavedDependencies(store: store, imageLoader: imageLoader)
+    }
+}
