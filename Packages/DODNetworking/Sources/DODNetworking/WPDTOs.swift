@@ -6,20 +6,42 @@ import Foundation
 /// this module; nothing else should see the raw shape.
 enum WPDTO {
 
-    /// `/wp/v2/posts` response item (with `_fields` requested in T-051).
+    /// `/wp/v2/posts` response item. With `_embed=wp:featuredmedia`, WP
+    /// inlines the resolved image URLs under `_embedded` so we avoid a
+    /// per-recipe follow-up call to /media/{id}.
     struct Post: Decodable {
         let id: Int
         let slug: String
         let link: URL
         let title: RenderedString
         let excerpt: RenderedString
-        let date: String?  // ISO8601 in default WP install
+        let date: String?
         let featuredMedia: Int?
         let categories: [Int]?
+        let embedded: PostEmbedded?
 
         enum CodingKeys: String, CodingKey {
             case id, slug, link, title, excerpt, date, categories
             case featuredMedia = "featured_media"
+            case embedded = "_embedded"
+        }
+
+        /// Pick the best size from the embedded media, preferring
+        /// medium_large for list rows (CL-6).
+        var inlineHeroURL: URL? {
+            guard let media = embedded?.featuredMedia?.first else { return nil }
+            let sizes = media.mediaDetails?.sizes ?? [:]
+            return sizes["medium_large"]?.sourceURL
+                ?? sizes["medium"]?.sourceURL
+                ?? media.sourceURL
+        }
+    }
+
+    struct PostEmbedded: Decodable {
+        let featuredMedia: [Media]?
+
+        enum CodingKeys: String, CodingKey {
+            case featuredMedia = "wp:featuredmedia"
         }
     }
 

@@ -29,9 +29,9 @@ public final class Telemetry: @unchecked Sendable {
         configured = true
     }
 
-    /// Send a single event. Safe to call before ``start(appID:)`` — the event
-    /// will be passed to the transport, which may queue or drop it depending
-    /// on its initialization state. We never crash on uninitialized telemetry.
+    /// Send a single event. Safe to call before ``start(appID:)`` — the
+    /// production transport guards itself against uninitialized sends; the
+    /// test recording transport captures unconditionally.
     public func send(_ event: AnalyticsEvent) {
         lock.lock()
         let transport = self.transport

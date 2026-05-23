@@ -15,13 +15,15 @@ extension WPRestClient {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "per_page", value: String(perPage)),
-            URLQueryItem(name: "_fields", value: "id,slug,link,title,excerpt,date,featured_media,categories"),
+            // `_embed` and `_fields` interact badly: filtering excludes the
+            // _links field that drives embedding, so omit _fields here.
+            URLQueryItem(name: "_embed", value: "wp:featuredmedia"),
         ]
         if let categoryID {
             queryItems.append(URLQueryItem(name: "categories", value: String(categoryID)))
         }
         let posts: [WPDTO.Post] = try await get(path: "posts", queryItems: queryItems)
-        return posts.map { $0.toRecipeListItem(heroImage: nil) }
+        return posts.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
     }
 
     /// Search posts by query string.
@@ -38,9 +40,11 @@ extension WPRestClient {
             URLQueryItem(name: "search", value: trimmed),
             URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "per_page", value: String(perPage)),
-            URLQueryItem(name: "_fields", value: "id,slug,link,title,excerpt,date,featured_media,categories"),
+            // `_embed` and `_fields` interact badly: filtering excludes the
+            // _links field that drives embedding, so omit _fields here.
+            URLQueryItem(name: "_embed", value: "wp:featuredmedia"),
         ]
         let posts: [WPDTO.Post] = try await get(path: "posts", queryItems: queryItems)
-        return posts.map { $0.toRecipeListItem(heroImage: nil) }
+        return posts.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
     }
 }
