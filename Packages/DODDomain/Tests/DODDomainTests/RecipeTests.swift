@@ -1,0 +1,85 @@
+import Foundation
+import Testing
+
+@testable import DODDomain
+
+@Suite("Recipe value type") struct RecipeTests {
+
+    private static let baseURL =
+        URL(
+            string: "https://www.dutchovendaddy.com/skillet-corn/"
+        ) ?? URL(filePath: "/dev/null")
+
+    @Test func equalityIsValueBased() {
+        let recipe1 = Self.makeRecipe(id: 42)
+        let recipe2 = Self.makeRecipe(id: 42)
+        #expect(recipe1 == recipe2)
+        #expect(recipe1.hashValue == recipe2.hashValue)
+    }
+
+    @Test func differentIdsAreUnequal() {
+        #expect(Self.makeRecipe(id: 1) != Self.makeRecipe(id: 2))
+    }
+
+    @Test func codableRoundTrip() throws {
+        let original = Self.makeRecipe(id: 7)
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Recipe.self, from: encoded)
+        #expect(decoded == original)
+    }
+
+    @Test func hasDetailFalseWhenIngredientsAndInstructionsEmpty() {
+        let recipe = Self.makeRecipe(id: 1)
+        #expect(!recipe.hasDetail)
+    }
+
+    @Test func hasDetailTrueWhenIngredientsPresent() {
+        let recipe = Self.makeRecipe(
+            id: 1,
+            ingredients: [RecipeIngredient(text: "1 cup flour")]
+        )
+        #expect(recipe.hasDetail)
+    }
+
+    @Test func hasDetailTrueWhenInstructionsPresent() {
+        let recipe = Self.makeRecipe(
+            id: 1,
+            instructions: [RecipeInstruction(step: 1, text: "Preheat oven")]
+        )
+        #expect(recipe.hasDetail)
+    }
+
+    private static func makeRecipe(
+        id: Int,
+        ingredients: [RecipeIngredient] = [],
+        instructions: [RecipeInstruction] = []
+    ) -> Recipe {
+        Recipe(
+            id: id,
+            slug: "skillet-corn",
+            title: "Garlic Butter Skillet Corn",
+            excerpt: "An easy side dish.",
+            canonicalURL: baseURL,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            ingredients: ingredients,
+            instructions: instructions
+        )
+    }
+}
+
+@Suite("RecipeListItem value type") struct RecipeListItemTests {
+
+    @Test func codableRoundTrip() throws {
+        let original = RecipeListItem(
+            id: 99,
+            title: "Skillet Apple Crisp",
+            excerpt: "Warm and bubbly.",
+            heroImage: URL(string: "https://example.com/img.jpg"),
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            totalTimeDisplay: "45 min"
+        )
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(RecipeListItem.self, from: encoded)
+        #expect(decoded == original)
+    }
+}
