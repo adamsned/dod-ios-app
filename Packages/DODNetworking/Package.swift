@@ -16,10 +16,10 @@ let package = Package(
             name: "DODNetworking",
             dependencies: ["DODDomain", "DODSupport"]
         ),
-        // Fixtures resource directive added back in T-061 with real HTML files.
         .testTarget(
             name: "DODNetworkingTests",
-            dependencies: ["DODNetworking"]
+            dependencies: ["DODNetworking"],
+            resources: [.process("Fixtures")]
         ),
     ]
 )
