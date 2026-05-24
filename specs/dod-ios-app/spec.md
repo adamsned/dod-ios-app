@@ -198,6 +198,8 @@ Added by the Phase 7 amendment (CL-21, 2026-05-24). The guest-identity model —
 - **AC-15.4** No identity field is ever sent to TelemetryDeck. Name and email travel ONLY to dutchovendaddy.com over HTTPS.
 - **AC-15.5** Keychain access uses the modern `Security` framework via a small wrapper in `DODSupport` (Wave-1 sub 3 builds it). Reads are synchronous + cheap; writes throw on Keychain error.
 
+**Integration shipped:** Wave-2 wired US-13/14/15 into `RecipeDetailView` (new `RecipeDetailRatingsSection` + view-model state + composition-root wiring) in commit `<filled in post-commit>` (T-220).
+
 ### US-8 — First-launch onboarding
 **As a** Weekend Cook on first cold launch,
 **I want** a brief welcome explaining what the app does,

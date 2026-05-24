@@ -798,6 +798,11 @@ Added 2026-05-23 by the consultant-pass amendment. Implements the new spec contr
 
 ---
 
+### Cluster: Comments & Ratings integration (US-13/14/15)
+- T-220 RecipeDetail comments + ratings integration (this commit)
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) = 79

@@ -129,6 +129,11 @@ public struct RecipeDetailView: View {
                         items: isOfflineSnapshot ? [] : viewModel.related,
                         onSelect: onSelectRelated
                     )
+                    // US-13/14/15 integration: ratings + reviews hangs off
+                    // the bottom of the scroll content. The section owns
+                    // its own guest-identity sheet so the host doesn't
+                    // need to coordinate presentation state.
+                    RecipeDetailRatingsSection(viewModel: viewModel)
                 }
                 .padding(.bottom, DODSpacing.xl)
             }

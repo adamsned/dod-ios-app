@@ -28,6 +28,9 @@ final class AppDependencies {
     private let pageFetcher: RecipePageFetcher
     private let imageLoader: ImageLoader
     private let networkMonitor: NetworkMonitor
+    private let commentsClient: WPCommentsClient
+    private let ratingsClient: WPRMRatingsClient
+    private let guestIdentityStore: any GuestIdentityStoring
 
     init() {
         do {
@@ -43,6 +46,12 @@ final class AppDependencies {
         self.pageFetcher = RecipePageFetcher()
         self.imageLoader = ImageLoader()
         self.networkMonitor = NetworkMonitor.shared
+        // US-13/14/15 integration: the comments + ratings + guest-identity
+        // clients are constructed alongside the rest of the long-lived
+        // services and handed to `LiveRecipeDetailDependencies` on demand.
+        self.commentsClient = WPCommentsClient()
+        self.ratingsClient = WPRMRatingsClient()
+        self.guestIdentityStore = KeychainGuestIdentityStore()
     }
 
     /// Called once from `@main` at app launch.
@@ -92,7 +101,10 @@ final class AppDependencies {
             client: restClient,
             fetcher: pageFetcher,
             store: store,
-            monitor: networkMonitor
+            monitor: networkMonitor,
+            commentsClient: commentsClient,
+            ratingsClient: ratingsClient,
+            guestIdentity: guestIdentityStore
         )
     }
 

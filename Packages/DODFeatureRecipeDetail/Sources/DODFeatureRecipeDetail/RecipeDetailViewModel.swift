@@ -16,6 +16,19 @@ public final class RecipeDetailViewModel {
         case unavailable  // AC-4.11
     }
 
+    /// State machine for the ratings + comments section. `.idle` means
+    /// `loadRatingsAndComments()` has not yet been called; `.loading` is
+    /// the first network round-trip; `.ready` is the steady state (any
+    /// background refresh failure leaves us in `.ready` with whatever the
+    /// cache had — REG-14 / AC-14.6); `.error` only fires when both the
+    /// cache and the network came back empty/broken.
+    public enum CommentsLoadState: Equatable {
+        case idle
+        case loading
+        case ready
+        case error(String)
+    }
+
     public let listItem: RecipeListItem
     public let canonicalURL: URL
     public private(set) var recipe: Recipe?
@@ -24,6 +37,23 @@ public final class RecipeDetailViewModel {
     public private(set) var isSaved: Bool = false
     public private(set) var checkedIngredientIDs: Set<UUID> = []
     public private(set) var snackbarMessage: String?
+
+    // MARK: - Comments + ratings state (US-13/14/15)
+
+    public private(set) var ratingSummary: RecipeRating?
+    public private(set) var comments: [RecipeComment] = []
+    public private(set) var commentsLoadState: CommentsLoadState = .idle
+    /// Current selection in the `StarRatingInput` before the user taps
+    /// "Submit rating". 0 means "no selection".
+    public private(set) var pendingUserRating: Int = 0
+    public private(set) var commentDraft: String = ""
+    public private(set) var isSubmittingComment: Bool = false
+    public private(set) var isSubmittingRating: Bool = false
+    /// True when the Keychain has no guest identity yet — the view layer
+    /// uses this to gate the rating / composer affordances behind the
+    /// non-dismissible `GuestIdentitySheet` (AC-15.1).
+    public var requiresGuestIdentity: Bool = true
+
     /// Tracks whether `cookModeStarted` has already been sent this session
     /// for this recipe, so re-entering Cook Mode in the same view session
     /// fires at most one telemetry event (spec AC-7.7).
@@ -54,10 +84,158 @@ public final class RecipeDetailViewModel {
             recipe = cached
             loadState = .ready
             await loadRelated(forCategoryID: cached.categoryIDs.first)
+        } else {
+            // Step 2: try fetch + parse.
+            await fetchAndParse()
+        }
+        // Step 3: layer the ratings + comments load on top. This MUST run
+        // after the recipe path above so the screen renders content
+        // immediately and the comments section appears once it's ready
+        // — never blocking the recipe load itself (US-13/14 integration).
+        await loadRatingsAndComments()
+    }
+
+    // MARK: - Comments + ratings (US-13/14/15)
+
+    /// Populate `ratingSummary` and `comments` from the local cache
+    /// immediately for the offline-first read, then refresh from the
+    /// network in the background. Network failures leave the cached
+    /// state in place per REG-14 / AC-14.6.
+    public func loadRatingsAndComments() async {
+        // Refresh the guest-identity gate so the view picks up a
+        // previously-saved identity (e.g. the user rated a different
+        // recipe earlier this session).
+        requiresGuestIdentity = await dependencies.loadGuestIdentity() == nil
+
+        commentsLoadState = .loading
+
+        // Step 1: fast path — cached values.
+        if let cachedRating = await dependencies.cachedRatingSummary(recipeID: listItem.id) {
+            ratingSummary = cachedRating
+            // If the cache already remembers this device's userRating,
+            // seed the input so the user can "Edit" without retyping.
+            if let userRating = cachedRating.userRating, pendingUserRating == 0 {
+                pendingUserRating = userRating
+            }
+        }
+        let cachedComments = await dependencies.cachedComments(postID: listItem.id)
+        if !cachedComments.isEmpty {
+            comments = cachedComments
+            commentsLoadState = .ready
+        }
+
+        // Step 2: network refresh (best-effort).
+        let fresh = await dependencies.fetchRatingSummary(recipeID: listItem.id)
+        ratingSummary = fresh
+        await dependencies.cacheRatingSummary(fresh)
+
+        do {
+            let page = try await dependencies.fetchComments(postID: listItem.id, page: 1)
+            // Show approved comments only per AC-14.2.
+            let approved = page.comments.filter { $0.status == .approved }
+            comments = approved
+            await dependencies.cacheComments(approved, postID: listItem.id)
+            commentsLoadState = .ready
+        } catch {
+            DODLog.network.error("comments fetch failed: \(String(describing: error))")
+            // If we already hydrated from cache, stay in `.ready` so the
+            // user keeps seeing the cached thread (AC-14.6). Only surface
+            // `.error` when we have nothing to show.
+            if comments.isEmpty {
+                commentsLoadState = .error("Couldn't load comments.")
+            }
+        }
+    }
+
+    public func setPendingRating(_ stars: Int) {
+        pendingUserRating = stars
+    }
+
+    public func setCommentDraft(_ text: String) {
+        commentDraft = text
+    }
+
+    /// Submit a star rating. Gated behind the guest-identity sheet —
+    /// callers should check `requiresGuestIdentity` first and present
+    /// `GuestIdentitySheet` if true. AC-13.2 / AC-13.3 / AC-13.5.
+    public func submitRating(stars: Int) async {
+        guard (1...5).contains(stars) else { return }
+        guard let identity = await dependencies.loadGuestIdentity() else {
+            // Caller should have presented the sheet; flip the gate so
+            // the next render presents it.
+            requiresGuestIdentity = true
             return
         }
-        // Step 2: try fetch + parse.
-        await fetchAndParse()
+        isSubmittingRating = true
+        defer { isSubmittingRating = false }
+
+        do {
+            let updated = try await dependencies.postRating(
+                recipeID: listItem.id,
+                stars: stars,
+                name: identity.name,
+                email: identity.email
+            )
+            ratingSummary = updated
+            pendingUserRating = stars
+            await dependencies.cacheRatingSummary(updated)
+            snackbarMessage = "Thanks for rating."
+        } catch {
+            DODLog.network.error("post rating failed: \(String(describing: error))")
+            snackbarMessage = "Couldn't save your rating — try again."
+        }
+    }
+
+    /// Submit the in-progress comment draft (and the pending rating, if
+    /// non-zero). Gated behind the guest-identity sheet. AC-14.3 /
+    /// AC-14.4 / AC-14.7.
+    public func submitComment() async {
+        let trimmed = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let identity = await dependencies.loadGuestIdentity() else {
+            requiresGuestIdentity = true
+            return
+        }
+        isSubmittingComment = true
+        defer { isSubmittingComment = false }
+
+        do {
+            let ratingToSend = pendingUserRating > 0 ? pendingUserRating : nil
+            let posted = try await dependencies.postComment(
+                postID: listItem.id,
+                body: trimmed,
+                name: identity.name,
+                email: identity.email,
+                rating: ratingToSend
+            )
+            let awaitingApproval = posted.status != .approved
+            if !awaitingApproval {
+                // Prepend the approved comment so the user sees it land.
+                comments.insert(posted, at: 0)
+                await dependencies.cacheComments(comments, postID: listItem.id)
+                snackbarMessage = "Comment posted."
+            } else {
+                // AC-14.4: held comments are NOT prepended to the visible
+                // list — we only render approved rows.
+                snackbarMessage = "Submitted for moderation."
+            }
+            commentDraft = ""
+        } catch {
+            DODLog.network.error("post comment failed: \(String(describing: error))")
+            snackbarMessage = "Couldn't post your comment — try again."
+        }
+    }
+
+    /// Persist the captured display name + email and unblock the pending
+    /// rate / post action. AC-15.2.
+    public func saveGuestIdentityAndContinue(name: String, email: String) async {
+        do {
+            try await dependencies.saveGuestIdentity(name: name, email: email)
+            requiresGuestIdentity = false
+        } catch {
+            DODLog.persistence.error("save guest identity failed: \(String(describing: error))")
+            snackbarMessage = "Couldn't save your identity — try again."
+        }
     }
 
     public func toggleIngredient(_ id: UUID) {
