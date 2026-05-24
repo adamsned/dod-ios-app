@@ -3,11 +3,20 @@ import DODDesignSystem
 import DODDomain
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// Recipe detail screen. Header (AC-4.1) + ingredients (AC-4.2) + instructions
 /// (AC-4.3) + optional video (AC-4.4, AC-4.5) + related (AC-4.6) +
 /// save (AC-4.7) + share (AC-4.8). VoiceOver labels (AC-4.10).
 /// Offline-aware (AC-4.9, AC-5.4, AC-5.5).
 public struct RecipeDetailView: View {
+
+    private enum SectionAnchor: Hashable {
+        case ingredients
+        case instructions
+    }
 
     @State private var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
@@ -32,6 +41,7 @@ public struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar { toolbarItems }
+        .overlay(alignment: .bottomTrailing) { floatingActionsOverlay }
         .task {
             await viewModel.onAppear()
             isOfflineSnapshot = await viewModel.isOffline
@@ -51,15 +61,7 @@ public struct RecipeDetailView: View {
     private var content: some View {
         switch viewModel.loadState {
         case .loadingDetail:
-            ScrollView {
-                VStack(spacing: DODSpacing.md) {
-                    LoadingSkeleton(cornerRadius: 0).frame(height: 280)
-                    LoadingSkeleton().frame(height: 24).padding(.horizontal, DODSpacing.md)
-                    LoadingSkeleton().frame(height: 16).padding(.horizontal, DODSpacing.lg)
-                    LoadingSkeleton().frame(height: 16).padding(.horizontal, DODSpacing.lg)
-                }
-            }
-            .accessibilityLabel("Loading recipe")
+            loadingSkeleton
         case .unavailable:
             EmptyState(
                 systemImage: "exclamationmark.triangle",
@@ -71,73 +73,77 @@ public struct RecipeDetailView: View {
         }
     }
 
-    private var readyBody: some View {
+    private var loadingSkeleton: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                heroSection
-                metaSection
-                if let video = viewModel.recipe?.video {
-                    videoSection(video)
+            VStack(spacing: DODSpacing.md) {
+                LoadingSkeleton(cornerRadius: 0).frame(height: 280)
+                LoadingSkeleton().frame(height: 24).padding(.horizontal, DODSpacing.md)
+                LoadingSkeleton().frame(height: 16).padding(.horizontal, DODSpacing.lg)
+                LoadingSkeleton().frame(height: 16).padding(.horizontal, DODSpacing.lg)
+            }
+        }
+        .accessibilityLabel("Loading recipe")
+    }
+
+    private var readyBody: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                    RecipeDetailHero(
+                        url: viewModel.recipe?.heroImageLargeURL ?? viewModel.listItem.heroImage,
+                        title: viewModel.listItem.title
+                    )
+                    RecipeDetailMetaPills(items: metaPillItems)
+                    excerptText
+                    RecipeDetailQuickJump(items: quickJumpItems(proxy: proxy))
+                    if let video = viewModel.recipe?.video {
+                        videoSection(video)
+                    }
+                    ingredientsSection.id(SectionAnchor.ingredients)
+                    instructionsSection.id(SectionAnchor.instructions)
+                    RelatedRecipesStrip(
+                        items: isOfflineSnapshot ? [] : viewModel.related,
+                        onSelect: onSelectRelated
+                    )
                 }
-                ingredientsSection
-                instructionsSection
-                RelatedRecipesStrip(
-                    items: isOfflineSnapshot ? [] : viewModel.related,
-                    onSelect: onSelectRelated
-                )
+                .padding(.bottom, DODSpacing.xl)
             }
-            .padding(.bottom, DODSpacing.xl)
         }
     }
 
-    private var heroSection: some View {
-        let url = viewModel.recipe?.heroImageLargeURL ?? viewModel.listItem.heroImage
-        return AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().aspectRatio(contentMode: .fill)
-            default:
-                LoadingSkeleton(cornerRadius: 0)
-            }
+    @ViewBuilder
+    private var excerptText: some View {
+        if !viewModel.listItem.excerpt.isEmpty {
+            Text(viewModel.listItem.excerpt)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelSecondary)
+                .padding(.horizontal, DODSpacing.md)
         }
-        .frame(height: 260)
-        .clipped()
-        .accessibilityLabel(viewModel.listItem.title)
     }
 
-    private var metaSection: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text(viewModel.listItem.title)
-                .dodFont(DODType.displayLarge)
-                .foregroundStyle(DODColor.label)
-            if !viewModel.listItem.excerpt.isEmpty {
-                Text(viewModel.listItem.excerpt)
-                    .dodFont(DODType.body)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            metaRow
+    private var metaPillItems: [RecipeDetailMetaPills.Item] {
+        var result: [RecipeDetailMetaPills.Item] = []
+        if let total = viewModel.recipe?.totalTime {
+            result.append(.init(icon: "clock", label: format(duration: total)))
         }
-        .padding(.horizontal, DODSpacing.md)
+        if let servings = viewModel.recipe?.servings {
+            result.append(.init(icon: "person.2", label: "\(servings) servings"))
+        }
+        return result
     }
 
-    private var metaRow: some View {
-        HStack(spacing: DODSpacing.md) {
-            if let total = viewModel.recipe?.totalTime {
-                metaItem(icon: "clock", label: format(duration: total))
-            }
-            if let servings = viewModel.recipe?.servings {
-                metaItem(icon: "person.2", label: "\(servings) servings")
-            }
-        }
-        .padding(.top, DODSpacing.xs)
+    private func quickJumpItems(proxy: ScrollViewProxy) -> [RecipeDetailQuickJump.Item] {
+        [
+            .init(title: "Ingredients") {
+                withAnimation { proxy.scrollTo(SectionAnchor.ingredients, anchor: .top) }
+            },
+            .init(title: "Instructions") {
+                withAnimation { proxy.scrollTo(SectionAnchor.instructions, anchor: .top) }
+            },
+        ]
     }
 
-    private func metaItem(icon: String, label: String) -> some View {
-        HStack(spacing: DODSpacing.xxs) {
-            Image(systemName: icon).foregroundStyle(DODColor.labelSecondary)
-            Text(label).dodFont(DODType.caption).foregroundStyle(DODColor.labelSecondary)
-        }
-    }
+    // MARK: - Sections
 
     @ViewBuilder
     private func videoSection(_ video: RecipeVideo) -> some View {
@@ -180,7 +186,10 @@ public struct RecipeDetailView: View {
                     IngredientCheckRow(
                         ingredient: ingredient,
                         isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
-                        onToggle: { viewModel.toggleIngredient(ingredient.id) }
+                        onToggle: {
+                            viewModel.toggleIngredient(ingredient.id)
+                            triggerLightHaptic()
+                        }
                     )
                 }
             }
@@ -202,15 +211,15 @@ public struct RecipeDetailView: View {
         .padding(.horizontal, DODSpacing.md)
     }
 
+    // MARK: - Toolbars
+
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             HStack(spacing: DODSpacing.md) {
                 Button {
+                    triggerMediumHaptic()
                     Task { await viewModel.toggleSaved() }
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    #endif
                 } label: {
                     Image(systemName: viewModel.isSaved ? "heart.fill" : "heart")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
@@ -232,6 +241,20 @@ public struct RecipeDetailView: View {
     }
 
     @ViewBuilder
+    private var floatingActionsOverlay: some View {
+        if viewModel.loadState == .ready {
+            RecipeDetailFloatingActions(
+                isSaved: viewModel.isSaved,
+                canonicalURL: viewModel.canonicalURL,
+                onSave: { Task { await viewModel.toggleSaved() } },
+                onShare: { Task { await viewModel.didShare() } }
+            )
+            .padding(.trailing, DODSpacing.md)
+            .padding(.bottom, DODSpacing.lg)
+        }
+    }
+
+    @ViewBuilder
     private var snackbar: some View {
         if let message = viewModel.snackbarMessage {
             Snackbar(message: message)
@@ -242,6 +265,20 @@ public struct RecipeDetailView: View {
                     viewModel.dismissSnackbar()
                 }
         }
+    }
+
+    // MARK: - Helpers
+
+    private func triggerMediumHaptic() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+    }
+
+    private func triggerLightHaptic() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
     }
 
     private func format(duration: Duration) -> String {
