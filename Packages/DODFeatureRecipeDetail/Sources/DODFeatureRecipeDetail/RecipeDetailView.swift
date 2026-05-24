@@ -32,6 +32,8 @@ public struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar { toolbarItems }
+        .sensoryFeedback(.success, trigger: viewModel.isSaved)
+        .sensoryFeedback(.impact(weight: .light), trigger: viewModel.checkedIngredientIDs.count)
         .task {
             await viewModel.onAppear()
             isOfflineSnapshot = await viewModel.isOffline
@@ -206,11 +208,10 @@ public struct RecipeDetailView: View {
     private var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             HStack(spacing: DODSpacing.md) {
+                // Save haptic is wired via `.sensoryFeedback(.success, trigger:
+                // viewModel.isSaved)` on the body — no manual generator here.
                 Button {
                     Task { await viewModel.toggleSaved() }
-                    #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    #endif
                 } label: {
                     Image(systemName: viewModel.isSaved ? "heart.fill" : "heart")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)

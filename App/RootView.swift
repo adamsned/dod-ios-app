@@ -37,6 +37,7 @@ struct RootView: View {
             }
         }
         .tint(DODColor.accent)
+        .sensoryFeedback(.selection, trigger: selectedTab)
         .onChange(of: selectedTab) { _, newValue in
             Telemetry.shared.send(.screenView(name: newValue.telemetryName))
         }

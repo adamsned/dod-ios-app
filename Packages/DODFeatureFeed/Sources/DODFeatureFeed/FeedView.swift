@@ -28,6 +28,7 @@ public struct FeedView: View {
         .task { await viewModel.onAppear() }
         .refreshable { await viewModel.refresh() }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isOffline)
+        .sensoryFeedback(.success, trigger: viewModel.refreshCount)
     }
 
     @ViewBuilder
