@@ -1,64 +1,58 @@
 # App Icon — v1.0
 
-**Status:** Placeholder icon shipped on `feat/app-icon-placeholder` so the
-App Store submission isn't blocked. Owner should replace
-`App/Assets.xcassets/AppIcon.appiconset/AppIcon.png` with real branding
-before submitting v1.0.
-
-## What ships today (placeholder)
-
-A 1024×1024 PNG pictogram of a cast-iron skillet (top-down view) rendered
-with ImageMagick:
-
-- Cream background `#FAF6EE` (matches `DODColor.cream`)
-- Cast-iron-brown skillet rim and handle `#3D2B1F`
-  (matches `DODColor.castIronBrown`)
-- Burnt-orange seasoning ring `#C56A24`
-  (matches `DODColor.burntOrange`)
-- No text (Apple "no text on icon" guideline)
-- No transparency, 8-bit sRGB (App Store requirement)
-
-The pictogram reads cleanly at the smallest displayed size (60×60) because
-the focal element is well inside the safe area.
+**Status:** **Real brand icon shipped.** Owner-provided "DUTCH OVEN DADDY · CAST
+IRON LIVING" circular badge with the dutch oven silhouette, packaged as an
+Apple Icon Composer `.icon` bundle.
 
 ## Where it lives
 
 ```
-App/Assets.xcassets/
-├── Contents.json
-└── AppIcon.appiconset/
-    ├── Contents.json   # single 1024 reference, Xcode 14+ format
-    └── AppIcon.png     # 1024×1024 sRGB, no alpha
+App/
+├── AppIcon.icon/             ← Icon Composer bundle (NOT inside Assets.xcassets)
+│   ├── icon.json             ← Layer manifest: solid sRGB-white fill,
+│   │                            single glass layer containing "DOD Master.png"
+│   │                            at scale 1.05, neutral shadow @ 0.5 opacity,
+│   │                            translucency @ 0.5
+│   └── Assets/
+│       └── DOD Master.png    ← 1048 × 1058, 8-bit/color RGBA source artwork
+└── Assets.xcassets/          ← Brand color set; no AppIconSet here anymore
 ```
 
-`project.yml` sets `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` on the
-DODApp target. The `App` folder is already in `sources:`, so XcodeGen
-picks up the catalog automatically — no project.yml change required.
+`project.yml` keeps `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`. XcodeGen
+finds the bundle by basename — because the file is `AppIcon.icon`, Xcode 26
+resolves it as the app icon at build time.
 
-## How to replace with real branding
+## Why `.icon` instead of a flat `.appiconset`
 
-1. Create a single 1024×1024 PNG with the Dutch Oven Daddy brand
-   artwork on a solid background (Apple no longer accepts transparency
-   for app icons).
-2. Replace `App/Assets.xcassets/AppIcon.appiconset/AppIcon.png` with
-   the new file. Keep the filename — `Contents.json` references it
-   by name.
-3. (Optional) For iOS 18+ icon customization, add **Dark** and
-   **Tinted** variants in Xcode → drag into the dark/tinted slots
-   of the `AppIcon.appiconset`. Recommended but not required for v1.
+The Icon Composer format (Xcode 26 / iOS 26) lets a single source artwork
+auto-generate Light, Dark, and Tinted variants iOS 18+ ships. The bundle
+declares:
+- A **solid sRGB white fill** for the base canvas (satisfies App Store's
+  no-transparency requirement automatically).
+- A **glass layer** with neutral shadow + 50% translucency so the system
+  composites the badge with the same depth treatment Apple's own app icons
+  get on iOS 26.
 
-## Design guidance for the replacement
+No code change is required if the artwork is updated — replace
+`App/AppIcon.icon/Assets/DOD Master.png`, run `xcodegen generate`, rebuild.
 
-- Keep the focal element well inside the safe area — at 60×60 (the
-  smallest displayed size) detail vanishes.
-- No text on the icon — App Store enforces a "no text" guideline.
-- Warm earth tone background to match the in-app palette
-  (`DODColor.cream` or `DODColor.castIronBrown` work well).
-- The blog already has a brand logo; the simplest path is to use that
-  on a solid cream/brown background.
+## How to replace artwork later (e.g. seasonal variants)
+
+1. Open Icon Composer (Xcode 26 → File → New → Icon, or `Xcode → Open → AppIcon.icon`).
+2. Drop a new 1024 × 1024 (or larger) PNG into the existing layer; tweak
+   shadow / translucency / scale in the manifest if desired.
+3. Save back to `App/AppIcon.icon`; commit the updated `icon.json` and PNG.
+4. Verify the build picks it up: `xcodegen generate && xcodebuild ... build`.
+
+## Verified
+
+- `xcodebuild` for `DODApp` on iPhone 17 simulator (iOS 26.5): **BUILD SUCCEEDED**
+- Installed on iPhone 17 simulator, home screen shows the badge with the
+  correct circular shape, brown silhouette, and brand outline at full size.
+- Screenshot captured at `/tmp/dod-icon-on-home.png` (cream/white background,
+  iOS auto-applied the standard rounded-rect mask).
 
 ## When this can be skipped
 
-Never — App Store rejects builds without an app icon. The placeholder
-covers that gate today; the replacement is for brand polish, not for
-shipping.
+Never — App Store rejects builds without an app icon. v1.0 now ships the
+real brand mark.
