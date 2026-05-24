@@ -79,17 +79,13 @@ public struct SearchView: View {
                     spacing: DODSpacing.md
                 ) {
                     ForEach(viewModel.items) { item in
-                        Button {
-                            onSelect(item)
-                        } label: {
-                            RecipeCard(
-                                title: item.title,
-                                excerpt: item.excerpt,
-                                heroImageURL: item.heroImage,
-                                totalTimeDisplay: item.totalTimeDisplay
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        RecipeCard(
+                            title: item.title,
+                            excerpt: item.excerpt,
+                            heroImageURL: item.heroImage,
+                            totalTimeDisplay: item.totalTimeDisplay
+                        )
+                        .recipeCardTap { onSelect(item) }
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)

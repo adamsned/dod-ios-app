@@ -112,6 +112,57 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(app.buttons["Share recipe"].exists)
     }
 
+    /// REG-DOD-LIST-SCROLL: dragging up on the feed must scroll the list to
+    /// reveal more recipes. Pre-fix the entire recipe card was wrapped in
+    /// a `Button { } label: { ... }.buttonStyle(.plain).contentShape(Rectangle())`
+    /// which, when a single card dominated the viewport, swallowed the
+    /// finger pan gesture and the feed couldn't be scrolled. We now use
+    /// `.recipeCardTap` (an `.onTapGesture`-based modifier with the
+    /// `.isButton` accessibility trait) so taps still navigate but vertical
+    /// drags belong to the ScrollView.
+    ///
+    /// The drag deliberately STARTS inside the first recipe row — that is
+    /// the gesture path a real finger takes when only one tall card is
+    /// visible. `app.scrollViews.firstMatch.swipeUp()` is too privileged
+    /// (it bypasses the row's gesture recognizers), so it would silently
+    /// keep passing even when the bug was present.
+    func test_feedScrollsToRevealMoreRecipes() {
+        let firstStaticText = app.staticTexts.matching(NSPredicate(format: "label != %@", "Recipes")).firstMatch
+        XCTAssertTrue(firstStaticText.waitForExistence(timeout: 15))
+
+        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
+        let recipeButtons = app.buttons.matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        XCTAssertTrue(recipeButtons.firstMatch.waitForExistence(timeout: 15))
+
+        let beforeLabels = recipeButtons.allElementsBoundByIndex.map(\.label)
+        let lastBefore = beforeLabels.last ?? ""
+
+        // Drag starting INSIDE the first visible recipe row.
+        let firstButton = recipeButtons.element(boundBy: 0)
+        let start = firstButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = firstButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -2.0))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        let afterLabels = recipeButtons.allElementsBoundByIndex.map(\.label)
+        let lastAfter = afterLabels.last ?? ""
+
+        // Either the visible last row changed, or the set of visible rows
+        // grew. Either condition proves the ScrollView actually moved.
+        let scrolled = lastBefore != lastAfter || afterLabels.count > beforeLabels.count
+        if !scrolled {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "scroll-stuck"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        XCTAssertTrue(
+            scrolled,
+            "Feed should scroll when the user drags up from inside a recipe row. "
+            + "before(\(beforeLabels.count) rows, last=\(lastBefore.prefix(40))) "
+            + "after(\(afterLabels.count) rows, last=\(lastAfter.prefix(40)))"
+        )
+    }
+
     func test_savedTabEmptyStateOnFreshInstall() {
         app.tabBars.firstMatch.buttons["Saved"].tap()
         // Spec AC-5.8 verbatim.

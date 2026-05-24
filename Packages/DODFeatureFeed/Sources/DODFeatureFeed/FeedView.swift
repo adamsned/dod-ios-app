@@ -59,16 +59,11 @@ public struct FeedView: View {
         ScrollView {
             LazyVGrid(columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: DODSpacing.md) {
                 ForEach(viewModel.items) { item in
-                    Button {
-                        onSelect(item)
-                    } label: {
-                        FeedRow(item: item)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .task {
-                        await viewModel.loadMoreIfNeeded(currentItem: item)
-                    }
+                    FeedRow(item: item)
+                        .recipeCardTap { onSelect(item) }
+                        .task {
+                            await viewModel.loadMoreIfNeeded(currentItem: item)
+                        }
                 }
             }
             .padding(.horizontal, DODSpacing.md)

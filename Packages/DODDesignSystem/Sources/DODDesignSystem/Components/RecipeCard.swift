@@ -114,6 +114,35 @@ public struct RecipeCard: View {
     }
 }
 
+// MARK: - Tap modifier
+
+extension View {
+    /// Make a `RecipeCard` (or any recipe row) tappable as a navigation
+    /// entry point WITHOUT eating the parent `ScrollView`'s vertical pan
+    /// gesture.
+    ///
+    /// Why this exists (bug fix for DOD-LIST-SCROLL):
+    /// The obvious idiom is `Button { onTap() } label: { RecipeCard(...) }
+    /// .buttonStyle(.plain)`. Inside a `LazyVGrid` inside a `ScrollView`
+    /// on iOS 26, the Button claims the cell's full rect as its tap
+    /// gesture surface; when a single card is tall enough to dominate the
+    /// viewport, the user's finger touch starts inside the Button and the
+    /// scroll never gets a chance to win the gesture race. The screen
+    /// appears stuck.
+    ///
+    /// Fix: use `.onTapGesture` (which doesn't compete with the
+    /// surrounding scroll gesture) and apply the `.isButton`
+    /// accessibility trait manually so VoiceOver + XCUITest still see
+    /// the row as a tappable element.
+    public func recipeCardTap(_ action: @escaping () -> Void) -> some View {
+        self
+            .contentShape(Rectangle())
+            .onTapGesture(perform: action)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+    }
+}
+
 #Preview("With time chip") {
     RecipeCard(
         title: "Garlic Butter Skillet Corn",
