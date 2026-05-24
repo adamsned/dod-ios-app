@@ -17,10 +17,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-
       - name: Install SwiftLint
         run: brew install swiftlint
-
       - name: Run SwiftLint (strict)
         run: bin/lint.sh
 
@@ -30,18 +28,14 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-
       - name: Install swift-format
         run: brew install swift-format
+      - name: Check formatting
+        run: swift-format lint --recursive --strict --configuration .swift-format App Packages
 
-      - name: Check formatting (no diff allowed)
-        run: |
-          swift-format format --recursive --configuration .swift-format App Packages > /dev/null
-          # Lint mode: exits non-zero on style diffs
-          swift-format lint --recursive --strict --configuration .swift-format App Packages
-
-  test-packages:
-    name: Test SPM packages
+  # L1: per-package unit tests (Swift Testing). Fast, isolated.
+  test-unit-packages:
+    name: L1 Unit · ${{ matrix.package }}
     runs-on: macos-14
     timeout-minutes: 20
     strategy:
@@ -50,7 +44,6 @@ jobs:
         package:
           - DODDomain
           - DODSupport
-          - DODDesignSystem
           - DODAnalytics
           - DODNetworking
           - DODPersistence
@@ -61,22 +54,41 @@ jobs:
           - DODFeatureSaved
     steps:
       - uses: actions/checkout@v4
-
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
-
       - name: Cache SPM
         uses: actions/cache@v4
         with:
-          path: |
-            Packages/${{ matrix.package }}/.build
+          path: Packages/${{ matrix.package }}/.build
           key: ${{ runner.os }}-spm-${{ matrix.package }}-${{ hashFiles(format('Packages/{0}/Package.swift', matrix.package)) }}
-          restore-keys: |
-            ${{ runner.os }}-spm-${{ matrix.package }}-
-
       - name: Test
         working-directory: Packages/${{ matrix.package }}
         run: swift test --parallel
+
+  # L4: DesignSystem snapshots run on iOS simulator (UIKit dependency).
+  test-snapshots-designsystem:
+    name: L4 Snapshots · DODDesignSystem
+    runs-on: macos-14
+    timeout-minutes: 15
+    needs: [lint, format]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Test on iOS simulator
+        working-directory: Packages/DODDesignSystem
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -scheme DODDesignSystem \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            test | xcpretty
+      - name: Upload snapshot diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-diffs
+          path: Packages/DODDesignSystem/Tests/DODDesignSystemTests/__Snapshots__/
 
   build-app:
     name: Build app (iOS Simulator)
@@ -85,22 +97,57 @@ jobs:
     needs: [lint, format]
     steps:
       - uses: actions/checkout@v4
-
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
-
       - name: Install XcodeGen
         run: brew install xcodegen
-
       - name: Generate project
         run: xcodegen generate
-
       - name: Build for iOS Simulator
         run: |
           set -o pipefail
           xcodebuild \
             -project DODApp.xcodeproj \
             -scheme DODApp \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
             -configuration Debug \
             build | xcpretty
+
+  # L3: UI smoke tests against the built app on a live simulator.
+  test-ui-smoke:
+    name: L3 UI Smoke
+    runs-on: macos-14
+    timeout-minutes: 30
+    needs: [build-app]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Run UI tests
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project DODApp.xcodeproj \
+            -scheme DODApp \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -only-testing:DODAppUITests \
+            test | xcpretty
+      - name: Upload UI test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-results
+          path: ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcresult
+
+  # Aggregate gate so branch protection can require a single check.
+  # Nightly L2 live-API tests live in .github/workflows/nightly-live-api.yml.
+  ci-required:
+    name: CI required
+    runs-on: ubuntu-latest
+    needs: [lint, format, test-unit-packages, test-snapshots-designsystem, build-app, test-ui-smoke]
+    steps:
+      - run: echo "All required CI jobs passed."

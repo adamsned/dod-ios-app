@@ -14,11 +14,32 @@ struct RootView: View {
 
     @State private var dependencies: AppDependencies
     @State private var selectedTab: AppTab = .feed
-    @State private var paths = NavigationPaths()
+    @State private var feedPath: [RecipeRoute] = []
+    @State private var categoriesPath: [RecipeRoute] = []
+    @State private var searchPath: [RecipeRoute] = []
+    @State private var savedPath: [RecipeRoute] = []
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(dependencies: AppDependencies) {
         _dependencies = State(initialValue: dependencies)
+    }
+
+    private func pathBinding(for tab: AppTab) -> Binding<[RecipeRoute]> {
+        switch tab {
+        case .feed: $feedPath
+        case .categories: $categoriesPath
+        case .search: $searchPath
+        case .saved: $savedPath
+        }
+    }
+
+    private func append(_ route: RecipeRoute, to tab: AppTab) {
+        switch tab {
+        case .feed: feedPath.append(route)
+        case .categories: categoriesPath.append(route)
+        case .search: searchPath.append(route)
+        case .saved: savedPath.append(route)
+        }
     }
 
     var body: some View {
@@ -37,7 +58,7 @@ struct RootView: View {
     private var phoneTabs: some View {
         TabView(selection: $selectedTab) {
             ForEach(AppTab.allCases) { tab in
-                NavigationStack(path: paths.binding(for: tab)) {
+                NavigationStack(path: pathBinding(for: tab)) {
                     rootContent(for: tab)
                         .navigationDestination(for: RecipeRoute.self) { route in
                             destination(for: route, currentTab: tab)
@@ -75,7 +96,7 @@ struct RootView: View {
             .navigationTitle("DOD")
             .listStyle(.sidebar)
         } detail: {
-            NavigationStack(path: paths.binding(for: selectedTab)) {
+            NavigationStack(path: pathBinding(for: selectedTab)) {
                 rootContent(for: selectedTab)
                     .navigationDestination(for: RecipeRoute.self) { route in
                         destination(for: route, currentTab: selectedTab)
@@ -96,23 +117,23 @@ struct RootView: View {
         case .feed:
             FeedView(
                 viewModel: FeedViewModel(dependencies: dependencies.feedDependencies()),
-                onSelect: { item in paths.append(.recipe(item: item), to: tab) }
+                onSelect: { item in append(.recipe(item: item), to: tab) }
             )
         case .categories:
             CategoryListView(
                 viewModel: CategoryListViewModel(dependencies: dependencies.categoriesDependencies()),
-                onSelect: { category in paths.append(.category(category), to: tab) }
+                onSelect: { category in append(.category(category), to: tab) }
             )
         case .search:
             SearchView(
                 viewModel: SearchViewModel(dependencies: dependencies.searchDependencies()),
-                onSelect: { item in paths.append(.recipe(item: item), to: tab) }
+                onSelect: { item in append(.recipe(item: item), to: tab) }
             )
         case .saved:
             SavedView(
                 viewModel: SavedViewModel(dependencies: dependencies.savedDependencies()),
                 onSelect: { recipe in
-                    paths.append(.recipe(item: Self.listItem(from: recipe)), to: tab)
+                    append(.recipe(item: Self.listItem(from: recipe)), to: tab)
                 }
             )
         }
@@ -134,7 +155,7 @@ struct RootView: View {
                     dependencies: dependencies.recipeDetailDependencies()
                 ),
                 onSelectRelated: { related in
-                    paths.append(.recipe(item: related), to: tab)
+                    append(.recipe(item: related), to: tab)
                 }
             )
             .onAppear {
@@ -146,7 +167,7 @@ struct RootView: View {
                     category: category,
                     dependencies: dependencies.categoriesDependencies()
                 ),
-                onSelect: { item in paths.append(.recipe(item: item), to: tab) }
+                onSelect: { item in append(.recipe(item: item), to: tab) }
             )
             .onAppear {
                 Telemetry.shared.send(.screenView(name: "category_recipes"))

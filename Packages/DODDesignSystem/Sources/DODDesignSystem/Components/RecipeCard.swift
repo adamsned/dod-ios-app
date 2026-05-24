@@ -32,9 +32,18 @@ public struct RecipeCard: View {
         }
         .background(DODColor.surfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
+        // Note: we do NOT collapse children into a single accessibility element.
+        // When a feature wraps RecipeCard in a Button, that Button derives its
+        // accessibility label from the visible Text content — which gives
+        // VoiceOver and XCUITest the right semantics (a tappable recipe row).
+        // The accessibilityLabel computed property is still exposed for any
+        // non-Button host that needs to apply it manually.
     }
+
+    /// Composite label suitable for hosts that need to collapse the card into
+    /// a single accessibility element (e.g. a custom-styled host without a
+    /// Button wrapper).
+    public var combinedAccessibilityLabel: String { accessibilityLabel }
 
     private var heroSection: some View {
         ZStack(alignment: .topTrailing) {

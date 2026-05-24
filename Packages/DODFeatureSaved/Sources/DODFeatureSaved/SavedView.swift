@@ -48,13 +48,17 @@ public struct SavedView: View {
                     spacing: DODSpacing.md
                 ) {
                     ForEach(viewModel.recipes) { recipe in
-                        RecipeCard(
-                            title: recipe.title,
-                            excerpt: recipe.excerpt,
-                            heroImageURL: recipe.heroImage,
-                            totalTimeDisplay: totalTimeDisplay(recipe)
-                        )
-                        .onTapGesture { onSelect(recipe) }
+                        Button {
+                            onSelect(recipe)
+                        } label: {
+                            RecipeCard(
+                                title: recipe.title,
+                                excerpt: recipe.excerpt,
+                                heroImageURL: recipe.heroImage,
+                                totalTimeDisplay: totalTimeDisplay(recipe)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)

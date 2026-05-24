@@ -79,3 +79,17 @@ targets:
             echo "warning: SwiftLint not installed — brew install swiftlint"
           fi
         basedOnDependencyAnalysis: false
+
+  DODAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODAppUITests
+        TARGETED_DEVICE_FAMILY: "1,2"
+        TEST_TARGET_NAME: DODApp
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: DODApp

@@ -65,13 +65,17 @@ public struct CategoryRecipesView: View {
     }
 
     private func recipeRow(_ item: RecipeListItem) -> some View {
-        RecipeCard(
-            title: item.title,
-            excerpt: item.excerpt,
-            heroImageURL: item.heroImage,
-            totalTimeDisplay: item.totalTimeDisplay
-        )
-        .onTapGesture { onSelect(item) }
+        Button {
+            onSelect(item)
+        } label: {
+            RecipeCard(
+                title: item.title,
+                excerpt: item.excerpt,
+                heroImageURL: item.heroImage,
+                totalTimeDisplay: item.totalTimeDisplay
+            )
+        }
+        .buttonStyle(.plain)
         .task { await viewModel.loadMoreIfNeeded(currentItem: item) }
     }
 }
