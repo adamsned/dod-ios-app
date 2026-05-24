@@ -121,5 +121,52 @@ final class DesignSystemSnapshotTests: XCTestCase {
         .frame(width: 402, height: 874)
         assertSnapshot(of: view, as: .image(layout: .fixed(width: 402, height: 874)))
     }
+
+    // MARK: - US-9 home-screen widget
+    //
+    // First-time record: the harness writes a baseline PNG under
+    // `__Snapshots__/SnapshotTests/<testName>.png` and reports the test as
+    // failed (so devs notice). Subsequent runs diff and pass when stable.
+    // The existing tests above were recorded the same way; nothing special
+    // about these.
+
+    /// REG-9.1: small widget layout at 158×158pt (iPhone 17 small system
+    /// widget size). Pins the gradient + chip + title arrangement so
+    /// future changes to typography or hero treatment surface in diff.
+    func test_widgetCard_small_populated() {
+        let view = WidgetCard.Small(
+            content: .init(
+                title: "Garlic Butter Skillet Corn",
+                excerpt: "An easy 15-minute side dish that pairs with everything.",
+                heroImageURL: nil,
+                totalTimeDisplay: "15 min"
+            )
+        )
+        .frame(width: 158, height: 158)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 158, height: 158)), record: .missing)
+    }
+
+    /// REG-9.2: medium widget layout at 338×158pt (iPhone 17 medium
+    /// system widget size).
+    func test_widgetCard_medium_populated() {
+        let view = WidgetCard.Medium(
+            content: .init(
+                title: "Garlic Butter Skillet Corn",
+                excerpt: "An easy 15-minute side dish that pairs with everything.",
+                heroImageURL: nil,
+                totalTimeDisplay: "15 min"
+            )
+        )
+        .frame(width: 338, height: 158)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 338, height: 158)), record: .missing)
+    }
+
+    /// REG-9.3: placeholder layout for when the App Group store has no
+    /// snapshot yet (first launch). AC-9.4.
+    func test_widgetCard_placeholder() {
+        let view = WidgetCard.Placeholder()
+            .frame(width: 158, height: 158)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 158, height: 158)), record: .missing)
+    }
 }
 #endif

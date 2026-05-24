@@ -6,6 +6,8 @@ import DODFeatureFeed
 import DODFeatureRecipeDetail
 import DODFeatureSaved
 import DODFeatureSearch
+import DODPersistence
+import DODSupport
 import SwiftUI
 
 /// One tab's navigation stack. Each tab gets its own `@State` path so
@@ -15,6 +17,9 @@ struct TabStack: View {
 
     let tab: AppTab
     let dependencies: AppDependencies
+    /// Inbound widget deep link, set by `RootView.handle(url:)`. Only the
+    /// Feed tab consumes it — see the `.onChange` modifier in `body`.
+    @Binding var pendingDeepLink: WidgetDeepLink?
     @State private var path: [RecipeRoute] = []
 
     var body: some View {
@@ -23,6 +28,14 @@ struct TabStack: View {
                 .navigationDestination(for: RecipeRoute.self) { route in
                     destination(for: route)
                 }
+        }
+        .task(id: pendingDeepLink) {
+            // Only one tab — Feed — services widget deep links. Selecting
+            // any other tab leaves the link untouched until Feed reappears.
+            // Using `.task(id:)` (not `.onChange`) so we can `await` the
+            // actor-isolated store lookup without spawning a detached Task.
+            guard tab == .feed, let link = pendingDeepLink else { return }
+            await consume(link: link)
         }
     }
 
@@ -94,5 +107,40 @@ struct TabStack: View {
             totalTimeDisplay: nil,
             canonicalURL: recipe.canonicalURL
         )
+    }
+
+    /// Service a widget deep link by pushing the recipe detail onto our
+    /// path. Resolution preference, best → worst:
+    ///   1. The same RecipeListItem the cache has — gives the detail
+    ///      screen everything it needs to render the cell instantly.
+    ///   2. The widget snapshot entry — same fields, written by this very
+    ///      build, so equivalently safe.
+    /// If neither is available the deep link is dropped silently; the next
+    /// time the feed refreshes we'll re-write the snapshot.
+    ///
+    /// AC-9.2 / spec.md US-9.
+    private func consume(link: WidgetDeepLink) async {
+        defer { pendingDeepLink = nil }
+        switch link {
+        case .recipe(let id):
+            if let cached = await cachedListItem(forID: id) {
+                path = [.recipe(item: cached)]
+            } else if let snapshotItem = snapshotListItem(forID: id) {
+                path = [.recipe(item: snapshotItem)]
+            }
+        case .feed:
+            // Already on Feed (RootView set the tab); just clear any push
+            // stack so the user lands on the root list.
+            path = []
+        }
+    }
+
+    private func cachedListItem(forID id: Int) async -> RecipeListItem? {
+        try? await dependencies.store.listItems(forIDs: [id]).first
+    }
+
+    private func snapshotListItem(forID id: Int) -> RecipeListItem? {
+        guard let snapshot = WidgetSnapshotStore()?.read() else { return nil }
+        return snapshot.entries.first(where: { $0.id == id }).map(RecipeListItem.init(snapshot:))
     }
 }

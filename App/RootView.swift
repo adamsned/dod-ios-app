@@ -1,5 +1,6 @@
 import DODAnalytics
 import DODDesignSystem
+import DODSupport
 import SwiftUI
 
 /// Top-level shell. TabView on compact widths (iPhone), NavigationSplitView on
@@ -17,6 +18,13 @@ struct RootView: View {
     @State private var dependencies: AppDependencies
     @State private var selectedTab: AppTab = .feed
     @State private var showOnboarding: Bool
+    /// Set by `onOpenURL` when the user taps the home-screen widget
+    /// (spec.md US-9 AC-9.2). `TabStack.feed` consumes the value via
+    /// `.onChange` and pushes the recipe detail. Reset to `nil` once
+    /// consumed so the same link doesn't double-fire if the OS re-delivers
+    /// it (e.g. on a cold launch where the deep link arrives while the
+    /// view is still mounting).
+    @State private var pendingDeepLink: WidgetDeepLink?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(dependencies: AppDependencies) {
@@ -35,6 +43,9 @@ struct RootView: View {
             }
         }
         .task { await dependencies.bootstrap() }
+        .onOpenURL { url in
+            handle(url: url)
+        }
         .sheet(isPresented: $showOnboarding) {
             OnboardingSheet(
                 title: "Welcome to Dutch Oven Daddy",
@@ -73,11 +84,15 @@ struct RootView: View {
     private var phoneTabs: some View {
         TabView(selection: $selectedTab) {
             ForEach(AppTab.allCases) { tab in
-                TabStack(tab: tab, dependencies: dependencies)
-                    .tabItem {
-                        Label(tab.title, systemImage: tab.systemImage)
-                    }
-                    .tag(tab)
+                TabStack(
+                    tab: tab,
+                    dependencies: dependencies,
+                    pendingDeepLink: $pendingDeepLink
+                )
+                .tabItem {
+                    Label(tab.title, systemImage: tab.systemImage)
+                }
+                .tag(tab)
             }
         }
         .tint(DODColor.accent)
@@ -106,12 +121,31 @@ struct RootView: View {
             .listStyle(.sidebar)
         } detail: {
             // Re-instantiate per tab change so @State in TabStack resets cleanly.
-            TabStack(tab: selectedTab, dependencies: dependencies)
-                .id(selectedTab)
+            TabStack(
+                tab: selectedTab,
+                dependencies: dependencies,
+                pendingDeepLink: $pendingDeepLink
+            )
+            .id(selectedTab)
         }
         .tint(DODColor.accent)
         .onChange(of: selectedTab) { _, newValue in
             Telemetry.shared.send(.screenView(name: newValue.telemetryName))
+        }
+    }
+
+    /// Inbound URL from the OS — today only `dod://` URLs from the
+    /// home-screen widget (spec.md US-9 AC-9.2). Anything else is ignored
+    /// (no rich-link previews, no Universal Links in v1).
+    private func handle(url: URL) {
+        guard let link = WidgetDeepLink(url: url) else { return }
+        switch link {
+        case .recipe, .feed:
+            // Either route lives under the Feed tab today — Feed is where
+            // recipe details push from, so switching there gives the
+            // NavigationStack the right context.
+            selectedTab = .feed
+            pendingDeepLink = link
         }
     }
 }

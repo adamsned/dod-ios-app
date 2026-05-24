@@ -98,6 +98,10 @@ public final class FeedViewModel {
             currentPage = 1
             loadState = items.isEmpty ? .empty : .loaded
             if fetched.count < 20 { reachedEnd = true }
+            // Hand the freshly-loaded top-of-feed to the home-screen widget
+            // (spec.md US-9, AC-9.3). Fire-and-forget; failures inside the
+            // dependency are logged there, never thrown.
+            await dependencies.publishWidgetSnapshot(items: items)
         } catch {
             DODLog.network.error("feed initial load failed: \(String(describing: error))")
             // Offline-with-cache (AC-1.6) vs first-launch-offline (AC-1.5):
