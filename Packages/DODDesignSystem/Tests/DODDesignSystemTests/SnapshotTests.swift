@@ -168,5 +168,194 @@ final class DesignSystemSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(of: view, as: .image(layout: .fixed(width: 158, height: 158)), record: .missing)
     }
+
+    // MARK: - US-13 / US-14 / US-15 comments + ratings + guest identity
+    //
+    // Light mode only — matches the existing convention above. Dark-mode
+    // baselines would double the file count for marginal coverage gain.
+    // Record-on-missing so first runs lay down baselines instead of failing.
+
+    func test_starRatingDisplay_4point5_stars_27_count() {
+        let view = StarRatingDisplay(average: 4.5, count: 27)
+            .padding(DODSpacing.md)
+            .background(DODColor.surface)
+            .frame(width: 280, height: 60)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 280, height: 60)), record: .missing)
+    }
+
+    /// Empty count → EmptyView; we wrap in a parent to prove "nothing"
+    /// renders between two adjacent texts. AC: caller decides fallback.
+    func test_starRatingDisplay_zeroCountIsEmpty() {
+        let view = VStack(spacing: 4) {
+            Text("Above")
+            StarRatingDisplay(average: 0, count: 0)
+            Text("Below")
+        }
+        .padding(DODSpacing.md)
+        .background(DODColor.surface)
+        .frame(width: 280, height: 100)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 280, height: 100)), record: .missing)
+    }
+
+    func test_starRatingInput_zero() {
+        let view = StatefulInputHost(initial: 0)
+            .padding(DODSpacing.md)
+            .background(DODColor.surface)
+            .frame(width: 320, height: 80)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 320, height: 80)), record: .missing)
+    }
+
+    func test_starRatingInput_threeStarsSelected() {
+        let view = StatefulInputHost(initial: 3)
+            .padding(DODSpacing.md)
+            .background(DODColor.surface)
+            .frame(width: 320, height: 80)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 320, height: 80)), record: .missing)
+    }
+
+    func test_commentRow_withAvatarAndRating() {
+        let view = CommentRow(
+            authorName: "Jamie L.",
+            avatarURL: nil,
+            relativeDate: "3 days ago",
+            bodyText:
+                "Made this last night and it was incredible. Subbed smoked paprika for the regular kind and it added a great depth.",
+            ratingValue: 5
+        )
+        .padding(DODSpacing.md)
+        .background(DODColor.surface)
+        .frame(width: 390)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+    }
+
+    func test_commentRow_pendingModeration() {
+        let view = CommentRow(
+            authorName: "You",
+            avatarURL: nil,
+            relativeDate: "Just now",
+            bodyText: "Question — can I sub butter for the oil?",
+            ratingValue: 4,
+            isPendingModeration: true
+        )
+        .padding(DODSpacing.md)
+        .background(DODColor.surface)
+        .frame(width: 390)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+    }
+
+    /// 600-character body — ensures layout stays sane when a comment is
+    /// long enough to multi-line wrap several times. No truncation; let
+    /// the row grow vertically.
+    func test_commentRow_longBodyTruncates() {
+        let longBody = String(
+            repeating: "This is a long comment body that should wrap many times within the row. ",
+            count: 9
+        )
+        .prefix(600)
+        let view = CommentRow(
+            authorName: "Pat M.",
+            avatarURL: nil,
+            relativeDate: "1 week ago",
+            bodyText: String(longBody),
+            ratingValue: 5
+        )
+        .padding(DODSpacing.md)
+        .background(DODColor.surface)
+        .frame(width: 390)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+    }
+
+    func test_commentComposer_emptyState() {
+        let view = StatefulComposerHost(text: "", rating: 0, isSubmitting: false)
+            .frame(width: 390, height: 600)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)), record: .missing)
+    }
+
+    func test_commentComposer_filledState() {
+        let view = StatefulComposerHost(
+            text: "Made this for Sunday dinner and the whole family went back for seconds.",
+            rating: 5,
+            isSubmitting: false
+        )
+        .frame(width: 390, height: 600)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)), record: .missing)
+    }
+
+    func test_guestIdentitySheet_empty() {
+        let view = StatefulIdentityHost(name: "", email: "")
+            .frame(width: 390, height: 600)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)), record: .missing)
+    }
+
+    func test_guestIdentitySheet_filledValid() {
+        let view = StatefulIdentityHost(name: "Jamie L.", email: "jamie@example.com")
+            .frame(width: 390, height: 600)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)), record: .missing)
+    }
+
+    func test_moderationBadge_eachKind() {
+        let view = VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            ModerationBadge(kind: .awaitingApproval)
+            ModerationBadge(kind: .posted)
+            ModerationBadge(kind: .failed)
+        }
+        .padding(DODSpacing.md)
+        .background(DODColor.surface)
+        .frame(width: 280, height: 180)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 280, height: 180)), record: .missing)
+    }
+}
+
+// MARK: - Stateful hosts
+//
+// `@State`-bound views need a real conforming type — preview helpers in
+// the source files are `private`, so we re-declare equivalent shells here
+// for the snapshot harness.
+
+private struct StatefulInputHost: View {
+    @State var value: Int
+    init(initial: Int) { _value = State(initialValue: initial) }
+    var body: some View { StarRatingInput(value: $value) }
+}
+
+private struct StatefulComposerHost: View {
+    @State var text: String
+    @State var rating: Int
+    let isSubmitting: Bool
+
+    init(text: String, rating: Int, isSubmitting: Bool) {
+        _text = State(initialValue: text)
+        _rating = State(initialValue: rating)
+        self.isSubmitting = isSubmitting
+    }
+
+    var body: some View {
+        CommentComposer(
+            text: $text,
+            rating: $rating,
+            isSubmitting: isSubmitting,
+            onSubmit: {},
+            onCancel: {}
+        )
+    }
+}
+
+private struct StatefulIdentityHost: View {
+    @State var name: String
+    @State var email: String
+
+    init(name: String, email: String) {
+        _name = State(initialValue: name)
+        _email = State(initialValue: email)
+    }
+
+    var body: some View {
+        GuestIdentitySheet(
+            displayName: $name,
+            email: $email,
+            isSubmitting: false,
+            onContinue: {}
+        )
+    }
 }
 #endif
