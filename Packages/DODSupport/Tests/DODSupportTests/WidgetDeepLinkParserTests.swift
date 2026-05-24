@@ -87,4 +87,37 @@ import Testing
         let url = try #require(URL(string: "Dod://Saved"))
         #expect(WidgetDeepLinkParser.parse(url) == .saved)
     }
+
+    // MARK: - T-323 / AC-17.9 `source` query parameter
+
+    /// The saved widget's recipe-row tap emits `?source=saved` so the
+    /// host app can fire `widgetOpened(kind: .saved, recipeID:)` instead
+    /// of mis-attributing the open to the featured widget.
+    @Test func parsesRecipeWithSavedSource() throws {
+        let url = try #require(URL(string: "dod://recipe/4641?source=saved"))
+        #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 4641, source: .saved))
+    }
+
+    /// Featured widget URLs continue to omit the query parameter; the
+    /// parser must keep treating them as `.featured` so existing analytics
+    /// for the today's-featured surface aren't broken by T-323.
+    @Test func parsesRecipeWithoutSourceDefaultsToFeatured() throws {
+        let url = try #require(URL(string: "dod://recipe/12"))
+        #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 12, source: .featured))
+    }
+
+    /// Unknown `source` values fall back to `.featured` rather than
+    /// rejecting the URL — the navigation contract still holds, the
+    /// analytics layer just attributes to the default surface.
+    @Test func parsesRecipeWithUnknownSourceFallsBackToFeatured() throws {
+        let url = try #require(URL(string: "dod://recipe/12?source=banana"))
+        #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 12, source: .featured))
+    }
+
+    /// Source query parameter is case-insensitive — same forgiveness as
+    /// the scheme + host parsing above.
+    @Test func parsesRecipeSourceCaseInsensitive() throws {
+        let url = try #require(URL(string: "dod://recipe/9?source=SAVED"))
+        #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 9, source: .saved))
+    }
 }

@@ -142,7 +142,10 @@ struct TabStack: View {
     private func consume(link: WidgetDeepLink) async {
         defer { pendingDeepLink = nil }
         switch link {
-        case .recipe(let id):
+        case .recipe(let id, _):
+            // `source` is consumed at the RootView analytics layer; the
+            // detail-push behaviour is the same regardless of which widget
+            // emitted the URL.
             if let cached = await cachedListItem(forID: id) {
                 path = [.recipe(item: cached)]
             } else if let snapshotItem = snapshotListItem(forID: id) {
