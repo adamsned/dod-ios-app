@@ -29,3 +29,11 @@ public enum MigrationPlan: SchemaMigrationPlan {
 ```
 
 Then update `RecipeStore.makeContainer` to use `SchemaV2.self` and write a `MigrationTests.swift` that exercises the upgrade path.
+
+## Live history
+
+| Version | When       | Change                                                                | Migration type | Locked by                                       |
+| ------- | ---------- | --------------------------------------------------------------------- | -------------- | ----------------------------------------------- |
+| V1 → V2 | 2026-05-23 | Added `CachedIngredient` model (local ingredient index for US-12).    | Lightweight    | `MigrationTests.lightweightV1toV2OpensCleanly`  |
+
+**V2 design note.** No existing field on `CachedRecipe`/`CachedListPage`/`CachedImage` was touched. The new `CachedIngredient` rows start empty after upgrade; they fill in as recipes are viewed and `RecipeStore.mergeDetail(_:)` parses their JSON-LD. Search silently falls back to REST title/excerpt for recipes whose ingredients aren't yet indexed — there is no error path the user sees.
