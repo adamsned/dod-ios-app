@@ -15,6 +15,7 @@ Immutable rules. All specs, plans, and tasks must conform. Changes require an ex
 - **Orientation:** portrait + landscape on iPad; portrait-primary on iPhone (landscape allowed for recipe reading and video).
 - **No** watchOS, macOS Catalyst, or visionOS in v1. Revisit after launch.
 - **Cook Mode** is in scope for v1.0 (a hands-free, screen-awake cooking surface on recipe detail). Was previously an implicit non-feature; promoted in by the consultant-pass amendment (CL-16, spec US-7). Watch / Mac / Vision targets remain out.
+- **ActivityKit (iOS 16.1+)** is used for Cook Mode timers (spec US-11). When a user starts a step timer in Cook Mode, the app pushes a Live Activity so the countdown surfaces on the Lock Screen and (on iPhone 14 Pro and later) in the Dynamic Island. ActivityKit calls are wrapped behind `if #available(iOS 16.1, *)` and guarded with `#if canImport(ActivityKit)` so the package still builds on the macOS test slice. Pre-iOS 16.1 hosts and users who have disabled Live Activities system-wide degrade silently to the inline timer only (spec AC-11.4). The Live Activity payload (`recipeTitle`, `recipeID`, `remainingSeconds`, `stepText`, `isPaused`) carries no PII and is not telemetry — it is a system-presented countdown, not an event sent to TelemetryDeck, and the App Privacy questionnaire is unaffected (parallel to the idle-timer note in §9).
 
 ## 3. Tech stack
 

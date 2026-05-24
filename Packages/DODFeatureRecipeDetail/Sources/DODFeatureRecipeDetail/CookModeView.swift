@@ -158,7 +158,7 @@ public struct CookModeView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let duration = StepTimerParser.firstDuration(in: step.text) {
-                CookTimer(duration: duration)
+                CookTimer(duration: duration, stepText: step.text, liveActivitySink: viewModel)
             }
         }
         .padding(.horizontal, DODSpacing.md)

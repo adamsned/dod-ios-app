@@ -5,7 +5,7 @@ import Testing
 @testable import DODFeatureRecipeDetail
 
 @MainActor
-@Suite("CookModeViewModel (US-7)") struct CookModeViewModelTests {
+@Suite("CookModeViewModel (US-7 + US-11)") struct CookModeViewModelTests {
 
     // MARK: - Navigation (AC-7.4)
 
@@ -147,12 +147,90 @@ import Testing
         #expect(viewModel.isIdleTimerDisabled == true)
     }
 
+    // MARK: - Live Activity (US-11)
+
+    @Test func startingTimerActivityTogglesHasLiveActivity() {
+        let activity = FakeLiveActivityController()
+        let viewModel = Self.makeViewModel(stepCount: 1, liveActivity: activity)
+        #expect(!viewModel.hasLiveActivity, "AC-11.1 — no activity until the timer starts")
+        viewModel.startTimerLiveActivity(stepText: "Bake 30 minutes", totalSeconds: 30 * 60)
+        #expect(viewModel.hasLiveActivity, "AC-11.1 — timer-start must create an Activity")
+        #expect(activity.startedAttributes?.recipeID == 100)
+        #expect(activity.startedAttributes?.totalSeconds == 30 * 60)
+        #expect(activity.lastInitialState?.remainingSeconds == 30 * 60)
+        #expect(activity.lastInitialState?.isPaused == false)
+    }
+
+    @Test func startingZeroDurationTimerIsANoOp() {
+        // Defensive: a malformed parse shouldn't spawn an instantly-stale
+        // Lock Screen card.
+        let activity = FakeLiveActivityController()
+        let viewModel = Self.makeViewModel(stepCount: 1, liveActivity: activity)
+        viewModel.startTimerLiveActivity(stepText: "no duration", totalSeconds: 0)
+        #expect(activity.startCallCount == 0)
+        #expect(!viewModel.hasLiveActivity)
+    }
+
+    @Test func endingTimerActivityClearsHasLiveActivity() {
+        let activity = FakeLiveActivityController()
+        let viewModel = Self.makeViewModel(stepCount: 1, liveActivity: activity)
+        viewModel.startTimerLiveActivity(stepText: "Step", totalSeconds: 60)
+        viewModel.endTimerLiveActivity()
+        #expect(!viewModel.hasLiveActivity, "AC-11.3 — completion / cancel ends the activity")
+        #expect(activity.endCallCount == 1)
+    }
+
+    @Test func updatingActivityForwardsContentState() {
+        let activity = FakeLiveActivityController()
+        let viewModel = Self.makeViewModel(stepCount: 1, liveActivity: activity)
+        viewModel.startTimerLiveActivity(stepText: "Step", totalSeconds: 60)
+        viewModel.updateTimerLiveActivity(remainingSeconds: 42, stepText: "Step", isPaused: false)
+        #expect(activity.lastUpdateState?.remainingSeconds == 42, "AC-11.2 — per-tick updates flow through")
+        #expect(activity.lastUpdateState?.isPaused == false)
+    }
+
+    @Test func updatingWithoutAnActiveActivityIsANoOp() {
+        // Tick events fire from the SwiftUI Timer publisher every second
+        // even when no activity is in flight — the VM must filter so we
+        // don't churn the system trying to update a dead handle.
+        let activity = FakeLiveActivityController()
+        let viewModel = Self.makeViewModel(stepCount: 1, liveActivity: activity)
+        viewModel.updateTimerLiveActivity(remainingSeconds: 1, stepText: "x", isPaused: false)
+        #expect(activity.updateCallCount == 0)
+    }
+
+    @Test func endCookModeAlsoEndsAnyInFlightActivity() {
+        // AC-11.3 — Cook Mode exit while a timer is still running must
+        // clear the Lock Screen card. Symmetric to the idle-timer toggle.
+        let activity = FakeLiveActivityController()
+        let viewModel = Self.makeViewModel(stepCount: 1, liveActivity: activity)
+        viewModel.beginCookMode()
+        viewModel.startTimerLiveActivity(stepText: "Step", totalSeconds: 60)
+        #expect(viewModel.hasLiveActivity)
+        viewModel.endCookMode()
+        #expect(!viewModel.hasLiveActivity)
+        #expect(activity.endCallCount == 1)
+    }
+
+    @Test func startingASecondTimerReplacesTheFirst() {
+        // Moving forward to a new step while the previous step's timer is
+        // still up must not stack two cards.
+        let activity = FakeLiveActivityController()
+        let viewModel = Self.makeViewModel(stepCount: 1, liveActivity: activity)
+        viewModel.startTimerLiveActivity(stepText: "First", totalSeconds: 60)
+        viewModel.startTimerLiveActivity(stepText: "Second", totalSeconds: 30)
+        #expect(activity.startCallCount == 2)
+        #expect(activity.lastInitialState?.stepText == "Second")
+        #expect(activity.lastInitialState?.remainingSeconds == 30)
+    }
+
     // MARK: - Helpers
 
     static func makeViewModel(
         stepCount: Int,
         seed: Set<UUID> = [],
-        idleTimer: IdleTimerController = FakeIdleTimerController()
+        idleTimer: IdleTimerController = FakeIdleTimerController(),
+        liveActivity: any CookLiveActivityController = FakeLiveActivityController()
     ) -> CookModeViewModel {
         let instructions = (1...max(stepCount, 1)).map { index in
             RecipeInstruction(step: index, text: "Step \(index) body.")
@@ -169,7 +247,8 @@ import Testing
         return CookModeViewModel(
             recipe: recipe,
             initialCheckedIngredients: seed,
-            idleTimer: idleTimer
+            idleTimer: idleTimer,
+            liveActivity: liveActivity
         )
     }
 }
@@ -177,4 +256,40 @@ import Testing
 @MainActor
 final class FakeIdleTimerController: IdleTimerController {
     var isDisabled: Bool = false
+}
+
+/// In-memory fake for ``CookLiveActivityController``. Tracks each side
+/// effect so tests can assert on call counts and the most recent
+/// attributes / content state without spinning up ActivityKit.
+@MainActor
+final class FakeLiveActivityController: CookLiveActivityController {
+
+    private(set) var isActive: Bool = false
+    private(set) var startCallCount: Int = 0
+    private(set) var updateCallCount: Int = 0
+    private(set) var endCallCount: Int = 0
+    private(set) var startedAttributes: CookActivityAttributes?
+    private(set) var lastInitialState: CookActivityAttributes.ContentState?
+    private(set) var lastUpdateState: CookActivityAttributes.ContentState?
+
+    func start(
+        attributes: CookActivityAttributes,
+        initialState: CookActivityAttributes.ContentState
+    ) {
+        startCallCount += 1
+        startedAttributes = attributes
+        lastInitialState = initialState
+        isActive = true
+    }
+
+    func update(state: CookActivityAttributes.ContentState) {
+        guard isActive else { return }
+        updateCallCount += 1
+        lastUpdateState = state
+    }
+
+    func end() {
+        endCallCount += 1
+        isActive = false
+    }
 }

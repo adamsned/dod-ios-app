@@ -35,17 +35,20 @@ public final class CookModeViewModel {
     public var checkedIngredientIDs: Set<UUID>
 
     private let idleTimer: any IdleTimerController
+    private let liveActivity: any CookLiveActivityController
     private var priorIdleTimerDisabled: Bool = false
     private var didBegin: Bool = false
 
     public init(
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
-        idleTimer: any IdleTimerController = SystemIdleTimerController()
+        idleTimer: any IdleTimerController = SystemIdleTimerController(),
+        liveActivity: any CookLiveActivityController = SystemCookLiveActivityController()
     ) {
         self.recipe = recipe
         self.checkedIngredientIDs = initialCheckedIngredients
         self.idleTimer = idleTimer
+        self.liveActivity = liveActivity
     }
 
     /// Total number of steps, derived from the recipe. Zero if the recipe
@@ -85,12 +88,63 @@ public final class CookModeViewModel {
         idleTimer.isDisabled = true
     }
 
-    /// Called on view disappear: restores the previous idle-timer value.
-    /// Symmetric with `beginCookMode` (AC-7.3, AC-7.6).
+    /// Called on view disappear: restores the previous idle-timer value
+    /// and ends any in-flight Live Activity (AC-11.3). Symmetric with
+    /// `beginCookMode` (AC-7.3, AC-7.6).
     public func endCookMode() {
         guard didBegin else { return }
         idleTimer.isDisabled = priorIdleTimerDisabled
         didBegin = false
+        // Exiting Cook Mode must clear the Lock Screen card — leaving a
+        // ghost activity behind would be the Live Activity equivalent of
+        // the "battery still draining" idle-timer bug.
+        liveActivity.end()
+    }
+
+    // MARK: - Live Activity (US-11)
+
+    /// True while a Live Activity card is on the Lock Screen / Dynamic
+    /// Island for the current Cook Mode session. Plumbed through to the
+    /// inline ``CookTimer`` so its tick can mirror progress to the system
+    /// surface.
+    public var hasLiveActivity: Bool {
+        liveActivity.isActive
+    }
+
+    /// Begin a Live Activity for the supplied countdown. Called by
+    /// ``CookTimer`` the moment the user taps Start. Idempotent — a new
+    /// start replaces any in-flight activity so the displayed step text
+    /// always matches the one driving the countdown.
+    public func startTimerLiveActivity(stepText: String, totalSeconds: Int) {
+        guard totalSeconds > 0 else { return }
+        let attributes = CookActivityAttributes(
+            recipeTitle: recipe.title,
+            recipeID: recipe.id,
+            totalSeconds: totalSeconds
+        )
+        let initial = CookActivityAttributes.ContentState(
+            remainingSeconds: totalSeconds,
+            stepText: stepText,
+            isPaused: false
+        )
+        liveActivity.start(attributes: attributes, initialState: initial)
+    }
+
+    /// Push a new per-second state to the in-flight activity (AC-11.2).
+    public func updateTimerLiveActivity(remainingSeconds: Int, stepText: String, isPaused: Bool) {
+        guard liveActivity.isActive else { return }
+        let state = CookActivityAttributes.ContentState(
+            remainingSeconds: max(remainingSeconds, 0),
+            stepText: stepText,
+            isPaused: isPaused
+        )
+        liveActivity.update(state: state)
+    }
+
+    /// End the in-flight activity — called on timer completion, on the
+    /// user tapping Reset, and as part of ``endCookMode`` (AC-11.3).
+    public func endTimerLiveActivity() {
+        liveActivity.end()
     }
 
     // MARK: - Navigation

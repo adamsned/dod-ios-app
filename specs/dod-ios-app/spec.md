@@ -150,6 +150,19 @@ Added by consultant-pass amendment (CL-17, 2026-05-23). Reverses the earlier CL-
 - **AC-8.2** A "Get cooking" primary button dismisses the sheet and sets `dod.onboardingCompletedV1 = true`. All future cold launches go straight to Feed with no sheet.
 - **AC-8.3** iPad first launch shows the same single-screen sheet (same content, same flag) — no separate iPad onboarding flow. The sheet sizes appropriately for iPad via standard SwiftUI `.sheet` presentation; the flag is shared with iPhone since saves and UserDefaults are per-install (consistent with AC-5.7 / CL-5).
 
+### US-11 — Live Activity for active Cook Mode timer
+**As a** user actively cooking,
+**I want** a Live Activity for the running Cook Mode timer,
+**so that** I can leave the app to grab ingredients and come back at the buzzer without re-opening Cook Mode.
+
+Added by consultant-pass amendment (2026-05-23, Tier 3). Builds on US-7 / AC-7.* — the Live Activity is a per-step companion to the inline ``CookTimer``, not a replacement. Constitution §2 was amended in the same pass to call out ActivityKit (iOS 16.1+) as the platform surface Cook Mode timers use.
+
+**Acceptance criteria:**
+- **AC-11.1** Given Cook Mode is on a step whose text parses to a duration (per `StepTimerParser`), when the user taps Start on the inline `CookTimer`, then a Live Activity is created with `recipeTitle`, `recipeID`, `totalSeconds`, and an initial `ContentState(remainingSeconds: totalSeconds, stepText: <current step text>, isPaused: false)`. The card appears on the Lock Screen and, on iPhone 14 Pro and later, in the Dynamic Island.
+- **AC-11.2** While the timer is running, the Live Activity is updated every second with the new `remainingSeconds`; pausing the inline timer flips `isPaused` to true on the next update so the lock-screen UI can dim the progress arc and label the state.
+- **AC-11.3** The Live Activity ends when (a) the countdown hits zero, (b) the user taps Reset, (c) the user starts a new step's timer (the previous activity is replaced, not stacked), or (d) Cook Mode itself is exited via the Done button or `endCookMode`.
+- **AC-11.4** On hosts where ActivityKit isn't available (`iOS < 16.1`) or where the user has disabled Live Activities system-wide (`ActivityAuthorizationInfo().areActivitiesEnabled == false`), Cook Mode behaves exactly as it did pre-US-11 — the inline timer still runs, no Lock Screen card appears, and no errors surface to the user.
+
 ---
 
 ## Cross-cutting acceptance criteria
@@ -192,6 +205,7 @@ Mandates (per constitution §6):
   - **REG-DOD-NAV-1**: tapping a recipe row pushes the detail screen and it stays pushed. Failure mode: `RecipeStore.cache(listItem:)` dropped `canonicalURL` on insert, so the detail fetch fell back to the homepage, JSON-LD parse failed, and AC-4.11's auto-dismiss popped the user back to the feed. Locked by `DODPersistenceTests.canonicalURLRoundTrips`, `DODPersistenceTests.canonicalURLUpdatesButDoesNotClobberOnNil`, and `SmokeTests.test_recipeDetailOpensAndShowsContent`.
   - **REG-DOD-LIST-SCROLL**: vertical drag inside a recipe row scrolls the surrounding list. Failure mode: `Button { } label: { RecipeCard }.buttonStyle(.plain)` inside a `LazyVGrid` inside a `ScrollView` swallowed the pan gesture on iOS 26. Locked by `SmokeTests.test_feedScrollsToRevealMoreRecipes`.
   - **REG-INFO-PLIST-CLOBBER**: `xcodegen generate` must not strip launch-screen / orientation keys from `App/Info.plist`. Failure mode: those keys lived only in the hand-maintained plist; XcodeGen rewrote it from `project.yml` on every regenerate, silently re-introducing the iOS letterbox bug. Locked by keeping the keys in `project.yml`'s `info.properties` block; `SmokeTests.test_appLaunchesWithoutTelemetryAppID` proves the app renders at launch (does not yet pixel-verify edge-to-edge — noted gap).
+  - **REG-11 (US-11)**: Cook Mode Live Activity lifecycle is fully exercised by the `CookModeViewModel` unit suite — start, end, replace-on-new-timer, no-op on tick when no activity, and end-on-cook-mode-exit are each pinned by a named test in `CookModeViewModelTests`. The lock-screen and Dynamic Island compact views are pinned by `CookLiveActivitySnapshotTests`. Failure mode: the cook would lose track of the buzzer the moment the screen dimmed and would either over-cook or have to keep the app foregrounded for the full duration.
 
 ## Clarifications
 

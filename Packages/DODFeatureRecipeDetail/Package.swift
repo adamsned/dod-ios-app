@@ -14,6 +14,9 @@ let package = Package(
         .package(path: "../DODAnalytics"),
         .package(path: "../DODNetworking"),
         .package(path: "../DODPersistence"),
+        // Test-only — visual regression for the Cook Mode Live Activity
+        // surfaces (US-11). See constitution §3 (approved dep) + §6 L4.
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
     ],
     targets: [
         .target(
@@ -27,6 +30,13 @@ let package = Package(
                 "DODPersistence",
             ]
         ),
-        .testTarget(name: "DODFeatureRecipeDetailTests", dependencies: ["DODFeatureRecipeDetail"]),
+        .testTarget(
+            name: "DODFeatureRecipeDetailTests",
+            dependencies: [
+                "DODFeatureRecipeDetail",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+            ],
+            resources: [.process("__Snapshots__")]
+        ),
     ]
 )

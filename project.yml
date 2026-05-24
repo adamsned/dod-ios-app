@@ -63,6 +63,12 @@ targets:
         # this key iOS letterboxes the app, producing large black bars
         # top and bottom. Empty dict = default system background.
         UILaunchScreen: {}
+        # Opt the host app in to Live Activities (US-11). Required for
+        # `ActivityKit.Activity.request` to succeed at runtime — without
+        # this key, `ActivityAuthorizationInfo().areActivitiesEnabled`
+        # returns false and Cook Mode timers can't surface on the Lock
+        # Screen / Dynamic Island.
+        NSSupportsLiveActivities: true
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
@@ -92,6 +98,12 @@ targets:
       - package: DODFeatureSearch
       - package: DODFeatureRecipeDetail
       - package: DODFeatureSaved
+      # Embed the Live Activity widget extension so its
+      # ActivityConfiguration is registered with the system at app
+      # launch — without an embedded extension iOS won't render the
+      # Lock Screen / Dynamic Island UI when `Activity.request` fires.
+      - target: DODAppLiveActivity
+        embed: true
     preBuildScripts:
       - name: SwiftLint
         script: |
@@ -101,6 +113,34 @@ targets:
             echo "warning: SwiftLint not installed — brew install swiftlint"
           fi
         basedOnDependencyAnalysis: false
+
+  # Minimal widget extension whose sole job is to host the
+  # ActivityConfiguration for Cook Mode timers (US-11). Kept separate
+  # from any general-purpose widget target so the orchestrator can land
+  # this branch independently of the parallel widget work.
+  DODAppLiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LiveActivity
+    info:
+      path: LiveActivity/Info.plist
+      properties:
+        CFBundleDisplayName: DOD Live Activity
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp.LiveActivity
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: LiveActivity/Info.plist
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: DODFeatureRecipeDetail
+      - package: DODDesignSystem
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: ActivityKit.framework
 
   DODAppUITests:
     type: bundle.ui-testing

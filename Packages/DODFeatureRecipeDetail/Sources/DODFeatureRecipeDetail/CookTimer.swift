@@ -16,6 +16,11 @@ import SwiftUI
 struct CookTimer: View {
 
     let totalSeconds: Int
+    let stepText: String
+    /// Optional Live Activity sink. `CookModeView` supplies the owning
+    /// view model so this timer can mirror its countdown to the Lock
+    /// Screen (US-11). Standalone previews / SwiftUI hosts may omit it.
+    weak var liveActivitySink: CookModeViewModel?
 
     @State private var remaining: Int
     @State private var isRunning: Bool = false
@@ -25,10 +30,12 @@ struct CookTimer: View {
     /// changes (not a Bool, which would only fire once per `true` transition).
     @State private var completionTick: Int = 0
 
-    init(duration: Duration) {
+    init(duration: Duration, stepText: String = "", liveActivitySink: CookModeViewModel? = nil) {
         let seconds = Int(duration.components.seconds)
         self.totalSeconds = max(seconds, 0)
         self._remaining = State(initialValue: max(seconds, 0))
+        self.stepText = stepText
+        self.liveActivitySink = liveActivitySink
     }
 
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -64,7 +71,7 @@ struct CookTimer: View {
         HStack(spacing: DODSpacing.xs) {
             Button(isRunning ? "Pause" : (didComplete ? "Done" : "Start")) {
                 if didComplete { return }
-                isRunning.toggle()
+                togglePlay()
             }
             .buttonStyle(.borderedProminent)
             .tint(DODColor.accent)
@@ -80,6 +87,31 @@ struct CookTimer: View {
 
     // MARK: - State transitions
 
+    private func togglePlay() {
+        let goingToRun = !isRunning
+        isRunning = goingToRun
+        if goingToRun {
+            // First Start (or Resume after Pause): make sure a Live
+            // Activity exists and matches the current remaining time.
+            // `start` is idempotent, so calling on resume is safe.
+            liveActivitySink?.startTimerLiveActivity(
+                stepText: stepText,
+                totalSeconds: max(remaining, 0)
+            )
+            liveActivitySink?.updateTimerLiveActivity(
+                remainingSeconds: remaining,
+                stepText: stepText,
+                isPaused: false
+            )
+        } else {
+            liveActivitySink?.updateTimerLiveActivity(
+                remainingSeconds: remaining,
+                stepText: stepText,
+                isPaused: true
+            )
+        }
+    }
+
     private func tick() {
         guard isRunning, remaining > 0 else { return }
         remaining -= 1
@@ -87,6 +119,13 @@ struct CookTimer: View {
             isRunning = false
             didComplete = true
             completionTick &+= 1  // overflow-safe trigger bump
+            liveActivitySink?.endTimerLiveActivity()
+        } else {
+            liveActivitySink?.updateTimerLiveActivity(
+                remainingSeconds: remaining,
+                stepText: stepText,
+                isPaused: false
+            )
         }
     }
 
@@ -94,6 +133,7 @@ struct CookTimer: View {
         isRunning = false
         didComplete = false
         remaining = totalSeconds
+        liveActivitySink?.endTimerLiveActivity()
     }
 
     // MARK: - Display helpers
