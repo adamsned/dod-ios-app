@@ -76,5 +76,35 @@ final class DesignSystemSnapshotTests: XCTestCase {
         .frame(width: 358)
         assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
     }
+
+    /// US-8 first-launch welcome sheet. iPhone 17 logical size is 402×874pt;
+    /// rendering at .large detent fills (nearly) the full screen and gives
+    /// us a stable baseline to diff against on layout changes.
+    func test_onboardingSheet_default() {
+        let view = OnboardingSheet(
+            title: "Welcome to Dutch Oven Daddy",
+            bullets: [
+                .init(
+                    systemImage: "house.fill",
+                    title: "Browse the latest",
+                    caption: "New cast iron recipes appear at the top."
+                ),
+                .init(
+                    systemImage: "magnifyingglass",
+                    title: "Search what you've got",
+                    caption: "Type any ingredient or technique to filter."
+                ),
+                .init(
+                    systemImage: "heart.fill",
+                    title: "Save for offline",
+                    caption: "Tap the heart on any recipe to cook it without Wi-Fi."
+                ),
+            ],
+            ctaTitle: "Get cooking",
+            onContinue: {}
+        )
+        .frame(width: 402, height: 874)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 402, height: 874)))
+    }
 }
 #endif

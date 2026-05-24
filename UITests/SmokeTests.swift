@@ -14,6 +14,11 @@ final class SmokeTests: XCTestCase {
         app = XCUIApplication()
         // Ensure no stale telemetry app ID — REG-1 regression guard.
         app.launchEnvironment["DOD_FORCE_NO_TELEMETRY_APPID"] = "1"
+        // Suppress the first-launch welcome sheet by default so every test
+        // boots straight into the tab bar. The one onboarding-specific test
+        // overrides this in-body by relaunching with -DODForceFreshOnboarding.
+        // Spec trace: US-8.
+        app.launchEnvironment["DOD_SUPPRESS_ONBOARDING"] = "1"
         app.launch()
     }
 
@@ -170,6 +175,42 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(
             emptyTitle.waitForExistence(timeout: 6),
             "Saved tab should show empty state on fresh install"
+        )
+    }
+
+    /// US-8: the welcome sheet shows on a fresh launch (i.e. when the
+    /// `dod.onboardingCompletedV1` UserDefaults flag is unset), and tapping
+    /// "Get cooking" dismisses it so the tab bar becomes reachable.
+    ///
+    /// `-DODForceFreshOnboarding` is the escape hatch handled in
+    /// `DODApp.applyTestLaunchOverrides()` — it removes the persisted flag at
+    /// app start so we don't depend on a real fresh install (which Xcode
+    /// can't reliably do between runs). We also drop the
+    /// `DOD_SUPPRESS_ONBOARDING` env var set in setUp so it doesn't suppress
+    /// the very thing this test is asserting.
+    func test_onboardingShowsOnFirstLaunchAndDismisses() {
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "DOD_SUPPRESS_ONBOARDING")
+        app.launchArguments.append("-DODForceFreshOnboarding")
+        app.launch()
+
+        let welcome = app.staticTexts["Welcome to Dutch Oven Daddy"]
+        XCTAssertTrue(
+            welcome.waitForExistence(timeout: 8),
+            "Welcome sheet should appear on first launch"
+        )
+
+        let cta = app.buttons["Get cooking"]
+        XCTAssertTrue(cta.exists, "CTA button should be visible inside the sheet")
+        cta.tap()
+
+        XCTAssertTrue(
+            app.tabBars.firstMatch.waitForExistence(timeout: 5),
+            "Tab bar should appear after the welcome sheet is dismissed"
+        )
+        XCTAssertFalse(
+            welcome.exists,
+            "Welcome sheet should be gone after Get cooking is tapped"
         )
     }
 }
