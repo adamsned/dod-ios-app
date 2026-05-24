@@ -138,6 +138,23 @@ Added by consultant-pass amendment (CL-16, 2026-05-23). Constitution §2 was ame
 - **AC-7.6** The user exits Cook Mode via an explicit "Done" button in the navigation bar or via the system back gesture. Either restores normal navigation (recipe detail underneath) and re-enables auto-lock per AC-7.3.
 - **AC-7.7** Telemetry: a new event `cookModeStarted(recipeID:)` is sent the first time Cook Mode is entered for a given recipe during a session. It carries only the integer WP recipe ID — no free-text payload. The event is added to the constitution §9 allowlist by the consultant-pass amendment; the `AnalyticsEvent` enum gains the corresponding case in the follow-up implementation task (see plan.md Phase 6 cluster, task T-305).
 
+### US-12 — Ingredient search, filters, recents
+**As a** cook,
+**I want** to search recipes by ingredient and filter results by cook time, category, or what I've cooked before,
+**so that** I can find what to make with what I have in 20 minutes.
+
+Added by Tier-4 consultant-pass amendment (CL-19, 2026-05-23). Reframes AC-3.2's "ingredient-body matching is **not required in v1**" caveat. Instead of changing WP's REST surface (it can't be done without server-side work — see CL-1), the app now maintains a local SwiftData ingredient index sourced from the JSON-LD details that the detail view already parses.
+
+**Acceptance criteria:**
+- **AC-12.1** Ingredient-aware ranking. Each time a recipe's detail JSON-LD parses successfully, the ingredient lines are written into a local SwiftData index (`CachedIngredient`). Subsequent searches run a REST `search=` pass **and** a local ingredient pass and merge with this ranking: (1) REST title contains the query, (2) any other REST hit, (3) local-ingredient hit that REST missed. Duplicate recipes dedupe at the highest tier they appear in.
+- **AC-12.2** Filter chips. Above the results, a horizontal chip row exposes: Category (default "All categories"; tap → menu of every WP category), Cook time (default "Any time"; tap → `≤ 15 min` / `≤ 30 min` / `≤ 60 min` / `1 hr+`), and a "Recently viewed" toggle. Filters are visible whether or not a query is active.
+- **AC-12.3** Filters compose; changing one re-ranks the cached merge without a network round trip. Recipes with no category data or no parsed total-time are excluded by the corresponding chip (a MISS), so filter contracts can't be violated by missing metadata.
+- **AC-12.4** Recent searches persist. The last `RecentSearches.maxEntries` (10) successful queries are stored in UserDefaults (`dod.recentSearchesV1`), case-insensitively deduped and trimmed. In the idle empty state the user sees a "Recent" header + tappable chips; a separate "Try" header lists the top-5 categories by recipe count as one-tap suggestions. Tapping a recent chip re-runs the search through the standard debounce path.
+- **AC-12.5** Local search performance. The local ingredient pass for a typical cache (≤ 100 unsaved recipes per AC-1.6) returns within **200ms** on iPhone 13 baseline. Implementation note: a SwiftData `#Predicate` substring fetch against ~1000 normalized rows; no in-memory full-table scan.
+- **AC-12.6** Telemetry contract unchanged. The recent-searches store keeps raw queries **local only**. Analytics continues to send only `StringHasher.sha256Hex(query)` per AC-3.6.
+
+**Supersedes:** AC-3.2's "ingredient-body matching is **not required in v1**" remains the *spec-level* description of the REST contract; AC-12.1 specifies the locally-indexed augmentation.
+
 ### US-8 — First-launch onboarding
 **As a** Weekend Cook on first cold launch,
 **I want** a brief welcome explaining what the app does,
@@ -192,6 +209,7 @@ Mandates (per constitution §6):
   - **REG-DOD-NAV-1**: tapping a recipe row pushes the detail screen and it stays pushed. Failure mode: `RecipeStore.cache(listItem:)` dropped `canonicalURL` on insert, so the detail fetch fell back to the homepage, JSON-LD parse failed, and AC-4.11's auto-dismiss popped the user back to the feed. Locked by `DODPersistenceTests.canonicalURLRoundTrips`, `DODPersistenceTests.canonicalURLUpdatesButDoesNotClobberOnNil`, and `SmokeTests.test_recipeDetailOpensAndShowsContent`.
   - **REG-DOD-LIST-SCROLL**: vertical drag inside a recipe row scrolls the surrounding list. Failure mode: `Button { } label: { RecipeCard }.buttonStyle(.plain)` inside a `LazyVGrid` inside a `ScrollView` swallowed the pan gesture on iOS 26. Locked by `SmokeTests.test_feedScrollsToRevealMoreRecipes`.
   - **REG-INFO-PLIST-CLOBBER**: `xcodegen generate` must not strip launch-screen / orientation keys from `App/Info.plist`. Failure mode: those keys lived only in the hand-maintained plist; XcodeGen rewrote it from `project.yml` on every regenerate, silently re-introducing the iOS letterbox bug. Locked by keeping the keys in `project.yml`'s `info.properties` block; `SmokeTests.test_appLaunchesWithoutTelemetryAppID` proves the app renders at launch (does not yet pixel-verify edge-to-edge — noted gap).
+  - **REG-12 (US-12)**: ingredient index round-trip, merger rank, and filter-composition logic stay correct as Search v2 evolves. Locked by `DODPersistenceTests.IngredientIndexTests` (write-on-mergeDetail, substring match, case-insensitive, short-query guard, re-merge replaces rows), `DODPersistenceTests.SearchFilterInputsTests` (category / total-time / recently-viewed accessors), `DODFeatureSearchTests.SearchResultMergerTests` (title > excerpt > local-only tier ordering and dedupe), `DODFeatureSearchTests.SearchFiltersTests` (each chip + composed), `DODFeatureSearchTests.RecentSearchesTests` (LRU dedupe + trim + clear), and `DODFeatureSearchTests` view-model coverage of `filterChipNarrowsResultsWithoutNetworkRoundTrip`, `recentSearchesPersistAcrossViewModelInstances`, and `offlineWithLocalIngredientHitsStillShowsResults`.
 
 ## Clarifications
 

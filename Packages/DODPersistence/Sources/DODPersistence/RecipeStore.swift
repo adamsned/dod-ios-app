@@ -101,6 +101,9 @@ public actor RecipeStore {
         target.jsonLDParsedAt = .now
         target.jsonLDFailedAt = nil
 
+        // US-12 / AC-12.1: keep the local ingredient index in sync.
+        try replaceIngredientIndexRows(forRecipeID: recipe.id, with: recipe.ingredients)
+
         try modelContext.save()
     }
 
@@ -313,14 +316,25 @@ extension RecipeStore {
     /// Create the on-disk container for production use.
     public static func productionContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(SchemaV1.models),
+            for: Schema(SchemaV2.models),
             migrationPlan: MigrationPlan.self,
             configurations: ModelConfiguration()
         )
     }
 
-    /// Create an in-memory container for tests.
+    /// Create an in-memory container for tests. Uses the current schema so
+    /// fixture data exercises the same models the app ships with.
     public static func inMemoryContainer() throws -> ModelContainer {
+        try ModelContainer(
+            for: Schema(SchemaV2.models),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+    }
+
+    /// Create an in-memory container at the legacy V1 schema. Used only by
+    /// the V1→V2 migration test to prove a pre-US-12 store opens cleanly
+    /// under V2. Production code never calls this.
+    public static func inMemoryContainerV1() throws -> ModelContainer {
         try ModelContainer(
             for: Schema(SchemaV1.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
