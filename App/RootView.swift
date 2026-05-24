@@ -7,12 +7,23 @@ import SwiftUI
 /// owns its own @State path — that's the fix for DOD-NAV-1.
 struct RootView: View {
 
+    /// `UserDefaults` key that gates the first-launch welcome sheet. Persisted
+    /// as a bool — `true` once the user dismisses the sheet, never set again.
+    /// The `V1` suffix is intentional: if we ever want to re-show onboarding
+    /// after a major redesign we bump to `V2` rather than reading the old key.
+    /// Spec trace: US-8 (post-launch amendment to CL-7).
+    static let onboardingCompletedKey = "dod.onboardingCompletedV1"
+
     @State private var dependencies: AppDependencies
     @State private var selectedTab: AppTab = .feed
+    @State private var showOnboarding: Bool
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(dependencies: AppDependencies) {
         _dependencies = State(initialValue: dependencies)
+        _showOnboarding = State(
+            initialValue: !UserDefaults.standard.bool(forKey: Self.onboardingCompletedKey)
+        )
     }
 
     var body: some View {
@@ -24,7 +35,40 @@ struct RootView: View {
             }
         }
         .task { await dependencies.bootstrap() }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingSheet(
+                title: "Welcome to Dutch Oven Daddy",
+                bullets: Self.welcomeBullets,
+                ctaTitle: "Get cooking",
+                onContinue: {
+                    UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
+                    showOnboarding = false
+                }
+            )
+            .presentationDetents([.large])
+        }
     }
+
+    /// The three highlight rows shown on first launch. Declared as a static so
+    /// the array is not rebuilt every render and so tests/previews can reuse
+    /// the exact same content the app ships.
+    static let welcomeBullets: [OnboardingSheet.Bullet] = [
+        .init(
+            systemImage: "house.fill",
+            title: "Browse the latest",
+            caption: "New cast iron recipes appear at the top."
+        ),
+        .init(
+            systemImage: "magnifyingglass",
+            title: "Search what you've got",
+            caption: "Type any ingredient or technique to filter."
+        ),
+        .init(
+            systemImage: "heart.fill",
+            title: "Save for offline",
+            caption: "Tap the heart on any recipe to cook it without Wi-Fi."
+        ),
+    ]
 
     private var phoneTabs: some View {
         TabView(selection: $selectedTab) {
