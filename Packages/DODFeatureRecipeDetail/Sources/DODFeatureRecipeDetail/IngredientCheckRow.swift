@@ -25,6 +25,7 @@ public struct IngredientCheckRow: View {
                     .dodFont(DODType.body)
                     .foregroundStyle(isChecked ? DODColor.labelSecondary : DODColor.label)
                     .strikethrough(isChecked, color: DODColor.labelSecondary)
+                    .animation(.easeInOut(duration: 0.15), value: isChecked)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.vertical, DODSpacing.xs)
