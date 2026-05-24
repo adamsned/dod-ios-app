@@ -34,14 +34,16 @@ import Testing
         // and the spy counters at zero.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.cachedRecipes[401] = RecipeDetailTestFixtures.makeRecipe(
-            id: 401, withDetail: true
+            id: 401,
+            withDetail: true
         )
         dependencies.fetchedRatingSummary = RecipeRating(recipeID: 401, average: 3.5, count: 4)
         dependencies.fetchedComments = [
             RecipeDetailTestFixtures.makeComment(id: 1, postID: 401, body: "Tasty.")
         ]
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
-            dependencies: dependencies, listItemID: 401
+            dependencies: dependencies,
+            listItemID: 401
         )
 
         await viewModel.onAppear()
@@ -70,7 +72,8 @@ import Testing
             RecipeDetailTestFixtures.makeComment(id: 2, postID: 402, body: "Loved it.")
         ]
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
-            dependencies: dependencies, listItemID: 402
+            dependencies: dependencies,
+            listItemID: 402
         )
 
         await viewModel.onAppear()
@@ -101,7 +104,8 @@ import Testing
         // `fetchedRatingSummary` left nil → fake returns the zero summary.
         // `fetchedComments` left empty → page is empty but the call succeeds.
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
-            dependencies: dependencies, listItemID: 403
+            dependencies: dependencies,
+            listItemID: 403
         )
 
         await viewModel.onAppear()
@@ -127,7 +131,8 @@ import Testing
             RecipeDetailTestFixtures.makeComment(id: 12, postID: 404, body: "Family hit."),
         ]
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
-            dependencies: dependencies, listItemID: 404
+            dependencies: dependencies,
+            listItemID: 404
         )
 
         await viewModel.onAppear()
@@ -152,7 +157,8 @@ import Testing
             RecipeDetailTestFixtures.makeComment(id: 3, postID: 405, body: "Spam.", status: .spam),
         ]
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
-            dependencies: dependencies, listItemID: 405
+            dependencies: dependencies,
+            listItemID: 405
         )
 
         await viewModel.onAppear()
@@ -179,7 +185,8 @@ import Testing
         }
 
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
-            dependencies: dependencies, listItemID: 406
+            dependencies: dependencies,
+            listItemID: 406
         )
 
         // Run `onAppear` concurrently so we can peek at the view model
@@ -212,10 +219,14 @@ import Testing
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 407, withDetail: true)
         dependencies.cachedRatingByRecipe[407] = RecipeRating(
-            recipeID: 407, average: 4.0, count: 1, userRating: 4
+            recipeID: 407,
+            average: 4.0,
+            count: 1,
+            userRating: 4
         )
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
-            dependencies: dependencies, listItemID: 407
+            dependencies: dependencies,
+            listItemID: 407
         )
 
         await viewModel.onAppear()
@@ -231,7 +242,8 @@ import Testing
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 408, withDetail: true)
         dependencies.guestIdentity = (name: "Pat", email: "pat@example.com")
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
-            dependencies: dependencies, listItemID: 408
+            dependencies: dependencies,
+            listItemID: 408
         )
 
         await viewModel.onAppear()

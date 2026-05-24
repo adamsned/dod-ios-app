@@ -12,7 +12,9 @@ import Testing
     @Test func successfulFetchPopulatesRecipeAndRelated() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
-            id: 1, withDetail: true, categoryID: 336
+            id: 1,
+            withDetail: true,
+            categoryID: 336
         )
         dependencies.related = [
             RecipeDetailTestFixtures.makeListItem(id: 100),
@@ -216,7 +218,10 @@ import Testing
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 70, withDetail: true)
         dependencies.guestIdentity = (name: "Sam", email: "sam@example.com")
         dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
-            id: 999, postID: 70, body: "Approved comment.", status: .approved
+            id: 999,
+            postID: 70,
+            body: "Approved comment.",
+            status: .approved
         )
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 70)
         await viewModel.onAppear()
@@ -239,7 +244,10 @@ import Testing
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 71, withDetail: true)
         dependencies.guestIdentity = (name: "Sam", email: "sam@example.com")
         dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
-            id: 1000, postID: 71, body: "Held comment.", status: .hold
+            id: 1000,
+            postID: 71,
+            body: "Held comment.",
+            status: .hold
         )
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 71)
         await viewModel.onAppear()
