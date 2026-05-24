@@ -798,8 +798,56 @@ Added 2026-05-23 by the consultant-pass amendment. Implements the new spec contr
 
 ---
 
-### Cluster: Comments & Ratings integration (US-13/14/15)
-- T-220 RecipeDetail comments + ratings integration (this commit)
+### Cluster: Comments & Ratings (US-13/14/15) || F7-comments
+
+The five-PR cluster that shipped comments + ratings via WP REST +
+WPRM, with Keychain-backed guest identity (no accounts). Wave-1
+(T-210..T-213) ran four worktree subagents in parallel, then
+Wave-2 (T-220) integrated everything into `RecipeDetailView`.
+
+### T-210 — Spec amendment: US-13/14/15 + CL-21/22/23
+- **Scope:** Constitution + spec amendment authorizing comments, ratings, and the guest-identity pattern. Adds US-13 (read + post WP comments), US-14 (1–5 star WPRM ratings), US-15 (Keychain-stored guest name/email — no accounts). Three CL entries with rationale. App Privacy questionnaire expanded for Contact Info: Email + User Content: Customer Support.
+- **Files:** `specs/dod-ios-app/spec.md`, `specs/dod-ios-app/clarifications.md`, `specs/constitution.md`, `Marketing/AppPrivacy.md`, `Marketing/TestFlight.md`, `README.md`.
+- **AC:** Spec contains AC-13.* / AC-14.* / AC-15.* with REG-13 / REG-14 / REG-15 invariants. App Privacy doc reflects the new data categories.
+- **Deps:** none.
+- **Est:** 2h
+- **Shipped:** commit `aa4340a` (`docs(spec): authorize comments + ratings`).
+
+### T-211 — Domain + Networking: WP comments + WPRM ratings clients
+- **Scope:** New domain types `RecipeComment` (Sendable+Hashable+Codable; status enum with `.unknown` fallback) and `RecipeRating` (clamped average 0…5, count ≥ 0). New `WPCommentsClient` (paged GET with `_embed=author` + headers-sourced totals, POST with optional WPRM rating meta) and `WPRMRatingsClient` (dual wrapped/flat decode, degrades to zero-summary on 401/403/offline per REG-14). New `WPDTO.Comment` / `WPDTO.CommentMeta` / `WPDTO.WPRMRatingResponse`. Golden fixtures captured 2026-05-24 from dutchovendaddy.com.
+- **Files:** `Packages/DODDomain/Sources/DODDomain/RecipeComment.swift`, `Packages/DODDomain/Sources/DODDomain/RecipeRating.swift`, `Packages/DODNetworking/Sources/DODNetworking/WPCommentsClient.swift`, `Packages/DODNetworking/Sources/DODNetworking/WPRMRatingsClient.swift`, `Packages/DODNetworking/Sources/DODNetworking/WPDTOs.swift` (additive), fixtures + tests under `Packages/DODNetworking/Tests/`.
+- **AC:** 23 new unit tests (11 comments + 12 ratings) green; 2 DOD_RUN_LIVE_TESTS-gated integration tests for the live blog.
+- **Deps:** T-210.
+- **Est:** 4h
+- **Shipped:** commit `53ed8f4` (`feat(network): WP comments + WPRM ratings clients with golden fixtures`).
+- **||:** F7-comments
+
+### T-212 — Persistence: Schema V3 + Keychain guest identity
+- **Scope:** New SwiftData models `CachedComment` + `CachedRating` (snapshot value types kept independent of `DODDomain` types to break merge-order dependency). New `SchemaV3` + `RecipeStore+CommentsRatings.swift` extension methods for cache + read + invalidate. New `GuestIdentityStoring` protocol with production `KeychainGuestIdentityStore` (delete-then-add per field; thread-safe SecItem calls) and test-side `InMemoryGuestIdentityStore`.
+- **Files:** `Packages/DODPersistence/Sources/DODPersistence/CachedComment.swift`, `Packages/DODPersistence/Sources/DODPersistence/CachedRating.swift`, `Packages/DODPersistence/Sources/DODPersistence/SchemaV3.swift`, `Packages/DODPersistence/Sources/DODPersistence/RecipeStore+CommentsRatings.swift`, `Packages/DODPersistence/Sources/DODPersistence/RecipeStore.swift` (additive), `Packages/DODPersistence/Sources/DODPersistence/SchemaV1.swift`, `Packages/DODPersistence/MIGRATION.md`, `Packages/DODSupport/Sources/DODSupport/GuestIdentityStore.swift`, tests under each.
+- **AC:** 15 new cache tests + 7 new GuestIdentityStore tests green; SchemaV1 → V3 migration covered.
+- **Deps:** T-210.
+- **Est:** 5h
+- **Shipped:** commit `a4a4daf` (`feat(persist): Schema V3 — CachedComment + CachedRating + Keychain GuestIdentityStore`).
+- **||:** F7-comments
+
+### T-213 — DesignSystem: ratings + comments primitives
+- **Scope:** Five new SwiftUI components — `StarRating` (display + interactive), `CommentRow` (author / date / body / optional rating / pending pill), `CommentComposer` (sheet-style submit form with character counter), `GuestIdentitySheet` (non-dismissible name + email collection), `ModerationBadge` (pill for awaitingApproval / posted / failed). Pure presentation; no business logic, network, or Keychain.
+- **Files:** five new files in `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/`, snapshot tests appended to `Packages/DODDesignSystem/Tests/DODDesignSystemTests/SnapshotTests.swift`, 12 PNG baselines under `__Snapshots__/`.
+- **AC:** 12 new snapshot tests pass on iOS Simulator (recorded baselines committed).
+- **Deps:** T-210.
+- **Est:** 3h
+- **Shipped:** commit `9cae2b1` (`feat(design): StarRating + CommentRow + CommentComposer + GuestIdentitySheet`).
+- **||:** F7-comments
+
+### T-220 — RecipeDetail integration
+- **Scope:** Wire the components + clients + cache into `RecipeDetailView`. New `RecipeDetailRatingsSection`, expanded `RecipeDetailViewModel` (`loadRatingsAndComments`, `submitRating`, `submitComment`, `saveGuestIdentityAndContinue`, identity gating, hung-fetch non-blocking), expanded `RecipeDetailDependencies` + `LiveRecipeDetailDependencies` (rating summary fetch with REG-14 graceful zero, paged comments, snapshot ↔ domain bridging). New `AnalyticsEvent.recipeRated(recipeID:stars:)` + `recipeCommentSubmitted(recipeID:awaitingApproval:)`. `AppDependencies` constructs `WPCommentsClient`, `WPRMRatingsClient`, `KeychainGuestIdentityStore` and passes them through. XCUI smoke test asserts the "Ratings & Reviews" header renders.
+- **Files:** `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/RecipeDetailRatingsSection.swift` (new), `RecipeDetailDependencies.swift`, `RecipeDetailViewModel.swift`, `RecipeDetailView.swift`, `Packages/DODAnalytics/Sources/DODAnalytics/AnalyticsEvent.swift`, `App/AppDependencies.swift`, `UITests/RecipeDetailRatingsSmokeTests.swift` (new). Follow-up `9a161a0` extracted `FakeRecipeDetailDependencies` to a separate file and added 8 regression tests + 3 snapshot baselines after the iOS-Sim build surfaced SwiftLint failures that the SPM `swift test` slice missed.
+- **AC:** DODAnalytics 12 tests + DODFeatureRecipeDetail 45 tests green; iOS-Sim app build succeeds; XCUI smoke test asserts the section renders.
+- **Deps:** T-211, T-212, T-213.
+- **Est:** 4h (+1h for the SwiftLint+format regression catch in `9a161a0`)
+- **Shipped:** commits `056f096` (feature) + `9a161a0` (lint/format/regression coverage).
+- **||:** F7-comments
 
 ---
 
@@ -901,8 +949,8 @@ Parallelism tag conventions: tasks sharing `||:` letter can run simultaneously i
 
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) = 90
-- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) = ~182 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) = 95
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) = ~201 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
