@@ -169,6 +169,10 @@ final class DesignSystemSnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: .image(layout: .fixed(width: 158, height: 158)), record: .missing)
     }
 
+    // US-17 saved-recipes widget snapshot tests live in
+    // `SavedWidgetSnapshotTests.swift` to keep this file under SwiftLint's
+    // file-length cap.
+
     // MARK: - US-13 / US-14 / US-15 comments + ratings + guest identity
     //
     // Light mode only — matches the existing convention above. Dark-mode

@@ -156,6 +156,8 @@ public enum WidgetCard {
 
     /// Hero image / fallback gradient. AsyncImage is cheap inside the
     /// widget process; WidgetKit caches its decoded image data.
+    /// `internal` so saved-variant rows declared in
+    /// `WidgetCard+Saved.swift` can reuse the same primitive.
     struct Hero: View {
 
         let url: URL?

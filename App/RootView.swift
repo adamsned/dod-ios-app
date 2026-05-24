@@ -166,11 +166,19 @@ struct RootView: View {
 
     // MARK: - Deep-link routing
 
-    /// Widget URL handler (spec.md US-9 AC-9.2). Switches to Feed and
-    /// hands the link to TabStack via the `pendingDeepLink` binding.
+    /// Widget URL handler (spec.md US-9 AC-9.2, US-17 AC-17.4). For
+    /// recipe + feed routes, switches to Feed and hands the link to the
+    /// TabStack via the `pendingDeepLink` binding. For the saved route
+    /// (US-17), the Saved tab owns the destination directly so we just
+    /// switch tabs — no pending-link push.
     private func handle(widgetLink link: WidgetDeepLink) {
-        selectedTab = .feed
-        pendingDeepLink = link
+        switch link {
+        case .saved:
+            selectedTab = .saved
+        case .feed, .recipe:
+            selectedTab = .feed
+            pendingDeepLink = link
+        }
     }
 
     /// Routes a parsed `DeepLinkIntent` into tab + path state (US-10).
