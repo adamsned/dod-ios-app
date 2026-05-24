@@ -1,16 +1,12 @@
-import AVKit
 import DODDesignSystem
 import DODDomain
 import SwiftUI
-
-#if canImport(UIKit)
-import UIKit
-#endif
 
 /// Recipe detail screen. Header (AC-4.1) + ingredients (AC-4.2) + instructions
 /// (AC-4.3) + optional video (AC-4.4, AC-4.5) + related (AC-4.6) +
 /// save (AC-4.7) + share (AC-4.8). VoiceOver labels (AC-4.10).
 /// Offline-aware (AC-4.9, AC-5.4, AC-5.5).
+/// Cook Now CTA presents Cook Mode (US-7).
 public struct RecipeDetailView: View {
 
     private enum SectionAnchor: Hashable {
@@ -20,6 +16,7 @@ public struct RecipeDetailView: View {
 
     @State private var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
+    @State private var isCookModePresented: Bool = false
     @Environment(\.dismiss) private var dismiss
     public let onSelectRelated: (RecipeListItem) -> Void
 
@@ -44,6 +41,15 @@ public struct RecipeDetailView: View {
         .overlay(alignment: .bottomTrailing) { floatingActionsOverlay }
         .sensoryFeedback(.success, trigger: viewModel.isSaved)
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.checkedIngredientIDs.count)
+        #if os(iOS)
+        .fullScreenCover(isPresented: $isCookModePresented) {
+            cookModeCover
+        }
+        #else
+        .sheet(isPresented: $isCookModePresented) {
+            cookModeCover
+        }
+        #endif
         .task {
             await viewModel.onAppear()
             isOfflineSnapshot = await viewModel.isOffline
@@ -56,6 +62,20 @@ public struct RecipeDetailView: View {
                     dismiss()
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var cookModeCover: some View {
+        if let recipe = viewModel.recipe, !recipe.instructions.isEmpty {
+            CookModeView(
+                recipe: recipe,
+                initialCheckedIngredients: viewModel.checkedIngredientIDs,
+                onClose: { updatedChecks in
+                    viewModel.mergeIngredientChecks(updatedChecks)
+                    isCookModePresented = false
+                }
+            )
         }
     }
 
@@ -96,10 +116,11 @@ public struct RecipeDetailView: View {
                         title: viewModel.listItem.title
                     )
                     RecipeDetailMetaPills(items: metaPillItems)
+                    cookNowSection
                     excerptText
                     RecipeDetailQuickJump(items: quickJumpItems(proxy: proxy))
                     if let video = viewModel.recipe?.video {
-                        videoSection(video)
+                        RecipeDetailVideoSection(video: video, isOfflineSnapshot: isOfflineSnapshot)
                     }
                     ingredientsSection.id(SectionAnchor.ingredients)
                     instructionsSection.id(SectionAnchor.instructions)
@@ -120,6 +141,18 @@ public struct RecipeDetailView: View {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
                 .padding(.horizontal, DODSpacing.md)
+        }
+    }
+
+    /// AC-7.1 CTA. Hidden until the recipe detail has parsed instructions
+    /// — without those, Cook Mode would open onto an empty step list.
+    @ViewBuilder
+    private var cookNowSection: some View {
+        if let recipe = viewModel.recipe, !recipe.instructions.isEmpty {
+            CookNowCTA(onTap: {
+                Task { await viewModel.didTapCookMode() }
+                isCookModePresented = true
+            })
         }
     }
 
@@ -146,37 +179,6 @@ public struct RecipeDetailView: View {
     }
 
     // MARK: - Sections
-
-    @ViewBuilder
-    private func videoSection(_ video: RecipeVideo) -> some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text("Video")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-                .padding(.horizontal, DODSpacing.md)
-            if isOfflineSnapshot {
-                // AC-5.5 — saved-offline placeholder.
-                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
-                    .fill(DODColor.surfaceElevated)
-                    .frame(height: 200)
-                    .overlay(
-                        VStack(spacing: DODSpacing.xs) {
-                            Image(systemName: "play.slash")
-                                .font(.title)
-                                .foregroundStyle(DODColor.labelSecondary)
-                            Text("Video unavailable offline")
-                                .dodFont(DODType.caption)
-                                .foregroundStyle(DODColor.labelSecondary)
-                        }
-                    )
-                    .padding(.horizontal, DODSpacing.md)
-            } else {
-                VideoPlayer(player: AVPlayer(url: video.url))
-                    .frame(height: 200)
-                    .padding(.horizontal, DODSpacing.md)
-            }
-        }
-    }
 
     private var ingredientsSection: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {

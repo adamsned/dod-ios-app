@@ -79,6 +79,41 @@ import Testing
         #expect(!viewModel.checkedIngredientIDs.contains(firstID))
     }
 
+    @Test func cookModeTelemetryFiresOnceThenIsIdempotent() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = Self.makeRecipe(id: 11, withDetail: true)
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 11)
+        await viewModel.onAppear()
+        await viewModel.didTapCookMode()
+        await viewModel.didTapCookMode()
+        await viewModel.didTapCookMode()
+        // AC-7.7 — "first time Cook Mode is entered for a given recipe
+        // during a session" — repeat taps don't re-fire.
+        let cookEvents = dependencies.telemetryEvents.filter { event in
+            if case .cookModeStarted = event { return true }
+            return false
+        }
+        #expect(cookEvents.count == 1)
+        if case .cookModeStarted(let recipeID) = cookEvents.first {
+            #expect(recipeID == 11)
+        } else {
+            Issue.record("Expected cookModeStarted event")
+        }
+    }
+
+    @Test func mergeIngredientChecksReplacesSet() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = Self.makeRecipe(id: 12, withDetail: true)
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 12)
+        await viewModel.onAppear()
+        let id1 = UUID()
+        let id2 = UUID()
+        viewModel.mergeIngredientChecks([id1, id2])
+        #expect(viewModel.checkedIngredientIDs == [id1, id2])
+        viewModel.mergeIngredientChecks([])
+        #expect(viewModel.checkedIngredientIDs.isEmpty)
+    }
+
     // MARK: - Helpers
 
     static func makeViewModel(

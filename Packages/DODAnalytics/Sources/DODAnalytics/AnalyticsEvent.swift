@@ -2,8 +2,10 @@ import Foundation
 
 /// Compile-enforced allowlist of analytics events.
 ///
-/// Constitution §9 caps v1 tracking to these eight event types. Adding a new
-/// case here requires a constitution amendment **and** an App Privacy review.
+/// Constitution §9 caps v1 tracking to this allowlist. Adding a new case
+/// here requires a constitution amendment **and** an App Privacy review.
+/// The consultant-pass amendment (2026-05-23) added `cookModeStarted` for
+/// US-7 (Cook Mode); see spec AC-7.7.
 ///
 /// All payload values are anonymous by design: no PII, no IDFA, no raw user
 /// input. Search queries are hashed (spec AC-3.6).
@@ -33,6 +35,10 @@ public enum AnalyticsEvent: Sendable, Hashable {
 
     /// User opened a saved recipe while the device was offline.
     case offlineRead(recipeID: Int)
+
+    /// Cook Mode (US-7) entered for a recipe. Fires once per recipe per
+    /// session — see ``RecipeDetailViewModel.startCookMode()``.
+    case cookModeStarted(recipeID: Int)
 }
 
 extension AnalyticsEvent {
@@ -47,6 +53,7 @@ extension AnalyticsEvent {
         case .recipeSearched: "recipe_searched"
         case .recipeShared: "recipe_shared"
         case .offlineRead: "offline_read"
+        case .cookModeStarted: "cook_mode_started"
         }
     }
 
@@ -69,6 +76,8 @@ extension AnalyticsEvent {
         case .recipeShared(let recipeID):
             ["recipe_id": String(recipeID)]
         case .offlineRead(let recipeID):
+            ["recipe_id": String(recipeID)]
+        case .cookModeStarted(let recipeID):
             ["recipe_id": String(recipeID)]
         }
     }
