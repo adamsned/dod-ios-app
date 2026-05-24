@@ -6,7 +6,22 @@ Built spec-first. See [`specs/`](specs/) for the constitution, spec, plan, and t
 
 ## Status
 
-Phase 5 — Implement, Cluster A (scaffolding).
+Phase 6 — Iterate. v1.0 feature-complete, navigation bug DOD-NAV-1 fixed, full
+test pyramid (L1 unit + L2 live-API + L3 UI smoke + L4 visual regression) wired
+into CI. Pre-TestFlight checklist outstanding — see
+[`Marketing/TestFlight.md`](Marketing/TestFlight.md).
+
+## Read the spec first
+
+This repo is built spec-first. If you're new, read in this order:
+
+1. [`specs/constitution.md`](specs/constitution.md) — immutable rules (stack, testing, privacy, deps).
+2. [`specs/dod-ios-app/spec.md`](specs/dod-ios-app/spec.md) — user stories + acceptance criteria.
+3. [`specs/dod-ios-app/plan.md`](specs/dod-ios-app/plan.md) — architecture (modular Swift Packages).
+4. [`specs/dod-ios-app/tasks.md`](specs/dod-ios-app/tasks.md) — original task breakdown T-001..T-184.
+5. [`specs/dod-ios-app/clarifications.md`](specs/dod-ios-app/clarifications.md) — CL-1..CL-10 decisions with rationale.
+
+Every PR should cite the T-ID and AC IDs it implements (constitution §11).
 
 ## Prerequisites
 

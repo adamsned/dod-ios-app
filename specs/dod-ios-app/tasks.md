@@ -1,0 +1,755 @@
+# Tasks — Dutch Oven Daddy iOS App v1
+
+**Status:** Phase 4 — Tasks, draft for review
+**Implements:** [`plan.md`](plan.md)
+**Realizes:** [`spec.md`](spec.md)
+
+Each task is a single PR, 1–4 hours of focused work. Field meanings:
+
+- **Scope** — what the PR does, in one or two sentences. If it grows beyond this, split it.
+- **Files** — files likely touched. Not exhaustive; new helpers are fine, sweeping unrelated edits are not.
+- **AC** — acceptance: the test or verification that proves the task is done. References `spec.md` AC IDs when applicable.
+- **Deps** — task IDs that must merge first. Empty = parallel-safe right now.
+- **Est** — engineering hours estimate.
+- **||** — parallel cluster tag. Tasks sharing a tag can be picked up by separate contributors at the same time.
+
+---
+
+## Cluster A — Repo scaffolding (sequential start)
+
+### T-001 — Create Xcode project + git repo
+- **Scope:** Init `DODApp.xcodeproj`, iOS 17 minimum, universal (iPhone+iPad), Swift 5.9+. Create git repo with `.gitignore` (Xcode, SPM, `.DS_Store`, `*.xcconfig` for secrets).
+- **Files:** `DODApp.xcodeproj/`, `App/DODApp.swift`, `App/RootView.swift`, `.gitignore`, `README.md` (stub).
+- **AC:** `git status` clean; `xcodebuild -scheme DODApp -destination 'platform=iOS Simulator,name=iPhone 15'` succeeds; app launches to a black screen.
+- **Deps:** —
+- **Est:** 2h
+- **||:** A-start
+
+### T-002 — Add SwiftLint config
+- **Scope:** Add `.swiftlint.yml` with rules per constitution §10. Wire as a build-phase script. Warnings fail CI.
+- **Files:** `.swiftlint.yml`, build-phase script.
+- **AC:** `swiftlint --strict` exits 0 on empty project. Intentional rule violation in a scratch file fails CI.
+- **Deps:** T-001
+- **Est:** 1h
+- **||:** A-config
+
+### T-003 — Add swift-format + pre-commit
+- **Scope:** Add `.swift-format` (Apple defaults), a `bin/format.sh`, and a pre-commit hook docs entry.
+- **Files:** `.swift-format`, `bin/format.sh`, `README.md`.
+- **AC:** `swift-format format --in-place -r .` produces no diff on a freshly cloned repo.
+- **Deps:** T-001
+- **Est:** 1h
+- **||:** A-config
+
+### T-004 — CI workflow (GitHub Actions)
+- **Scope:** `.github/workflows/ci.yml` builds + runs all unit tests on every PR. Cache derived data. Lint job runs in parallel.
+- **Files:** `.github/workflows/ci.yml`.
+- **AC:** Open a draft PR; CI completes green within 10 minutes; failing the lint deliberately fails the run.
+- **Deps:** T-001, T-002
+- **Est:** 2h
+- **||:** A-config
+
+### T-005 — Create 11 Package.swift skeletons
+- **Scope:** Add `Packages/DODDomain`, `DODSupport`, `DODDesignSystem`, `DODAnalytics`, `DODNetworking`, `DODPersistence`, `DODFeatureFeed`, `DODFeatureCategories`, `DODFeatureSearch`, `DODFeatureRecipeDetail`, `DODFeatureSaved`. Each with empty `Sources/` and `Tests/` and a single placeholder `.swift` file so the package compiles.
+- **Files:** 11× `Packages/*/Package.swift`, 11× `Sources/*/Placeholder.swift`, 11× `Tests/*/PlaceholderTests.swift`.
+- **AC:** Each `swift build` inside its own package directory succeeds; `swift test` finds and runs zero tests cleanly.
+- **Deps:** T-001
+- **Est:** 3h
+- **||:** A-modules
+
+### T-006 — Wire packages into the app target
+- **Scope:** Add all 11 packages as local Swift Package dependencies of the `DODApp` Xcode target. Verify the app still builds and launches.
+- **Files:** Xcode project file; minor `DODApp.swift` imports to confirm linkage.
+- **AC:** `xcodebuild` succeeds; `import DODDomain` (etc.) resolves in the app target.
+- **Deps:** T-005
+- **Est:** 2h
+- **||:** A-modules
+
+---
+
+## Cluster B — Foundation modules (parallel after Cluster A)
+
+### DODDomain (||: B-domain)
+
+### T-010 — Recipe + RecipeListItem
+- **Scope:** Define `Recipe` and `RecipeListItem` structs per plan §2. Sendable, Hashable, Identifiable. Detail fields are optionals (populated post-JSON-LD).
+- **Files:** `Sources/DODDomain/Recipe.swift`, `RecipeListItem.swift`.
+- **AC:** Type conformance unit tests pass (Hashable equality, Codable round-trip).
+- **Deps:** T-006
+- **Est:** 2h
+
+### T-011 — Category + ingredient/instruction/video/nutrition value types
+- **Scope:** Define `Category`, `RecipeIngredient`, `RecipeInstruction`, `RecipeVideo`, `RecipeNutrition` per plan §2.
+- **Files:** `Sources/DODDomain/Category.swift`, `RecipeIngredient.swift`, `RecipeInstruction.swift`, `RecipeVideo.swift`, `RecipeNutrition.swift`.
+- **AC:** Unit tests for each conformance.
+- **Deps:** T-006
+- **Est:** 2h
+
+### DODSupport (||: B-support)
+
+### T-020 — HTMLSanitizer
+- **Scope:** Strip HTML tags + decode entities from a WP excerpt to plain text. Pure function.
+- **Files:** `Sources/DODSupport/HTMLSanitizer.swift`, `Tests/HTMLSanitizerTests.swift`.
+- **AC:** 8+ golden cases pass (entities, nested tags, empty input, multibyte).
+- **Deps:** T-006
+- **Est:** 2h
+
+### T-021 — StringHasher
+- **Scope:** SHA256 hex digest of a lowercased, trimmed string. Used for hashed search-query telemetry (AC-3.6).
+- **Files:** `Sources/DODSupport/StringHasher.swift`, `Tests/StringHasherTests.swift`.
+- **AC:** Stable digest for the same input; differs by 1 character difference.
+- **Deps:** T-006
+- **Est:** 1h
+
+### T-022 — Logger
+- **Scope:** OSLog wrapper with category-per-subsystem. Public API: `Logger.network`, `Logger.persistence`, `Logger.ui`. Never logs user input strings (redact at the boundary).
+- **Files:** `Sources/DODSupport/Logger.swift`, `Tests/LoggerTests.swift`.
+- **AC:** Logged messages reach `os_log` (verified via lightweight subscriber in test); redaction helper truncates user-input fields.
+- **Deps:** T-006
+- **Est:** 1h
+
+### DODDesignSystem (||: B-design)
+
+### T-030 — Color palette + asset catalog
+- **Scope:** Asset catalog with light/dark variants for every semantic color from plan §5. `DODColor` enum exposes them as `Color`.
+- **Files:** `Sources/DODDesignSystem/Resources/Colors.xcassets`, `Sources/DODDesignSystem/Colors.swift`.
+- **AC:** Snapshot test renders a swatch grid in light + dark on iPhone + iPad; no missing-asset warnings.
+- **Deps:** T-006
+- **Est:** 2h
+
+### T-031 — Typography ramp
+- **Scope:** `DODType` enum exposing system-font styles with Dynamic Type binding. AX5 supported.
+- **Files:** `Sources/DODDesignSystem/Typography.swift`, snapshot tests at default + AX5 sizes.
+- **AC:** Snapshot tests pass at `.large` and `.accessibility5`.
+- **Deps:** T-006
+- **Est:** 2h
+
+### T-032 — Spacing constants
+- **Scope:** `DODSpacing` enum with the 4/8/12/16/24/32 grid.
+- **Files:** `Sources/DODDesignSystem/Spacing.swift`.
+- **AC:** Compiles; no public surface change checked by snapshot tests in T-033+.
+- **Deps:** T-006
+- **Est:** 0.5h
+
+### T-033 — EmptyState component
+- **Scope:** `EmptyState(title:, body:, action:)` — icon + title + body + optional CTA button.
+- **Files:** `Sources/DODDesignSystem/Components/EmptyState.swift`, snapshot tests.
+- **AC:** Snapshot light/dark, iPhone/iPad, with and without CTA.
+- **Deps:** T-030, T-031, T-032
+- **Est:** 2h
+
+### T-034 — OfflineBanner component
+- **Scope:** Non-blocking top banner per CC-2. Slides in on offline, slides out on reconnect. Pure SwiftUI.
+- **Files:** `OfflineBanner.swift`, snapshot tests.
+- **AC:** Snapshot pinned visible; animation timing covered by a 100ms unit test on the view model.
+- **Deps:** T-030, T-031, T-032
+- **Est:** 2h
+
+### T-035 — LoadingSkeleton component
+- **Scope:** Shimmer-skeleton rows for use in list and detail screens. Respects Reduce Motion (static gradient when set).
+- **Files:** `LoadingSkeleton.swift`, snapshot + reduce-motion tests.
+- **AC:** Snapshots pass; with Reduce Motion enabled, animation is replaced with a static fill.
+- **Deps:** T-030, T-031, T-032
+- **Est:** 2h
+
+### T-036 — Snackbar component
+- **Scope:** Auto-dismissing bottom snackbar with optional Undo button. Used for save-toggle undo (AC-5.1) and recipe-unavailable (AC-4.11).
+- **Files:** `Snackbar.swift`, snapshot + dismiss-timer tests.
+- **AC:** Snapshot pass; dismiss-timer test asserts 4s default; explicit `Undo` button visible when action is provided.
+- **Deps:** T-030, T-031, T-032
+- **Est:** 2h
+
+### T-037 — RecipeCard component
+- **Scope:** Reusable list row: hero image (AsyncImage placeholder), title (1–2 lines), excerpt (2 lines), total-time chip. Used by Feed, Category, Search, Saved.
+- **Files:** `RecipeCard.swift`, snapshot tests.
+- **AC:** Snapshot light/dark, iPhone/iPad. Truncates correctly at AX5.
+- **Deps:** T-030, T-031, T-032
+- **Est:** 3h
+
+### DODAnalytics (||: B-analytics)
+
+### T-040 — AnalyticsEvent sealed enum
+- **Scope:** Sealed enum listing every allowlisted event from constitution §9 (`appOpen`, `screenView`, `recipeView`, `recipeSaved`, `recipeUnsaved`, `recipeSearched`, `recipeShared`, `offlineRead`). Compiler-enforced allowlist.
+- **Files:** `Sources/DODAnalytics/AnalyticsEvent.swift`, `Tests/AnalyticsEventTests.swift`.
+- **AC:** Cannot construct an unknown event (proven by a doc-comment + a compile-check test in a private fixture file).
+- **Deps:** T-006
+- **Est:** 1h
+
+### T-041 — Telemetry wrapper
+- **Scope:** Add `TelemetryDeck/SwiftSDK` SPM dep to `DODAnalytics`. `Telemetry.start(appID:)` and `Telemetry.send(_ event: AnalyticsEvent)`. No other code in the app imports TelemetryDeck.
+- **Files:** `Package.swift` (deps), `Sources/DODAnalytics/Telemetry.swift`, `Tests/TelemetryTests.swift`.
+- **AC:** Test injects a fake transport, sends each `AnalyticsEvent`, asserts the right payload shape; verifies no PII fields leak.
+- **Deps:** T-040
+- **Est:** 2h
+
+---
+
+## Cluster C — Networking module (after Cluster B Domain + Support)
+
+### T-050 — WPClientError + URLSession baseline
+- **Scope:** Typed error enum (`networkUnavailable`, `httpStatus(Int)`, `decoding`, `timeout`). `WPRestClient` initializer takes a `URLSession` for testability.
+- **Files:** `Sources/DODNetworking/WPClientError.swift`, `WPRestClient.swift` skeleton.
+- **AC:** Compile + unit test that maps URLSession errors to WPClientError cases.
+- **Deps:** T-010, T-011
+- **Est:** 1.5h
+
+### T-051 — WPRestClient.posts (paged)
+- **Scope:** `func posts(categoryID: Int?, page: Int) async throws -> [RecipeListItem]`. Uses `_fields` to keep payload small. 20 per page (CL-2).
+- **Files:** `WPRestClient.swift`, fixture JSON in tests.
+- **AC:** Unit test against checked-in fixture returns parsed items; pagination param appears in URL.
+- **Deps:** T-050
+- **Est:** 2h
+
+### T-052 — WPRestClient.categories
+- **Scope:** `func categories() async throws -> [Category]`, `per_page=100`, `hide_empty=true`.
+- **Files:** `WPRestClient.swift`, fixture.
+- **AC:** Categories parsed and sorted; `count==0` already filtered by the API param.
+- **Deps:** T-050
+- **Est:** 1.5h
+
+### T-053 — WPRestClient.search
+- **Scope:** `func search(query: String, page: Int) async throws -> [RecipeListItem]`. URL-encodes the query.
+- **Files:** `WPRestClient.swift`, fixture.
+- **AC:** Unit tests cover empty, 1-char (returns empty by client guard — actual debounce in feature), happy path.
+- **Deps:** T-050
+- **Est:** 1.5h
+
+### T-054 — WPRestClient.media (image size resolution)
+- **Scope:** `func media(id: Int) async throws -> MediaSizes`. Returns `medium_large` and largest-≤-2048px URLs per CL-6.
+- **Files:** `WPRestClient.swift`, `MediaSizes.swift`, fixture.
+- **AC:** Fixture media response yields the correct URLs for list and hero sizes.
+- **Deps:** T-050
+- **Est:** 2h
+
+### T-055 — NetworkMonitor
+- **Scope:** Actor wrapping `NWPathMonitor`. Exposes `var isOnline: Bool` and an `AsyncStream<Bool>` of changes.
+- **Files:** `Sources/DODNetworking/NetworkMonitor.swift`, tests with a fake path provider.
+- **AC:** Stream emits on simulated change.
+- **Deps:** T-006
+- **Est:** 2h
+
+### T-056 — RecipePageFetcher
+- **Scope:** `func html(for url: URL) async throws -> String`. Sets `Accept-Encoding: gzip`. 30s timeout.
+- **Files:** `RecipePageFetcher.swift`, fixture.
+- **AC:** Test using stubbed `URLSession` returns the expected body.
+- **Deps:** T-050
+- **Est:** 1.5h
+
+### T-057 — JSONLDRecipeParser: extract <script> blocks
+- **Scope:** Pure-Swift regex/scan to pull every `<script type="application/ld+json">…</script>` payload from an HTML string. No HTML parser dependency.
+- **Files:** `JSONLDRecipeParser.swift`, tests with checked-in mini HTML.
+- **AC:** Test with 3-block HTML returns exactly 3 strings; malformed boundaries gracefully return what is parseable.
+- **Deps:** T-006
+- **Est:** 2h
+
+### T-058 — JSONLDRecipeParser: map @type:Recipe → Recipe
+- **Scope:** Walk parsed JSON, find object with `@type == "Recipe"` (handles `@graph` envelopes). Map fields to `Recipe` partial.
+- **Files:** `JSONLDRecipeParser.swift`, tests.
+- **AC:** Single-recipe fixture yields populated `Recipe`; missing block returns typed `.notFound` error.
+- **Deps:** T-057, T-010, T-011
+- **Est:** 3h
+
+### T-059 — JSONLDRecipeParser: instruction shape variants (R-4)
+- **Scope:** Handle both `recipeInstructions` as `[String]` and `[HowToStep]`. Same for `[HowToSection]` containing steps.
+- **Files:** `JSONLDRecipeParser.swift`, fixture HTMLs covering both shapes.
+- **AC:** Both fixtures parse to equivalent `[RecipeInstruction]` arrays.
+- **Deps:** T-058
+- **Est:** 2h
+
+### T-060 — ImageLoader actor
+- **Scope:** Actor with `func image(for: URL) async throws -> Data`. Uses `URLSession` + disk cache (passed in from Persistence later — for now an in-memory `NSCache`).
+- **Files:** `ImageLoader.swift`, tests with stub session.
+- **AC:** Concurrent calls for the same URL coalesce into a single network request.
+- **Deps:** T-050
+- **Est:** 2h
+
+### T-061 — Golden-file HTML fixtures
+- **Scope:** Check in 5 representative HTML files from the live blog: cake, savory, soup, bread, the temperature-chart non-recipe.
+- **Files:** `Tests/DODNetworkingTests/Fixtures/*.html`.
+- **AC:** Files committed (LFS not needed at this size). Each <1 MB.
+- **Deps:** —
+- **Est:** 1h
+
+### T-062 — Golden-file parser tests
+- **Scope:** For each fixture: assert that 4 parse to a populated `Recipe`, the temperature-chart fixture fails with `.notFound`. Lock the JSON-LD contract.
+- **Files:** `Tests/DODNetworkingTests/GoldenParseTests.swift`.
+- **AC:** All assertions pass.
+- **Deps:** T-058, T-059, T-061
+- **Est:** 2h
+
+---
+
+## Cluster D — Persistence module (after Cluster B Domain)
+
+### T-070 — CachedRecipe @Model
+- **Scope:** `@Model final class CachedRecipe` per plan §2.
+- **Files:** `Sources/DODPersistence/CachedRecipe.swift`.
+- **AC:** Compiles; in-memory `ModelContainer` test inserts + fetches one row.
+- **Deps:** T-010
+- **Est:** 2h
+
+### T-071 — CachedListPage @Model
+- **Scope:** Per plan §2.
+- **Files:** `CachedListPage.swift`.
+- **AC:** In-memory test inserts a page keyed `home`, fetches it back.
+- **Deps:** T-006
+- **Est:** 1h
+
+### T-072 — CachedImage @Model
+- **Scope:** Per plan §2.
+- **Files:** `CachedImage.swift`.
+- **AC:** Insert + fetch test passes.
+- **Deps:** T-006
+- **Est:** 1h
+
+### T-073 — RecipeStore CRUD
+- **Scope:** `RecipeStore` actor with `save(_ recipe: Recipe)`, `cache(_ listItem: RecipeListItem)`, `recipe(id:) -> Recipe?`, `toggleSaved(id:) async throws`.
+- **Files:** `RecipeStore.swift`, tests.
+- **AC:** Round-trip tests for each method.
+- **Deps:** T-070, T-071, T-072
+- **Est:** 3h
+
+### T-074 — CachePolicy LRU (100 unsaved)
+- **Scope:** `evictIfNeeded()` keeps unsaved CachedRecipe rows ≤ 100 by oldest `lastViewedAt`. Saved rows never evicted (NFR-1).
+- **Files:** `CachePolicy.swift`, tests.
+- **AC:** Insert 110 unsaved + 10 saved; after policy run, count is 110 (100 unsaved + 10 saved).
+- **Deps:** T-073
+- **Est:** 2h
+
+### T-075 — CachePolicy image budget (200 MB)
+- **Scope:** Evict oldest non-pinned images until total `bytes` ≤ 200 MB (NFR-2).
+- **Files:** `CachePolicy.swift`, tests.
+- **AC:** Test with synthetic 1 MB rows asserts post-policy total.
+- **Deps:** T-074
+- **Est:** 2h
+
+### T-076 — Blocklist logic for AC-1.7
+- **Scope:** `RecipeStore.markJSONLDFailed(id:)`, `clearBlocklist()` (used by pull-to-refresh). Queries that drive lists exclude rows with `jsonLDFailedAt != nil`.
+- **Files:** `RecipeStore.swift`, tests.
+- **AC:** Insert blocklisted row + healthy row; list query returns only the healthy one. After `clearBlocklist()`, both appear.
+- **Deps:** T-073
+- **Est:** 2h
+
+### T-077 — SwiftData schema version + migration template
+- **Scope:** Define `Schema(versionedSchema: V1.self)`. Add `MigrationPlan` skeleton with a doc note: future schema changes are additive-only (R-5).
+- **Files:** `SchemaV1.swift`, `MigrationPlan.swift`, `MIGRATION.md`.
+- **AC:** App boots with V1 store; doc reviewed.
+- **Deps:** T-070, T-071, T-072
+- **Est:** 2h
+
+---
+
+## Cluster E — Feature modules (parallel after Cluster C + D)
+
+### DODFeatureFeed (||: E-feed)
+
+### T-080 — FeedRow binding
+- **Scope:** Adapter from `RecipeListItem` to `RecipeCard` (DesignSystem). Lives in feature for now; if reused elsewhere unchanged, promote later.
+- **Files:** `FeedRow.swift`, snapshot test.
+- **AC:** Snapshot pass.
+- **Deps:** T-037, T-010
+- **Est:** 1h
+
+### T-081 — FeedViewModel: initial load + infinite scroll
+- **Scope:** `@Observable` view model. Loads page 1 on appear, pages on bottom-trigger. Holds offline flag from injected `NetworkMonitor`.
+- **Files:** `FeedViewModel.swift`, tests with fake client.
+- **AC:** AC-1.1, AC-1.2 covered by unit tests.
+- **Deps:** T-051, T-055, T-073
+- **Est:** 3h
+
+### T-082 — FeedView pull-to-refresh
+- **Scope:** SwiftUI view with `.refreshable`. Calls VM refresh, which clears blocklist (T-076).
+- **Files:** `FeedView.swift`, UI test.
+- **AC:** AC-1.4 + the AC-1.7 reset behavior covered.
+- **Deps:** T-081, T-076
+- **Est:** 2h
+
+### T-083 — Offline banner integration
+- **Scope:** Wire `OfflineBanner` to `FeedViewModel.isOffline`. Cached page hydration when offline.
+- **Files:** `FeedView.swift`, `FeedViewModel.swift`.
+- **AC:** AC-1.6 covered.
+- **Deps:** T-082, T-034
+- **Est:** 2h
+
+### T-084 — First-launch offline empty state
+- **Scope:** Show `EmptyState` with "You need internet to load recipes the first time" + Retry when no cached page exists and offline.
+- **Files:** `FeedView.swift`.
+- **AC:** AC-1.5 covered.
+- **Deps:** T-083, T-033
+- **Est:** 1h
+
+### T-085 — List filter for blocklisted posts
+- **Scope:** Query path uses the blocklist-aware list method from T-076.
+- **Files:** `FeedViewModel.swift`.
+- **AC:** AC-1.7 covered by unit test.
+- **Deps:** T-076, T-081
+- **Est:** 1h
+
+### T-086 — Feed AC sweep tests
+- **Scope:** Audit `FeedViewModelTests` + `FeedViewTests` ensure every AC-1.* maps to a named test.
+- **Files:** test additions, no production code.
+- **AC:** Audit checklist in PR description maps AC-1.1..1.7 → test names.
+- **Deps:** T-080..T-085
+- **Est:** 2h
+
+### DODFeatureCategories (||: E-cats)
+
+### T-090 — CategoryListViewModel + view
+- **Scope:** Fetches categories, alpha-sorts, hides count==0 (already filtered server-side; double-check client-side).
+- **Files:** `CategoryListViewModel.swift`, `CategoryListView.swift`, tests.
+- **AC:** AC-2.1, AC-2.2 covered.
+- **Deps:** T-052
+- **Est:** 2h
+
+### T-091 — CategoryRecipesViewModel + view
+- **Scope:** Paged list scoped to a category id. Reuses `FeedRow` indirectly via `RecipeCard`.
+- **Files:** `CategoryRecipesViewModel.swift`, `CategoryRecipesView.swift`, tests.
+- **AC:** AC-2.3 covered.
+- **Deps:** T-051, T-037
+- **Est:** 3h
+
+### T-092 — Categories AC sweep
+- **Scope:** Tests for AC-2.4 (empty-zero hidden), AC-2.5 (error state).
+- **Files:** test additions.
+- **AC:** Mapping documented.
+- **Deps:** T-090, T-091
+- **Est:** 1.5h
+
+### DODFeatureSearch (||: E-search)
+
+### T-100 — SearchViewModel debounce
+- **Scope:** `@Observable` VM with 300ms debounce via `task(id: query)` + `Task.sleep`.
+- **Files:** `SearchViewModel.swift`, tests using a manual clock.
+- **AC:** AC-3.1 covered; debounce verified.
+- **Deps:** T-053
+- **Est:** 2h
+
+### T-101 — SearchView UI + empty/error
+- **Scope:** Text field with clear button. Results list (RecipeCard). Empty + offline states.
+- **Files:** `SearchView.swift`.
+- **AC:** AC-3.3, AC-3.4, AC-3.5, AC-3.7 covered.
+- **Deps:** T-100, T-037, T-033, T-034
+- **Est:** 3h
+
+### T-102 — Hashed-query analytics
+- **Scope:** On each finalized search, call `Telemetry.send(.recipeSearched(queryHash:))`. Hash via `StringHasher`. Raw string never sent.
+- **Files:** `SearchViewModel.swift`, test asserting payload.
+- **AC:** AC-3.6 covered; assertion that raw query is absent from outgoing payload.
+- **Deps:** T-100, T-041, T-021
+- **Est:** 1h
+
+### T-103 — Search AC sweep
+- **Scope:** AC-3.2 (title+excerpt scope; ingredient-body deferred — add an in-app note in the empty state when results look sparse).
+- **Files:** `SearchView.swift`, test.
+- **AC:** Mapping documented.
+- **Deps:** T-101
+- **Est:** 1h
+
+### DODFeatureRecipeDetail (||: E-detail, largest cluster)
+
+### T-110 — RecipeDetailViewModel skeleton
+- **Scope:** Loads cached `RecipeListItem` instantly for header; triggers async detail fetch via `RecipePageFetcher` + `JSONLDRecipeParser`. Surfaces loading/error states.
+- **Files:** `RecipeDetailViewModel.swift`, tests with fake fetcher.
+- **AC:** Header renders immediately; detail fields populate after fetch resolves.
+- **Deps:** T-056, T-058, T-059, T-073
+- **Est:** 3h
+
+### T-111 — Detail header
+- **Scope:** Hero image (large size), title, short description, meta row (prep/cook/total/servings).
+- **Files:** `RecipeDetailView.swift`, snapshot.
+- **AC:** AC-4.1 covered.
+- **Deps:** T-110, T-037, T-054, T-060
+- **Est:** 2h
+
+### T-112 — Ingredient section + checkbox row
+- **Scope:** `IngredientCheckRow` with tap-to-strike. State held in VM, not persisted (AC-4.2).
+- **Files:** `IngredientCheckRow.swift`, section view, tests.
+- **AC:** AC-4.2 covered; VoiceOver announces toggle state.
+- **Deps:** T-110
+- **Est:** 2h
+
+### T-113 — Instruction section
+- **Scope:** `InstructionStep` numbered rows; readable line spacing; Dynamic Type to AX5.
+- **Files:** `InstructionStep.swift`, section view, snapshot at AX5.
+- **AC:** AC-4.3 covered.
+- **Deps:** T-110, T-031
+- **Est:** 2h
+
+### T-114 — Video player section
+- **Scope:** AVKit `VideoPlayer` inline when `recipe.video != nil`. PiP enabled. Hidden block when nil.
+- **Files:** detail view additions, tests.
+- **AC:** AC-4.4, AC-4.5 covered.
+- **Deps:** T-110
+- **Est:** 3h
+
+### T-115 — RelatedRecipesStrip
+- **Scope:** Horizontal scroll of 3–4 related recipes from same primary category. Hidden when offline (AC-5.6).
+- **Files:** `RelatedRecipesStrip.swift`, tests.
+- **AC:** AC-4.6, AC-5.6 covered.
+- **Deps:** T-110, T-051
+- **Est:** 3h
+
+### T-116 — Save button + haptic
+- **Scope:** Heart icon in nav bar. Toggles `isSaved` via `RecipeStore`. Haptic feedback. Snackbar with Undo on unsave.
+- **Files:** `RecipeDetailView.swift`, VM, tests.
+- **AC:** AC-4.7, AC-5.1 covered.
+- **Deps:** T-110, T-076, T-036
+- **Est:** 2h
+
+### T-117 — Share button + iOS share sheet
+- **Scope:** ShareLink with `recipe.canonicalURL`. Fires `Telemetry.send(.recipeShared)`.
+- **Files:** `RecipeDetailView.swift`, tests.
+- **AC:** AC-4.8, AC-6.1, AC-6.2, AC-6.3 covered.
+- **Deps:** T-110, T-041
+- **Est:** 1h
+
+### T-118 — Offline recipe rendering
+- **Scope:** When offline and recipe is saved, all sections render from cache; no network calls.
+- **Files:** VM logic, tests.
+- **AC:** AC-4.9, AC-5.4 covered.
+- **Deps:** T-110, T-073
+- **Est:** 2h
+
+### T-119 — Recipe-unavailable failure path
+- **Scope:** On JSON-LD parse failure: nav pop + snackbar; mark post via `markJSONLDFailed`.
+- **Files:** VM logic, view glue, tests.
+- **AC:** AC-4.11 covered.
+- **Deps:** T-110, T-076, T-036
+- **Est:** 2h
+
+### T-120 — VoiceOver pass on detail
+- **Scope:** Hero image alt = recipe title. Ingredient checkboxes announce state. Instruction list reachable in order.
+- **Files:** accessibility modifiers in detail screen.
+- **AC:** AC-4.10 covered; Accessibility Inspector clean.
+- **Deps:** T-111, T-112, T-113
+- **Est:** 2h
+
+### T-121 — Detail AC sweep
+- **Scope:** Final audit; every AC-4.* and AC-6.* has a named test.
+- **Files:** test additions.
+- **AC:** Mapping documented in PR description.
+- **Deps:** T-110..T-120
+- **Est:** 2h
+
+### DODFeatureSaved (||: E-saved)
+
+### T-130 — SavedViewModel
+- **Scope:** SwiftData query for `CachedRecipe` where `isSaved == true`, newest-saved-first.
+- **Files:** `SavedViewModel.swift`, tests.
+- **AC:** AC-5.3 covered.
+- **Deps:** T-073
+- **Est:** 2h
+
+### T-131 — SavedView
+- **Scope:** List of `RecipeCard`s. Tap → `RecipeDetailView`.
+- **Files:** `SavedView.swift`, snapshot.
+- **AC:** Snapshot pass; navigation test asserts tap behavior.
+- **Deps:** T-130, T-037
+- **Est:** 1.5h
+
+### T-132 — Save action pre-download
+- **Scope:** On `toggleSaved` true→: fetch + persist full `Recipe` body and both image sizes within 5s on a normal connection. Background `Task`.
+- **Files:** `RecipeStore.swift` (extend), tests with fake clock.
+- **AC:** AC-5.2 covered.
+- **Deps:** T-073, T-060, T-058
+- **Est:** 3h
+
+### T-133 — Saved empty state
+- **Scope:** Shows `EmptyState` with "Tap the heart on any recipe to save it for offline."
+- **Files:** `SavedView.swift`.
+- **AC:** AC-5.8 covered.
+- **Deps:** T-131, T-033
+- **Est:** 0.5h
+
+### T-134 — Offline saved-recipe read (integration test)
+- **Scope:** Integration test simulating offline + saved recipe: all sections render with zero network calls.
+- **Files:** `Tests/SavedOfflineTests.swift`.
+- **AC:** AC-5.4 covered.
+- **Deps:** T-118, T-132
+- **Est:** 2h
+
+### T-135 — Inline video offline placeholder
+- **Scope:** When offline + saved + recipe has video, show "Video unavailable offline" placeholder card.
+- **Files:** detail view branch.
+- **AC:** AC-5.5 covered.
+- **Deps:** T-114, T-118
+- **Est:** 1h
+
+### T-136 — Saved AC sweep
+- **Scope:** Audit; every AC-5.* has a named test. AC-5.7 documented in onboarding-less first-launch FAQ in README.
+- **Files:** test additions, README note.
+- **AC:** Mapping documented.
+- **Deps:** T-130..T-135
+- **Est:** 1.5h
+
+---
+
+## Cluster F — App composition (after Cluster E)
+
+### T-140 — AppDependencies composition root
+- **Scope:** Single struct that constructs and holds: `WPRestClient`, `RecipeStore`, `NetworkMonitor`, `Telemetry`, `ImageLoader`. Injected into each feature root view.
+- **Files:** `App/AppDependencies.swift`.
+- **AC:** App builds; preview-only `MockDependencies` exists for SwiftUI previews.
+- **Deps:** E-cluster done
+- **Est:** 2h
+
+### T-141 — RootView TabView (iPhone)
+- **Scope:** Tab bar with Feed / Categories / Search / Saved. Calls `Telemetry.send(.appOpen)` on first appear.
+- **Files:** `App/RootView.swift`, `App/ContentTabs.swift`.
+- **AC:** UI test verifies all four tabs reachable.
+- **Deps:** T-140
+- **Est:** 2h
+
+### T-142 — NavigationSplitView for iPad
+- **Scope:** On iPad horizontal regular, use `NavigationSplitView` with sidebar (Feed/Categories/Search/Saved) + content + detail. Stack on iPhone (CC-8).
+- **Files:** `RootView.swift` adaptive logic.
+- **AC:** Snapshot at iPad 12.9" + UI test.
+- **Deps:** T-141
+- **Est:** 3h
+
+### T-143 — Telemetry screen-view wiring
+- **Scope:** Each tab and detail screen sends `.screenView` on appear. Detail open sends `.recipeView`.
+- **Files:** each feature view, `Telemetry` helper modifier.
+- **AC:** Test confirms one event per appearance, no duplicates on tab re-selection within 1s.
+- **Deps:** T-141
+- **Est:** 1.5h
+
+---
+
+## Cluster G — iPad adaptation pass (after F)
+
+### T-150 — Feed iPad layout
+- **Scope:** Two-column grid on iPad regular; one-column on iPhone. List → split secondary on iPad.
+- **Files:** `FeedView.swift`.
+- **AC:** Snapshot at iPad portrait + landscape.
+- **Deps:** T-142
+- **Est:** 2h
+
+### T-151 — Categories iPad layout
+- **Scope:** Sidebar list + secondary recipe grid on iPad. Stack on iPhone.
+- **Files:** `CategoryListView.swift`, `CategoryRecipesView.swift`.
+- **AC:** Snapshot.
+- **Deps:** T-142
+- **Est:** 2h
+
+### T-152 — Search iPad layout
+- **Scope:** Search bar persistently visible on iPad; results in secondary column.
+- **Files:** `SearchView.swift`.
+- **AC:** Snapshot.
+- **Deps:** T-142
+- **Est:** 1.5h
+
+### T-153 — Recipe Detail iPad layout
+- **Scope:** Two-column on iPad: hero + ingredients in primary, instructions in secondary. Single column on iPhone.
+- **Files:** `RecipeDetailView.swift`.
+- **AC:** Snapshot.
+- **Deps:** T-142
+- **Est:** 3h
+
+### T-154 — Saved iPad layout
+- **Scope:** Grid like Feed.
+- **Files:** `SavedView.swift`.
+- **AC:** Snapshot.
+- **Deps:** T-142, T-150
+- **Est:** 1h
+
+---
+
+## Cluster H — Accessibility audit pass
+
+### T-160 — Dynamic Type AX5 sweep
+- **Scope:** Open every screen at AX5 in simulator; fix overflow, truncation, tap-targets.
+- **Files:** various.
+- **AC:** Snapshot suite at AX5 added for every top-level view.
+- **Deps:** All features
+- **Est:** 4h
+
+### T-161 — VoiceOver label audit
+- **Scope:** Every interactive element has a label; every meaningful image has a description; every screen has a logical reading order.
+- **Files:** various; mostly modifier additions.
+- **AC:** Accessibility Inspector reports zero issues on each screen.
+- **Deps:** All features
+- **Est:** 3h
+
+### T-162 — Contrast audit in light + dark
+- **Scope:** Verify every text/background pair meets WCAG AA. Adjust palette tokens if needed.
+- **Files:** `Colors.xcassets`, possibly `Colors.swift`.
+- **AC:** Audit report attached to PR; failing pairs fixed.
+- **Deps:** T-030
+- **Est:** 2h
+
+---
+
+## Cluster I — Performance pass
+
+### T-170 — Cold launch trace + fixes
+- **Scope:** Instruments cold-launch run on iPhone 13. Identify and remove top-3 contributors above budget.
+- **Files:** likely `DODApp.swift`, dependency wiring.
+- **AC:** Cold launch < 1.5s on iPhone 13 baseline (CC-7).
+- **Deps:** T-141
+- **Est:** 3h
+
+### T-171 — List scroll instrument
+- **Scope:** Instruments time-profile of feed scroll. Fix dropped frames.
+- **Files:** `FeedView.swift`, `RecipeCard.swift`.
+- **AC:** 60fps sustained; no dropped frames in 30s scroll test.
+- **Deps:** T-080, T-082
+- **Est:** 2h
+
+### T-172 — CI perf gate
+- **Scope:** XCTest performance test for cold launch + scroll. Wire into CI; regression > 10% fails.
+- **Files:** `DODPerformanceTests/`, CI yml.
+- **AC:** Two perf tests pass on CI runner; intentionally added sleep makes them fail.
+- **Deps:** T-170, T-171
+- **Est:** 2h
+
+---
+
+## Cluster J — Release prep
+
+### T-180 — App icon + asset catalog
+- **Scope:** Add app icon set (all required sizes) from blog-provided artwork.
+- **Files:** `Assets.xcassets/AppIcon.appiconset/`.
+- **AC:** No missing-size warnings; archive builds clean.
+- **Deps:** Owner provides artwork
+- **Est:** 1h
+
+### T-181 — Screenshots
+- **Scope:** Generate App Store screenshots: 6.5", 6.7" iPhone, 12.9" iPad. Two per device (Feed + Recipe Detail) minimum.
+- **Files:** `Marketing/Screenshots/`.
+- **AC:** All required device sizes present.
+- **Deps:** All features complete
+- **Est:** 3h
+
+### T-182 — App Privacy questionnaire
+- **Scope:** Draft Apple App Store privacy answers exactly matching constitution §9. Document inside repo.
+- **Files:** `Marketing/AppPrivacy.md`.
+- **AC:** Reviewed line-by-line against constitution §9.
+- **Deps:** T-041
+- **Est:** 1h
+
+### T-183 — Marketing copy
+- **Scope:** App Store description, keywords, what's new.
+- **Files:** `Marketing/AppStoreCopy.md`.
+- **AC:** Owner-approved.
+- **Deps:** —
+- **Est:** 1.5h
+
+### T-184 — TestFlight first beta
+- **Scope:** Archive + upload to App Store Connect. Configure TestFlight build with 10 internal testers.
+- **Files:** none (App Store Connect config).
+- **AC:** Build delivered to testers; install + launch sanity verified.
+- **Deps:** Everything in A–I complete
+- **Est:** 2h
+
+---
+
+## Summary
+
+- **Total tasks:** 73
+- **Total estimate:** ~143 hours
+- **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
+- **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
+- **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
+
+Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
