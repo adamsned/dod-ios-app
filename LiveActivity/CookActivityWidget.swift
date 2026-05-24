@@ -1,0 +1,59 @@
+import ActivityKit
+import DODDesignSystem
+import DODFeatureRecipeDetail
+import SwiftUI
+import WidgetKit
+
+/// `ActivityConfiguration` for the Cook Mode timer Live Activity (US-11).
+///
+/// Wires ``CookActivityAttributes`` to the lock-screen and Dynamic Island
+/// view layouts defined in the feature package (so the SnapshotTesting
+/// suite can pin them without importing this extension). The
+/// `ActivityConfiguration` is the only API surface here — everything
+/// visual delegates to `CookActivity*View`.
+@available(iOS 16.1, *)
+struct CookActivityWidget: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: CookActivityAttributes.self) { context in
+            CookActivityLockScreenView(
+                recipeTitle: context.attributes.recipeTitle,
+                stepText: context.state.stepText,
+                remainingSeconds: context.state.remainingSeconds,
+                totalSeconds: context.attributes.totalSeconds,
+                isPaused: context.state.isPaused
+            )
+            .padding(.horizontal, DODSpacing.sm)
+            .padding(.vertical, DODSpacing.xs)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    CookActivityCompactLeadingView()
+                        .padding(.leading, DODSpacing.xs)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    CookActivityCompactTrailingView(
+                        remainingSeconds: context.state.remainingSeconds
+                    )
+                    .padding(.trailing, DODSpacing.xs)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    CookActivityLockScreenView(
+                        recipeTitle: context.attributes.recipeTitle,
+                        stepText: context.state.stepText,
+                        remainingSeconds: context.state.remainingSeconds,
+                        totalSeconds: context.attributes.totalSeconds,
+                        isPaused: context.state.isPaused
+                    )
+                }
+            } compactLeading: {
+                CookActivityCompactLeadingView()
+            } compactTrailing: {
+                CookActivityCompactTrailingView(
+                    remainingSeconds: context.state.remainingSeconds
+                )
+            } minimal: {
+                CookActivityCompactLeadingView()
+            }
+        }
+    }
+}

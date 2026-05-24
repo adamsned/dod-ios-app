@@ -178,6 +178,19 @@ Added by consultant-pass tier-3 amendment (2026-05-23). Wires the existing recip
 
 **Constitution §9 note:** intent invocations do NOT add new tracked events. `OpenRecipeIntent` lands on the detail screen, which fires the existing `.recipeView` event from `RecipeDetailViewModel.onAppear()`. `StartCookModeIntent` additionally triggers the existing `.cookModeStarted` event via the auto-presentation path. App Privacy posture is unchanged.
 
+### US-11 — Live Activity for active Cook Mode timer
+**As a** user actively cooking,
+**I want** a Live Activity for the running Cook Mode timer,
+**so that** I can leave the app to grab ingredients and come back at the buzzer without re-opening Cook Mode.
+
+Added by consultant-pass amendment (2026-05-23, Tier 3). Builds on US-7 / AC-7.* — the Live Activity is a per-step companion to the inline ``CookTimer``, not a replacement. Constitution §2 was amended in the same pass to call out ActivityKit (iOS 16.1+) as the platform surface Cook Mode timers use.
+
+**Acceptance criteria:**
+- **AC-11.1** Given Cook Mode is on a step whose text parses to a duration (per `StepTimerParser`), when the user taps Start on the inline `CookTimer`, then a Live Activity is created with `recipeTitle`, `recipeID`, `totalSeconds`, and an initial `ContentState(remainingSeconds: totalSeconds, stepText: <current step text>, isPaused: false)`. The card appears on the Lock Screen and, on iPhone 14 Pro and later, in the Dynamic Island.
+- **AC-11.2** While the timer is running, the Live Activity is updated every second with the new `remainingSeconds`; pausing the inline timer flips `isPaused` to true on the next update so the lock-screen UI can dim the progress arc and label the state.
+- **AC-11.3** The Live Activity ends when (a) the countdown hits zero, (b) the user taps Reset, (c) the user starts a new step's timer (the previous activity is replaced, not stacked), or (d) Cook Mode itself is exited via the Done button or `endCookMode`.
+- **AC-11.4** On hosts where ActivityKit isn't available (`iOS < 16.1`) or where the user has disabled Live Activities system-wide (`ActivityAuthorizationInfo().areActivitiesEnabled == false`), Cook Mode behaves exactly as it did pre-US-11 — the inline timer still runs, no Lock Screen card appears, and no errors surface to the user.
+
 ---
 
 ## Cross-cutting acceptance criteria
@@ -222,6 +235,7 @@ Mandates (per constitution §6):
   - **REG-INFO-PLIST-CLOBBER**: `xcodegen generate` must not strip launch-screen / orientation keys from `App/Info.plist`. Failure mode: those keys lived only in the hand-maintained plist; XcodeGen rewrote it from `project.yml` on every regenerate, silently re-introducing the iOS letterbox bug. Locked by keeping the keys in `project.yml`'s `info.properties` block; `SmokeTests.test_appLaunchesWithoutTelemetryAppID` proves the app renders at launch (does not yet pixel-verify edge-to-edge — noted gap).
   - **REG-9**: the widget snapshot wire format the host app writes (`WidgetSnapshotStore.write`) round-trips losslessly through the widget extension's reader, and the small/medium widget layouts don't drift visually. Locked by `WidgetSnapshotStoreTests` (DODSupport: round-trip, max-entries cap, version-mismatch rejection, clear), `WidgetDeepLinkParserTests` (DODSupport: 8 cases covering `dod://recipe/<id>` and `dod://feed` plus rejection of malformed and hostile URLs), and `DesignSystemSnapshotTests.test_widgetCard_{small,medium}_populated` + `test_widgetCard_placeholder` (DODDesignSystem: pixel-locked baselines for the three layouts).
   - **REG-10**: deep-link URLs from App Intents / Siri Shortcuts / Spotlight must round-trip through `DeepLinkIntent.parse(_:)` and `DeepLinkIntent.url` without losing their target id or action. Failure mode would be Siri opening the wrong recipe (or the homepage) when a user says "Open Bourbon Berry Cake" — silently incorrect from the user's perspective. Locked by the round-trip cases in `DODSupportTests.DeepLinkIntentTests` and the entity-lookup tests in `DODPersistenceTests.RecentlyViewedTests` (`recipeWithoutTouchingDoesNotBumpLastViewedAt` in particular, which guards against Siri suggestions promoting the wrong recipe in subsequent LRU queries).
+  - **REG-11 (US-11)**: Cook Mode Live Activity lifecycle is fully exercised by the `CookModeViewModel` unit suite — start, end, replace-on-new-timer, no-op on tick when no activity, and end-on-cook-mode-exit are each pinned by a named test in `CookModeViewModelTests`. The lock-screen and Dynamic Island compact views are pinned by `CookLiveActivitySnapshotTests`. Failure mode: the cook would lose track of the buzzer the moment the screen dimmed and would either over-cook or have to keep the app foregrounded for the full duration.
 
 ## Clarifications
 

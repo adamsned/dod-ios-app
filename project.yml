@@ -63,6 +63,12 @@ targets:
         # this key iOS letterboxes the app, producing large black bars
         # top and bottom. Empty dict = default system background.
         UILaunchScreen: {}
+        # Opt the host app in to Live Activities (US-11). Required for
+        # `ActivityKit.Activity.request` to succeed at runtime — without
+        # this key, `ActivityAuthorizationInfo().areActivitiesEnabled`
+        # returns false and Cook Mode timers can't surface on the Lock
+        # Screen / Dynamic Island.
+        NSSupportsLiveActivities: true
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
@@ -99,11 +105,11 @@ targets:
       - package: DODFeatureSearch
       - package: DODFeatureRecipeDetail
       - package: DODFeatureSaved
-      # Widget extension embedded into the app bundle so installing the app
-      # installs the widget too. XcodeGen wires up the matching "Embed App
-      # Extensions" build phase automatically when an `app-extension` target
-      # appears as a dependency here.
+      # Widget extension (home-screen, US-9).
       - target: DODAppWidget
+      # Live Activity extension (Cook Mode timer, US-11).
+      - target: DODAppLiveActivity
+        embed: true
     preBuildScripts:
       - name: SwiftLint
         script: |
@@ -139,15 +145,39 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_FILE: Widget/Info.plist
         CODE_SIGN_ENTITLEMENTS: Widget/DODAppWidget.entitlements
-        # Widget extensions ship inside the host app's PlugIns directory;
-        # SKIP_INSTALL prevents xcodebuild from trying to install the
-        # extension on its own when building from the command line.
         SKIP_INSTALL: YES
     dependencies:
       - package: DODSupport
         product: DODSupport
       - package: DODDesignSystem
         product: DODDesignSystem
+
+  # Live Activity extension hosting ActivityConfiguration for the
+  # Cook Mode countdown timer (US-11). Separate from the home-screen
+  # widget so each can be iterated on independently.
+  DODAppLiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LiveActivity
+    info:
+      path: LiveActivity/Info.plist
+      properties:
+        CFBundleDisplayName: DOD Live Activity
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp.LiveActivity
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: LiveActivity/Info.plist
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: DODFeatureRecipeDetail
+      - package: DODDesignSystem
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: ActivityKit.framework
 
   DODAppUITests:
     type: bundle.ui-testing
