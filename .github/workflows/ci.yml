@@ -10,9 +10,46 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Path filtering — docs/spec/marketing-only changes don't need the
+# (expensive) macOS-runner pipeline. The "code-changed" job is the
+# single source of truth: every downstream job reads it.
 jobs:
+  changes:
+    name: Detect path changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      ios_sim: ${{ steps.filter.outputs.ios_sim }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          # `code` triggers lint/format/L1. `ios_sim` triggers the
+          # heavy iOS-Simulator jobs (snapshot, build, UI smoke).
+          # iOS-Sim is gated more strictly so a Linux-only fix
+          # (e.g. README, spec, CONTRIBUTING) doesn't pay simulator
+          # boot time.
+          filters: |
+            code:
+              - 'App/**'
+              - 'Packages/**'
+              - 'project.yml'
+              - '.swift-format'
+              - '.swiftlint.yml'
+              - 'bin/**'
+              - '.github/workflows/ci.yml'
+            ios_sim:
+              - 'App/**'
+              - 'Packages/**'
+              - 'project.yml'
+              - '.github/workflows/ci.yml'
+
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-14
     timeout-minutes: 5
     steps:
@@ -24,6 +61,8 @@ jobs:
 
   format:
     name: Format check
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-14
     timeout-minutes: 5
     steps:
@@ -33,47 +72,51 @@ jobs:
       - name: Check formatting
         run: swift-format lint --recursive --strict --configuration .swift-format App Packages
 
-  # L1: per-package unit tests (Swift Testing). Fast, isolated.
+  # L1: all package unit tests in ONE macOS job. We previously ran
+  # this as a 10-job matrix; each parallel job has a ~60s billed
+  # minimum on macOS, so the matrix burned ~10 macOS minutes per push
+  # for ~30s of actual work. Serial drops total billed time ~3-4x.
+  # Trade-off: wall-clock test time is longer (~3-4min vs ~30s
+  # parallel) but unit tests are tiny so it barely matters.
   test-unit-packages:
-    name: L1 Unit · ${{ matrix.package }}
+    name: L1 Unit · all packages
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-14
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        package:
-          - DODDomain
-          - DODSupport
-          - DODAnalytics
-          - DODNetworking
-          - DODPersistence
-          - DODFeatureFeed
-          - DODFeatureCategories
-          - DODFeatureSearch
-          - DODFeatureRecipeDetail
-          - DODFeatureSaved
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 16 (Swift 6.0)
-        # All packages declare swift-tools-version: 6.0. The macos-14 default
-        # Xcode is 15.4 which ships Swift 5.10 and fails immediately; pin
-        # 16.x explicitly so `swift test` uses the right toolchain.
+        # All packages declare swift-tools-version: 6.0. The macos-14
+        # default Xcode is 15.4 / Swift 5.10 which fails immediately;
+        # pin 16.x so `swift test` finds the right toolchain.
         run: sudo xcode-select -s /Applications/Xcode_16.app
-      - name: Cache SPM
+      - name: Cache SPM build outputs
         uses: actions/cache@v4
         with:
-          path: Packages/${{ matrix.package }}/.build
-          key: ${{ runner.os }}-spm-xcode16-${{ matrix.package }}-${{ hashFiles(format('Packages/{0}/Package.swift', matrix.package)) }}
-      - name: Test
-        working-directory: Packages/${{ matrix.package }}
-        run: swift test --parallel
+          path: |
+            Packages/*/.build
+          key: ${{ runner.os }}-spm-xcode16-${{ hashFiles('Packages/*/Package.swift') }}
+      - name: Test all packages sequentially
+        # Bash loop so a single failure surfaces clearly. `set -e`
+        # makes the loop fail-fast at the first broken package.
+        run: |
+          set -e
+          for pkg in DODDomain DODSupport DODAnalytics DODNetworking \
+                     DODPersistence DODFeatureFeed DODFeatureCategories \
+                     DODFeatureSearch DODFeatureRecipeDetail DODFeatureSaved; do
+            echo "::group::swift test — $pkg"
+            (cd "Packages/$pkg" && swift test --parallel)
+            echo "::endgroup::"
+          done
 
   # L4: DesignSystem snapshots run on iOS simulator (UIKit dependency).
   test-snapshots-designsystem:
     name: L4 Snapshots · DODDesignSystem
+    needs: [changes, lint, format]
+    if: needs.changes.outputs.ios_sim == 'true'
     runs-on: macos-14
     timeout-minutes: 15
-    needs: [lint, format]
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 16 (Swift 6.0)
@@ -95,9 +138,10 @@ jobs:
 
   build-app:
     name: Build app (iOS Simulator)
+    needs: [changes, lint, format]
+    if: needs.changes.outputs.ios_sim == 'true'
     runs-on: macos-14
     timeout-minutes: 25
-    needs: [lint, format]
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 16 (Swift 6.0)
@@ -119,9 +163,10 @@ jobs:
   # L3: UI smoke tests against the built app on a live simulator.
   test-ui-smoke:
     name: L3 UI Smoke
+    needs: [changes, build-app]
+    if: needs.changes.outputs.ios_sim == 'true'
     runs-on: macos-14
     timeout-minutes: 30
-    needs: [build-app]
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 16 (Swift 6.0)
@@ -146,11 +191,35 @@ jobs:
           name: ui-test-results
           path: ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcresult
 
-  # Aggregate gate so branch protection can require a single check.
-  # Nightly L2 live-API tests live in .github/workflows/nightly-live-api.yml.
+  # Aggregate gate. Runs even when upstream jobs were skipped (e.g.
+  # docs-only PR) so the PR can show a single green "CI required"
+  # check regardless of which jobs actually executed. Fails if any
+  # required upstream job failed; succeeds if they passed OR were
+  # skipped because path filters excluded them.
   ci-required:
     name: CI required
+    needs: [changes, lint, format, test-unit-packages,
+            test-snapshots-designsystem, build-app, test-ui-smoke]
+    if: always()
     runs-on: ubuntu-latest
-    needs: [lint, format, test-unit-packages, test-snapshots-designsystem, build-app, test-ui-smoke]
     steps:
-      - run: echo "All required CI jobs passed."
+      - name: Aggregate result
+        run: |
+          # Each input is "success", "failure", "cancelled", or "skipped".
+          # Skipped is fine (path filter excluded the job); failure is not.
+          for name in changes lint format test-unit-packages \
+                     test-snapshots-designsystem build-app test-ui-smoke; do
+            result_var="${name//-/_}_RESULT"
+            echo "$name: ${!result_var:-not-run}"
+          done
+          if [[ "${{ needs.changes.result }}" == "failure" \
+             || "${{ needs.lint.result }}" == "failure" \
+             || "${{ needs.format.result }}" == "failure" \
+             || "${{ needs.test-unit-packages.result }}" == "failure" \
+             || "${{ needs.test-snapshots-designsystem.result }}" == "failure" \
+             || "${{ needs.build-app.result }}" == "failure" \
+             || "${{ needs.test-ui-smoke.result }}" == "failure" ]]; then
+            echo "::error::At least one required CI job failed."
+            exit 1
+          fi
+          echo "All required CI jobs passed (or were skipped by path filter)."
