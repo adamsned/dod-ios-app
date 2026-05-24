@@ -1,0 +1,20 @@
+# Code owners — auto-requested as reviewers on matching PRs.
+# Syntax: <path> <@owner1> <@owner2>
+# Last matching line wins.
+
+# Default: dad owns everything unless overridden below.
+*                                @adamsned
+
+# Specs are reviewed by both — every change is a joint decision.
+/specs/                          @adamsned @spencer0706
+/specs/constitution.md           @adamsned @spencer0706
+
+# CI + repo tooling — dad owns.
+/.github/                        @adamsned
+/project.yml                     @adamsned
+/.swiftlint.yml                  @adamsned
+/.swift-format                   @adamsned
+/bin/                            @adamsned
+
+# Claude Code agents — both maintain (we both use them).
+/.claude/                        @adamsned @spencer0706
