@@ -96,6 +96,62 @@ import Testing
     }
 }
 
+@Suite("RecipeStore recently-viewed + entity lookup (US-10)")
+struct RecentlyViewedTests {
+
+    /// AC-10.1: AppEntity query must surface the most-recently-viewed
+    /// recipes via `recentlyViewed(limit:)`. Newest `lastViewedAt` first;
+    /// blocklisted rows excluded.
+    @Test func recentlyViewedReturnsNewestFirst() async throws {
+        let store = try await makeStore()
+        try await store.cache(listItem: makeListItem(id: 1, title: "Old"))
+        try await store.cache(listItem: makeListItem(id: 2, title: "Newer"))
+        try await store.cache(listItem: makeListItem(id: 3, title: "Newest"))
+        let recents = try await store.recentlyViewed(limit: 10)
+        #expect(recents.map(\.id) == [3, 2, 1])
+    }
+
+    @Test func recentlyViewedRespectsLimit() async throws {
+        let store = try await makeStore()
+        for index in 0..<5 {
+            try await store.cache(listItem: makeListItem(id: index, title: "R\(index)"))
+        }
+        let recents = try await store.recentlyViewed(limit: 3)
+        #expect(recents.count == 3)
+    }
+
+    @Test func recentlyViewedExcludesBlocklisted() async throws {
+        let store = try await makeStore()
+        try await store.cache(listItem: makeListItem(id: 1, title: "Healthy"))
+        try await store.cache(listItem: makeListItem(id: 2, title: "Broken"))
+        try await store.markJSONLDFailed(id: 2)
+        let recents = try await store.recentlyViewed(limit: 10)
+        #expect(recents.map(\.id) == [1])
+    }
+
+    /// AC-10.1: the AppEntity lookup must NOT touch `lastViewedAt`. If it
+    /// did, every Siri suggestion would re-rank to the top and pollute the
+    /// LRU.
+    @Test func recipeWithoutTouchingDoesNotBumpLastViewedAt() async throws {
+        let store = try await makeStore()
+        try await store.cache(listItem: makeListItem(id: 1, title: "First"))
+        // Sleep a millisecond so any bump to lastViewedAt would be observable.
+        try await Task.sleep(nanoseconds: 1_000_000)
+        try await store.cache(listItem: makeListItem(id: 2, title: "Second"))
+        // Probe id=1 via the silent accessor.
+        _ = try await store.recipeWithoutTouching(id: 1)
+        let recents = try await store.recentlyViewed(limit: 10)
+        // Id 2 should still be at the top — the probe must not have promoted id 1.
+        #expect(recents.first?.id == 2, "Silent accessor must not bump lastViewedAt")
+    }
+
+    @Test func recipeWithoutTouchingReturnsNilForMissingID() async throws {
+        let store = try await makeStore()
+        let recipe = try await store.recipeWithoutTouching(id: 999)
+        #expect(recipe == nil)
+    }
+}
+
 @Suite("RecipeStore LRU policy (T-074)") struct LRUPolicyTests {
 
     @Test func unsavedRowsAreCappedAtTheBudget() async throws {

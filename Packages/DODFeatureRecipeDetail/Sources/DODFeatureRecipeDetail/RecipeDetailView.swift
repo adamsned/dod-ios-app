@@ -17,14 +17,21 @@ public struct RecipeDetailView: View {
     @State private var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
     @State private var isCookModePresented: Bool = false
+    /// True when the screen was entered via the StartCookModeIntent deep
+    /// link (US-10). We watch the load state and flip the cover open as
+    /// soon as the recipe has instructions to render. Resets to false
+    /// after firing so a manual exit + re-entry behaves normally.
+    @State private var pendingAutoCookMode: Bool
     @Environment(\.dismiss) private var dismiss
     public let onSelectRelated: (RecipeListItem) -> Void
 
     public init(
         viewModel: RecipeDetailViewModel,
-        onSelectRelated: @escaping (RecipeListItem) -> Void
+        onSelectRelated: @escaping (RecipeListItem) -> Void,
+        autoStartCookMode: Bool = false
     ) {
         _viewModel = State(initialValue: viewModel)
+        _pendingAutoCookMode = State(initialValue: autoStartCookMode)
         self.onSelectRelated = onSelectRelated
     }
 
@@ -55,13 +62,7 @@ public struct RecipeDetailView: View {
             isOfflineSnapshot = await viewModel.isOffline
         }
         .onChange(of: viewModel.loadState) { _, newValue in
-            if newValue == .unavailable {
-                // Pop after a brief moment so the snackbar is visible.
-                Task {
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    dismiss()
-                }
-            }
+            handleLoadStateChange(newValue)
         }
     }
 
@@ -268,10 +269,31 @@ public struct RecipeDetailView: View {
                 }
         }
     }
+}
 
-    // MARK: - Helpers
+// MARK: - Helpers
 
-    private func format(duration: Duration) -> String {
+extension RecipeDetailView {
+
+    fileprivate func handleLoadStateChange(_ newValue: RecipeDetailViewModel.LoadState) {
+        if newValue == .unavailable {
+            // Pop after a brief moment so the snackbar is visible.
+            Task {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                dismiss()
+            }
+        }
+        // US-10 / AC-10.1: if the deep link asked us to jump straight to
+        // Cook Mode, do it the instant the recipe has instructions
+        // populated. Same gating as the manual CTA (AC-7.1).
+        guard newValue == .ready, pendingAutoCookMode else { return }
+        guard let recipe = viewModel.recipe, !recipe.instructions.isEmpty else { return }
+        pendingAutoCookMode = false
+        Task { await viewModel.didTapCookMode() }
+        isCookModePresented = true
+    }
+
+    fileprivate func format(duration: Duration) -> String {
         let seconds = Int(duration.components.seconds)
         let minutes = seconds / 60
         if minutes < 60 { return "\(minutes) min" }

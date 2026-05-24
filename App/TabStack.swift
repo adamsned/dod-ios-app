@@ -15,7 +15,21 @@ struct TabStack: View {
 
     let tab: AppTab
     let dependencies: AppDependencies
+    /// Binding-style sink so RootView can drive a tab's stack from outside —
+    /// used by App Intents / Spotlight deep links (US-10). Optional so the
+    /// non-feed stacks don't need to plumb anything.
+    @Binding var externalRoute: RecipeRoute?
     @State private var path: [RecipeRoute] = []
+
+    init(
+        tab: AppTab,
+        dependencies: AppDependencies,
+        externalRoute: Binding<RecipeRoute?> = .constant(nil)
+    ) {
+        self.tab = tab
+        self.dependencies = dependencies
+        self._externalRoute = externalRoute
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -23,6 +37,13 @@ struct TabStack: View {
                 .navigationDestination(for: RecipeRoute.self) { route in
                     destination(for: route)
                 }
+        }
+        .onChange(of: externalRoute) { _, newValue in
+            guard let newValue else { return }
+            path.append(newValue)
+            // Hand the binding back so RootView can detect that the push has
+            // landed and clear `pending` on DeepLinkDispatcher.
+            externalRoute = nil
         }
     }
 
@@ -55,7 +76,7 @@ struct TabStack: View {
     @ViewBuilder
     private func destination(for route: RecipeRoute) -> some View {
         switch route {
-        case .recipe(let item):
+        case .recipe(let item, let autoStartCookMode):
             let canonical =
                 item.canonicalURL
                 ?? URL(string: "https://www.dutchovendaddy.com/") ?? URL(filePath: "/")
@@ -65,7 +86,8 @@ struct TabStack: View {
                     canonicalURL: canonical,
                     dependencies: dependencies.recipeDetailDependencies()
                 ),
-                onSelectRelated: { related in path.append(.recipe(item: related)) }
+                onSelectRelated: { related in path.append(.recipe(item: related)) },
+                autoStartCookMode: autoStartCookMode
             )
             .onAppear {
                 Telemetry.shared.send(.screenView(name: "recipe_detail"))

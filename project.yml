@@ -74,6 +74,12 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # Deep-link scheme `dod://` for App Intents + Siri Shortcuts (US-10).
+        # Routed by `RootView.handle(intent:)` into the right tab + path.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.dutchovendaddy.DODApp.deeplink
+            CFBundleURLSchemes:
+              - dod
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp

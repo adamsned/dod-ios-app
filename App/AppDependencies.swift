@@ -54,6 +54,9 @@ final class AppDependencies {
             Telemetry.shared.start(appID: appID)
         }
         Telemetry.shared.send(.appOpen)
+        // US-10: hand the store to the AppIntents environment so the entity
+        // query and Spotlight indexer can read saved + recently-viewed rows.
+        AppIntentEnvironment.register(store: store)
     }
 
     // MARK: - Per-feature dependency views

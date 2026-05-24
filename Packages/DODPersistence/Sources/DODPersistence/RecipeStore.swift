@@ -134,6 +134,27 @@ public actor RecipeStore {
         return try modelContext.fetch(descriptor).map(Self.toDomain)
     }
 
+    /// Most-recently-viewed recipes for surfacing in Siri / Spotlight (US-10).
+    /// Includes both saved and unsaved rows, sorted by `lastViewedAt` (the
+    /// same field LRU eviction uses), newest first. Blocklisted rows are
+    /// filtered out so we don't suggest a recipe whose detail fetch has
+    /// failed.
+    public func recentlyViewed(limit: Int = 30) throws -> [Recipe] {
+        var descriptor = FetchDescriptor<CachedRecipe>(
+            predicate: #Predicate { $0.jsonLDFailedAt == nil },
+            sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return try modelContext.fetch(descriptor).map(Self.toDomain)
+    }
+
+    /// Fetch a single recipe as a Domain.Recipe by id without bumping
+    /// `lastViewedAt`. Used by App Intents entity lookup (US-10) — Siri
+    /// surfacing should not pollute the LRU order.
+    public func recipeWithoutTouching(id: Int) throws -> Recipe? {
+        try fetchRecipe(id: id).map(Self.toDomain)
+    }
+
     // MARK: - Blocklist (AC-1.7)
 
     /// Mark a recipe as having a failing JSON-LD parse. Subsequent list
