@@ -1,3 +1,4 @@
+import CoreSpotlight
 import DODAnalytics
 import DODDesignSystem
 import DODSupport
@@ -18,13 +19,11 @@ struct RootView: View {
     @State private var dependencies: AppDependencies
     @State private var selectedTab: AppTab = .feed
     @State private var showOnboarding: Bool
-    /// Set by `onOpenURL` when the user taps the home-screen widget
-    /// (spec.md US-9 AC-9.2). `TabStack.feed` consumes the value via
-    /// `.onChange` and pushes the recipe detail. Reset to `nil` once
-    /// consumed so the same link doesn't double-fire if the OS re-delivers
-    /// it (e.g. on a cold launch where the deep link arrives while the
-    /// view is still mounting).
+    /// Widget deep link (spec.md US-9 AC-9.2). Feed tab consumes via .task(id:).
     @State private var pendingDeepLink: WidgetDeepLink?
+    /// App Intents / Spotlight route (spec.md US-10).
+    @State private var feedExternalRoute: RecipeRoute?
+    @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(dependencies: AppDependencies) {
@@ -42,9 +41,38 @@ struct RootView: View {
                 phoneTabs
             }
         }
-        .task { await dependencies.bootstrap() }
+        .task {
+            await dependencies.bootstrap()
+            // Push current saved + recents into Spotlight on every cold launch
+            // so users can find DOD recipes from the home-screen search bar
+            // even if they've never invoked the app today (US-10 / AC-10.3).
+            await indexSpotlight()
+        }
         .onOpenURL { url in
-            handle(url: url)
+            // Widget deep links route through WidgetDeepLink; App-Intents URLs
+            // route through DeepLinkIntent. Try widget first (narrower), then
+            // intent fallback.
+            if let link = WidgetDeepLink(url: url) {
+                handle(widgetLink: link)
+                return
+            }
+            if let intent = DeepLinkIntent.parse(url) {
+                handle(intent: intent)
+            }
+        }
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            guard
+                let identifier = activity.userInfo?[
+                    CSSearchableItemActivityIdentifier
+                ] as? String,
+                let id = identifier.split(separator: ".").last.flatMap({ Int($0) })
+            else { return }
+            handle(intent: .openRecipe(id: id))
+        }
+        .onChange(of: dispatcher.pending) { _, newValue in
+            guard let newValue else { return }
+            handle(intent: newValue)
+            dispatcher.consume()
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingSheet(
@@ -87,7 +115,8 @@ struct RootView: View {
                 TabStack(
                     tab: tab,
                     dependencies: dependencies,
-                    pendingDeepLink: $pendingDeepLink
+                    pendingDeepLink: tab == .feed ? $pendingDeepLink : .constant(nil),
+                    externalRoute: tab == .feed ? $feedExternalRoute : .constant(nil)
                 )
                 .tabItem {
                     Label(tab.title, systemImage: tab.systemImage)
@@ -124,7 +153,8 @@ struct RootView: View {
             TabStack(
                 tab: selectedTab,
                 dependencies: dependencies,
-                pendingDeepLink: $pendingDeepLink
+                pendingDeepLink: selectedTab == .feed ? $pendingDeepLink : .constant(nil),
+                externalRoute: selectedTab == .feed ? $feedExternalRoute : .constant(nil)
             )
             .id(selectedTab)
         }
@@ -134,18 +164,65 @@ struct RootView: View {
         }
     }
 
-    /// Inbound URL from the OS — today only `dod://` URLs from the
-    /// home-screen widget (spec.md US-9 AC-9.2). Anything else is ignored
-    /// (no rich-link previews, no Universal Links in v1).
-    private func handle(url: URL) {
-        guard let link = WidgetDeepLink(url: url) else { return }
-        switch link {
-        case .recipe, .feed:
-            // Either route lives under the Feed tab today — Feed is where
-            // recipe details push from, so switching there gives the
-            // NavigationStack the right context.
+    // MARK: - Deep-link routing
+
+    /// Widget URL handler (spec.md US-9 AC-9.2). Switches to Feed and
+    /// hands the link to TabStack via the `pendingDeepLink` binding.
+    private func handle(widgetLink link: WidgetDeepLink) {
+        selectedTab = .feed
+        pendingDeepLink = link
+    }
+
+    /// Routes a parsed `DeepLinkIntent` into tab + path state (US-10).
+    private func handle(intent: DeepLinkIntent) {
+        switch intent {
+        case .openSaved:
+            selectedTab = .saved
+        case .openRecipe(let id):
             selectedTab = .feed
-            pendingDeepLink = link
+            Task { @MainActor in
+                guard let route = await resolveRecipeRoute(id: id, autoStartCookMode: false) else {
+                    return
+                }
+                feedExternalRoute = route
+            }
+        case .startCookMode(let recipeID):
+            selectedTab = .feed
+            Task { @MainActor in
+                guard
+                    let route = await resolveRecipeRoute(
+                        id: recipeID,
+                        autoStartCookMode: true
+                    )
+                else { return }
+                feedExternalRoute = route
+            }
+        }
+    }
+
+    private func resolveRecipeRoute(id: Int, autoStartCookMode: Bool) async -> RecipeRoute? {
+        guard let recipe = try? await dependencies.store.recipeWithoutTouching(id: id) else {
+            DODLog.app.error("deep link: recipe \(id) not in cache, ignoring")
+            return nil
+        }
+        let item = RecipeEntityPayload.fromRecipe(recipe).toListItem()
+        return .recipe(item: item, autoStartCookMode: autoStartCookMode)
+    }
+
+    private func indexSpotlight() async {
+        do {
+            let payloads = try await RecipeEntityQuery.suggestedPayloads()
+            let items = payloads.map { payload -> CSSearchableItem in
+                let entity = RecipeEntity(payload: payload)
+                return CSSearchableItem(
+                    uniqueIdentifier: "dod.recipe.\(payload.id)",
+                    domainIdentifier: "com.dutchovendaddy.DODApp.recipes",
+                    attributeSet: entity.attributeSet
+                )
+            }
+            try await CSSearchableIndex.default().indexSearchableItems(items)
+        } catch {
+            DODLog.app.error("spotlight index failed: \(String(describing: error))")
         }
     }
 }

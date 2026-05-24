@@ -18,9 +18,25 @@ struct TabStack: View {
     let tab: AppTab
     let dependencies: AppDependencies
     /// Inbound widget deep link, set by `RootView.handle(url:)`. Only the
-    /// Feed tab consumes it — see the `.onChange` modifier in `body`.
+    /// Feed tab consumes it — see the `.task(id:)` modifier in `body`.
     @Binding var pendingDeepLink: WidgetDeepLink?
+    /// Binding-style sink so RootView can drive a tab's stack from outside —
+    /// used by App Intents / Spotlight deep links (US-10). Optional so the
+    /// non-feed stacks don't need to plumb anything.
+    @Binding var externalRoute: RecipeRoute?
     @State private var path: [RecipeRoute] = []
+
+    init(
+        tab: AppTab,
+        dependencies: AppDependencies,
+        pendingDeepLink: Binding<WidgetDeepLink?> = .constant(nil),
+        externalRoute: Binding<RecipeRoute?> = .constant(nil)
+    ) {
+        self.tab = tab
+        self.dependencies = dependencies
+        self._pendingDeepLink = pendingDeepLink
+        self._externalRoute = externalRoute
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -30,12 +46,15 @@ struct TabStack: View {
                 }
         }
         .task(id: pendingDeepLink) {
-            // Only one tab — Feed — services widget deep links. Selecting
-            // any other tab leaves the link untouched until Feed reappears.
-            // Using `.task(id:)` (not `.onChange`) so we can `await` the
-            // actor-isolated store lookup without spawning a detached Task.
+            // Widget deep link (only Feed consumes).
             guard tab == .feed, let link = pendingDeepLink else { return }
             await consume(link: link)
+        }
+        .onChange(of: externalRoute) { _, newValue in
+            // App-Intents / Spotlight route push.
+            guard let newValue else { return }
+            path.append(newValue)
+            externalRoute = nil
         }
     }
 
@@ -68,7 +87,7 @@ struct TabStack: View {
     @ViewBuilder
     private func destination(for route: RecipeRoute) -> some View {
         switch route {
-        case .recipe(let item):
+        case .recipe(let item, let autoStartCookMode):
             let canonical =
                 item.canonicalURL
                 ?? URL(string: "https://www.dutchovendaddy.com/") ?? URL(filePath: "/")
@@ -78,7 +97,8 @@ struct TabStack: View {
                     canonicalURL: canonical,
                     dependencies: dependencies.recipeDetailDependencies()
                 ),
-                onSelectRelated: { related in path.append(.recipe(item: related)) }
+                onSelectRelated: { related in path.append(.recipe(item: related)) },
+                autoStartCookMode: autoStartCookMode
             )
             .onAppear {
                 Telemetry.shared.send(.screenView(name: "recipe_detail"))
