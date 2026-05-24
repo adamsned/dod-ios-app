@@ -14,6 +14,10 @@ let package = Package(
         .package(path: "../DODAnalytics"),
         .package(path: "../DODNetworking"),
         .package(path: "../DODPersistence"),
+        // Test-only — top-level screen visual regression (US-18 / T-332).
+        // Pin matches `DODDesignSystem/Package.swift` so the package graph
+        // resolves a single `swift-snapshot-testing` version.
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
     ],
     targets: [
         .target(
@@ -27,6 +31,13 @@ let package = Package(
                 "DODPersistence",
             ]
         ),
-        .testTarget(name: "DODFeatureSearchTests", dependencies: ["DODFeatureSearch"]),
+        .testTarget(
+            name: "DODFeatureSearchTests",
+            dependencies: [
+                "DODFeatureSearch",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+            ],
+            resources: [.process("__Snapshots__")]
+        ),
     ]
 )
