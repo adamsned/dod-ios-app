@@ -871,6 +871,7 @@ Parallelism tag conventions: tasks sharing `||:` letter can run simultaneously i
 - **Deps:** T-330.
 - **Est:** 4h (test infrastructure + sim record + visual review).
 - **||:** P8-darkmode
+- **Shipped:** commit `44ce7b9` — 5 new snapshot test files (Feed, CategoryList, CategoryRecipes, Search, Saved) with 4 test methods each = 20 total; `swift-snapshot-testing` 1.17.0 added to the 4 feature `Package.swift` files; `StatefulHost` shim per test file (test-target-only, never in production target); `record: .missing` so baselines lay down on first iOS-sim run. PNGs not committed by this PR — see T-335.
 
 ### T-333 — Commit Cook Live Activity baselines (US-18 follow-up)
 - **Scope:** The existing `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/CookLiveActivitySnapshotTests.swift` declares five tests but commits no PNGs — running them today fails. Record mode pass to lay down the five baselines; extend the lock-screen test with a `_dark` variant. The Dynamic Island compact pieces are tiny system-controlled surfaces — light-only is sufficient (system inverts them automatically). Recipe detail root view dark + AX5 also handled here.
@@ -888,12 +889,20 @@ Parallelism tag conventions: tasks sharing `||:` letter can run simultaneously i
 - **Est:** 1h.
 - **||:** P8-darkmode
 
+### T-335 — Harvest + commit T-332's screen baselines (US-18 follow-up)
+- **Scope:** T-332 added 20 new snapshot test methods across four feature packages (`DODFeatureFeed`, `DODFeatureCategories`, `DODFeatureSearch`, `DODFeatureSaved`) but committed no PNGs — the tests use `record: .missing`, so the first iOS-sim run lays the baselines down. Sim record pass: run `xcodebuild test -scheme <each>` for each of the four packages on `platform=iOS Simulator,name=iPhone 17`, open every resulting PNG, and commit it under the matching `__Snapshots__/<TestClass>/` directory if it looks correct. Pure baseline harvest — no source changes to the views, view-models, or test files themselves (T-332 already extended the test surface; this task only commits the resulting baselines). Mirrors the T-330 → T-331 relationship for DesignSystem.
+- **Files:** `Packages/DODFeatureFeed/Tests/DODFeatureFeedTests/__Snapshots__/FeedViewSnapshotTests/test_loadedFeed_*.1.png` (×4), `Packages/DODFeatureCategories/Tests/DODFeatureCategoriesTests/__Snapshots__/CategoryListViewSnapshotTests/test_loadedCategories_*.1.png` (×4) + `__Snapshots__/CategoryRecipesViewSnapshotTests/test_loadedRecipes_*.1.png` (×4), `Packages/DODFeatureSearch/Tests/DODFeatureSearchTests/__Snapshots__/SearchViewSnapshotTests/test_searchResults_*.1.png` (×4), `Packages/DODFeatureSaved/Tests/DODFeatureSavedTests/__Snapshots__/SavedViewSnapshotTests/test_loadedSaved_*.1.png` (×4) — 20 PNGs total.
+- **AC:** AC-18.1, AC-18.4 (verify each rendered baseline).
+- **Deps:** T-332.
+- **Est:** 1h (sim run + spot-check + commit).
+- **||:** P8-darkmode
+
 ---
 
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 4 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334) = 89
-- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~13 hours (Phase 8) + ~8 hours (Phase 8 follow-ups) = ~181 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) = 90
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) = ~182 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
