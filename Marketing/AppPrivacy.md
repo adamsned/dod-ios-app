@@ -1,14 +1,14 @@
 # App Store Privacy Questionnaire — v1.0
 
-**Status:** T-182 draft. Verify line-by-line against constitution §9 before submitting.
+**Status:** T-182 draft. Verify line-by-line against constitution §9 before submitting. Amended 2026-05-24 for CL-21 (comments + ratings, US-13/14/15).
 
 When submitting v1.0 to App Store Connect, answer the **App Privacy** section exactly as below. Every claim here traces to a constitution clause; deviating requires a constitution amendment + a new audit.
 
 ## Top-level question: "Does this app collect data from this app?"
 
-**Answer:** **Yes** — Usage Data only.
+**Answer:** **Yes** — Usage Data, Contact Info (email), and User Content (comment text).
 
-Rationale: we send TelemetryDeck events listed in `AnalyticsEvent.swift`. Although TelemetryDeck does not collect personal data, Apple's questionnaire counts any data sent off-device as "collected."
+Rationale: we send TelemetryDeck events listed in `AnalyticsEvent.swift`. Although TelemetryDeck does not collect personal data, Apple's questionnaire counts any data sent off-device as "collected." Separately, v1.0 ships comments + ratings (US-13/14/15): when a user posts, the app sends their display name, email, and (for US-14) the comment body to dutchovendaddy.com's WordPress REST endpoints. **Name + email never reach TelemetryDeck** — they travel only to dutchovendaddy.com over HTTPS.
 
 ## Data Types Collected
 
@@ -17,8 +17,23 @@ Check **only** the following categories:
 | Apple category | Specific type | Linked to user? | Used for tracking? | Purposes |
 |---|---|---|---|---|
 | Usage Data | Product Interaction | **No** | **No** | App Functionality, Analytics |
+| Contact Info | Email Address | **Yes** (to the user's chosen display name) | **No** | App Functionality |
+| User Content | Customer Support | **Yes** | **No** | App Functionality |
 
-Everything else (Contact Info, Health & Fitness, Financial Info, Location, Sensitive Info, Contacts, User Content, Browsing History, Search History, Identifiers, Purchases, Diagnostics) — **uncheck**.
+Everything else (Health & Fitness, Financial Info, Location, Sensitive Info, Contacts, Browsing History, Search History, Identifiers, Purchases, Diagnostics) — **uncheck**.
+
+### "Contact Info — Email Address" details
+
+- Collected only when a user posts a rating (US-13) or comment (US-14) for the first time.
+- Stored on-device in the iOS Keychain under service `com.dutchovendaddy.DODApp.guest` so the user isn't re-prompted on subsequent posts (US-15 AC-15.2).
+- Sent over HTTPS to `https://www.dutchovendaddy.com/wp-json/wp/v2/comments` and `https://www.dutchovendaddy.com/wp-json/wp-recipe-maker/v1/rating` as the standard WordPress `author_email` field for moderation.
+- **Never** sent to TelemetryDeck or any third party.
+
+### "User Content — Customer Support" details
+
+- The comment body text the user submits in US-14's composer.
+- Sent over HTTPS to `https://www.dutchovendaddy.com/wp-json/wp/v2/comments`.
+- **Never** sent to TelemetryDeck. The `recipeCommentSubmitted` analytics event carries only the integer recipe id and a bool for moderation status — never the raw comment body (constitution §9, spec AC-14.7).
 
 ### "Product Interaction" details
 
@@ -51,10 +66,16 @@ Dutch Oven Daddy iOS App — Privacy Policy
 
 The Dutch Oven Daddy iOS app collects anonymous Usage Data via TelemetryDeck
 (https://telemetrydeck.com) for the sole purpose of understanding which
-features of the app are used. No personal information is collected. No
-account is required. We do not share, sell, or rent any data. Search
-queries are cryptographically hashed before transmission so the original
-text cannot be recovered. Saved recipes are stored only on your device.
+features of the app are used. No account is required. We do not share, sell,
+or rent any data. Search queries are cryptographically hashed before
+transmission so the original text cannot be recovered. Saved recipes are
+stored only on your device.
+
+When you post a comment or rating, your display name and email are sent to
+dutchovendaddy.com so the comment can be moderated and replied to. We do not
+share this with anyone else. Your display name and email are stored on your
+device in the iOS Keychain so you don't have to re-enter them; uninstalling
+the app removes them.
 
 For questions, contact: <support@dutchovendaddy.com>
 

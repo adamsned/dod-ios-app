@@ -7,7 +7,7 @@
 
 A native iPhone and iPad reader for the Dutch Oven Daddy cooking blog. Readers can discover recipes from the home feed, browse by category, search, and save recipes so they're available while cooking — even with no internet in the kitchen.
 
-The app is read-only: no comments, no ratings, no accounts. Recipes are the hero; UI chrome stays out of the way.
+The app is **mostly read-only** — every recipe is a tap away without sign-in — with two write surfaces in v1.0: posting a rating (US-13) and posting a comment (US-14) on a recipe, both via the dutchovendaddy.com WordPress REST API under a Keychain-stored guest identity (US-15). No accounts. Recipes are the hero; UI chrome stays out of the way.
 
 ## Personas
 
@@ -29,7 +29,6 @@ The app is read-only: no comments, no ratings, no accounts. Recipes are the hero
 - User accounts and sign-in
 - Cross-device sync (iCloud) of saved recipes
 - Push notifications for new recipes
-- Comments and ratings
 - Meal planning / weekly calendar
 - Shopping list
 - Cooking mode (screen-awake, in-app timers)
@@ -155,6 +154,50 @@ Added by Tier-4 consultant-pass amendment (CL-19, 2026-05-23). Reframes AC-3.2's
 
 **Supersedes:** AC-3.2's "ingredient-body matching is **not required in v1**" remains the *spec-level* description of the REST contract; AC-12.1 specifies the locally-indexed augmentation.
 
+### US-13 — Read + post a star rating
+**As a** weekend cook,
+**I want** to rate a recipe 1–5 stars and see what others rated it,
+**so that** I can both contribute and triage the canon of recipes.
+
+Added by the Phase 7 amendment (CL-21, 2026-05-24). Wires the app to WordPress Recipe Maker's existing rating system. A rating is technically a WP comment with `meta.wprm_comment_rating` set; from the user's perspective it's an independent star tap. Posting a rating may also leave a comment (US-14) but doesn't have to.
+
+**Acceptance criteria:**
+- **AC-13.1** Recipe detail header shows the WPRM rating summary (`/wp-recipe-maker/v1/rating/recipe/<id>`) as `<average star icon> · <count> ratings` when count ≥ 1. When count is 0, the summary is hidden — show only the inline 5-star input prompt "Rate this recipe."
+- **AC-13.2** Tapping a star on the input fires the first-time guest-identity sheet if Keychain has no identity (US-15); otherwise immediately POSTs to `/wp-recipe-maker/v1/rating` with name + email from the Keychain identity, the star value, and the recipe id.
+- **AC-13.3** After a successful POST, the input row collapses to "You rated this <stars>" with an "Edit" affordance; tapping Edit re-opens the star input and a subsequent POST overwrites the prior rating (WPRM dedupes by email).
+- **AC-13.4** Network or server error: show inline "Couldn't save your rating — try again" with a retry button. Persisted rating state from Keychain so a stale rating shows on relaunch even before the network round-trip.
+- **AC-13.5** Rating telemetry: new `AnalyticsEvent.recipeRated(recipeID:stars:)` event (constitution §9 amendment — see CL-21). No raw user text in the payload.
+
+### US-14 — Read + post comments
+**As a** weekend cook,
+**I want** to read other cooks' comments and add my own,
+**so that** I can share tips and learn from people who've made the recipe.
+
+Added by the Phase 7 amendment (CL-21, 2026-05-24).
+
+**Acceptance criteria:**
+- **AC-14.1** Recipe detail has an expandable "Comments (<count>)" section below the instructions. Collapsed by default; tapping expands and lazy-loads `/wp/v2/comments?post=<id>&per_page=10&_embed=author`. Newest-first.
+- **AC-14.2** Each comment row shows: author name, optional avatar (from `author_avatar_urls`), relative date ("3 days ago"), comment body (HTML-stripped via existing `HTMLSanitizer`), and the comment's star rating (if `meta.wprm_comment_rating > 0`) — small inline stars under the body.
+- **AC-14.3** A "Write a comment" CTA at the bottom of the section opens a composer sheet: text field (1000-char max), optional star row (defaults to user's existing rating from US-13 if any), Submit button. Submit fires the guest-identity sheet (US-15) if needed, then POSTs to `/wp/v2/comments` with `post`, `author_name`, `author_email`, `content`, and (if a star was chosen) `meta: { wprm_comment_rating: <stars> }`.
+- **AC-14.4** Post-submit feedback: if the response status is `approved`, the new comment appears immediately at the top of the list with a brief "Posted" snackbar. If status is `hold` (default — moderation queue), show a "Your comment is awaiting approval" snackbar and do NOT prepend it to the visible list (per AC-14.2 we only render `approved`). Either way the composer dismisses.
+- **AC-14.5** Read path tolerates pagination: a "Load more" button at the bottom fetches the next page when `X-WP-TotalPages` says there are more.
+- **AC-14.6** Offline read: comments cached locally on previous fetches show with an "(offline)" pill — see DODPersistence change (Wave-1 sub 3). Posting offline is queued (best-effort) and shown as "pending — will send when online" — Sub 3's responsibility.
+- **AC-14.7** Comment telemetry: new `AnalyticsEvent.recipeCommentSubmitted(recipeID:moderated:Bool)`. No raw comment text. The `moderated` field is true when WP returns `hold`, false when `approved`. (Constitution §9 amendment — see CL-21.)
+
+### US-15 — Guest identity (name + email, no account)
+**As any** user about to post,
+**I want** to tell the app my display name and email **once**,
+**so that** I don't have to re-enter it on every comment or rating.
+
+Added by the Phase 7 amendment (CL-21, 2026-05-24). The guest-identity model — name + email, Keychain-only, no password — is the constitutional substitute for accounts; see constitution §9.
+
+**Acceptance criteria:**
+- **AC-15.1** First tap to rate (US-13) or comment (US-14) presents a non-dismissible sheet asking for "Display name" (1–40 chars, no validation beyond non-empty) and "Email" (basic format validation: contains `@` and `.`, rejects obvious garbage). Both required to proceed.
+- **AC-15.2** Submitting the sheet writes both values to the iOS Keychain under service `com.dutchovendaddy.DODApp.guest` (account: `display-name` and `email`). The sheet then dismisses and resumes the pending rate/post action automatically.
+- **AC-15.3** A future Settings affordance (out of scope for v1; tracked as CL-22) will let users edit or clear their guest identity. For v1.0, identity can only be cleared by uninstalling the app.
+- **AC-15.4** No identity field is ever sent to TelemetryDeck. Name and email travel ONLY to dutchovendaddy.com over HTTPS.
+- **AC-15.5** Keychain access uses the modern `Security` framework via a small wrapper in `DODSupport` (Wave-1 sub 3 builds it). Reads are synchronous + cheap; writes throw on Keychain error.
+
 ### US-8 — First-launch onboarding
 **As a** Weekend Cook on first cold launch,
 **I want** a brief welcome explaining what the app does,
@@ -254,6 +297,9 @@ Mandates (per constitution §6):
   - **REG-10**: deep-link URLs from App Intents / Siri Shortcuts / Spotlight must round-trip through `DeepLinkIntent.parse(_:)` and `DeepLinkIntent.url` without losing their target id or action. Failure mode would be Siri opening the wrong recipe (or the homepage) when a user says "Open Bourbon Berry Cake" — silently incorrect from the user's perspective. Locked by the round-trip cases in `DODSupportTests.DeepLinkIntentTests` and the entity-lookup tests in `DODPersistenceTests.RecentlyViewedTests` (`recipeWithoutTouchingDoesNotBumpLastViewedAt` in particular, which guards against Siri suggestions promoting the wrong recipe in subsequent LRU queries).
   - **REG-11 (US-11)**: Cook Mode Live Activity lifecycle is fully exercised by the `CookModeViewModel` unit suite — start, end, replace-on-new-timer, no-op on tick when no activity, and end-on-cook-mode-exit are each pinned by a named test in `CookModeViewModelTests`. The lock-screen and Dynamic Island compact views are pinned by `CookLiveActivitySnapshotTests`. Failure mode: the cook would lose track of the buzzer the moment the screen dimmed and would either over-cook or have to keep the app foregrounded for the full duration.
   - **REG-12 (US-12)**: ingredient index round-trip, merger rank, and filter-composition logic stay correct as Search v2 evolves. Locked by `DODPersistenceTests.IngredientIndexTests` (write-on-mergeDetail, substring match, case-insensitive, short-query guard, re-merge replaces rows), `DODPersistenceTests.SearchFilterInputsTests` (category / total-time / recently-viewed accessors), `DODFeatureSearchTests.SearchResultMergerTests` (title > excerpt > local-only tier ordering and dedupe), `DODFeatureSearchTests.SearchFiltersTests` (each chip + composed), `DODFeatureSearchTests.RecentSearchesTests` (LRU dedupe + trim + clear), and `DODFeatureSearchTests` view-model coverage of `filterChipNarrowsResultsWithoutNetworkRoundTrip`, `recentSearchesPersistAcrossViewModelInstances`, and `offlineWithLocalIngredientHitsStillShowsResults`.
+  - **REG-13 (US-13)**: WPRM rating round-trip. Locked by `DODNetworkingTests.WPRMRatingsClientTests` (summary read fixture + post body shape) and `DODFeatureRecipeDetailTests.RatingViewModelTests` (state machine after successful + failed post).
+  - **REG-14 (US-14)**: WP comment list pagination + post payload + `hold` status handling. Locked by `DODNetworkingTests.WPCommentsClientTests` and `DODFeatureRecipeDetailTests.CommentsViewModelTests`.
+  - **REG-15 (US-15)**: Keychain round-trip for the guest identity. Locked by `DODSupportTests.GuestIdentityStoreTests` (write → read → overwrite → clear). Note that the test uses a Keychain access group scoped to the test bundle so it doesn't leak into the device keychain.
 
 ## Clarifications
 

@@ -7,6 +7,7 @@ Immutable rules. All specs, plans, and tasks must conform. Changes require an ex
 - Native iOS/iPadOS app for the Dutch Oven Daddy cooking blog (dutchovendaddy.com).
 - Primary job: let readers browse, search, save, and cook recipes from the blog on iPhone and iPad.
 - Brand: warm, food-forward, readable. Recipes are the hero — chrome is minimal.
+- The app is **mostly** read-only: every recipe is a tap away without sign-in. v1.0 adds **two write surfaces** — submitting a rating (1–5 stars) and posting a comment on a recipe — both of which post directly to the dutchovendaddy.com WordPress install via its REST API. No accounts; see §9 for the guest-identity model.
 
 ## 2. Platforms & versions
 
@@ -99,11 +100,20 @@ The test pyramid has **four** layers. Every PR must keep all layers green.
 ## 9. Privacy & security
 
 - **Analytics:** **TelemetryDeck only.** Chosen because it requires no ATT prompt, collects no IDFA, no PII, no cross-app tracking, and ships a small SDK. Any other analytics SDK (Google Analytics/Firebase, Mixpanel, Amplitude, etc.) is **prohibited** in v1 and requires a constitution amendment.
-  - Events tracked are limited to: app open, screen view, recipe view, recipe save/unsave, search query (query string hashed, not raw), share action, offline-read event, cook-mode-started event (recipe ID only, no free-text payload — added by consultant-pass amendment for spec US-7 AC-7.7).
-  - **No** raw user input strings sent to TelemetryDeck. No device identifiers beyond TelemetryDeck's anonymized client hash.
-  - App Privacy "nutrition label" declares: *Usage Data — Product Interaction — not linked to user, not used for tracking.*
+  - Events tracked are limited to: app open, screen view, recipe view, recipe save/unsave, search query (query string hashed, not raw), share action, offline-read event, cook-mode-started event (recipe ID only, no free-text payload — added by consultant-pass amendment for spec US-7 AC-7.7), `recipeRated(recipeID:stars:)` (added by CL-21 for US-13 AC-13.5 — integer recipe id + integer 1–5 star count, no free text), `recipeCommentSubmitted(recipeID:moderated:)` (added by CL-21 for US-14 AC-14.7 — integer recipe id + bool indicating whether the WP response was `hold` (true) or `approved` (false), no raw comment body).
+  - **No** raw user input strings sent to TelemetryDeck. No device identifiers beyond TelemetryDeck's anonymized client hash. The guest-identity name + email (US-15) are **never** sent to TelemetryDeck — they travel only to dutchovendaddy.com over HTTPS.
+  - App Privacy "nutrition label" declares: *Usage Data — Product Interaction — not linked to user, not used for tracking;* and, per CL-21, *Contact Info — Email Address* + *User Content — Customer Support* — linked to user, not used for tracking, for App Functionality only. Full mapping table below.
 - **Ads & third-party trackers:** none. Ever, without an amendment.
-- **No** PII collected. No accounts in v1.
+- **Guest identity for comments/ratings:** the app collects a display **name** and **email address** from the user the first time they tap to post a rating or comment (US-15). Both are stored in the iOS Keychain on-device only. The same name + email is sent to dutchovendaddy.com's WP REST `/wp/v2/comments` and `/wp-recipe-maker/v1/rating` endpoints on every subsequent post — these are the standard WordPress fields the blog already uses for comment-by-email moderation. No password, no auth token, no account.
+- **App Privacy questionnaire mapping** (per CL-21):
+
+  | Apple category | Specific type | Linked to user? | Used for tracking? | Purposes |
+  |---|---|---|---|---|
+  | Contact Info | Email Address | Yes (to the user's chosen display name) | No | App Functionality |
+  | User Content | Customer Support | Yes | No | App Functionality |
+  | Usage Data | Product Interaction | No | No | App Functionality, Analytics |
+
+  Explicit non-collection still true: no password, no IDFA, no device id beyond TelemetryDeck's anonymous client hash. No accounts in v1.
 - **App Transport Security:** strict HTTPS only. No exceptions.
 - **Secrets:** TelemetryDeck app ID is the only secret in v1. Stored in a gitignored `.xcconfig`, not in source. Never logged.
 - **Crash reporting:** Apple's built-in MetricKit only in v1. No Crashlytics/Sentry.

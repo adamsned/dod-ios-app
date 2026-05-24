@@ -14,6 +14,7 @@
 - [ ] Support URL is live at `https://www.dutchovendaddy.com/app-support/`.
 - [ ] Accessibility audit completed in simulator per `accessibility-audit.md`.
 - [ ] Cold-launch trace shows < 1.5s per `performance-audit.md`.
+- [ ] Pre-flight comment-system check (added 2026-05-24 for US-13/14/15): the app now writes ratings + comments back to dutchovendaddy.com over the WP REST API, so the WordPress side has to be in the right state before the build hits TestFlight. Confirm WP **Settings → Discussion → "Comment author must fill out name and email"** is **ON** (the app always sends both, but the live blog has to require them so anonymous bot posts get rejected at the source). Confirm **"Users must be registered and logged in to comment"** is **OFF** (the app posts as a guest using name + email — registration would block every submission). Confirm the **comment moderation queue is enabled** (default) so US-14 AC-14.4's `hold` branch actually exercises in production and a human can triage spam before it goes live. Recommend installing a basic anti-spam plugin (Akismet) if not already present — the new write surface is going to attract bot traffic, and Akismet is the path-of-least-resistance defense for a fresh WordPress install.
 
 ## Apple Developer Program
 

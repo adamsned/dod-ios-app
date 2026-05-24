@@ -19,6 +19,8 @@ by `clarifications.md` CL-16/CL-17/CL-18). Cards switch to a 2-column compact /
 3-column regular grid (CC-9). Pre-TestFlight checklist tracked in
 [`Marketing/TestFlight.md`](Marketing/TestFlight.md).
 
+**Phase 7 amendment (2026-05-24):** v1.0 now includes comments + ratings — US-13 (1–5 star ratings via WPRM), US-14 (read + post WP comments), US-15 (Keychain-stored guest identity, no accounts), authorized by `clarifications.md` CL-21/22/23.
+
 ## Read the spec first
 
 This repo is built spec-first. If you're new, read in this order:
