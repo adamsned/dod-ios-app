@@ -855,19 +855,44 @@ Parallelism tag conventions: tasks sharing `||:` letter can run simultaneously i
 - **Est:** 4h (audit + baseline fills)
 - **||:** P8-darkmode
 
-### T-331+ — Appearance audit follow-up fixes (US-18)
-- **Scope:** Reserved for fixes the T-330 audit surfaces. Each is its own task with concrete scope + AC mapping. Until T-330 runs, this list is empty. If the audit produces no fixes, no T-331+ rows appear and US-18 closes with just T-330.
-- **AC:** AC-18.4, AC-18.5 (only the cells that fail in the audit).
+### T-331 — Commit dark + AX5 baselines for DesignSystem (US-18 follow-up)
+- **Scope:** Run `xcodebuild test -scheme DODDesignSystem -destination 'platform=iOS Simulator,name=iPhone 17'` against the 20 new `*_dark` / `*_AX5` test methods T-330 added in `SnapshotTests+AppearanceAudit.swift`. The tests already use `record: .missing`, so the first run lays the PNGs down automatically. Open each one; if it looks right, commit it under `__Snapshots__/DesignSystemAppearanceSnapshotTests/`. Pure baseline harvest — no source changes to the component implementations or the test file itself (T-330 already extended the test surface; this task only commits the resulting baselines). No contrast bug is expected; if one surfaces, log a separate T-33x for the fix.
+- **Files:** `Packages/DODDesignSystem/Tests/DODDesignSystemTests/__Snapshots__/DesignSystemAppearanceSnapshotTests/test_*_dark.1.png`, `test_*_AX5.1.png` (20 new PNGs).
+- **AC:** AC-18.1, AC-18.2, AC-18.4 (verify each rendered baseline).
 - **Deps:** T-330.
-- **Est:** TBD per fix.
+- **Est:** 1h (sim run + spot-check + commit).
+- **||:** P8-darkmode
+
+### T-332 — Top-level screen snapshot tests (US-18 follow-up)
+- **Scope:** Stand up new snapshot test files for the five top-level screens that lack any visual coverage: Feed, Categories list, Category detail, Search, Saved. Each test file lives next to the existing `*ViewModelTests.swift` in its feature package. Coverage: 1 representative state per screen (e.g. Feed = loaded with 6 rows; Saved = 3 saved) × {light, dark} × {defT, AX5} = 4 snapshots per screen, ~20 PNGs total. Requires adding `swift-snapshot-testing` to `Package.swift` for `DODFeatureFeed`, `DODFeatureCategories`, `DODFeatureSaved`, `DODFeatureSearch` (currently only `DODDesignSystem` and `DODFeatureRecipeDetail` declare the dep). Plus a `StatefulHost`-style shim per screen so the `*ViewModel` can be put into the desired state synchronously without going through real dependencies.
+- **Files:** `Packages/DODFeatureFeed/Tests/DODFeatureFeedTests/FeedViewSnapshotTests.swift`, `Packages/DODFeatureCategories/Tests/DODFeatureCategoriesTests/CategoryListViewSnapshotTests.swift` + `CategoryRecipesViewSnapshotTests.swift`, `Packages/DODFeatureSaved/Tests/DODFeatureSavedTests/SavedViewSnapshotTests.swift`, `Packages/DODFeatureSearch/Tests/DODFeatureSearchTests/SearchViewSnapshotTests.swift`, plus `Package.swift` amendments in each. New `__Snapshots__` directories with the resulting PNGs.
+- **AC:** AC-18.1, AC-18.4.
+- **Deps:** T-330.
+- **Est:** 4h (test infrastructure + sim record + visual review).
+- **||:** P8-darkmode
+
+### T-333 — Commit Cook Live Activity baselines (US-18 follow-up)
+- **Scope:** The existing `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/CookLiveActivitySnapshotTests.swift` declares five tests but commits no PNGs — running them today fails. Record mode pass to lay down the five baselines; extend the lock-screen test with a `_dark` variant. The Dynamic Island compact pieces are tiny system-controlled surfaces — light-only is sufficient (system inverts them automatically). Recipe detail root view dark + AX5 also handled here.
+- **Files:** New PNGs under `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/__Snapshots__/CookLiveActivitySnapshotTests/`, plus extension of `CookLiveActivitySnapshotTests.swift` with `_dark` lock-screen variant. Optional: new `RecipeDetailViewSnapshotTests.swift` for the recipe detail root view dark + AX5 cell.
+- **AC:** AC-18.1.
+- **Deps:** T-330.
+- **Est:** 2h.
+- **||:** P8-darkmode
+
+### T-334 — Tab bar appearance baseline (US-18 + US-16 follow-up)
+- **Scope:** Once the US-16 tab bar refinement (T-310) lands, snapshot the assembled `TabStack` in both appearances at default Dynamic Type. Single light + single dark PNG is enough — the tab bar is system chrome plus an icon set; AX5 is not meaningful (tab bar text never scales beyond the system cap). Lives next to whatever test target ends up housing `TabStack`.
+- **Files:** TBD pending T-310's choice of test target; likely a new `App/Tests/TabStackSnapshotTests.swift` or a host-app L4 test.
+- **AC:** AC-18.1, AC-16.x (the relevant US-16 visual criterion).
+- **Deps:** T-330, T-310.
+- **Est:** 1h.
 - **||:** P8-darkmode
 
 ---
 
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) = 85
-- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~13 hours (Phase 8) = ~173 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 4 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334) = 89
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~13 hours (Phase 8) + ~8 hours (Phase 8 follow-ups) = ~181 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
