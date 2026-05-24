@@ -76,5 +76,20 @@ final class DesignSystemSnapshotTests: XCTestCase {
         .frame(width: 358)
         assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
     }
+
+    /// Exercise RecipeCard at the new ~180pt half-width — the size each card
+    /// occupies in the 2-column iPhone grid introduced by the CC-9
+    /// amendment. Guards against title/excerpt truncation issues that
+    /// don't surface at the full-width 358pt layout.
+    func test_recipeCard_halfWidth() {
+        let view = RecipeCard(
+            title: "Garlic Butter Skillet Corn",
+            excerpt: "An easy 15-minute side dish that pairs with everything.",
+            heroImageURL: nil,
+            totalTimeDisplay: "15 min"
+        )
+        .frame(width: 180)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+    }
 }
 #endif

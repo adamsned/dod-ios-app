@@ -65,7 +65,7 @@ public struct RecipeCard: View {
                     EmptyView()
                 }
             }
-            .frame(height: 200)
+            .frame(height: 140)
             .clipped()
             .accessibilityHidden(true)
 
@@ -83,12 +83,12 @@ public struct RecipeCard: View {
                 .foregroundStyle(DODColor.label)
                 .lineLimit(2)
             Text(excerpt)
-                .dodFont(DODType.body)
+                .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DODSpacing.md)
+        .padding(DODSpacing.sm)
     }
 
     private func timeChip(_ display: String) -> some View {
@@ -98,7 +98,7 @@ public struct RecipeCard: View {
         }
         .dodFont(DODType.caption)
         .foregroundStyle(DODColor.cream)
-        .padding(.horizontal, DODSpacing.xs)
+        .padding(.horizontal, DODSpacing.xxs)
         .padding(.vertical, DODSpacing.xxs)
         .background(
             Capsule().fill(DODColor.castIronBrown.opacity(0.85))
