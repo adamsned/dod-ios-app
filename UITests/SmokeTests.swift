@@ -64,17 +64,11 @@ final class SmokeTests: XCTestCase {
         )
     }
 
-    /// KNOWN-FAILING: tapping a recipe Button in the LazyVGrid does not push
-    /// the detail screen. Live simulator manual click reproduces the same
-    /// behavior — this is a real navigation bug in RootView/NavigationStack
-    /// path observation, not a test-flake.
-    ///
-    /// See issue tracker bug DOD-NAV-1 (to be filed). Test is kept here as a
-    /// regression target so we know when the fix lands.
-    func test_recipeDetailOpensAndShowsContent() throws {
-        throw XCTSkip("DOD-NAV-1: recipe tap doesn't push detail screen — see RootView path binding")
-        // Body kept below; XCTSkip stops execution but preserves the test.
-        // swiftlint:disable:next unreachable_code
+    /// REG-DOD-NAV-1: tapping a recipe row must push the detail screen.
+    /// Original bug: per-tab path bindings constructed by a parent helper
+    /// method inside ForEach broke SwiftUI's NavigationStack identity.
+    /// Fix: each tab owns its own @State path inside a dedicated TabStack view.
+    func test_recipeDetailOpensAndShowsContent() {
         // Wait for the feed to populate, then tap the first recipe Button.
         // Tab-bar buttons share the same parent app.buttons collection, so
         // filter out the four known tab labels.

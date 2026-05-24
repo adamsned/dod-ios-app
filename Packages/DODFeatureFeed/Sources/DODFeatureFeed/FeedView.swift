@@ -63,6 +63,7 @@ public struct FeedView: View {
                         onSelect(item)
                     } label: {
                         FeedRow(item: item)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .task {

@@ -17,6 +17,59 @@ import Testing
         #expect(first.title == "Apple Crisp")
     }
 
+    /// REG-DOD-NAV-1: cache(listItem:) must round-trip canonicalURL.
+    /// Before this fix the URL was dropped on insert, which made recipe-tap
+    /// navigation fall back to the homepage and immediately auto-dismiss.
+    @Test func canonicalURLRoundTrips() async throws {
+        let store = try await makeStore()
+        let url = URL(string: "https://www.dutchovendaddy.com/test-recipe/") ?? URL(filePath: "/")
+        let listItem = RecipeListItem(
+            id: 88,
+            title: "Test",
+            excerpt: "x",
+            heroImage: nil,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            totalTimeDisplay: nil,
+            canonicalURL: url
+        )
+        try await store.cache(listItem: listItem)
+        let items = try await store.listItems(forIDs: [88])
+        let first = try #require(items.first)
+        #expect(first.canonicalURL == url)
+    }
+
+    /// Updating an existing row with a fresh canonicalURL should overwrite,
+    /// but passing nil should NOT clobber a previously-stored good value.
+    @Test func canonicalURLUpdatesButDoesNotClobberOnNil() async throws {
+        let store = try await makeStore()
+        let url = URL(string: "https://www.dutchovendaddy.com/r/") ?? URL(filePath: "/")
+        try await store.cache(
+            listItem: RecipeListItem(
+                id: 99,
+                title: "A",
+                excerpt: "x",
+                heroImage: nil,
+                publishedAt: .now,
+                totalTimeDisplay: nil,
+                canonicalURL: url
+            )
+        )
+        // Re-cache with nil canonicalURL (simulating a partial update).
+        try await store.cache(
+            listItem: RecipeListItem(
+                id: 99,
+                title: "A",
+                excerpt: "y",
+                heroImage: nil,
+                publishedAt: .now,
+                totalTimeDisplay: nil,
+                canonicalURL: nil
+            )
+        )
+        let items = try await store.listItems(forIDs: [99])
+        #expect(items.first?.canonicalURL == url, "Nil update must not clobber existing URL")
+    }
+
     @Test func mergeDetailPopulatesIngredientsAndInstructions() async throws {
         let store = try await makeStore()
         try await store.cache(listItem: makeListItem(id: 42, title: "Pasta"))

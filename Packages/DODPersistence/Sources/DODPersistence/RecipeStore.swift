@@ -24,6 +24,13 @@ public actor RecipeStore {
             existing.title = listItem.title
             existing.excerptText = listItem.excerpt
             existing.heroImageURLString = listItem.heroImage?.absoluteString
+            // Update canonical URL when REST returns it — critical for
+            // recipe-detail navigation (spec AC-4.11 + CL-4). Only overwrite
+            // when a non-empty value is available so we don't clobber a good
+            // existing value with an empty one.
+            if let canonicalURL = listItem.canonicalURL {
+                existing.canonicalURLString = canonicalURL.absoluteString
+            }
             existing.lastViewedAt = .now
             // Successful re-fetch clears any prior blocklist entry (AC-1.7 reset
             // on pull-to-refresh).
@@ -35,7 +42,7 @@ public actor RecipeStore {
                     slug: "",
                     title: listItem.title,
                     excerptText: listItem.excerpt,
-                    canonicalURLString: "",
+                    canonicalURLString: listItem.canonicalURL?.absoluteString ?? "",
                     heroImageURLString: listItem.heroImage?.absoluteString,
                     publishedAt: listItem.publishedAt,
                     lastViewedAt: .now
@@ -256,7 +263,8 @@ public actor RecipeStore {
             excerpt: row.excerptText,
             heroImage: row.heroImageURLString.flatMap { URL(string: $0) },
             publishedAt: row.publishedAt,
-            totalTimeDisplay: row.totalSeconds.map(formatTime)
+            totalTimeDisplay: row.totalSeconds.map(formatTime),
+            canonicalURL: row.canonicalURLString.isEmpty ? nil : URL(string: row.canonicalURLString)
         )
     }
 
