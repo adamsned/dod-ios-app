@@ -24,6 +24,10 @@ public final class RecipeDetailViewModel {
     public private(set) var isSaved: Bool = false
     public private(set) var checkedIngredientIDs: Set<UUID> = []
     public private(set) var snackbarMessage: String?
+    /// Tracks whether `cookModeStarted` has already been sent this session
+    /// for this recipe, so re-entering Cook Mode in the same view session
+    /// fires at most one telemetry event (spec AC-7.7).
+    private var cookModeTelemetrySentThisSession: Bool = false
 
     private let dependencies: RecipeDetailDependencies
 
@@ -82,6 +86,22 @@ public final class RecipeDetailViewModel {
 
     public func didShare() async {
         await dependencies.sendTelemetry(.recipeShared(recipeID: listItem.id))
+    }
+
+    /// Called when the user taps the Cook Now CTA (spec AC-7.1). Sends the
+    /// `cookModeStarted` telemetry event the first time per recipe per
+    /// session (AC-7.7), no-ops on subsequent entries within the same
+    /// detail-screen lifetime.
+    public func didTapCookMode() async {
+        guard !cookModeTelemetrySentThisSession else { return }
+        cookModeTelemetrySentThisSession = true
+        await dependencies.sendTelemetry(.cookModeStarted(recipeID: listItem.id))
+    }
+
+    /// Merges back the ingredient check set from Cook Mode's drawer so
+    /// state round-trips into the underlying detail screen (AC-7.5).
+    public func mergeIngredientChecks(_ ids: Set<UUID>) {
+        checkedIngredientIDs = ids
     }
 
     public func dismissSnackbar() {

@@ -30,6 +30,15 @@ import Testing
         }
     }
 
+    @Test func cookModeStartedCarriesOnlyRecipeID() {
+        // Spec AC-7.7 + constitution §9: payload is exactly { recipe_id } —
+        // no free-text, no step index, nothing the user typed.
+        let event = AnalyticsEvent.cookModeStarted(recipeID: 7)
+        #expect(event.name == "cook_mode_started")
+        #expect(event.payload == ["recipe_id": "7"])
+        #expect(event.payload.keys.count == 1)
+    }
+
     @Test func allEventNamesAreUnique() {
         let allNames: [String] = [
             AnalyticsEvent.appOpen.name,
@@ -40,6 +49,7 @@ import Testing
             AnalyticsEvent.recipeSearched(queryHash: "h").name,
             AnalyticsEvent.recipeShared(recipeID: 1).name,
             AnalyticsEvent.offlineRead(recipeID: 1).name,
+            AnalyticsEvent.cookModeStarted(recipeID: 1).name,
         ]
         #expect(Set(allNames).count == allNames.count)
     }

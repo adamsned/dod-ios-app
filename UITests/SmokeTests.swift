@@ -178,6 +178,76 @@ final class SmokeTests: XCTestCase {
         )
     }
 
+    /// US-7 / AC-7.1, AC-7.2, AC-7.4, AC-7.6: tapping the Cook Now CTA on
+    /// recipe detail presents the full-screen Cook Mode surface, "Step 1 of M"
+    /// is visible, Next advances to step 2, and Done dismisses back to detail.
+    func test_cookModeOpensAndAdvances() {
+        // Step 1: open the feed and navigate into a recipe detail.
+        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
+        let recipeButtons = app.buttons.matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        XCTAssertTrue(
+            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
+            "Feed should show at least 2 recipe buttons"
+        )
+        recipeButtons.element(boundBy: 1).tap()
+
+        // Detail screen should land — same wait as test_recipeDetailOpensAndShowsContent.
+        let ingredientsHeader = app.staticTexts["Ingredients"]
+        XCTAssertTrue(
+            ingredientsHeader.waitForExistence(timeout: 45),
+            "Recipe detail should show Ingredients section before tapping Cook Now"
+        )
+
+        // Step 2: tap Cook Now. The CTA has the accessibility label "Cook Now".
+        let cookNow = app.buttons["Cook Now"]
+        XCTAssertTrue(
+            cookNow.waitForExistence(timeout: 5),
+            "Cook Now CTA should be visible on recipe detail (AC-7.1)"
+        )
+        cookNow.tap()
+
+        // Step 3: full-screen cover with "Step 1 of M" — AC-7.2.
+        let stepOnePredicate = NSPredicate(format: "label BEGINSWITH 'Step 1 of'")
+        let stepOne = app.staticTexts.matching(stepOnePredicate).firstMatch
+        XCTAssertTrue(
+            stepOne.waitForExistence(timeout: 5),
+            "Cook Mode should render 'Step 1 of M' in the top bar"
+        )
+
+        // Step 4: tap Next, expect step counter to advance to "Step 2 of M".
+        // Some recipes have only one step — guard so the test doesn't flake.
+        let stepOneLabel = stepOne.label
+        if let total = Self.totalStepsCount(from: stepOneLabel), total >= 2 {
+            let nextButton = app.buttons["Next"]
+            XCTAssertTrue(nextButton.waitForExistence(timeout: 3), "Next button should be present mid-flow")
+            nextButton.tap()
+            let stepTwoPredicate = NSPredicate(format: "label BEGINSWITH 'Step 2 of'")
+            let stepTwo = app.staticTexts.matching(stepTwoPredicate).firstMatch
+            XCTAssertTrue(
+                stepTwo.waitForExistence(timeout: 3),
+                "Cook Mode should advance to 'Step 2 of M' on Next"
+            )
+        }
+
+        // Step 5: tap Done — AC-7.6 — and assert we're back on detail.
+        let doneButton = app.buttons["Exit Cook Mode"]
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 3), "Done button should be in Cook Mode top bar")
+        doneButton.tap()
+
+        XCTAssertTrue(
+            ingredientsHeader.waitForExistence(timeout: 5),
+            "After Done, the recipe detail Ingredients header should be visible again"
+        )
+    }
+
+    /// Pulls the total step count out of a label like "Step 1 of 7".
+    /// Returns nil if the label doesn't match the expected pattern.
+    private static func totalStepsCount(from label: String) -> Int? {
+        let parts = label.split(separator: " ")
+        guard parts.count >= 4, let total = Int(parts[3]) else { return nil }
+        return total
+    }
+
     /// US-8: the welcome sheet shows on a fresh launch (i.e. when the
     /// `dod.onboardingCompletedV1` UserDefaults flag is unset), and tapping
     /// "Get cooking" dismisses it so the tab bar becomes reachable.
