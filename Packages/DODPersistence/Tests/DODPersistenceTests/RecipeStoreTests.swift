@@ -246,12 +246,12 @@ struct RecentlyViewedTests {
 
 // MARK: - Helpers
 
-private func makeStore() async throws -> RecipeStore {
+func makeStore() async throws -> RecipeStore {
     let container = try RecipeStore.inMemoryContainer()
     return RecipeStore(modelContainer: container)
 }
 
-private func makeListItem(id: Int, title: String) -> RecipeListItem {
+func makeListItem(id: Int, title: String) -> RecipeListItem {
     RecipeListItem(
         id: id,
         title: title,
@@ -262,7 +262,7 @@ private func makeListItem(id: Int, title: String) -> RecipeListItem {
     )
 }
 
-private func makeRecipe(id: Int, withDetail: Bool) -> Recipe {
+func makeRecipe(id: Int, withDetail: Bool) -> Recipe {
     Recipe(
         id: id,
         slug: "slug-\(id)",
@@ -281,7 +281,7 @@ private func makeRecipe(id: Int, withDetail: Bool) -> Recipe {
 /// US-12 overload: lets ingredient-index tests inject specific ingredient
 /// strings, categories, and total time without sharing the broader shape
 /// of `makeRecipe(id:withDetail:)`.
-private func makeRecipe(
+func makeRecipe(
     id: Int,
     categoryIDs: [Int] = [],
     ingredients: [String],
