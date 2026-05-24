@@ -1,14 +1,15 @@
 import SwiftUI
 
-/// Grid columns that adapt to horizontal size class: one column on iPhone,
-/// two columns on iPad regular. Used by Feed, Categories, Search, Saved
-/// for consistent list-vs-grid behavior (spec CC-8, T-150..T-154).
+/// Grid columns that adapt to horizontal size class: two columns on iPhone
+/// (compact width), three columns on iPad regular. Used by Feed, Categories,
+/// Search, Saved for consistent grid behavior (spec CC-8 + CC-9 amendment,
+/// T-150..T-154).
 public struct AdaptiveRecipeGrid: Layout {
     public var spacing: CGFloat
     public var compactColumns: Int
     public var regularColumns: Int
 
-    public init(spacing: CGFloat = DODSpacing.md, compactColumns: Int = 1, regularColumns: Int = 2) {
+    public init(spacing: CGFloat = DODSpacing.md, compactColumns: Int = 2, regularColumns: Int = 3) {
         self.spacing = spacing
         self.compactColumns = compactColumns
         self.regularColumns = regularColumns
@@ -68,8 +69,16 @@ private struct AdaptiveGridContainer: ViewModifier {
 }
 
 /// Convenience: standard adaptive `LazyVGrid` columns for recipe rows.
+///
+/// Rationale (CC-9 amendment, May 2026): the original 1-column / 2-column
+/// split made the feed feel sparse on modern iPhone hardware — only ~2
+/// cards visible above the tab bar on an iPhone 17. Bumping compact to 2
+/// columns and regular to 3 columns gives a denser, more contemporary
+/// browsing surface (3+ rows above the fold on iPhone 13 baseline) while
+/// still keeping each card wide enough (~180pt) to read the title and
+/// excerpt comfortably.
 public func recipeGridColumns(horizontalSizeClass: UserInterfaceSizeClass?) -> [GridItem] {
-    let columns = horizontalSizeClass == .regular ? 2 : 1
+    let columns = horizontalSizeClass == .regular ? 3 : 2
     return Array(
         repeating: GridItem(.flexible(), spacing: DODSpacing.md, alignment: .top),
         count: columns
