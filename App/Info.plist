@@ -20,11 +20,6 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<!-- UILaunchScreen is required for iOS to render edge-to-edge on modern
-	     devices (notch, Dynamic Island, home indicator). Without this key
-	     iOS letterboxes the app, producing large black bars top and bottom.
-	     Empty dict = default system background; we don't customize the
-	     launch screen since it's visible for ~200ms. -->
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>

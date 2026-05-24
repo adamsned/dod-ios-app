@@ -52,6 +52,28 @@ targets:
       - path: App
     info:
       path: App/Info.plist
+      # These keys MUST live here in project.yml. `xcodegen generate`
+      # regenerates App/Info.plist on every run and silently strips any
+      # hand-edited keys. We've fixed the same letterbox bug twice now
+      # because UILaunchScreen kept getting clobbered — keep it here.
+      properties:
+        LSRequiresIPhoneOS: true
+        # UILaunchScreen is required for iOS to render edge-to-edge on
+        # modern devices (notch, Dynamic Island, home indicator). Without
+        # this key iOS letterboxes the app, producing large black bars
+        # top and bottom. Empty dict = default system background.
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp
