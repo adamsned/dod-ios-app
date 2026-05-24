@@ -334,10 +334,12 @@ public actor RecipeStore {
 
 extension RecipeStore {
 
-    /// Create the on-disk container for production use.
+    /// Create the on-disk container for production use. Pinned to the
+    /// latest schema (`SchemaV3`) — older on-disk stores get migrated via
+    /// `MigrationPlan` at open.
     public static func productionContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(SchemaV2.models),
+            for: Schema(SchemaV3.models),
             migrationPlan: MigrationPlan.self,
             configurations: ModelConfiguration()
         )
@@ -347,7 +349,7 @@ extension RecipeStore {
     /// fixture data exercises the same models the app ships with.
     public static func inMemoryContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(SchemaV2.models),
+            for: Schema(SchemaV3.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
     }
@@ -358,6 +360,16 @@ extension RecipeStore {
     public static func inMemoryContainerV1() throws -> ModelContainer {
         try ModelContainer(
             for: Schema(SchemaV1.models),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+    }
+
+    /// Create an in-memory container at the V2 schema. Used only by the
+    /// V2→V3 migration test to prove a pre-US-13/14 store opens cleanly
+    /// under V3. Production code never calls this.
+    public static func inMemoryContainerV2() throws -> ModelContainer {
+        try ModelContainer(
+            for: Schema(SchemaV2.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
     }

@@ -37,17 +37,24 @@ public enum SchemaV2: VersionedSchema {
     }
 }
 
-/// Migration plan. V1 -> V2 is lightweight because V2 is V1 plus one new
-/// model. Per MIGRATION.md rule 3 there is a migration test
-/// (`MigrationTests.lightweightV1toV2OpensCleanly`) that asserts a V1 store
-/// opens under V2 without data loss.
+/// Migration plan.
+///
+/// - V1 → V2: lightweight (V2 = V1 + `CachedIngredient`).
+/// - V2 → V3: lightweight (V3 = V2 + `CachedComment` + `CachedRating`).
+///
+/// Per MIGRATION.md rule 3 every stage has a paired migration test:
+/// - `MigrationTests.lightweightV1toV2OpensCleanly`
+/// - `MigrationV3Tests.V2_to_V3_lightweightMigration`
 public enum MigrationPlan: SchemaMigrationPlan {
 
     public static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self]
     }
 
     public static var stages: [MigrationStage] {
-        [.lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self)]
+        [
+            .lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self),
+            .lightweight(fromVersion: SchemaV2.self, toVersion: SchemaV3.self),
+        ]
     }
 }
