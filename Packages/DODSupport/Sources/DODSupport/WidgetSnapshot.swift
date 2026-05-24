@@ -122,8 +122,16 @@ public enum WidgetSnapshotConfig {
 /// header just hasn't been audited for Swift 6 Sendability yet.
 public struct WidgetSnapshotStore: @unchecked Sendable {
 
-    private let defaults: UserDefaults
+    // `internal` rather than `private` so the saved-recipes extension in
+    // SavedRecipesWidgetSnapshot.swift can reuse the same UserDefaults
+    // suite — both widgets share an App Group, only their keys differ.
+    let defaults: UserDefaults
     private let key: String
+
+    /// Backing store the saved-recipes extension methods write to. Same
+    /// `UserDefaults` instance — exposed under a friendlier name so the
+    /// extension reads as if it owned its own field.
+    var savedRecipesDefaults: UserDefaults { defaults }
 
     public init?(
         suiteName: String = WidgetSnapshotConfig.appGroupIdentifier,
