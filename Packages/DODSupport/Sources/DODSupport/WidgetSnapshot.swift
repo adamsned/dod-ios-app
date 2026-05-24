@@ -63,6 +63,10 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
 ///
 /// Recognized shapes:
 ///   - `dod://recipe/<id>` — open the recipe with the given WP ID
+///   - `dod://recipe/<id>?source=saved` — same target, but tagged as
+///     coming from the saved-recipes widget (US-17 / AC-17.9). The
+///     navigation path is identical; the source surfaces only on the
+///     parsed ``Route.recipe`` for analytics discrimination.
 ///   - `dod://feed` — open or switch to the Feed tab
 ///   - `dod://saved` — open or switch to the Saved tab (US-17 / AC-17.4,
 ///     AC-17.5; CL-29). Both the empty-state placeholder and any tap on
@@ -70,8 +74,19 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
 ///     fire this URL.
 public enum WidgetDeepLinkParser {
 
+    /// Which widget surface produced the URL. Inferred from the URL itself:
+    /// `dod://saved` and `dod://recipe/<id>?source=saved` are `.saved`;
+    /// everything else is `.featured` (the original v1 widget).
+    public enum Source: String, Sendable, Hashable, CaseIterable {
+        case featured
+        case saved
+    }
+
     public enum Route: Equatable, Sendable {
-        case recipe(id: Int)
+        /// `dod://recipe/<id>`. `source` reflects the widget surface the
+        /// tap originated from — see ``Source``. Defaults to `.featured`
+        /// for back-compat with pre-T-323 URLs that omitted the query.
+        case recipe(id: Int, source: Source = .featured)
         case feed
         case saved
     }
@@ -85,7 +100,7 @@ public enum WidgetDeepLinkParser {
         case "recipe":
             let trimmed = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             guard let id = Int(trimmed), id > 0 else { return nil }
-            return .recipe(id: id)
+            return .recipe(id: id, source: parseSource(from: url))
         case "feed":
             return .feed
         case "saved":
@@ -99,6 +114,18 @@ public enum WidgetDeepLinkParser {
         default:
             return nil
         }
+    }
+
+    /// Reads the optional `?source=<value>` query parameter off the URL.
+    /// Unknown / missing values fall back to `.featured` so legacy widget
+    /// URLs (pre-T-323) keep working unchanged.
+    private static func parseSource(from url: URL) -> Source {
+        guard
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+            let raw = components.queryItems?.first(where: { $0.name.lowercased() == "source" })?
+                .value?.lowercased()
+        else { return .featured }
+        return Source(rawValue: raw) ?? .featured
     }
 }
 

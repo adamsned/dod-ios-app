@@ -1,3 +1,4 @@
+import DODAnalytics
 import DODDomain
 import DODSupport
 import Foundation
@@ -16,6 +17,31 @@ extension WidgetDeepLink {
     init?(url: URL) {
         guard let parsed = WidgetDeepLinkParser.parse(url) else { return nil }
         self = parsed
+    }
+
+    /// Map the parsed route onto the analytics widget kind. The featured
+    /// widget owns `.feed` and recipe URLs without a source override
+    /// (which the parser collapses to `Source.featured`). The saved
+    /// widget owns `.saved` and recipe URLs that carry
+    /// `?source=saved` (T-323 / AC-17.9).
+    var widgetKind: WidgetKind {
+        switch self {
+        case .feed:
+            .featured
+        case .saved:
+            .saved
+        case .recipe(_, let source):
+            source == .saved ? .saved : .featured
+        }
+    }
+
+    /// Integer recipe id if the tap targeted a specific recipe; `nil` for
+    /// chrome / empty-state URLs that land on the Saved or Feed tab.
+    var recipeID: Int? {
+        switch self {
+        case .recipe(let id, _): id
+        case .feed, .saved: nil
+        }
     }
 }
 

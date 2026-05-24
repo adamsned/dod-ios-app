@@ -58,6 +58,58 @@ import Testing
         #expect(held.payload == ["recipe_id": "12", "awaiting_approval": "true"])
     }
 
+    @Test func widgetOpenedFeaturedCarriesKindAndRecipeID() {
+        // Spec AC-17.9 + constitution §9 (US-17 amendment): the featured
+        // widget tap reports kind="featured" plus the integer recipe id.
+        let event = AnalyticsEvent.widgetOpened(kind: .featured, recipeID: 42)
+        #expect(event.name == "widget_opened")
+        #expect(event.payload == ["kind": "featured", "recipe_id": "42"])
+        #expect(event.payload.keys.count == 2)
+    }
+
+    @Test func widgetOpenedSavedRowCarriesKindAndRecipeID() {
+        // Spec AC-17.9: saved-widget per-row tap reports kind="saved"
+        // plus the integer recipe id of the row tapped.
+        let event = AnalyticsEvent.widgetOpened(kind: .saved, recipeID: 99)
+        #expect(event.payload == ["kind": "saved", "recipe_id": "99"])
+    }
+
+    @Test func widgetOpenedSavedChromeOmitsRecipeID() {
+        // Spec AC-17.9 + AC-17.4 / AC-17.5: saved-widget chrome /
+        // empty-state tap reports kind="saved" with **no** recipe id —
+        // the tap landed on `dod://saved`, not a specific recipe.
+        let event = AnalyticsEvent.widgetOpened(kind: .saved, recipeID: nil)
+        #expect(event.name == "widget_opened")
+        #expect(event.payload == ["kind": "saved"])
+        #expect(event.payload["recipe_id"] == nil)
+        #expect(event.payload.keys.count == 1)
+    }
+
+    @Test func widgetOpenedPayloadHasNoFreeText() {
+        // Constitution §9: the widgetOpened allowlist amendment forbids
+        // free-text payload. Sweep every (kind, recipeID) combination and
+        // assert each value parses as a known enum case or an integer.
+        let permittedKindValues = Set(WidgetKind.allCases.map(\.rawValue))
+        let cases: [AnalyticsEvent] = [
+            .widgetOpened(kind: .featured, recipeID: 1),
+            .widgetOpened(kind: .featured, recipeID: nil),
+            .widgetOpened(kind: .saved, recipeID: 1),
+            .widgetOpened(kind: .saved, recipeID: nil),
+        ]
+        for event in cases {
+            for (key, value) in event.payload {
+                switch key {
+                case "kind":
+                    #expect(permittedKindValues.contains(value))
+                case "recipe_id":
+                    #expect(Int(value) != nil, "recipe_id must serialize as a decimal integer")
+                default:
+                    Issue.record("Unexpected payload key \(key) on widgetOpened — free text leaked")
+                }
+            }
+        }
+    }
+
     @Test func allEventNamesAreUnique() {
         let allNames: [String] = [
             AnalyticsEvent.appOpen.name,
@@ -71,6 +123,7 @@ import Testing
             AnalyticsEvent.cookModeStarted(recipeID: 1).name,
             AnalyticsEvent.recipeRated(recipeID: 1, stars: 5).name,
             AnalyticsEvent.recipeCommentSubmitted(recipeID: 1, awaitingApproval: false).name,
+            AnalyticsEvent.widgetOpened(kind: .featured, recipeID: 1).name,
         ]
         #expect(Set(allNames).count == allNames.count)
     }
