@@ -81,9 +81,13 @@ Each module owns its sources and tests. Layering is compiler-enforced — see [`
 ## Workflow
 
 1. Pick a task from [`specs/dod-ios-app/tasks.md`](specs/dod-ios-app/tasks.md).
-2. Branch: `feat/T-NNN-short-slug` (or `fix/`, `spec/`).
+2. Branch: `<type>/<short-slug>` (`feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`, `spec/`).
 3. PR description cites the T-ID **and** the AC IDs from `spec.md` it implements (constitution §11).
-4. CI green + human approval required to merge.
+4. CI green + one human approval from the *other* maintainer before merge.
+
+Full collaboration rules — branch naming, commit message format,
+pre-flight checks, PR review expectations, and how the AI agent
+drives PRs — are in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Formatting
 

@@ -1,0 +1,23 @@
+# CODEOWNERS — review routing for the DOD iOS app.
+#
+# Soft enforcement: branch protection isn't enabled on this private repo
+# (would require GitHub Pro), so CODEOWNERS just auto-requests reviews —
+# it doesn't block merge. Treat the request as a social contract: get
+# one human review from the *other* maintainer before merging.
+
+# Default: both maintainers own everything.
+*                                       @adamsned @spencer0706
+
+# Spec, constitution, and clarifications are higher-risk — call them out
+# explicitly so they're visible in the PR review request list.
+/specs/                                 @adamsned @spencer0706
+/Marketing/                             @adamsned @spencer0706
+
+# CI + repo plumbing.
+/.github/                               @adamsned
+/scripts/                               @adamsned
+
+# Signing, entitlements, secrets surfaces — bias to the repo admin.
+/App/DODApp.xcconfig*                   @adamsned
+/App/*.entitlements                     @adamsned
+/Marketing/AppPrivacy.md                @adamsned
