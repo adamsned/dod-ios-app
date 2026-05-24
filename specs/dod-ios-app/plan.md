@@ -443,6 +443,8 @@ JSON-LD parser gets **golden-file tests** — checked-in HTML samples from 5 rep
 | R-4 | Some posts have multi-language `recipeInstructions` shapes (HowToStep array vs plain string array) | High | Medium | Parser handles both shapes from day one; golden-file fixtures include both |
 | R-5 | SwiftData migration on a future schema change | Medium | High — saved recipes could be lost | Versioned schema from v1; never delete `CachedRecipe` fields, only add — migration plan template in repo |
 | R-6 | iPad split-view layouts add complexity not budgeted | Medium | Medium | iPad layouts are Phase 4 tasks tagged `[ipad]` — can defer the last two if schedule slips, file an issue, do not silently merge |
+| R-7 | Composite gesture pitfalls in `LazyVGrid` + `ScrollView` + `Button` | Medium | High — feed becomes un-scrollable | iOS gesture disambiguation between scroll-pan and tap is fragile when a `Button` dominates a tall cell. Use the `recipeCardTap` modifier (or equivalent `.contentShape` + `.onTapGesture` + `isButton` trait pattern) for any future row-style component; never wrap a tall card in a `Button` without proving scroll still works (see REG-DOD-LIST-SCROLL) |
+| R-8 | Code-generation tools silently clobbering hand-maintained config | High | High — survival-critical Info.plist keys lost on next regenerate | Anything in `App/Info.plist` (and similar plist/xcconfig files) not also expressed in `project.yml` is lost on the next `xcodegen generate`. Keep survival-critical keys in `project.yml`'s `info.properties` block. Reviewer rule: any PR that hand-edits `App/Info.plist` is suspicious — push the value back to `project.yml` instead (see REG-INFO-PLIST-CLOBBER) |
 
 ---
 

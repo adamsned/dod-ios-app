@@ -6,9 +6,12 @@ Built spec-first. See [`specs/`](specs/) for the constitution, spec, plan, and t
 
 ## Status
 
-Phase 6 — Iterate. v1.0 feature-complete, navigation bug DOD-NAV-1 fixed, full
-test pyramid (L1 unit + L2 live-API + L3 UI smoke + L4 visual regression) wired
-into CI. Pre-TestFlight checklist outstanding — see
+Phase 6 — Iterate. v1.0 feature-complete; post-launch bugs DOD-NAV-1 (detail
+nav), list-scroll on iOS 26, and the XcodeGen Info.plist clobber are all fixed
+and locked by regression tests (REG-DOD-NAV-1, REG-DOD-LIST-SCROLL,
+REG-INFO-PLIST-CLOBBER — see `specs/dod-ios-app/spec.md`). Full test pyramid
+(L1 unit + L2 live-API + L3 UI smoke + L4 visual regression) wired into CI.
+Pre-TestFlight checklist outstanding — see
 [`Marketing/TestFlight.md`](Marketing/TestFlight.md).
 
 ## Read the spec first

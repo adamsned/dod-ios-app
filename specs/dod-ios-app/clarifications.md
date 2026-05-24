@@ -84,3 +84,15 @@ Resolved questions are dated and traceable. Each resolution lists which acceptan
 ## Phase 2 status: CLOSED
 
 All 10 clarifications resolved. Spec deltas applied below. Ready for Phase 3 — Plan.
+
+---
+
+## Phase 6 amendments (post-launch)
+
+Bugs surfaced after v1.0 was feature-complete. Each is locked by a regression test (see `spec.md` "Test pyramid" section) so it can't silently regress.
+
+- **CL-11 (2026-05-23)** — TelemetryDeck SDK fatal-errors when `signal()` runs before `initialize()`. Fix: transport guards its own `configured` flag. Locked by REG-1. Commit `74231c9`.
+- **CL-12 (2026-05-23)** — WP REST `_embed=wp:featuredmedia` is silently dropped when `_fields` is also requested. Fix: omit `_fields` when using `_embed`. Locked by REG-2. Commit `74231c9`.
+- **CL-13 (2026-05-23)** — `RecipeStore.cache(listItem:)` dropped `canonicalURL` on insert, so recipe detail navigation auto-dismissed (AC-4.11) on JSON-LD parse failure. Locked by REG-DOD-NAV-1. Commit `14e4cf9`.
+- **CL-14 (2026-05-23)** — `Button` + `LazyVGrid` + `ScrollView` swallows pan gestures on iOS 26, making the feed un-scrollable. Locked by REG-DOD-LIST-SCROLL. Commit `130aa18`.
+- **CL-15 (2026-05-23)** — `xcodegen generate` clobbers hand-edited `App/Info.plist` keys (launch screen, orientations) that aren't mirrored in `project.yml`. Locked by REG-INFO-PLIST-CLOBBER. Commit `0c98f6e`.
