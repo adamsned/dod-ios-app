@@ -24,6 +24,14 @@ public protocol RecipeDetailDependencies: Sendable {
     func isOnline() async -> Bool
     func sendTelemetry(_ event: AnalyticsEvent) async
 
+    /// Re-publish the saved-recipes widget snapshot. Called by the view
+    /// model immediately after every `toggleSaved(id:)` so the home-screen
+    /// widget timeline refreshes the same render frame the user sees the
+    /// snackbar (US-17 / AC-17.3 + AC-17.6, T-322 host-side glue).
+    /// Default no-op so existing fakes keep compiling — only
+    /// ``LiveRecipeDetailDependencies`` actually publishes.
+    func publishSavedWidgetSnapshot() async
+
     // MARK: - Comments + ratings (US-13/14/15)
 
     /// Fetch the public WPRM rating summary. Never throws — degrades to a
@@ -86,6 +94,13 @@ public protocol RecipeDetailDependencies: Sendable {
     func saveGuestIdentity(name: String, email: String) async throws
 }
 
+extension RecipeDetailDependencies {
+    /// Default no-op so existing fakes (e.g. `FakeRecipeDetailDependencies`
+    /// in the test suite) don't have to opt in to widget publishing. The
+    /// live wiring overrides this — see ``LiveRecipeDetailDependencies``.
+    public func publishSavedWidgetSnapshot() async {}
+}
+
 public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
 
     let client: WPRestClient
@@ -95,6 +110,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     let commentsClient: WPCommentsClient
     let ratingsClient: WPRMRatingsClient
     let guestIdentity: any GuestIdentityStoring
+    private let savedWidgetPublisher: SavedRecipesWidgetPublisher?
 
     public init(
         client: WPRestClient,
@@ -103,7 +119,8 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         monitor: NetworkMonitor,
         commentsClient: WPCommentsClient,
         ratingsClient: WPRMRatingsClient,
-        guestIdentity: any GuestIdentityStoring
+        guestIdentity: any GuestIdentityStoring,
+        savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil
     ) {
         self.client = client
         self.fetcher = fetcher
@@ -112,6 +129,10 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         self.commentsClient = commentsClient
         self.ratingsClient = ratingsClient
         self.guestIdentity = guestIdentity
+        // Default to a publisher rooted in the same store + the live App
+        // Group; callers can pass nil to disable the side effect for
+        // unit-test wiring that doesn't care about widgets.
+        self.savedWidgetPublisher = savedWidgetPublisher ?? SavedRecipesWidgetPublisher(store: store)
     }
 
     public func cachedRecipe(id: Int) async throws -> Recipe? {
@@ -153,6 +174,14 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
 
     public func sendTelemetry(_ event: AnalyticsEvent) async {
         Telemetry.shared.send(event)
+    }
+
+    /// Re-publish the saved-recipes home-screen widget snapshot (US-17 /
+    /// AC-17.3, AC-17.6). Called by the view model after every save /
+    /// unsave. Fire-and-forget — all error paths are logged inside
+    /// ``SavedRecipesWidgetPublisher.publish()``.
+    public func publishSavedWidgetSnapshot() async {
+        await savedWidgetPublisher?.publish()
     }
 
     // MARK: - Comments + ratings
