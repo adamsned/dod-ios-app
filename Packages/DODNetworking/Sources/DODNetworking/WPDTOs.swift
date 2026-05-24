@@ -93,6 +93,137 @@ enum WPDTO {
         formatter.formatOptions = [.withInternetDateTime]
         return formatter.date(from: withZone) ?? Date()
     }
+
+    // MARK: - Comments (US-13 / REG-13)
+
+    /// `/wp/v2/comments` response item. Used by ``WPCommentsClient`` to map
+    /// into ``DODDomain.RecipeComment``.
+    struct Comment: Decodable {
+        let id: Int
+        let post: Int
+        /// WP serializes the no-parent case as `0`; we normalize at the
+        /// domain boundary.
+        let parent: Int?
+        let authorName: String
+        let dateGMT: String?
+        let content: RenderedString
+        let status: String?
+        let authorAvatarURLs: [String: URL]?
+        let meta: CommentMeta?
+
+        enum CodingKeys: String, CodingKey {
+            case id, post, parent, content, status, meta
+            case authorName = "author_name"
+            case dateGMT = "date_gmt"
+            case authorAvatarURLs = "author_avatar_urls"
+        }
+
+        /// Pick the largest Gravatar size WP returned. WP keys the avatar
+        /// map by string-encoded pixel sizes ("24", "48", "96"); we prefer
+        /// 96 for high-DPI displays.
+        var bestAvatarURL: URL? {
+            guard let urls = authorAvatarURLs, !urls.isEmpty else { return nil }
+            let preferred = ["96", "48", "24"]
+            for key in preferred where urls[key] != nil {
+                return urls[key]
+            }
+            // Fallback: pick the highest numeric key present.
+            let sortedByPx = urls.compactMap { key, value -> (Int, URL)? in
+                Int(key).map { ($0, value) }
+            }
+            .sorted { $0.0 > $1.0 }
+            return sortedByPx.first?.1
+        }
+    }
+
+    /// Comment meta blob. The only field we read today is the WPRM star
+    /// rating. WP may emit the rating as an Int *or* as a numeric String
+    /// depending on the meta registration; ``CommentMeta`` accepts both.
+    struct CommentMeta: Decodable {
+        let wprmCommentRating: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case wprmCommentRating = "wprm_comment_rating"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if let intValue = try? container.decodeIfPresent(Int.self, forKey: .wprmCommentRating) {
+                self.wprmCommentRating = intValue
+            } else if let stringValue = try? container.decodeIfPresent(String.self, forKey: .wprmCommentRating) {
+                self.wprmCommentRating = Int(stringValue)
+            } else {
+                self.wprmCommentRating = nil
+            }
+        }
+    }
+
+    // MARK: - Ratings (US-14 / REG-14)
+
+    /// `/wp-recipe-maker/v1/rating/recipe/<id>` response.
+    ///
+    /// WPRM's public documentation shows the wrapped shape
+    /// `{ "rating": { "average": …, "count": …, "total": … } }`. Older /
+    /// alternate plugin builds return the bare object — both decode here so
+    /// REG-14's "degrade gracefully" promise holds even if the shape drifts.
+    struct WPRMRatingResponse: Decodable {
+        let average: Double
+        let count: Int
+
+        enum RootKeys: String, CodingKey {
+            case rating
+        }
+
+        enum InnerKeys: String, CodingKey {
+            case average, count, total
+        }
+
+        init(from decoder: Decoder) throws {
+            // Try wrapped shape first.
+            let root = try? decoder.container(keyedBy: RootKeys.self)
+            if let inner = try? root?.nestedContainer(keyedBy: InnerKeys.self, forKey: .rating) {
+                self.average = Self.decodeDouble(inner, key: .average)
+                self.count = Self.decodeInt(inner, key: .count)
+                return
+            }
+            // Fall back to flat shape.
+            let flat = try decoder.container(keyedBy: InnerKeys.self)
+            self.average = Self.decodeDouble(flat, key: .average)
+            self.count = Self.decodeInt(flat, key: .count)
+        }
+
+        private static func decodeDouble(
+            _ container: KeyedDecodingContainer<InnerKeys>,
+            key: InnerKeys
+        ) -> Double {
+            if let value = try? container.decodeIfPresent(Double.self, forKey: key) {
+                return value
+            }
+            if let value = try? container.decodeIfPresent(Int.self, forKey: key) {
+                return Double(value)
+            }
+            if let value = try? container.decodeIfPresent(String.self, forKey: key) {
+                return Double(value) ?? 0
+            }
+            return 0
+        }
+
+        private static func decodeInt(
+            _ container: KeyedDecodingContainer<InnerKeys>,
+            key: InnerKeys
+        ) -> Int {
+            if let value = try? container.decodeIfPresent(Int.self, forKey: key) {
+                return value
+            }
+            if let value = try? container.decodeIfPresent(Double.self, forKey: key) {
+                return Int(value)
+            }
+            if let value = try? container.decodeIfPresent(String.self, forKey: key) {
+                return Int(value) ?? 0
+            }
+            return 0
+        }
+    }
 }
 
 // MARK: - Domain mapping
@@ -117,5 +248,34 @@ extension WPDTO.Post {
 extension WPDTO.Category {
     func toDomain() -> DODDomain.Category {
         DODDomain.Category(id: id, name: name, slug: slug, count: count)
+    }
+}
+
+extension WPDTO.Comment {
+    /// Map a wire-format comment to the public domain type. Strips HTML,
+    /// normalizes parent=0 → nil, decodes unknown status strings to
+    /// `.unknown` rather than throwing.
+    func toDomain() -> RecipeComment {
+        let normalizedParent: Int? = {
+            guard let parent, parent > 0 else { return nil }
+            return parent
+        }()
+        let mappedStatus: RecipeComment.Status = {
+            guard let raw = status, let value = RecipeComment.Status(rawValue: raw) else {
+                return .unknown
+            }
+            return value
+        }()
+        return RecipeComment(
+            id: id,
+            postID: post,
+            parentID: normalizedParent,
+            authorName: HTMLSanitizer.plainText(from: authorName),
+            avatarURL: bestAvatarURL,
+            dateGMT: WPDTO.parseWPDate(dateGMT),
+            body: HTMLSanitizer.plainText(from: content.rendered),
+            ratingValue: meta?.wprmCommentRating,
+            status: mappedStatus
+        )
     }
 }

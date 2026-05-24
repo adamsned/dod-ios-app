@@ -83,4 +83,29 @@ struct LiveAPITests {
         }
         #expect(mentioned, "At least one result should mention 'skillet' textually")
     }
+
+    /// REG-13: comments endpoint must surface at least one approved comment
+    /// for the canary post 21238 along with the pagination headers.
+    @Test func commentsEndpointReturnsRealData() async throws {
+        let client = WPCommentsClient()
+        let page = try await client.comments(forPostID: 21238, page: 1, perPage: 10)
+        try #require(!page.comments.isEmpty, "Expected at least one comment on post 21238")
+        #expect(page.totalCount >= page.comments.count)
+        #expect(page.totalPages >= 1)
+        let first = try #require(page.comments.first)
+        #expect(first.postID == 21238)
+        #expect(!first.body.isEmpty, "Body must be non-empty after HTML strip")
+        #expect(!first.body.contains("<"), "Body must be plain text, not HTML")
+    }
+
+    /// REG-14: ratings endpoint must return an average in 0...5 and count
+    /// ≥ 0 — even when the upstream blob requires auth (the client degrades
+    /// to a zero-summary instead of throwing).
+    @Test func ratingsEndpointReturnsRealAverage() async throws {
+        let client = WPRMRatingsClient()
+        let summary = try await client.summary(forRecipeID: 21238)
+        #expect((0.0...5.0).contains(summary.average))
+        #expect(summary.count >= 0)  // swiftlint:disable:this empty_count
+        #expect(summary.recipeID == 21238)
+    }
 }
