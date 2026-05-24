@@ -15,6 +15,7 @@ cd "$(dirname "$0")/.."
 swift-format format --in-place --recursive \
     --configuration .swift-format \
     App \
+    AppTests \
     Packages
 
 echo "swift-format: done."

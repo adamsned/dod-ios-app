@@ -192,3 +192,26 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: DODApp
+
+  # Host-app unit tests. App-target Swift types that aren't worth lifting
+  # into a feature package (e.g. `AppTab`, route enums, deep-link parsers
+  # that touch SwiftUI state) live here. Most domain logic still belongs
+  # in `Packages/<Feature>/Tests/` (constitution §6 L1) — this target is
+  # for the small island of App-target code that can't be packaged.
+  #
+  # Added in T-310 (US-16) to pin the `AppTab.allCases` order so a future
+  # refactor can't silently re-shuffle the bottom tab bar.
+  DODAppUnitTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AppTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODAppUnitTests
+        TARGETED_DEVICE_FAMILY: "1,2"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/DODApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DODApp"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: DODApp

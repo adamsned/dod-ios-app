@@ -70,7 +70,7 @@ jobs:
       - name: Install swift-format
         run: brew install swift-format
       - name: Check formatting
-        run: swift-format lint --recursive --strict --configuration .swift-format App Packages
+        run: swift-format lint --recursive --strict --configuration .swift-format App AppTests Packages
 
   # L1: all package unit tests in ONE macOS job. We previously ran
   # this as a 10-job matrix; each parallel job has a ~60s billed
@@ -160,6 +160,35 @@ jobs:
             -configuration Debug \
             build | xcpretty
 
+  # L1 (host-app slice): unit tests against App-target types that can't
+  # be lifted into a feature package — currently just AppTab. Most domain
+  # logic still lives in Packages/*/Tests/ (test-unit-packages above).
+  # Gated behind the iOS-Sim path filter since it depends on xcodebuild +
+  # the simulator; skipped on docs-only PRs.
+  test-unit-app:
+    name: L1 Unit · DODApp
+    needs: [changes, build-app]
+    if: needs.changes.outputs.ios_sim == 'true'
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 16 (Swift 6.0)
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project DODApp.xcodeproj \
+            -scheme DODApp \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -only-testing:DODAppUnitTests \
+            test | xcpretty
+
   # L3: UI smoke tests against the built app on a live simulator.
   test-ui-smoke:
     name: L3 UI Smoke
@@ -198,7 +227,7 @@ jobs:
   # skipped because path filters excluded them.
   ci-required:
     name: CI required
-    needs: [changes, lint, format, test-unit-packages,
+    needs: [changes, lint, format, test-unit-packages, test-unit-app,
             test-snapshots-designsystem, build-app, test-ui-smoke]
     if: always()
     runs-on: ubuntu-latest
@@ -207,7 +236,7 @@ jobs:
         run: |
           # Each input is "success", "failure", "cancelled", or "skipped".
           # Skipped is fine (path filter excluded the job); failure is not.
-          for name in changes lint format test-unit-packages \
+          for name in changes lint format test-unit-packages test-unit-app \
                      test-snapshots-designsystem build-app test-ui-smoke; do
             result_var="${name//-/_}_RESULT"
             echo "$name: ${!result_var:-not-run}"
@@ -216,6 +245,7 @@ jobs:
              || "${{ needs.lint.result }}" == "failure" \
              || "${{ needs.format.result }}" == "failure" \
              || "${{ needs.test-unit-packages.result }}" == "failure" \
+             || "${{ needs.test-unit-app.result }}" == "failure" \
              || "${{ needs.test-snapshots-designsystem.result }}" == "failure" \
              || "${{ needs.build-app.result }}" == "failure" \
              || "${{ needs.test-ui-smoke.result }}" == "failure" ]]; then
