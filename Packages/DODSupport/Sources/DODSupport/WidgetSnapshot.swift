@@ -64,11 +64,16 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
 /// Recognized shapes:
 ///   - `dod://recipe/<id>` — open the recipe with the given WP ID
 ///   - `dod://feed` — open or switch to the Feed tab
+///   - `dod://saved` — open or switch to the Saved tab (US-17 / AC-17.4,
+///     AC-17.5; CL-29). Both the empty-state placeholder and any tap on
+///     widget chrome (outside a recipe row) of the saved-recipes widget
+///     fire this URL.
 public enum WidgetDeepLinkParser {
 
     public enum Route: Equatable, Sendable {
         case recipe(id: Int)
         case feed
+        case saved
     }
 
     /// Returns `nil` for any URL we don't recognize so callers never spawn
@@ -83,6 +88,14 @@ public enum WidgetDeepLinkParser {
             return .recipe(id: id)
         case "feed":
             return .feed
+        case "saved":
+            // `dod://saved` only — reject any path-bearing variant
+            // (`dod://saved/`, `dod://saved/123`, etc.). The widget
+            // chrome and empty-state placeholder both emit the bare URL;
+            // anything with a path is malformed and ignored. AC-17.8.
+            let trimmed = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard trimmed.isEmpty else { return nil }
+            return .saved
         default:
             return nil
         }

@@ -50,4 +50,41 @@ import Testing
         let url = try #require(URL(string: "dod://settings/notifications"))
         #expect(WidgetDeepLinkParser.parse(url) == nil)
     }
+
+    // MARK: - US-17 `dod://saved` cases (AC-17.4, AC-17.5, AC-17.8)
+
+    @Test func parsesSavedRoute() throws {
+        let url = try #require(URL(string: "dod://saved"))
+        #expect(WidgetDeepLinkParser.parse(url) == .saved)
+    }
+
+    /// Trailing slash is the same logical URL — accept it, mirroring how
+    /// `URL.path` normalizes `dod://saved/` to an empty path component.
+    @Test func parsesSavedRouteWithTrailingSlash() throws {
+        let url = try #require(URL(string: "dod://saved/"))
+        #expect(WidgetDeepLinkParser.parse(url) == .saved)
+    }
+
+    /// Anything after the host is malformed — the widget only ever emits
+    /// the bare `dod://saved`. Reject so a hostile pasteboard URL can't
+    /// piggy-back on the Saved tab route.
+    @Test func savedRouteWithExtraPathIsRejected() throws {
+        let url = try #require(URL(string: "dod://saved/foo"))
+        #expect(WidgetDeepLinkParser.parse(url) == nil)
+    }
+
+    /// And the numeric variant — guard against `dod://saved/<id>` being
+    /// misread as a recipe deep link.
+    @Test func savedRouteWithNumericPathIsRejected() throws {
+        let url = try #require(URL(string: "dod://saved/123"))
+        #expect(WidgetDeepLinkParser.parse(url) == nil)
+    }
+
+    /// Case-insensitive scheme + host — same contract as
+    /// `schemeIsCaseInsensitive` above so the parser doesn't care about
+    /// how iOS canonicalizes the URL between processes.
+    @Test func savedRouteIsCaseInsensitive() throws {
+        let url = try #require(URL(string: "Dod://Saved"))
+        #expect(WidgetDeepLinkParser.parse(url) == .saved)
+    }
 }
