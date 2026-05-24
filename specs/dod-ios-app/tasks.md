@@ -851,13 +851,110 @@ Wave-2 (T-220) integrated everything into `RecipeDetailView`.
 
 ---
 
+## Phase 8 — Post-launch polish cluster (2026-05-24)
+
+Parallelism tag conventions: tasks sharing `||:` letter can run simultaneously in separate worktrees. Tasks within US-17 (`P8-widget-*`) are sequenced because they touch related files; tasks across stories (`P8-tab`, `P8-widget-*`, `P8-darkmode`) are independent.
+
+### T-310 — Tab bar refinement (US-16)
+- **Scope:** Reorder `AppTab.allCases` to **Recipes → Categories → Saved → Search**. Change `AppTab.systemImage` for `.saved` from `"heart"` to `"bookmark"`. Selection-fill behavior (`bookmark.fill` when selected) handled by SwiftUI's default tab styling. Tests: an enum-level unit test pinning `AppTab.allCases` order; an L3 smoke test asserting the third tab opens Saved; updated L4 snapshots of the tab bar in light + dark, iPhone + iPad, with each tab selected.
+- **Files:** `App/AppTab.swift`, `App/AppTabTests.swift` (new, in `UITests/` if there isn't a host target — confirm at implementation time), `UITests/DODAppUITests/SmokeTests.swift` (extend), snapshot baselines under the appropriate `__Snapshots__` folder.
+- **AC:** AC-16.1, AC-16.2, AC-16.3, AC-16.4, AC-16.5, AC-16.6.
+- **Deps:** —
+- **Est:** 1h
+- **||:** P8-tab
+
+### T-320 — SavedRecipesWidget snapshot infrastructure (US-17)
+- **Scope:** New `SavedRecipesWidgetSnapshot` struct in `Packages/DODSupport/Sources/DODSupport/` (next to existing `WidgetSnapshot.swift`). Codable, versioned (`schemaVersion: 1`). Writer extends `WidgetSnapshotStore` with a saved-recipes file inside the App Group container. Unit tests: round-trip, max-entries cap (small=1 / medium=3), version-mismatch rejection, clear-on-empty.
+- **Files:** New `Packages/DODSupport/Sources/DODSupport/SavedRecipesWidgetSnapshot.swift`, update to `Packages/DODSupport/Sources/DODSupport/WidgetSnapshotStore.swift` (add saved file path + writer method), new `Packages/DODSupport/Tests/DODSupportTests/SavedRecipesWidgetSnapshotTests.swift`.
+- **AC:** AC-17.3, AC-17.6 (snapshot side), AC-17.8 (L1 cases).
+- **Deps:** — (independent of T-310, T-330; pairs with T-321 + T-322 inside the widget cluster).
+- **Est:** 2h
+- **||:** P8-widget-snapshot
+
+### T-321 — SavedRecipesWidget extension + entry view (US-17)
+- **Scope:** New `SavedRecipesWidget` widget kind in `Widget/` (next to `FeaturedRecipeWidget.swift`). Timeline provider reads `SavedRecipesWidgetSnapshot` from the App Group; renders small (1 recipe) + medium (3 recipes). Reuses `WidgetCard` from `DODDesignSystem` (extend if the saved-recipes row shape differs meaningfully — prefer a variant over a new component). Empty state with placeholder text + `dod://saved` tap target. Register in `DODAppWidgetBundle`. Add `dod://saved` parse case to `WidgetDeepLinkParser`. L4 snapshot tests for empty / 1-saved / 3-saved on both sizes, both appearances.
+- **Files:** New `Widget/SavedRecipesWidget.swift`, new `Widget/SavedRecipesWidgetEntryView.swift`, update `Widget/DODAppWidgetBundle.swift`, update `Packages/DODSupport/Sources/DODSupport/WidgetDeepLinkParser.swift` + tests, update `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/WidgetCard.swift` if a variant is needed (with snapshot tests for it).
+- **AC:** AC-17.1, AC-17.2, AC-17.4, AC-17.5, AC-17.7, AC-17.8 (deep-link case).
+- **Deps:** T-320 (consumes the snapshot type), T-310 (Saved tab position — `dod://saved` lands on whichever tab index Saved occupies after T-310 merges).
+- **Est:** 3h
+- **||:** P8-widget-ext
+
+### T-322 — SavedStore observation + snapshot writer wiring (US-17)
+- **Scope:** Observe `SavedStore` from `DODApp` (or `AppDependencies` startup). On every saved-set mutation, build the small + medium snapshot payloads, write them via the `WidgetSnapshotStore` API from T-320, and call `WidgetCenter.shared.reloadTimelines(ofKind: "SavedRecipesWidget")`. Cap payload at the medium size's 3 entries (writing more is wasted I/O). Unit test asserts: writer called on save, writer called on unsave, payload contents are the N most-recently-saved sorted by `savedAt` desc.
+- **Files:** `App/DODApp.swift` or `App/AppDependencies.swift` (observation setup), new unit test in the appropriate package — likely a new helper in `Packages/DODPersistence/` or a host-test if the observation glue is App-target-only.
+- **AC:** AC-17.3 (host side), AC-17.6 (reload trigger).
+- **Deps:** T-320, T-321 (the widget must exist before its timeline reloads do anything useful, but the writer can land before the widget — keep the merge order T-320 → T-321 → T-322).
+- **Est:** 2h
+- **||:** P8-widget-host
+
+### T-323 — `widgetOpened` analytics event (US-17)
+- **Scope:** Replace the implicit widget-deep-link consumption logging with a single `widgetOpened(kind: WidgetKind, recipeID: Int?)` `AnalyticsEvent` case where `WidgetKind = .featured | .saved`. Update the existing featured-widget tap site to fire it; add the saved-widget tap site. Constitution §9 allowlist gets the new event. Unit test asserts payload shape (no free text, integer or nil recipeID only).
+- **Files:** `Packages/DODAnalytics/Sources/DODAnalytics/AnalyticsEvent.swift`, `Packages/DODAnalytics/Tests/DODAnalyticsTests/AnalyticsEventTests.swift`, the existing featured-widget tap consumer (probably `App/RootView.swift` or `App/DeepLinkDispatcher.swift`), constitution §9 allowlist amendment.
+- **AC:** AC-17.9.
+- **Deps:** T-321 (saved tap site exists).
+- **Est:** 1h
+- **||:** P8-widget-tel
+
+### T-330 — Appearance audit (US-18)
+- **Scope:** **Audit phase only.** Walk every top-level screen and every `DODDesignSystem/Components/` component in both light and dark appearance, default + AX5 Dynamic Type. Fill any missing L4 snapshot baselines (one PR per gap class, not one PR per missing baseline — pragmatic). Produce `specs/dod-ios-app/appearance-audit.md` with the surface × appearance × Dynamic Type matrix, each cell marked pass/fail/n/a with a one-line note. **Any fix surfaced by the audit is logged as a T-331..T-339 follow-up task in this same file**; T-330 itself doesn't ship fixes, only the audit + missing baselines.
+- **Files:** New `specs/dod-ios-app/appearance-audit.md`, new L4 snapshot files in the appropriate packages, follow-up task entries below the summary.
+- **AC:** AC-18.1, AC-18.2, AC-18.3, AC-18.6.
+- **Deps:** — (independent; runs against current main).
+- **Est:** 4h (audit + baseline fills)
+- **||:** P8-darkmode
+
+### T-331 — Commit dark + AX5 baselines for DesignSystem (US-18 follow-up)
+- **Scope:** Run `xcodebuild test -scheme DODDesignSystem -destination 'platform=iOS Simulator,name=iPhone 17'` against the 20 new `*_dark` / `*_AX5` test methods T-330 added in `SnapshotTests+AppearanceAudit.swift`. The tests already use `record: .missing`, so the first run lays the PNGs down automatically. Open each one; if it looks right, commit it under `__Snapshots__/DesignSystemAppearanceSnapshotTests/`. Pure baseline harvest — no source changes to the component implementations or the test file itself (T-330 already extended the test surface; this task only commits the resulting baselines). No contrast bug is expected; if one surfaces, log a separate T-33x for the fix.
+- **Files:** `Packages/DODDesignSystem/Tests/DODDesignSystemTests/__Snapshots__/DesignSystemAppearanceSnapshotTests/test_*_dark.1.png`, `test_*_AX5.1.png` (20 new PNGs).
+- **AC:** AC-18.1, AC-18.2, AC-18.4 (verify each rendered baseline).
+- **Deps:** T-330.
+- **Est:** 1h (sim run + spot-check + commit).
+- **||:** P8-darkmode
+- **Shipped:** commit `57c4e03` (`chore(T-331): record DesignSystem dark + AX5 snapshot baselines (US-18)`). Recorded against Xcode 26.5 / iOS 26.5 / iPhone 17 simulator. 21 PNGs landed (17 dark + 4 AX5 — the original task estimate of 20 was off by one) under `__Snapshots__/SnapshotTests+AppearanceAudit/` (lib derives the directory from the source-file basename, not the test class name).
+
+### T-332 — Top-level screen snapshot tests (US-18 follow-up)
+- **Scope:** Stand up new snapshot test files for the five top-level screens that lack any visual coverage: Feed, Categories list, Category detail, Search, Saved. Each test file lives next to the existing `*ViewModelTests.swift` in its feature package. Coverage: 1 representative state per screen (e.g. Feed = loaded with 6 rows; Saved = 3 saved) × {light, dark} × {defT, AX5} = 4 snapshots per screen, ~20 PNGs total. Requires adding `swift-snapshot-testing` to `Package.swift` for `DODFeatureFeed`, `DODFeatureCategories`, `DODFeatureSaved`, `DODFeatureSearch` (currently only `DODDesignSystem` and `DODFeatureRecipeDetail` declare the dep). Plus a `StatefulHost`-style shim per screen so the `*ViewModel` can be put into the desired state synchronously without going through real dependencies.
+- **Files:** `Packages/DODFeatureFeed/Tests/DODFeatureFeedTests/FeedViewSnapshotTests.swift`, `Packages/DODFeatureCategories/Tests/DODFeatureCategoriesTests/CategoryListViewSnapshotTests.swift` + `CategoryRecipesViewSnapshotTests.swift`, `Packages/DODFeatureSaved/Tests/DODFeatureSavedTests/SavedViewSnapshotTests.swift`, `Packages/DODFeatureSearch/Tests/DODFeatureSearchTests/SearchViewSnapshotTests.swift`, plus `Package.swift` amendments in each. New `__Snapshots__` directories with the resulting PNGs.
+- **AC:** AC-18.1, AC-18.4.
+- **Deps:** T-330.
+- **Est:** 4h (test infrastructure + sim record + visual review).
+- **||:** P8-darkmode
+- **Shipped:** commit `44ce7b9` — 5 new snapshot test files (Feed, CategoryList, CategoryRecipes, Search, Saved) with 4 test methods each = 20 total; `swift-snapshot-testing` 1.17.0 added to the 4 feature `Package.swift` files; `StatefulHost` shim per test file (test-target-only, never in production target); `record: .missing` so baselines lay down on first iOS-sim run. PNGs not committed by this PR — see T-335.
+
+### T-333 — Commit Cook Live Activity baselines (US-18 follow-up)
+- **Scope:** The existing `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/CookLiveActivitySnapshotTests.swift` declares five tests but commits no PNGs — running them today fails. Record mode pass to lay down the five baselines; extend the lock-screen test with a `_dark` variant. The Dynamic Island compact pieces are tiny system-controlled surfaces — light-only is sufficient (system inverts them automatically). Recipe detail root view dark + AX5 also handled here.
+- **Files:** New PNGs under `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/__Snapshots__/CookLiveActivitySnapshotTests/`, plus extension of `CookLiveActivitySnapshotTests.swift` with `_dark` lock-screen variant. Optional: new `RecipeDetailViewSnapshotTests.swift` for the recipe detail root view dark + AX5 cell.
+- **AC:** AC-18.1.
+- **Deps:** T-330.
+- **Est:** 2h.
+- **||:** P8-darkmode
+
+### T-334 — Tab bar appearance baseline (US-18 + US-16 follow-up)
+- **Scope:** Once the US-16 tab bar refinement (T-310) lands, snapshot the assembled `TabStack` in both appearances at default Dynamic Type. Single light + single dark PNG is enough — the tab bar is system chrome plus an icon set; AX5 is not meaningful (tab bar text never scales beyond the system cap). Lives next to whatever test target ends up housing `TabStack`.
+- **Files:** TBD pending T-310's choice of test target; likely a new `App/Tests/TabStackSnapshotTests.swift` or a host-app L4 test.
+- **AC:** AC-18.1, AC-16.x (the relevant US-16 visual criterion).
+- **Deps:** T-330, T-310.
+- **Est:** 1h.
+- **||:** P8-darkmode
+
+### T-335 — Harvest + commit T-332's screen baselines (US-18 follow-up)
+- **Scope:** T-332 added 20 new snapshot test methods across four feature packages (`DODFeatureFeed`, `DODFeatureCategories`, `DODFeatureSearch`, `DODFeatureSaved`) but committed no PNGs — the tests use `record: .missing`, so the first iOS-sim run lays the baselines down. Sim record pass: run `xcodebuild test -scheme <each>` for each of the four packages on `platform=iOS Simulator,name=iPhone 17`, open every resulting PNG, and commit it under the matching `__Snapshots__/<TestClass>/` directory if it looks correct. Pure baseline harvest — no source changes to the views, view-models, or test files themselves (T-332 already extended the test surface; this task only commits the resulting baselines). Mirrors the T-330 → T-331 relationship for DesignSystem.
+- **Files:** `Packages/DODFeatureFeed/Tests/DODFeatureFeedTests/__Snapshots__/FeedViewSnapshotTests/test_loadedFeed_*.1.png` (×4), `Packages/DODFeatureCategories/Tests/DODFeatureCategoriesTests/__Snapshots__/CategoryListViewSnapshotTests/test_loadedCategories_*.1.png` (×4) + `__Snapshots__/CategoryRecipesViewSnapshotTests/test_loadedRecipes_*.1.png` (×4), `Packages/DODFeatureSearch/Tests/DODFeatureSearchTests/__Snapshots__/SearchViewSnapshotTests/test_searchResults_*.1.png` (×4), `Packages/DODFeatureSaved/Tests/DODFeatureSavedTests/__Snapshots__/SavedViewSnapshotTests/test_loadedSaved_*.1.png` (×4) — 20 PNGs total.
+- **AC:** AC-18.1, AC-18.4 (verify each rendered baseline).
+- **Deps:** T-332.
+- **Est:** 1h (sim run + spot-check + commit).
+- **||:** P8-darkmode
+
+---
+
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) = 84
-- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) = ~179 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) = 95
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) = ~201 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
 - **Phase 6 parallelism:** F6-cards, F6-icon, F6-detail, F6-onb can all run in parallel. F6-cook (T-304, T-305) is the only sequential thread inside Phase 6.
+- **Phase 8 parallelism:** P8-tab (T-310) and P8-darkmode (T-330) are fully independent. The widget cluster sequences T-320 → T-321 → T-322 → T-323 internally but is independent of P8-tab and P8-darkmode externally. So three worktrees can run simultaneously: one on T-310, one on T-320 (then handing forward inside the cluster), one on T-330.
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
