@@ -35,14 +35,31 @@ Format suggestion (not enforced):
 > `2190f27`, app icon `1b8e027`, today's-featured widget `e0aebc6`). Moved
 > here when the file relocated under `specs/dod-ios-app/`.
 
-- **Swap "Search" and "Saved" tab positions.** Within US-1 navigation; no
-  spec amendment needed. (~1h)
-- **Heart → bookmark on the Saved tab icon.** Pure icon swap. (~30min)
-- **Saved-recipes home-screen widget.** A *second* widget distinct from
-  the existing today's-featured one. Existing `WidgetSnapshotStore` would
-  gain a parallel "savedRecipes" entrypoint; the widget extension would
-  gain a second `WidgetConfiguration`. Worth a real US-NN amendment when
-  it goes through spec orchestration.
-- **Light/dark mode polish.** Full AX5 dynamic-type sweep across every
-  screen in both appearances; fix anything that misreads. Worth its own
-  task cluster.
+_All four 2026-05-24 captures have graduated to spec-driven work and
+shipped. See "Recently graduated" below for the trail._
+
+## Recently graduated
+
+Items that left the backlog after going through Specify → Clarify → Plan →
+Tasks → Implement. Kept here as a short audit trail; remove entries once
+they're far enough in the rear-view mirror that the spec is the only
+useful reference.
+
+- **Swap "Search" and "Saved" tab positions** — became **US-16** /
+  AC-16.1 / [T-310](tasks.md). Shipped in [#10](https://github.com/adamsned/dod-ios-app/pull/10).
+- **Heart → bookmark on the Saved tab icon** — folded into the same
+  US-16 / AC-16.2 / T-310. Shipped in [#10](https://github.com/adamsned/dod-ios-app/pull/10).
+  In-recipe Save heart intentionally untouched per AC-16.3.
+- **Saved-recipes home-screen widget** — became **US-17** (AC-17.1
+  through AC-17.9) and the [T-320..T-323 cluster](tasks.md). Shipped
+  across [#8](https://github.com/adamsned/dod-ios-app/pull/8) (snapshot infra),
+  [#17](https://github.com/adamsned/dod-ios-app/pull/17) (extension + entry view),
+  [#18](https://github.com/adamsned/dod-ios-app/pull/18) (host SavedStore wiring),
+  [#19](https://github.com/adamsned/dod-ios-app/pull/19) (`widgetOpened` analytics).
+- **Light/dark mode polish** — became **US-18** + [T-330](tasks.md)
+  (audit) and the [T-331..T-334 follow-ups](tasks.md) the audit
+  surfaced. Audit shipped in [#9](https://github.com/adamsned/dod-ios-app/pull/9);
+  DesignSystem dark + AX5 baselines in [#14](https://github.com/adamsned/dod-ios-app/pull/14);
+  top-level screen baselines in [#15](https://github.com/adamsned/dod-ios-app/pull/15).
+  CookLiveActivity baselines (T-333) still in flight on
+  [#11](https://github.com/adamsned/dod-ios-app/pull/11).
