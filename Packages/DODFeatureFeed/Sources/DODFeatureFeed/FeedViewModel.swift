@@ -23,6 +23,10 @@ public final class FeedViewModel {
     public private(set) var loadState: LoadState = .idle
     public private(set) var isOffline: Bool = false
     public private(set) var errorMessage: String?
+    /// Bumped after every successful pull-to-refresh so the view can fire a
+    /// `.sensoryFeedback(.success, trigger:)` haptic. Not part of any AC —
+    /// purely UX polish (iOS 17 sensoryFeedback wiring).
+    public private(set) var refreshCount: Int = 0
 
     private let dependencies: FeedDependencies
     private var currentPage: Int = 0
@@ -62,6 +66,11 @@ public final class FeedViewModel {
     public func refresh() async {
         try? await dependencies.clearBlocklist()
         await loadInitial(forceReplace: true)
+        // Bump only on a clean refresh — error/offline paths set errorMessage
+        // and shouldn't reward the user with a success haptic.
+        if errorMessage == nil {
+            refreshCount &+= 1
+        }
     }
 
     /// Infinite-scroll trigger when a near-bottom row appears (AC-1.2).

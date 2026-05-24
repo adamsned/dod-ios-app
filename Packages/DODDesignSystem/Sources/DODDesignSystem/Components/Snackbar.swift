@@ -18,6 +18,11 @@ public struct Snackbar: View {
     public let message: String
     public let action: Action?
 
+    /// Bumped once on appear so `.sensoryFeedback` fires a subtle light tap
+    /// for every fresh snackbar presentation, even if the message text is
+    /// identical to a previously shown one.
+    @State private var appearanceTrigger: Int = 0
+
     public init(message: String, action: Action? = nil) {
         self.message = message
         self.action = action
@@ -45,6 +50,8 @@ public struct Snackbar: View {
         .padding(.horizontal, DODSpacing.md)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(action.map { "\(message). \($0.title) available." } ?? message)
+        .sensoryFeedback(.impact(weight: .light), trigger: appearanceTrigger)
+        .onAppear { appearanceTrigger &+= 1 }
     }
 }
 

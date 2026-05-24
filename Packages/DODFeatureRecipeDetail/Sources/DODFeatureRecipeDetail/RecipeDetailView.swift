@@ -42,6 +42,8 @@ public struct RecipeDetailView: View {
         #endif
         .toolbar { toolbarItems }
         .overlay(alignment: .bottomTrailing) { floatingActionsOverlay }
+        .sensoryFeedback(.success, trigger: viewModel.isSaved)
+        .sensoryFeedback(.impact(weight: .light), trigger: viewModel.checkedIngredientIDs.count)
         .task {
             await viewModel.onAppear()
             isOfflineSnapshot = await viewModel.isOffline
@@ -186,10 +188,7 @@ public struct RecipeDetailView: View {
                     IngredientCheckRow(
                         ingredient: ingredient,
                         isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
-                        onToggle: {
-                            viewModel.toggleIngredient(ingredient.id)
-                            triggerLightHaptic()
-                        }
+                        onToggle: { viewModel.toggleIngredient(ingredient.id) }
                     )
                 }
             }
@@ -217,8 +216,9 @@ public struct RecipeDetailView: View {
     private var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             HStack(spacing: DODSpacing.md) {
+                // Save haptic is wired via `.sensoryFeedback(.success, trigger:
+                // viewModel.isSaved)` on the body — no manual generator here.
                 Button {
-                    triggerMediumHaptic()
                     Task { await viewModel.toggleSaved() }
                 } label: {
                     Image(systemName: viewModel.isSaved ? "heart.fill" : "heart")
@@ -268,18 +268,6 @@ public struct RecipeDetailView: View {
     }
 
     // MARK: - Helpers
-
-    private func triggerMediumHaptic() {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
-    }
-
-    private func triggerLightHaptic() {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
-    }
 
     private func format(duration: Duration) -> String {
         let seconds = Int(duration.components.seconds)

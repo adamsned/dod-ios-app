@@ -17,11 +17,11 @@ struct RecipeDetailFloatingActions: View {
 
     var body: some View {
         VStack(spacing: DODSpacing.sm) {
+            // Save haptic is fired by the parent view's
+            // .sensoryFeedback(.success, trigger: viewModel.isSaved) so we
+            // don't double-fire here.
             Button(
-                action: {
-                    triggerSaveHaptic()
-                    onSave()
-                },
+                action: onSave,
                 label: {
                     Image(systemName: isSaved ? "heart.fill" : "heart")
                         .font(.title3)
@@ -47,11 +47,5 @@ struct RecipeDetailFloatingActions: View {
             )
             .accessibilityLabel("Share recipe")
         }
-    }
-
-    private func triggerSaveHaptic() {
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
     }
 }
