@@ -82,10 +82,12 @@ public struct RecipeDetailRatingsSection: View {
     // MARK: - RatingsHeader
 
     /// AC-13.1 — shows the aggregate when count ≥ 1, otherwise the
-    /// "Be the first to rate this recipe." invitation.
+    /// "Be the first to rate this recipe." invitation. `summary.count`
+    /// here is the rating-count integer (not a collection size), so the
+    /// `empty_count` rule is misfiring — disabled on this line.
     @ViewBuilder
     private var ratingsHeader: some View {
-        if let summary = viewModel.ratingSummary, summary.count > 0 {
+        if let summary = viewModel.ratingSummary, summary.count > 0 {  // swiftlint:disable:this empty_count
             StarRatingDisplay(average: summary.average, count: summary.count, starSize: 18)
         } else {
             Text("Be the first to rate this recipe.")
