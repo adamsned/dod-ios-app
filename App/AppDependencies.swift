@@ -6,9 +6,11 @@ import DODFeatureSaved
 import DODFeatureSearch
 import DODNetworking
 import DODPersistence
+import DODSupport
 import Foundation
 import SwiftData
 import SwiftUI
+import WidgetKit
 
 /// Composition root. Constructs every long-lived service once and hands
 /// per-feature `…Dependencies` views to view models on demand.
@@ -59,7 +61,19 @@ final class AppDependencies {
     // MARK: - Per-feature dependency views
 
     func feedDependencies() -> some FeedDependencies {
-        LiveFeedDependencies(client: restClient, store: store, monitor: networkMonitor)
+        // After the feed writes a fresh snapshot into the App Group, ask
+        // WidgetKit to rebuild any installed widget timelines so the user
+        // sees the new featured recipe without waiting for our 4-hour
+        // refresh cadence (spec.md US-9 AC-9.3).
+        let reload: LiveFeedDependencies.WidgetReloadHook = { _ in
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+        return LiveFeedDependencies(
+            client: restClient,
+            store: store,
+            monitor: networkMonitor,
+            widgetReload: reload
+        )
     }
 
     func categoriesDependencies() -> some CategoriesDependencies {

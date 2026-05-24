@@ -150,6 +150,19 @@ Added by consultant-pass amendment (CL-17, 2026-05-23). Reverses the earlier CL-
 - **AC-8.2** A "Get cooking" primary button dismisses the sheet and sets `dod.onboardingCompletedV1 = true`. All future cold launches go straight to Feed with no sheet.
 - **AC-8.3** iPad first launch shows the same single-screen sheet (same content, same flag) — no separate iPad onboarding flow. The sheet sizes appropriately for iPad via standard SwiftUI `.sheet` presentation; the flag is shared with iPhone since saves and UserDefaults are per-install (consistent with AC-5.7 / CL-5).
 
+### US-9 — Home-screen widget
+**As a** Returning Reader,
+**I want** a home-screen widget showing today's featured recipe,
+**so that** I can jump straight into a new recipe without opening the app and scrolling the feed.
+
+Added by consultant-pass amendment (2026-05-23). Constitution §2 was amended in the same pass to bring a WidgetKit extension into v1.0 platform scope. Watch / Mac / Vision targets remain out. The widget ships as a separate `app-extension` target `DODAppWidget` (NSExtensionPointIdentifier `com.apple.widgetkit-extension`) embedded in the host app bundle.
+
+**Acceptance criteria:**
+- **AC-9.1** A "Today's Recipe" widget is available in the iOS widget gallery in both `systemSmall` (square) and `systemMedium` (wide) sizes. Small surfaces hero + title + total-time chip on a gradient overlay; medium surfaces hero on the left with a "Today on DOD" eyebrow, title, excerpt, and total-time chip on the right. Large + Lock Screen accessory families are deferred to v2 (documented in `Marketing/TestFlight.md`).
+- **AC-9.2** Tapping the widget deep-links into the app via `dod://recipe/<id>` for a populated widget, or `dod://feed` for the placeholder. The app handles the URL in `RootView.onOpenURL`, switches the active tab to Feed, and pushes the recipe-detail screen (or clears the navigation stack for `dod://feed`). The push uses the cached `RecipeListItem` when available and otherwise falls back to the widget snapshot's own copy of title/hero/excerpt so the detail screen opens instantly even when the cache is cold.
+- **AC-9.3** The widget timeline refreshes every 4 hours **or** sooner — the app calls `WidgetCenter.shared.reloadAllTimelines()` after every successful feed load so a fresh top-of-feed item appears within seconds of the user pulling-to-refresh. Data flows via the shared App Group `group.com.dutchovendaddy.DODApp`: `WidgetSnapshotStore` writes the top 5 list items (`id`, `title`, `excerpt`, `heroImageURL`, `canonicalURL`, `publishedAt`, `totalTimeDisplay`) to a UserDefaults key under that suite; the widget's `TimelineProvider` reads the same key. Snapshots carry a `version` tag — readers on a mismatched version return `nil` and the widget surfaces the placeholder per AC-9.4.
+- **AC-9.4** When no snapshot exists (first launch, App Group unavailable in a non-provisioned build, or a version mismatch), the widget shows a placeholder layout that says "Open the app to see today's featured recipe here." rather than a crash or a blank panel. The placeholder is also what WidgetKit hands the gallery preview so the widget renders nicely while the user is still picking a size.
+
 ---
 
 ## Cross-cutting acceptance criteria
@@ -192,6 +205,7 @@ Mandates (per constitution §6):
   - **REG-DOD-NAV-1**: tapping a recipe row pushes the detail screen and it stays pushed. Failure mode: `RecipeStore.cache(listItem:)` dropped `canonicalURL` on insert, so the detail fetch fell back to the homepage, JSON-LD parse failed, and AC-4.11's auto-dismiss popped the user back to the feed. Locked by `DODPersistenceTests.canonicalURLRoundTrips`, `DODPersistenceTests.canonicalURLUpdatesButDoesNotClobberOnNil`, and `SmokeTests.test_recipeDetailOpensAndShowsContent`.
   - **REG-DOD-LIST-SCROLL**: vertical drag inside a recipe row scrolls the surrounding list. Failure mode: `Button { } label: { RecipeCard }.buttonStyle(.plain)` inside a `LazyVGrid` inside a `ScrollView` swallowed the pan gesture on iOS 26. Locked by `SmokeTests.test_feedScrollsToRevealMoreRecipes`.
   - **REG-INFO-PLIST-CLOBBER**: `xcodegen generate` must not strip launch-screen / orientation keys from `App/Info.plist`. Failure mode: those keys lived only in the hand-maintained plist; XcodeGen rewrote it from `project.yml` on every regenerate, silently re-introducing the iOS letterbox bug. Locked by keeping the keys in `project.yml`'s `info.properties` block; `SmokeTests.test_appLaunchesWithoutTelemetryAppID` proves the app renders at launch (does not yet pixel-verify edge-to-edge — noted gap).
+  - **REG-9**: the widget snapshot wire format the host app writes (`WidgetSnapshotStore.write`) round-trips losslessly through the widget extension's reader, and the small/medium widget layouts don't drift visually. Locked by `WidgetSnapshotStoreTests` (DODSupport: round-trip, max-entries cap, version-mismatch rejection, clear), `WidgetDeepLinkParserTests` (DODSupport: 8 cases covering `dod://recipe/<id>` and `dod://feed` plus rejection of malformed and hostile URLs), and `DesignSystemSnapshotTests.test_widgetCard_{small,medium}_populated` + `test_widgetCard_placeholder` (DODDesignSystem: pixel-locked baselines for the three layouts).
 
 ## Clarifications
 

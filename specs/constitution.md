@@ -15,6 +15,7 @@ Immutable rules. All specs, plans, and tasks must conform. Changes require an ex
 - **Orientation:** portrait + landscape on iPad; portrait-primary on iPhone (landscape allowed for recipe reading and video).
 - **No** watchOS, macOS Catalyst, or visionOS in v1. Revisit after launch.
 - **Cook Mode** is in scope for v1.0 (a hands-free, screen-awake cooking surface on recipe detail). Was previously an implicit non-feature; promoted in by the consultant-pass amendment (CL-16, spec US-7). Watch / Mac / Vision targets remain out.
+- **Widget extension included** for v1.0 — a WidgetKit extension (`app-extension` target, NSExtensionPointIdentifier `com.apple.widgetkit-extension`, bundle ID `com.dutchovendaddy.DODApp.Widget`) embedded in the host app bundle, surfacing today's featured recipe on the home screen in `systemSmall` and `systemMedium`. Promoted in by the consultant-pass amendment (2026-05-23, spec US-9). Data flows from app to widget via the shared App Group `group.com.dutchovendaddy.DODApp`; no new analytics, no new network endpoints, no PII. Large + Lock Screen accessory families remain out for v1. Watch / Mac / Vision targets still out.
 
 ## 3. Tech stack
 

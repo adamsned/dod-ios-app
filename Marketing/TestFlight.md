@@ -23,10 +23,42 @@ Required:
 - A Team ID — find at https://developer.apple.com/account → Membership.
 - An App ID for `com.dutchovendaddy.DODApp` registered at
   https://developer.apple.com/account/resources/identifiers/list
+- An App ID for `com.dutchovendaddy.DODApp.Widget` (the home-screen
+  widget extension, US-9). Register it the same way — it lives alongside
+  the host app's App ID.
+- An App Group `group.com.dutchovendaddy.DODApp` registered at
+  https://developer.apple.com/account/resources/identifiers/list?filter=applicationGroup
+  and added to **both** the host App ID and the widget App ID under their
+  Capabilities → App Groups settings. Without this the widget reads an
+  empty UserDefaults suite and surfaces the placeholder forever (AC-9.4
+  graceful-degrade path). Both `App/DODApp.entitlements` and
+  `Widget/DODAppWidget.entitlements` already declare the group; only the
+  developer-portal side is manual.
 
-`project.yml` already sets `bundleIdPrefix: com.dutchovendaddy` and
-`PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp`. Adjust if a
-different identifier is preferred.
+`project.yml` already sets `bundleIdPrefix: com.dutchovendaddy`,
+`PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp` (host) and
+`com.dutchovendaddy.DODApp.Widget` (widget extension). Adjust if a
+different identifier is preferred — and remember to mirror the change in
+the two `.entitlements` files plus the developer-portal records.
+
+## Widget extension — deferred scope
+
+For v1.0 the `DODAppWidget` extension ships only `systemSmall` and
+`systemMedium` families (spec.md US-9 AC-9.1). These v2 candidates are
+intentionally out of scope:
+
+- `systemLarge` home-screen size — would showcase 3-4 recipes at once;
+  needs a list view treatment we haven't designed.
+- Lock Screen `accessoryRectangular` / `accessoryCircular` /
+  `accessoryInline` — requires a separate tinted asset pass, plus a
+  decision on whether the lock screen variant deep-links into the app
+  the same way (today's `widgetURL` triggers an unlock prompt).
+- `accessoryCorner` (watchOS) — out for v1.0 per constitution §2.
+- StandBy mode treatments — defer until we have telemetry on adoption.
+
+Adding any of these is a 1-2 day task each: extend
+`FeaturedRecipeWidget.supportedFamilies`, add a new entry view variant,
+land matching snapshot baselines. No new App Group plumbing required.
 
 ## App Store Connect
 

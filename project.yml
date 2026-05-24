@@ -80,6 +80,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"  # iPhone + iPad
         INFOPLIST_FILE: App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: App/DODApp.entitlements
     dependencies:
       - package: DODDomain
       - package: DODSupport
@@ -92,6 +93,11 @@ targets:
       - package: DODFeatureSearch
       - package: DODFeatureRecipeDetail
       - package: DODFeatureSaved
+      # Widget extension embedded into the app bundle so installing the app
+      # installs the widget too. XcodeGen wires up the matching "Embed App
+      # Extensions" build phase automatically when an `app-extension` target
+      # appears as a dependency here.
+      - target: DODAppWidget
     preBuildScripts:
       - name: SwiftLint
         script: |
@@ -101,6 +107,41 @@ targets:
             echo "warning: SwiftLint not installed — brew install swiftlint"
           fi
         basedOnDependencyAnalysis: false
+
+  # Home-screen widget (US-9). One WidgetBundle hosting one
+  # StaticConfiguration (`FeaturedRecipeWidget`) in small + medium sizes.
+  # Reads the snapshot the host app writes into the shared App Group
+  # `group.com.dutchovendaddy.DODApp`; tap-throughs deep-link into the app
+  # via `dod://recipe/<id>` handled by RootView.onOpenURL.
+  DODAppWidget:
+    type: app-extension
+    platform: iOS
+    productType: app-extension
+    sources:
+      - path: Widget
+        excludes:
+          - "DODAppWidget.entitlements"
+          - "Info.plist"
+    info:
+      path: Widget/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp.Widget
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: Widget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Widget/DODAppWidget.entitlements
+        # Widget extensions ship inside the host app's PlugIns directory;
+        # SKIP_INSTALL prevents xcodebuild from trying to install the
+        # extension on its own when building from the command line.
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: DODSupport
+        product: DODSupport
+      - package: DODDesignSystem
+        product: DODDesignSystem
 
   DODAppUITests:
     type: bundle.ui-testing
