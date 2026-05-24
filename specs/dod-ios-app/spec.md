@@ -253,6 +253,54 @@ Added by consultant-pass amendment (2026-05-23, Tier 3). Builds on US-7 / AC-7.*
 - **AC-11.3** The Live Activity ends when (a) the countdown hits zero, (b) the user taps Reset, (c) the user starts a new step's timer (the previous activity is replaced, not stacked), or (d) Cook Mode itself is exited via the Done button or `endCookMode`.
 - **AC-11.4** On hosts where ActivityKit isn't available (`iOS < 16.1`) or where the user has disabled Live Activities system-wide (`ActivityAuthorizationInfo().areActivitiesEnabled == false`), Cook Mode behaves exactly as it did pre-US-11 — the inline timer still runs, no Lock Screen card appears, and no errors surface to the user.
 
+### US-16 — Tab bar refinement (Saved promoted, bookmark icon)
+**As a** Returning Reader,
+**I want** the "Saved" tab to live closer to the home tab and use a bookmark icon,
+**so that** my saved recipes feel like a real shelf I return to (not a passing favorite) and are within easier thumb reach.
+
+Added post-Phase 6 (2026-05-24). Aesthetic + ergonomic refinement; no new data, no new screens.
+
+**Acceptance criteria:**
+- **AC-16.1** Tab order on the bottom bar is **Recipes → Categories → Saved → Search** (Saved moves from position 4 to position 3; Search moves from position 3 to position 4). The `AppTab.allCases` order is the single source of truth and is what changes.
+- **AC-16.2** The "Saved" tab uses SF Symbol `bookmark` when unselected and `bookmark.fill` when selected. Selection-aware variants follow the same pattern as existing system tabs (no custom asset).
+- **AC-16.3** The in-recipe Save affordance (`AC-4.7`, navigation-bar heart) is **unchanged in v1** — only the tab icon flips. Revisiting the in-recipe icon is a follow-up if it feels inconsistent in user testing; left out to keep this change reversible and surface a single decision at a time.
+- **AC-16.4** Telemetry: `AppTab.telemetryName` mapping is unchanged (`"saved"` stays `"saved"`); the change is purely visual + ordering, so existing screen-view event counts remain comparable across the change.
+- **AC-16.5** L4 snapshot tests cover the tab bar in both light and dark appearance, iPhone 13 + iPad 12.9", with each tab selected. Baselines are updated as part of the implementing PR (intentional visual change).
+- **AC-16.6** L3 UI smoke test asserts the third tab from the left opens Saved (was Search) and the fourth opens Search (was Saved), guarding against accidental re-ordering in a future refactor.
+
+### US-17 — Home-screen widget for saved recipes
+**As a** Returning Reader,
+**I want** a home-screen widget that shows my saved recipes,
+**so that** I can jump straight into one I've already bookmarked without opening the app and scrolling to the Saved tab.
+
+Added post-Phase 6 (2026-05-24). Builds on the US-9 widget infrastructure (`WidgetSnapshotStore`, `WidgetDeepLinkParser`, `WidgetCard`, App Group container). This story adds a **second** widget alongside the existing today's-featured one; it does not replace it.
+
+**Acceptance criteria:**
+- **AC-17.1** A new home-screen widget kind, `SavedRecipesWidget`, is added to `DODAppWidgetBundle` alongside `FeaturedRecipeWidget`. The widget's display name is "Saved Recipes" and its description is "Your saved recipes, one tap from a cook."
+- **AC-17.2** Supported sizes are `.systemSmall` (1 saved recipe) and `.systemMedium` (3 saved recipes). `.systemLarge` is **out of scope for v1** — revisit only if user testing surfaces demand.
+- **AC-17.3** Widget content is sourced from a new snapshot file (`SavedRecipesWidgetSnapshot`) written to the App Group container by the host app whenever the saved set changes (observe `SavedStore` from `DODApp`). Snapshot carries the N most-recently-saved recipes (small=1, medium=3) with title + cached hero-image filename + canonical URL + recipe ID + saved-at timestamp.
+- **AC-17.4** Tapping a recipe row in the widget opens its detail via the existing `dod://recipe/<id>` deep link (US-9 / `WidgetDeepLinkParser`). Tapping the widget chrome (outside any recipe row) opens the Saved tab via a new `dod://saved` deep link.
+- **AC-17.5** Empty state: when no recipes are saved, the widget renders a placeholder ("Save a recipe to see it here") that tap-targets to the Saved tab (`dod://saved`). The widget never crashes or shows broken images for missing data.
+- **AC-17.6** Timeline: the widget reloads at most once every 15 minutes from snapshot changes; the host app forces a reload via `WidgetCenter.shared.reloadTimelines(ofKind:)` whenever `SavedStore` writes or removes a recipe. No network calls from the widget extension itself.
+- **AC-17.7** L4 snapshot tests cover empty / 1-saved / 3-saved states on both small + medium sizes, both light + dark appearances. Baselines committed.
+- **AC-17.8** L1 unit tests cover: snapshot encode/decode round-trip, max-entries cap (small=1 / medium=3), version-mismatch rejection, and the new `dod://saved` deep-link parse case. Existing `WidgetDeepLinkParserTests` is extended; new `SavedRecipesWidgetSnapshotTests` lives next to the existing `WidgetSnapshotTests`.
+- **AC-17.9** Telemetry: a new event `widgetOpened(kind: "saved" | "featured", recipeID: Int?)` replaces the implicit "widget deep link consumed" log. Constitution §9 allowlist updated in the implementing PR. Existing today's-featured tap continues to deep-link the same way; only the analytics shape generalizes.
+
+### US-18 — Light/dark mode appearance polish
+**As any** user,
+**I want** every surface in the app to look intentional in both light and dark mode at every Dynamic Type size,
+**so that** the app feels finished regardless of my system appearance.
+
+Added post-Phase 6 (2026-05-24). Constitution §7 already mandates WCAG AA contrast in both modes — this story scopes the **audit + targeted fixes** to land the mandate everywhere it isn't already enforced by an existing snapshot test.
+
+**Acceptance criteria:**
+- **AC-18.1** Every top-level screen from US-1 through US-15 (Feed, Categories list, Category detail, Search, Recipe detail, Saved, Cook Mode, Onboarding, plus the comments + ratings section added by US-13/14/15) has L4 snapshot coverage in **both** light and dark appearances on iPhone 13 baseline. Gaps surfaced by the audit are filled by the implementing PR before any visual change is made (so the diff is provable, not opinion).
+- **AC-18.2** Every reusable component in `DODDesignSystem/Components/` has L4 snapshot coverage in both appearances at default + AX5 Dynamic Type sizes. Same rule: existing gaps filled first, fixes proven by the diff.
+- **AC-18.3** Audit checklist is captured in a new `specs/dod-ios-app/appearance-audit.md` (sibling to `accessibility-audit.md` and `performance-audit.md`). Each surface + component row records: light pass/fail, dark pass/fail, notes on any fix applied, baseline snapshot reference.
+- **AC-18.4** Any contrast failure (WCAG AA, computed against the actual rendered tokens — not against the design system's stated values) is resolved either by adjusting the token in `DODDesignSystem.Colors` or by overriding at the offending site with a documented reason. No silent overrides.
+- **AC-18.5** Reduce-Transparency and Reduce-Motion respected in both appearances (already required by constitution §7; the audit verifies it).
+- **AC-18.6** The audit is allowed to surface *no* code changes — a clean audit closes the story. The deliverable is the audit document plus any fixes the audit prompted, not a guaranteed list of fixes.
+
 ---
 
 ## Cross-cutting acceptance criteria
