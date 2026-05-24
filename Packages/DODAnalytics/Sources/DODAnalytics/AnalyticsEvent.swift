@@ -51,6 +51,32 @@ public enum AnalyticsEvent: Sendable, Hashable {
     /// (i.e. `status != .approved` on the returned DTO). The comment body
     /// is **never** included.
     case recipeCommentSubmitted(recipeID: Int, awaitingApproval: Bool)
+
+    /// Home-screen widget tap consumed by the host app (US-17 AC-17.9).
+    /// Fires from `RootView.handle(widgetLink:)` for every recognized
+    /// `dod://` URL the widget extension emits — featured widget face,
+    /// saved-widget recipe row, or saved-widget chrome / empty-state
+    /// fallback. The kind identifies which widget surface was tapped; the
+    /// optional recipe id is the integer WP post id when the tap targeted
+    /// a specific recipe (`dod://recipe/<id>`), and `nil` for chrome /
+    /// empty-state taps (`dod://saved`, `dod://feed`). No free-text
+    /// payload — see constitution §9 allowlist (amended for this event).
+    case widgetOpened(kind: WidgetKind, recipeID: Int?)
+}
+
+/// Identifier for the widget surface a `widgetOpened` event originated
+/// from. Serializes as the lowercase case name (`"featured"` / `"saved"`)
+/// on the wire — see ``AnalyticsEvent/payload``.
+public enum WidgetKind: String, Sendable, Hashable, CaseIterable {
+
+    /// `FeaturedRecipeWidget` — today's-featured recipe surface
+    /// (spec US-9).
+    case featured
+
+    /// `SavedRecipesWidget` — saved-recipes surface introduced by
+    /// US-17 (T-321). Covers both the per-row recipe tap and the
+    /// chrome / empty-state tap that lands on `dod://saved`.
+    case saved
 }
 
 extension AnalyticsEvent {
@@ -68,6 +94,7 @@ extension AnalyticsEvent {
         case .cookModeStarted: "cook_mode_started"
         case .recipeRated: "recipe_rated"
         case .recipeCommentSubmitted: "recipe_comment_submitted"
+        case .widgetOpened: "widget_opened"
         }
     }
 
@@ -97,6 +124,16 @@ extension AnalyticsEvent {
             ["recipe_id": String(recipeID), "stars": String(stars)]
         case .recipeCommentSubmitted(let recipeID, let awaitingApproval):
             ["recipe_id": String(recipeID), "awaiting_approval": String(awaitingApproval)]
+        case .widgetOpened(let kind, let recipeID):
+            // `kind` is always emitted; `recipe_id` is only emitted when
+            // the tap targeted a specific recipe (`dod://recipe/<id>`).
+            // Chrome / empty-state taps drop the key entirely rather than
+            // sending a sentinel string. Constitution §9: no free text.
+            if let recipeID {
+                ["kind": kind.rawValue, "recipe_id": String(recipeID)]
+            } else {
+                ["kind": kind.rawValue]
+            }
         }
     }
 }

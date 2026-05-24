@@ -171,7 +171,17 @@ struct RootView: View {
     /// TabStack via the `pendingDeepLink` binding. For the saved route
     /// (US-17), the Saved tab owns the destination directly so we just
     /// switch tabs — no pending-link push.
+    ///
+    /// Fires `widgetOpened(kind:, recipeID:)` once per consumed link
+    /// (T-323 / AC-17.9). The kind reflects which widget surface the tap
+    /// came from — the parser inspects the URL's `source` query parameter
+    /// for recipe URLs and the host name itself for chrome URLs. Per
+    /// constitution §9 (US-17 amendment) the payload carries only the
+    /// kind plus an integer recipe id (or nil for chrome / empty-state
+    /// taps that land on the Saved or Feed tab without a specific
+    /// recipe target).
     private func handle(widgetLink link: WidgetDeepLink) {
+        Telemetry.shared.send(.widgetOpened(kind: link.widgetKind, recipeID: link.recipeID))
         switch link {
         case .saved:
             selectedTab = .saved

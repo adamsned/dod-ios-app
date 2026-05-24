@@ -109,14 +109,20 @@ struct SavedRecipesWidgetEntryView: View {
 
     // MARK: - Helpers
 
-    /// Build a `dod://recipe/<id>` URL for tap-through. Mirrors
-    /// `FeaturedRecipeWidgetEntryView.deepLink(for:)` so both widgets
-    /// emit identical recipe URLs.
+    /// Build a `dod://recipe/<id>?source=saved` URL for tap-through.
+    /// Mirrors `FeaturedRecipeWidgetEntryView.deepLink(for:)` so both
+    /// widgets emit recipe URLs in the same shape; the `source` query
+    /// parameter is the discriminator the host app uses to fire the
+    /// correct `widgetOpened(kind:)` analytics event (T-323 / AC-17.9).
+    /// The recipe-detail nav contract is unaffected: the parser still
+    /// resolves the URL to `.recipe(id:)` and ignores the source on
+    /// the navigation path.
     static func deepLink(for entry: SavedRecipesWidgetSnapshot.Entry) -> URL? {
         var components = URLComponents()
         components.scheme = "dod"
         components.host = "recipe"
         components.path = "/\(entry.recipeID)"
+        components.queryItems = [URLQueryItem(name: "source", value: "saved")]
         return components.url
     }
 
