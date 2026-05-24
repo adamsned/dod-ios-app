@@ -97,14 +97,27 @@ final class AppDependencies {
     }
 
     func recipeDetailDependencies() -> some RecipeDetailDependencies {
-        LiveRecipeDetailDependencies(
+        // After a save / unsave the recipe-detail view model asks the
+        // dependency to refresh the saved-recipes widget snapshot. The
+        // publisher writes to the App Group container and then calls this
+        // hook, which is what actually pokes WidgetKit. The kind string
+        // is pinned in spec.md AC-17.6 — must match the widget's
+        // `kind` (T-321 will register it).
+        let savedWidgetReload: SavedRecipesWidgetPublisher.ReloadHook = {
+            WidgetCenter.shared.reloadTimelines(ofKind: "SavedRecipesWidget")
+        }
+        return LiveRecipeDetailDependencies(
             client: restClient,
             fetcher: pageFetcher,
             store: store,
             monitor: networkMonitor,
             commentsClient: commentsClient,
             ratingsClient: ratingsClient,
-            guestIdentity: guestIdentityStore
+            guestIdentity: guestIdentityStore,
+            savedWidgetPublisher: SavedRecipesWidgetPublisher(
+                store: store,
+                reload: savedWidgetReload
+            )
         )
     }
 
