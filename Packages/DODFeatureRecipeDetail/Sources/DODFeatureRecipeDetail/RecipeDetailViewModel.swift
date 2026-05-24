@@ -257,6 +257,12 @@ public final class RecipeDetailViewModel {
                 await dependencies.sendTelemetry(.recipeUnsaved(recipeID: listItem.id))
                 snackbarMessage = "Removed from saved."
             }
+            // Refresh the saved-recipes home-screen widget snapshot so its
+            // timeline reflects the new state without waiting for
+            // WidgetKit's default 15-minute refresh (US-17 / AC-17.3 +
+            // AC-17.6). Fire-and-forget; errors are logged inside the
+            // dependency, never thrown.
+            await dependencies.publishSavedWidgetSnapshot()
         } catch {
             DODLog.persistence.error("toggle save failed: \(String(describing: error))")
         }
