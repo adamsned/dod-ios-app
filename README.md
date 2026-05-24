@@ -11,7 +11,12 @@ nav), list-scroll on iOS 26, and the XcodeGen Info.plist clobber are all fixed
 and locked by regression tests (REG-DOD-NAV-1, REG-DOD-LIST-SCROLL,
 REG-INFO-PLIST-CLOBBER — see `specs/dod-ios-app/spec.md`). Full test pyramid
 (L1 unit + L2 live-API + L3 UI smoke + L4 visual regression) wired into CI.
-Pre-TestFlight checklist outstanding — see
+
+**Consultant pass landing (2026-05-23):** Cook Mode (US-7), recipe detail
+polish, onboarding sheet (US-8), and the real app icon are in flight as the
+Phase 6 work cluster (T-300..T-305 in `specs/dod-ios-app/tasks.md`, authorized
+by `clarifications.md` CL-16/CL-17/CL-18). Cards switch to a 2-column compact /
+3-column regular grid (CC-9). Pre-TestFlight checklist tracked in
 [`Marketing/TestFlight.md`](Marketing/TestFlight.md).
 
 ## Read the spec first

@@ -122,6 +122,34 @@ The app is read-only: no comments, no ratings, no accounts. Recipes are the hero
 - **AC-6.2** The shared payload is the recipe's canonical web URL on dutchovendaddy.com (not a deep link to the app in v1).
 - **AC-6.3** Share action is tracked via TelemetryDeck (event: `recipe_shared`).
 
+### US-7 — Cook Mode
+**As a** Weekend Cook,
+**I want** a hands-free cooking surface,
+**so that** I can follow a recipe at the stove without the screen sleeping.
+
+Added by consultant-pass amendment (CL-16, 2026-05-23). Constitution §2 was amended in the same pass to bring Cook Mode in scope for v1.0; constitution §9 documents the idle-timer toggle as a UIKit device-state change (not a new data category) and adds `cookModeStarted` to the analytics allowlist.
+
+**Acceptance criteria:**
+- **AC-7.1** Recipe detail has a prominent "Cook Now" button (visually distinct primary CTA, reachable without scrolling on iPhone 13 baseline).
+- **AC-7.2** Tapping "Cook Now" opens a full-screen takeover showing the recipe title, a step counter formatted "Step N of M", the current step's instruction text in large type (Dynamic Type up to AX5 per CC-1), and a persistent ingredients drawer that the user can pull up without leaving Cook Mode.
+- **AC-7.3** While Cook Mode is the foreground surface, the screen does not auto-lock. Implementation: set `UIApplication.shared.isIdleTimerDisabled = true` on entry and restore the prior value on exit. This is the only place in the app that touches `isIdleTimerDisabled`.
+- **AC-7.4** Swipe-left (or tap "Next") advances one step; swipe-right (or tap "Back") reverses one step. After the last step, a "Done" state is shown with an explicit "Finish" or "Done" affordance — no auto-loop back to step 1.
+- **AC-7.5** The ingredient check state from regular recipe detail (AC-4.2) carries into Cook Mode for the current screen lifetime — checking off an ingredient in Cook Mode's drawer and then exiting back to detail shows the same checks, and vice versa. State is **not** persisted across app launches (matches AC-4.2 lifetime contract).
+- **AC-7.6** The user exits Cook Mode via an explicit "Done" button in the navigation bar or via the system back gesture. Either restores normal navigation (recipe detail underneath) and re-enables auto-lock per AC-7.3.
+- **AC-7.7** Telemetry: a new event `cookModeStarted(recipeID:)` is sent the first time Cook Mode is entered for a given recipe during a session. It carries only the integer WP recipe ID — no free-text payload. The event is added to the constitution §9 allowlist by the consultant-pass amendment; the `AnalyticsEvent` enum gains the corresponding case in the follow-up implementation task (see plan.md Phase 6 cluster, task T-305).
+
+### US-8 — First-launch onboarding
+**As a** Weekend Cook on first cold launch,
+**I want** a brief welcome explaining what the app does,
+**so that** I'm oriented before I land on the feed.
+
+Added by consultant-pass amendment (CL-17, 2026-05-23). Reverses the earlier CL-7 "no onboarding" decision after the consultant pass argued that a single-screen sheet costs almost nothing and helps first-time users recognize the heart-save and search affordances before they need them.
+
+**Acceptance criteria:**
+- **AC-8.1** On the first cold launch — gated by a single `UserDefaults` flag `dod.onboardingCompletedV1` — the app presents a single-screen modal sheet over the Feed. The sheet contains a friendly welcome line and exactly three bullets: "Browse the latest recipes from dutchovendaddy.com", "Search for what you're craving", and "Tap the heart to save any recipe for offline cooking".
+- **AC-8.2** A "Get cooking" primary button dismisses the sheet and sets `dod.onboardingCompletedV1 = true`. All future cold launches go straight to Feed with no sheet.
+- **AC-8.3** iPad first launch shows the same single-screen sheet (same content, same flag) — no separate iPad onboarding flow. The sheet sizes appropriately for iPad via standard SwiftUI `.sheet` presentation; the flag is shared with iPhone since saves and UserDefaults are per-install (consistent with AC-5.7 / CL-5).
+
 ---
 
 ## Cross-cutting acceptance criteria
@@ -136,6 +164,7 @@ These apply to every screen, not just one story.
 - **CC-6 App Privacy label:** v1 collects only Usage Data (Product Interaction), not linked to identity, not used for tracking. The App Store privacy questionnaire must match this exactly.
 - **CC-7 Performance:** screens hit the budgets in constitution §8 (cold launch <1.5s, 60fps lists, recipe detail open <300ms cached / <1.5s fetched).
 - **CC-8 iPad layouts:** every screen has an adaptive iPad layout. List + detail uses `NavigationSplitView` on iPad (sidebar + content), stack on iPhone.
+- **CC-9 Visual density (added by consultant-pass amendment, CL-18):** the four list surfaces — Feed (US-1), Categories recipe lists (US-2), Search results (US-3), and Saved (US-5) — render as a **2-column grid** on compact horizontal size class (iPhone in portrait) and a **3-column grid** on regular horizontal size class (iPad and large iPhones in landscape). The previous 1-column compact default is retired. RecipeCard hero image height is tuned so at least **3 rows are visible above the fold** on iPhone 13 baseline in light mode at default Dynamic Type. Plan T-300 implements; snapshot tests at iPhone 13 + iPad 12.9" lock the new layout.
 
 ---
 

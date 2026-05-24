@@ -14,6 +14,7 @@ Immutable rules. All specs, plans, and tasks must conform. Changes require an ex
 - **Minimum OS:** iOS 17 / iPadOS 17.
 - **Orientation:** portrait + landscape on iPad; portrait-primary on iPhone (landscape allowed for recipe reading and video).
 - **No** watchOS, macOS Catalyst, or visionOS in v1. Revisit after launch.
+- **Cook Mode** is in scope for v1.0 (a hands-free, screen-awake cooking surface on recipe detail). Was previously an implicit non-feature; promoted in by the consultant-pass amendment (CL-16, spec US-7). Watch / Mac / Vision targets remain out.
 
 ## 3. Tech stack
 
@@ -96,7 +97,7 @@ The test pyramid has **four** layers. Every PR must keep all layers green.
 ## 9. Privacy & security
 
 - **Analytics:** **TelemetryDeck only.** Chosen because it requires no ATT prompt, collects no IDFA, no PII, no cross-app tracking, and ships a small SDK. Any other analytics SDK (Google Analytics/Firebase, Mixpanel, Amplitude, etc.) is **prohibited** in v1 and requires a constitution amendment.
-  - Events tracked are limited to: app open, screen view, recipe view, recipe save/unsave, search query (query string hashed, not raw), share action, offline-read event.
+  - Events tracked are limited to: app open, screen view, recipe view, recipe save/unsave, search query (query string hashed, not raw), share action, offline-read event, cook-mode-started event (recipe ID only, no free-text payload — added by consultant-pass amendment for spec US-7 AC-7.7).
   - **No** raw user input strings sent to TelemetryDeck. No device identifiers beyond TelemetryDeck's anonymized client hash.
   - App Privacy "nutrition label" declares: *Usage Data — Product Interaction — not linked to user, not used for tracking.*
 - **Ads & third-party trackers:** none. Ever, without an amendment.
@@ -105,6 +106,7 @@ The test pyramid has **four** layers. Every PR must keep all layers green.
 - **Secrets:** TelemetryDeck app ID is the only secret in v1. Stored in a gitignored `.xcconfig`, not in source. Never logged.
 - **Crash reporting:** Apple's built-in MetricKit only in v1. No Crashlytics/Sentry.
 - **App Store compliance:** every release passes through the App Privacy questionnaire honestly; any new data collection requires updating that questionnaire *and* this section before submission.
+- **Cook Mode idle-timer:** while Cook Mode (spec US-7) is the foreground surface, the app sets `UIApplication.shared.isIdleTimerDisabled = true` so the screen does not auto-lock during a cook, and restores the prior value on exit. This is a UIKit-level device-state toggle, **not** a tracked event and **not** a new category of data collection — no signal is sent to TelemetryDeck about idle-timer state, and the App Privacy questionnaire is unaffected. Cook Mode entry is tracked separately as an allowlisted `cookModeStarted` event under "Usage Data — Product Interaction" (see §9 event list above and spec US-7 AC-7.7).
 
 ## 10. Coding standards
 

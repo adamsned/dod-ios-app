@@ -473,13 +473,29 @@ JSON-LD parser gets **golden-file tests** — checked-in HTML samples from 5 rep
 
 ---
 
+## Phase 6 work cluster — Consultant pass
+
+Added 2026-05-23 by the consultant-pass amendment (clarifications CL-16, CL-17, CL-18). Six high-level tasks listed here so the plan stays the source of truth; per-task scope/files/AC/deps/estimate live in `tasks.md` under "Phase 6 — Consultant pass".
+
+- **T-300 — Card visual density.** Implements CC-9: 2-column grid on compact horizontal size class (iPhone portrait), 3-column on regular (iPad, large iPhones in landscape), across Feed / Categories / Search / Saved. Shorter RecipeCard hero so ≥3 rows are visible above the fold on iPhone 13 baseline. Touches `Packages/DODFeatureFeed`, `Packages/DODFeatureCategories`, `Packages/DODFeatureSearch`, `Packages/DODFeatureSaved`, and `Packages/DODDesignSystem/Components/RecipeCard.swift`. Snapshot tests at iPhone 13 + iPad 12.9" lock the new layout. Supersedes the one-column-compact assumption in T-150.
+- **T-301 — App icon placeholder + asset catalog.** Promote the placeholder app icon into a real `AppIcon.appiconset` with every required size populated (1024 marketing, all iPhone/iPad scaled variants). Asset catalog only — does not change app launch behavior. Unblocks the TestFlight build that's currently flagged "missing icon" in App Store Connect. Closes the part of T-180 that was deferred behind owner-provided artwork.
+- **T-302 — Recipe detail polish.** Two visual fixes the consultant flagged on recipe detail (US-4): (a) sticky save + share buttons that stay reachable when scrolled to instructions/related, and (b) a hero overlay (title + meta row over a gradient at the bottom of the hero image) so the meta row is anchored at the top of the visible content area instead of dropping below the fold. No new ACs — refinement of AC-4.1, AC-4.7, AC-4.8 within the existing contract.
+- **T-303 — Onboarding sheet (US-8).** Implements US-8 AC-8.1, AC-8.2, AC-8.3. New `OnboardingSheet` view in `Packages/DODFeatureFeed` (or a small new `DODFeatureOnboarding` module if it grows beyond one file — decide during the task). Wires the `dod.onboardingCompletedV1` UserDefaults flag in the composition root (`App/AppDependencies.swift` or a small helper). Snapshot tests at iPhone + iPad. Unit test asserts the flag is set after dismiss and the sheet is not shown on second launch.
+- **T-304 — Cook Mode (US-7).** Implements US-7 AC-7.1 through AC-7.6. New `CookModeView` + `CookModeViewModel` in `Packages/DODFeatureRecipeDetail`. "Cook Now" CTA added to `RecipeDetailView`. View model owns the shared ingredient-check state binding (AC-7.5) — likely lifted up from `RecipeDetailViewModel` into a small `IngredientCheckState` value shared via environment or initializer injection. UIKit `UIApplication.shared.isIdleTimerDisabled` toggle wrapped in a small `IdleTimerCoordinator` so it's mockable in tests (AC-7.3). Swipe + tap navigation. Snapshot tests at iPhone + iPad, light + dark. UI smoke test (L3) launches Cook Mode and verifies the screen does not auto-lock during a 10-second hold.
+- **T-305 — Cook Mode telemetry event.** Adds `cookModeStarted(recipeID: Int)` case to the `AnalyticsEvent` sealed enum in `Packages/DODAnalytics/Sources/DODAnalytics/AnalyticsEvent.swift`. Wires the send-site inside `CookModeViewModel` on first entry per recipe-per-session (AC-7.7). Unit test asserts the event fires exactly once per recipe even if the user re-enters Cook Mode after exiting. Companion test asserts no raw text is included in the payload (only the integer ID). The constitution §9 allowlist was amended in the consultant pass to permit this event; this task lands the code.
+
+Dependencies: T-300, T-301, T-302, T-303 are parallel-safe. T-305 depends on T-304. T-304 depends on T-302 only to avoid merge churn on `RecipeDetailView`; functionally they're independent.
+
+---
+
 ## 11. Out of plan — explicit
 
 These are *not* in this plan and require a plan update before any code is written for them:
 
 - Article view for non-recipe posts (CL-10 said no for v1).
 - iCloud / CloudKit sync (deferred to v2).
-- Cooking mode, shopping list (out of spec).
+- In-app cooking timers (the consultant pass brought Cook Mode's screen-awake half in scope per US-7; per-step countdown timers remain out for v1).
+- Shopping list (out of spec).
 - Watch / Mac / Vision targets (constitution §2).
 - Any analytics SDK besides TelemetryDeck (constitution §9).
 

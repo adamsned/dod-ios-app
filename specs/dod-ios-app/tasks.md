@@ -744,12 +744,67 @@ Each task is a single PR, 1–4 hours of focused work. Field meanings:
 
 ---
 
+## Phase 6 — Consultant pass
+
+Added 2026-05-23 by the consultant-pass amendment. Implements the new spec contracts: CC-9 (visual density), US-7 (Cook Mode), US-8 (Onboarding). Authorized in `clarifications.md` CL-16, CL-17, CL-18. High-level grouping mirrors `plan.md` "Phase 6 work cluster — Consultant pass".
+
+### T-300 — Card visual density (CC-9)
+- **Scope:** Switch Feed / Categories / Search / Saved from 1-column compact (T-150-era) to 2-column compact + 3-column regular. Reduce RecipeCard hero height so ≥3 rows are visible above the fold on iPhone 13 baseline. Snapshot tests at iPhone 13 + iPad 12.9".
+- **Files:** `Packages/DODDesignSystem/Sources/DODDesignSystem/AdaptiveGrid.swift`, `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/RecipeCard.swift`, the four FeatureXxxView files, snapshot suite under `Packages/DODDesignSystem/Tests/`.
+- **AC:** CC-9; visual regression snapshots updated.
+- **Deps:** — (independent of T-301..T-305).
+- **Est:** 3h
+- **||:** F6-cards
+
+### T-301 — App icon placeholder + asset catalog
+- **Scope:** Populate `App/Assets.xcassets/AppIcon.appiconset/` with every required iPhone + iPad size from a single 1024 marketing master (placeholder artwork until the owner ships final). Unblocks TestFlight "missing icon" rejection.
+- **Files:** `App/Assets.xcassets/AppIcon.appiconset/Contents.json`, PNG variants, possibly `Marketing/AppIcon.md`.
+- **AC:** Archive build succeeds with no "missing required icon" warning; closes T-180 part 1.
+- **Deps:** —
+- **Est:** 1h
+- **||:** F6-icon
+
+### T-302 — Recipe detail polish
+- **Scope:** Sticky save + share buttons on `RecipeDetailView` so they remain reachable when scrolled past hero. Hero overlay (title + meta row over a gradient at the bottom of the hero image) anchoring meta at the top of the visible content area. Refines AC-4.1, AC-4.7, AC-4.8 without changing the contract.
+- **Files:** `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/RecipeDetailView.swift`, new `RecipeDetailHero.swift` if cleanly extractable, snapshot tests.
+- **AC:** AC-4.1, AC-4.7, AC-4.8 still pass; new snapshots locked.
+- **Deps:** —
+- **Est:** 3h
+- **||:** F6-detail
+
+### T-303 — Onboarding sheet (US-8)
+- **Scope:** First-launch single-screen modal sheet over Feed. Three bullets, "Get cooking" dismiss button, `dod.onboardingCompletedV1` UserDefaults flag.
+- **Files:** New `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/OnboardingSheet.swift` (or inside `DODFeatureFeed` if cross-app reuse not needed), `App/RootView.swift` (or `App/AppDependencies.swift`) for the flag check + presentation glue, snapshot + unit tests.
+- **AC:** AC-8.1, AC-8.2, AC-8.3.
+- **Deps:** — (T-303 is independent, but reads cleaner once T-300 lands so the underlying Feed looks final in screenshots).
+- **Est:** 3h
+- **||:** F6-onb
+
+### T-304 — Cook Mode (US-7)
+- **Scope:** Full-screen takeover from recipe detail. "Cook Now" CTA, step counter, large step text, ingredients drawer, `isIdleTimerDisabled` toggle with restore-on-exit, swipe + tap step navigation, Done state on last step, shared ingredient-check state with detail.
+- **Files:** New `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/CookModeView.swift` + `CookModeViewModel.swift` + `IdleTimerCoordinator.swift` (UIKit toggle wrapper, mockable), updates to `RecipeDetailView.swift` + `RecipeDetailViewModel.swift` for the Cook Now button and shared check state, snapshot tests, L3 UI smoke test.
+- **AC:** AC-7.1 through AC-7.6.
+- **Deps:** T-302 (merge-order, not functional — both touch `RecipeDetailView`).
+- **Est:** 6h (split across 2 PRs if it grows)
+- **||:** F6-cook
+
+### T-305 — Cook Mode telemetry event
+- **Scope:** Add `cookModeStarted(recipeID: Int)` case to the sealed `AnalyticsEvent` enum. Wire send-site in `CookModeViewModel` to fire exactly once per recipe per session. Unit test asserts single-fire + no raw text in payload.
+- **Files:** `Packages/DODAnalytics/Sources/DODAnalytics/AnalyticsEvent.swift`, `Packages/DODAnalytics/Tests/DODAnalyticsTests/AnalyticsEventTests.swift`, `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/CookModeViewModel.swift` (send-site).
+- **AC:** AC-7.7; constitution §9 allowlist updated in the consultant pass already.
+- **Deps:** T-304.
+- **Est:** 1h
+- **||:** F6-cook
+
+---
+
 ## Summary
 
-- **Total tasks:** 73
-- **Total estimate:** ~143 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) = 79
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) = ~160 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
+- **Phase 6 parallelism:** F6-cards, F6-icon, F6-detail, F6-onb can all run in parallel. F6-cook (T-304, T-305) is the only sequential thread inside Phase 6.
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
