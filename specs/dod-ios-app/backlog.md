@@ -152,14 +152,6 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
   legibility. Size: **S–M** depending on whether the brown gets applied
   cell-level or surface-level.
 
-- **"Saved Recipes" widget description copy.** Current
-  `.configurationDescription(_:)` string on `SavedRecipesWidget` reads
-  awkwardly — needs a rewrite to something more natural. Pure string
-  change in `Widget/SavedRecipesWidget.swift`. Worth a CL noting the
-  rewrite (user-facing widget gallery copy), same pattern CL-36 used
-  for the "Today's Recipe" → "Latest Recipe" rename. Size: **XS**
-  (~30min including the CL).
-
 #### Tests
 
 - **L2 test for new-recipe surfacing.** When a recipe is published on
@@ -238,7 +230,7 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
 | Settings page | L | Splits into multiple T-NNN at spec time |
 | Ratings layout cleanup | S | Amends T-302 |
 | Categories tab brown | S–M | Needs CL on cell-vs-surface tinting |
-| Saved widget description | XS | Single string + CL |
+| ~~Saved widget description~~ | ~~XS~~ | Graduated to US-25 / CL-40 / T-400 |
 | L2 new-recipe test | S | New REG-16 |
 | REG-T-360 widget image | M | Investigate fresh-install transient first |
 | REG-T-390 widget text | M | T-390 was overconfident; T-394 follow-up |
@@ -332,3 +324,16 @@ useful reference.
   Screen, not the home-screen Tinted/Clear pipeline this story
   audits). Clean-audit closure (AC-23.6) explicitly authorized —
   mirror of AC-18.6.
+- **"Saved Recipes" widget description copy rewrite** — became
+  **US-25** (AC-25.1 through AC-25.3) + [CL-40](clarifications.md) +
+  [T-400](tasks.md). Single user-facing string change in
+  `Widget/SavedRecipesWidget.swift`: "Your saved recipes, one tap from
+  a cook." → "Quick access to your saved recipes." per CL-40, which
+  also captured the three rejected alternatives ("at a glance" /
+  "Tap to open…" / "Your bookmarked recipes, right on the home
+  screen"). Amends `AC-17.1` (description string superseded with the
+  same strike-through treatment T-380 applied to `AC-4.7`).
+  Widget-face baselines (`SavedWidgetSnapshotTests`) unaffected — the
+  description string lives in the iOS widget gallery UI, not on the
+  rendered widget face. Same pattern CL-36 established for the
+  "Today's Recipe" → "Latest Recipe" rename.
