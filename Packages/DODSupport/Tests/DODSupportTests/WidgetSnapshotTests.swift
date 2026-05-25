@@ -75,6 +75,85 @@ import Testing
         #expect(store.read() == nil)
     }
 
+    // MARK: - US-21 / T-360 — heroImageFilename additive field
+
+    @Test func entryRoundTripsHeroImageFilename() throws {
+        let defaults = try Self.freshDefaults()
+        let store = WidgetSnapshotStore(defaults: defaults, key: "test.heroFilename")
+        let entry = WidgetSnapshot.Entry(
+            id: 42,
+            title: "Hero filename test",
+            excerpt: "An excerpt.",
+            heroImageURL: URL(string: "https://example.com/img.jpg"),
+            canonicalURL: URL(string: "https://example.com/recipe-42/"),
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            totalTimeDisplay: "10 min",
+            heroImageFilename: "abc123.img"
+        )
+        try store.write(WidgetSnapshot(writtenAt: Date(), entries: [entry]))
+        let read = try #require(store.read())
+        #expect(read.entries.first?.heroImageFilename == "abc123.img")
+    }
+
+    @Test func entryDecodesPayloadFromPreUS21WriterWithoutFilenameField() throws {
+        // Older host binaries (pre-US-21) wrote the entry without the
+        // `heroImageFilename` field. The new decoder must default the
+        // missing field to nil rather than refusing the payload — the
+        // widget can still render via the gradient placeholder for those
+        // entries, but the surrounding entry data (title, excerpt, etc.)
+        // must still come through cleanly.
+        let defaults = try Self.freshDefaults()
+        let key = "test.preUS21"
+        // Build the payload by hand without the `heroImageFilename` key.
+        let legacyPayload: [String: Any] = [
+            "version": WidgetSnapshot.currentVersion,
+            "writtenAt": "2024-01-01T00:00:00Z",  // ISO-8601, no fractional seconds
+            "entries": [
+                [
+                    "id": 7,
+                    "title": "Legacy entry",
+                    "excerpt": "Excerpt",
+                    "publishedAt": "2024-01-01T00:00:00Z",
+                ]
+            ],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: legacyPayload)
+        defaults.set(data, forKey: key)
+        let store = WidgetSnapshotStore(defaults: defaults, key: key)
+        let read = try #require(store.read())
+        let firstEntry = try #require(read.entries.first)
+        #expect(firstEntry.id == 7)
+        #expect(firstEntry.title == "Legacy entry")
+        #expect(firstEntry.heroImageFilename == nil)
+        #expect(firstEntry.heroImageURL == nil)
+    }
+
+    @Test func entryWithFilenameMatchesBridgeFilenameForURL() throws {
+        // Sanity: when the writer populates `heroImageFilename` from
+        // `WidgetImageBridge.filename(for:)`, the round-tripped value is
+        // exactly what the widget consumer expects to resolve against
+        // the App Group container.
+        let url = try #require(URL(string: "https://www.dutchovendaddy.com/img.jpg"))
+        let expected = WidgetImageBridge.filename(for: url)
+        let entry = WidgetSnapshot.Entry(
+            id: 1,
+            title: "x",
+            excerpt: "x",
+            heroImageURL: url,
+            canonicalURL: nil,
+            publishedAt: Date(),
+            totalTimeDisplay: nil,
+            heroImageFilename: expected
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(entry)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let roundTripped = try decoder.decode(WidgetSnapshot.Entry.self, from: data)
+        #expect(roundTripped.heroImageFilename == expected)
+    }
+
     // MARK: - Helpers
 
     private static func freshDefaults() throws -> UserDefaults {

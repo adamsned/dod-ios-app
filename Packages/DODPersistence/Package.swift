@@ -8,12 +8,13 @@ let package = Package(
         .library(name: "DODPersistence", targets: ["DODPersistence"])
     ],
     dependencies: [
-        .package(path: "../DODDomain")
+        .package(path: "../DODDomain"),
+        .package(path: "../DODSupport"),
     ],
     targets: [
         .target(
             name: "DODPersistence",
-            dependencies: ["DODDomain"]
+            dependencies: ["DODDomain", "DODSupport"]
         ),
         .testTarget(name: "DODPersistenceTests", dependencies: ["DODPersistence"]),
     ]

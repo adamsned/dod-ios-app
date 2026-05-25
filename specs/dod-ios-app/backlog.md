@@ -35,8 +35,10 @@ Format suggestion (not enforced):
 > `2190f27`, app icon `1b8e027`, today's-featured widget `e0aebc6`). Moved
 > here when the file relocated under `specs/dod-ios-app/`.
 
-_All four 2026-05-24 captures have graduated to spec-driven work and
-shipped. See "Recently graduated" below for the trail._
+_Five of the six 2026-05-24 captures have graduated to spec-driven
+work and shipped. See "Recently graduated" below for the trail. The
+remaining capture (widget readability under Clear/Tinted home-screen
+appearances) is still open._
 
 ### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
 
@@ -48,36 +50,6 @@ shipped. See "Recently graduated" below for the trail._
   legible. Likely needs `widgetAccentedRenderingMode` / accent-color
   handling. Size: M. Pair with US-18 audit-style framing — produce a
   matrix and fix what fails.
-
-- **"Today's Recipe" widget → rename + show real recipe image.** Two
-  changes to the existing US-9 widget:
-  1. Rename display name from "Today's Recipe" to "Latest Recipe"
-     (less ambiguous about cadence — the widget already reflects the
-     most recent post, not a daily-curated pick).
-  2. The placeholder knife-and-fork glyph should be replaced with the
-     actual recipe hero image. The widget already has the recipe ID;
-     needs the host to ensure the hero image is exported to the App
-     Group container so the widget extension can render it (saved
-     widget hit the same limitation per T-322's nil-filename note).
-  Size: M for the image bridge, S for the rename. Will need a CL on
-  the rename in case anyone has the old name pinned in screenshots
-  or marketing.
-
-- **Heart → bookmark everywhere in the saved-recipes context.**
-  Reverses the in-recipe carve-out from AC-16.3 (which left the
-  navigation-bar Save heart on `RecipeDetailView` intentionally
-  unchanged). The user is now saying the icons should be consistent
-  with the Saved tab — bookmark everywhere. Touches:
-  1. `RecipeDetailView` navigation-bar Save button (AC-4.7 / AC-5.1 —
-     "Save button (heart icon)") — change wording in spec, swap glyph.
-  2. AC-5.8 empty-state copy "Tap the heart on any recipe to save it
-     for offline" — reword to "Tap the bookmark…".
-  3. Audit anywhere else "heart" appears in copy or imagery in
-     saved-context (search results, related-recipes, etc.).
-  This is a deliberate amendment to AC-16.3 — when this graduates,
-  the clarification should explicitly note that CL-24 (which fixed
-  the tab icon) is now extended to the in-recipe surface too. Size: S
-  for the swap; the audit-for-stray-hearts is what makes it M.
 
 ## Recently graduated
 
@@ -126,6 +98,25 @@ useful reference.
   explicitly out of bounds per AC-20.3. Pure SF Symbol swap — no
   layout change, no token change, US-12's AC-12.1..AC-12.6 pinned by
   AC-20.5. Shipped in [#23](https://github.com/adamsned/dod-ios-app/pull/23).
+- **"Today's Recipe" widget → rename + show real recipe image** —
+  became **US-21** (AC-21.1 through AC-21.6) + [T-360](tasks.md), with
+  the file-export image bridge decision (vs shared-SwiftData-container
+  vs widget-side URLSession) captured in
+  [CL-35](clarifications.md) and the display-name rename rationale in
+  [CL-36](clarifications.md). T-360 builds the bridge + wires the
+  featured widget; saved widget consumption is the
+  [T-361](tasks.md) follow-up (same bridge, second consumer — clears
+  T-322's open "Future work" note). Shipped in
+  [#24](https://github.com/adamsned/dod-ios-app/pull/24).
+- **Heart → bookmark everywhere in the saved-recipes context** —
+  became [CL-38](clarifications.md) + amended `AC-4.7`, `AC-5.1`,
+  `AC-5.8`, `AC-8.1`, `AC-16.3` (the last via explicit reversal of
+  T-310's carve-out) + [T-380](tasks.md). Extends CL-24's bookmark
+  decision into every saved-recipes surface: in-recipe nav-bar Save
+  button, sticky floating Save button, Saved tab empty state, Save
+  snackbar wording, onboarding bullet copy, `OpenSavedRecipesIntent`
+  Siri shortcut glyph. Wire-format `widgetOpened` `kind: .saved` and
+  US-11 Live Activity glyphs explicitly out of scope per CL-38.
 - **Lock-screen widget for "Latest Recipe" (rectangular)** — became
   **US-22** (AC-22.1 through AC-22.5) + [T-370](tasks.md), with the
   `.accessoryRectangular`-only family decision (and the reasons

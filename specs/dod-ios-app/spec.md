@@ -90,7 +90,7 @@ The app is **mostly read-only** — every recipe is a tap away without sign-in �
 - **AC-4.4** If the recipe has an embedded video (WPRM video field), then a video player is shown inline above the instructions. Tapping play starts playback; the player respects iOS PiP.
 - **AC-4.5** If the recipe has no video, no empty video block is shown.
 - **AC-4.6** A "Related Recipes" section shows 3–4 recipes from the same primary category at the bottom. Tapping one opens its detail.
-- **AC-4.7** A Save button (heart icon) is in the navigation bar. Tapping toggles saved state with haptic feedback.
+- **AC-4.7** A Save button (bookmark icon) is in the navigation bar. Tapping toggles saved state with haptic feedback. *Amended by CL-38 (T-380, 2026-05-24); supersedes the earlier "heart icon" wording, which was retained in v1 by the carve-out in AC-16.3. Original: ~~"A Save button (heart icon) is in the navigation bar."~~*
 - **AC-4.8** A Share button (native share sheet) is in the navigation bar; sharing exposes the recipe's web URL.
 - **AC-4.9** Recipe detail is fully usable offline if the recipe is saved (per US-5).
 - **AC-4.10** VoiceOver: hero image has a recipe-title alt, ingredient checkboxes announce checked/unchecked state, steps are reachable in order.
@@ -102,14 +102,14 @@ The app is **mostly read-only** — every recipe is a tap away without sign-in �
 **so that** spotty kitchen wifi doesn't break my cook.
 
 **Acceptance criteria:**
-- **AC-5.1** Tapping the Save button (heart) on a recipe detail marks it saved. Tapping again unsaves with a confirmation undo (snackbar).
+- **AC-5.1** Tapping the Save button (bookmark) on a recipe detail marks it saved. Tapping again unsaves with a confirmation undo (snackbar). *Amended by CL-38 (T-380, 2026-05-24); supersedes the earlier "(heart)" wording. Original: ~~"Tapping the Save button (heart) on a recipe detail marks it saved."~~*
 - **AC-5.2** When a recipe is saved, the full recipe payload (text, ingredients, steps, metadata) **and** the hero image are downloaded for offline use within 5 seconds of saving on a normal connection.
 - **AC-5.3** The Saved tab shows all saved recipes, newest-saved-first, in the same row format as the home feed.
 - **AC-5.4** Given the device is offline, when the user taps a saved recipe, then the full recipe detail opens with no network calls and all text + hero image present.
 - **AC-5.5** Inline videos in saved recipes do **not** need to play offline in v1. Show a "Video unavailable offline" placeholder if offline.
 - **AC-5.6** Related recipes section is hidden when offline.
 - **AC-5.7** Saved recipes persist across app launches, reinstalls **not** required (SwiftData store survives normal launch; reinstall wipes saves — known limitation, document in onboarding).
-- **AC-5.8** The Saved tab shows an empty state when no recipes are saved: "Tap the heart on any recipe to save it for offline."
+- **AC-5.8** The Saved tab shows an empty state when no recipes are saved: "Tap the bookmark on any recipe to save it for offline." *Amended by CL-38 (T-380, 2026-05-24). Original: ~~"Tap the heart on any recipe to save it for offline."~~*
 
 ### US-6 — Share a recipe
 **As any** reader,
@@ -205,10 +205,10 @@ Added by the Phase 7 amendment (CL-21, 2026-05-24). The guest-identity model —
 **I want** a brief welcome explaining what the app does,
 **so that** I'm oriented before I land on the feed.
 
-Added by consultant-pass amendment (CL-17, 2026-05-23). Reverses the earlier CL-7 "no onboarding" decision after the consultant pass argued that a single-screen sheet costs almost nothing and helps first-time users recognize the heart-save and search affordances before they need them.
+Added by consultant-pass amendment (CL-17, 2026-05-23). Reverses the earlier CL-7 "no onboarding" decision after the consultant pass argued that a single-screen sheet costs almost nothing and helps first-time users recognize the bookmark-save and search affordances before they need them. *(The original CL-17 wording said "heart-save"; CL-38 / T-380 (2026-05-24) flipped the glyph everywhere in the saved-recipes context, so the rationale now reads "bookmark-save" to stay in lock-step with AC-8.1's user-facing copy.)*
 
 **Acceptance criteria:**
-- **AC-8.1** On the first cold launch — gated by a single `UserDefaults` flag `dod.onboardingCompletedV1` — the app presents a single-screen modal sheet over the Feed. The sheet contains a friendly welcome line and exactly three bullets: "Browse the latest recipes from dutchovendaddy.com", "Search for what you're craving", and "Tap the heart to save any recipe for offline cooking".
+- **AC-8.1** On the first cold launch — gated by a single `UserDefaults` flag `dod.onboardingCompletedV1` — the app presents a single-screen modal sheet over the Feed. The sheet contains a friendly welcome line and exactly three bullets: "Browse the latest recipes from dutchovendaddy.com", "Search for what you're craving", and "Tap the bookmark to save any recipe for offline cooking". *Amended by CL-38 (T-380, 2026-05-24); the third bullet's "heart" wording is superseded so the onboarding affordance lines up with the post-T-380 glyph everywhere else. Original third bullet: ~~"Tap the heart to save any recipe for offline cooking"~~*
 - **AC-8.2** A "Get cooking" primary button dismisses the sheet and sets `dod.onboardingCompletedV1 = true`. All future cold launches go straight to Feed with no sheet.
 - **AC-8.3** iPad first launch shows the same single-screen sheet (same content, same flag) — no separate iPad onboarding flow. The sheet sizes appropriately for iPad via standard SwiftUI `.sheet` presentation; the flag is shared with iPhone since saves and UserDefaults are per-install (consistent with AC-5.7 / CL-5).
 
@@ -263,7 +263,7 @@ Added post-Phase 6 (2026-05-24). Aesthetic + ergonomic refinement; no new data, 
 **Acceptance criteria:**
 - **AC-16.1** Tab order on the bottom bar is **Recipes → Categories → Saved → Search** (Saved moves from position 4 to position 3; Search moves from position 3 to position 4). The `AppTab.allCases` order is the single source of truth and is what changes.
 - **AC-16.2** The "Saved" tab uses SF Symbol `bookmark` when unselected and `bookmark.fill` when selected. Selection-aware variants follow the same pattern as existing system tabs (no custom asset).
-- **AC-16.3** The in-recipe Save affordance (`AC-4.7`, navigation-bar heart) is **unchanged in v1** — only the tab icon flips. Revisiting the in-recipe icon is a follow-up if it feels inconsistent in user testing; left out to keep this change reversible and surface a single decision at a time.
+- **AC-16.3** The in-recipe Save affordance (per `AC-4.7`) also uses `bookmark` / `bookmark.fill`, matching the Saved tab icon (AC-16.2) and every other saved-recipes surface. *Amended by CL-38 (T-380, 2026-05-24); supersedes the earlier carve-out from T-310 that kept the in-recipe heart in v1 — the "follow-up if it feels inconsistent" hedge in the original wording is the lineage being executed here. Original: ~~"The in-recipe Save affordance (`AC-4.7`, navigation-bar heart) is **unchanged in v1** — only the tab icon flips. Revisiting the in-recipe icon is a follow-up if it feels inconsistent in user testing; left out to keep this change reversible and surface a single decision at a time."~~*
 - **AC-16.4** Telemetry: `AppTab.telemetryName` mapping is unchanged (`"saved"` stays `"saved"`); the change is purely visual + ordering, so existing screen-view event counts remain comparable across the change.
 - **AC-16.5** L4 snapshot tests cover the tab bar in both light and dark appearance, iPhone 13 + iPad 12.9", with each tab selected. Baselines are updated as part of the implementing PR (intentional visual change).
 - **AC-16.6** L3 UI smoke test asserts the third tab from the left opens Saved (was Search) and the fourth opens Search (was Saved), guarding against accidental re-ordering in a future refactor.
@@ -329,6 +329,32 @@ Added post-Phase 9 (2026-05-24). The Search tab's category filter chip (and the 
 - **AC-20.3** The `questionmark.folder` glyph used by the `.noResults` `EmptyState` (line ~74 of `SearchView.swift`) is **not** changed by this story — that glyph denotes a generic search-not-found state, not a category-filter chip, and the iOS-stock pattern there is `questionmark.folder` or `magnifyingglass`. Out of bounds; called out explicitly to prevent scope creep.
 - **AC-20.4** L4 snapshot coverage exists for `FilterChipRow` in both selected and unselected states across light + dark appearances at default Dynamic Type on iPhone 13 baseline (4 PNGs total). The existing T-332 full-screen `SearchViewSnapshotTests` baselines are owned by T-335 and are **not** committed by this PR — focused chip-only baselines are added in a new `FilterChipRowSnapshotTests` file to lock the iconography without colliding with T-335's wider deliverable.
 - **AC-20.5** US-12's existing acceptance criteria (AC-12.1 ingredient-aware ranking, AC-12.2 filter chips above results, AC-12.3 filters compose without network, AC-12.4 recent searches + idle suggestions, AC-12.5 200ms local-pass budget, AC-12.6 telemetry contract) are **not regressed**. The implementing PR's existing `SearchViewModelTests` + `SearchFiltersTests` + `SearchResultMergerTests` + `RecentSearchesTests` suites still pass against the new view; no view-model or filter-logic code is touched.
+
+### US-21 — Featured-recipe widget renders the actual hero image (Latest Recipe rename)
+**As a** Returning Reader,
+**I want** the home-screen featured widget to show the actual recipe hero image (not a placeholder glyph), and to be labeled "Latest Recipe" so I know it reflects the newest post,
+**so that** my home screen looks like a real recipe widget and the name matches what it actually shows.
+
+Added 2026-05-24 (post-Phase 9). Refines the existing US-9 "Today's Recipe" widget on two axes:
+
+1. **Display-name rename** — "Today's Recipe" → "Latest Recipe." The widget already reflects whatever sits at the top of the WP feed (i.e. the newest post), not a daily-curated pick. The "Today's" name implied a cadence the widget never honored; "Latest" matches what it actually shows. CL-36 captures the rationale.
+2. **Real hero image render** — the widget currently shows the knife-and-fork placeholder glyph (`fork.knife` over a gradient) instead of the recipe's hero image. The widget's `WidgetCard.Hero` view supports an image URL but the snapshot wire format carries only a remote `heroImageURL` — feeding that to `AsyncImage` inside the widget extension would trigger a network fetch on every timeline reload, which constitution §9 implicit and AC-17.6's "no network calls from the widget extension itself" forbid by analogy. The fix is a **file-export image bridge** so the widget reads cached bytes from the shared App Group container instead. CL-35 captures the bridge choice (file-export vs shared-SwiftData-container vs widget-side URLSession) and why the file-export option wins.
+
+US-9's existing acceptance criteria (AC-9.1 small + medium sizes, AC-9.2 deep-link routing, AC-9.3 4-hour timeline + app-driven reload, AC-9.4 placeholder fallback) are **not regressed**. AC-21.5 explicitly pins them.
+
+**Acceptance criteria:**
+- **AC-21.1** The featured-recipe widget's `.configurationDisplayName(_:)` is "Latest Recipe" (was "Today's Recipe"). Description copy stays unchanged ("See the latest Dutch Oven Daddy recipe right on your home screen.") — only the display name changes. Users picking the widget from the iOS gallery see the new name; existing widgets installed before the rename pick up the new name on the next system widget-gallery refresh (system-managed, not app-controlled).
+- **AC-21.2** When the host has cached a recipe's hero image bytes (via the existing `RecipeStore.cacheImage(url:bytes:)` path used by the saved-recipes pre-download AC-5.2 and by any in-app feed/detail image load), those bytes are **also** written as a file inside the shared App Group container under a deterministic filename derived from the image URL. The filename is plumbed into the widget snapshot the host writes after every successful feed load (US-9 / AC-9.3 — the existing `WidgetSnapshotStore.write` call site in `LiveFeedDependencies.publishWidgetSnapshot(items:)`).
+- **AC-21.3** The featured-recipe widget extension's `WidgetCard.Hero` view resolves the snapshot's filename into a `file://` URL pointing at the App Group container and renders the image via `AsyncImage`. The widget extension makes **no** network calls. When the filename is `nil` (first launch, app group missing, image bytes not yet cached for the top-of-feed recipe), the widget falls back to the existing knife-and-fork gradient placeholder — same view, no visual change for the empty case.
+- **AC-21.4** Image bridge eviction stays aligned with the existing image cache budget (NFR-2 / 200 MB). When `RecipeStore.evictImagesIfNeeded()` deletes a `CachedImage` row, the corresponding App Group file is also deleted so the two stores never drift. The bridge is a write-through cache, not an independent store.
+- **AC-21.5** US-9's existing ACs (AC-9.1 through AC-9.4) are **not regressed**. The display-name change does not alter the widget kind, the supported families, the deep-link grammar, the timeline cadence, or the placeholder fallback. Existing snapshot baselines for `WidgetCard.Placeholder` and `WidgetCard.Small/Medium` with `heroImageURL: nil` continue to render identically (no diff). New baselines cover the populated-with-real-image case.
+- **AC-21.6** L1 unit tests cover the image bridge: writing image bytes via the host store also writes the file to the App Group container; the filename is deterministic for a given URL; eviction removes both the SwiftData row and the file; reading a filename from a snapshot resolves to a valid `file://` URL inside the container; absent files fall back to nil. L4 snapshot baselines for the featured widget's small + medium populated states are re-recorded against the real-image render path (was: hero gradient; now: actual image bytes from the bridge under test fixtures).
+
+**Constitution + spec notes:**
+- The host-side App-Group file write happens inside `RecipeStore.cacheImage(...)` — bytes flow through the existing single-writer entry point so there's no second pathway to keep in sync.
+- The widget extension makes **no** network calls in any of its code paths (still true with AC-21.3 — `file://` is a local read, not a network fetch).
+- No new analytics events. The widget tap still fires `widgetOpened(kind: "featured", recipeID:)` per AC-17.9.
+- Saved widget bridge consumption — T-322's `SavedRecipesWidgetPublisher` left `heroImageFilename: nil` with an explicit follow-up note ("Future work: write image files to the App Group container on `preDownloadImages` and use that filename here. T-321 (widget extension) will need to read the file once it exists."). This story builds the bridge but **wires only the featured widget**. A follow-up entry in `tasks.md` covers the saved-widget consumption so both widgets eventually render real images — same bridge, two consumers.
 
 ### US-22 — Latest-recipe lock-screen widget
 **As a** Returning Reader,

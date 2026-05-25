@@ -209,6 +209,42 @@ struct RecentlyViewedTests {
         let pinned = try await store.image(url: pinnedURL)
         #expect(pinned != nil, "Pinned image must remain available")
     }
+
+    // MARK: - US-21 / T-360 — WidgetImageBridge integration
+
+    @Test func cacheImageStillSucceedsWhenAppGroupContainerUnavailable() async throws {
+        // The widget image bridge writes a side-effect file inside the
+        // shared App Group container; in unit tests the container is
+        // unavailable (no entitlement) and the bridge silently no-ops.
+        // The contract is that `cacheImage(...)` itself must NEVER fail
+        // because of a bridge-side error — the SwiftData write is the
+        // authoritative path and the file is best-effort. This test pins
+        // that contract by exercising a normal `cacheImage` flow and
+        // asserting both the SwiftData round-trip and the
+        // bridge-no-op-doesn't-throw behavior (the absence of an
+        // exception IS the assertion — Swift Testing fails the test on
+        // any thrown error).
+        let store = try await makeStore()
+        let url = URL(string: "https://example.com/bridge-noop.jpg") ?? URL(filePath: "/")
+        let bytes = Data([0xFF, 0xD8, 0xFF])
+        try await store.cacheImage(url: url, bytes: bytes)
+        let read = try await store.image(url: url)
+        #expect(read == bytes, "SwiftData read must still work when the App Group bridge is no-op")
+    }
+
+    @Test func evictImagesStillSucceedsWhenAppGroupContainerUnavailable() async throws {
+        // Same contract on the eviction side — the bridge's file delete
+        // is best-effort and must never block the SwiftData row delete.
+        let store = try await makeStore()
+        let url = URL(string: "https://example.com/evict-noop.jpg") ?? URL(filePath: "/")
+        try await store.cacheImage(url: url, bytes: Data(repeating: 0xAA, count: 256))
+        // No-throw assertion — the eviction path must complete cleanly
+        // even when the bridge's file delete returns false.
+        try await store.evictImagesIfNeeded()
+        // The image is well under the 200 MB budget so it's still there.
+        let read = try await store.image(url: url)
+        #expect(read != nil)
+    }
 }
 
 @Suite("RecipeStore blocklist (T-076, AC-1.7)") struct BlocklistTests {

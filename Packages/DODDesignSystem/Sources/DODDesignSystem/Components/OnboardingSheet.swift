@@ -11,7 +11,7 @@ import SwiftUI
 public struct OnboardingSheet: View {
 
     /// One row of the three-bullet rundown. `systemImage` is an SF Symbol
-    /// name (e.g. `house.fill`, `magnifyingglass`, `heart.fill`).
+    /// name (e.g. `house.fill`, `magnifyingglass`, `bookmark.fill`).
     public struct Bullet: Identifiable {
         public let id: String
         public let systemImage: String
@@ -131,9 +131,9 @@ public struct OnboardingSheet: View {
                 caption: "Type any ingredient or technique to filter."
             ),
             .init(
-                systemImage: "heart.fill",
+                systemImage: "bookmark.fill",
                 title: "Save for offline",
-                caption: "Tap the heart on any recipe to cook it without Wi-Fi."
+                caption: "Tap the bookmark on any recipe to cook it without Wi-Fi."
             ),
         ],
         ctaTitle: "Get cooking",

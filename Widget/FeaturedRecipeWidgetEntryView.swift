@@ -50,10 +50,21 @@ struct FeaturedRecipeWidgetEntryView: View {
     }
 
     static func content(from recipe: WidgetSnapshot.Entry) -> WidgetCard.Content {
-        WidgetCard.Content(
+        // Resolve the bridged filename into a `file://` URL pointing at
+        // the shared App Group container (spec.md AC-21.3). `AsyncImage`
+        // against a `file://` URL is a local read — not a network fetch
+        // — so the widget extension keeps its no-network contract
+        // (constitution §9 implicit, AC-17.6 analog). When the filename
+        // is nil OR the file is absent OR the App Group container can't
+        // be located, `WidgetCard.Hero` renders the gradient placeholder
+        // fallback (AC-21.3, AC-21.5 — placeholder behavior unchanged).
+        let heroFileURL = recipe.heroImageFilename.flatMap {
+            WidgetImageBridge.fileURL(forFilename: $0)
+        }
+        return WidgetCard.Content(
             title: recipe.title,
             excerpt: recipe.excerpt,
-            heroImageURL: recipe.heroImageURL,
+            heroImageURL: heroFileURL,
             totalTimeDisplay: recipe.totalTimeDisplay
         )
     }

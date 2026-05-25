@@ -20,7 +20,7 @@ For each device size, capture these screens in this order (so the carousel tells
 2. **Recipe detail** (something visually appealing — the bourbon berry brown sugar cake is a known good one). Scrolled so the hero image and the start of the ingredients list are both visible.
 3. **Recipe detail** scrolled to the instructions, ideally with one ingredient checked off so the UI tells you what's interactive.
 4. **Search** showing a search like "skillet" with multiple matched results.
-5. **Saved** with 3–4 saved recipes, plus the home button glimpse showing the heart-filled state.
+5. **Saved** with 3–4 saved recipes, plus the home button glimpse showing the bookmark-filled state.
 
 ## How to capture
 

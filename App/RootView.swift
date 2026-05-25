@@ -103,9 +103,9 @@ struct RootView: View {
             caption: "Type any ingredient or technique to filter."
         ),
         .init(
-            systemImage: "heart.fill",
+            systemImage: "bookmark.fill",
             title: "Save for offline",
-            caption: "Tap the heart on any recipe to cook it without Wi-Fi."
+            caption: "Tap the bookmark on any recipe to cook it without Wi-Fi."
         ),
     ]
 
