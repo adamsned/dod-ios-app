@@ -129,4 +129,4 @@ useful reference.
   [CL-33](clarifications.md). Layout-pass only — no `DODDesignSystem`
   token churn, no `CategoryRecipesView` change, US-2's
   AC-2.1..AC-2.5 explicitly pinned by AC-19.4. Shipped in
-  [#XX](https://github.com/adamsned/dod-ios-app/pull/XX).
+  [#22](https://github.com/adamsned/dod-ios-app/pull/22).
