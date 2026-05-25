@@ -96,6 +96,14 @@ public struct LiveFeedDependencies: FeedDependencies {
         // The widget displays one recipe today but the snapshot reserves
         // room for ``WidgetSnapshotConfig.maxEntries`` so we can rotate
         // through them later without changing the wire format. AC-9.3.
+        //
+        // `heroImageFilename` is populated from the URL via
+        // ``WidgetImageBridge.filename(for:)`` for every entry that has
+        // a `heroImage`, regardless of whether the bytes are currently
+        // on disk. The widget reads the file by name and falls back to
+        // the gradient placeholder if absent (AC-21.3). Keeping this
+        // pure (no I/O) lets the snapshot writer stay free of any
+        // file-system dependency.
         let entries = items.prefix(WidgetSnapshotConfig.maxEntries).map {
             WidgetSnapshot.Entry(
                 id: $0.id,
@@ -104,7 +112,8 @@ public struct LiveFeedDependencies: FeedDependencies {
                 heroImageURL: $0.heroImage,
                 canonicalURL: $0.canonicalURL,
                 publishedAt: $0.publishedAt,
-                totalTimeDisplay: $0.totalTimeDisplay
+                totalTimeDisplay: $0.totalTimeDisplay,
+                heroImageFilename: $0.heroImage.map(WidgetImageBridge.filename(for:))
             )
         }
         guard let widgetStore else {

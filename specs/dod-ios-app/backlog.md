@@ -40,13 +40,6 @@ shipped. See "Recently graduated" below for the trail._
 
 ### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
 
-- **Search tab — `tag.fill` instead of folder icon on tags.** The
-  current folder SF Symbol on the tag chips reads as "navigate into a
-  folder" rather than "filter by tag" — pure SF Symbol swap to
-  `tag.fill` should fix the affordance. Size: S. Verify the chip
-  visuals still balance with the symbol's bounding box; if not, may
-  need spacing tweaks too.
-
 - **Widget readability under "Clear" and "Tinted" home-screen
   appearances.** iOS 18+ home-screen icon/widget modes (Clear, Tinted,
   Dark beyond standard dark mode) wash out the existing widget cards.
@@ -55,20 +48,6 @@ shipped. See "Recently graduated" below for the trail._
   legible. Likely needs `widgetAccentedRenderingMode` / accent-color
   handling. Size: M. Pair with US-18 audit-style framing — produce a
   matrix and fix what fails.
-
-- **"Today's Recipe" widget → rename + show real recipe image.** Two
-  changes to the existing US-9 widget:
-  1. Rename display name from "Today's Recipe" to "Latest Recipe"
-     (less ambiguous about cadence — the widget already reflects the
-     most recent post, not a daily-curated pick).
-  2. The placeholder knife-and-fork glyph should be replaced with the
-     actual recipe hero image. The widget already has the recipe ID;
-     needs the host to ensure the hero image is exported to the App
-     Group container so the widget extension can render it (saved
-     widget hit the same limitation per T-322's nil-filename note).
-  Size: M for the image bridge, S for the rename. Will need a CL on
-  the rename in case anyone has the old name pinned in screenshots
-  or marketing.
 
 - **Lock-screen widget for "Latest Recipe" (rectangular).** Add a
   rectangular-family lock-screen widget that shows the latest
@@ -114,6 +93,29 @@ useful reference.
   token churn, no `CategoryRecipesView` change, US-2's
   AC-2.1..AC-2.5 explicitly pinned by AC-19.4. Shipped in
   [#22](https://github.com/adamsned/dod-ios-app/pull/22).
+- **Search tab — `tag.fill` instead of folder icon on tags** — became
+  **US-20** (AC-20.1 through AC-20.5) + [T-350](tasks.md), with the
+  glyph-choice rationale (`tag.fill` over `tag` / `number` /
+  `crop.rotate` / keeping `folder`) captured in
+  [CL-34](clarifications.md). What the backlog called "tags" turned
+  out to be WordPress *categories* in code (Search v1 surfaces only
+  the category taxonomy per CL-3); the same `folder` glyph appears on
+  both the `FilterChipRow.categoryChip` and the `IdleSuggestionsView`
+  "Try" category-suggestion pills, and both swap to `tag.fill` in this
+  PR. The `.noResults` `questionmark.folder` empty-state glyph is
+  explicitly out of bounds per AC-20.3. Pure SF Symbol swap — no
+  layout change, no token change, US-12's AC-12.1..AC-12.6 pinned by
+  AC-20.5. Shipped in [#23](https://github.com/adamsned/dod-ios-app/pull/23).
+- **"Today's Recipe" widget → rename + show real recipe image** —
+  became **US-21** (AC-21.1 through AC-21.6) + [T-360](tasks.md), with
+  the file-export image bridge decision (vs shared-SwiftData-container
+  vs widget-side URLSession) captured in
+  [CL-35](clarifications.md) and the display-name rename rationale in
+  [CL-36](clarifications.md). T-360 builds the bridge + wires the
+  featured widget; saved widget consumption is the
+  [T-361](tasks.md) follow-up (same bridge, second consumer — clears
+  T-322's open "Future work" note). Shipped in
+  [#24](https://github.com/adamsned/dod-ios-app/pull/24).
 - **Heart → bookmark everywhere in the saved-recipes context** —
   became [CL-38](clarifications.md) + amended `AC-4.7`, `AC-5.1`,
   `AC-5.8`, `AC-8.1`, `AC-16.3` (the last via explicit reversal of
