@@ -154,18 +154,8 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
 
 #### Tests
 
-- **L2 test for new-recipe surfacing.** When a recipe is published on
-  dutchovendaddy.com, verify the app's feed (US-1 `/wp/v2/posts` query)
-  picks it up. Lives in the existing **L2 nightly live-API tier**
-  (constitution §6 / AC-T3). Tags as `live-api`; doesn't gate PRs but
-  surfaces contract drift early. Approach: read the WP feed's newest
-  post id at test time, assert it's present in the app's `RecipeStore`
-  after a `feed.refresh()`. Companion check: post's `_embed`'d
-  `wp:featuredmedia` round-trips into a non-nil `heroImage` (already
-  pinned by `REG-2` but worth re-asserting against the newest post on
-  every nightly run, not just the fixture). Size: **S** (~2h — one new
-  test plus the helper that fetches "newest post id"). New regression
-  ID: `REG-16`.
+_(empty — the L2 new-recipe-surfacing test graduated to REG-16 / T-420;
+see "Recently graduated" below.)_
 
 #### Regression reports — work that just shipped but the user still sees broken
 
@@ -231,7 +221,7 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
 | Ratings layout cleanup | S | Amends T-302 |
 | Categories tab brown | S–M | Needs CL on cell-vs-surface tinting |
 | ~~Saved widget description~~ | ~~XS~~ | Graduated to US-25 / CL-40 / T-400 |
-| L2 new-recipe test | S | New REG-16 |
+| ~~L2 new-recipe test~~ | ~~S~~ | Graduated to REG-16 / CL-43 / T-420 |
 | REG-T-360 widget image | M | Investigate fresh-install transient first |
 | REG-T-390 widget text | M | T-390 was overconfident; T-394 follow-up |
 
@@ -337,3 +327,18 @@ useful reference.
   description string lives in the iOS widget gallery UI, not on the
   rendered widget face. Same pattern CL-36 established for the
   "Today's Recipe" → "Latest Recipe" rename.
+- **L2 test for new-recipe surfacing** — became regression
+  [`REG-16`](spec.md) (no new US — this is a test mandate, not a
+  feature) + [`CL-43`](clarifications.md) (why a live newest-post L2
+  test in addition to REG-2's fixture-based one) + [`T-420`](tasks.md)
+  under the Phase 10 cluster. New L2 test methods live alongside the
+  existing `LiveAPITests` suite (constitution §6 L2 tier, gated by
+  the same `DOD_RUN_LIVE_TESTS=1` env var, picked up by the existing
+  `nightly-live-api.yml` workflow per AC-T3). Two methods:
+  `newestPostIsReachableViaFeedRefresh` (asserts the WP REST newest
+  post id round-trips through `WPRestClient.posts()` +
+  `RecipeStore.cache(listItems:)` + `RecipeStore.listItems(forIDs:)`,
+  the production feed-load path), and `newestPostHasNonNilHeroImage`
+  (re-asserts REG-2's hero-image invariant against the live newest
+  post on every nightly run, not just the fixture's "at least half
+  pass" gate).
