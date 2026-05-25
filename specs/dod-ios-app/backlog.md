@@ -141,17 +141,6 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
     its call site in `RecipeDetailView`. Amends the post-Phase-6 T-302
     "polish" decision. Size: **S** (~1h).
 
-- **Categories tab brown.** The categories list cells + the
-  `.searchable` field background in the Categories tab should pick up
-  the same brown used by the recipe cards in the main Recipes tab
-  (probably `DODColor.castIronBrown` per the existing palette). T-340
-  picked iOS-stock `.insetGrouped` styling which uses the system grouped
-  background; this would override to match the brand surface. Worth a
-  CL on whether this should be a global `.scrollContentBackground`
-  override or per-cell tinting — both have implications for dark mode
-  legibility. Size: **S–M** depending on whether the brown gets applied
-  cell-level or surface-level.
-
 - **"Saved Recipes" widget description copy.** Current
   `.configurationDescription(_:)` string on `SavedRecipesWidget` reads
   awkwardly — needs a rewrite to something more natural. Pure string
@@ -237,7 +226,6 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
 |---|---|---|
 | Settings page | L | Splits into multiple T-NNN at spec time |
 | Ratings layout cleanup | S | Amends T-302 |
-| Categories tab brown | S–M | Needs CL on cell-vs-surface tinting |
 | Saved widget description | XS | Single string + CL |
 | L2 new-recipe test | S | New REG-16 |
 | REG-T-360 widget image | M | Investigate fresh-install transient first |
@@ -332,3 +320,15 @@ useful reference.
   Screen, not the home-screen Tinted/Clear pipeline this story
   audits). Clean-audit closure (AC-23.6) explicitly authorized —
   mirror of AC-18.6.
+- **Categories tab brown** — became **US-24** (AC-24.1 through AC-24.6) +
+  [CL-40](clarifications.md) + [T-430](tasks.md). Surface-color pass that
+  amends T-340's `.insetGrouped` layout on one axis: the scroll surface
+  around the inset-grouped row cards AND the area behind the `.searchable`
+  field adopt `DODColor.castIronBrown` (the same token the recipe-card
+  time chip, offline banner, snackbar, and search filter chip use). The
+  surface-vs-cell-level tinting decision is captured in CL-40 — surface
+  wins because cell-level can't reach the `.searchable` field's container,
+  and repainting cells would blow row-text contrast in both light and
+  dark modes (the brand brown does not vary by appearance). Six
+  `CategoryListViewSnapshotTests` baselines re-recorded; row text + cells
+  + filter logic + view model untouched per AC-24.4.
