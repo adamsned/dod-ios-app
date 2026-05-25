@@ -36,6 +36,15 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         public let canonicalURL: URL?
         public let publishedAt: Date
         public let totalTimeDisplay: String?
+        /// Filename (not full path) of the hero image bytes the host
+        /// wrote into the App Group container via ``WidgetImageBridge``.
+        /// `nil` means no bytes have been bridged yet for this URL — the
+        /// widget renders its gradient placeholder rather than chasing a
+        /// network fetch (spec.md AC-21.3 + AC-17.6 forbid widget-side
+        /// network). Additive field added by US-21 / T-360; older decoders
+        /// that don't know about the field still parse the rest of the
+        /// payload via Codable's default-value handling for missing keys.
+        public let heroImageFilename: String?
 
         public init(
             id: Int,
@@ -44,7 +53,8 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
             heroImageURL: URL?,
             canonicalURL: URL?,
             publishedAt: Date,
-            totalTimeDisplay: String?
+            totalTimeDisplay: String?,
+            heroImageFilename: String? = nil
         ) {
             self.id = id
             self.title = title
@@ -53,6 +63,30 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
             self.canonicalURL = canonicalURL
             self.publishedAt = publishedAt
             self.totalTimeDisplay = totalTimeDisplay
+            self.heroImageFilename = heroImageFilename
+        }
+
+        // Custom decoder so the new `heroImageFilename` field defaults to
+        // nil when reading a snapshot written by a pre-US-21 host (the
+        // wire-format version stays at 1 because the change is purely
+        // additive — older readers ignore the field, older writers omit
+        // it, both keep working).
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = try container.decode(Int.self, forKey: .id)
+            self.title = try container.decode(String.self, forKey: .title)
+            self.excerpt = try container.decode(String.self, forKey: .excerpt)
+            self.heroImageURL = try container.decodeIfPresent(URL.self, forKey: .heroImageURL)
+            self.canonicalURL = try container.decodeIfPresent(URL.self, forKey: .canonicalURL)
+            self.publishedAt = try container.decode(Date.self, forKey: .publishedAt)
+            self.totalTimeDisplay = try container.decodeIfPresent(
+                String.self,
+                forKey: .totalTimeDisplay
+            )
+            self.heroImageFilename = try container.decodeIfPresent(
+                String.self,
+                forKey: .heroImageFilename
+            )
         }
     }
 }

@@ -963,7 +963,7 @@ Single-task cluster for US-19 / CL-31..33. Layout-pass over `CategoryListView`, 
 
 ## Phase 10 — Search + widget polish (2026-05-24)
 
-Cluster for small visual / iconography fixes the backlog flagged after Phase 9 closed. Items here are single-PR scoped and independent — they only share a phase so the file structure stays readable as the post-launch polish list grows.
+Cluster for small visual / iconography fixes the backlog flagged after Phase 9 closed. Items here are single-PR scoped and mostly independent — they share a phase so the file structure stays readable as the post-launch polish list grows. T-360 + T-361 form an internal sub-cluster (latest-recipe widget + image bridge); other entries are standalone.
 
 ### T-350 — Search filter chip iconography (US-20)
 - **Scope:** Pure SF Symbol swap on the Search tab's two category-flavored surfaces. (1) `FilterChipRow.categoryChip` `systemImage` argument: `"folder"` → `"tag.fill"` so the chip glyph reads as "filter by taxonomy" instead of "navigate into a folder" (CL-34). (2) `IdleSuggestionsView`'s "Try" section pill builder call site: `pill(text: category.name, systemImage: "folder")` → `pill(text: category.name, systemImage: "tag.fill")` so the idle-state category suggestions match the filter chip glyph. The `.noResults` `EmptyState` `questionmark.folder` glyph is explicitly **not** touched per AC-20.3 — it denotes a search-not-found state, not a category filter. No layout change, no token change, no view-model change; the surrounding chip text, menu contents, `isOn` selected-state fill, accessibility labels, and pill action handlers are byte-for-byte preserved. Tests: add `FilterChipRowSnapshotTests` with 4 chip-only PNG baselines (selected + unselected × light + dark, default Dynamic Type, iPhone 13 baseline). Existing `SearchViewSnapshotTests` baselines remain owned by T-335 — those PNGs are **not** committed by this PR (mirrors the T-340 / CategoryRecipesView precedent where a sim-recorded PNG outside the task's deliverable was left untracked).
@@ -973,18 +973,43 @@ Cluster for small visual / iconography fixes the backlog flagged after Phase 9 c
 - **Est:** 1h
 - **||:** P10-search
 
+### T-360 — Latest Recipe widget: rename + real hero image (US-21)
+- **Scope:** Two changes to the existing US-9 featured widget, plus a shared image bridge that both widgets can later consume.
+  1. **Rename.** `FeaturedRecipeWidget.configurationDisplayName(_:)` "Today's Recipe" → "Latest Recipe" (AC-21.1).
+  2. **Image bridge (CL-35).** New `WidgetImageBridge` helper in `DODSupport` exposing a deterministic filename for a given image URL (`SHA256(urlString) + ".jpg"`) and a `containerURL(forSecurityApplicationGroupIdentifier:)`-backed file URL resolver. The bridge is a pure library — no I/O methods beyond reading. Writes happen inside `RecipeStore.cacheImage(url:bytes:...)`: after the SwiftData insert/update, write the same bytes to the App Group container at the deterministic filename. Eviction inside `RecipeStore.evictImagesIfNeeded()` deletes the corresponding file alongside the SwiftData row (AC-21.4). Both file write and file delete are best-effort — they log on failure but never throw past SwiftData.
+  3. **Snapshot wire format.** `WidgetSnapshot.Entry` gains an additive optional `heroImageFilename: String?` field. Existing readers (any out-of-date widget binary against a new host payload) ignore unknown fields. The version tag bumps so older host binaries against a new widget read the snapshot as version-mismatched and fall back to the placeholder — same contract as today.
+  4. **Snapshot writer.** `LiveFeedDependencies.publishWidgetSnapshot(items:)` computes the filename for each `RecipeListItem`'s `heroImage` URL via `WidgetImageBridge.filename(for:)` and populates the new field. The filename is populated whether or not the file currently exists on disk — the widget reads the file by name and falls back to the placeholder gradient if absent (AC-21.3). This keeps the snapshot writer pure (no I/O dependency).
+  5. **Widget render.** `FeaturedRecipeWidgetEntryView` resolves `entry.recipe.heroImageFilename` into a `file://` URL via `WidgetImageBridge.fileURL(forFilename:)` and passes it to the existing `WidgetCard.Content.heroImageURL`. The render path inside `WidgetCard.Hero` is unchanged — `AsyncImage` against a `file://` URL is a local read (AC-21.3, no widget-side network). Existing snapshot baselines for `WidgetCard.Small/Medium` with `heroImageURL: nil` are unaffected (the empty case still renders the gradient placeholder).
+- **Files:**
+  - **Spec/clarifications/tasks/backlog (commit 1):** `specs/dod-ios-app/spec.md` (US-21), `specs/dod-ios-app/clarifications.md` (CL-35, CL-36), `specs/dod-ios-app/tasks.md` (this entry + T-361), `specs/dod-ios-app/backlog.md` (graduation).
+  - **Source (commit 2):** `Packages/DODSupport/Sources/DODSupport/WidgetImageBridge.swift` (new, ~50 LOC); `Packages/DODSupport/Sources/DODSupport/WidgetSnapshot.swift` (add `heroImageFilename` to `Entry`, no other shape change); `Packages/DODPersistence/Sources/DODPersistence/RecipeStore.swift` (file write on cache, file delete on evict); `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FeedDependencies.swift` (snapshot writer populates filename); `Widget/FeaturedRecipeWidget.swift` (display name); `Widget/FeaturedRecipeWidgetEntryView.swift` (filename → file URL).
+  - **Tests (commit 2):** `Packages/DODSupport/Tests/DODSupportTests/WidgetImageBridgeTests.swift` (new); `Packages/DODSupport/Tests/DODSupportTests/WidgetSnapshotTests.swift` (additive — round-trip with the new filename field); `Packages/DODPersistence/Tests/DODPersistenceTests/RecipeStoreTests.swift` (extend — assert cache writes a file, evict removes it); `Packages/DODDesignSystem/Tests/DODDesignSystemTests/SnapshotTests.swift` (re-record the populated-with-image baselines using a fixture image; placeholder baseline unaffected).
+  - **Out of bounds:** `Widget/SavedRecipesWidget.swift` and its entry view + `SavedRecipesWidgetPublisher.swift` — saved-widget consumption is T-361's deliverable (the bridge is built here, just not wired on that surface). Lock-screen widget code (T-370, parallel branch `feat/T-370-lock-screen-widget`) — lock-screen widgets are text-only and don't need the bridge.
+- **AC:** AC-21.1, AC-21.2, AC-21.3, AC-21.4, AC-21.5, AC-21.6; pins AC-9.1..AC-9.4 (US-9), AC-17.6 (US-17 widget-side no-network contract).
+- **Deps:** — (independent; runs against current main).
+- **Est:** 4h
+- **||:** P10-latest-widget
+
+### T-361 — Saved-recipes widget: consume image bridge (US-21 follow-up, US-17 polish)
+- **Scope:** Wire `SavedRecipesWidgetPublisher.toSnapshotEntry(_:)` to populate `heroImageFilename` via `WidgetImageBridge.filename(for:)` instead of always passing nil. Reads `SavedRecipeWidgetRow.heroImageURL` (already plumbed through T-322); no changes to `RecipeStore.savedRecipesForWidget(limit:)` shape. Widget extension already resolves filenames per `SavedRecipesWidgetEntryView.heroImageURL(forFilename:)` (T-321) — no widget-side change. L4 snapshot baselines for `WidgetCard.Saved*` populated states re-recorded against the real-image render path (T-360's fixture image works here too). Updates the explicit "Future work" comment in `SavedRecipesWidgetPublisher.toSnapshotEntry(_:)` to point at the bridge instead of trailing as an open TODO.
+- **Files:** `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/SavedRecipesWidgetPublisher.swift` (filename now non-nil), `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/SavedRecipesWidgetPublisherTests.swift` (extend to assert the bridged filename matches the URL), `Packages/DODDesignSystem/Tests/DODDesignSystemTests/SavedWidgetSnapshotTests.swift` (re-record populated baselines), corresponding PNGs under `__Snapshots__/SavedWidgetSnapshotTests/`.
+- **AC:** AC-17.3 (host side, filename now honest), AC-21.2 (bridge is the single writer; saved widget is the second consumer).
+- **Deps:** T-360 (consumes `WidgetImageBridge` which T-360 introduces).
+- **Est:** 1.5h
+- **||:** P10-latest-widget
+
 ---
 
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 1 (Phase 10 search + widget polish: T-350) = 97
-- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) + ~2 hours (Phase 9) + ~1 hour (Phase 10) = ~204 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 3 (Phase 10 search + widget polish: T-350, T-360, T-361) = 99
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) + ~2 hours (Phase 9) + ~6.5 hours (Phase 10) = ~209.5 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
 - **Phase 6 parallelism:** F6-cards, F6-icon, F6-detail, F6-onb can all run in parallel. F6-cook (T-304, T-305) is the only sequential thread inside Phase 6.
 - **Phase 8 parallelism:** P8-tab (T-310) and P8-darkmode (T-330) are fully independent. The widget cluster sequences T-320 → T-321 → T-322 → T-323 internally but is independent of P8-tab and P8-darkmode externally. So three worktrees can run simultaneously: one on T-310, one on T-320 (then handing forward inside the cluster), one on T-330.
 - **Phase 9 parallelism:** P9-categories (T-340) is independent of every Phase 8 task and is the only Phase 9 work item.
-- **Phase 10 parallelism:** P10-search (T-350) is independent of every Phase 8 + Phase 9 task. New tasks added to Phase 10 should explicitly declare their parallelism tag and any cross-cluster dep.
+- **Phase 10 parallelism:** P10-search (T-350) is independent of every other task. P10-latest-widget sequences T-360 → T-361 internally (T-361 consumes the `WidgetImageBridge` T-360 introduces); the sub-cluster is independent of T-350 and of T-370 (lock-screen widget, separate branch). Lock-screen widgets are text-only and don't need the image bridge.
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
