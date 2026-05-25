@@ -89,6 +89,160 @@ Don't graduate these into spec work without a real user signal — they
 either need a paired web-side effort (Universal Links) or have
 non-trivial scope risk (Watch, Collections).
 
+### Captured 2026-05-25 (round 4, @spencer0706)
+
+Mix of new surfaces, polish, an L2 test addition, and two regression
+reports against work that just shipped (items marked **REG-** in the
+notes). Captured after using the post-round-2 build on iPhone 16 sim.
+
+#### New surfaces / features
+
+- **Settings page** — new top-level surface reached from a **gear icon**
+  in the top corner of the Recipes (Feed) tab. Layout styled to match
+  the Categories tab (`.insetGrouped` list per T-340 / CL-32). Initial
+  content (each its own row group):
+  1. **Imperial ↔ metric measurement toggle.** Affects every ingredient
+     quantity rendered in recipe detail + Cook Mode. Pure presentation
+     transform — source JSON-LD stays untouched. Open question for
+     spec time: what's the default for a fresh install (US-locale → imperial,
+     metric for everywhere else)? Persist to UserDefaults.
+  2. **About Me section.** Pull the "About Me" content from
+     [`https://www.dutchovendaddy.com/about-me/`](https://www.dutchovendaddy.com/about-me/).
+     Open question for spec time: fetch live each visit, fetch once
+     and cache offline (preferred), or copy-paste the text at build
+     time? Live fetch with cache + offline fallback is the most natural
+     fit with the existing CL-1 hybrid strategy. WP REST exposes
+     `/wp/v2/pages?slug=about-me` for this.
+  3. **Version + build number footer.** Display
+     `CFBundleShortVersionString (CFBundleVersion)` (e.g. "1.0.2 (47)")
+     as a centered footnote-style label at the bottom of the screen.
+     Reads from `Bundle.main.infoDictionary`. Trivial — bundled here
+     because it's the natural place to land. Size: **XS** on its own.
+
+  Total size: **L** (~1 week). Split into multiple T-NNN tasks at spec
+  time — the imperial/metric transform is its own work item separate
+  from the About Me fetch and from the gear-icon entry-point plumbing.
+
+#### Polish
+
+- **Ratings & Reviews button layout + sticky-actions cleanup.**
+  - **Swap "Submit" and "Cancel" button positions** in the rating-submit
+    composer. Worth a CL on the iOS convention here — typically primary
+    actions live at the trailing/right edge with cancel at leading/left
+    on iPhone, but `confirmationDialog` and `alert` defaults differ.
+    Capture the chosen pattern + cite Apple HIG when this graduates.
+  - **Remove the sticky save + share buttons above the tab bar** on
+    `RecipeDetailView`. T-302 added these as a floating-actions row
+    (`RecipeDetailFloatingActions.swift`) so the affordances stay
+    reachable when scrolled past the hero. User is now saying the
+    top-of-screen save + share (in the navigation bar, `AC-4.7` +
+    `AC-4.8`) are sufficient and the sticky duplicates clutter the
+    bottom. Removes one file (`RecipeDetailFloatingActions.swift`) plus
+    its call site in `RecipeDetailView`. Amends the post-Phase-6 T-302
+    "polish" decision. Size: **S** (~1h).
+
+- **Categories tab brown.** The categories list cells + the
+  `.searchable` field background in the Categories tab should pick up
+  the same brown used by the recipe cards in the main Recipes tab
+  (probably `DODColor.castIronBrown` per the existing palette). T-340
+  picked iOS-stock `.insetGrouped` styling which uses the system grouped
+  background; this would override to match the brand surface. Worth a
+  CL on whether this should be a global `.scrollContentBackground`
+  override or per-cell tinting — both have implications for dark mode
+  legibility. Size: **S–M** depending on whether the brown gets applied
+  cell-level or surface-level.
+
+- **"Saved Recipes" widget description copy.** Current
+  `.configurationDescription(_:)` string on `SavedRecipesWidget` reads
+  awkwardly — needs a rewrite to something more natural. Pure string
+  change in `Widget/SavedRecipesWidget.swift`. Worth a CL noting the
+  rewrite (user-facing widget gallery copy), same pattern CL-36 used
+  for the "Today's Recipe" → "Latest Recipe" rename. Size: **XS**
+  (~30min including the CL).
+
+#### Tests
+
+- **L2 test for new-recipe surfacing.** When a recipe is published on
+  dutchovendaddy.com, verify the app's feed (US-1 `/wp/v2/posts` query)
+  picks it up. Lives in the existing **L2 nightly live-API tier**
+  (constitution §6 / AC-T3). Tags as `live-api`; doesn't gate PRs but
+  surfaces contract drift early. Approach: read the WP feed's newest
+  post id at test time, assert it's present in the app's `RecipeStore`
+  after a `feed.refresh()`. Companion check: post's `_embed`'d
+  `wp:featuredmedia` round-trips into a non-nil `heroImage` (already
+  pinned by `REG-2` but worth re-asserting against the newest post on
+  every nightly run, not just the fixture). Size: **S** (~2h — one new
+  test plus the helper that fetches "newest post id"). New regression
+  ID: `REG-16`.
+
+#### Regression reports — work that just shipped but the user still sees broken
+
+- **REG-T-360 — "Latest Recipe" widget still shows fork-and-knife.**
+  T-360 / [#24](https://github.com/adamsned/dod-ios-app/pull/24) built
+  the file-export image bridge (CL-35 Option A) and wired the featured
+  widget to render real images via `WidgetImageBridge.fileURL(forFilename:)`.
+  User reports the widget still renders the placeholder glyph after
+  reinstalling the app, browsing the feed, and waiting for snapshots
+  to refresh. Possible causes worth investigating before treating as a
+  confirmed bug:
+  1. **Fresh-install transient.** `RecipeStore.cacheImage(...)` only
+     fires when the app actually loads image bytes; if the feed loaded
+     but the hero images haven't been pre-cached yet, the App Group
+     directory is empty and the widget falls back to placeholder per
+     `CL-35.3`. Wait ~30s after a feed scroll, then check.
+  2. **Bridge isn't writing.** The `feat(T-360)` impl plumbed
+     filenames into the snapshot writer in `LiveFeedDependencies.publishWidgetSnapshot`,
+     but the host-side file write happens in
+     `RecipeStore+ImageCache.swift`. Verify the write actually fires
+     by inspecting `~/Library/Developer/CoreSimulator/Devices/.../Shared/AppGroup/<group-id>/`
+     for `*.img` files.
+  3. **Widget timeline cache.** WidgetCenter may still be holding the
+     pre-T-360 timeline; force-reload via `WidgetCenter.shared.reloadAllTimelines()`
+     during testing.
+
+  If investigation confirms the bridge isn't populating files on the
+  host side, this becomes a fix for `T-360`'s implementation. Size:
+  **M** (debug + fix). Reference [`CL-35`](clarifications.md),
+  [`AC-21.2`](spec.md), [`AC-21.3`](spec.md).
+
+- **REG-T-390 — Home-screen widgets still unreadable in Tinted / Clear.**
+  T-390 / [#27](https://github.com/adamsned/dod-ios-app/pull/27) audited
+  the widgets under iOS 18+'s accented rendering modes (Tinted +
+  Clear both surface as `widgetRenderingMode == .accented`) and
+  concluded 5/6 surfaces passed, applying only one surgical fix
+  (`widgetAccentedRenderingMode(.fullColor)` on the hero `Image` in
+  `WidgetCard.Hero.loadedImage(_:)`). User reports: **"white text on
+  a white background is not acceptable"** — the recipe title rendered
+  over the hero in `WidgetCard.Small` (`.foregroundStyle(.white)` per
+  the codebase audit at `WidgetCard.swift:67–69`) is invisible against
+  a light wallpaper in the accented mode because `containerBackground`
+  is stripped and the `.white` literal doesn't tint correctly. The
+  T-390 audit's "system desaturation handles it" assumption was wrong
+  — the codebase-tinting-risk research artifact at
+  `/tmp/widget-audit-research/codebase-tinting-risk.md` flagged exactly
+  this as the smoking gun and was overridden by the main agent's
+  inspection. **What to fix:** replace `.foregroundStyle(.white)` on
+  text that renders over the hero with a system semantic color (e.g.
+  `.primary` with `widgetAccentable()` opt-in), OR force-add a
+  contrast-providing scrim behind the title. Apply the same fix to
+  `SavedRecipesWidget` rows. Size: **M** (~3h — investigate every
+  hardcoded text color in the widget views, fix, re-record the 12
+  Tinted/Vibrant baselines T-390 added). Reference
+  [`AC-23`](spec.md), [`CL-39`](clarifications.md). This becomes a
+  **T-394** follow-up under T-390's existing follow-up list (T-391..T-393).
+
+#### Sizing summary
+
+| Item | Size | Notes |
+|---|---|---|
+| Settings page | L | Splits into multiple T-NNN at spec time |
+| Ratings layout cleanup | S | Amends T-302 |
+| Categories tab brown | S–M | Needs CL on cell-vs-surface tinting |
+| Saved widget description | XS | Single string + CL |
+| L2 new-recipe test | S | New REG-16 |
+| REG-T-360 widget image | M | Investigate fresh-install transient first |
+| REG-T-390 widget text | M | T-390 was overconfident; T-394 follow-up |
+
 ## Recently graduated
 
 Items that left the backlog after going through Specify → Clarify → Plan →
