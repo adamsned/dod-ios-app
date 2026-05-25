@@ -40,13 +40,6 @@ shipped. See "Recently graduated" below for the trail._
 
 ### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
 
-- **Categories tab — modernize visual language.** The Categories tab
-  feels stale next to the rest of the app. Restyle to match current
-  iOS design conventions (cell styling, header treatment, spacing).
-  Size: M. Open question for spec time: is this a token-level change
-  in `DODDesignSystem` (which would affect other surfaces) or a
-  Categories-only layout pass? Worth a design pass before specifying.
-
 - **Search tab — `tag.fill` instead of folder icon on tags.** The
   current folder SF Symbol on the tag chips reads as "navigate into a
   folder" rather than "filter by tag" — pure SF Symbol swap to
@@ -128,3 +121,12 @@ useful reference.
   top-level screen baselines in [#15](https://github.com/adamsned/dod-ios-app/pull/15).
   CookLiveActivity baselines (T-333) still in flight on
   [#11](https://github.com/adamsned/dod-ios-app/pull/11).
+- **Categories tab — modernize visual language** — became **US-19**
+  (AC-19.1 through AC-19.6) + [T-340](tasks.md), with the
+  token-vs-layout decision captured in
+  [CL-31](clarifications.md), the `.insetGrouped` choice in
+  [CL-32](clarifications.md), and the `.searchable` add-in in
+  [CL-33](clarifications.md). Layout-pass only — no `DODDesignSystem`
+  token churn, no `CategoryRecipesView` change, US-2's
+  AC-2.1..AC-2.5 explicitly pinned by AC-19.4. Shipped in
+  [#XX](https://github.com/adamsned/dod-ios-app/pull/XX).

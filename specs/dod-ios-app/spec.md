@@ -301,6 +301,21 @@ Added post-Phase 6 (2026-05-24). Constitution §7 already mandates WCAG AA contr
 - **AC-18.5** Reduce-Transparency and Reduce-Motion respected in both appearances (already required by constitution §7; the audit verifies it).
 - **AC-18.6** The audit is allowed to surface *no* code changes — a clean audit closes the story. The deliverable is the audit document plus any fixes the audit prompted, not a guaranteed list of fixes.
 
+### US-19 — Categories tab visual modernization
+**As a** Recipe Hunter,
+**I want** the Categories tab to feel like a current-iOS surface and to let me jump to a category by name,
+**so that** scanning ~30+ categories doesn't read like a 2018 dictionary and I can find "Soups" without scrolling.
+
+Added post-Phase 8 (2026-05-24). The Categories tab (US-2) was untouched by the CC-9 visual-density pass — that work only re-laid the four *grid* surfaces. The categories list still uses `.plain` style with a hand-rolled chevron + count `HStack`, which now reads stale next to the modernized Feed / Search / Saved. This story is a **Categories-only layout pass** that swaps in iOS-stock containers; it touches no design tokens and leaves the underlying data contract (US-2) intact.
+
+**Acceptance criteria:**
+- **AC-19.1** The Categories list uses SwiftUI's `.insetGrouped` list style so rows render inside a system-grouped card with iOS-standard rounded corners, inset, and separators — replacing the current `.plain` flat-list look. Each row is a `NavigationLink`-shaped cell with the system disclosure indicator instead of the hand-rolled `Image(systemName: "chevron.right")` in the existing `HStack`.
+- **AC-19.2** Each row displays the category name on the leading side and the recipe count on the trailing side rendered as a `Text` in `DODColor.labelSecondary` (the system "value" treatment), with the disclosure chevron after it. No new design-system tokens; the visual ramp is built from the existing `DODType` / `DODColor` / `DODSpacing` set per CL-31 / CL-32.
+- **AC-19.3** A native `.searchable` field is added to the Categories list, scoped to the list (placement `.navigationBarDrawer(displayMode: .automatic)` — the iOS standard). Filtering matches `category.name` case-insensitively; clearing the field restores the full list. The filter is purely client-side over the already-loaded `categories` array — no new network call, no view-model state machine beyond a `@State searchText`.
+- **AC-19.4** US-2's existing acceptance criteria (AC-2.1 alphabetical order, AC-2.2 name + count, AC-2.3 tap → category recipes, AC-2.4 zero-count hidden, AC-2.5 error state with Retry) are **not regressed**. The implementing PR's tests pin each of AC-2.1..AC-2.5 against the new layout. The Categories *recipes* sub-screen (`CategoryRecipesView`, AC-2.3) is out of scope for this story — only the list of categories themselves is restyled.
+- **AC-19.5** L4 snapshot coverage exists for the new layout on iPhone 13 baseline + iPad 12.9" in both light and dark appearances, at default Dynamic Type. The four existing `CategoryListViewSnapshotTests` baselines (light/dark × default/AX5 on iPhone 13) are re-recorded as part of this PR; new iPad-12.9" baselines (light + dark, default Dynamic Type) are added. AX5 on iPad is not added — list rows don't visually differ from iPhone at AX5 in a way the existing iPhone AX5 baseline doesn't already cover.
+- **AC-19.6** Accessibility per constitution §7 / CC-1: the existing `.accessibilityLabel("\(category.name), \(category.count) recipes")` per-row label is preserved; the new search field has a default `.searchable` VoiceOver label ("Search"); the empty result state when no categories match the typed query shows an inline secondary-label "No categories match '<query>'" message (no full `EmptyState` takeover — the field stays visible).
+
 ---
 
 ## Cross-cutting acceptance criteria

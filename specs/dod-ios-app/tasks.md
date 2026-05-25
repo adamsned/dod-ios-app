@@ -947,14 +947,29 @@ Parallelism tag conventions: tasks sharing `||:` letter can run simultaneously i
 
 ---
 
+## Phase 9 — Categories modernization (2026-05-24)
+
+Single-task cluster for US-19 / CL-31..33. Layout-pass over `CategoryListView`, no DesignSystem token churn, no touch on US-2's data contract.
+
+### T-340 — Categories tab visual modernization (US-19)
+- **Scope:** Restyle `CategoryListView` to use SwiftUI's `.insetGrouped` list with system disclosure rows, secondary-label trailing count, and a `.searchable`-backed name filter. Replace the hand-rolled `Button { } label: { HStack { … Image(systemName: "chevron.right") } }` with an iOS-stock cell shape. No `CategoryRecipesView` changes; no token edits in `DODDesignSystem`. Tests: re-record the four existing `CategoryListViewSnapshotTests` baselines (light/dark × default/AX5 on iPhone 13) to lock the new look, add two new iPad-12.9" baselines (light + dark, default Dynamic Type) per AC-19.5, and add a `CategoryListViewModelTests` (or extension thereof) unit test asserting the new client-side search filter works case-insensitively and that an empty/whitespace query restores the full list. AC-2.1..AC-2.5 stay green via the existing `CategoryListViewModelTests` suite — no test rewrite, just confirm the suite still passes against the new view.
+- **Files:** `Packages/DODFeatureCategories/Sources/DODFeatureCategories/CategoryListView.swift` (layout + `.searchable`), `Packages/DODFeatureCategories/Tests/DODFeatureCategoriesTests/CategoryListViewSnapshotTests.swift` (extend with iPad-12.9" tests, re-record baselines), `Packages/DODFeatureCategories/Tests/DODFeatureCategoriesTests/CategoriesTests.swift` (search-filter unit test). Snapshot PNGs under `Packages/DODFeatureCategories/Tests/DODFeatureCategoriesTests/__Snapshots__/CategoryListViewSnapshotTests/`. **Out of bounds:** `Packages/DODDesignSystem/**`, `Packages/DODFeatureCategories/Sources/DODFeatureCategories/CategoryRecipesView.swift` (CategoryRecipes grid is governed by US-2 AC-2.3 and was already modernized by T-300 / CC-9), `Packages/DODFeatureCategories/Sources/DODFeatureCategories/CategoryListViewModel.swift` (no data-shape changes required for a pure visual pass).
+- **AC:** AC-19.1, AC-19.2, AC-19.3, AC-19.4, AC-19.5, AC-19.6; pins AC-2.1..AC-2.5.
+- **Deps:** — (independent; runs against current main).
+- **Est:** 2h
+- **||:** P9-categories
+
+---
+
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) = 95
-- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) = ~201 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) = 96
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) + ~2 hours (Phase 9) = ~203 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
 - **Phase 6 parallelism:** F6-cards, F6-icon, F6-detail, F6-onb can all run in parallel. F6-cook (T-304, T-305) is the only sequential thread inside Phase 6.
 - **Phase 8 parallelism:** P8-tab (T-310) and P8-darkmode (T-330) are fully independent. The widget cluster sequences T-320 → T-321 → T-322 → T-323 internally but is independent of P8-tab and P8-darkmode externally. So three worktrees can run simultaneously: one on T-310, one on T-320 (then handing forward inside the cluster), one on T-330.
+- **Phase 9 parallelism:** P9-categories (T-340) is independent of every Phase 8 task and is the only Phase 9 work item.
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
