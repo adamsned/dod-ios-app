@@ -34,6 +34,70 @@ import Testing
 }
 
 @MainActor
+@Suite("CategoryListView search filter (T-340 / AC-19.3)") struct CategoryListSearchFilterTests {
+
+    @Test func emptyQueryReturnsFullList() {
+        let categories = Self.makeCategories()
+        let result = CategoryListView.filtered(categories: categories, matching: "")
+        #expect(result.count == categories.count)
+    }
+
+    @Test func whitespaceQueryReturnsFullList() {
+        let categories = Self.makeCategories()
+        let result = CategoryListView.filtered(categories: categories, matching: "   \n\t")
+        #expect(result.count == categories.count)
+    }
+
+    @Test func substringMatchIsCaseInsensitive() {
+        let categories = Self.makeCategories()
+        let lowercased = CategoryListView.filtered(categories: categories, matching: "beef")
+        let uppercased = CategoryListView.filtered(categories: categories, matching: "BEEF")
+        let mixed = CategoryListView.filtered(categories: categories, matching: "BeEf")
+        #expect(lowercased.map(\.id) == [1])
+        #expect(uppercased.map(\.id) == [1])
+        #expect(mixed.map(\.id) == [1])
+    }
+
+    @Test func substringMatchMatchesAnywhereInName() {
+        let categories = Self.makeCategories()
+        // "ast" appears inside "Breakfast" and inside "Pasta" — substring
+        // match should pick both, in input order.
+        let astMatches = CategoryListView.filtered(categories: categories, matching: "ast")
+        #expect(astMatches.map(\.name) == ["Breakfast", "Pasta"])
+        // Prefix-only match.
+        let oneSubstring = CategoryListView.filtered(categories: categories, matching: "one")
+        #expect(oneSubstring.map(\.name) == ["One-pot meals"])
+    }
+
+    @Test func noMatchReturnsEmpty() {
+        let categories = Self.makeCategories()
+        let result = CategoryListView.filtered(categories: categories, matching: "zzz-nope")
+        #expect(result.isEmpty)
+    }
+
+    @Test func queryPreservesOrderOfInput() {
+        let categories = Self.makeCategories()
+        // 's' matches multiple; filter should preserve input order.
+        let result = CategoryListView.filtered(categories: categories, matching: "s")
+        let matchingIDs = categories.filter { $0.name.localizedCaseInsensitiveContains("s") }.map(\.id)
+        #expect(result.map(\.id) == matchingIDs)
+    }
+
+    static func makeCategories() -> [DODDomain.Category] {
+        [
+            .init(id: 1, name: "Beef", slug: "beef", count: 42),
+            .init(id: 2, name: "Breakfast", slug: "breakfast", count: 28),
+            .init(id: 3, name: "Chicken", slug: "chicken", count: 56),
+            .init(id: 4, name: "Desserts", slug: "desserts", count: 33),
+            .init(id: 5, name: "One-pot meals", slug: "one-pot", count: 19),
+            .init(id: 6, name: "Pasta", slug: "pasta", count: 24),
+            .init(id: 7, name: "Sides", slug: "sides", count: 18),
+            .init(id: 8, name: "Soups & stews", slug: "soups", count: 22),
+        ]
+    }
+}
+
+@MainActor
 @Suite("CategoryRecipesViewModel (T-091, T-092)") struct CategoryRecipesViewModelTests {
 
     @Test func initialLoadFromCategoryPage() async {
