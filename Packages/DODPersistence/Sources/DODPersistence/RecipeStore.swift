@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 import SwiftData
 
@@ -194,44 +195,13 @@ public actor RecipeStore {
         return ids.compactMap { id in byID[id].map(Self.toListItem) }
     }
 
-    // MARK: - Image cache
-
-    public func cacheImage(url: URL, bytes: Data, pinnedToSavedRecipeID: Int? = nil) throws {
-        let urlString = url.absoluteString
-        let descriptor = FetchDescriptor<CachedImage>(
-            predicate: #Predicate { $0.urlString == urlString }
-        )
-        if let existing = try modelContext.fetch(descriptor).first {
-            existing.bytes = bytes
-            existing.lastUsedAt = .now
-            if let pin = pinnedToSavedRecipeID {
-                existing.pinnedToSavedRecipeID = pin
-            }
-        } else {
-            modelContext.insert(
-                CachedImage(
-                    urlString: urlString,
-                    bytes: bytes,
-                    pinnedToSavedRecipeID: pinnedToSavedRecipeID
-                )
-            )
-        }
-        try modelContext.save()
-        try evictImagesIfNeeded()
-    }
-
-    public func image(url: URL) throws -> Data? {
-        let urlString = url.absoluteString
-        let descriptor = FetchDescriptor<CachedImage>(
-            predicate: #Predicate { $0.urlString == urlString }
-        )
-        guard let row = try modelContext.fetch(descriptor).first else { return nil }
-        row.lastUsedAt = .now
-        try modelContext.save()
-        return row.bytes
-    }
-
-    // MARK: - Eviction policies (T-074, T-075)
+    // MARK: - Eviction policies (T-074)
+    //
+    // Image cache + image-eviction lives in `RecipeStore+ImageCache.swift`
+    // — extracted there to keep this actor body under SwiftLint's
+    // `type_body_length` cap once the US-21 widget image bridge wiring
+    // landed. Cap is enforced because actors that grow without
+    // restraint become hard to reason about for cross-actor calls.
 
     /// Trim unsaved CachedRecipes to ``unsavedLRUCap`` by oldest `lastViewedAt`.
     /// Saved recipes are never evicted (NFR-1).
@@ -245,24 +215,6 @@ public actor RecipeStore {
         guard overflow > 0 else { return }
         for row in unsaved.prefix(overflow) {
             modelContext.delete(row)
-        }
-        try modelContext.save()
-    }
-
-    /// Trim image rows until total bytes ≤ ``imageBudgetBytes``. Pinned rows
-    /// (saved-recipe images) are excluded from eviction (NFR-2).
-    public func evictImagesIfNeeded() throws {
-        let descriptor = FetchDescriptor<CachedImage>(
-            sortBy: [SortDescriptor(\.lastUsedAt, order: .forward)]
-        )
-        let all = try modelContext.fetch(descriptor)
-        var total = all.reduce(0) { $0 + $1.bytes.count }
-        guard total > Self.imageBudgetBytes else { return }
-        for row in all where row.pinnedToSavedRecipeID == nil {
-            let size = row.bytes.count
-            modelContext.delete(row)
-            total -= size
-            if total <= Self.imageBudgetBytes { break }
         }
         try modelContext.save()
     }
