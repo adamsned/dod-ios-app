@@ -35,8 +35,10 @@ Format suggestion (not enforced):
 > `2190f27`, app icon `1b8e027`, today's-featured widget `e0aebc6`). Moved
 > here when the file relocated under `specs/dod-ios-app/`.
 
-_All four 2026-05-24 captures have graduated to spec-driven work and
-shipped. See "Recently graduated" below for the trail._
+_Five of the six 2026-05-24 captures have graduated to spec-driven
+work and shipped. See "Recently graduated" below for the trail. The
+remaining capture (widget readability under Clear/Tinted home-screen
+appearances) is still open._
 
 ### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
 
@@ -48,16 +50,6 @@ shipped. See "Recently graduated" below for the trail._
   legible. Likely needs `widgetAccentedRenderingMode` / accent-color
   handling. Size: M. Pair with US-18 audit-style framing — produce a
   matrix and fix what fails.
-
-- **Lock-screen widget for "Latest Recipe" (rectangular).** Add a
-  rectangular-family lock-screen widget that shows the latest
-  recipe's title + short description as text only. Lock-screen
-  widgets are text/info-only by design (no image rendering, monochrome
-  rendering pipeline) so this is a clean addition — reuses the same
-  snapshot the home-screen widget reads, just in a different
-  `WidgetConfiguration` with a `.accessoryRectangular` family.
-  Size: M. AC will need to cover the iOS 16+ availability gate (same
-  pattern as US-11's `ActivityKit` gate).
 
 ## Recently graduated
 
@@ -125,3 +117,11 @@ useful reference.
   snackbar wording, onboarding bullet copy, `OpenSavedRecipesIntent`
   Siri shortcut glyph. Wire-format `widgetOpened` `kind: .saved` and
   US-11 Live Activity glyphs explicitly out of scope per CL-38.
+- **Lock-screen widget for "Latest Recipe" (rectangular)** — became
+  **US-22** (AC-22.1 through AC-22.5) + [T-370](tasks.md), with the
+  `.accessoryRectangular`-only family decision (and the reasons
+  `.accessoryCircular` / `.accessoryInline` are out of scope)
+  captured in [CL-37](clarifications.md). Text-only rendering by
+  design; reuses the US-9 `WidgetSnapshot` wire format so no new
+  snapshot file, no new App Group key, no new host-side observer,
+  no new `WidgetDeepLinkParser` case. Locked by REG-22.
