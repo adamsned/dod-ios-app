@@ -63,16 +63,6 @@ shipped. See "Recently graduated" below for the trail._
   the rename in case anyone has the old name pinned in screenshots
   or marketing.
 
-- **Lock-screen widget for "Latest Recipe" (rectangular).** Add a
-  rectangular-family lock-screen widget that shows the latest
-  recipe's title + short description as text only. Lock-screen
-  widgets are text/info-only by design (no image rendering, monochrome
-  rendering pipeline) so this is a clean addition — reuses the same
-  snapshot the home-screen widget reads, just in a different
-  `WidgetConfiguration` with a `.accessoryRectangular` family.
-  Size: M. AC will need to cover the iOS 16+ availability gate (same
-  pattern as US-11's `ActivityKit` gate).
-
 - **Heart → bookmark everywhere in the saved-recipes context.**
   Reverses the in-recipe carve-out from AC-16.3 (which left the
   navigation-bar Save heart on `RecipeDetailView` intentionally
@@ -136,3 +126,11 @@ useful reference.
   explicitly out of bounds per AC-20.3. Pure SF Symbol swap — no
   layout change, no token change, US-12's AC-12.1..AC-12.6 pinned by
   AC-20.5. Shipped in [#23](https://github.com/adamsned/dod-ios-app/pull/23).
+- **Lock-screen widget for "Latest Recipe" (rectangular)** — became
+  **US-22** (AC-22.1 through AC-22.5) + [T-370](tasks.md), with the
+  `.accessoryRectangular`-only family decision (and the reasons
+  `.accessoryCircular` / `.accessoryInline` are out of scope)
+  captured in [CL-37](clarifications.md). Text-only rendering by
+  design; reuses the US-9 `WidgetSnapshot` wire format so no new
+  snapshot file, no new App Group key, no new host-side observer,
+  no new `WidgetDeepLinkParser` case. Locked by REG-22.
