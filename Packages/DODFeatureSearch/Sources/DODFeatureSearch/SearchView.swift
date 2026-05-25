@@ -137,7 +137,7 @@ struct FilterChipRow: View {
         } label: {
             chipLabel(
                 text: selectedCategoryName,
-                systemImage: "folder",
+                systemImage: "tag.fill",
                 isOn: filters.categoryID != nil
             )
         }
@@ -234,7 +234,7 @@ struct IdleSuggestionsView: View {
                         section(title: "Try") {
                             FlowLayout(spacing: DODSpacing.xs) {
                                 ForEach(topCategories) { category in
-                                    pill(text: category.name, systemImage: "folder") {
+                                    pill(text: category.name, systemImage: "tag.fill") {
                                         onCategoryTap(category)
                                     }
                                 }

@@ -40,13 +40,6 @@ shipped. See "Recently graduated" below for the trail._
 
 ### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
 
-- **Search tab — `tag.fill` instead of folder icon on tags.** The
-  current folder SF Symbol on the tag chips reads as "navigate into a
-  folder" rather than "filter by tag" — pure SF Symbol swap to
-  `tag.fill` should fix the affordance. Size: S. Verify the chip
-  visuals still balance with the symbol's bounding box; if not, may
-  need spacing tweaks too.
-
 - **Widget readability under "Clear" and "Tinted" home-screen
   appearances.** iOS 18+ home-screen icon/widget modes (Clear, Tinted,
   Dark beyond standard dark mode) wash out the existing widget cards.
@@ -116,6 +109,19 @@ useful reference.
   token churn, no `CategoryRecipesView` change, US-2's
   AC-2.1..AC-2.5 explicitly pinned by AC-19.4. Shipped in
   [#22](https://github.com/adamsned/dod-ios-app/pull/22).
+- **Search tab — `tag.fill` instead of folder icon on tags** — became
+  **US-20** (AC-20.1 through AC-20.5) + [T-350](tasks.md), with the
+  glyph-choice rationale (`tag.fill` over `tag` / `number` /
+  `crop.rotate` / keeping `folder`) captured in
+  [CL-34](clarifications.md). What the backlog called "tags" turned
+  out to be WordPress *categories* in code (Search v1 surfaces only
+  the category taxonomy per CL-3); the same `folder` glyph appears on
+  both the `FilterChipRow.categoryChip` and the `IdleSuggestionsView`
+  "Try" category-suggestion pills, and both swap to `tag.fill` in this
+  PR. The `.noResults` `questionmark.folder` empty-state glyph is
+  explicitly out of bounds per AC-20.3. Pure SF Symbol swap — no
+  layout change, no token change, US-12's AC-12.1..AC-12.6 pinned by
+  AC-20.5. Shipped in [#23](https://github.com/adamsned/dod-ios-app/pull/23).
 - **"Today's Recipe" widget → rename + show real recipe image** —
   became **US-21** (AC-21.1 through AC-21.6) + [T-360](tasks.md), with
   the file-export image bridge decision (vs shared-SwiftData-container
