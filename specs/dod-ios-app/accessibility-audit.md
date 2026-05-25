@@ -17,7 +17,7 @@
 | IngredientCheckRow | Label = ingredient text, value = "checked"/"unchecked", trait `.isSelected` when checked | RecipeDetail |
 | InstructionStepView | Combined "Step N. {text}" | RecipeDetail |
 | RecipeDetailView hero image | Label = recipe title | RecipeDetail |
-| Save heart button | "Save recipe" / "Unsave recipe" toggle label | RecipeDetail |
+| Save bookmark button | "Save recipe" / "Unsave recipe" toggle label | RecipeDetail |
 | Share button | "Share recipe" | RecipeDetail |
 | Category list row | "{name}, {count} recipes" | Categories |
 | Loading skeleton group | `accessibilityElement(children: .ignore)` + "Loading recipes" container label | Feed |

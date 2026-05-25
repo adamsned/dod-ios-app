@@ -23,7 +23,7 @@ struct RecipeDetailFloatingActions: View {
             Button(
                 action: onSave,
                 label: {
-                    Image(systemName: isSaved ? "heart.fill" : "heart")
+                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
                         .font(.title3)
                         .foregroundStyle(.white)
                         .frame(width: 48, height: 48)

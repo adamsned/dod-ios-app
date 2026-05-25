@@ -121,7 +121,7 @@ struct DODShortcuts: AppShortcutsProvider {
                 "Open saved recipes in \(.applicationName)",
             ],
             shortTitle: "Saved Recipes",
-            systemImageName: "heart.fill"
+            systemImageName: "bookmark.fill"
         )
     }
 }

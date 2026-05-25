@@ -31,8 +31,9 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         case .search: "magnifyingglass"
         // `bookmark` (outline) when unselected, `bookmark.fill` when
         // selected — SwiftUI's tab styling handles the swap. AC-16.2.
-        // The in-recipe Save heart in RecipeDetailView is intentionally
-        // **not** updated here (AC-16.3).
+        // The in-recipe Save button in RecipeDetailView matches this
+        // glyph too (post-T-380 / CL-38 — reverses AC-16.3's earlier
+        // carve-out so the affordance is consistent across surfaces).
         case .saved: "bookmark"
         }
     }

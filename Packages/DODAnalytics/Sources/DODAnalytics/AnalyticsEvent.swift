@@ -21,10 +21,10 @@ public enum AnalyticsEvent: Sendable, Hashable {
     /// Recipe detail screen opened.
     case recipeView(recipeID: Int)
 
-    /// Save heart tapped on.
+    /// Save bookmark tapped on.
     case recipeSaved(recipeID: Int)
 
-    /// Save heart tapped off.
+    /// Save bookmark tapped off.
     case recipeUnsaved(recipeID: Int)
 
     /// Finalized search submitted. Query is **hashed** (constitution §9, spec AC-3.6).

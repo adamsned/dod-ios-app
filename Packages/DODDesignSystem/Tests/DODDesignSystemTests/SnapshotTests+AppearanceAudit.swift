@@ -32,7 +32,7 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
     // — the only visual delta is `userInterfaceStyle = .dark`.
 
     func test_emptyState_default_dark() {
-        let view = EmptyState(title: "No saved recipes yet", message: "Tap the heart on any recipe.")
+        let view = EmptyState(title: "No saved recipes yet", message: "Tap the bookmark on any recipe.")
             .frame(width: 390, height: 600)
         assertSnapshot(of: view, as: Self.darkImage(width: 390, height: 600), record: .missing)
     }
@@ -306,9 +306,9 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
                 caption: "Type any ingredient or technique to filter."
             ),
             .init(
-                systemImage: "heart.fill",
+                systemImage: "bookmark.fill",
                 title: "Save for offline",
-                caption: "Tap the heart on any recipe to cook it without Wi-Fi."
+                caption: "Tap the bookmark on any recipe to cook it without Wi-Fi."
             ),
         ]
     }
