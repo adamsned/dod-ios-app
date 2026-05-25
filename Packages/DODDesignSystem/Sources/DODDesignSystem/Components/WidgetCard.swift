@@ -1,10 +1,22 @@
 import SwiftUI
 
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
+
 /// Visual components used by the home-screen widget (spec.md US-9). Defined
 /// in DODDesignSystem so they can be snapshot-tested via the existing
-/// SnapshotTesting harness (constitution §6 L4) without dragging WidgetKit
-/// into the test target. The widget extension hosts these inside its
-/// `TimelineEntryView`; this module knows nothing about WidgetKit itself.
+/// SnapshotTesting harness (constitution §6 L4). The widget extension hosts
+/// these inside its `TimelineEntryView`; the only WidgetKit dependency in
+/// this module is the iOS-only ``Image.widgetAccentedRenderingMode(_:)``
+/// modifier used inside ``WidgetCard/Hero`` to opt the real recipe photo out
+/// of the iOS 18+ "Tinted" / "Vibrant" home-screen desaturation pass (spec
+/// US-23 / AC-23.2). The modifier lives on `SwiftUICore.Image` not
+/// `SwiftUICore.View`, so applying it at the entry-view layer would require
+/// breaking apart the ``Small``/``Medium`` API — surgically applying it
+/// inside ``Hero`` is the bounded fix. WidgetKit is iOS-only and the import
+/// is `#if canImport(WidgetKit)`-gated so the macOS test slice
+/// (`swift test`) continues to build.
 ///
 /// All variants accept a single ``WidgetCard.Content`` struct so the call
 /// site is identical to the production code path.
@@ -158,6 +170,22 @@ public enum WidgetCard {
     /// widget process; WidgetKit caches its decoded image data.
     /// `internal` so saved-variant rows declared in
     /// `WidgetCard+Saved.swift` can reuse the same primitive.
+    ///
+    /// The loaded ``image`` is opted out of the iOS 18+ home-screen
+    /// "Tinted" / "Vibrant" desaturation pass via
+    /// ``Image/widgetAccentedRenderingMode(_:)`` set to
+    /// ``WidgetAccentedRenderingMode/fullColor`` — the recipe hero photo
+    /// is the recognizable element of the widget, and a tinted
+    /// monochromatic blur of a Dutch oven recipe is harder to identify
+    /// at home-screen distance than the true-color photo. Apple's
+    /// Photos / Music widgets use the same `.fullColor` opt-out on
+    /// their photo / album-art content. The fallback gradient + glyph
+    /// (shown while the image is loading or absent) intentionally
+    /// **does not** opt out — it SHOULD tint with the system so the
+    /// empty/loading state blends with the user's wallpaper choice
+    /// rather than fighting it.
+    /// Spec trace: spec.md US-23 / AC-23.2 /
+    /// `widget-appearance-audit.md`.
     struct Hero: View {
 
         let url: URL?
@@ -168,9 +196,7 @@ public enum WidgetCard {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
+                            loadedImage(image)
                         case .empty, .failure:
                             fallbackGradient
                         @unknown default:
@@ -182,6 +208,38 @@ public enum WidgetCard {
                 }
             }
             .clipped()
+        }
+
+        /// Loaded recipe-photo branch. Extracted so the iOS 18+ /
+        /// macOS 15+ ``Image/widgetAccentedRenderingMode(_:)`` opt-out
+        /// can wrap the photo without polluting the `AsyncImage.phase`
+        /// switch. The modifier lives on `Image` not `View`, so the
+        /// call order is `image.resizable() -> Image` then
+        /// `.widgetAccentedRenderingMode(.fullColor) -> some View`
+        /// then the View-flavored `.aspectRatio(_:contentMode:)`. The
+        /// pre-iOS-18 fallback path returns the same shape without the
+        /// rendering-mode hint (a no-op on hosts where the
+        /// Tinted/Vibrant appearances don't exist). The `macOS 15.0`
+        /// floor in the `#available` check is what the modifier's
+        /// own Apple-side availability annotation requires; the
+        /// DODDesignSystem package supports macOS 14+ for the
+        /// non-visual `swift test` slice, so the fallback path is
+        /// required for the macOS 14 → 14.x compile target.
+        private func loadedImage(_ image: Image) -> some View {
+            #if canImport(WidgetKit)
+            if #available(iOS 18.0, macOS 15.0, *) {
+                return AnyView(
+                    image
+                        .resizable()
+                        .widgetAccentedRenderingMode(.fullColor)
+                        .aspectRatio(contentMode: .fill)
+                )
+            } else {
+                return AnyView(image.resizable().aspectRatio(contentMode: .fill))
+            }
+            #else
+            return AnyView(image.resizable().aspectRatio(contentMode: .fill))
+            #endif
         }
 
         private var fallbackGradient: some View {
