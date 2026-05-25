@@ -90,7 +90,7 @@ The app is **mostly read-only** — every recipe is a tap away without sign-in �
 - **AC-4.4** If the recipe has an embedded video (WPRM video field), then a video player is shown inline above the instructions. Tapping play starts playback; the player respects iOS PiP.
 - **AC-4.5** If the recipe has no video, no empty video block is shown.
 - **AC-4.6** A "Related Recipes" section shows 3–4 recipes from the same primary category at the bottom. Tapping one opens its detail.
-- **AC-4.7** A Save button (heart icon) is in the navigation bar. Tapping toggles saved state with haptic feedback.
+- **AC-4.7** A Save button (bookmark icon) is in the navigation bar. Tapping toggles saved state with haptic feedback. *Amended by CL-38 (T-380, 2026-05-24); supersedes the earlier "heart icon" wording, which was retained in v1 by the carve-out in AC-16.3. Original: ~~"A Save button (heart icon) is in the navigation bar."~~*
 - **AC-4.8** A Share button (native share sheet) is in the navigation bar; sharing exposes the recipe's web URL.
 - **AC-4.9** Recipe detail is fully usable offline if the recipe is saved (per US-5).
 - **AC-4.10** VoiceOver: hero image has a recipe-title alt, ingredient checkboxes announce checked/unchecked state, steps are reachable in order.
@@ -102,14 +102,14 @@ The app is **mostly read-only** — every recipe is a tap away without sign-in �
 **so that** spotty kitchen wifi doesn't break my cook.
 
 **Acceptance criteria:**
-- **AC-5.1** Tapping the Save button (heart) on a recipe detail marks it saved. Tapping again unsaves with a confirmation undo (snackbar).
+- **AC-5.1** Tapping the Save button (bookmark) on a recipe detail marks it saved. Tapping again unsaves with a confirmation undo (snackbar). *Amended by CL-38 (T-380, 2026-05-24); supersedes the earlier "(heart)" wording. Original: ~~"Tapping the Save button (heart) on a recipe detail marks it saved."~~*
 - **AC-5.2** When a recipe is saved, the full recipe payload (text, ingredients, steps, metadata) **and** the hero image are downloaded for offline use within 5 seconds of saving on a normal connection.
 - **AC-5.3** The Saved tab shows all saved recipes, newest-saved-first, in the same row format as the home feed.
 - **AC-5.4** Given the device is offline, when the user taps a saved recipe, then the full recipe detail opens with no network calls and all text + hero image present.
 - **AC-5.5** Inline videos in saved recipes do **not** need to play offline in v1. Show a "Video unavailable offline" placeholder if offline.
 - **AC-5.6** Related recipes section is hidden when offline.
 - **AC-5.7** Saved recipes persist across app launches, reinstalls **not** required (SwiftData store survives normal launch; reinstall wipes saves — known limitation, document in onboarding).
-- **AC-5.8** The Saved tab shows an empty state when no recipes are saved: "Tap the heart on any recipe to save it for offline."
+- **AC-5.8** The Saved tab shows an empty state when no recipes are saved: "Tap the bookmark on any recipe to save it for offline." *Amended by CL-38 (T-380, 2026-05-24). Original: ~~"Tap the heart on any recipe to save it for offline."~~*
 
 ### US-6 — Share a recipe
 **As any** reader,
@@ -205,10 +205,10 @@ Added by the Phase 7 amendment (CL-21, 2026-05-24). The guest-identity model —
 **I want** a brief welcome explaining what the app does,
 **so that** I'm oriented before I land on the feed.
 
-Added by consultant-pass amendment (CL-17, 2026-05-23). Reverses the earlier CL-7 "no onboarding" decision after the consultant pass argued that a single-screen sheet costs almost nothing and helps first-time users recognize the heart-save and search affordances before they need them.
+Added by consultant-pass amendment (CL-17, 2026-05-23). Reverses the earlier CL-7 "no onboarding" decision after the consultant pass argued that a single-screen sheet costs almost nothing and helps first-time users recognize the bookmark-save and search affordances before they need them. *(The original CL-17 wording said "heart-save"; CL-38 / T-380 (2026-05-24) flipped the glyph everywhere in the saved-recipes context, so the rationale now reads "bookmark-save" to stay in lock-step with AC-8.1's user-facing copy.)*
 
 **Acceptance criteria:**
-- **AC-8.1** On the first cold launch — gated by a single `UserDefaults` flag `dod.onboardingCompletedV1` — the app presents a single-screen modal sheet over the Feed. The sheet contains a friendly welcome line and exactly three bullets: "Browse the latest recipes from dutchovendaddy.com", "Search for what you're craving", and "Tap the heart to save any recipe for offline cooking".
+- **AC-8.1** On the first cold launch — gated by a single `UserDefaults` flag `dod.onboardingCompletedV1` — the app presents a single-screen modal sheet over the Feed. The sheet contains a friendly welcome line and exactly three bullets: "Browse the latest recipes from dutchovendaddy.com", "Search for what you're craving", and "Tap the bookmark to save any recipe for offline cooking". *Amended by CL-38 (T-380, 2026-05-24); the third bullet's "heart" wording is superseded so the onboarding affordance lines up with the post-T-380 glyph everywhere else. Original third bullet: ~~"Tap the heart to save any recipe for offline cooking"~~*
 - **AC-8.2** A "Get cooking" primary button dismisses the sheet and sets `dod.onboardingCompletedV1 = true`. All future cold launches go straight to Feed with no sheet.
 - **AC-8.3** iPad first launch shows the same single-screen sheet (same content, same flag) — no separate iPad onboarding flow. The sheet sizes appropriately for iPad via standard SwiftUI `.sheet` presentation; the flag is shared with iPhone since saves and UserDefaults are per-install (consistent with AC-5.7 / CL-5).
 
@@ -263,7 +263,7 @@ Added post-Phase 6 (2026-05-24). Aesthetic + ergonomic refinement; no new data, 
 **Acceptance criteria:**
 - **AC-16.1** Tab order on the bottom bar is **Recipes → Categories → Saved → Search** (Saved moves from position 4 to position 3; Search moves from position 3 to position 4). The `AppTab.allCases` order is the single source of truth and is what changes.
 - **AC-16.2** The "Saved" tab uses SF Symbol `bookmark` when unselected and `bookmark.fill` when selected. Selection-aware variants follow the same pattern as existing system tabs (no custom asset).
-- **AC-16.3** The in-recipe Save affordance (`AC-4.7`, navigation-bar heart) is **unchanged in v1** — only the tab icon flips. Revisiting the in-recipe icon is a follow-up if it feels inconsistent in user testing; left out to keep this change reversible and surface a single decision at a time.
+- **AC-16.3** The in-recipe Save affordance (per `AC-4.7`) also uses `bookmark` / `bookmark.fill`, matching the Saved tab icon (AC-16.2) and every other saved-recipes surface. *Amended by CL-38 (T-380, 2026-05-24); supersedes the earlier carve-out from T-310 that kept the in-recipe heart in v1 — the "follow-up if it feels inconsistent" hedge in the original wording is the lineage being executed here. Original: ~~"The in-recipe Save affordance (`AC-4.7`, navigation-bar heart) is **unchanged in v1** — only the tab icon flips. Revisiting the in-recipe icon is a follow-up if it feels inconsistent in user testing; left out to keep this change reversible and surface a single decision at a time."~~*
 - **AC-16.4** Telemetry: `AppTab.telemetryName` mapping is unchanged (`"saved"` stays `"saved"`); the change is purely visual + ordering, so existing screen-view event counts remain comparable across the change.
 - **AC-16.5** L4 snapshot tests cover the tab bar in both light and dark appearance, iPhone 13 + iPad 12.9", with each tab selected. Baselines are updated as part of the implementing PR (intentional visual change).
 - **AC-16.6** L3 UI smoke test asserts the third tab from the left opens Saved (was Search) and the fourth opens Search (was Saved), guarding against accidental re-ordering in a future refactor.

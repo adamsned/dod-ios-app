@@ -23,9 +23,13 @@ final class DesignSystemSnapshotTests: XCTestCase {
     }
 
     func test_emptyState_default() {
-        let view = EmptyState(title: "No saved recipes yet", message: "Tap the heart on any recipe.")
+        let view = EmptyState(title: "No saved recipes yet", message: "Tap the bookmark on any recipe.")
             .frame(width: 390, height: 600)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)))
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 600)),
+            record: .missing
+        )
     }
 
     func test_emptyState_withAction() {
@@ -110,16 +114,20 @@ final class DesignSystemSnapshotTests: XCTestCase {
                     caption: "Type any ingredient or technique to filter."
                 ),
                 .init(
-                    systemImage: "heart.fill",
+                    systemImage: "bookmark.fill",
                     title: "Save for offline",
-                    caption: "Tap the heart on any recipe to cook it without Wi-Fi."
+                    caption: "Tap the bookmark on any recipe to cook it without Wi-Fi."
                 ),
             ],
             ctaTitle: "Get cooking",
             onContinue: {}
         )
         .frame(width: 402, height: 874)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 402, height: 874)))
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 402, height: 874)),
+            record: .missing
+        )
     }
 
     // MARK: - US-9 home-screen widget

@@ -16,7 +16,7 @@ public enum DODColor {
     public static let label = bundleColor("Label")
     /// Secondary / supporting text color.
     public static let labelSecondary = bundleColor("LabelSecondary")
-    /// Brand accent (save heart, primary buttons).
+    /// Brand accent (save bookmark, primary buttons).
     public static let accent = bundleColor("Accent")
 
     // MARK: - Raw brand palette (for design system internals)

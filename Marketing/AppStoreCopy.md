@@ -40,7 +40,7 @@ WHAT'S INSIDE
 • Browse every recipe — chronological feed of the latest posts, plus
   category browsing for desserts, beef, chicken, sides, sourdough, and more.
 • Search instantly — type a recipe name or ingredient and find your match.
-• Save for offline — tap the heart on any recipe to keep it on your device.
+• Save for offline — tap the bookmark on any recipe to keep it on your device.
   Spotty kitchen Wi-Fi can't break your cook.
 • Cook-friendly detail screen — large readable type, tap-to-strike
   ingredient list, numbered steps, embedded video when the recipe has one.

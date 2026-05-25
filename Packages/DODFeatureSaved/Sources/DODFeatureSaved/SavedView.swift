@@ -28,9 +28,9 @@ public struct SavedView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .empty:
             EmptyState(
-                systemImage: "heart",
+                systemImage: "bookmark",
                 title: "No saved recipes yet",
-                message: "Tap the heart on any recipe to save it for offline."
+                message: "Tap the bookmark on any recipe to save it for offline."
             )
         case .error:
             EmptyState(

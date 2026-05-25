@@ -350,7 +350,7 @@ Use Swift's `Regex` + a small streaming search over the HTML — *not* a full HT
 ### Recipe Detail (US-4)
 - Loads `RecipeListItem` from cache instantly (for hero + title), then triggers the two-step detail fetch.
 - While fetching: skeleton placeholders for ingredients/instructions per CC-3.
-- Heart toggle is a single SwiftUI animation, calls `RecipeStore.toggleSaved(id:)`.
+- Bookmark toggle is a single SwiftUI animation, calls `RecipeStore.toggleSaved(id:)`. (CL-38 / T-380 swapped the original heart glyph to `bookmark` to match the Saved tab — see AC-4.7's amended wording.)
 - On failure: snackbar + nav pop per AC-4.11.
 
 ### Saved (US-5)
@@ -367,7 +367,7 @@ Palette sampled from dutchovendaddy.com hero imagery (cast-iron + warm earth). *
 enum DODColor {
     // Brand
     static let castIronBrown   = Color(hex: 0x3D2B1F)   // primary nav, headings
-    static let burntOrange     = Color(hex: 0xC56A24)   // accent, save heart, buttons
+    static let burntOrange     = Color(hex: 0xC56A24)   // accent, save bookmark, buttons
     static let warmGold        = Color(hex: 0xD4A24C)   // secondary accent
     static let cream           = Color(hex: 0xFAF6EE)   // app background light
     static let charcoal        = Color(hex: 0x2C2C2C)   // body text light

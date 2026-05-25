@@ -71,9 +71,9 @@ public struct EmptyState: View {
 
 #Preview("Empty list") {
     EmptyState(
-        systemImage: "heart",
+        systemImage: "bookmark",
         title: "No saved recipes yet",
-        message: "Tap the heart on any recipe to save it for offline."
+        message: "Tap the bookmark on any recipe to save it for offline."
     )
 }
 

@@ -26,9 +26,11 @@ final class AppTabTests: XCTestCase {
 
     /// AC-16.2 / CL-24: the Saved tab uses SF Symbol `bookmark`
     /// (selection-aware — SwiftUI swaps to `bookmark.fill` automatically
-    /// when the tab is the active one). The in-recipe Save heart in
-    /// `RecipeDetailView` is intentionally **not** changed here
-    /// (AC-16.3) — only the tab icon flips.
+    /// when the tab is the active one). Post-T-380 / CL-38, the in-recipe
+    /// Save button in `RecipeDetailView` matches this glyph too —
+    /// AC-16.3 was amended to drop the original "in-recipe heart
+    /// unchanged" carve-out so the affordance for the same action
+    /// reads identically across surfaces.
     func test_savedTab_usesBookmarkSymbol() {
         XCTAssertEqual(AppTab.saved.systemImage, "bookmark")
     }

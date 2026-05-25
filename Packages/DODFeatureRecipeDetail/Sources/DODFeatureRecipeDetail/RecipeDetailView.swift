@@ -229,7 +229,7 @@ public struct RecipeDetailView: View {
                 Button {
                     Task { await viewModel.toggleSaved() }
                 } label: {
-                    Image(systemName: viewModel.isSaved ? "heart.fill" : "heart")
+                    Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
