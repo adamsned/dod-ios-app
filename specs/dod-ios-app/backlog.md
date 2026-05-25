@@ -135,4 +135,4 @@ useful reference.
   PR. The `.noResults` `questionmark.folder` empty-state glyph is
   explicitly out of bounds per AC-20.3. Pure SF Symbol swap — no
   layout change, no token change, US-12's AC-12.1..AC-12.6 pinned by
-  AC-20.5. Shipped in [#XX](https://github.com/adamsned/dod-ios-app/pull/XX).
+  AC-20.5. Shipped in [#23](https://github.com/adamsned/dod-ios-app/pull/23).
