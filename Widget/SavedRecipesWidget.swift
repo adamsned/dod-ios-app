@@ -31,7 +31,7 @@ struct SavedRecipesWidget: Widget {
                 }
         }
         .configurationDisplayName("Saved Recipes")
-        .description("Your saved recipes, one tap from a cook.")
+        .description("Quick access to your saved recipes.")
         // CL-26: small + medium only. `.systemLarge` is deferred to v1.1
         // pending user-testing demand.
         .supportedFamilies([.systemSmall, .systemMedium])
