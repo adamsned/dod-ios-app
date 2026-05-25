@@ -42,6 +42,53 @@ shipped. See "Recently graduated" below for the trail._
 
 _(empty — all items graduated; see "Recently graduated" below.)_
 
+### Captured 2026-05-25 (round 3, @adamsned)
+
+User has chosen to defer TestFlight until at least round 3 ships. These
+three items each turn a feature the website *can't* easily replicate
+into a reason the native app exists. Tier 1 from the consultant pass on
+2026-05-25.
+
+- **Cooking Voice Mode** — hands-free recipe reading during Cook Mode.
+  "Hey Siri, next step / repeat / pause / what was that?" Uses on-device
+  `AVSpeechSynthesizer` so no network round-trip, no subscription cost,
+  no privacy surface. Pairs with the existing Cook Mode + Live Activity
+  infrastructure: the current step the Live Activity highlights is the
+  same step Voice Mode reads aloud. Probably wants a `CL-` entry on
+  whether to also wire up an App Intent (`ReadNextStepIntent`) so Siri
+  can drive it without the app being foregrounded. Size: **M**
+  (~2 weeks). The biggest differentiator we could ship vs. every other
+  food-blog reader on the App Store.
+
+- **Shopping list from saved recipes** — select N saved recipes →
+  "Add to shopping list" → ingredients grouped by aisle (produce /
+  pantry / dairy / meat / spices / other) with checkable items and an
+  "I already have this" toggle per ingredient. Share-via-iMessage as the
+  primary export (perfect for sending the list to a spouse on the way to
+  the store). Pure local SwiftData; no WP backend involvement. The
+  aisle classifier is the one open design question — could be a small
+  static keyword map (good enough for v1), could escalate to a
+  category-tagged ingredient dictionary later. Size: **M** (~1.5 weeks).
+  Turns the recipe app you cook *from* into the grocery list you shop
+  *from*. Massive utility loop.
+
+- **Recipe scaling** — tap "Serves 4" → stepper or slider → choose new
+  serving count → all ingredient quantities multiply with proper
+  fraction handling (½ cup × 1.5 → ¾ cup, not 0.75). Optional warning
+  at scales the typical home dutch oven physically can't hold (rough
+  rule: >12 servings on a 5-quart). Pure presentation logic; no schema
+  change since the source recipe is untouched. Size: **S** (~3 days).
+  Every recipe-app review on the App Store wants this and almost
+  nobody does it well.
+
+**Explicitly deferred from this round** (consultant Tier 2+ — capture
+later if v1.x user reviews call for them): Universal Links to the
+website, Recipe Collections ("Cookbooks"), Apple Watch + complications,
+background app refresh, daily push notification, photo-with-comment.
+Don't graduate these into spec work without a real user signal — they
+either need a paired web-side effort (Universal Links) or have
+non-trivial scope risk (Watch, Collections).
+
 ## Recently graduated
 
 Items that left the backlog after going through Specify → Clarify → Plan →
