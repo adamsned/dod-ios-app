@@ -961,15 +961,30 @@ Single-task cluster for US-19 / CL-31..33. Layout-pass over `CategoryListView`, 
 
 ---
 
+## Phase 10 — Search + widget polish (2026-05-24)
+
+Cluster for small visual / iconography fixes the backlog flagged after Phase 9 closed. Items here are single-PR scoped and independent — they only share a phase so the file structure stays readable as the post-launch polish list grows.
+
+### T-350 — Search filter chip iconography (US-20)
+- **Scope:** Pure SF Symbol swap on the Search tab's two category-flavored surfaces. (1) `FilterChipRow.categoryChip` `systemImage` argument: `"folder"` → `"tag.fill"` so the chip glyph reads as "filter by taxonomy" instead of "navigate into a folder" (CL-34). (2) `IdleSuggestionsView`'s "Try" section pill builder call site: `pill(text: category.name, systemImage: "folder")` → `pill(text: category.name, systemImage: "tag.fill")` so the idle-state category suggestions match the filter chip glyph. The `.noResults` `EmptyState` `questionmark.folder` glyph is explicitly **not** touched per AC-20.3 — it denotes a search-not-found state, not a category filter. No layout change, no token change, no view-model change; the surrounding chip text, menu contents, `isOn` selected-state fill, accessibility labels, and pill action handlers are byte-for-byte preserved. Tests: add `FilterChipRowSnapshotTests` with 4 chip-only PNG baselines (selected + unselected × light + dark, default Dynamic Type, iPhone 13 baseline). Existing `SearchViewSnapshotTests` baselines remain owned by T-335 — those PNGs are **not** committed by this PR (mirrors the T-340 / CategoryRecipesView precedent where a sim-recorded PNG outside the task's deliverable was left untracked).
+- **Files:** `Packages/DODFeatureSearch/Sources/DODFeatureSearch/SearchView.swift` (two `systemImage` string literal edits), `Packages/DODFeatureSearch/Tests/DODFeatureSearchTests/FilterChipRowSnapshotTests.swift` (new — 4 test methods + a `FilterChipRowHost` SwiftUI shim that holds the `@State` binding for the chip row outside of the wider `SearchView`). Snapshot PNGs under `Packages/DODFeatureSearch/Tests/DODFeatureSearchTests/__Snapshots__/FilterChipRowSnapshotTests/`. **Out of bounds:** `SearchView.swift` line ~74 `questionmark.folder` empty-state glyph (per AC-20.3), `SearchViewModel.swift`, `SearchFilters.swift`, `SearchResultMerger.swift`, `RecentSearches.swift` (no logic change), `SearchViewSnapshotTests.swift` and its baselines (owned by T-335).
+- **AC:** AC-20.1, AC-20.2, AC-20.3, AC-20.4, AC-20.5; pins AC-12.1..AC-12.6.
+- **Deps:** — (independent; runs against current main).
+- **Est:** 1h
+- **||:** P10-search
+
+---
+
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) = 96
-- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) + ~2 hours (Phase 9) = ~203 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 1 (Phase 10 search + widget polish: T-350) = 97
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) + ~2 hours (Phase 9) + ~1 hour (Phase 10) = ~204 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
 - **Phase 6 parallelism:** F6-cards, F6-icon, F6-detail, F6-onb can all run in parallel. F6-cook (T-304, T-305) is the only sequential thread inside Phase 6.
 - **Phase 8 parallelism:** P8-tab (T-310) and P8-darkmode (T-330) are fully independent. The widget cluster sequences T-320 → T-321 → T-322 → T-323 internally but is independent of P8-tab and P8-darkmode externally. So three worktrees can run simultaneously: one on T-310, one on T-320 (then handing forward inside the cluster), one on T-330.
 - **Phase 9 parallelism:** P9-categories (T-340) is independent of every Phase 8 task and is the only Phase 9 work item.
+- **Phase 10 parallelism:** P10-search (T-350) is independent of every Phase 8 + Phase 9 task. New tasks added to Phase 10 should explicitly declare their parallelism tag and any cross-cluster dep.
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
