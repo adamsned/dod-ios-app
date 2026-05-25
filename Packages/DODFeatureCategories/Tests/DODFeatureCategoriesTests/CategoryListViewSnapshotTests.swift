@@ -7,13 +7,18 @@ import XCTest
 
 @testable import DODFeatureCategories
 
-/// L4 visual-regression coverage for ``CategoryListView``'s loaded state
-/// across the {light, dark} × {default Dynamic Type, AX5} matrix called
-/// out by US-18 / AC-18.1.
+/// L4 visual-regression coverage for ``CategoryListView``'s loaded state.
 ///
-/// First iOS-sim test run uses `record: .missing` to lay the baseline PNGs
-/// down. T-335 follow-up commits them. Spec trace: constitution §6 L4,
-/// US-18 AC-18.1, AC-18.2.
+/// The four iPhone 13 baselines (`light/dark` × `default/AX5`) lock the
+/// US-18 / AC-18.1 matrix; the two iPad 12.9" baselines (`light/dark` ×
+/// `default`) lock the US-19 / AC-19.5 expansion. The implementing PR for
+/// T-340 re-recorded the iPhone baselines (the layout changed from
+/// `.plain` to `.insetGrouped` with a `.searchable` filter) and added the
+/// two iPad-12.9" baselines for the first time.
+///
+/// First iOS-sim test run uses `record: .missing` to lay any missing
+/// baseline PNGs down. Spec trace: constitution §6 L4, US-2 AC-2.1..2.2,
+/// US-18 AC-18.1, AC-18.2, US-19 AC-19.1, AC-19.2, AC-19.5.
 final class CategoryListViewSnapshotTests: XCTestCase {
 
     override func setUp() {
@@ -57,6 +62,32 @@ final class CategoryListViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 1_800), traits: Self.darkAX5Traits()),
+            record: .missing
+        )
+    }
+
+    /// iPad 12.9" baseline — light, default Dynamic Type. Added by T-340
+    /// per AC-19.5. AX5 on iPad is intentionally omitted: list rows
+    /// don't visually differ from iPhone at AX5 in a way the existing
+    /// iPhone AX5 baselines don't already cover.
+    @MainActor
+    func test_loadedCategories_iPad_light_defaultDynamicType() async {
+        let view = await Self.makeHostedList()
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 1_024, height: 1_366), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
+    /// iPad 12.9" baseline — dark, default Dynamic Type. Added by T-340
+    /// per AC-19.5.
+    @MainActor
+    func test_loadedCategories_iPad_dark_defaultDynamicType() async {
+        let view = await Self.makeHostedList()
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 1_024, height: 1_366), traits: Self.darkTraits()),
             record: .missing
         )
     }
@@ -124,8 +155,9 @@ final class CategoryListViewSnapshotTests: XCTestCase {
 // MARK: - Stateful host
 //
 // Wraps `CategoryListView` with a `NavigationStack` so the navigation title
-// renders, and absorbs the `onSelect` closure required by the view's init.
-// Test-target-only — never in the production target.
+// and (T-340) the `.searchable` field render correctly, and absorbs the
+// `onSelect` closure required by the view's init. Test-target-only —
+// never in the production target.
 
 @MainActor
 private struct CategoryListStatefulHost: View {
