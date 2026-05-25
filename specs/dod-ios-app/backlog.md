@@ -125,4 +125,4 @@ useful reference.
   featured widget; saved widget consumption is the
   [T-361](tasks.md) follow-up (same bridge, second consumer — clears
   T-322's open "Future work" note). Shipped in
-  [#XX](https://github.com/adamsned/dod-ios-app/pull/XX).
+  [#24](https://github.com/adamsned/dod-ios-app/pull/24).
