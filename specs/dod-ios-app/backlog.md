@@ -38,6 +38,71 @@ Format suggestion (not enforced):
 _All four 2026-05-24 captures have graduated to spec-driven work and
 shipped. See "Recently graduated" below for the trail._
 
+### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
+
+- **Categories tab — modernize visual language.** The Categories tab
+  feels stale next to the rest of the app. Restyle to match current
+  iOS design conventions (cell styling, header treatment, spacing).
+  Size: M. Open question for spec time: is this a token-level change
+  in `DODDesignSystem` (which would affect other surfaces) or a
+  Categories-only layout pass? Worth a design pass before specifying.
+
+- **Search tab — `tag.fill` instead of folder icon on tags.** The
+  current folder SF Symbol on the tag chips reads as "navigate into a
+  folder" rather than "filter by tag" — pure SF Symbol swap to
+  `tag.fill` should fix the affordance. Size: S. Verify the chip
+  visuals still balance with the symbol's bounding box; if not, may
+  need spacing tweaks too.
+
+- **Widget readability under "Clear" and "Tinted" home-screen
+  appearances.** iOS 18+ home-screen icon/widget modes (Clear, Tinted,
+  Dark beyond standard dark mode) wash out the existing widget cards.
+  Need to audit `WidgetCard` (both featured and saved variants) in all
+  three appearances and ensure text + key visual elements stay
+  legible. Likely needs `widgetAccentedRenderingMode` / accent-color
+  handling. Size: M. Pair with US-18 audit-style framing — produce a
+  matrix and fix what fails.
+
+- **"Today's Recipe" widget → rename + show real recipe image.** Two
+  changes to the existing US-9 widget:
+  1. Rename display name from "Today's Recipe" to "Latest Recipe"
+     (less ambiguous about cadence — the widget already reflects the
+     most recent post, not a daily-curated pick).
+  2. The placeholder knife-and-fork glyph should be replaced with the
+     actual recipe hero image. The widget already has the recipe ID;
+     needs the host to ensure the hero image is exported to the App
+     Group container so the widget extension can render it (saved
+     widget hit the same limitation per T-322's nil-filename note).
+  Size: M for the image bridge, S for the rename. Will need a CL on
+  the rename in case anyone has the old name pinned in screenshots
+  or marketing.
+
+- **Lock-screen widget for "Latest Recipe" (rectangular).** Add a
+  rectangular-family lock-screen widget that shows the latest
+  recipe's title + short description as text only. Lock-screen
+  widgets are text/info-only by design (no image rendering, monochrome
+  rendering pipeline) so this is a clean addition — reuses the same
+  snapshot the home-screen widget reads, just in a different
+  `WidgetConfiguration` with a `.accessoryRectangular` family.
+  Size: M. AC will need to cover the iOS 16+ availability gate (same
+  pattern as US-11's `ActivityKit` gate).
+
+- **Heart → bookmark everywhere in the saved-recipes context.**
+  Reverses the in-recipe carve-out from AC-16.3 (which left the
+  navigation-bar Save heart on `RecipeDetailView` intentionally
+  unchanged). The user is now saying the icons should be consistent
+  with the Saved tab — bookmark everywhere. Touches:
+  1. `RecipeDetailView` navigation-bar Save button (AC-4.7 / AC-5.1 —
+     "Save button (heart icon)") — change wording in spec, swap glyph.
+  2. AC-5.8 empty-state copy "Tap the heart on any recipe to save it
+     for offline" — reword to "Tap the bookmark…".
+  3. Audit anywhere else "heart" appears in copy or imagery in
+     saved-context (search results, related-recipes, etc.).
+  This is a deliberate amendment to AC-16.3 — when this graduates,
+  the clarification should explicitly note that CL-24 (which fixed
+  the tab icon) is now extended to the in-recipe surface too. Size: S
+  for the swap; the audit-for-stray-hearts is what makes it M.
+
 ## Recently graduated
 
 Items that left the backlog after going through Specify → Clarify → Plan →
