@@ -125,22 +125,6 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
 
 #### Polish
 
-- **Ratings & Reviews button layout + sticky-actions cleanup.**
-  - **Swap "Submit" and "Cancel" button positions** in the rating-submit
-    composer. Worth a CL on the iOS convention here — typically primary
-    actions live at the trailing/right edge with cancel at leading/left
-    on iPhone, but `confirmationDialog` and `alert` defaults differ.
-    Capture the chosen pattern + cite Apple HIG when this graduates.
-  - **Remove the sticky save + share buttons above the tab bar** on
-    `RecipeDetailView`. T-302 added these as a floating-actions row
-    (`RecipeDetailFloatingActions.swift`) so the affordances stay
-    reachable when scrolled past the hero. User is now saying the
-    top-of-screen save + share (in the navigation bar, `AC-4.7` +
-    `AC-4.8`) are sufficient and the sticky duplicates clutter the
-    bottom. Removes one file (`RecipeDetailFloatingActions.swift`) plus
-    its call site in `RecipeDetailView`. Amends the post-Phase-6 T-302
-    "polish" decision. Size: **S** (~1h).
-
 - **Categories tab brown.** The categories list cells + the
   `.searchable` field background in the Categories tab should pick up
   the same brown used by the recipe cards in the main Recipes tab
@@ -228,7 +212,7 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
 | Item | Size | Notes |
 |---|---|---|
 | Settings page | L | Splits into multiple T-NNN at spec time |
-| Ratings layout cleanup | S | Amends T-302 |
+| ~~Ratings layout cleanup~~ | ~~S~~ | Graduated → US-26 / CL-41/42 / T-410 |
 | Categories tab brown | S–M | Needs CL on cell-vs-surface tinting |
 | ~~Saved widget description~~ | ~~XS~~ | Graduated to US-25 / CL-40 / T-400 |
 | L2 new-recipe test | S | New REG-16 |
@@ -337,3 +321,19 @@ useful reference.
   description string lives in the iOS widget gallery UI, not on the
   rendered widget face. Same pattern CL-36 established for the
   "Today's Recipe" → "Latest Recipe" rename.
+- **Ratings & Reviews button layout + sticky-actions cleanup** —
+  became **US-26** (AC-26.1 through AC-26.5) +
+  [CL-41](clarifications.md) (Submit/Cancel order in `CommentComposer`
+  with Apple HIG citation) + [CL-42](clarifications.md) (sticky
+  `RecipeDetailFloatingActions` removal, explicitly amending T-302's
+  Phase 6 polish decision) + [T-410](tasks.md). The nav-bar Save
+  (`AC-4.7`, bookmark glyph post-T-380) + Share (`AC-4.8`) are now
+  the single in-recipe affordance for both actions; the duplicate
+  bottom-trailing sticky stack is removed.
+  `RecipeDetailFloatingActions.swift` is deleted; its call site in
+  `RecipeDetailView`'s `.overlay(alignment: .bottomTrailing)` is
+  removed. `CommentComposer.actions` swaps Cancel + Submit positions
+  so Submit (primary) sits at the trailing edge and Cancel
+  (`role: .cancel`) at the leading edge — HIG-compliant iPhone sheet
+  pattern. AC-4.7 footnote amended to point at CL-42 / US-26;
+  US-4 / US-7 / US-13 / US-14 ACs explicitly pinned by AC-26.4.
