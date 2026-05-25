@@ -56,20 +56,6 @@ shipped. See "Recently graduated" below for the trail._
   handling. Size: M. Pair with US-18 audit-style framing — produce a
   matrix and fix what fails.
 
-- **"Today's Recipe" widget → rename + show real recipe image.** Two
-  changes to the existing US-9 widget:
-  1. Rename display name from "Today's Recipe" to "Latest Recipe"
-     (less ambiguous about cadence — the widget already reflects the
-     most recent post, not a daily-curated pick).
-  2. The placeholder knife-and-fork glyph should be replaced with the
-     actual recipe hero image. The widget already has the recipe ID;
-     needs the host to ensure the hero image is exported to the App
-     Group container so the widget extension can render it (saved
-     widget hit the same limitation per T-322's nil-filename note).
-  Size: M for the image bridge, S for the rename. Will need a CL on
-  the rename in case anyone has the old name pinned in screenshots
-  or marketing.
-
 - **Lock-screen widget for "Latest Recipe" (rectangular).** Add a
   rectangular-family lock-screen widget that shows the latest
   recipe's title + short description as text only. Lock-screen
@@ -130,3 +116,13 @@ useful reference.
   token churn, no `CategoryRecipesView` change, US-2's
   AC-2.1..AC-2.5 explicitly pinned by AC-19.4. Shipped in
   [#22](https://github.com/adamsned/dod-ios-app/pull/22).
+- **"Today's Recipe" widget → rename + show real recipe image** —
+  became **US-21** (AC-21.1 through AC-21.6) + [T-360](tasks.md), with
+  the file-export image bridge decision (vs shared-SwiftData-container
+  vs widget-side URLSession) captured in
+  [CL-35](clarifications.md) and the display-name rename rationale in
+  [CL-36](clarifications.md). T-360 builds the bridge + wires the
+  featured widget; saved widget consumption is the
+  [T-361](tasks.md) follow-up (same bridge, second consumer — clears
+  T-322's open "Future work" note). Shipped in
+  [#XX](https://github.com/adamsned/dod-ios-app/pull/XX).
