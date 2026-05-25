@@ -961,15 +961,30 @@ Single-task cluster for US-19 / CL-31..33. Layout-pass over `CategoryListView`, 
 
 ---
 
+## Phase 10 — In-recipe glyph consolidation (2026-05-24)
+
+Single-task cluster for CL-38 / amended US-16. Reverses the AC-16.3 carve-out from T-310: every saved-recipes surface now uses `bookmark` / `bookmark.fill`, including the in-recipe Save button that T-310 deliberately left as a heart. Sweep covers navigation bar, sticky floating action, empty state copy + glyph, onboarding bullet copy + glyph, and the Siri shortcut glyph for `OpenSavedRecipesIntent`. Wire-format analytics strings (`kind: .saved` in `widgetOpened`) and Live Activity glyphs are explicitly out of bounds — see CL-38.
+
+### T-380 — Heart → bookmark in saved-recipes surfaces (CL-38, amends AC-16.3)
+- **Scope:** Sweep every `Image(systemName: "heart")` / `"heart.fill"` and "heart" copy string in the saved-recipes context to `"bookmark"` / `"bookmark.fill"` / "bookmark". Touches: `RecipeDetailView` nav-bar Save button (`AC-4.7`), `RecipeDetailFloatingActions` sticky Save button (T-302's variant of the same affordance, also `AC-4.7`), `SavedView` empty state (`AC-5.8` icon + copy), `OnboardingSheet` welcome bullet (`AC-8.1` copy + glyph, plus the in-file `#Preview` and the test fixture in `SnapshotTests+AppearanceAudit`), `RootView.welcomeBullets` (the production source of those bullets), `RecipeAppIntents.DODShortcuts` (`OpenSavedRecipesIntent` `systemImageName` per `AC-10.4`), `EmptyState.swift` `#Preview` doc-fixture, `SnapshotTests` test fixture (matches the production copy), comment / doc-string scrubs in `AppTab.swift`, `AnalyticsEvent.swift` (`recipeSaved` / `recipeUnsaved` doc comments), `Colors.swift` (accent comment), `AppTabTests.swift` (comment about the in-recipe heart now superseded), plus the `accessibility-audit.md` "Save heart button" row, the `plan.md` "Heart toggle" + accent-color comments, the `Marketing/AppStoreCopy.md` "tap the heart" line, and the `Marketing/Screenshots/README.md` "heart-filled state" note. **Snapshot baseline re-record:** every L4 baseline that renders a save button or an EmptyState heart (DesignSystem `test_emptyState_default*`, `test_onboardingSheet_default*`, plus any RecipeDetail / Saved baseline once the new glyph is in place). **Visually review each PNG before commit.** **Out of bounds:** the wire-format string `WidgetKind.saved` in `AnalyticsEvent.widgetOpened` (internal — not user-facing copy); Live Activity Cook Mode glyphs (US-11 territory); other tab icons; brand-token names like `castIronBrown` / `burntOrange`.
+- **Files:** `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/RecipeDetailView.swift`, `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/RecipeDetailFloatingActions.swift`, `Packages/DODFeatureSaved/Sources/DODFeatureSaved/SavedView.swift`, `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/EmptyState.swift`, `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/OnboardingSheet.swift`, `App/RootView.swift`, `App/RecipeAppIntents.swift`, `App/AppTab.swift`, `Packages/DODAnalytics/Sources/DODAnalytics/AnalyticsEvent.swift`, `Packages/DODDesignSystem/Sources/DODDesignSystem/Colors.swift`, `AppTests/AppTabTests.swift`, `Packages/DODDesignSystem/Tests/DODDesignSystemTests/SnapshotTests.swift`, `Packages/DODDesignSystem/Tests/DODDesignSystemTests/SnapshotTests+AppearanceAudit.swift`, `specs/dod-ios-app/accessibility-audit.md`, `specs/dod-ios-app/plan.md`, `Marketing/AppStoreCopy.md`, `Marketing/Screenshots/README.md`, plus the re-recorded L4 baselines under each touched test target's `__Snapshots__/`.
+- **AC:** Implements amended AC-4.7, AC-5.1, AC-5.8, AC-8.1, AC-16.3 (all amended by CL-38); pins AC-10.4 (Siri shortcut glyph stays consistent with the in-app glyph).
+- **Deps:** — (independent; runs against current main; assumes T-310 already shipped the tab-icon half of CL-24).
+- **Est:** 2h (sweep is small; visual review of every re-recorded snapshot is what makes it M-shaped per the backlog estimate).
+- **||:** P10-glyph
+
+---
+
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) = 96
-- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) + ~2 hours (Phase 9) = ~203 hours
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 1 (Phase 10 glyph consolidation: T-380) = 97
+- **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) + ~2 hours (Phase 9) + ~2 hours (Phase 10) = ~205 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.
 - **Parallel clusters once Cluster C + D land:** E-feed, E-cats, E-search, E-detail, E-saved can all run simultaneously (Saved depends on Detail finishing the offline path).
 - **Phase 6 parallelism:** F6-cards, F6-icon, F6-detail, F6-onb can all run in parallel. F6-cook (T-304, T-305) is the only sequential thread inside Phase 6.
 - **Phase 8 parallelism:** P8-tab (T-310) and P8-darkmode (T-330) are fully independent. The widget cluster sequences T-320 → T-321 → T-322 → T-323 internally but is independent of P8-tab and P8-darkmode externally. So three worktrees can run simultaneously: one on T-310, one on T-320 (then handing forward inside the cluster), one on T-330.
 - **Phase 9 parallelism:** P9-categories (T-340) is independent of every Phase 8 task and is the only Phase 9 work item.
+- **Phase 10 parallelism:** P10-glyph (T-380) is independent — assumes T-310 already shipped.
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

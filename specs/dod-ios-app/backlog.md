@@ -80,22 +80,6 @@ shipped. See "Recently graduated" below for the trail._
   Size: M. AC will need to cover the iOS 16+ availability gate (same
   pattern as US-11's `ActivityKit` gate).
 
-- **Heart → bookmark everywhere in the saved-recipes context.**
-  Reverses the in-recipe carve-out from AC-16.3 (which left the
-  navigation-bar Save heart on `RecipeDetailView` intentionally
-  unchanged). The user is now saying the icons should be consistent
-  with the Saved tab — bookmark everywhere. Touches:
-  1. `RecipeDetailView` navigation-bar Save button (AC-4.7 / AC-5.1 —
-     "Save button (heart icon)") — change wording in spec, swap glyph.
-  2. AC-5.8 empty-state copy "Tap the heart on any recipe to save it
-     for offline" — reword to "Tap the bookmark…".
-  3. Audit anywhere else "heart" appears in copy or imagery in
-     saved-context (search results, related-recipes, etc.).
-  This is a deliberate amendment to AC-16.3 — when this graduates,
-  the clarification should explicitly note that CL-24 (which fixed
-  the tab icon) is now extended to the in-recipe surface too. Size: S
-  for the swap; the audit-for-stray-hearts is what makes it M.
-
 ## Recently graduated
 
 Items that left the backlog after going through Specify → Clarify → Plan →
@@ -130,3 +114,12 @@ useful reference.
   token churn, no `CategoryRecipesView` change, US-2's
   AC-2.1..AC-2.5 explicitly pinned by AC-19.4. Shipped in
   [#22](https://github.com/adamsned/dod-ios-app/pull/22).
+- **Heart → bookmark everywhere in the saved-recipes context** —
+  became [CL-38](clarifications.md) + amended `AC-4.7`, `AC-5.1`,
+  `AC-5.8`, `AC-8.1`, `AC-16.3` (the last via explicit reversal of
+  T-310's carve-out) + [T-380](tasks.md). Extends CL-24's bookmark
+  decision into every saved-recipes surface: in-recipe nav-bar Save
+  button, sticky floating Save button, Saved tab empty state, Save
+  snackbar wording, onboarding bullet copy, `OpenSavedRecipesIntent`
+  Siri shortcut glyph. Wire-format `widgetOpened` `kind: .saved` and
+  US-11 Live Activity glyphs explicitly out of scope per CL-38.
