@@ -35,21 +35,12 @@ Format suggestion (not enforced):
 > `2190f27`, app icon `1b8e027`, today's-featured widget `e0aebc6`). Moved
 > here when the file relocated under `specs/dod-ios-app/`.
 
-_Five of the six 2026-05-24 captures have graduated to spec-driven
-work and shipped. See "Recently graduated" below for the trail. The
-remaining capture (widget readability under Clear/Tinted home-screen
-appearances) is still open._
+_All six 2026-05-24 captures have graduated to spec-driven work and
+shipped. See "Recently graduated" below for the trail._
 
 ### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
 
-- **Widget readability under "Clear" and "Tinted" home-screen
-  appearances.** iOS 18+ home-screen icon/widget modes (Clear, Tinted,
-  Dark beyond standard dark mode) wash out the existing widget cards.
-  Need to audit `WidgetCard` (both featured and saved variants) in all
-  three appearances and ensure text + key visual elements stay
-  legible. Likely needs `widgetAccentedRenderingMode` / accent-color
-  handling. Size: M. Pair with US-18 audit-style framing — produce a
-  matrix and fix what fails.
+_(empty — all items graduated; see "Recently graduated" below.)_
 
 ## Recently graduated
 
@@ -124,4 +115,19 @@ useful reference.
   captured in [CL-37](clarifications.md). Text-only rendering by
   design; reuses the US-9 `WidgetSnapshot` wire format so no new
   snapshot file, no new App Group key, no new host-side observer,
-  no new `WidgetDeepLinkParser` case. Locked by REG-22.
+  no new `WidgetDeepLinkParser` case. Locked by REG-22. Shipped in
+  [#26](https://github.com/adamsned/dod-ios-app/pull/26).
+- **Widget readability under "Clear" and "Tinted" home-screen
+  appearances** — became **US-23** (AC-23.1 through AC-23.6) +
+  [CL-39](clarifications.md) + [T-390](tasks.md). Audit-style task
+  per the same framing CL-30 established for US-18: inventory every
+  home-screen widget surface × every iOS 18+ rendering-mode value
+  (`.fullColor` / Standard, `.accented` / Tinted, `.vibrant` /
+  Vibrant) plus the existing Standard-dark pair, document the matrix
+  in `widget-appearance-audit.md`, and apply targeted fixes for any
+  surface that fails. Lock-screen widget (US-22 / T-370, merged via
+  PR #26) explicitly scoped out — lock-screen accessory widgets use
+  a different system rendering pipeline (monochrome vibrancy on Lock
+  Screen, not the home-screen Tinted/Clear pipeline this story
+  audits). Clean-audit closure (AC-23.6) explicitly authorized —
+  mirror of AC-18.6.
