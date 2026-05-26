@@ -61,17 +61,33 @@ public struct SearchView: View {
                 recents: viewModel.recentSearches,
                 topCategories: viewModel.topCategorySuggestions,
                 onRecentTap: { viewModel.selectRecent($0) },
+                // US-29 / AC-29.1 / CL-49.1 + CL-49.5: tapping a "Try"
+                // category pill populates the search field and runs a
+                // normal text query through the existing debounce path.
+                // The pre-T-500 path also set `filters.categoryID`, which
+                // dropped every REST result whose recipe-detail page
+                // hadn't yet hydrated the local category-IDs cache — the
+                // smoking gun behind the "tag search returns no results"
+                // round-6 report. CL-49 documents the full root cause.
                 onCategoryTap: { category in
-                    viewModel.filters.categoryID = category.id
                     viewModel.query = category.name
-                }
+                },
+                onClearRecents: { viewModel.clearRecentSearches() }
             )
         case .searching:
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .noResults:
+            // US-29 / AC-29.3 / CL-49.3: glyph swap from
+            // `questionmark.folder` to `questionmark.circle`. Explicitly
+            // reverses AC-20.3's carve-out — round-6 user feedback was
+            // that `questionmark.folder` reads as "in some folder I
+            // haven't found" rather than "not found, period."
+            // `questionmark.circle` is the iOS-stock "I can't find what
+            // you asked for" glyph (Settings' search, Mail's search,
+            // Notes' search all use it).
             EmptyState(
-                systemImage: "questionmark.folder",
+                systemImage: "questionmark.circle",
                 title: "No recipes match '\(viewModel.query)'",
                 message: "Try a different word or clear a filter."
             )
@@ -130,9 +146,21 @@ struct FilterChipRow: View {
 
     private var categoryChip: some View {
         Menu {
-            Button("All categories") { filters.categoryID = nil }
+            // US-29 / AC-29.4 / CL-49.4: the "All categories" first row
+            // is intentionally absent — the Categories tab (reachable
+            // via bottom nav) is the canonical "browse all categories"
+            // affordance. To clear a picked category here the user
+            // re-taps the same category in the menu to deselect it.
+            // The chip's display label still reads "All categories"
+            // via `selectedCategoryName` when no category is picked.
             ForEach(categories) { category in
-                Button(category.name) { filters.categoryID = category.id }
+                Button(category.name) {
+                    if filters.categoryID == category.id {
+                        filters.categoryID = nil
+                    } else {
+                        filters.categoryID = category.id
+                    }
+                }
             }
         } label: {
             chipLabel(
@@ -208,6 +236,7 @@ struct IdleSuggestionsView: View {
     let topCategories: [DODDomain.Category]
     let onRecentTap: (String) -> Void
     let onCategoryTap: (DODDomain.Category) -> Void
+    let onClearRecents: () -> Void
 
     var body: some View {
         if recents.isEmpty && topCategories.isEmpty {
@@ -220,15 +249,13 @@ struct IdleSuggestionsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DODSpacing.lg) {
                     if !recents.isEmpty {
-                        section(title: "Recent") {
-                            FlowLayout(spacing: DODSpacing.xs) {
-                                ForEach(Array(recents.enumerated()), id: \.offset) { _, query in
-                                    pill(text: query, systemImage: "clock") {
-                                        onRecentTap(query)
-                                    }
-                                }
-                            }
-                        }
+                        // US-29 / AC-29.2 / CL-49.2: the "Recent" section
+                        // header is rendered with the title at the
+                        // leading edge and a "Clear All" button at the
+                        // trailing edge. The button wipes the
+                        // `UserDefaults`-backed recent-searches store
+                        // via `RecentSearches.clear()`.
+                        recentsSection
                     }
                     if !topCategories.isEmpty {
                         section(title: "Try") {
@@ -243,6 +270,28 @@ struct IdleSuggestionsView: View {
                     }
                 }
                 .padding(DODSpacing.md)
+            }
+        }
+    }
+
+    private var recentsSection: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            HStack {
+                Text("Recent")
+                    .dodFont(DODType.heading)
+                    .foregroundStyle(DODColor.label)
+                Spacer()
+                Button("Clear All", action: onClearRecents)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.castIronBrown)
+                    .accessibilityLabel("Clear all recent searches")
+            }
+            FlowLayout(spacing: DODSpacing.xs) {
+                ForEach(Array(recents.enumerated()), id: \.offset) { _, query in
+                    pill(text: query, systemImage: "clock") {
+                        onRecentTap(query)
+                    }
+                }
             }
         }
     }

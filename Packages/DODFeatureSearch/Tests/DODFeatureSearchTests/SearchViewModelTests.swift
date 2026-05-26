@@ -152,6 +152,23 @@ import Testing
         #expect(secondVM.recentSearches.contains("pizza"))
     }
 
+    @Test func clearRecentSearchesEmptiesStore() async {
+        // US-29 / AC-29.2 / CL-49.2: `clearRecentSearches()` wipes both
+        // the persisted `RecentSearches` store and the in-memory array
+        // the view binds to.
+        let scratch = Self.scratchRecents()
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["pasta"] = [Self.makeItem(1)]
+        let viewModel = SearchViewModel(dependencies: dependencies, recentSearches: scratch)
+        viewModel.query = "pasta"
+        await viewModel.runImmediateSearch()
+        #expect(viewModel.recentSearches.first == "pasta")
+
+        viewModel.clearRecentSearches()
+        #expect(viewModel.recentSearches.isEmpty)
+        #expect(scratch.recent().isEmpty)
+    }
+
     @Test func selectRecentReRunsSearchWithStoredQuery() async {
         let dependencies = FakeSearchDependencies()
         dependencies.results["tacos"] = [Self.makeItem(5, title: "Beef Tacos")]
