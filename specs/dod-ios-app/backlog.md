@@ -89,6 +89,70 @@ Don't graduate these into spec work without a real user signal — they
 either need a paired web-side effort (Universal Links) or have
 non-trivial scope risk (Watch, Collections).
 
+### Captured 2026-05-25 (round 5, @spencer0706) — widget fixes that didn't actually fix the bugs
+
+After T-362 (PR #34, commit `0aa8633`) and T-394 (PR #37, commit `5f500c8`) merged
+and Spencer rebuilt the simulator with both fixes, **both bugs still appear to be
+present from the user's perspective.** Re-opening with new IDs so the next attempt
+starts fresh instead of patching the same patches.
+
+- **REG-T-362-v2 — Latest Recipe widget image still shows fork-and-knife.** T-362
+  added a feed-side image prefetch through `RecipeStore.cacheImage(...)` to
+  populate the App Group container (verified: 5 `.img` files appear after 20s).
+  The bridge writes are confirmed working at the file-system level, but the
+  widget still renders the placeholder in Spencer's testing. Possible gaps to
+  investigate:
+  1. Widget snapshot reads the filename but `AsyncImage` at the resolved
+     `file://` URL fails silently (file permissions, sandbox boundary, URL
+     malformation).
+  2. Widget timeline cache holds the pre-T-362 snapshot for longer than
+     expected; `WidgetCenter.shared.reloadAllTimelines()` may need to be called
+     explicitly post-prefetch instead of waiting for the natural 15-min cap.
+  3. The widget extension's filename → file-URL resolution path in
+     `FeaturedRecipeWidgetEntryView` may have a bug introduced by T-362 that
+     wasn't caught because the manual verification only checked file presence,
+     not widget rendering on the home screen.
+  Reproduce: fresh-install the app, add the Latest Recipe widget to the home
+  screen, browse the Recipes tab for 20s, force-reload the widget (or wait the
+  natural cap), confirm whether the widget shows a real recipe image.
+
+- **REG-T-394-v2 — Tinted/Clear home-screen widget still has the readability bug.**
+  T-394 added `widgetAccentedRenderingMode(.fullColor)` on the scrim + text
+  overlay groups via PR #37 / commit `5f500c8`. The snapshot tests it re-recorded
+  show legible text. But Spencer's real-home-screen test in Tinted mode still
+  surfaces the white-on-white-ish problem. Possible gaps:
+  1. The `.fullColor` opt-out is being applied at the wrong scope — needs to be
+     on each `Image` / `LinearGradient` individually rather than on the VStack
+     containing them.
+  2. The widget's `containerBackground` strips even the `.fullColor`-marked
+     children in `.accented` mode (iOS 18+ behavior may be more aggressive than
+     documented).
+  3. T-394's snapshot tests render the view in a test host that doesn't fully
+     replicate the system Tinted rendering pipeline — the snapshot looks fine
+     because the test environment isn't the real environment.
+  Reproduce: install fresh build, add Latest Recipe widget, switch home screen
+  to Tinted mode (long-press → Edit → tint → pick a bright color), confirm
+  whether title is readable. Crucial: this is now the SECOND attempt at this fix
+  (T-390 → T-394). The next attempt should NOT rely on snapshot tests as proof
+  — it should require a real home-screen install + screenshot in Tinted mode
+  before merging.
+
+#### Lessons to bake into future widget-fix tasks
+
+- **L4 snapshot tests don't replicate the real widget rendering pipeline.** Both
+  REG-T-362-v2 and REG-T-394-v2 had snapshot tests that passed while the real
+  widget on the real home screen stayed broken. Any future widget-bug fix should
+  take a real screenshot from the installed widget on the home screen, not just
+  from the test host.
+- **The image bridge needs an end-to-end widget render verification, not just a
+  file-presence check.** T-362's verification confirmed bytes hit the App Group
+  directory; it never confirmed the widget read them and rendered them.
+- **A "fix" that passes its own audit but the user still sees the bug means the
+  audit's threshold was wrong.** T-390 → T-394 → REG-T-394-v2 is now a chain of
+  this same failure mode. The next attempt at REG-T-394-v2 needs to define
+  "fixed" as "Spencer (or dad) looks at the simulator and confirms the bug is
+  gone" — not as "the snapshot test passes."
+
 ### Captured 2026-05-25 (round 4, @spencer0706)
 
 Mix of new surfaces, polish, an L2 test addition, and two regression
