@@ -72,14 +72,8 @@ into a reason the native app exists. Tier 1 from the consultant pass on
   Turns the recipe app you cook *from* into the grocery list you shop
   *from*. Massive utility loop.
 
-- **Recipe scaling** — tap "Serves 4" → stepper or slider → choose new
-  serving count → all ingredient quantities multiply with proper
-  fraction handling (½ cup × 1.5 → ¾ cup, not 0.75). Optional warning
-  at scales the typical home dutch oven physically can't hold (rough
-  rule: >12 servings on a 5-quart). Pure presentation logic; no schema
-  change since the source recipe is untouched. Size: **S** (~3 days).
-  Every recipe-app review on the App Store wants this and almost
-  nobody does it well.
+_(Graduated — see "Recently graduated" below: US-31 / CL-52 / T-440
+shipped the stepper + `FractionRenderer` + warning copy.)_
 
 **Explicitly deferred from this round** (consultant Tier 2+ — capture
 later if v1.x user reviews call for them): Universal Links to the
@@ -515,6 +509,34 @@ useful reference.
   CL-49.3 explicitly reverses [AC-20.3](spec.md)'s
   `questionmark.folder` carve-out per round-6 user feedback.
   Implementing PR: T-500.
+- **Recipe scaling (round-3 backlog, dad's idea)** — graduated to
+  **US-31** (AC-31.1 through AC-31.8) + [CL-52](clarifications.md) +
+  [T-440](tasks.md). Tap a "Serves N" stepper near the recipe meta row;
+  ingredient quantities re-render multiplied by `userServings /
+  sourceServings` with cook-friendly fractions (½ × 1.5 → ¾, not 0.75;
+  2 ½ × 2 → 5, not 5.0). The new `FractionRenderer` utility lives in
+  `DODSupport` so the recipe-detail view + Cook Mode drawer both consume
+  the same canonical fraction table (eighth-cup precision per CL-52:
+  `{1/8, 1/4, 1/3, 1/2, 2/3, 3/4, 7/8}` + whole numbers, with a 1/16 snap
+  tolerance). Source `Recipe.servings` and `RecipeIngredient.text` are
+  never mutated — scaling is pure presentation per AC-31.8. Non-blocking
+  warning caption renders below the stepper at > 12 servings ("Most home
+  dutch ovens (5-quart) cap out around 12 servings. Consider doubling
+  the recipe in two batches instead.") with the threshold rationale +
+  encapsulation in CL-52. No new analytics, no new persistence schema,
+  no new wire format, no `Recipe` / `RecipeIngredient` schema change.
+  Stepper range 1...24 (clamped at view-model layer). Cook Mode's
+  `CookModeView.init` gains an additive `ingredientScaleFactor: Double = 1.0`
+  parameter, defaulted so existing call sites stay unbroken. Locked
+  by 26 L1 `FractionRendererTests` cases in `DODSupport` covering the
+  four backlog-quote load-bearing examples + the decimal-source snap +
+  the canonical fraction table + the warning-threshold boundary, 8 L1
+  view-model tests in `RecipeDetailViewModelTests` covering default-fallback /
+  source-yield sync / no-op-after-manual / range clamping / scale-factor
+  math / warning kick-in / AC-31.7 check-state survival / AC-31.8
+  source-recipe immutability, and 6 L4 `RecipeServingsScalerSnapshotTests`
+  baselines covering the three scale points (default = 4, scaled-up = 8,
+  warning = 16) in light + dark per the constitution §6 L4 mandate.
 - **New-recipe surfacing — new Dutch Oven Daddy recipes don't show up in
   the app** — graduated to [REG-18](spec.md) + [CL-50](clarifications.md) +
   [T-510](tasks.md). Root cause traced: `WPRestClient.get(path:queryItems:)`
