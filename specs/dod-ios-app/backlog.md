@@ -271,7 +271,21 @@ useful reference.
   a different system rendering pipeline (monochrome vibrancy on Lock
   Screen, not the home-screen Tinted/Clear pipeline this story
   audits). Clean-audit closure (AC-23.6) explicitly authorized —
-  mirror of AC-18.6.
+  mirror of AC-18.6. Follow-up: T-394 (Featured widget contrast fix
+  per [CL-46](clarifications.md) + [AC-23.7](spec.md), parallel
+  branch `fix/T-394-widget-text-contrast`) and T-395 (Saved widget
+  contrast audit verdict — clean, no source fix needed, per CL-46
+  sibling entry, parallel branch
+  `fix/T-395-saved-widget-tint-contrast`). Both branches add their
+  own copy of CL-46 + AC-23.7 and collide deliberately at merge
+  time; T-395's clean-audit verdict means the saved-widget surfaces
+  (`WidgetCard.SavedSmall`, `WidgetCard.SavedMedium`,
+  `WidgetCard.SavedEmpty`, `WidgetCard.SavedListRow`) ship no source
+  change — they enforce AC-23.7 by-construction because the layouts
+  render text NEXT TO the `Hero` thumbnail (VStack / HStack), not
+  OVER it (no `ZStack` overlay), so the smoking-gun text-over-image
+  failure mode T-394 fixes does not exist in `WidgetCard+Saved.swift`
+  today.
 - **"Saved Recipes" widget description copy rewrite** — became
   **US-25** (AC-25.1 through AC-25.3) + [CL-40](clarifications.md) +
   [T-400](tasks.md). Single user-facing string change in
