@@ -80,11 +80,29 @@ final class AppDependencies {
         let reload: LiveFeedDependencies.WidgetReloadHook = { _ in
             WidgetCenter.shared.reloadAllTimelines()
         }
+        // Fixes REG-T-360 / CL-45. The widget snapshot's
+        // `heroImageFilename` strings are deterministic SHA256-of-URL,
+        // but the bridge files only exist after `RecipeStore.cacheImage`
+        // writes them. T-360 wired the cache-side hook but no production
+        // call site asked for feed hero bytes — only saved-recipe
+        // pre-download (AC-5.2). This prefetcher closes that gap by
+        // routing the snapshotted hero URLs through the same
+        // `ImageLoader` + `cacheImage` path. Fire-and-forget inside
+        // `LiveFeedDependencies.publishWidgetSnapshot(items:)`.
+        let loader = imageLoader
+        let cacheStore = store
+        let prefetch: LiveFeedDependencies.ImagePrefetcher = { urls in
+            for url in urls {
+                guard let bytes = try? await loader.data(for: url) else { continue }
+                try? await cacheStore.cacheImage(url: url, bytes: bytes)
+            }
+        }
         return LiveFeedDependencies(
             client: restClient,
             store: store,
             monitor: networkMonitor,
-            widgetReload: reload
+            widgetReload: reload,
+            imagePrefetcher: prefetch
         )
     }
 

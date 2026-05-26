@@ -143,33 +143,7 @@ see "Recently graduated" below.)_
 
 #### Regression reports — work that just shipped but the user still sees broken
 
-- **REG-T-360 — "Latest Recipe" widget still shows fork-and-knife.**
-  T-360 / [#24](https://github.com/adamsned/dod-ios-app/pull/24) built
-  the file-export image bridge (CL-35 Option A) and wired the featured
-  widget to render real images via `WidgetImageBridge.fileURL(forFilename:)`.
-  User reports the widget still renders the placeholder glyph after
-  reinstalling the app, browsing the feed, and waiting for snapshots
-  to refresh. Possible causes worth investigating before treating as a
-  confirmed bug:
-  1. **Fresh-install transient.** `RecipeStore.cacheImage(...)` only
-     fires when the app actually loads image bytes; if the feed loaded
-     but the hero images haven't been pre-cached yet, the App Group
-     directory is empty and the widget falls back to placeholder per
-     `CL-35.3`. Wait ~30s after a feed scroll, then check.
-  2. **Bridge isn't writing.** The `feat(T-360)` impl plumbed
-     filenames into the snapshot writer in `LiveFeedDependencies.publishWidgetSnapshot`,
-     but the host-side file write happens in
-     `RecipeStore+ImageCache.swift`. Verify the write actually fires
-     by inspecting `~/Library/Developer/CoreSimulator/Devices/.../Shared/AppGroup/<group-id>/`
-     for `*.img` files.
-  3. **Widget timeline cache.** WidgetCenter may still be holding the
-     pre-T-360 timeline; force-reload via `WidgetCenter.shared.reloadAllTimelines()`
-     during testing.
-
-  If investigation confirms the bridge isn't populating files on the
-  host side, this becomes a fix for `T-360`'s implementation. Size:
-  **M** (debug + fix). Reference [`CL-35`](clarifications.md),
-  [`AC-21.2`](spec.md), [`AC-21.3`](spec.md).
+_(REG-T-360 graduated — see "Recently graduated" below.)_
 
 - **REG-T-390 — Home-screen widgets still unreadable in Tinted / Clear.**
   T-390 / [#27](https://github.com/adamsned/dod-ios-app/pull/27) audited
@@ -206,7 +180,7 @@ see "Recently graduated" below.)_
 | Categories tab brown | S–M | Needs CL on cell-vs-surface tinting |
 | ~~Saved widget description~~ | ~~XS~~ | Graduated to US-25 / CL-40 / T-400 |
 | ~~L2 new-recipe test~~ | ~~S~~ | Graduated to REG-16 / CL-43 / T-420 |
-| REG-T-360 widget image | M | Investigate fresh-install transient first |
+| ~~REG-T-360 widget image~~ | ~~M~~ | Graduated to CL-45 / T-362 |
 | REG-T-390 widget text | M | T-390 was overconfident; T-394 follow-up |
 
 ## Recently graduated
@@ -354,3 +328,19 @@ useful reference.
   dark modes (the brand brown does not vary by appearance). Six
   `CategoryListViewSnapshotTests` baselines re-recorded; row text + cells
   + filter logic + view model untouched per AC-24.4.
+- **REG-T-360 — Latest Recipe widget hero image** — graduated to
+  [CL-45](clarifications.md) + [T-362](tasks.md). T-360 shipped the
+  `WidgetImageBridge` (CL-35 Option A) and wired the host-side file
+  write inside `RecipeStore.cacheImage(url:bytes:)`, but the only
+  production caller of `cacheImage` was `LiveSavedDependencies.preDownloadImages`
+  (AC-5.2 saved-recipe pre-download). The feed-load path populated
+  the snapshot's `heroImageFilename` strings without ever asking
+  `cacheImage` to write the bytes — files never existed, widget fell
+  back to placeholder. T-362 adds a fire-and-forget prefetch to
+  `LiveFeedDependencies.publishWidgetSnapshot(items:)` that routes
+  the trimmed `WidgetSnapshotConfig.maxEntries` hero URLs through
+  `ImageLoader.data(for:)` + `RecipeStore.cacheImage(url:bytes:)`,
+  letting the existing bridge fire for free. Diagnostic logs
+  added inside `cacheImage` and `WidgetImageBridge.writeImage` so
+  the next regression of this shape surfaces in `Console.app`.
+  Shipped in [#34](https://github.com/adamsned/dod-ios-app/pull/34).

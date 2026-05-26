@@ -19,6 +19,17 @@ extension RecipeStore {
 
     public func cacheImage(url: URL, bytes: Data, pinnedToSavedRecipeID: Int? = nil) throws {
         let urlString = url.absoluteString
+        // Diagnostic surface for REG-T-360 / CL-45. A future regression
+        // where the snapshot writer plumbs filenames but no caller
+        // actually pushes bytes through here would otherwise be invisible
+        // — the widget would silently render the gradient placeholder
+        // and the only evidence in the file system is an empty
+        // `widget-images/` directory. Logging at debug level keeps the
+        // signal out of normal `Console.app` chatter but makes it
+        // observable when filtering for `subsystem == "app.dod"`.
+        DODLog.persistence.debug(
+            "cacheImage byte-write: \(bytes.count, privacy: .public)B for \(urlString, privacy: .public)"
+        )
         let descriptor = FetchDescriptor<CachedImage>(
             predicate: #Predicate { $0.urlString == urlString }
         )
