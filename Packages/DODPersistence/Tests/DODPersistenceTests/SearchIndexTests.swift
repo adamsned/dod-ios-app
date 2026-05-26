@@ -106,6 +106,78 @@ import Testing
         let viewed = try await store.recentlyViewedRecipeIDs()
         #expect(viewed == [1, 2])
     }
+
+    // MARK: - REG-17 (T-530, CL-53): REST categoryIDs round-trip into the cache.
+
+    @Test func categoryIDsRoundTripFromListItem() async throws {
+        // Pins T-530 / CL-53 / REG-17's cache-side contract: a freshly-fetched
+        // REST hit (no `mergeDetail(_:)` call, no JSON-LD parse yet) must
+        // round-trip its `RecipeListItem.categoryIDs` into the cache so
+        // `categoryIDs(forRecipeIDs:)` returns the populated array — which
+        // is what the Search-tab category chip filters against. Before
+        // T-530, `cache(listItem:)` dropped the field on the floor and
+        // every fresh REST hit's category-IDs map was empty.
+        let store = try await makeStore()
+        let listItem = RecipeListItem(
+            id: 7,
+            title: "Beef Skillet",
+            excerpt: "x",
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            categoryIDs: [10, 20]
+        )
+        try await store.cache(listItem: listItem)
+        let map = try await store.categoryIDs(forRecipeIDs: [7])
+        #expect(
+            map[7] == [10, 20],
+            "REST `Post.categories` must round-trip into `CachedRecipe.categoryIDs` via `cache(listItem:)` — REG-17 lock."
+        )
+    }
+
+    @Test func categoryIDsCacheDoesNotClobberOnNilOrEmptyWireValue() async throws {
+        // The cache-side "don't clobber populated data" guard mirrors the
+        // existing `canonicalURL` guard at `RecipeStore.swift:32-34`. A
+        // recipe that's been opened (and thus has its `CachedRecipe.categoryIDs`
+        // populated by `mergeDetail(_:)`) must not have that data wiped by
+        // a subsequent feed-refresh REST hit whose payload happens to
+        // surface a nil or empty categories array (server glitch, plugin
+        // misconfiguration).
+        let store = try await makeStore()
+        // First, prime the row with a `mergeDetail` so categoryIDs gets populated.
+        try await store.mergeDetail(
+            makeRecipe(id: 8, categoryIDs: [30, 40], ingredients: ["x"])
+        )
+        // Now a list-cache pass with nil categoryIDs (the wire-omitted
+        // case) and an explicit empty-array categoryIDs (the
+        // server-returned-empty case) must both leave the existing
+        // populated value untouched.
+        let nilCategoriesItem = RecipeListItem(
+            id: 8,
+            title: "Beef Skillet",
+            excerpt: "x",
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            categoryIDs: nil
+        )
+        try await store.cache(listItem: nilCategoriesItem)
+        var map = try await store.categoryIDs(forRecipeIDs: [8])
+        #expect(
+            map[8] == [30, 40],
+            "nil-on-the-wire must not clobber populated cache categoryIDs"
+        )
+
+        let emptyCategoriesItem = RecipeListItem(
+            id: 8,
+            title: "Beef Skillet",
+            excerpt: "x",
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            categoryIDs: []
+        )
+        try await store.cache(listItem: emptyCategoriesItem)
+        map = try await store.categoryIDs(forRecipeIDs: [8])
+        #expect(
+            map[8] == [30, 40],
+            "empty-on-the-wire must not clobber populated cache categoryIDs"
+        )
+    }
 }
 
 // MARK: - Migration (US-12 / CL-19)

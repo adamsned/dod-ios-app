@@ -232,6 +232,16 @@ extension WPDTO.Post {
     /// Map to a `RecipeListItem` for list screens. Hero image URL is filled
     /// in later by the view-model (it requires a follow-up `/media/{id}` call
     /// or use of the featured media link if pre-resolved).
+    ///
+    /// `categoryIDs` is propagated from the wire payload (T-530 / CL-53 /
+    /// REG-17) so the Search-tab category chip can filter fresh REST hits
+    /// without waiting for a recipe-detail open to hydrate
+    /// `CachedRecipe.categoryIDs` via the JSON-LD merge path. When the
+    /// payload omits the field (`categories == nil`), the field stays
+    /// nil rather than being forced to an empty array — that distinction
+    /// is what the cache-side guard inside `RecipeStore.cache(listItem:)`
+    /// uses to avoid clobbering a populated `CachedRecipe.categoryIDs`
+    /// value with an absent-on-the-wire one.
     func toRecipeListItem(heroImage: URL?) -> RecipeListItem {
         RecipeListItem(
             id: id,
@@ -240,7 +250,8 @@ extension WPDTO.Post {
             heroImage: heroImage,
             publishedAt: WPDTO.parseWPDate(date),
             totalTimeDisplay: nil,
-            canonicalURL: link
+            canonicalURL: link,
+            categoryIDs: categories
         )
     }
 }

@@ -28,6 +28,11 @@ import Testing
         #expect(item.id == 21238)
         #expect(item.title == "Garlic Butter Skillet Corn")
         #expect(item.excerpt == "Easy 15-minute side dish.")
+        // T-530 / CL-53 / REG-17: the WP `categories` array on the wire
+        // must round-trip into `RecipeListItem.categoryIDs` so the
+        // downstream cache pass + Search-tab category chip can filter
+        // fresh REST hits.
+        #expect(item.categoryIDs == [1590, 334])
     }
 
     @Test func sendsCategoryParameterWhenScoped() async throws {
