@@ -110,18 +110,12 @@ public struct CommentComposer: View {
     }
 
     private var actions: some View {
+        // Submit (primary) at leading, Cancel (role: .cancel) at trailing —
+        // a deliberate visual swap from the iPhone-stock HIG default per
+        // US-26 / AC-26.3 / CL-41. The cancel role is preserved on the
+        // Cancel button so VoiceOver + the system back-gesture still
+        // honor it as the cancel affordance; the swap is purely visual.
         HStack(spacing: DODSpacing.md) {
-            Button(role: .cancel, action: onCancel) {
-                Text("Cancel")
-                    .dodFont(DODType.bodyEmphasized)
-                    .padding(.horizontal, DODSpacing.lg)
-                    .padding(.vertical, DODSpacing.sm)
-            }
-            .buttonStyle(.bordered)
-            .disabled(isSubmitting)
-
-            Spacer()
-
             Button(action: onSubmit) {
                 Text(isSubmitting ? "Submitting..." : "Submit")
                     .dodFont(DODType.bodyEmphasized)
@@ -131,6 +125,17 @@ public struct CommentComposer: View {
             .buttonStyle(.borderedProminent)
             .tint(DODColor.accent)
             .disabled(!canSubmit)
+
+            Spacer()
+
+            Button(role: .cancel, action: onCancel) {
+                Text("Cancel")
+                    .dodFont(DODType.bodyEmphasized)
+                    .padding(.horizontal, DODSpacing.lg)
+                    .padding(.vertical, DODSpacing.sm)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isSubmitting)
         }
     }
 

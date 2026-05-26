@@ -45,7 +45,10 @@ public struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar { toolbarItems }
-        .overlay(alignment: .bottomTrailing) { floatingActionsOverlay }
+        // Note: T-302 originally added a sticky `RecipeDetailFloatingActions`
+        // overlay anchored to `.bottomTrailing` here. Removed by T-410 /
+        // CL-42 — the nav-bar Save + Share (AC-4.7 + AC-4.8) are the
+        // single in-recipe affordance for both actions. See US-26 / AC-26.1.
         .sensoryFeedback(.success, trigger: viewModel.isSaved)
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.checkedIngredientIDs.count)
         #if os(iOS)
@@ -245,20 +248,6 @@ public struct RecipeDetailView: View {
                 )
                 .accessibilityLabel("Share recipe")
             }
-        }
-    }
-
-    @ViewBuilder
-    private var floatingActionsOverlay: some View {
-        if viewModel.loadState == .ready {
-            RecipeDetailFloatingActions(
-                isSaved: viewModel.isSaved,
-                canonicalURL: viewModel.canonicalURL,
-                onSave: { Task { await viewModel.toggleSaved() } },
-                onShare: { Task { await viewModel.didShare() } }
-            )
-            .padding(.trailing, DODSpacing.md)
-            .padding(.bottom, DODSpacing.lg)
         }
     }
 
