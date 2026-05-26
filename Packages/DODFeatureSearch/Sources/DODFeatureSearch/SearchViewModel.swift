@@ -88,6 +88,18 @@ public final class SearchViewModel {
         self.query = query
     }
 
+    /// Wipe the persisted recent-searches store and update the
+    /// view-bound `recentSearches` array so the "Recent" section
+    /// disappears on the next observation tick. Backed by the existing
+    /// `RecentSearches.clear()` method.
+    ///
+    /// Spec trace: US-29 / AC-29.2 (Clear All affordance), CL-49.2
+    /// (single-source-of-truth routing through the view-model).
+    public func clearRecentSearches() {
+        recents.clear()
+        recentSearches = recents.recent()
+    }
+
     /// Load categories so the chip menu and the empty-state suggestions can
     /// render. Idempotent — fetches once per session unless explicitly
     /// refreshed.
