@@ -34,6 +34,19 @@ public struct WPRestClient: Sendable {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "GET"
         request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        // REG-18 (CL-50): bypass URLCache.shared AND Cloudflare's edge CDN so
+        // pull-to-refresh actually picks up newly-published recipes. WP REST
+        // responses lack a `Cache-Control` header but carry `Last-Modified`,
+        // which makes `URLSession.shared` apply HTTP heuristic freshness
+        // (~0.1 * (now - Last-Modified)) and serve stale cached payloads on
+        // repeated refresh. Cloudflare adds a second stale layer with a
+        // multi-minute edge TTL on `cf-cache-status: HIT` responses, so the
+        // CDN can return pre-publish JSON even when URLCache misses. Both
+        // markers are required: `.reloadIgnoringLocalCacheData` skips the
+        // device cache; `Cache-Control: no-cache` asks the CDN to revalidate
+        // with origin per RFC 7234 §5.2.1.4.
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
         let (data, response) = try await httpClient.data(for: request)
         guard (200..<300).contains(response.statusCode) else {
