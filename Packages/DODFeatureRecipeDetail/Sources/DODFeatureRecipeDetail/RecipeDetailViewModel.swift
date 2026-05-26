@@ -38,6 +38,25 @@ public final class RecipeDetailViewModel {
     public private(set) var checkedIngredientIDs: Set<UUID> = []
     public private(set) var snackbarMessage: String?
 
+    // MARK: - Servings scaler (US-31)
+
+    /// Current user-selected serving count. Defaults to the recipe's
+    /// source `recipeYield` (JSON-LD per AC-4.11) once the detail loads;
+    /// stays at the AC-31.3 default sentinel `4` until then so the stepper
+    /// has a stable starting value during the loading window. Spec trace:
+    /// AC-31.1, AC-31.2 (range 1..24), AC-31.3 (default = source servings),
+    /// AC-31.8 (source `Recipe.servings` is never mutated).
+    public private(set) var userServings: Int = RecipeDetailViewModel.defaultServings
+    /// Servings stepper range (AC-31.2). Lower bound 1 (a single serving
+    /// is the smallest reasonable scale); upper bound 24 keeps the
+    /// stepper usable on the smallest iPhone screens, while still reaching
+    /// roughly 4× a typical 6-serving recipe before requiring a manual
+    /// math step.
+    public let userServingsRange: ClosedRange<Int> = 1...24
+    /// Fallback default when the recipe hasn't loaded yet or didn't
+    /// publish a `recipeYield` block (AC-31.3 second sentence).
+    public static let defaultServings: Int = 4
+
     // MARK: - Comments + ratings state (US-13/14/15)
 
     public private(set) var ratingSummary: RecipeRating?
@@ -286,6 +305,55 @@ public final class RecipeDetailViewModel {
     /// state round-trips into the underlying detail screen (AC-7.5).
     public func mergeIngredientChecks(_ ids: Set<UUID>) {
         checkedIngredientIDs = ids
+    }
+
+    // MARK: - Servings scaler (US-31)
+
+    /// Source serving count from the JSON-LD `recipeYield`. Falls back to
+    /// ``defaultServings`` if the recipe hasn't parsed yet or didn't ship
+    /// a yield value. Spec trace: AC-31.3, AC-4.11.
+    public var sourceServings: Int {
+        recipe?.servings ?? Self.defaultServings
+    }
+
+    /// Multiplier the view layer applies to ingredient quantities at
+    /// render time. AC-31.4. The source ``Recipe`` model is never
+    /// mutated — this is pure presentation logic (AC-31.8).
+    public var servingsScaleFactor: Double {
+        let source = max(sourceServings, 1)
+        return Double(userServings) / Double(source)
+    }
+
+    /// True when the user has scaled past the threshold where a home
+    /// 5-quart dutch oven becomes a physical-capacity concern.
+    /// Spec trace: AC-31.6 (warning copy), CL-52 (threshold rationale).
+    public var shouldShowServingWarning: Bool {
+        FractionRenderer.shouldShowDutchOvenWarning(forServings: userServings)
+    }
+
+    /// Adjust the user's serving count (clamped to ``userServingsRange``).
+    /// Called from the stepper's `value` binding. AC-31.7: changing the
+    /// serving count never clears ``checkedIngredientIDs`` — the user's
+    /// in-progress check state survives a scale.
+    public func setUserServings(_ count: Int) {
+        userServings = clampToRange(count)
+    }
+
+    /// Sync ``userServings`` to the source servings once the recipe has
+    /// parsed. Called from the view after `loadState` reaches `.ready`.
+    /// Idempotent — re-syncing while already aligned is a no-op so the
+    /// user's manual stepper changes aren't clobbered by a late refresh.
+    public func resetServingsToSourceIfFirstLoad() {
+        guard userServings == Self.defaultServings, sourceServings != Self.defaultServings else {
+            return
+        }
+        userServings = clampToRange(sourceServings)
+    }
+
+    /// Clamp `count` to ``userServingsRange``. Centralized so the setter
+    /// and the source-sync path agree on bounds.
+    private func clampToRange(_ count: Int) -> Int {
+        min(max(count, userServingsRange.lowerBound), userServingsRange.upperBound)
     }
 
     public func dismissSnackbar() {

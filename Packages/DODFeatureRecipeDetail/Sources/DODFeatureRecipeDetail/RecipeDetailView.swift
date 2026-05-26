@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODDomain
+import DODSupport
 import SwiftUI
 
 /// Recipe detail screen. Header (AC-4.1) + ingredients (AC-4.2) + instructions
@@ -75,6 +76,7 @@ public struct RecipeDetailView: View {
             CookModeView(
                 recipe: recipe,
                 initialCheckedIngredients: viewModel.checkedIngredientIDs,
+                ingredientScaleFactor: viewModel.servingsScaleFactor,
                 onClose: { updatedChecks in
                     viewModel.mergeIngredientChecks(updatedChecks)
                     isCookModePresented = false
@@ -120,6 +122,7 @@ public struct RecipeDetailView: View {
                         title: viewModel.listItem.title
                     )
                     RecipeDetailMetaPills(items: metaPillItems)
+                    servingsScaler
                     cookNowSection
                     excerptText
                     RecipeDetailQuickJump(items: quickJumpItems(proxy: proxy))
@@ -141,6 +144,19 @@ public struct RecipeDetailView: View {
                 .padding(.bottom, DODSpacing.xl)
             }
         }
+    }
+
+    /// Per-render serving-count scaler. US-31 / AC-31.1.
+    private var servingsScaler: some View {
+        RecipeServingsScaler(
+            value: Binding(
+                get: { viewModel.userServings },
+                set: { viewModel.setUserServings($0) }
+            ),
+            range: viewModel.userServingsRange,
+            sourceServings: viewModel.sourceServings,
+            showsWarning: viewModel.shouldShowServingWarning
+        )
     }
 
     @ViewBuilder
@@ -195,9 +211,13 @@ public struct RecipeDetailView: View {
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
             if let ingredients = viewModel.recipe?.ingredients {
+                // US-31 / AC-31.4 + AC-31.5: scale at render time.
+                // Source recipe `ingredient.text` stays untouched (AC-31.8).
+                let factor = viewModel.servingsScaleFactor
                 ForEach(ingredients) { ingredient in
                     IngredientCheckRow(
                         ingredient: ingredient,
+                        displayText: FractionRenderer.scale(ingredient.text, by: factor),
                         isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
                         onToggle: { viewModel.toggleIngredient(ingredient.id) }
                     )
@@ -276,6 +296,11 @@ extension RecipeDetailView {
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 dismiss()
             }
+        }
+        // US-31 / AC-31.3: once the recipe is loaded, sync the stepper
+        // default to the source `recipeYield` if we haven't already.
+        if newValue == .ready {
+            viewModel.resetServingsToSourceIfFirstLoad()
         }
         // US-10 / AC-10.1: if the deep link asked us to jump straight to
         // Cook Mode, do it the instant the recipe has instructions

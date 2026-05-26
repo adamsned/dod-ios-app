@@ -237,8 +237,16 @@ enum RecipeDetailTestFixtures {
         )
     }
 
-    static func makeRecipe(id: Int, withDetail: Bool, categoryID: Int = 0) -> Recipe {
-        Recipe(
+    static func makeRecipe(
+        id: Int,
+        withDetail: Bool,
+        categoryID: Int = 0,
+        servings: Int? = nil,
+        ingredients: [RecipeIngredient]? = nil
+    ) -> Recipe {
+        let resolvedIngredients: [RecipeIngredient] =
+            ingredients ?? (withDetail ? [.init(text: "salt"), .init(text: "pepper")] : [])
+        return Recipe(
             id: id,
             slug: "slug-\(id)",
             title: "Recipe \(id)",
@@ -246,9 +254,10 @@ enum RecipeDetailTestFixtures {
             canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/") ?? URL(filePath: "/"),
             categoryIDs: categoryID > 0 ? [categoryID] : [],
             publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
-            ingredients: withDetail ? [.init(text: "salt"), .init(text: "pepper")] : [],
+            ingredients: resolvedIngredients,
             instructions: withDetail ? [.init(step: 1, text: "Stir.")] : [],
-            totalTime: .seconds(15 * 60)
+            totalTime: .seconds(15 * 60),
+            servings: servings
         )
     }
 }

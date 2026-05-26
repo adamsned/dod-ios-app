@@ -21,10 +21,15 @@ public struct CookModeView: View {
     @State private var viewModel: CookModeViewModel
     @State private var ingredientsDrawerVisible: Bool = false
     public let onClose: (Set<UUID>) -> Void
+    /// Scale factor inherited from the host detail screen so the drawer
+    /// ingredient rows agree with the scaled list the user just left. AC-7.5
+    /// + US-31 carry-over.
+    private let ingredientScaleFactor: Double
 
     public init(
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
+        ingredientScaleFactor: Double = 1.0,
         onClose: @escaping (Set<UUID>) -> Void
     ) {
         _viewModel = State(
@@ -33,6 +38,7 @@ public struct CookModeView: View {
                 initialCheckedIngredients: initialCheckedIngredients
             )
         )
+        self.ingredientScaleFactor = ingredientScaleFactor
         self.onClose = onClose
     }
 
@@ -210,11 +216,7 @@ public struct CookModeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DODSpacing.sm) {
                     ForEach(viewModel.recipe.ingredients) { ingredient in
-                        IngredientCheckRow(
-                            ingredient: ingredient,
-                            isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
-                            onToggle: { viewModel.toggleIngredient(ingredient.id) }
-                        )
+                        ingredientRow(for: ingredient)
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)
@@ -297,5 +299,22 @@ public struct CookModeView: View {
     private func close() {
         viewModel.endCookMode()
         onClose(viewModel.checkedIngredientIDs)
+    }
+}
+
+// MARK: - Ingredients drawer row
+
+extension CookModeView {
+    /// One row in the ingredients drawer with the scaled `displayText`
+    /// (US-31 / AC-31.4 carry-over into Cook Mode). Pulled into an
+    /// extension so the type body stays under the SwiftLint length cap.
+    @ViewBuilder
+    fileprivate func ingredientRow(for ingredient: RecipeIngredient) -> some View {
+        IngredientCheckRow(
+            ingredient: ingredient,
+            displayText: FractionRenderer.scale(ingredient.text, by: ingredientScaleFactor),
+            isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
+            onToggle: { viewModel.toggleIngredient(ingredient.id) }
+        )
     }
 }
