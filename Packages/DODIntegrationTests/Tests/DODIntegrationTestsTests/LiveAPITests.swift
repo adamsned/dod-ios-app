@@ -228,4 +228,87 @@ struct LiveAPITests {
             """
         )
     }
+
+    /// REG-18 (US-1, T-510, CL-50): `WPRestClient.get(path:queryItems:)`
+    /// bypasses `URLCache.shared` so a previously-cached stale page-1
+    /// batch can never hide a newly-published recipe from
+    /// pull-to-refresh. Plants a known-stale `CachedURLResponse` in
+    /// `URLCache.shared` for the exact production URL `posts()`
+    /// requests (body is `[]` — empty array — which would round-trip
+    /// through `WPRestClient.posts()` into an empty `[RecipeListItem]`
+    /// if URLSession served the cached entry). Headers attach
+    /// `Cache-Control: max-age=3600` + `Last-Modified` so URLSession's
+    /// default `.useProtocolCachePolicy` would consider the cache entry
+    /// fresh and serve it without hitting the network. Then calls
+    /// `WPRestClient.posts()` and asserts the returned list is
+    /// non-empty — fails on `origin/main` because URLSession serves the
+    /// planted decoy from `URLCache.shared`, passes after CL-50's
+    /// two-line cache-bypass fix (`.reloadIgnoringLocalCacheData` +
+    /// `Cache-Control: no-cache` header) lands.
+    ///
+    /// Why this test lives in `LiveAPITests` rather than as an L1 unit
+    /// test against `FakeHTTPClient`: the bug is about URLSession.shared
+    /// + URLCache.shared behavior — a contract between Foundation and
+    /// the real `URLSession` instance the production `WPRestClient` uses.
+    /// An L1 test against `FakeHTTPClient` could only assert the request
+    /// has the right `cachePolicy` value, not that URLSession actually
+    /// honors it against a planted cache entry. The L2 tier is the right
+    /// surface for proving the actual cache-bypass behavior end-to-end.
+    @Test func feedRefreshBypassesStaleURLCacheEntry() async throws {
+        // The exact URL `WPRestClient.posts()` requests for the default
+        // page-1 batch — same path, same query-item ordering as
+        // `WPRestClient+Posts.swift` builds via `buildURL(...)`.
+        let postsURLString =
+            "https://www.dutchovendaddy.com/wp-json/wp/v2/posts"
+            + "?page=1&per_page=20&_embed=wp:featuredmedia"
+        let postsURL = try #require(URL(string: postsURLString))
+        let cacheKeyRequest = URLRequest(url: postsURL)
+
+        // Plant a stale-but-"fresh" cache entry: empty-array body that
+        // would round-trip through `WPRestClient.posts()` into an empty
+        // `[RecipeListItem]` if URLSession served it. Cache-Control
+        // makes URLSession's heuristic consider it fresh for an hour;
+        // Last-Modified pads the heuristic for older `URLSession`
+        // implementations that fall back to it.
+        let staleBody = Data("[]".utf8)
+        let staleHeaders: [String: String] = [
+            "Content-Type": "application/json",
+            "Cache-Control": "max-age=3600",
+            "Last-Modified": "Tue, 26 May 2026 20:00:00 GMT",
+        ]
+        let staleResponse = try #require(
+            HTTPURLResponse(
+                url: postsURL,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: staleHeaders
+            )
+        )
+        let staleCached = CachedURLResponse(
+            response: staleResponse,
+            data: staleBody
+        )
+        URLCache.shared.storeCachedResponse(staleCached, for: cacheKeyRequest)
+        defer { URLCache.shared.removeCachedResponse(for: cacheKeyRequest) }
+
+        // Production-equivalent call. If URLSession honored the planted
+        // cache entry, `items` would decode from `[]` and be empty.
+        let client = WPRestClient()
+        let items = try await client.posts()
+
+        #expect(
+            !items.isEmpty,
+            """
+            `WPRestClient.posts()` returned an empty array on a live \
+            call, which means `URLSession.shared` served the planted \
+            stale `[]` cache entry from `URLCache.shared` instead of \
+            hitting the network. REG-18 / CL-50: \
+            `WPRestClient.get(path:queryItems:)` must set \
+            `request.cachePolicy = .reloadIgnoringLocalCacheData` AND \
+            add `Cache-Control: no-cache` request header so URLCache \
+            (and Cloudflare's edge CDN) cannot hide newly-published \
+            recipes from the next pull-to-refresh.
+            """
+        )
+    }
 }
