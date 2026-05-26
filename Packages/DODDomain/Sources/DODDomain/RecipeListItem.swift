@@ -17,6 +17,18 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
     /// New REST responses populate it from `post.link` — required for
     /// recipe-detail navigation (spec.md AC-4.* + CL-4).
     public let canonicalURL: URL?
+    /// WP category IDs the recipe is tagged with, sourced from the REST
+    /// `posts` payload (every search / feed / category hit carries them on
+    /// the wire). Optional so older Codable payloads (pre-CL-53) decode
+    /// cleanly. `nil` means "categories were not supplied on the wire"
+    /// (e.g. a `RecipeListItem` constructed from a non-REST source such
+    /// as the local cache before T-530 landed); an empty array means
+    /// "REST confirmed zero categories." See CL-53 / REG-17 / T-530 —
+    /// this field is what lets the Search-tab category chip filter
+    /// freshly-fetched REST results without waiting for a recipe-detail
+    /// open to hydrate `CachedRecipe.categoryIDs` via the JSON-LD merge
+    /// path.
+    public let categoryIDs: [Int]?
 
     public init(
         id: Int,
@@ -25,7 +37,8 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
         heroImage: URL? = nil,
         publishedAt: Date,
         totalTimeDisplay: String? = nil,
-        canonicalURL: URL? = nil
+        canonicalURL: URL? = nil,
+        categoryIDs: [Int]? = nil
     ) {
         self.id = id
         self.title = title
@@ -34,5 +47,6 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
         self.publishedAt = publishedAt
         self.totalTimeDisplay = totalTimeDisplay
         self.canonicalURL = canonicalURL
+        self.categoryIDs = categoryIDs
     }
 }
