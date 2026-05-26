@@ -11,14 +11,18 @@ import SwiftUI
 /// the row composition uses only existing `DODType` / `DODColor` /
 /// `DODSpacing` values per CL-31.
 ///
-/// Surface color follows US-24 / CL-40: the scroll surface around the
-/// inset-grouped row cards AND the area behind the `.searchable` field
-/// adopt `DODColor.castIronBrown` (the same token the recipe-card time
-/// chip, offline banner, snackbar, and search filter chip use) so the
-/// Categories tab carries the same brown that anchors the recipe-card
-/// visual language on the Feed tab. The row cells themselves keep the
-/// system-default inset-grouped fill (white in light, dark earth in dark)
-/// so the established row-text contrast carries forward unchanged.
+/// Surface color follows the post-T-520 `DODColor.surface` contract
+/// (US-30 / CL-51): the scroll surround paints `DODColor.surface`
+/// (`#F9F6EF` light / `#42210B` dark) via `.scrollContentBackground(.hidden)
+/// + .background(DODColor.surface)` — the same pattern Feed / Saved /
+/// Search use, so the Categories tab matches the rest of the app.
+/// The `.insetGrouped` row cells keep their system-default fill
+/// (`UIColor.secondarySystemGroupedBackground`) so row-text contrast
+/// carries forward unchanged. T-430 / CL-44 previously applied a one-tab
+/// `.background(DODColor.castIronBrown)` override here; T-560 / CL-54
+/// reverted that override (swapping in `DODColor.surface`) after the
+/// T-520 color overhaul re-tinted `surface` to the user's chosen
+/// brand-warm palette across every screen.
 public struct CategoryListView: View {
 
     @State private var viewModel: CategoryListViewModel
@@ -90,7 +94,7 @@ public struct CategoryListView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(DODColor.castIronBrown)
+        .background(DODColor.surface)
 
         #if os(iOS)
         return
