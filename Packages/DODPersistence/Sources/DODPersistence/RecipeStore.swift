@@ -32,6 +32,17 @@ public actor RecipeStore {
             if let canonicalURL = listItem.canonicalURL {
                 existing.canonicalURLString = canonicalURL.absoluteString
             }
+            // T-530 / CL-53 / REG-17: propagate WP categories from the
+            // REST payload so the Search-tab category chip can filter
+            // fresh REST hits without waiting for the recipe-detail JSON-LD
+            // merge. Same don't-clobber-with-empty guard `canonicalURL`
+            // above uses — a non-empty REST categories array wins; nil or
+            // empty leaves the existing populated `categoryIDs` alone (so
+            // a re-fetch can't wipe data that `mergeDetail(_:)` already
+            // wrote from the JSON-LD parse).
+            if let categoryIDs = listItem.categoryIDs, !categoryIDs.isEmpty {
+                existing.categoryIDs = categoryIDs
+            }
             existing.lastViewedAt = .now
             // Successful re-fetch clears any prior blocklist entry (AC-1.7 reset
             // on pull-to-refresh).
@@ -45,6 +56,12 @@ public actor RecipeStore {
                     excerptText: listItem.excerpt,
                     canonicalURLString: listItem.canonicalURL?.absoluteString ?? "",
                     heroImageURLString: listItem.heroImage?.absoluteString,
+                    // T-530 / CL-53 / REG-17: REST-supplied categories
+                    // hydrate the row on insert so the category filter
+                    // works for first-time REST hits the user hasn't
+                    // opened yet. nil-on-the-wire falls back to the
+                    // initializer's default `[]`.
+                    categoryIDs: listItem.categoryIDs ?? [],
                     publishedAt: listItem.publishedAt,
                     lastViewedAt: .now
                 )
