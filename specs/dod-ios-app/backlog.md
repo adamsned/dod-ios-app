@@ -343,4 +343,4 @@ useful reference.
   letting the existing bridge fire for free. Diagnostic logs
   added inside `cacheImage` and `WidgetImageBridge.writeImage` so
   the next regression of this shape surfaces in `Console.app`.
-  Shipped in [#XX](https://github.com/adamsned/dod-ios-app/pull/XX).
+  Shipped in [#34](https://github.com/adamsned/dod-ios-app/pull/34).
