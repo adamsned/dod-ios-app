@@ -99,7 +99,7 @@ _(All 5 items graduated as the **US-29 / CL-49 / T-500** bundle — see "Recentl
 
 #### Filter logic
 
-- **"Any time" filter actually composes with other filters.** Selecting a duration (e.g. "≤1 hour") in the Any-time chip should narrow results in combination with a category filter — e.g. "Beef and Red Meat Recipes that take 1 hour to make." Today the filter doesn't appear to be composing correctly. Bug investigation + fix. Size: **M** (likely in `SearchResultMerger` or the WP query construction). Captured in the test pyramid as a new **REG-17**.
+_(Graduated — see "Recently graduated" below: T-530 / CL-53 / REG-17 traced the bug to the WP REST → domain → cache pipeline dropping `Post.categories`, so the category filter excluded every fresh REST hit and the AND with the Any-time chip yielded zero. Fixed by propagating `categoryIDs` through `RecipeListItem` and `RecipeStore.cache(listItem:)`.)_
 
 #### New-recipe surfacing — real bug, not just a backlog idea
 
@@ -133,7 +133,7 @@ _(Background/foreground color overhaul graduated — see "Recently graduated" be
 | ~~3. `questionmark.circle` not `.folder`~~ | ~~XS~~ | Graduated to US-29 / CL-49 / T-500 |
 | ~~4. Remove "All categories" button~~ | ~~XS~~ | Graduated to US-29 / CL-49 / T-500 |
 | ~~5. "Try" suggestions fill search bar~~ | ~~S~~ | Graduated to US-29 / CL-49 / T-500 |
-| 6. "Any time" filter composes | M | Logic bug; new REG-17 |
+| ~~6. "Any time" filter composes~~ | ~~M~~ | Graduated → REG-17 / CL-53 / T-530 |
 | 7. Login + OAuth | XL | **Constitution amendment first** |
 | ~~8. New recipes don't surface~~ | ~~M~~ | Graduated → REG-18 / CL-50 / T-510 |
 | ~~9. Background/foreground color overhaul~~ | ~~M~~ | Graduated to US-30 / CL-51 / T-520 |
@@ -542,3 +542,50 @@ useful reference.
   `CachedURLResponse` in `URLCache.shared` and asserts `WPRestClient.posts()`
   returns the live posts rather than the planted decoy — fails on `origin/main`,
   passes after the fix.
+- **"Any time" filter actually composes with the category filter** —
+  graduated to [REG-17](spec.md) + [CL-53](clarifications.md) +
+  [T-530](tasks.md). Root cause traced: WP REST `/wp/v2/posts?search=...`
+  returns `Post.categories: [Int]` on every search hit, but
+  `WPDTO.Post.toRecipeListItem(heroImage:)` dropped the categories at the
+  network → domain boundary, and `RecipeStore.cache(listItem:)` never
+  wrote `categoryIDs` to the cache row. So `RecipeStore.categoryIDs(forRecipeIDs:)`
+  returned `[recipeID: []]` for every fresh REST hit whose detail page hadn't
+  been opened, and `SearchFilters.apply(...)` line 56's `[]?.contains(10)`
+  check resolved to `false` — dropping every fresh REST hit before the
+  cook-time chip's predicate ever ran. Layering the Any-time chip on top
+  of an already-empty set yielded zero, so the user read this as "the
+  Any-time filter doesn't compose with the category filter." CL-49.1's
+  prior fix (T-500) had addressed the *idle-state "Try" pill* path by
+  routing pills into the query field rather than `filters.categoryID`,
+  but the user-driven chip toggle path stayed broken until T-530.
+  Fix: propagate the WP categories taxonomy already-on-the-wire through
+  the wire → domain → cache pipeline. Three small source edits — one
+  Optional `categoryIDs: [Int]?` field on `DODDomain.RecipeListItem`
+  (backward-compat with existing Codable payloads via the same Optional-
+  with-default-nil pattern `canonicalURL` / `heroImage` /
+  `totalTimeDisplay` use), one-line addition to
+  `WPDTO.Post.toRecipeListItem(heroImage:)` populating it from
+  `WPDTO.Post.categories`, and a guarded write inside
+  `RecipeStore.cache(listItem:)` that propagates the value into
+  `CachedRecipe.categoryIDs` (mirrors the `canonicalURL` "don't clobber
+  a populated value with a nil/empty one" guard at lines 32-34). After
+  the fix, picking a category narrows the result set to category-tagged
+  REST hits using wire data already in flight, then picking "≤1 hour"
+  narrows further to those whose `totalSeconds` is populated AND
+  ≤3600 — AND composition end-to-end, no extra network round-trip,
+  no schema change. The MISS-on-unknown-totalSeconds semantic for
+  recipes the user has never opened is preserved (documented behavior
+  per `RecipeStore+IngredientIndex.swift:84-87` and the existing
+  `SearchFiltersTests.categoryFilterTreatsUnknownAsMiss` test). CL-53
+  captures the rejected alternatives (pre-hydrate `categoryIDsByRecipe`
+  on chip toggle via a new REST round-trip; opt-in via a new
+  `RecipeStore.injectCategoryIDs(_:)` method threaded from the view-model;
+  non-optional `categoryIDs: [Int]` with default `[]` on `RecipeListItem`;
+  weakening `SearchFilters.apply(...)`'s missing-vs-empty handling to
+  admit unknowns). Locked by new merger test
+  `SearchResultMergerTests.composeCategoryAndCookTimeFiltersForFreshRESTResults`
+  (the AND composition contract — given a recipe in category C and total-time T,
+  `{category: C, maxDuration: T}` includes it; `{category: C, maxDuration: T-1}`
+  does NOT), plus companion store-side and network-side tests for the
+  round-trip through `cache(listItem:)` and the REST DTO mapping.
+  Implementing PR: T-530.
