@@ -34,8 +34,10 @@ The `Colors.xcassets` palette has light + dark variants for every semantic token
 
 | Pair | Light | Dark | Status |
 |---|---|---|---|
-| Label on Surface | #2C2C2C on #FAF6EE | #E6DECF on #1B140E | ✓ Both ≥ 12:1 |
-| LabelSecondary on Surface | #6B6B6B on #FAF6EE | #A8A39A on #1B140E | ✓ Both ≥ 4.5:1 |
+| Label on Surface | #2C2C2C on #F9F6EF | #E6DECF on #42210B | ✓ ≥ 12:1 light / ≥ 10.8:1 dark (US-30 / T-520) |
+| Label on SurfaceElevated | #2C2C2C on #FFFFFF | #E6DECF on #281F19 | ✓ ≥ 13.5:1 light / ≥ 12.1:1 dark (US-30 / T-520) |
+| LabelSecondary on Surface | #6B6B6B on #F9F6EF | #A8A39A on #42210B | ✓ ≥ 4.7:1 light / ≥ 5.7:1 dark (US-30 / T-520) |
+| LabelSecondary on SurfaceElevated | #6B6B6B on #FFFFFF | #A8A39A on #281F19 | ✓ ≥ 5.7:1 light / ≥ 6.4:1 dark (US-30 / T-520) |
 | Cream on CastIronBrown (banner) | #FAF6EE on #3D2B1F | same in dark | ✓ ≥ 11:1 |
 | Cream on BurntOrange (accent button) | #FAF6EE on #C56A24 | same | Need to verify in Accessibility Inspector |
 | WarmGold on CastIronBrown (snackbar Undo) | #D4A24C on #3D2B1F | same | Need to verify |

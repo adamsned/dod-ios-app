@@ -107,12 +107,7 @@ _(Graduated — see "Recently graduated" below: T-510 / CL-50 / REG-18 traced th
 
 #### Design-system overhaul
 
-- **App-wide background + foreground color overhaul.** Specific hex values per appearance:
-  - **Dark mode:** background `#42210B`, foreground (cards, surfaces, chips) `#281F19`.
-  - **Light mode:** background `#F9F6EF`, foreground (cards, surfaces, chips) `#FFFFFF`.
-  - **Text colors stay unchanged in both modes.**
-
-  Touches `DODColor.surface`, `DODColor.surfaceElevated`, `DODColor.background` (and any `Color.xcassets` entries for the matching tokens). Will re-record **every** L4 snapshot in the repo — design-system, feature views, widgets, lock-screen. Size: **M** (code is small; baseline churn is large). Worth a CL on which `DODColor` tokens the user meant by "background" vs "foreground" (the existing palette doesn't have a token literally named that — closest analogues are `Surface` for cards/cells and `SurfaceElevated` or `Cream` for the screen background). Verify in `accessibility-audit.md` that new values still pass WCAG AA against unchanged text colors.
+_(Background/foreground color overhaul graduated — see "Recently graduated" below.)_
 
 #### Major feature — needs constitution amendment before code
 
@@ -141,7 +136,7 @@ _(Graduated — see "Recently graduated" below: T-510 / CL-50 / REG-18 traced th
 | 6. "Any time" filter composes | M | Logic bug; new REG-17 |
 | 7. Login + OAuth | XL | **Constitution amendment first** |
 | ~~8. New recipes don't surface~~ | ~~M~~ | Graduated → REG-18 / CL-50 / T-510 |
-| 9. Background/foreground color overhaul | M | Re-records every L4 baseline |
+| ~~9. Background/foreground color overhaul~~ | ~~M~~ | Graduated to US-30 / CL-51 / T-520 |
 
 ### Captured 2026-05-25 (round 5, @spencer0706) — widget fixes that didn't actually fix the bugs
 
@@ -452,6 +447,33 @@ useful reference.
   added inside `cacheImage` and `WidgetImageBridge.writeImage` so
   the next regression of this shape surfaces in `Console.app`.
   Shipped in [#34](https://github.com/adamsned/dod-ios-app/pull/34).
+- **App-wide background + foreground color overhaul** — became
+  **US-30** (AC-30.1 through AC-30.4) + [CL-51](clarifications.md) +
+  [T-520](tasks.md). User-specified hex values per appearance: dark
+  mode background `#42210B` and foreground (cards / surfaces / chips)
+  `#281F19`; light mode background `#F9F6EF` and foreground `#FFFFFF`.
+  Text colors (`DODColor.label`, `DODColor.labelSecondary`) and brand
+  accents (`CastIronBrown`, `BurntOrange`, `WarmGold`, `Accent`,
+  `Charcoal`, `DarkEarth`) explicitly untouched per AC-30.3 — the
+  overhaul is bounded to the two semantic surface tokens. CL-51 maps
+  the user-facing "background" / "foreground" intent to the existing
+  `DODColor.surface` (screen-wide backdrop) and `DODColor.surfaceElevated`
+  (cards / sheets above surface) tokens — the palette has no token
+  literally named "background" or "foreground", but Colors.swift's
+  doc-comments already pin the semantic role of each. `Cream` and
+  `CreamSubtle` are NOT touched even though their names suggest a
+  background role — in this codebase `Cream` is the foreground text
+  color used on dark brand surfaces (CastIronBrown buttons,
+  Snackbar, OfflineBanner, RecipeCard time-chip), not a screen
+  background. WCAG AA contrast verified against unchanged text
+  tokens: Label on Surface ≥ 10.8:1 and Label on SurfaceElevated ≥
+  12:1 in both light and dark; LabelSecondary on the new dark
+  surfaces ≥ 5.7:1 (well above the 4.5:1 floor). `accessibility-audit.md`
+  contrast table updated with the new hex values. Re-records every
+  L4 baseline that includes a surface token — DesignSystem
+  components, feature views, widgets, lock-screen text-only baselines
+  excluded (no surface visible). Shipped in T-520.
+
 - **REG-T-390 — Home-screen widgets still unreadable in Tinted / Clear**
   — graduated to [CL-48](clarifications.md) + [T-394](tasks.md).
   T-390 / [#27](https://github.com/adamsned/dod-ios-app/pull/27) audited
