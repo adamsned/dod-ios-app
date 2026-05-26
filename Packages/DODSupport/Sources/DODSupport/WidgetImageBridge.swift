@@ -127,6 +127,17 @@ public enum WidgetImageBridge {
         )
         do {
             try bytes.write(to: fileURL, options: .atomic)
+            // Diagnostic surface for REG-T-360 / CL-45. Mirror of the
+            // debug log inside `RecipeStore.cacheImage(url:bytes:)` so
+            // a future "the widget is still showing placeholder" report
+            // can be triaged in one console pass — if the host log fires
+            // but this one doesn't, the App Group entitlement / container
+            // resolution broke; if both fire and the widget still shows
+            // placeholder, the widget-side resolver or snapshot wire
+            // format regressed.
+            DODLog.persistence.debug(
+                "WidgetImageBridge wrote \(bytes.count, privacy: .public)B to \(filename(for: url), privacy: .public)"
+            )
             return true
         } catch {
             DODLog.app.error(

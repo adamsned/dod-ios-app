@@ -37,24 +37,38 @@ public struct LiveFeedDependencies: FeedDependencies {
     /// entry list that gets persisted to the App Group store.
     public typealias WidgetReloadHook = @Sendable ([WidgetSnapshot.Entry]) -> Void
 
+    /// Sendable hook the app supplies to download hero-image bytes for the
+    /// just-snapshotted feed entries and route them through
+    /// `RecipeStore.cacheImage(url:bytes:)` so the existing
+    /// ``WidgetImageBridge`` writes mirror files into the App Group container.
+    /// Fired in a detached `Task` AFTER the snapshot has been written —
+    /// feed-load latency is unaffected and per-URL failures inside the
+    /// prefetcher are logged + swallowed (the widget renders the gradient
+    /// placeholder for the brief window between first feed load and first
+    /// timeline tick after prefetch completes). REG-T-360 / CL-45 / T-362.
+    public typealias ImagePrefetcher = @Sendable ([URL]) async -> Void
+
     let client: WPRestClient
     let store: RecipeStore
     let monitor: NetworkMonitor
     private let widgetStore: WidgetSnapshotStore?
     private let widgetReload: WidgetReloadHook?
+    private let imagePrefetcher: ImagePrefetcher?
 
     public init(
         client: WPRestClient,
         store: RecipeStore,
         monitor: NetworkMonitor,
         widgetStore: WidgetSnapshotStore? = WidgetSnapshotStore(),
-        widgetReload: WidgetReloadHook? = nil
+        widgetReload: WidgetReloadHook? = nil,
+        imagePrefetcher: ImagePrefetcher? = nil
     ) {
         self.client = client
         self.store = store
         self.monitor = monitor
         self.widgetStore = widgetStore
         self.widgetReload = widgetReload
+        self.imagePrefetcher = imagePrefetcher
     }
 
     public func fetchPosts(page: Int) async throws -> [RecipeListItem] {
@@ -130,5 +144,21 @@ public struct LiveFeedDependencies: FeedDependencies {
             return
         }
         widgetReload?(Array(entries))
+        // Kick off the hero-image prefetch AFTER the snapshot has been
+        // written. The prefetcher routes the bytes through
+        // `RecipeStore.cacheImage(url:bytes:)`, which fires the existing
+        // `WidgetImageBridge` write hook (T-360 / AC-21.2) and populates
+        // the App Group container so the next 15-min timeline refresh
+        // (CL-28) can render real images instead of the gradient
+        // placeholder. Fire-and-forget — feed-load latency is unaffected
+        // and per-URL failures inside the prefetcher are logged +
+        // swallowed. REG-T-360 / CL-45.
+        if let imagePrefetcher {
+            let heroURLs = entries.compactMap { $0.heroImageURL }
+            guard !heroURLs.isEmpty else { return }
+            Task.detached(priority: .utility) {
+                await imagePrefetcher(heroURLs)
+            }
+        }
     }
 }
