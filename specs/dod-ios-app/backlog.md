@@ -145,31 +145,7 @@ see "Recently graduated" below.)_
 
 _(REG-T-360 graduated — see "Recently graduated" below.)_
 
-- **REG-T-390 — Home-screen widgets still unreadable in Tinted / Clear.**
-  T-390 / [#27](https://github.com/adamsned/dod-ios-app/pull/27) audited
-  the widgets under iOS 18+'s accented rendering modes (Tinted +
-  Clear both surface as `widgetRenderingMode == .accented`) and
-  concluded 5/6 surfaces passed, applying only one surgical fix
-  (`widgetAccentedRenderingMode(.fullColor)` on the hero `Image` in
-  `WidgetCard.Hero.loadedImage(_:)`). User reports: **"white text on
-  a white background is not acceptable"** — the recipe title rendered
-  over the hero in `WidgetCard.Small` (`.foregroundStyle(.white)` per
-  the codebase audit at `WidgetCard.swift:67–69`) is invisible against
-  a light wallpaper in the accented mode because `containerBackground`
-  is stripped and the `.white` literal doesn't tint correctly. The
-  T-390 audit's "system desaturation handles it" assumption was wrong
-  — the codebase-tinting-risk research artifact at
-  `/tmp/widget-audit-research/codebase-tinting-risk.md` flagged exactly
-  this as the smoking gun and was overridden by the main agent's
-  inspection. **What to fix:** replace `.foregroundStyle(.white)` on
-  text that renders over the hero with a system semantic color (e.g.
-  `.primary` with `widgetAccentable()` opt-in), OR force-add a
-  contrast-providing scrim behind the title. Apply the same fix to
-  `SavedRecipesWidget` rows. Size: **M** (~3h — investigate every
-  hardcoded text color in the widget views, fix, re-record the 12
-  Tinted/Vibrant baselines T-390 added). Reference
-  [`AC-23`](spec.md), [`CL-39`](clarifications.md). This becomes a
-  **T-394** follow-up under T-390's existing follow-up list (T-391..T-393).
+_(REG-T-390 graduated — see "Recently graduated" below.)_
 
 #### Sizing summary
 
@@ -181,7 +157,7 @@ _(REG-T-360 graduated — see "Recently graduated" below.)_
 | ~~Saved widget description~~ | ~~XS~~ | Graduated to US-25 / CL-40 / T-400 |
 | ~~L2 new-recipe test~~ | ~~S~~ | Graduated to REG-16 / CL-43 / T-420 |
 | ~~REG-T-360 widget image~~ | ~~M~~ | Graduated to CL-45 / T-362 |
-| REG-T-390 widget text | M | T-390 was overconfident; T-394 follow-up |
+| ~~REG-T-390 widget text~~ | ~~M~~ | Graduated to CL-48 / T-394 |
 
 ## Recently graduated
 
@@ -358,3 +334,27 @@ useful reference.
   added inside `cacheImage` and `WidgetImageBridge.writeImage` so
   the next regression of this shape surfaces in `Console.app`.
   Shipped in [#34](https://github.com/adamsned/dod-ios-app/pull/34).
+- **REG-T-390 — Home-screen widgets still unreadable in Tinted / Clear**
+  — graduated to [CL-48](clarifications.md) + [T-394](tasks.md).
+  T-390 / [#27](https://github.com/adamsned/dod-ios-app/pull/27) audited
+  the home-screen widgets under iOS 18+ `.accented` rendering and
+  concluded 5/6 surfaces passed with a single `widgetAccentedRenderingMode(.fullColor)`
+  opt-out on `WidgetCard.Hero`. The user-reported regression — "white
+  text on a white background is not acceptable" — was the `WidgetCard.Small`
+  recipe title's `.foregroundStyle(.white)` (`WidgetCard.swift:81`)
+  collapsing into the wallpaper-tinted default group on light wallpapers
+  because the existing three-stop bottom-anchored 110pt gradient
+  flattened to the same plane as the title under `.accented` rendering.
+  T-394 replaces that three-stop bottom band with a full-height two-stop
+  scrim (`.clear` at top → `.black.opacity(0.55)` at bottom) inside the
+  `WidgetCard.Small` `ZStack`, giving the `.white` title a calibrated
+  WCAG-AA-equivalent contrast scaffold that survives the `.accented`
+  flattening pass. The 12 `WidgetCardTintedAppearanceSnapshotTests`
+  baselines T-390 added are re-recorded for the populated Small surfaces;
+  the Saved + placeholder baselines pass byte-identical because the
+  source change is bounded to `WidgetCard.Small`. CL-48 explicitly defers
+  AC-23.7 part-(b) (`.widgetAccentable(true)` opt-in on the title) to a
+  clean T-39X follow-up if future audit data shows the scrim alone is
+  insufficient on extreme-bright wallpapers — the minimal-diff scrim is
+  the immediate fix the user-reported regression demands. Shipped in
+  [#37](https://github.com/adamsned/dod-ios-app/pull/37).
