@@ -357,4 +357,4 @@ useful reference.
   clean T-39X follow-up if future audit data shows the scrim alone is
   insufficient on extreme-bright wallpapers — the minimal-diff scrim is
   the immediate fix the user-reported regression demands. Shipped in
-  [#XX](https://github.com/adamsned/dod-ios-app/pull/XX).
+  [#37](https://github.com/adamsned/dod-ios-app/pull/37).
