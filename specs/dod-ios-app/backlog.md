@@ -141,28 +141,21 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
     its call site in `RecipeDetailView`. Amends the post-Phase-6 T-302
     "polish" decision. Size: **S** (~1h).
 
-- **"Saved Recipes" widget description copy.** Current
-  `.configurationDescription(_:)` string on `SavedRecipesWidget` reads
-  awkwardly — needs a rewrite to something more natural. Pure string
-  change in `Widget/SavedRecipesWidget.swift`. Worth a CL noting the
-  rewrite (user-facing widget gallery copy), same pattern CL-36 used
-  for the "Today's Recipe" → "Latest Recipe" rename. Size: **XS**
-  (~30min including the CL).
+- **Categories tab brown.** The categories list cells + the
+  `.searchable` field background in the Categories tab should pick up
+  the same brown used by the recipe cards in the main Recipes tab
+  (probably `DODColor.castIronBrown` per the existing palette). T-340
+  picked iOS-stock `.insetGrouped` styling which uses the system grouped
+  background; this would override to match the brand surface. Worth a
+  CL on whether this should be a global `.scrollContentBackground`
+  override or per-cell tinting — both have implications for dark mode
+  legibility. Size: **S–M** depending on whether the brown gets applied
+  cell-level or surface-level.
 
 #### Tests
 
-- **L2 test for new-recipe surfacing.** When a recipe is published on
-  dutchovendaddy.com, verify the app's feed (US-1 `/wp/v2/posts` query)
-  picks it up. Lives in the existing **L2 nightly live-API tier**
-  (constitution §6 / AC-T3). Tags as `live-api`; doesn't gate PRs but
-  surfaces contract drift early. Approach: read the WP feed's newest
-  post id at test time, assert it's present in the app's `RecipeStore`
-  after a `feed.refresh()`. Companion check: post's `_embed`'d
-  `wp:featuredmedia` round-trips into a non-nil `heroImage` (already
-  pinned by `REG-2` but worth re-asserting against the newest post on
-  every nightly run, not just the fixture). Size: **S** (~2h — one new
-  test plus the helper that fetches "newest post id"). New regression
-  ID: `REG-16`.
+_(empty — the L2 new-recipe-surfacing test graduated to REG-16 / T-420;
+see "Recently graduated" below.)_
 
 #### Regression reports — work that just shipped but the user still sees broken
 
@@ -226,8 +219,9 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
 |---|---|---|
 | Settings page | L | Splits into multiple T-NNN at spec time |
 | Ratings layout cleanup | S | Amends T-302 |
-| Saved widget description | XS | Single string + CL |
-| L2 new-recipe test | S | New REG-16 |
+| Categories tab brown | S–M | Needs CL on cell-vs-surface tinting |
+| ~~Saved widget description~~ | ~~XS~~ | Graduated to US-25 / CL-40 / T-400 |
+| ~~L2 new-recipe test~~ | ~~S~~ | Graduated to REG-16 / CL-43 / T-420 |
 | REG-T-360 widget image | M | Investigate fresh-install transient first |
 | REG-T-390 widget text | M | T-390 was overconfident; T-394 follow-up |
 
@@ -320,13 +314,41 @@ useful reference.
   Screen, not the home-screen Tinted/Clear pipeline this story
   audits). Clean-audit closure (AC-23.6) explicitly authorized —
   mirror of AC-18.6.
+- **"Saved Recipes" widget description copy rewrite** — became
+  **US-25** (AC-25.1 through AC-25.3) + [CL-40](clarifications.md) +
+  [T-400](tasks.md). Single user-facing string change in
+  `Widget/SavedRecipesWidget.swift`: "Your saved recipes, one tap from
+  a cook." → "Quick access to your saved recipes." per CL-40, which
+  also captured the three rejected alternatives ("at a glance" /
+  "Tap to open…" / "Your bookmarked recipes, right on the home
+  screen"). Amends `AC-17.1` (description string superseded with the
+  same strike-through treatment T-380 applied to `AC-4.7`).
+  Widget-face baselines (`SavedWidgetSnapshotTests`) unaffected — the
+  description string lives in the iOS widget gallery UI, not on the
+  rendered widget face. Same pattern CL-36 established for the
+  "Today's Recipe" → "Latest Recipe" rename.
+- **L2 test for new-recipe surfacing** — became regression
+  [`REG-16`](spec.md) (no new US — this is a test mandate, not a
+  feature) + [`CL-43`](clarifications.md) (why a live newest-post L2
+  test in addition to REG-2's fixture-based one) + [`T-420`](tasks.md)
+  under the Phase 10 cluster. New L2 test methods live alongside the
+  existing `LiveAPITests` suite (constitution §6 L2 tier, gated by
+  the same `DOD_RUN_LIVE_TESTS=1` env var, picked up by the existing
+  `nightly-live-api.yml` workflow per AC-T3). Two methods:
+  `newestPostIsReachableViaFeedRefresh` (asserts the WP REST newest
+  post id round-trips through `WPRestClient.posts()` +
+  `RecipeStore.cache(listItems:)` + `RecipeStore.listItems(forIDs:)`,
+  the production feed-load path), and `newestPostHasNonNilHeroImage`
+  (re-asserts REG-2's hero-image invariant against the live newest
+  post on every nightly run, not just the fixture's "at least half
+  pass" gate).
 - **Categories tab brown** — became **US-24** (AC-24.1 through AC-24.6) +
-  [CL-40](clarifications.md) + [T-430](tasks.md). Surface-color pass that
+  [CL-44](clarifications.md) + [T-430](tasks.md). Surface-color pass that
   amends T-340's `.insetGrouped` layout on one axis: the scroll surface
   around the inset-grouped row cards AND the area behind the `.searchable`
   field adopt `DODColor.castIronBrown` (the same token the recipe-card
   time chip, offline banner, snackbar, and search filter chip use). The
-  surface-vs-cell-level tinting decision is captured in CL-40 — surface
+  surface-vs-cell-level tinting decision is captured in CL-44 — surface
   wins because cell-level can't reach the `.searchable` field's container,
   and repainting cells would blow row-text contrast in both light and
   dark modes (the brand brown does not vary by appearance). Six
