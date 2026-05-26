@@ -95,11 +95,7 @@ Mix of small Search-tab polish, a real bug (new recipes not surfacing), a design
 
 #### Search-tab polish (5 small items, likely one PR)
 
-- **"No recipes match '[Tag]'" appears when searching by tag.** When the user searches via a tag chip, the result is a "no recipes match" empty state instead of actual filtered results. The tag-search path is broken. Size: **S** — investigate where the tag query lands in `SearchViewModel` and why it returns empty.
-- **"Clear All" button next to "Recent" label.** Wipe all recent searches with one tap. New button in `RecentSearchesView` (or equivalent) next to the section header. Size: **XS**.
-- **`questionmark.circle` instead of `questionmark.folder` for the no-results empty state.** AC-20.3 from T-350 explicitly left `questionmark.folder` alone as the empty-state glyph, but `questionmark.circle` is the iOS-stock "I can't find what you asked for" glyph. Single SF Symbol swap. Size: **XS**.
-- **Remove "All categories" button from the Search tab.** The Categories tab already exists and is reachable via the bottom nav; duplicating "All categories" inside Search is redundant and confusing. Delete the button + its handler. Size: **XS**.
-- **"Try" suggestions fill the search bar (don't select a category).** Today, tapping a "Try" suggestion (idle-state pill) silently applies it as a category filter. The user expects it to populate the search field with the suggestion text so they can edit before searching. Change the action handler from "set category filter" to "set search text." Size: **S**.
+_(All 5 items graduated as the **US-29 / CL-49 / T-500** bundle — see "Recently graduated" below.)_
 
 #### Filter logic
 
@@ -137,11 +133,11 @@ Mix of small Search-tab polish, a real bug (new recipes not surfacing), a design
 
 | Item | Size | Notes |
 |---|---|---|
-| 1. Tag search "No recipes match" | S | Investigate SearchViewModel tag path |
-| 2. "Clear All" recents button | XS | Single button + handler |
-| 3. `questionmark.circle` not `.folder` | XS | One-line SF Symbol swap |
-| 4. Remove "All categories" button | XS | Delete-only |
-| 5. "Try" suggestions fill search bar | S | Change one action handler |
+| ~~1. Tag search "No recipes match"~~ | ~~S~~ | Graduated to US-29 / CL-49 / T-500 |
+| ~~2. "Clear All" recents button~~ | ~~XS~~ | Graduated to US-29 / CL-49 / T-500 |
+| ~~3. `questionmark.circle` not `.folder`~~ | ~~XS~~ | Graduated to US-29 / CL-49 / T-500 |
+| ~~4. Remove "All categories" button~~ | ~~XS~~ | Graduated to US-29 / CL-49 / T-500 |
+| ~~5. "Try" suggestions fill search bar~~ | ~~S~~ | Graduated to US-29 / CL-49 / T-500 |
 | 6. "Any time" filter composes | M | Logic bug; new REG-17 |
 | 7. Login + OAuth | XL | **Constitution amendment first** |
 | 8. New recipes don't surface | M | Real bug, related to T-420 |
@@ -480,3 +476,20 @@ useful reference.
   insufficient on extreme-bright wallpapers — the minimal-diff scrim is
   the immediate fix the user-reported regression demands. Shipped in
   [#37](https://github.com/adamsned/dod-ios-app/pull/37).
+- **Search-tab polish bundle (5 round-6 items)** — became **US-29**
+  (AC-29.1 through AC-29.6) + [CL-49](clarifications.md) +
+  [T-500](tasks.md). One PR bundles five small Search-tab polish items
+  the user flagged in round 6: (1) "tag search returns 'No recipes
+  match'" report, (2) "Clear All" button next to the "Recent" section
+  header, (3) `questionmark.folder` → `questionmark.circle` for the
+  no-results empty state, (4) removal of the "All categories" menu
+  row, (5) "Try" suggestions populate the search field instead of
+  selecting a category. CL-49.1 captures the root-cause investigation
+  on item 1 — there is no tag-search feature in the code (per CL-3,
+  "WP categories only in v1"); the user's misread was a "Try" category
+  pill that double-set a filter and dropped every REST result whose
+  category map wasn't hydrated yet. Items 1 and 5 resolve to the same
+  single action-handler change in `IdleSuggestionsView.onCategoryTap`.
+  CL-49.3 explicitly reverses [AC-20.3](spec.md)'s
+  `questionmark.folder` carve-out per round-6 user feedback.
+  Implementing PR: T-500.
