@@ -10,6 +10,15 @@ import SwiftUI
 /// client-side name filter. No custom DesignSystem tokens are introduced;
 /// the row composition uses only existing `DODType` / `DODColor` /
 /// `DODSpacing` values per CL-31.
+///
+/// Surface color follows US-24 / CL-40: the scroll surface around the
+/// inset-grouped row cards AND the area behind the `.searchable` field
+/// adopt `DODColor.castIronBrown` (the same token the recipe-card time
+/// chip, offline banner, snackbar, and search filter chip use) so the
+/// Categories tab carries the same brown that anchors the recipe-card
+/// visual language on the Feed tab. The row cells themselves keep the
+/// system-default inset-grouped fill (white in light, dark earth in dark)
+/// so the established row-text contrast carries forward unchanged.
 public struct CategoryListView: View {
 
     @State private var viewModel: CategoryListViewModel
@@ -81,7 +90,7 @@ public struct CategoryListView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(DODColor.surface)
+        .background(DODColor.castIronBrown)
 
         #if os(iOS)
         return
