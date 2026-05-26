@@ -107,7 +107,7 @@ Mix of small Search-tab polish, a real bug (new recipes not surfacing), a design
 
 #### New-recipe surfacing — real bug, not just a backlog idea
 
-- **New Dutch Oven Daddy recipes don't show up in the app.** When a recipe is published on dutchovendaddy.com, it doesn't appear in the app's feed. This is the same failure mode T-420's REG-16 nightly test was designed to catch. The L2 test passes on dev fixtures but the real app surface fails. Possible causes: (a) feed caching is too aggressive and never invalidates, (b) the WP REST query's date filter is wrong, (c) pagination state isn't resetting on refresh, (d) something else. Reproduce: confirm a known-new recipe on dutchovendaddy.com isn't in the app's feed; trace why. Size: **M**.
+_(Graduated — see "Recently graduated" below: T-510 / CL-50 / REG-18 traced the bug to URLCache.shared + Cloudflare CDN serving stale page-1 batches, fixed by bypassing both caches inside `WPRestClient.get(...)`.)_
 
 #### Design-system overhaul
 
@@ -139,7 +139,7 @@ _(Background/foreground color overhaul graduated — see "Recently graduated" be
 | 5. "Try" suggestions fill search bar | S | Change one action handler |
 | 6. "Any time" filter composes | M | Logic bug; new REG-17 |
 | 7. Login + OAuth | XL | **Constitution amendment first** |
-| 8. New recipes don't surface | M | Real bug, related to T-420 |
+| ~~8. New recipes don't surface~~ | ~~M~~ | Graduated → REG-18 / CL-50 / T-510 |
 | ~~9. Background/foreground color overhaul~~ | ~~M~~ | Graduated to US-30 / CL-51 / T-520 |
 
 ### Captured 2026-05-25 (round 5, @spencer0706) — widget fixes that didn't actually fix the bugs
@@ -502,3 +502,30 @@ useful reference.
   insufficient on extreme-bright wallpapers — the minimal-diff scrim is
   the immediate fix the user-reported regression demands. Shipped in
   [#37](https://github.com/adamsned/dod-ios-app/pull/37).
+- **New-recipe surfacing — new Dutch Oven Daddy recipes don't show up in
+  the app** — graduated to [REG-18](spec.md) + [CL-50](clarifications.md) +
+  [T-510](tasks.md). Root cause traced: `WPRestClient.get(path:queryItems:)`
+  built its `URLRequest` with the default `cachePolicy = .useProtocolCachePolicy`
+  and no explicit `Cache-Control` request header. WP REST responses carry
+  `Last-Modified` but no `Cache-Control`, so iOS `URLSession.shared` applied
+  HTTP heuristic freshness (~`0.1 * (now - Last-Modified)`) and served a stale
+  page-1 batch from `URLCache.shared` on repeated pull-to-refresh. Cloudflare's
+  edge CDN added a second stale layer with a multi-minute TTL on `cf-cache-status: HIT`
+  responses — even when URLCache missed, the CDN could return pre-publish JSON
+  that omitted a just-published recipe. T-420's REG-16 nightly L2 test didn't
+  catch this because it runs in a fresh `swift test` process with an empty
+  URLCache and makes one fresh call against a CDN that may happen to be fresh
+  at test time; the failure only surfaced under the production user-driven
+  repeated-refresh pattern. Fix: two-line addition to `WPRestClient.get(path:queryItems:)`
+  that sets `request.cachePolicy = .reloadIgnoringLocalCacheData` (bypasses
+  URLCache.shared) AND `request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")`
+  (asks Cloudflare to revalidate with origin per RFC 7234 §5.2.1.4). Both
+  lines are required: cachePolicy alone leaves the CDN serving stale; the
+  header alone leaves URLCache serving stale. CL-50 captures the rejected
+  alternatives (per-call `forceFresh: Bool` parameter, cache-busting query
+  param, `.reloadIgnoringLocalAndRemoteCacheData`, `.reloadRevalidatingCacheData`,
+  global `URLCache.shared` disable). Locked by new L2 test
+  `LiveAPITests.feedRefreshBypassesStaleURLCacheEntry` that plants a known-stale
+  `CachedURLResponse` in `URLCache.shared` and asserts `WPRestClient.posts()`
+  returns the live posts rather than the planted decoy — fails on `origin/main`,
+  passes after the fix.
