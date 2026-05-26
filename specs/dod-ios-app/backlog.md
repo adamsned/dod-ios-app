@@ -89,6 +89,64 @@ Don't graduate these into spec work without a real user signal — they
 either need a paired web-side effort (Universal Links) or have
 non-trivial scope risk (Watch, Collections).
 
+### Captured 2026-05-26 (round 6, @spencer0706) — Search-tab cleanup + new recipe surfacing + design + login
+
+Mix of small Search-tab polish, a real bug (new recipes not surfacing), a design-system overhaul, and one massive feature (login + OAuth) that needs a constitution amendment before any code lands.
+
+#### Search-tab polish (5 small items, likely one PR)
+
+- **"No recipes match '[Tag]'" appears when searching by tag.** When the user searches via a tag chip, the result is a "no recipes match" empty state instead of actual filtered results. The tag-search path is broken. Size: **S** — investigate where the tag query lands in `SearchViewModel` and why it returns empty.
+- **"Clear All" button next to "Recent" label.** Wipe all recent searches with one tap. New button in `RecentSearchesView` (or equivalent) next to the section header. Size: **XS**.
+- **`questionmark.circle` instead of `questionmark.folder` for the no-results empty state.** AC-20.3 from T-350 explicitly left `questionmark.folder` alone as the empty-state glyph, but `questionmark.circle` is the iOS-stock "I can't find what you asked for" glyph. Single SF Symbol swap. Size: **XS**.
+- **Remove "All categories" button from the Search tab.** The Categories tab already exists and is reachable via the bottom nav; duplicating "All categories" inside Search is redundant and confusing. Delete the button + its handler. Size: **XS**.
+- **"Try" suggestions fill the search bar (don't select a category).** Today, tapping a "Try" suggestion (idle-state pill) silently applies it as a category filter. The user expects it to populate the search field with the suggestion text so they can edit before searching. Change the action handler from "set category filter" to "set search text." Size: **S**.
+
+#### Filter logic
+
+- **"Any time" filter actually composes with other filters.** Selecting a duration (e.g. "≤1 hour") in the Any-time chip should narrow results in combination with a category filter — e.g. "Beef and Red Meat Recipes that take 1 hour to make." Today the filter doesn't appear to be composing correctly. Bug investigation + fix. Size: **M** (likely in `SearchResultMerger` or the WP query construction). Captured in the test pyramid as a new **REG-17**.
+
+#### New-recipe surfacing — real bug, not just a backlog idea
+
+- **New Dutch Oven Daddy recipes don't show up in the app.** When a recipe is published on dutchovendaddy.com, it doesn't appear in the app's feed. This is the same failure mode T-420's REG-16 nightly test was designed to catch. The L2 test passes on dev fixtures but the real app surface fails. Possible causes: (a) feed caching is too aggressive and never invalidates, (b) the WP REST query's date filter is wrong, (c) pagination state isn't resetting on refresh, (d) something else. Reproduce: confirm a known-new recipe on dutchovendaddy.com isn't in the app's feed; trace why. Size: **M**.
+
+#### Design-system overhaul
+
+- **App-wide background + foreground color overhaul.** Specific hex values per appearance:
+  - **Dark mode:** background `#42210B`, foreground (cards, surfaces, chips) `#281F19`.
+  - **Light mode:** background `#F9F6EF`, foreground (cards, surfaces, chips) `#FFFFFF`.
+  - **Text colors stay unchanged in both modes.**
+
+  Touches `DODColor.surface`, `DODColor.surfaceElevated`, `DODColor.background` (and any `Color.xcassets` entries for the matching tokens). Will re-record **every** L4 snapshot in the repo — design-system, feature views, widgets, lock-screen. Size: **M** (code is small; baseline churn is large). Worth a CL on which `DODColor` tokens the user meant by "background" vs "foreground" (the existing palette doesn't have a token literally named that — closest analogues are `Surface` for cards/cells and `SurfaceElevated` or `Cream` for the screen background). Verify in `accessibility-audit.md` that new values still pass WCAG AA against unchanged text colors.
+
+#### Major feature — needs constitution amendment before code
+
+- **Login + account system (Google + Apple + email).** Account icon in the Recipes tab's top-right nav corner; tap → login sheet with three options. Name + email persist across the app for save / comment / rate flows.
+
+  **Constitutional conflicts to surface BEFORE any code:**
+  1. **§1 Product identity:** today says "mostly read-only with two write surfaces." Login changes the app's identity considerably — it stops being anonymous.
+  2. **§4 Content source:** "No auth required for reads in v1. Anonymous client." Would need to amend.
+  3. **§9 Privacy & security:** today uses Keychain-stored guest identity (CL-21/22 — name+email for comments/ratings) sent only to dutchovendaddy.com. OAuth adds Google + Apple as third parties; the App Privacy questionnaire changes meaningfully (now collecting account credentials). The "no IDFA, no cross-app tracking" stance survives Sign in with Apple but breaks under Google Sign-In without careful scope handling.
+  4. **§3 Dependencies:** would need `GoogleSignIn` SDK; `Sign in with Apple` uses system `AuthenticationServices` (no new dep). Both need plan-time approval.
+  5. **CL-5 (iCloud sync deferred to v2):** today says saved recipes are device-local. A real account opens server-side sync of saves + comments + ratings; the spec needs to decide whether login implies sync or whether they're still independent.
+
+  **Backend implications:** dutchovendaddy.com's WordPress doesn't natively support OAuth account creation — adding it requires a WP plugin (e.g., MiniOrange, WPOAuth) or a side service. This is a paired web + iOS effort, not iOS-only.
+
+  Size: **XL** (~3–4 weeks for the iOS side alone; backend longer). **Paused pending architecture conversation with dad before graduating.**
+
+#### Sizing summary
+
+| Item | Size | Notes |
+|---|---|---|
+| 1. Tag search "No recipes match" | S | Investigate SearchViewModel tag path |
+| 2. "Clear All" recents button | XS | Single button + handler |
+| 3. `questionmark.circle` not `.folder` | XS | One-line SF Symbol swap |
+| 4. Remove "All categories" button | XS | Delete-only |
+| 5. "Try" suggestions fill search bar | S | Change one action handler |
+| 6. "Any time" filter composes | M | Logic bug; new REG-17 |
+| 7. Login + OAuth | XL | **Constitution amendment first** |
+| 8. New recipes don't surface | M | Real bug, related to T-420 |
+| 9. Background/foreground color overhaul | M | Re-records every L4 baseline |
+
 ### Captured 2026-05-25 (round 5, @spencer0706) — widget fixes that didn't actually fix the bugs
 
 After T-362 (PR #34, commit `0aa8633`) and T-394 (PR #37, commit `5f500c8`) merged
