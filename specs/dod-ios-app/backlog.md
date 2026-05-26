@@ -342,3 +342,15 @@ useful reference.
   (re-asserts REG-2's hero-image invariant against the live newest
   post on every nightly run, not just the fixture's "at least half
   pass" gate).
+- **Categories tab brown** — became **US-24** (AC-24.1 through AC-24.6) +
+  [CL-44](clarifications.md) + [T-430](tasks.md). Surface-color pass that
+  amends T-340's `.insetGrouped` layout on one axis: the scroll surface
+  around the inset-grouped row cards AND the area behind the `.searchable`
+  field adopt `DODColor.castIronBrown` (the same token the recipe-card
+  time chip, offline banner, snackbar, and search filter chip use). The
+  surface-vs-cell-level tinting decision is captured in CL-44 — surface
+  wins because cell-level can't reach the `.searchable` field's container,
+  and repainting cells would blow row-text contrast in both light and
+  dark modes (the brand brown does not vary by appearance). Six
+  `CategoryListViewSnapshotTests` baselines re-recorded; row text + cells
+  + filter logic + view model untouched per AC-24.4.
