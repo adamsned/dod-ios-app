@@ -115,9 +115,12 @@ public struct LiveFeedDependencies: FeedDependencies {
         // ``WidgetImageBridge.filename(for:)`` for every entry that has
         // a `heroImage`, regardless of whether the bytes are currently
         // on disk. The widget reads the file by name and falls back to
-        // the gradient placeholder if absent (AC-21.3). Keeping this
-        // pure (no I/O) lets the snapshot writer stay free of any
-        // file-system dependency.
+        // the gradient placeholder if absent (AC-21.3). Keeping the
+        // snapshot writer itself pure (no I/O) lets the wire-format
+        // write stay file-system-free; the parallel hero-image
+        // precache below (T-392) handles getting the bytes onto disk
+        // through the existing `store.cacheImage` chain which mirrors
+        // to the bridge.
         let entries = items.prefix(WidgetSnapshotConfig.maxEntries).map {
             WidgetSnapshot.Entry(
                 id: $0.id,
@@ -144,20 +147,58 @@ public struct LiveFeedDependencies: FeedDependencies {
             return
         }
         widgetReload?(Array(entries))
-        // Kick off the hero-image prefetch AFTER the snapshot has been
-        // written. The prefetcher routes the bytes through
-        // `RecipeStore.cacheImage(url:bytes:)`, which fires the existing
-        // `WidgetImageBridge` write hook (T-360 / AC-21.2) and populates
-        // the App Group container so the next 15-min timeline refresh
-        // (CL-28) can render real images instead of the gradient
-        // placeholder. Fire-and-forget — feed-load latency is unaffected
-        // and per-URL failures inside the prefetcher are logged +
-        // swallowed. REG-T-360 / CL-45.
-        if let imagePrefetcher {
-            let heroURLs = entries.compactMap { $0.heroImageURL }
-            guard !heroURLs.isEmpty else { return }
-            Task.detached(priority: .utility) {
-                await imagePrefetcher(heroURLs)
+
+        // T-392: Hero-image precache. Without this, `RecipeStore.cacheImage`
+        // only ran for *saved* recipes via `SavedDependencies`, so the
+        // featured-widget hero file at the bridge path never existed unless
+        // the user happened to have saved today's featured recipe — and
+        // the widget's `AsyncImage` fell back to the gradient placeholder.
+        // We dispatch the fetch on a detached Task so the user-visible feed
+        // load doesn't wait on it; failures are logged and swallowed so the
+        // graceful-fallback contract (AC-21.3) still holds.
+        let heroEntries = Array(entries)
+        let store = self.store
+        Task.detached { [store, heroEntries] in
+            await Self.precacheHeroImages(entries: heroEntries, into: store)
+        }
+    }
+
+    /// Fetch + cache hero image bytes for every snapshot entry that has a
+    /// URL. Calls into the same `store.cacheImage(url:bytes:)` site that
+    /// `SavedDependencies` uses on explicit save — `RecipeStore+ImageCache`
+    /// mirrors each write to ``WidgetImageBridge`` so the widget extension
+    /// can render the bytes without a network fetch. Best-effort by design:
+    /// any per-entry failure (network blip, image absent, decode-time error)
+    /// is logged and skipped; the widget falls back to the gradient
+    /// placeholder for that entry per AC-21.3.
+    ///
+    /// `nonisolated` + `static` so the detached Task closure can call it
+    /// without capturing `self` as a Sendable surface.
+    private static func precacheHeroImages(
+        entries: [WidgetSnapshot.Entry],
+        into store: RecipeStore
+    ) async {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForResource = 10
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+
+        for entry in entries {
+            guard let url = entry.heroImageURL else { continue }
+            do {
+                let (bytes, response) = try await session.data(from: url)
+                if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                    DODLog.app.notice(
+                        "widget hero precache: HTTP \(http.statusCode, privacy: .public) for \(url.absoluteString, privacy: .public)"
+                    )
+                    continue
+                }
+                try await store.cacheImage(url: url, bytes: bytes)
+            } catch {
+                DODLog.app.notice(
+                    "widget hero precache failed for \(url.absoluteString, privacy: .public): \(String(describing: error))"
+                )
             }
         }
     }

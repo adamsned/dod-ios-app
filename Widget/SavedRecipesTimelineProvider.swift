@@ -68,18 +68,24 @@ struct SavedRecipesTimelineProvider: TimelineProvider {
     private let refreshInterval: TimeInterval = 4 * 60 * 60
 
     func placeholder(in context: Context) -> SavedRecipesEntry {
-        SavedRecipesEntry.placeholder
+        // T-391/T-392 follow-up: WidgetKit calls `placeholder(in:)` first
+        // for the gallery preview thumbnail — it does NOT necessarily call
+        // `getSnapshot(in:completion:)` before painting the thumbnail.
+        // Reading the snapshot synchronously here is cheap (UserDefaults
+        // plist load, single-digit ms) and gives the gallery the user's
+        // real saved recipes immediately. Fall back to the hardcoded
+        // brand placeholder only when the App Group is empty (first
+        // launch, or the user hasn't saved any recipes yet). AC-17.5.
+        let entry = currentEntry()
+        return entry.entries.isEmpty ? .placeholder : entry
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SavedRecipesEntry) -> Void) {
-        // In the widget gallery (`context.isPreview`) WidgetKit wants a
-        // representative non-blank entry. Use the placeholder rather than
-        // hitting the App Group so the gallery render is fast and offline.
-        if context.isPreview {
-            completion(.placeholder)
-            return
-        }
-        completion(currentEntry())
+        // Mirror the `placeholder(in:)` path: prefer the live snapshot,
+        // fall back to the hardcoded brand placeholder only when the
+        // App Group is empty. T-391.
+        let entry = currentEntry()
+        completion(entry.entries.isEmpty ? .placeholder : entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SavedRecipesEntry>) -> Void) {

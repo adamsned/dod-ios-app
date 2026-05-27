@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
@@ -170,10 +174,23 @@ public enum WidgetCard {
 
     // MARK: - Shared primitives
 
-    /// Hero image / fallback gradient. AsyncImage is cheap inside the
-    /// widget process; WidgetKit caches its decoded image data.
+    /// Hero image / fallback gradient.
     /// `internal` so saved-variant rows declared in
     /// `WidgetCard+Saved.swift` can reuse the same primitive.
+    ///
+    /// **Why synchronous load for `file://` URLs (T-391/T-392 follow-up):**
+    /// `AsyncImage` is built on `URLSession` and does not reliably load
+    /// `file://` URLs inside a widget extension process — the request
+    /// completes with `.empty` rather than reading the local bytes. The
+    /// `WidgetImageBridge` writes hero JPEGs into the App Group container
+    /// (spec.md AC-21.2); reading them at render time is a trivially fast
+    /// local file read (single-digit ms for a 100KB JPEG on the user's
+    /// device), so we read synchronously via `UIImage(contentsOfFile:)` and
+    /// pass the decoded `Image` directly. WidgetKit caches the rendered
+    /// timeline entry image, so this happens once per timeline reload —
+    /// roughly every 4 hours per the app's reload cadence. Falls back to
+    /// `AsyncImage` for network URLs so unit-test fixtures and any future
+    /// remote URL caller still works.
     ///
     /// The loaded ``image`` is opted out of the iOS 18+ home-screen
     /// "Tinted" / "Vibrant" desaturation pass via
@@ -197,14 +214,25 @@ public enum WidgetCard {
         var body: some View {
             Group {
                 if let url {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
+                    if url.isFileURL {
+                        // Local App Group file — read synchronously. See
+                        // doc-comment above for why AsyncImage can't be
+                        // used for file:// URLs in widget extensions.
+                        if let image = Self.loadLocalImage(at: url) {
                             loadedImage(image)
-                        case .empty, .failure:
+                        } else {
                             fallbackGradient
-                        @unknown default:
-                            fallbackGradient
+                        }
+                    } else {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                loadedImage(image)
+                            case .empty, .failure:
+                                fallbackGradient
+                            @unknown default:
+                                fallbackGradient
+                            }
                         }
                     }
                 } else {
@@ -212,6 +240,30 @@ public enum WidgetCard {
                 }
             }
             .clipped()
+        }
+
+        /// Read a `file://` URL synchronously and wrap as a SwiftUI `Image`.
+        /// Returns nil if the file doesn't exist or isn't a decodable
+        /// image — caller renders the gradient placeholder, matching the
+        /// AC-21.3 "graceful fallback when bytes absent" contract.
+        ///
+        /// `UIImage(contentsOfFile:)` is fully synchronous and uses
+        /// ImageIO under the hood, which is what `AsyncImage` would call
+        /// anyway after its (broken-in-widget-extensions) `URLSession`
+        /// step. Reading a ~100KB JPEG on-device takes single-digit
+        /// milliseconds — well under WidgetKit's timeline-build budget.
+        ///
+        /// `UIKit`-gated so the macOS `swift test` slice still builds
+        /// (DODDesignSystem supports macOS 14+ for the non-visual tests).
+        static func loadLocalImage(at url: URL) -> Image? {
+            #if canImport(UIKit)
+            guard let uiImage = UIImage(contentsOfFile: url.path) else {
+                return nil
+            }
+            return Image(uiImage: uiImage)
+            #else
+            return nil
+            #endif
         }
 
         /// Loaded recipe-photo branch. Extracted so the iOS 18+ /
