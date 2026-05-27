@@ -25,10 +25,40 @@ public struct FeedView: View {
         }
         .background(DODColor.surface)
         .navigationTitle("Recipes")
+        .toolbar {
+            // US-32 AC-32.1: gear icon on the trailing edge of the Recipes
+            // nav bar pushes the Settings page. NavigationLink lives in the
+            // toolbar so it inherits the standard back button on the pushed
+            // screen; the existing TabStack NavigationStack hosts the push.
+            // `.topBarTrailing` is iOS-only; macOS test slice falls back to
+            // the default `.automatic` placement so the package still builds.
+            #if os(iOS)
+            ToolbarItem(placement: .topBarTrailing) {
+                settingsToolbarLink
+            }
+            #else
+            ToolbarItem(placement: .automatic) {
+                settingsToolbarLink
+            }
+            #endif
+        }
         .task { await viewModel.onAppear() }
         .refreshable { await viewModel.refresh() }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isOffline)
         .sensoryFeedback(.success, trigger: viewModel.refreshCount)
+    }
+
+    /// The toolbar gear-icon NavigationLink (US-32 AC-32.1). Extracted so
+    /// the `#if os(iOS)` placement branch + the macOS fallback share one
+    /// label definition.
+    private var settingsToolbarLink: some View {
+        NavigationLink {
+            SettingsView()
+        } label: {
+            Image(systemName: "gearshape")
+                .accessibilityLabel("Settings")
+        }
+        .accessibilityIdentifier("feed-toolbar-settings")
     }
 
     @ViewBuilder
