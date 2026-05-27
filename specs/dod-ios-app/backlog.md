@@ -106,7 +106,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 #### New recipe-detail action
 
-- **Download for offline viewing button (`square.and.arrow.down`).** Adds a third nav-bar action next to Save (`bookmark`, AC-4.7) and Share (`AC-4.8`). Tap → download the recipe payload (text + ingredients + steps + hero image at full resolution) for on-device offline access. "Perfect for camping when you don't have access to internet." Semantically distinct from Save (which is "I want to remember this") — Download is "I want to use this without network." A saved recipe is auto-downloaded per AC-5.2; download alone is a save without the bookmarking. Spec question: do Download and Save share storage? Are they separate concepts in the UI? Probably yes-and-yes with a UX distinction. Size: **M** — backend reuse is straightforward, the UX question is what makes it medium.
+- ~~**Download for offline viewing button (`square.and.arrow.down`).** Adds a third nav-bar action next to Save (`bookmark`, AC-4.7) and Share (`AC-4.8`). Tap → download the recipe payload (text + ingredients + steps + hero image at full resolution) for on-device offline access. "Perfect for camping when you don't have access to internet." Semantically distinct from Save (which is "I want to remember this") — Download is "I want to use this without network." A saved recipe is auto-downloaded per AC-5.2; download alone is a save without the bookmarking. Spec question: do Download and Save share storage? Are they separate concepts in the UI? Probably yes-and-yes with a UX distinction. Size: **M** — backend reuse is straightforward, the UX question is what makes it medium.~~ **Graduated 2026-05-27 as US-35 / CL-61 / T-620.**
 
 #### Recipes tab rename + content typing
 

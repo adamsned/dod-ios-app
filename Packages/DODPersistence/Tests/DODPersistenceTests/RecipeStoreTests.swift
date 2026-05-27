@@ -179,6 +179,30 @@ struct RecentlyViewedTests {
         let saved = try await store.savedRecipes()
         #expect(saved.contains(where: { $0.id == 999 }), "Saved recipe must survive overflow")
     }
+
+    /// US-35 / AC-35.5 — explicitly-downloaded recipes pin from LRU
+    /// eviction the same way saved recipes do. The new eviction
+    /// predicate (`isSaved == false && downloadedAt == nil`) preserves
+    /// rows where either flag is set, so a recipe a user grabbed for a
+    /// camping trip survives even when they never tap Save.
+    @Test func downloadedRecipeSurvivesLRUEviction() async throws {
+        let store = try await makeStore()
+        try await store.cache(listItem: makeListItem(id: 7777, title: "Camping Stew"))
+        let transitioned = try await store.markDownloaded(id: 7777)
+        #expect(transitioned == true)
+        // Re-tap on the same row is a no-op (AC-35.4).
+        let idempotent = try await store.markDownloaded(id: 7777)
+        #expect(idempotent == false)
+        #expect(try await store.isDownloaded(id: 7777) == true)
+        // Drown the LRU window with unrelated rows.
+        for index in 0..<(RecipeStore.unsavedLRUCap + 50) {
+            try await store.cache(listItem: makeListItem(id: 8000 + index, title: "Filler \(index)"))
+        }
+        #expect(
+            try await store.isDownloaded(id: 7777) == true,
+            "Explicitly-downloaded recipe must survive LRU eviction"
+        )
+    }
 }
 
 @Suite("RecipeStore image cache (T-075)") struct ImageCacheTests {

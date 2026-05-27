@@ -26,6 +26,17 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var markedFailedIDs: [Int] = []
     var telemetryEvents: [AnalyticsEvent] = []
     var fetchCount = 0
+    /// US-35 spy state: recipe IDs the test has flagged as downloaded
+    /// (mirrors `CachedRecipe.downloadedAt != nil`). Production routes
+    /// through `RecipeStore.markDownloaded(id:)`.
+    var downloadedIDs: Set<Int> = []
+    /// Per-recipe download-call counter so AC-35.4's "no second image
+    /// fetch on re-tap" idempotency contract can be locked.
+    var downloadCallCount: [Int: Int] = [:]
+    /// When non-nil, `downloadForOffline(recipe:)` throws this error
+    /// before flipping any state — lets tests cover the failure branch
+    /// without rigging up `ImageLoader` plumbing.
+    var downloadShouldFail = false
 
     // MARK: - Comments + ratings test surface
 
@@ -103,6 +114,23 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
 
     func isOnline() async -> Bool { online }
     func sendTelemetry(_ event: AnalyticsEvent) async { telemetryEvents.append(event) }
+
+    func isDownloaded(id: Int) async throws -> Bool {
+        downloadedIDs.contains(id)
+    }
+
+    func downloadForOffline(recipe: Recipe) async throws -> DownloadOutcome {
+        if downloadShouldFail { throw URLError(.notConnectedToInternet) }
+        downloadCallCount[recipe.id, default: 0] += 1
+        // Idempotent in either pin direction (explicit download OR
+        // saved-via-AC-5.2). Mirrors `LiveRecipeDetailDependencies`.
+        if downloadedIDs.contains(recipe.id) || savedIDs.contains(recipe.id) {
+            downloadedIDs.insert(recipe.id)
+            return .alreadyDownloaded
+        }
+        downloadedIDs.insert(recipe.id)
+        return .firstTime
+    }
 
     func fetchRatingSummary(recipeID: Int) async -> RecipeRating {
         fetchRatingSummaryCallCount += 1
