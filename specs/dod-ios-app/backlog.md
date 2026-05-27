@@ -134,11 +134,11 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 - ~~**Recipe/Article card long-press → "Save" with `bookmark.fill` icon.** Standard SwiftUI `.contextMenu` on the card. Tap menu item → save the recipe/article to the Saved tab (same code path as AC-5.1 tap-the-bookmark-on-detail flow). Works in both gallery and list view. Size: **S**.~~ **Graduated 2026-05-27 as US-34 / CL-60 / T-590.**
 
-- **Recent search long-press → "Clear" with `trash` icon, deletes only that term.** Companion to the bulk "Clear All" button (T-500). Standard `.contextMenu`; tap "Clear" removes only the long-pressed term from the recent searches list. Size: **S**.
+- ~~**Recent search long-press → "Clear" with `trash` icon, deletes only that term.**~~ Graduated → US-33 / CL-57 / T-580 as part of the Search-tab tweaks bundle.
 
 #### Color refinements
 
-- **"Clear All" button in Search tab should match the gear-icon orange in Recipes tab.** Whatever color `DODColor` token Settings gear-icon uses (likely `.warmGold` or `.burntOrange`), apply the same to the Clear All text/glyph. Size: **XS**.
+- ~~**"Clear All" button in Search tab should match the gear-icon orange in Recipes tab.**~~ Graduated → US-33 / CL-57 / T-580 as part of the Search-tab tweaks bundle. Token: `DODColor.accent` (the gear icon inherits the app-level `.tint(DODColor.accent)` from `RootView.swift`).
 
 - ~~**List cells + search bars: `#553724` in dark mode, `#FFFFFF` in light mode.**~~ — Graduated to CL-59 / T-610 as a further refinement of `SurfaceElevated` dark from `#5A3520` to `#553724` (Option A — single hex tweak; light stays `#FFFFFF`). Snapshot re-record remains T-571's deferred scope.
 
@@ -152,8 +152,8 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 | Recipes & Articles rename + article-rendering path | M | Amends CL-9 / AC-1.7 / AC-4.11 |
 | Gallery ↔ List view toggle | M | Plus icon-direction CL |
 | Card long-press → Save | S | SwiftUI `.contextMenu` |
-| Recent long-press → Clear | S | Companion to "Clear All" |
-| Clear All orange color match | XS | Single token swap |
+| ~~Recent long-press → Clear~~ | ~~S~~ | Graduated → US-33 / CL-57 / T-580 |
+| ~~Clear All orange color match~~ | ~~XS~~ | Graduated → US-33 / CL-57 / T-580 |
 | ~~List-cell + search-bar color refinement~~ | ~~S–M~~ | Graduated → CL-59 / T-610 (Option A: refine `SurfaceElevated` dark `#5A3520` → `#553724`) |
 
 **Next session also picks up these existing items per Spencer's batching note:**
@@ -669,3 +669,32 @@ useful reference.
   does NOT), plus companion store-side and network-side tests for the
   round-trip through `cache(listItem:)` and the REST DTO mapping.
   Implementing PR: T-530.
+- **Search-tab tweaks — orange Clear All + per-term recent removal (round-7
+  "Color refinements" + "Long-press context menus" bundle)** — graduated to
+  **US-33** (AC-33.1 through AC-33.4) + [CL-57](clarifications.md) +
+  [T-580](tasks.md). Two small round-7 Search-tab affordance polish items
+  bundled into one PR because both touch `RecentSearchesView` inside
+  `Packages/DODFeatureSearch/Sources/DODFeatureSearch/SearchView.swift`:
+  (1) the "Clear All" button's `.foregroundStyle` swaps from
+  `DODColor.castIronBrown` (the recipe-card time-chip + offline-banner brown)
+  to `DODColor.accent` (the brand orange `#C56A24`, identical to `BurntOrange`)
+  so it matches the Recipes-tab gear icon — the gear icon has no explicit
+  `.foregroundStyle` / `.tint` modifier in `FeedView.swift:58`, so it inherits
+  the app-level `.tint(DODColor.accent)` from `RootView.swift:127` /
+  `RootView.swift:161`; (2) each recent-search pill gains a `.contextMenu`
+  modifier with one `Button(role: .destructive)` showing
+  `Image(systemName: "trash")` + `Text("Clear")`. The button action calls a
+  new `SearchViewModel.removeRecentSearch(_:)` method that delegates to a new
+  `RecentSearches.remove(_:)` method on the UserDefaults-backed store
+  (case-insensitive match, mirrors the `record(_:)` dedupe rule, no-op on
+  missing term). CL-57 captures the brand-color match rationale + the
+  per-term context-menu pattern + the considered alternatives (warmGold /
+  burntOrange tokens, swipe-actions, list restructuring, confirmation
+  dialog). The bulk wipe-all path from US-29 / T-500 is unchanged —
+  `clearRecentSearches()` stays in place and the Clear All button still
+  calls it. One new L1 unit test in `RecentSearchesTests` locks the
+  remove-only-target-term contract. Implementing PR: T-580. **Coordination
+  note:** T-590 (card long-press → Save) and T-610 (list-cell + search-bar
+  color refinement) run on parallel branches against different files —
+  spec-file collisions at merge time are expected and the rebaser picks
+  the next free CL slot.
