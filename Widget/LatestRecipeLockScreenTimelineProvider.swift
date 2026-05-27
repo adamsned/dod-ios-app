@@ -65,11 +65,16 @@ struct LatestRecipeLockScreenTimelineProvider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (LatestRecipeLockScreenEntry) -> Void) {
         // In the widget gallery (`context.isPreview`) WidgetKit wants
-        // a representative non-blank entry. Use the placeholder rather
-        // than hitting the App Group so the gallery render is fast and
-        // offline.
+        // a representative non-blank entry. Prefer the live snapshot so
+        // the gallery shows the current recipe (text-only on lock-screen
+        // — no hero image render here regardless, per CL-37, but the
+        // title + excerpt should still be the user's real next-cook
+        // candidate, not the hardcoded "Garlic Butter Skillet Corn"
+        // placeholder). Fall back to the brand placeholder only when
+        // the App Group is empty. T-391.
         if context.isPreview {
-            completion(.placeholder)
+            let entry = currentEntry()
+            completion(entry.recipe == nil ? .placeholder : entry)
             return
         }
         completion(currentEntry())

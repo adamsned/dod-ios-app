@@ -58,10 +58,15 @@ struct FeaturedRecipeTimelineProvider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (FeaturedRecipeEntry) -> Void) {
         // In the widget gallery (`context.isPreview`) WidgetKit wants a
-        // representative non-blank entry. Use the placeholder rather than
-        // hitting the App Group so the gallery render is fast and offline.
+        // representative non-blank entry. Prefer the live snapshot so the
+        // gallery shows the current recipe + real hero image — the moment
+        // the user is deciding whether to add the widget is the most
+        // important impression in the widget's lifecycle. Fall back to
+        // the hardcoded brand placeholder only when the App Group is
+        // empty (first launch before the feed has loaded). T-391.
         if context.isPreview {
-            completion(.placeholder)
+            let entry = currentEntry()
+            completion(entry.recipe == nil ? .placeholder : entry)
             return
         }
         completion(currentEntry())

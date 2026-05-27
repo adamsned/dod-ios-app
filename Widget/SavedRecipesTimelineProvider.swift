@@ -73,10 +73,15 @@ struct SavedRecipesTimelineProvider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (SavedRecipesEntry) -> Void) {
         // In the widget gallery (`context.isPreview`) WidgetKit wants a
-        // representative non-blank entry. Use the placeholder rather than
-        // hitting the App Group so the gallery render is fast and offline.
+        // representative non-blank entry. Prefer the live snapshot so the
+        // gallery shows the user's real saved recipes (with hero images
+        // bridged through `WidgetImageBridge`). Fall back to the
+        // hardcoded brand placeholder only when the App Group is empty
+        // (first launch, or the user hasn't saved any recipes yet —
+        // either way the gallery render needs to look populated). T-391.
         if context.isPreview {
-            completion(.placeholder)
+            let entry = currentEntry()
+            completion(entry.entries.isEmpty ? .placeholder : entry)
             return
         }
         completion(currentEntry())
