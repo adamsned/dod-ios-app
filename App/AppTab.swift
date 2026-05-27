@@ -11,16 +11,53 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    /// Full screen-header title. Drives `FeedView.navigationTitle` (and
+    /// the corresponding nav titles for every other tab) per US-37 /
+    /// AC-37.1.
+    ///
+    /// **Read `tabLabel` — not `title` — for the bottom-tab `Label(...)`
+    /// declaration.** The two split in T-660 / CL-65: a nav-bar title
+    /// can wrap to a second line on small Dynamic Type sizes, but a
+    /// tab-bar item has a fixed ~80pt width and truncates anything
+    /// longer than ~10 characters into "Recipes & Arti...". The split
+    /// preserves both the full-content semantics in the header and the
+    /// short readable label at the bottom of the screen.
     var title: String {
         switch self {
         // US-37 / AC-37.1 (T-640, 2026-05-27): "Recipes" → "Recipes & Articles".
         // Communicates that the tab surfaces both WPRM-instrumented recipes
         // AND article-style posts (e.g. roundup posts) that route through
-        // `ArticleDetailView` per CL-63. The bottom-tab label and the
-        // `FeedView` nav title both consume this string; the telemetry name
+        // `ArticleDetailView` per CL-63. **T-660 / CL-65 (2026-05-27):**
+        // the bottom-tab label was split off into `tabLabel` below
+        // because "Recipes & Articles" truncates at the tab-bar's ~80pt
+        // width on standard iPhone widths. `title` continues to drive
+        // `FeedView.navigationTitle`. The telemetry name
         // (`telemetryName`, AC-16.4) is unchanged to preserve funnel
-        // comparisons across the rename.
+        // comparisons across both renames.
         case .feed: "Recipes & Articles"
+        case .categories: "Categories"
+        case .search: "Search"
+        case .saved: "Saved"
+        }
+    }
+
+    /// Short label used by the bottom tab bar (`Label(...)` inside
+    /// `.tabItem { }` in `RootView.phoneTabs`). For most tabs this
+    /// matches `title`. For `.feed` the tab bar gets the shorter
+    /// "Recipes" while the screen header keeps the full "Recipes &
+    /// Articles" — see T-660 / CL-65 for the rationale (tab-bar items
+    /// have ~80pt fixed width and truncate "Recipes & Articles" to
+    /// "Recipes & Arti..." on standard iPhone widths). The short label
+    /// matches the pre-T-640 wording, which is unambiguously paired
+    /// with the `house` glyph on the bottom bar; the content semantics
+    /// (recipes + articles) are still surfaced by the screen-header
+    /// `navigationTitle`.
+    var tabLabel: String {
+        switch self {
+        // T-660 / CL-65: short label for the bottom tab bar. Matches
+        // the pre-T-640 wording; the full "Recipes & Articles" still
+        // drives `FeedView.navigationTitle`.
+        case .feed: "Recipes"
         case .categories: "Categories"
         case .search: "Search"
         case .saved: "Saved"

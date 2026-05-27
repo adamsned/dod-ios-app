@@ -131,7 +131,13 @@ struct RootView: View {
                     externalRoute: tab == .feed ? $feedExternalRoute : .constant(nil)
                 )
                 .tabItem {
-                    Label(tab.title, systemImage: tab.systemImage)
+                    // T-660 / CL-65: bottom-tab `Label` reads `tabLabel`
+                    // (short — "Recipes" for `.feed`) so the tab-bar's
+                    // ~80pt fixed-width slot doesn't truncate the
+                    // "Recipes & Articles" rename to "Recipes & Arti...".
+                    // The screen-header `navigationTitle` continues to
+                    // render the full `title`.
+                    Label(tab.tabLabel, systemImage: tab.systemImage)
                 }
                 .tag(tab)
             }
