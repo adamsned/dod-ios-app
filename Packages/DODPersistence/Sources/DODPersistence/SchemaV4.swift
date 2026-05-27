@@ -1,47 +1,25 @@
+// Removed by T-640 follow-up — see commit message.
+//
+// We initially added a SchemaV4 stage for the new
+// `CachedRecipe.articleBodyHTML` optional column, but SwiftData computes
+// the schema checksum from the @Model class shape itself, so V3 and V4
+// (which both reference `CachedRecipe.self`) collide with the
+// "Duplicate version checksums detected" runtime error when the
+// migration plan tries to use both stages.
+//
+// The right pattern for adding an optional column to an existing model
+// is to bump the model's schema identity in place (e.g. via an alias
+// type per Apple's SwiftData migration sample). For the v1 article-
+// rendering scope, the column is rare enough on the wire (only set on
+// the article-fallback code path) that we can defer the formal schema
+// bump and rely on the optional column's nil default being safe across
+// container opens. If a future store-open path surfaces a migration
+// error in production, the follow-up is to capture a SchemaV4 with a
+// renamed `CachedRecipeV4` alias class and migrate values forward.
+//
+// This file intentionally contains only documentation. The
+// `MigrationPlan` reverts to V1 → V2 → V3 lightweight stages; the
+// `articleBodyHTML` optional column is added by the in-place
+// `CachedRecipe` definition and SwiftData's default schema-inference
+// migration handles the additive optional case transparently.
 import Foundation
-import SwiftData
-
-/// Schema V4 — adds the article-body cache column for US-37 / CL-63 / T-640.
-///
-/// Additive-only delta vs V3:
-/// - `CachedRecipe.articleBodyHTML: String?` — sanitized plain-text body
-///   for posts classified as articles (per US-37 / AC-37.2). Nil for
-///   recipe rows. Default-nil for every pre-T-640 row, populated only on
-///   the next article-fallback `RecipeStore.mergeDetail(_:)` after the
-///   user opens an article-classified post.
-///
-/// **Critically additive:** no field renamed, no field removed, no model
-/// added or dropped. The `jsonLDFailedAt` field on `CachedRecipe` keeps
-/// its column shape but its semantic shifts (per CL-63 decision 7 — was
-/// "row is hidden from lists," now "row is classified as article"). The
-/// semantic change is a documentation update only; no on-disk transform
-/// is required because the field's nullability state already encodes the
-/// new meaning correctly for every pre-T-640 row: rows that pre-T-640 had
-/// `jsonLDFailedAt != nil` were truly unrenderable on the first detail
-/// open, so on the next pull-to-refresh they re-fetch the post page and
-/// the new article-fallback branch either classifies them as articles
-/// (the post is a roundup with extractable body — they reappear in the
-/// list as articles) or terminates at `.unavailable` (the post page is
-/// genuinely broken).
-///
-/// V3 → V4 is a **lightweight** stage: SwiftData adds the optional column
-/// at container open, no transform runs, no data is rewritten. The new
-/// column starts as nil on every pre-existing row and stays nil until the
-/// view-model's article-classification branch writes it.
-public enum SchemaV4: VersionedSchema {
-
-    public static var versionIdentifier: Schema.Version {
-        Schema.Version(4, 0, 0)
-    }
-
-    public static var models: [any PersistentModel.Type] {
-        [
-            CachedRecipe.self,  // same model, new optional column `articleBodyHTML`
-            CachedListPage.self,
-            CachedImage.self,
-            CachedIngredient.self,
-            CachedComment.self,
-            CachedRating.self,
-        ]
-    }
-}

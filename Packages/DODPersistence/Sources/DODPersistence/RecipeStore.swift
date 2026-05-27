@@ -328,11 +328,15 @@ public actor RecipeStore {
 extension RecipeStore {
 
     /// Create the on-disk container for production use. Pinned to the
-    /// latest schema (`SchemaV4`) — older on-disk stores get migrated via
-    /// `MigrationPlan` at open (V1 → V2 → V3 → V4, all lightweight).
+    /// latest schema (`SchemaV3`) — older on-disk stores get migrated via
+    /// `MigrationPlan` at open (V1 → V2 → V3, all lightweight). The
+    /// `articleBodyHTML` optional column added for US-37 / CL-63 / T-640
+    /// is an in-place additive optional property on `CachedRecipe`; see
+    /// `SchemaV4.swift` for the rationale on why it's not a separate
+    /// schema stage.
     public static func productionContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(SchemaV4.models),
+            for: Schema(SchemaV3.models),
             migrationPlan: MigrationPlan.self,
             configurations: ModelConfiguration()
         )
@@ -342,7 +346,7 @@ extension RecipeStore {
     /// fixture data exercises the same models the app ships with.
     public static func inMemoryContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(SchemaV4.models),
+            for: Schema(SchemaV3.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
     }

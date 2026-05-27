@@ -294,15 +294,20 @@ struct MigrationV3Tests {
         #expect(v3Entities["CachedRating"] != nil, "V3 must include the new CachedRating model")
     }
 
-    @Test func migrationPlanListsV1ThroughV4() {
-        // T-640 (US-37 / CL-63) added SchemaV4 — V3 + the
-        // `CachedRecipe.articleBodyHTML` optional column for the article
-        // rendering path. V1→V2, V2→V3, V3→V4 are all lightweight stages
-        // per MIGRATION.md rule 1.
+    @Test func v3MigrationPlanLists3VersionsAnd2Stages() {
+        // T-640 (US-37 / CL-63) initially added SchemaV4 for the
+        // `CachedRecipe.articleBodyHTML` additive column but reverted
+        // the schema stage to avoid the "Duplicate version checksums"
+        // runtime collision SwiftData surfaces when two
+        // `VersionedSchema` definitions reference the same `@Model`
+        // class shape. The column is handled by SwiftData's in-place
+        // additive-optional migration; the migration plan retains
+        // V1 → V2 → V3 lightweight stages. See SchemaV4.swift for the
+        // rationale + future-work note.
         let schemas = MigrationPlan.schemas
-        #expect(schemas.count == 4, "V1, V2, V3, V4")
+        #expect(schemas.count == 3, "V1, V2, V3")
         let stages = MigrationPlan.stages
-        #expect(stages.count == 3, "V1→V2, V2→V3, V3→V4")
+        #expect(stages.count == 2, "V1→V2 and V2→V3")
     }
 }
 
