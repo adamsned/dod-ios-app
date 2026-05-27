@@ -184,6 +184,30 @@ struct RecentlyViewedTests {
         let saved = try await store.savedRecipes()
         #expect(saved.contains(where: { $0.id == 999 }), "Saved recipe must survive overflow")
     }
+
+    /// US-35 / AC-35.5 — explicitly-downloaded recipes pin from LRU
+    /// eviction the same way saved recipes do. The new eviction
+    /// predicate (`isSaved == false && downloadedAt == nil`) preserves
+    /// rows where either flag is set, so a recipe a user grabbed for a
+    /// camping trip survives even when they never tap Save.
+    @Test func downloadedRecipeSurvivesLRUEviction() async throws {
+        let store = try await makeStore()
+        try await store.cache(listItem: makeListItem(id: 7777, title: "Camping Stew"))
+        let transitioned = try await store.markDownloaded(id: 7777)
+        #expect(transitioned == true)
+        // Re-tap on the same row is a no-op (AC-35.4).
+        let idempotent = try await store.markDownloaded(id: 7777)
+        #expect(idempotent == false)
+        #expect(try await store.isDownloaded(id: 7777) == true)
+        // Drown the LRU window with unrelated rows.
+        for index in 0..<(RecipeStore.unsavedLRUCap + 50) {
+            try await store.cache(listItem: makeListItem(id: 8000 + index, title: "Filler \(index)"))
+        }
+        #expect(
+            try await store.isDownloaded(id: 7777) == true,
+            "Explicitly-downloaded recipe must survive LRU eviction"
+        )
+    }
 }
 
 @Suite("RecipeStore image cache (T-075)") struct ImageCacheTests {
@@ -249,6 +273,55 @@ struct RecentlyViewedTests {
         // The image is well under the 200 MB budget so it's still there.
         let read = try await store.image(url: url)
         #expect(read != nil)
+    }
+
+    // MARK: - US-36 / T-630 — clearImageCache
+
+    @Test func clearImageCacheRemovesUnpinnedRowsAndReturnsFreedBytes() async throws {
+        let store = try await makeStore()
+        let url1 = URL(string: "https://example.com/a.jpg") ?? URL(filePath: "/")
+        let url2 = URL(string: "https://example.com/b.jpg") ?? URL(filePath: "/")
+        try await store.cacheImage(url: url1, bytes: Data(repeating: 0xAA, count: 1024))
+        try await store.cacheImage(url: url2, bytes: Data(repeating: 0xBB, count: 2048))
+
+        let freed = try await store.clearImageCache()
+        #expect(freed == 1024 + 2048)
+
+        // Rows are gone — subsequent reads return nil per the existing
+        // image(url:) contract.
+        #expect(try await store.image(url: url1) == nil)
+        #expect(try await store.image(url: url2) == nil)
+    }
+
+    @Test func clearImageCachePreservesPinnedRows() async throws {
+        // AC-36.4 + CL-62: pinned images belong to saved recipes and
+        // survive Clear Cache so the AC-4.9 / AC-5.2 offline-saved
+        // contract is preserved.
+        let store = try await makeStore()
+        let unpinnedURL = URL(string: "https://example.com/unpinned.jpg") ?? URL(filePath: "/")
+        let pinnedURL = URL(string: "https://example.com/pinned.jpg") ?? URL(filePath: "/")
+        try await store.cacheImage(url: unpinnedURL, bytes: Data(repeating: 0x01, count: 512))
+        try await store.cacheImage(
+            url: pinnedURL,
+            bytes: Data(repeating: 0x02, count: 1024),
+            pinnedToSavedRecipeID: 42
+        )
+
+        let freed = try await store.clearImageCache()
+        // Only the unpinned 512 bytes are freed; pinned bytes survive.
+        #expect(freed == 512)
+
+        #expect(try await store.image(url: unpinnedURL) == nil)
+        #expect(try await store.image(url: pinnedURL) != nil)
+    }
+
+    @Test func clearImageCacheReturnsZeroWhenAlreadyEmpty() async throws {
+        // AC-36.4 zero-case: a fresh store with no images returns 0,
+        // which the snackbar formatter renders as "Cache was already
+        // clear." rather than the "Freed 0.0 MB" copy.
+        let store = try await makeStore()
+        let freed = try await store.clearImageCache()
+        #expect(freed == 0)
     }
 }
 

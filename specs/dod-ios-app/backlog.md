@@ -89,7 +89,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 #### Settings page expansion
 
-- **Add more standard settings.** Round out the Settings page (T-550) with the rest of what users expect from a recipe-app settings surface. Reasonable candidates to evaluate at spec time: notification preferences (when new recipes drop, weekly digest), default Cook Mode behavior (keep-screen-awake toggle vs always-on), default share format (link vs full text), data + cache management ("Clear image cache" / saved-recipes count), accessibility shortcuts (text size override, reduce motion), telemetry opt-out (per constitution §9), legal links (privacy policy, terms). Size: **M** — the audit-and-pick is the hardest part; each individual row is XS.
+- ~~**Add more standard settings.**~~ Graduated 2026-05-27 as US-36 / CL-62 / T-630 (with T-631 as the APNs follow-up). The audit-and-pick narrowed to five rows: Notifications (UI-only in v1; APNs deferred to T-631), Appearance (Match System / Light / Dark — `.preferredColorScheme` on `RootView`), Default Share Format (link-only / link + recipe text — persisted now, consumer is a future task), Clear Cached Recipe Images (button → `RecipeStore.clearImageCache()` → snackbar with freed-MB count, pinned images preserved), and Share Anonymous Usage Data (toggle, default ON per constitution §9, `TelemetryDeckTransport` short-circuits when OFF). Cook Mode keep-screen-awake, accessibility shortcuts, and legal links were deliberately deferred — see CL-62 for the reasoning.
 
 - **"About Ned Adams & Dutch Oven Daddy" — shorter paragraph + image.** The current placeholder paragraph in T-550's Settings → About row is too long for a phone screen. Replace with this exact copy:
 
@@ -106,7 +106,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 #### New recipe-detail action
 
-- **Download for offline viewing button (`square.and.arrow.down`).** Adds a third nav-bar action next to Save (`bookmark`, AC-4.7) and Share (`AC-4.8`). Tap → download the recipe payload (text + ingredients + steps + hero image at full resolution) for on-device offline access. "Perfect for camping when you don't have access to internet." Semantically distinct from Save (which is "I want to remember this") — Download is "I want to use this without network." A saved recipe is auto-downloaded per AC-5.2; download alone is a save without the bookmarking. Spec question: do Download and Save share storage? Are they separate concepts in the UI? Probably yes-and-yes with a UX distinction. Size: **M** — backend reuse is straightforward, the UX question is what makes it medium.
+- ~~**Download for offline viewing button (`square.and.arrow.down`).** Adds a third nav-bar action next to Save (`bookmark`, AC-4.7) and Share (`AC-4.8`). Tap → download the recipe payload (text + ingredients + steps + hero image at full resolution) for on-device offline access. "Perfect for camping when you don't have access to internet." Semantically distinct from Save (which is "I want to remember this") — Download is "I want to use this without network." A saved recipe is auto-downloaded per AC-5.2; download alone is a save without the bookmarking. Spec question: do Download and Save share storage? Are they separate concepts in the UI? Probably yes-and-yes with a UX distinction. Size: **M** — backend reuse is straightforward, the UX question is what makes it medium.~~ **Graduated 2026-05-27 as US-35 / CL-61 / T-620.**
 
 #### Recipes tab rename + content typing
 
@@ -142,7 +142,7 @@ _(Graduated 2026-05-27 as US-37 / CL-63 / T-640. Spec amends CL-9 + CL-10 + AC-1
 
 | Item | Size | Notes |
 |---|---|---|
-| Standard settings expansion | M | Audit-and-pick |
+| ~~Standard settings expansion~~ | ~~M~~ | Graduated → US-36 / CL-62 / T-630 (+ T-631 APNs follow-up) |
 | About Ned copy + photo | S | Asset prep open question |
 | Download button | M | Reuse cache, define UX distinction from Save |
 | Recipes & Articles rename + article-rendering path | M | Amends CL-9 / AC-1.7 / AC-4.11 |

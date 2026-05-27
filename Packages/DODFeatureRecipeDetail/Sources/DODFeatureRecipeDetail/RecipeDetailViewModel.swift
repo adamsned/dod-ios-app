@@ -48,6 +48,8 @@ public final class RecipeDetailViewModel {
     public internal(set) var related: [RecipeListItem] = []
     public internal(set) var loadState: LoadState = .loadingDetail
     public private(set) var isSaved: Bool = false
+    /// US-35 / AC-35.1 — `internal(set)` for the `+Download` extension.
+    public internal(set) var isDownloaded: Bool = false
     public private(set) var checkedIngredientIDs: Set<UUID> = []
     public internal(set) var snackbarMessage: String?
 
@@ -92,7 +94,8 @@ public final class RecipeDetailViewModel {
     private var cookModeTelemetrySentThisSession: Bool = false
 
     /// Internal so the fetch + classification extension (in
-    /// `RecipeDetailViewModel+Fetch.swift`) can read it. The dependency
+    /// `RecipeDetailViewModel+Fetch.swift`, T-640) and the US-35
+    /// `+Download` extension (T-620) can read it. The dependency
     /// surface is otherwise private to the view-model module.
     let dependencies: RecipeDetailDependencies
 
@@ -114,6 +117,7 @@ public final class RecipeDetailViewModel {
         // Telemetry per AC and constitution §9.
         await dependencies.sendTelemetry(.recipeView(recipeID: listItem.id))
         isSaved = (try? await dependencies.isSaved(id: listItem.id)) ?? false
+        isDownloaded = (try? await dependencies.isDownloaded(id: listItem.id)) ?? false
         // Step 1: hydrate from cache if present (fast path).
         if let cached = try? await dependencies.cachedRecipe(id: listItem.id), cached.hasDetail {
             recipe = cached

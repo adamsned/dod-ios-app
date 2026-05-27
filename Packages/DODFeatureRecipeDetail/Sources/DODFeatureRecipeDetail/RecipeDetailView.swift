@@ -263,6 +263,25 @@ public struct RecipeDetailView: View {
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
 
+                // US-35 / AC-35.1 — explicit download for offline use.
+                // Sits between Save (AC-4.7) and Share (AC-4.8); the
+                // glyph stays at the outline `square.and.arrow.down`
+                // regardless of state per CL-61's discoverability
+                // rationale (re-tapping a downloaded recipe surfaces the
+                // "Already downloaded" snackbar; a disabled button would
+                // hide that state from VoiceOver users).
+                Button {
+                    Task { await viewModel.downloadForOffline() }
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityLabel(
+                    viewModel.isDownloaded
+                        ? "Downloaded for offline use"
+                        : "Download for offline use"
+                )
+
                 ShareLink(item: viewModel.canonicalURL) {
                     Image(systemName: "square.and.arrow.up")
                         .foregroundStyle(DODColor.label)

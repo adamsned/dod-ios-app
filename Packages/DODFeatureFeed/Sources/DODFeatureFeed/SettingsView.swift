@@ -1,32 +1,56 @@
 import DODDesignSystem
 import SwiftUI
 
-/// Settings page (US-32, T-550 skeleton).
+/// Settings page (US-32 skeleton, US-36 expansion).
 ///
 /// Reached via the gear icon on the trailing edge of the Recipes (Feed)
-/// tab's nav bar (see ``FeedView``). v1 renders a `.insetGrouped` list
-/// styled to match the post-T-560 Categories tab (`.scrollContentBackground(.hidden)`
-/// + `.background(DODColor.surface)` — the same brand-surface treatment
-/// every other top-level tab uses post-T-520).
+/// tab's nav bar (see ``FeedView``). The list uses `.insetGrouped` with
+/// `.scrollContentBackground(.hidden) + .background(DODColor.surface)`
+/// to match the Categories tab treatment (CL-54 / T-560).
 ///
-/// Three rows:
-///   1. **Use metric units** — `Toggle` bound to ``SettingsViewModel/useMetricUnits``,
-///      which round-trips through `UserDefaults`. T-551 follow-up wires
-///      the flag into the ingredient-rendering path.
-///   2. **About Dutch Oven Daddy** — `NavigationLink` to a placeholder
-///      destination showing a coming-soon message. T-552 follow-up
-///      replaces the placeholder with the live `/wp/v2/pages?slug=about-me`
-///      fetch + offline cache.
-///   3. **Version footer** — Section footer rendering
-///      `"v\(version) (\(build))"` from `Bundle.main.infoDictionary`.
+/// **US-32 (T-550 skeleton) rows:**
+///   1. Use metric units — `Toggle` bound to ``SettingsViewModel/useMetricUnits``
+///      (UserDefaults round-trip; T-551 follow-up wires consumption).
+///   2. About Dutch Oven Daddy — `NavigationLink` to a placeholder
+///      destination (T-552 follow-up swaps in the WP REST fetch).
+///   3. Version footer.
 ///
-/// Spec trace: US-32 AC-32.1..AC-32.5.
+/// **US-36 (T-630 expansion) rows:**
+///   4. Notifications — `Toggle` bound to
+///      ``SettingsViewModel/notificationsEnabled`` (UI-only in v1;
+///      T-631 follow-up requests APNs authorization).
+///   5. Appearance — `Picker` bound to ``SettingsViewModel/appearance``.
+///      Selection persists and `RootView.preferredColorScheme(...)`
+///      consumes the persisted value at launch.
+///   6. Default Share Format — `Picker` bound to
+///      ``SettingsViewModel/shareFormat``. Persisted now; a future task
+///      wires the consumer at the `ShareLink` call site.
+///   7. Clear Cached Recipe Images — `Button` that invokes
+///      ``SettingsViewModel/clearImageCache(via:)`` and surfaces a
+///      `Snackbar` with the freed-MB count.
+///   8. Share Anonymous Usage Data — `Toggle` bound to
+///      ``SettingsViewModel/telemetryEnabled`` (default ON);
+///      `TelemetryDeckTransport` reads the same key at every `send(_:)`
+///      and short-circuits when false.
+///
+/// Spec trace: US-32 AC-32.1..AC-32.5; US-36 AC-36.1..AC-36.8.
 public struct SettingsView: View {
 
     @State private var viewModel: SettingsViewModel
+    /// Closure the Clear Cache row delegates to. Returns the total
+    /// bytes freed so the snackbar can format the "Freed X.X MB" copy.
+    /// Optional so previews + snapshot tests don't need to plumb a
+    /// `RecipeStore` — the button surfaces the zero-bytes copy when
+    /// nil. Production callers (composition root, FeedView's gear icon)
+    /// always pass a non-nil closure.
+    public let onClearImageCache: (() async throws -> Int)?
 
-    public init(viewModel: SettingsViewModel = SettingsViewModel()) {
+    public init(
+        viewModel: SettingsViewModel = SettingsViewModel(),
+        onClearImageCache: (() async throws -> Int)? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
+        self.onClearImageCache = onClearImageCache
     }
 
     public var body: some View {
@@ -35,11 +59,16 @@ public struct SettingsView: View {
             #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
             #endif
+            .overlay(alignment: .bottom) {
+                snackbarOverlay
+            }
     }
 
     @ViewBuilder
     private var content: some View {
         let baseList = List {
+            // MARK: US-32 rows
+
             Section {
                 Toggle(isOn: useMetricUnitsBinding) {
                     Text("Use metric units")
@@ -48,6 +77,79 @@ public struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-toggle-metric")
             }
+
+            // MARK: US-36 rows
+
+            Section {
+                Toggle(isOn: notificationsEnabledBinding) {
+                    Text("Notify me when new recipes drop")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-toggle-notifications")
+            } footer: {
+                Text("Push notifications arrive in a future update.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+            }
+
+            Section {
+                Picker(selection: appearanceBinding) {
+                    ForEach(AppearancePreference.allCases, id: \.self) { value in
+                        Text(value.displayName)
+                            .tag(value)
+                    }
+                } label: {
+                    Text("Appearance")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-picker-appearance")
+            }
+
+            Section {
+                Picker(selection: shareFormatBinding) {
+                    ForEach(ShareFormatPreference.allCases, id: \.self) { value in
+                        Text(value.displayName)
+                            .tag(value)
+                    }
+                } label: {
+                    Text("Default share format")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-picker-share-format")
+            }
+
+            Section {
+                Button {
+                    Task { await clearImageCacheIfAvailable() }
+                } label: {
+                    Text("Clear Cached Recipe Images")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.accent)
+                }
+                .accessibilityIdentifier("settings-button-clear-cache")
+            } footer: {
+                Text("Saved recipe images stay on your device.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+            }
+
+            Section {
+                Toggle(isOn: telemetryEnabledBinding) {
+                    Text("Share anonymous usage data")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-toggle-telemetry")
+            } footer: {
+                Text("Helps us improve the app. No personal information leaves your device.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+            }
+
+            // MARK: US-32 About + version
 
             Section {
                 NavigationLink {
@@ -80,14 +182,77 @@ public struct SettingsView: View {
         #endif
     }
 
-    /// Wraps the view-model's `useMetricUnits` Bool in a SwiftUI Binding
-    /// so the `Toggle` can drive it without exposing the @Observable
+    /// Snackbar overlay for the cache-clear feedback (AC-36.4). Hidden
+    /// when the view-model has no message; auto-dismisses on tap.
+    @ViewBuilder
+    private var snackbarOverlay: some View {
+        if let message = viewModel.snackbarMessage {
+            Snackbar(message: message)
+                .padding(.bottom, DODSpacing.md)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .onTapGesture { viewModel.dismissSnackbar() }
+                .task {
+                    // Auto-dismiss after 4 seconds. Matches the Snackbar
+                    // component's documented default presentation length.
+                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    viewModel.dismissSnackbar()
+                }
+                .accessibilityIdentifier("settings-snackbar")
+        }
+    }
+
+    // MARK: - Bindings
+
+    /// Wraps each view-model property in a SwiftUI Binding so the
+    /// Toggle / Picker drives it without exposing the @Observable
     /// mutation directly to the view layer.
+
     private var useMetricUnitsBinding: Binding<Bool> {
         Binding(
             get: { viewModel.useMetricUnits },
             set: { viewModel.useMetricUnits = $0 }
         )
+    }
+
+    private var notificationsEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.notificationsEnabled },
+            set: { viewModel.notificationsEnabled = $0 }
+        )
+    }
+
+    private var appearanceBinding: Binding<AppearancePreference> {
+        Binding(
+            get: { viewModel.appearance },
+            set: { viewModel.appearance = $0 }
+        )
+    }
+
+    private var shareFormatBinding: Binding<ShareFormatPreference> {
+        Binding(
+            get: { viewModel.shareFormat },
+            set: { viewModel.shareFormat = $0 }
+        )
+    }
+
+    private var telemetryEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.telemetryEnabled },
+            set: { viewModel.telemetryEnabled = $0 }
+        )
+    }
+
+    // MARK: - Actions
+
+    private func clearImageCacheIfAvailable() async {
+        guard let onClearImageCache else {
+            // No closure wired (preview / snapshot host). Surface the
+            // zero-case copy so the button still gives feedback rather
+            // than appearing broken in design surfaces.
+            viewModel.previewCacheClearMessage()
+            return
+        }
+        await viewModel.clearImageCache(onClear: onClearImageCache)
     }
 }
 
