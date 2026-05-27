@@ -1078,11 +1078,19 @@ Cluster for small visual / iconography fixes the backlog flagged after Phase 9 c
 - **Est:** 0.5h (~30 lines + a fix to a `var → let` lint warning that surfaces from the new code).
 - **||:** P10-widget-appearance (companion to T-391 — same widget-images-broken bug, two layers of fix).
 
+### T-393 — Widget gallery placeholder uses live snapshot (T-391/T-392 follow-up)
+- **Scope:** PR #46 shipped T-391/T-392 but visual verification on the iPhone 17 simulator showed the gallery preview was *still* rendering the hardcoded "Garlic Butter Skillet Corn" + brown gradient. Root cause: T-391 updated each provider's `getSnapshot(in:completion:)` to prefer the live snapshot when `context.isPreview == true`, but WidgetKit's Add-Widget gallery in iOS 17+ paints the preview thumbnail using **`placeholder(in:)`** — it does NOT necessarily call `getSnapshot` first. The three providers' `placeholder(in:)` methods still returned the hardcoded `*Entry.placeholder` constants, so the gallery thumbnail never saw the App-Group snapshot. Fix: move the same live-snapshot-or-fall-back-to-hardcoded logic from `getSnapshot` into `placeholder(in:)` in all three providers (the read is a UserDefaults plist load — single-digit ms, safely synchronous in a TimelineProvider). Bonus: `WidgetCard.Hero` previously used `AsyncImage(url:)` for the bridged file URL; `AsyncImage` is built on `URLSession` and does not reliably load `file://` URLs inside a widget extension process. Replaced the file-URL branch with `UIImage(contentsOfFile:)` + `Image(uiImage:)` — local read, single-digit ms, no async path, guaranteed to render the bridged bytes. Network URLs still take the `AsyncImage` branch so unit-test fixtures keep working. Visual verification: gallery now shows "Best Dutch Oven Recipes (30+ Tri..." with the actual recipe photo (Dutch oven of vegetables/meat), not the brown gradient.
+- **Files:** `Widget/FeaturedRecipeTimelineProvider.swift` (rewrite `placeholder(in:)`, simplify `getSnapshot`), `Widget/SavedRecipesTimelineProvider.swift` (same shape), `Widget/LatestRecipeLockScreenTimelineProvider.swift` (same shape), `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/WidgetCard.swift` (add `loadLocalImage(at:)` helper, branch `Hero` on `url.isFileURL`), `specs/dod-ios-app/tasks.md` (this entry).
+- **AC:** Pins AC-9.1..AC-9.4, AC-17.1..AC-17.9, AC-21.3 (gallery preview now shows the real hero image — the contract T-391 was supposed to deliver), AC-22.1..AC-22.5. No spec amendment — same surface as T-391, just a deeper layer of the same bug.
+- **Deps:** T-391, T-392 (this is the follow-up that makes those two visually correct).
+- **Est:** 0.5h (~4 files, ~15 lines each, no new types or wire-format changes).
+- **||:** P10-widget-appearance (closes out the T-391/T-392 visual contract).
+
 ---
 
 ## Summary
 
-- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 8 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392) = 104
+- **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 9 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393) = 105
 - **Total estimate:** ~143 hours + ~17 hours (Phase 6) + ~19 hours (Phase 7) + ~13 hours (Phase 8) + ~9 hours (Phase 8 follow-ups) + ~2 hours (Phase 9) + ~12.5 hours (Phase 10) = ~215.5 hours
 - **Critical path:** Cluster A → Domain (T-010, T-011) → Networking (T-058) → Recipe Detail (T-110..T-121). Roughly 6 weeks at one focused contributor; 3–4 weeks with two contributors using the parallelism tags.
 - **Parallel clusters once Cluster A lands:** B-domain, B-support, B-design, B-analytics can all run simultaneously.

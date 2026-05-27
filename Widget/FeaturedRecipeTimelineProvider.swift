@@ -53,23 +53,27 @@ struct FeaturedRecipeTimelineProvider: TimelineProvider {
     private let refreshInterval: TimeInterval = 4 * 60 * 60
 
     func placeholder(in context: Context) -> FeaturedRecipeEntry {
-        FeaturedRecipeEntry.placeholder
+        // T-391/T-392 follow-up: WidgetKit calls `placeholder(in:)` first
+        // for the gallery preview thumbnail — it does NOT necessarily call
+        // `getSnapshot(in:completion:)` before painting the thumbnail. The
+        // earlier fix only updated `getSnapshot` so the gallery still showed
+        // the hardcoded "Garlic Butter Skillet Corn" placeholder. Reading
+        // the snapshot synchronously here is cheap (UserDefaults plist
+        // load, single-digit ms) and gives the gallery the user's real
+        // latest recipe immediately. Fall back to the hardcoded brand
+        // placeholder only when the App Group is empty (first launch
+        // before the feed has loaded). AC-21.3.
+        let entry = currentEntry()
+        return entry.recipe == nil ? .placeholder : entry
     }
 
     func getSnapshot(in context: Context, completion: @escaping (FeaturedRecipeEntry) -> Void) {
-        // In the widget gallery (`context.isPreview`) WidgetKit wants a
-        // representative non-blank entry. Prefer the live snapshot so the
-        // gallery shows the current recipe + real hero image — the moment
-        // the user is deciding whether to add the widget is the most
-        // important impression in the widget's lifecycle. Fall back to
-        // the hardcoded brand placeholder only when the App Group is
-        // empty (first launch before the feed has loaded). T-391.
-        if context.isPreview {
-            let entry = currentEntry()
-            completion(entry.recipe == nil ? .placeholder : entry)
-            return
-        }
-        completion(currentEntry())
+        // Mirror the `placeholder(in:)` path: prefer the live snapshot,
+        // fall back to the hardcoded brand placeholder only when the
+        // App Group is empty (first launch before the feed has loaded).
+        // T-391.
+        let entry = currentEntry()
+        completion(entry.recipe == nil ? .placeholder : entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<FeaturedRecipeEntry>) -> Void) {

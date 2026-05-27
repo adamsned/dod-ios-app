@@ -60,24 +60,25 @@ struct LatestRecipeLockScreenTimelineProvider: TimelineProvider {
     private let refreshInterval: TimeInterval = 4 * 60 * 60
 
     func placeholder(in context: Context) -> LatestRecipeLockScreenEntry {
-        LatestRecipeLockScreenEntry.placeholder
+        // T-391/T-392 follow-up: WidgetKit calls `placeholder(in:)` first
+        // for the gallery preview thumbnail — it does NOT necessarily call
+        // `getSnapshot(in:completion:)` before painting the thumbnail.
+        // Reading the snapshot synchronously here is cheap (UserDefaults
+        // plist load, single-digit ms) and gives the gallery the user's
+        // real latest recipe immediately (title + excerpt; hero image
+        // doesn't apply on lock-screen per CL-37). Fall back to the
+        // hardcoded brand placeholder only when the App Group is empty
+        // (first launch before the feed has loaded). AC-22.4.
+        let entry = currentEntry()
+        return entry.recipe == nil ? .placeholder : entry
     }
 
     func getSnapshot(in context: Context, completion: @escaping (LatestRecipeLockScreenEntry) -> Void) {
-        // In the widget gallery (`context.isPreview`) WidgetKit wants
-        // a representative non-blank entry. Prefer the live snapshot so
-        // the gallery shows the current recipe (text-only on lock-screen
-        // — no hero image render here regardless, per CL-37, but the
-        // title + excerpt should still be the user's real next-cook
-        // candidate, not the hardcoded "Garlic Butter Skillet Corn"
-        // placeholder). Fall back to the brand placeholder only when
-        // the App Group is empty. T-391.
-        if context.isPreview {
-            let entry = currentEntry()
-            completion(entry.recipe == nil ? .placeholder : entry)
-            return
-        }
-        completion(currentEntry())
+        // Mirror the `placeholder(in:)` path: prefer the live snapshot,
+        // fall back to the hardcoded brand placeholder only when the
+        // App Group is empty. T-391.
+        let entry = currentEntry()
+        completion(entry.recipe == nil ? .placeholder : entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<LatestRecipeLockScreenEntry>) -> Void) {
