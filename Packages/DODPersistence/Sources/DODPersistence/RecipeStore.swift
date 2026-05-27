@@ -116,10 +116,21 @@ public actor RecipeStore {
         target.totalSeconds = recipe.totalTime.map(Self.secondsOf)
         target.servings = recipe.servings
         target.lastViewedAt = .now
-        target.jsonLDParsedAt = .now
-        target.jsonLDFailedAt = nil
+
+        // US-37 / CL-63 / T-640: persist article body; kind drives the
+        // jsonLDFailedAt discriminator (CL-63 decision 7).
+        target.articleBodyHTML = recipe.articleBodyHTML
+        switch recipe.kind {
+        case .recipe:
+            target.jsonLDParsedAt = .now
+            target.jsonLDFailedAt = nil
+        case .article:
+            target.jsonLDFailedAt = .now
+        }
 
         // US-12 / AC-12.1: keep the local ingredient index in sync.
+        // Article rows have empty `ingredients`, so this clears any
+        // stale entries from a prior recipe-kind merge.
         try replaceIngredientIndexRows(forRecipeID: recipe.id, with: recipe.ingredients)
 
         try modelContext.save()
@@ -185,13 +196,14 @@ public actor RecipeStore {
     }
 
     /// Most-recently-viewed recipes for surfacing in Siri / Spotlight (US-10).
-    /// Includes both saved and unsaved rows, sorted by `lastViewedAt` (the
-    /// same field LRU eviction uses), newest first. Blocklisted rows are
-    /// filtered out so we don't suggest a recipe whose detail fetch has
-    /// failed.
+    /// Includes both saved and unsaved rows, sorted by `lastViewedAt`
+    /// (the same field LRU eviction uses), newest first.
+    ///
+    /// US-37 / CL-63 / AC-37.4 (T-640): articles are no longer filtered
+    /// out — they're included alongside recipes and the App Intents entry
+    /// branches on `Recipe.kind` for the detail screen.
     public func recentlyViewed(limit: Int = 30) throws -> [Recipe] {
         var descriptor = FetchDescriptor<CachedRecipe>(
-            predicate: #Predicate { $0.jsonLDFailedAt == nil },
             sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
         )
         descriptor.fetchLimit = limit
@@ -226,13 +238,16 @@ public actor RecipeStore {
         try modelContext.save()
     }
 
-    /// List-friendly query: returns RecipeListItems that aren't blocklisted.
+    /// List-friendly query: returns RecipeListItems for the requested ids.
+    ///
+    /// US-37 / CL-63 / AC-37.4 (T-640): articles are no longer filtered
+    /// out — they're returned alongside recipes in the same row format.
     public func listItems(forIDs ids: [Int]) throws -> [RecipeListItem] {
         guard !ids.isEmpty else { return [] }
         let idSet = Set(ids)
         let descriptor = FetchDescriptor<CachedRecipe>(
             predicate: #Predicate { row in
-                idSet.contains(row.id) && row.jsonLDFailedAt == nil
+                idSet.contains(row.id)
             }
         )
         let rows = try modelContext.fetch(descriptor)
@@ -310,6 +325,13 @@ public actor RecipeStore {
         let video = row.videoJSON.flatMap {
             try? JSONDecoder().decode(RecipeVideo.self, from: $0)
         }
+        // US-37 / CL-63 / AC-37.4 (T-640): reconstruct kind from row
+        // signals. Non-nil `jsonLDFailedAt` + non-empty body ⇒ article.
+        // Pre-T-640 blocklist rows (no body) surface as recipes with
+        // empty content so `hasDetail` triggers a fresh fetch.
+        let kind: PostKind =
+            (row.jsonLDFailedAt != nil && !(row.articleBodyHTML ?? "").isEmpty)
+            ? .article : .recipe
         return Recipe(
             id: row.id,
             slug: row.slug,
@@ -327,7 +349,9 @@ public actor RecipeStore {
             totalTime: row.totalSeconds.map { .seconds($0) },
             servings: row.servings,
             nutrition: nutrition,
-            video: video
+            video: video,
+            kind: kind,
+            articleBodyHTML: row.articleBodyHTML
         )
     }
 }
@@ -338,7 +362,11 @@ extension RecipeStore {
 
     /// Create the on-disk container for production use. Pinned to the
     /// latest schema (`SchemaV3`) — older on-disk stores get migrated via
-    /// `MigrationPlan` at open.
+    /// `MigrationPlan` at open (V1 → V2 → V3, all lightweight). The
+    /// `articleBodyHTML` optional column added for US-37 / CL-63 / T-640
+    /// is an in-place additive optional property on `CachedRecipe`; see
+    /// `SchemaV4.swift` for the rationale on why it's not a separate
+    /// schema stage.
     public static func productionContainer() throws -> ModelContainer {
         try ModelContainer(
             for: Schema(SchemaV3.models),

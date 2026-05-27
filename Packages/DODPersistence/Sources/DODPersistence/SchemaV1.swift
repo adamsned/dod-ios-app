@@ -42,6 +42,17 @@ public enum SchemaV2: VersionedSchema {
 /// - V1 → V2: lightweight (V2 = V1 + `CachedIngredient`).
 /// - V2 → V3: lightweight (V3 = V2 + `CachedComment` + `CachedRating`).
 ///
+/// **US-37 / CL-63 / T-640 note:** the `articleBodyHTML` optional column
+/// added to `CachedRecipe` for the article-rendering path is NOT a
+/// separate schema stage — SwiftData computes the schema checksum from
+/// the `@Model` class shape, so defining a SchemaV4 that references the
+/// same `CachedRecipe.self` (with the new column) collides with V3
+/// ("Duplicate version checksums detected" at container open). The
+/// additive optional column is instead handled by SwiftData's default
+/// schema-inference migration — new optional properties on a model whose
+/// schema identifier hasn't bumped are accepted in-place at open. See
+/// `SchemaV4.swift` for the rationale and the future-work note.
+///
 /// Per MIGRATION.md rule 3 every stage has a paired migration test:
 /// - `MigrationTests.lightweightV1toV2OpensCleanly`
 /// - `MigrationV3Tests.V2_to_V3_lightweightMigration`

@@ -44,7 +44,13 @@ public struct FeedView: View {
             OfflineBanner(isOffline: viewModel.isOffline)
         }
         .background(DODColor.surface)
-        .navigationTitle("Recipes")
+        // US-37 / AC-37.1 (T-640, 2026-05-27): "Recipes" → "Recipes & Articles".
+        // Communicates that the tab surfaces both recipes (the JSON-LD-parseable
+        // posts) and articles (the JSON-LD-less posts routed to ArticleDetailView
+        // per CL-63). Matches AppTab.title for the same case. The bottom-tab
+        // label is set independently in AppTab.title; this only drives the
+        // screen's nav-bar title.
+        .navigationTitle("Recipes & Articles")
         .toolbar {
             // US-32 AC-32.1: gear icon on the trailing edge of the Recipes
             // nav bar pushes the Settings page. NavigationLink lives in the

@@ -5,7 +5,18 @@ import Foundation
 /// 2. Detail fields (ingredients, instructions, times, nutrition, video) come
 ///    from the JSON-LD Recipe block on the rendered post page.
 ///
-/// Spec trace: spec.md AC-4.* (recipe detail) and AC-4.11 (hybrid fetch).
+/// Per US-37 / CL-63 / AC-37.2 (T-640), this type also models **articles**
+/// (posts without a parseable JSON-LD `@type: Recipe` block) via the
+/// ``kind`` discriminator. Article rows have:
+/// - `kind == .article`
+/// - empty `ingredients` + `instructions` (no JSON-LD to parse)
+/// - a populated `articleBodyHTML` string (sanitized plain text extracted
+///   from the rendered HTML page via ``DODSupport/ArticleBodyExtractor``)
+/// - usually nil `servings`, `prepTime`, `cookTime`, `totalTime`,
+///   `nutrition`, `video` — none of those are meaningful for articles.
+///
+/// Spec trace: spec.md AC-4.* (recipe detail), AC-4.11 (hybrid fetch),
+/// US-37 / CL-63 (article path).
 public struct Recipe: Sendable, Hashable, Identifiable, Codable {
 
     // MARK: - List-fetch fields
@@ -31,6 +42,18 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
     public let nutrition: RecipeNutrition?
     public let video: RecipeVideo?
 
+    // MARK: - Kind discriminator + article fields (US-37 / CL-63)
+
+    /// Discriminates between WPRM/JSON-LD recipes and HTML-body articles.
+    /// Defaults to `.recipe` so existing callers (Codable decoders, fixture
+    /// builders, REST → domain mappers) keep producing recipe-kind rows
+    /// without an explicit argument.
+    public let kind: PostKind
+    /// Sanitized plain-text article body. Non-nil only when `kind == .article`
+    /// (populated by ``DODSupport/ArticleBodyExtractor``). Nil for recipes —
+    /// recipe content lives in `ingredients` + `instructions`.
+    public let articleBodyHTML: String?
+
     public init(
         id: Int,
         slug: String,
@@ -48,7 +71,9 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         totalTime: Duration? = nil,
         servings: Int? = nil,
         nutrition: RecipeNutrition? = nil,
-        video: RecipeVideo? = nil
+        video: RecipeVideo? = nil,
+        kind: PostKind = .recipe,
+        articleBodyHTML: String? = nil
     ) {
         self.id = id
         self.slug = slug
@@ -67,12 +92,77 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.servings = servings
         self.nutrition = nutrition
         self.video = video
+        self.kind = kind
+        self.articleBodyHTML = articleBodyHTML
+    }
+
+    // MARK: - Codable (back-compat for older payloads pre-kind)
+
+    /// Codable keys are explicit so older on-disk payloads (e.g. cached
+    /// detail blobs serialized before US-37) decode cleanly — the new
+    /// `kind` and `articleBodyHTML` keys are optional with sensible
+    /// defaults (`.recipe` and `nil` respectively).
+    enum CodingKeys: String, CodingKey {
+        case id, slug, title, excerpt, canonicalURL, heroImage, heroImageLargeURL
+        case categoryIDs, publishedAt, ingredients, instructions
+        case prepTime, cookTime, totalTime, servings, nutrition, video
+        case kind, articleBodyHTML
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(Int.self, forKey: .id)
+        self.slug = try container.decode(String.self, forKey: .slug)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.excerpt = try container.decode(String.self, forKey: .excerpt)
+        self.canonicalURL = try container.decode(URL.self, forKey: .canonicalURL)
+        self.heroImage = try container.decodeIfPresent(URL.self, forKey: .heroImage)
+        self.heroImageLargeURL = try container.decodeIfPresent(URL.self, forKey: .heroImageLargeURL)
+        self.categoryIDs = try container.decodeIfPresent([Int].self, forKey: .categoryIDs) ?? []
+        self.publishedAt = try container.decode(Date.self, forKey: .publishedAt)
+        self.ingredients = try container.decodeIfPresent([RecipeIngredient].self, forKey: .ingredients) ?? []
+        self.instructions = try container.decodeIfPresent([RecipeInstruction].self, forKey: .instructions) ?? []
+        self.prepTime = try container.decodeIfPresent(Duration.self, forKey: .prepTime)
+        self.cookTime = try container.decodeIfPresent(Duration.self, forKey: .cookTime)
+        self.totalTime = try container.decodeIfPresent(Duration.self, forKey: .totalTime)
+        self.servings = try container.decodeIfPresent(Int.self, forKey: .servings)
+        self.nutrition = try container.decodeIfPresent(RecipeNutrition.self, forKey: .nutrition)
+        self.video = try container.decodeIfPresent(RecipeVideo.self, forKey: .video)
+        // US-37 / CL-63: back-compat — older payloads have no `kind`,
+        // default to `.recipe`. The article body is nil for recipe rows
+        // by definition.
+        self.kind = try container.decodeIfPresent(PostKind.self, forKey: .kind) ?? .recipe
+        self.articleBodyHTML = try container.decodeIfPresent(String.self, forKey: .articleBodyHTML)
     }
 }
 
 extension Recipe {
-    /// True once the JSON-LD detail parse has populated cooking content.
+    /// True once the post's detail content has been populated:
+    /// - For recipes: `ingredients` or `instructions` are non-empty (the
+    ///   JSON-LD parse succeeded).
+    /// - For articles (US-37 / CL-63 / T-640): `articleBodyHTML` is
+    ///   non-empty (the article-body extraction succeeded).
+    ///
+    /// Used by the recipe-detail view model to decide whether the cache
+    /// can serve the screen without a fresh fetch. Articles trivially
+    /// have empty `ingredients` + `instructions` but DO carry their
+    /// extracted body in `articleBodyHTML`, so the cache-hit path still
+    /// short-circuits the network round-trip.
     public var hasDetail: Bool {
-        !ingredients.isEmpty || !instructions.isEmpty
+        if !ingredients.isEmpty || !instructions.isEmpty {
+            return true
+        }
+        if kind == .article, let body = articleBodyHTML, !body.isEmpty {
+            return true
+        }
+        return false
+    }
+
+    /// True when this post is an article (no JSON-LD Recipe; HTML body
+    /// renders via ``DODFeatureRecipeDetail/ArticleDetailView``).
+    /// Convenience accessor over `kind == .article` — call-sites read
+    /// more naturally as a Boolean question.
+    public var isArticle: Bool {
+        kind == .article
     }
 }

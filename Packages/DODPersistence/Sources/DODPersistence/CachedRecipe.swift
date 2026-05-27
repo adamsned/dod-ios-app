@@ -8,7 +8,13 @@ import SwiftData
 /// Cache policies (NFR-1, plan §2):
 /// - LRU window: 100 unsaved rows max, oldest `lastViewedAt` evicted first.
 /// - `isSaved == true` rows are pinned and never evicted.
-/// - `jsonLDFailedAt != nil` rows are blocklisted from list rendering (AC-1.7).
+/// - `jsonLDFailedAt != nil` rows are **classified as articles** post-T-640
+///   (per US-37 / CL-63 / AC-37.4 — the field's semantic was reframed from
+///   "blocklisted from list rendering" to "is article, render with
+///   HTML body"). Articles are no longer hidden from list queries; the
+///   pull-to-refresh `clearBlocklist()` call site is preserved so a
+///   server-side JSON-LD fix can re-classify a row back to recipe
+///   rendering on the next detail open.
 @Model
 public final class CachedRecipe {
 
@@ -53,6 +59,14 @@ public final class CachedRecipe {
     public var totalSeconds: Int?
     public var servings: Int?
 
+    /// US-37 / CL-63 / AC-37.6 (T-640): sanitized plain-text article body
+    /// for posts classified as articles. Nil for recipe rows. Populated
+    /// by `RecipeStore.mergeDetail(_:)` from the parsed `Recipe.articleBodyHTML`
+    /// field. Lightweight additive optional column — SwiftData migration
+    /// from `SchemaV3` is the default in-place migration since the field
+    /// is optional with a default of nil.
+    public var articleBodyHTML: String?
+
     public init(
         id: Int,
         slug: String,
@@ -67,7 +81,8 @@ public final class CachedRecipe {
         isSaved: Bool = false,
         jsonLDParsedAt: Date? = nil,
         jsonLDFailedAt: Date? = nil,
-        downloadedAt: Date? = nil
+        downloadedAt: Date? = nil,
+        articleBodyHTML: String? = nil
     ) {
         self.id = id
         self.slug = slug
@@ -83,5 +98,6 @@ public final class CachedRecipe {
         self.jsonLDParsedAt = jsonLDParsedAt
         self.jsonLDFailedAt = jsonLDFailedAt
         self.downloadedAt = downloadedAt
+        self.articleBodyHTML = articleBodyHTML
     }
 }

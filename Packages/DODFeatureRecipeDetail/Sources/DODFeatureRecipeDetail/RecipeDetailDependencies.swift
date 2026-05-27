@@ -16,6 +16,14 @@ public protocol RecipeDetailDependencies: Sendable {
     func cachedRecipe(id: Int) async throws -> Recipe?
     func fetchHTML(for url: URL) async throws -> String
     func parseJSONLD(html: String, merging: RecipeListItem, canonicalURL: URL) throws -> Recipe
+    /// US-37 / CL-63 / AC-37.2 (T-640): extract a sanitized plain-text
+    /// article body from the rendered HTML. Called by the view model when
+    /// `parseJSONLD(...)` throws — non-empty result classifies the post
+    /// as an article (`.article` load state + `ArticleDetailView` render);
+    /// empty result falls through to the terminal `.unavailable` path.
+    /// Default implementation routes to ``DODSupport/ArticleBodyExtractor``;
+    /// tests pass a fake.
+    func extractArticleBody(html: String) -> String
     func relatedRecipes(forCategoryID: Int) async throws -> [RecipeListItem]
     func mergeDetail(_ recipe: Recipe) async throws
     func markJSONLDFailed(id: Int) async throws
@@ -110,6 +118,14 @@ extension RecipeDetailDependencies {
     /// in the test suite) don't have to opt in to widget publishing. The
     /// live wiring overrides this — see ``LiveRecipeDetailDependencies``.
     public func publishSavedWidgetSnapshot() async {}
+
+    /// US-37 / CL-63 / AC-37.2 (T-640): default routes to
+    /// ``DODSupport/ArticleBodyExtractor`` so production callers get the
+    /// real extractor for free. Tests override this to return a canned
+    /// body (or empty string to exercise the unavailable fallback).
+    public func extractArticleBody(html: String) -> String {
+        ArticleBodyExtractor.extract(html: html)
+    }
 }
 
 public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
