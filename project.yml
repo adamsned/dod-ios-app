@@ -184,9 +184,36 @@ targets:
     platform: iOS
     sources:
       - path: UITests
+        # Carve the L5 E2E sources out of the L3 smoke target. The E2E
+        # journeys live alongside the smoke tests under `UITests/` (shared
+        # bundle infra) but compile into their own scheme (`DODAppE2ETests`
+        # below) so the smoke job stays fast and runs every PR while the
+        # E2E job runs label-gated. Spec trace: AC-T5 / CL-58.
+        excludes:
+          - "E2E"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODAppUITests
+        TARGETED_DEVICE_FAMILY: "1,2"
+        TEST_TARGET_NAME: DODApp
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: DODApp
+
+  # L5 End-to-end user journeys (AC-T5 / CL-58 — Phase 11). Same XCUITest
+  # framework as the L3 smoke target, just a separate scheme + source root
+  # so CI can invoke them independently with `-only-testing:` and gate
+  # them behind the `e2e` PR label. The first five journeys live in
+  # `UITests/E2E/CoreUserJourneysE2ETests.swift` (T-603); future PRs
+  # extend the suite as the feature surface grows.
+  DODAppE2ETests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests/E2E
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODAppE2ETests
         TARGETED_DEVICE_FAMILY: "1,2"
         TEST_TARGET_NAME: DODApp
         GENERATE_INFOPLIST_FILE: YES
