@@ -7,13 +7,19 @@ public struct CategoryRecipesView: View {
     @State private var viewModel: CategoryRecipesViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (RecipeListItem) -> Void
+    /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
+    /// `FeedView.onSave` for the contract; same shape applied to category
+    /// recipe lists.
+    public let onSave: ((RecipeListItem) -> Void)?
 
     public init(
         viewModel: CategoryRecipesViewModel,
-        onSelect: @escaping (RecipeListItem) -> Void
+        onSelect: @escaping (RecipeListItem) -> Void,
+        onSave: ((RecipeListItem) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
+        self.onSave = onSave
     }
 
     public var body: some View {
@@ -72,6 +78,7 @@ public struct CategoryRecipesView: View {
             totalTimeDisplay: item.totalTimeDisplay
         )
         .recipeCardTap { onSelect(item) }
+        .recipeCardContextMenu { onSave?(item) }
         .task { await viewModel.loadMoreIfNeeded(currentItem: item) }
     }
 }

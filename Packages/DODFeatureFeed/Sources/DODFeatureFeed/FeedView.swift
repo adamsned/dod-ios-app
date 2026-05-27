@@ -12,10 +12,21 @@ public struct FeedView: View {
     @State private var viewModel: FeedViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (RecipeListItem) -> Void
+    /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
+    /// so existing callers (tests, previews) don't need to plumb it. nil
+    /// here means the context menu still appears but the Save button is a
+    /// no-op; production callers (TabStack) always pass a non-nil closure
+    /// that routes through `RecipeStore.toggleSaved` per CL-59.
+    public let onSave: ((RecipeListItem) -> Void)?
 
-    public init(viewModel: FeedViewModel, onSelect: @escaping (RecipeListItem) -> Void) {
+    public init(
+        viewModel: FeedViewModel,
+        onSelect: @escaping (RecipeListItem) -> Void,
+        onSave: ((RecipeListItem) -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
+        self.onSave = onSave
     }
 
     public var body: some View {
@@ -92,6 +103,7 @@ public struct FeedView: View {
                 ForEach(viewModel.items) { item in
                     FeedRow(item: item)
                         .recipeCardTap { onSelect(item) }
+                        .recipeCardContextMenu { onSave?(item) }
                         .task {
                             await viewModel.loadMoreIfNeeded(currentItem: item)
                         }

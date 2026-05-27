@@ -7,10 +7,22 @@ public struct SavedView: View {
     @State private var viewModel: SavedViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (Recipe) -> Void
+    /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
+    /// `FeedView.onSave`; this surface passes a `Recipe` (not a
+    /// `RecipeListItem`) because the Saved tab already has the full domain
+    /// type at hand. The closure semantics match — long-press → toggle.
+    /// Tapping Save on an already-saved recipe flips it to unsaved per
+    /// `RecipeStore.toggleSaved`'s contract (CL-59 always-"Save" decision).
+    public let onSave: ((Recipe) -> Void)?
 
-    public init(viewModel: SavedViewModel, onSelect: @escaping (Recipe) -> Void) {
+    public init(
+        viewModel: SavedViewModel,
+        onSelect: @escaping (Recipe) -> Void,
+        onSave: ((Recipe) -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
+        self.onSave = onSave
     }
 
     public var body: some View {
@@ -55,6 +67,7 @@ public struct SavedView: View {
                             totalTimeDisplay: totalTimeDisplay(recipe)
                         )
                         .recipeCardTap { onSelect(recipe) }
+                        .recipeCardContextMenu { onSave?(recipe) }
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)

@@ -141,6 +141,25 @@ extension View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
     }
+
+    /// Attach the standard "Save" long-press context menu to a recipe card
+    /// (US-34 / AC-34.1 / CL-59).
+    ///
+    /// The menu hosts a single `Button` with the `bookmark.fill` SF Symbol
+    /// and the label "Save"; tapping it invokes `onSave`. Menu copy stays
+    /// "Save" regardless of the recipe's current saved state — see CL-59
+    /// for the "no Unsave branch in v1" rationale.
+    ///
+    /// The menu composes alongside `recipeCardTap` without eating the tap
+    /// gesture (SwiftUI's `.contextMenu` is gesture-distinct from
+    /// `.onTapGesture` — REG-DOD-LIST-SCROLL is unaffected).
+    public func recipeCardContextMenu(onSave: @escaping () -> Void) -> some View {
+        self.contextMenu {
+            Button(action: onSave) {
+                Label("Save", systemImage: "bookmark.fill")
+            }
+        }
+    }
 }
 
 #Preview("With time chip") {
