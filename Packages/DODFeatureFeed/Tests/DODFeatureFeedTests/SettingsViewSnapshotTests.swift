@@ -9,11 +9,15 @@ import XCTest
 /// L4 visual-regression coverage for ``SettingsView``'s loaded state.
 ///
 /// Two iPhone 13 baselines (light + dark, default Dynamic Type) lock the
-/// US-32 / AC-32.2 layout match against the Categories tab treatment.
-/// First iOS-sim test run uses `record: .missing` to lay any missing
-/// baseline PNGs down.
+/// US-32 / AC-32.2 layout match against the Categories tab treatment,
+/// extended in US-36 / T-630 to include the five additional rows
+/// (Notifications, Appearance, Default Share Format, Clear Cached
+/// Recipe Images, Share Anonymous Usage Data). The T-550 baselines
+/// were deleted on the T-630 commit; iOS-sim first-run uses
+/// `record: .missing` to lay the expanded PNGs down.
 ///
-/// Spec trace: US-32 AC-32.1..AC-32.4, CC-1 (light + dark accessibility).
+/// Spec trace: US-32 AC-32.1..AC-32.4, US-36 AC-36.1..AC-36.8,
+/// CC-1 (light + dark accessibility).
 final class SettingsViewSnapshotTests: XCTestCase {
 
     override func setUp() {

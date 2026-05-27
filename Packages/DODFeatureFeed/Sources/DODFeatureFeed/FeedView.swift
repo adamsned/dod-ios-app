@@ -18,15 +18,24 @@ public struct FeedView: View {
     /// no-op; production callers (TabStack) always pass a non-nil closure
     /// that routes through `RecipeStore.toggleSaved` per CL-59.
     public let onSave: ((RecipeListItem) -> Void)?
+    /// US-36 / AC-36.4 — Clear Cached Recipe Images closure plumbed from
+    /// the composition root through the gear-icon NavigationLink into
+    /// `SettingsView`. Optional so existing callers (tests, previews)
+    /// don't need to plumb it. Production callers (TabStack) always
+    /// pass a non-nil closure that routes through
+    /// `RecipeStore.clearImageCache()` and returns freed-byte total.
+    public let onClearImageCache: (() async throws -> Int)?
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
-        onSave: ((RecipeListItem) -> Void)? = nil
+        onSave: ((RecipeListItem) -> Void)? = nil,
+        onClearImageCache: (() async throws -> Int)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
+        self.onClearImageCache = onClearImageCache
     }
 
     public var body: some View {
@@ -61,10 +70,12 @@ public struct FeedView: View {
 
     /// The toolbar gear-icon NavigationLink (US-32 AC-32.1). Extracted so
     /// the `#if os(iOS)` placement branch + the macOS fallback share one
-    /// label definition.
+    /// label definition. The `onClearImageCache` closure (US-36 / AC-36.4)
+    /// is forwarded into `SettingsView` so the Clear Cache row's tap
+    /// routes through the composition root's `RecipeStore` instance.
     private var settingsToolbarLink: some View {
         NavigationLink {
-            SettingsView()
+            SettingsView(onClearImageCache: onClearImageCache)
         } label: {
             Image(systemName: "gearshape")
                 .accessibilityLabel("Settings")

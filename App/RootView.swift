@@ -1,6 +1,7 @@
 import CoreSpotlight
 import DODAnalytics
 import DODDesignSystem
+import DODFeatureFeed
 import DODSupport
 import SwiftUI
 
@@ -19,6 +20,15 @@ struct RootView: View {
     @State private var dependencies: AppDependencies
     @State private var selectedTab: AppTab = .feed
     @State private var showOnboarding: Bool
+    /// US-36 AC-36.2 — user-selected appearance preference. Backed by
+    /// `UserDefaults` (key `dod.settings.appearance`) via `@AppStorage`
+    /// so a write from `SettingsViewModel.appearance` (the Picker's
+    /// setter) lands here in the same frame. Applied to the root
+    /// `Group` via `.preferredColorScheme(...)`. When the value is
+    /// `.system` the modifier receives `nil` and the OS-level setting
+    /// drives every screen's color scheme.
+    @AppStorage(SettingsViewModel.appearancePreferenceKey)
+    private var appearanceRaw: String = AppearancePreference.system.rawValue
     /// Widget deep link (spec.md US-9 AC-9.2). Feed tab consumes via .task(id:).
     @State private var pendingDeepLink: WidgetDeepLink?
     /// App Intents / Spotlight route (spec.md US-10).
@@ -41,6 +51,8 @@ struct RootView: View {
                 phoneTabs
             }
         }
+        .preferredColorScheme(preferredColorScheme(for: appearance))
+        .animation(.easeInOut(duration: 0.2), value: appearance)
         .task {
             await dependencies.bootstrap()
             // Push current saved + recents into Spotlight on every cold launch
@@ -241,6 +253,30 @@ struct RootView: View {
             try await CSSearchableIndex.default().indexSearchableItems(items)
         } catch {
             DODLog.app.error("spotlight index failed: \(String(describing: error))")
+        }
+    }
+
+    // MARK: - Appearance (US-36 AC-36.2)
+
+    /// Decode the `@AppStorage`-backed raw value into a typed enum. An
+    /// absent / malformed value falls back to `.system` so users always
+    /// see a sensible default — same defensive fallback
+    /// `AppearancePreference.fromDefaults(_:)` implements for the
+    /// non-`@AppStorage` read path.
+    private var appearance: AppearancePreference {
+        AppearancePreference(rawValue: appearanceRaw) ?? .system
+    }
+
+    /// Map the user-selected preference onto SwiftUI's `ColorScheme?`.
+    /// `.system` returns `nil` so `.preferredColorScheme(...)` becomes a
+    /// no-op and the OS-level setting drives every screen — matches the
+    /// "Match System" default. `.light` / `.dark` force the SwiftUI
+    /// environment value regardless of OS preference.
+    private func preferredColorScheme(for value: AppearancePreference) -> ColorScheme? {
+        switch value {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
         }
     }
 }

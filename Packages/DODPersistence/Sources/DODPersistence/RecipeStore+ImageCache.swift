@@ -69,6 +69,42 @@ extension RecipeStore {
         return row.bytes
     }
 
+    /// Purge every unpinned `CachedImage` row + its App Group file
+    /// bridge mirror. Returns the total bytes freed so the Settings
+    /// row's snackbar can format a humane "Freed X.X MB" message
+    /// (US-36 / AC-36.4).
+    ///
+    /// Pinned rows (saved-recipe images, `pinnedToSavedRecipeID != nil`)
+    /// are preserved — those bytes belong to the AC-5.2 offline
+    /// pre-download contract, and wiping them would make saved recipes
+    /// lose their hero images until the next online visit (regression
+    /// against AC-4.9 "fully usable offline if saved"). The exempt-pinned
+    /// semantics mirror `evictImagesIfNeeded()`'s NFR-2 contract — same
+    /// rule, applied unconditionally rather than budget-gated.
+    ///
+    /// File deletion via ``WidgetImageBridge/deleteImage(for:)`` is
+    /// best-effort, mirroring the evict path. SwiftData remains
+    /// authoritative; a stale file in the App Group container would
+    /// only manifest as an orphan widget render until the next
+    /// `cacheImage(...)` call overwrites it.
+    ///
+    /// Spec trace: US-36 AC-36.4.
+    @discardableResult
+    public func clearImageCache() throws -> Int {
+        let descriptor = FetchDescriptor<CachedImage>(
+            predicate: #Predicate { $0.pinnedToSavedRecipeID == nil }
+        )
+        let unpinned = try modelContext.fetch(descriptor)
+        var freedBytes = 0
+        for row in unpinned {
+            freedBytes += row.bytes.count
+            URL(string: row.urlString).map { WidgetImageBridge.deleteImage(for: $0) }
+            modelContext.delete(row)
+        }
+        try modelContext.save()
+        return freedBytes
+    }
+
     /// Trim image rows until total bytes ≤ ``imageBudgetBytes``. Pinned rows
     /// (saved-recipe images) are excluded from eviction (NFR-2). When a
     /// row is evicted the corresponding App Group file (the widget image
