@@ -68,7 +68,8 @@ struct TabStack: View {
                 onSelect: { item in path.append(.recipe(item: item)) },
                 onSave: { item in
                     Task { await Self.saveFromCard(item: item, store: dependencies.store) }
-                }
+                },
+                onClearImageCache: { try await dependencies.store.clearImageCache() }
             )
         case .categories:
             CategoryListView(

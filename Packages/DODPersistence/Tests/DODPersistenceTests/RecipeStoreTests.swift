@@ -269,6 +269,55 @@ struct RecentlyViewedTests {
         let read = try await store.image(url: url)
         #expect(read != nil)
     }
+
+    // MARK: - US-36 / T-630 — clearImageCache
+
+    @Test func clearImageCacheRemovesUnpinnedRowsAndReturnsFreedBytes() async throws {
+        let store = try await makeStore()
+        let url1 = URL(string: "https://example.com/a.jpg") ?? URL(filePath: "/")
+        let url2 = URL(string: "https://example.com/b.jpg") ?? URL(filePath: "/")
+        try await store.cacheImage(url: url1, bytes: Data(repeating: 0xAA, count: 1024))
+        try await store.cacheImage(url: url2, bytes: Data(repeating: 0xBB, count: 2048))
+
+        let freed = try await store.clearImageCache()
+        #expect(freed == 1024 + 2048)
+
+        // Rows are gone — subsequent reads return nil per the existing
+        // image(url:) contract.
+        #expect(try await store.image(url: url1) == nil)
+        #expect(try await store.image(url: url2) == nil)
+    }
+
+    @Test func clearImageCachePreservesPinnedRows() async throws {
+        // AC-36.4 + CL-62: pinned images belong to saved recipes and
+        // survive Clear Cache so the AC-4.9 / AC-5.2 offline-saved
+        // contract is preserved.
+        let store = try await makeStore()
+        let unpinnedURL = URL(string: "https://example.com/unpinned.jpg") ?? URL(filePath: "/")
+        let pinnedURL = URL(string: "https://example.com/pinned.jpg") ?? URL(filePath: "/")
+        try await store.cacheImage(url: unpinnedURL, bytes: Data(repeating: 0x01, count: 512))
+        try await store.cacheImage(
+            url: pinnedURL,
+            bytes: Data(repeating: 0x02, count: 1024),
+            pinnedToSavedRecipeID: 42
+        )
+
+        let freed = try await store.clearImageCache()
+        // Only the unpinned 512 bytes are freed; pinned bytes survive.
+        #expect(freed == 512)
+
+        #expect(try await store.image(url: unpinnedURL) == nil)
+        #expect(try await store.image(url: pinnedURL) != nil)
+    }
+
+    @Test func clearImageCacheReturnsZeroWhenAlreadyEmpty() async throws {
+        // AC-36.4 zero-case: a fresh store with no images returns 0,
+        // which the snackbar formatter renders as "Cache was already
+        // clear." rather than the "Freed 0.0 MB" copy.
+        let store = try await makeStore()
+        let freed = try await store.clearImageCache()
+        #expect(freed == 0)
+    }
 }
 
 @Suite("RecipeStore blocklist (T-076, AC-1.7)") struct BlocklistTests {
