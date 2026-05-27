@@ -513,6 +513,24 @@ Added 2026-05-26 (round-3 backlog item, graduated). Pure presentation logic — 
 - `RecipeIngredient.text` stays a single free-text field. The JSON-LD `recipeIngredient` payload from WPRM is a single string per ingredient with quantity + unit + name interleaved (e.g. `"720 g bread flour"`, `"1 1/2 pounds cod fillets (cut into 2-3 inch uniform chunks)"`) — there is no structured `amount` + `unit` + `name` decomposition to lean on. The renderer parses the leading quantity by walking the head of the string for an integer / decimal / fraction / mixed-number prefix; everything from the first non-quantity character to the end is appended verbatim. Lines that don't begin with a digit or a Unicode vulgar fraction (e.g. `"Salt and freshly ground black pepper (to taste)"`, `"melted butter (for dipping)"`) return verbatim — the renderer never invents a quantity.
 - The Cook Mode `ingredientScaleFactor` parameter defaults to `1.0` so any future direct caller of `CookModeView` (Live Activity intent, App Intent deep link, future widget surface) still works without passing the scale.
 
+### US-32 — Settings page reachable from gear icon in Recipes nav
+**As a** Returning Reader,
+**I want** a Settings screen reachable via a gear icon on the trailing edge of the Recipes tab's nav bar,
+**so that** I have a discoverable entry point for app-wide preferences (measurement units, About info, version).
+
+Added 2026-05-26 (round-4 backlog item, graduated). v1 of this story ships a **skeleton** Settings surface: the gear-icon entry point plus a `.insetGrouped` list rendering the three rows the backlog described (metric-units toggle, About Me link, version footer). The actual ingredient-conversion implementation behind the toggle and the WP REST fetch behind the About Me link are deliberately deferred to follow-up tasks T-551 (metric units conversion) and T-552 (About Me fetch). CL-56 captures the skeleton-first decision and the rationale for bundling SettingsView inside DODFeatureFeed instead of creating a new Swift package.
+
+**Acceptance criteria:**
+- **AC-32.1** A gear icon (`Image(systemName: "gearshape")`) is rendered on the trailing edge of the Recipes (Feed) tab's nav bar, opposite the leading "Recipes" title. Tapping it presents `SettingsView` (push via NavigationLink so the existing back button works). The icon uses the default toolbar tint and carries the accessibility label `"Settings"`.
+- **AC-32.2** `SettingsView` renders as a `List` with `.listStyle(.insetGrouped)` and `.scrollContentBackground(.hidden) + .background(DODColor.surface)`, matching the visual treatment of the Categories tab per CL-54 / T-560 (consistent brand surface across the app).
+- **AC-32.3** The list contains three sections: (1) a Toggle row labeled "Use metric units" bound to a UserDefaults-backed flag (key `dod.settings.useMetricUnits`); (2) a NavigationLink row labeled "About Dutch Oven Daddy" pushing a placeholder destination view showing "Coming soon — fetched from /about-me/" (the live WP REST fetch is T-552); (3) a footer reading `"v\(version) (\(build))"` sourced from `Bundle.main.infoDictionary["CFBundleShortVersionString"]` and `Bundle.main.infoDictionary["CFBundleVersion"]`.
+- **AC-32.4** Toggling the "Use metric units" Toggle persists the new value to `UserDefaults.standard` under key `dod.settings.useMetricUnits` and is read back on subsequent app launches. No other surface in the app reads this flag yet (the actual ingredient conversion is T-551 — this PR ships only the toggle UI + persistence so the follow-up can wire it in without view churn).
+- **AC-32.5** US-4 (recipe detail rendering) is not regressed — no recipe-detail code path is touched. The existing tab navigation (US-1 / US-2 / US-3 / US-5) is not regressed — the gear icon adds a toolbar item to the Feed tab without changing root-tab routing.
+
+**Constitution + spec notes:**
+- No new analytics events, no new design tokens, no new persistence schema, no new wire-format fields, no new deep-link cases. The skeleton ships zero behavior beyond the toggle's UserDefaults round-trip and the placeholder About Me push; the WP REST fetch (T-552) and ingredient conversion (T-551) are explicit follow-ups.
+- `SettingsView` lives in `Packages/DODFeatureFeed/Sources/DODFeatureFeed/` rather than a new `DODFeatureSettings` package — CL-56 walks through the rationale (one screen, one entry point, project.yml churn deferred until Settings grows enough to warrant extraction).
+
 ---
 
 ## Cross-cutting acceptance criteria

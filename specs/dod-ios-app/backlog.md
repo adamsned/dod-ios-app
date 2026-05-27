@@ -204,31 +204,9 @@ notes). Captured after using the post-round-2 build on iPhone 16 sim.
 
 #### New surfaces / features
 
-- **Settings page** — new top-level surface reached from a **gear icon**
-  in the top corner of the Recipes (Feed) tab. Layout styled to match
-  the Categories tab (`.insetGrouped` list per T-340 / CL-32). Initial
-  content (each its own row group):
-  1. **Imperial ↔ metric measurement toggle.** Affects every ingredient
-     quantity rendered in recipe detail + Cook Mode. Pure presentation
-     transform — source JSON-LD stays untouched. Open question for
-     spec time: what's the default for a fresh install (US-locale → imperial,
-     metric for everywhere else)? Persist to UserDefaults.
-  2. **About Me section.** Pull the "About Me" content from
-     [`https://www.dutchovendaddy.com/about-me/`](https://www.dutchovendaddy.com/about-me/).
-     Open question for spec time: fetch live each visit, fetch once
-     and cache offline (preferred), or copy-paste the text at build
-     time? Live fetch with cache + offline fallback is the most natural
-     fit with the existing CL-1 hybrid strategy. WP REST exposes
-     `/wp/v2/pages?slug=about-me` for this.
-  3. **Version + build number footer.** Display
-     `CFBundleShortVersionString (CFBundleVersion)` (e.g. "1.0.2 (47)")
-     as a centered footnote-style label at the bottom of the screen.
-     Reads from `Bundle.main.infoDictionary`. Trivial — bundled here
-     because it's the natural place to land. Size: **XS** on its own.
-
-  Total size: **L** (~1 week). Split into multiple T-NNN tasks at spec
-  time — the imperial/metric transform is its own work item separate
-  from the About Me fetch and from the gear-icon entry-point plumbing.
+- ~~**Settings page**~~ — Graduated to US-32 / CL-56 / T-550 (skeleton),
+  with T-551 (metric-units conversion) and T-552 (About Me WP REST fetch)
+  as explicit Phase 10 follow-ups.
 
 #### Polish
 
