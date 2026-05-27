@@ -53,4 +53,18 @@ public final class RecentSearches: @unchecked Sendable {
     public func clear() {
         defaults.removeObject(forKey: key)
     }
+
+    /// Remove a single stored query (case-insensitive match, mirroring
+    /// ``record(_:)``'s dedupe rule). No-op if no entry matches.
+    ///
+    /// Spec trace: US-33 / AC-33.3 (per-term context-menu Clear).
+    public func remove(_ query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var current = recent()
+        let countBefore = current.count
+        current.removeAll { $0.caseInsensitiveCompare(trimmed) == .orderedSame }
+        guard current.count != countBefore else { return }
+        defaults.set(current, forKey: key)
+    }
 }

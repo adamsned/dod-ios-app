@@ -72,7 +72,9 @@ public struct SearchView: View {
                 onCategoryTap: { category in
                     viewModel.query = category.name
                 },
-                onClearRecents: { viewModel.clearRecentSearches() }
+                onClearRecents: { viewModel.clearRecentSearches() },
+                // US-33 / AC-33.3 / CL-57: per-term context-menu Clear.
+                onRemoveRecent: { viewModel.removeRecentSearch($0) }
             )
         case .searching:
             ProgressView()
@@ -237,6 +239,8 @@ struct IdleSuggestionsView: View {
     let onRecentTap: (String) -> Void
     let onCategoryTap: (DODDomain.Category) -> Void
     let onClearRecents: () -> Void
+    /// US-33 / AC-33.3 / CL-57: per-term context-menu removal.
+    let onRemoveRecent: (String) -> Void
 
     var body: some View {
         if recents.isEmpty && topCategories.isEmpty {
@@ -281,15 +285,24 @@ struct IdleSuggestionsView: View {
                     .dodFont(DODType.heading)
                     .foregroundStyle(DODColor.label)
                 Spacer()
+                // US-33 / AC-33.1 / CL-57: orange matches gear icon.
                 Button("Clear All", action: onClearRecents)
                     .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.castIronBrown)
+                    .foregroundStyle(DODColor.accent)
                     .accessibilityLabel("Clear all recent searches")
             }
             FlowLayout(spacing: DODSpacing.xs) {
                 ForEach(Array(recents.enumerated()), id: \.offset) { _, query in
                     pill(text: query, systemImage: "clock") {
                         onRecentTap(query)
+                    }
+                    // US-33 / AC-33.2 / CL-57: long-press → "Clear".
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            onRemoveRecent(query)
+                        } label: {
+                            Label("Clear", systemImage: "trash")
+                        }
                     }
                 }
             }
