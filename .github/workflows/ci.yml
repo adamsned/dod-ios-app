@@ -3,8 +3,22 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # The label-conditional `test-e2e` job (below) reads
+    # `github.event.pull_request.labels.*.name`. The `labeled` /
+    # `unlabeled` events are required so the job re-evaluates when an
+    # author adds or removes the `e2e` label after the PR is opened.
+    # Without these triggers the job would only see the labels present
+    # at PR-open time. Spec trace: AC-T5 / CL-58.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
+  # L5 E2E nightly safety net + manual escape hatch. Pairs with
+  # `nightly-live-api.yml`'s cron at the same 07:00 UTC so both early
+  # warning surfaces fire at the same wall clock. Spec trace:
+  # AC-T5 / CL-58.
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -220,24 +234,74 @@ jobs:
           name: ui-test-results
           path: ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcresult
 
+  # L5: end-to-end user journeys. Gated by:
+  #   1. `pull_request` events ONLY when the PR carries the `e2e` label,
+  #   2. `push` to `main` (post-merge safety net),
+  #   3. `workflow_dispatch` (manual escape hatch),
+  #   4. `schedule` (nightly env-drift detector).
+  # Reuses the `ios_sim` path filter so docs-only PRs that happen to be
+  # `e2e`-labeled don't waste runner minutes. Skipped on every other PR;
+  # the `ci-required` aggregator treats skipped as success. Spec trace:
+  # AC-T5 / CL-58. See `CONTRIBUTING.md` § "Does my PR need E2E?" for
+  # the PR-author checklist.
+  test-e2e:
+    name: L5 E2E User Journeys
+    needs: [changes, build-app]
+    if: >-
+      (github.event_name == 'pull_request' &&
+        contains(github.event.pull_request.labels.*.name, 'e2e') &&
+        needs.changes.outputs.ios_sim == 'true')
+      || github.event_name == 'push'
+      || github.event_name == 'workflow_dispatch'
+      || github.event_name == 'schedule'
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 16 (Swift 6.0)
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Run E2E user journeys
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project DODApp.xcodeproj \
+            -scheme DODApp \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -only-testing:DODAppE2ETests \
+            test | xcpretty
+      - name: Upload E2E artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcresult
+
   # Aggregate gate. Runs even when upstream jobs were skipped (e.g.
   # docs-only PR) so the PR can show a single green "CI required"
   # check regardless of which jobs actually executed. Fails if any
   # required upstream job failed; succeeds if they passed OR were
-  # skipped because path filters excluded them.
+  # skipped because path filters / label gating excluded them.
   ci-required:
     name: CI required
     needs: [changes, lint, format, test-unit-packages, test-unit-app,
-            test-snapshots-designsystem, build-app, test-ui-smoke]
+            test-snapshots-designsystem, build-app, test-ui-smoke,
+            test-e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate result
         run: |
           # Each input is "success", "failure", "cancelled", or "skipped".
-          # Skipped is fine (path filter excluded the job); failure is not.
+          # Skipped is fine (path filter or label gating excluded the
+          # job); failure is not. test-e2e specifically: PRs without the
+          # `e2e` label see this job as skipped, which is success.
           for name in changes lint format test-unit-packages test-unit-app \
-                     test-snapshots-designsystem build-app test-ui-smoke; do
+                     test-snapshots-designsystem build-app test-ui-smoke \
+                     test-e2e; do
             result_var="${name//-/_}_RESULT"
             echo "$name: ${!result_var:-not-run}"
           done
@@ -248,8 +312,9 @@ jobs:
              || "${{ needs.test-unit-app.result }}" == "failure" \
              || "${{ needs.test-snapshots-designsystem.result }}" == "failure" \
              || "${{ needs.build-app.result }}" == "failure" \
-             || "${{ needs.test-ui-smoke.result }}" == "failure" ]]; then
+             || "${{ needs.test-ui-smoke.result }}" == "failure" \
+             || "${{ needs.test-e2e.result }}" == "failure" ]]; then
             echo "::error::At least one required CI job failed."
             exit 1
           fi
-          echo "All required CI jobs passed (or were skipped by path filter)."
+          echo "All required CI jobs passed (or were skipped by path filter / label gating)."
