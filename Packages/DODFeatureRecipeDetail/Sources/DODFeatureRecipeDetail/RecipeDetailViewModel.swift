@@ -13,7 +13,15 @@ public final class RecipeDetailViewModel {
     public enum LoadState: Equatable {
         case loadingDetail
         case ready
-        case unavailable  // AC-4.11
+        /// US-37 / CL-63 / AC-37.3 (T-640): the post lacks parseable JSON-LD
+        /// but the article body extracted cleanly. The view renders
+        /// `ArticleDetailView` with the carried `Recipe.articleBodyHTML`.
+        /// Carries the kind-classified `Recipe` so the view layer has the
+        /// hero + title + body + canonical URL it needs to render — same
+        /// shape as `.ready`, just a different rendering branch.
+        case article(Recipe)
+        case unavailable  // AC-4.11 — final fallback (both JSON-LD AND
+        // article-body extraction failed).
     }
 
     /// State machine for the ratings + comments section. `.idle` means
@@ -31,12 +39,17 @@ public final class RecipeDetailViewModel {
 
     public let listItem: RecipeListItem
     public let canonicalURL: URL
-    public private(set) var recipe: Recipe?
-    public private(set) var related: [RecipeListItem] = []
-    public private(set) var loadState: LoadState = .loadingDetail
+    // Module-internal setters (`internal(set)`) so the fetch +
+    // classification extension in `RecipeDetailViewModel+Fetch.swift`
+    // can mutate the load-state machine. Externally these remain
+    // read-only — the public surface is unchanged from the pre-T-640
+    // shape callers consume.
+    public internal(set) var recipe: Recipe?
+    public internal(set) var related: [RecipeListItem] = []
+    public internal(set) var loadState: LoadState = .loadingDetail
     public private(set) var isSaved: Bool = false
     public private(set) var checkedIngredientIDs: Set<UUID> = []
-    public private(set) var snackbarMessage: String?
+    public internal(set) var snackbarMessage: String?
 
     // MARK: - Servings scaler (US-31)
 
@@ -78,7 +91,10 @@ public final class RecipeDetailViewModel {
     /// fires at most one telemetry event (spec AC-7.7).
     private var cookModeTelemetrySentThisSession: Bool = false
 
-    private let dependencies: RecipeDetailDependencies
+    /// Internal so the fetch + classification extension (in
+    /// `RecipeDetailViewModel+Fetch.swift`) can read it. The dependency
+    /// surface is otherwise private to the view-model module.
+    let dependencies: RecipeDetailDependencies
 
     public init(
         listItem: RecipeListItem,
@@ -101,8 +117,20 @@ public final class RecipeDetailViewModel {
         // Step 1: hydrate from cache if present (fast path).
         if let cached = try? await dependencies.cachedRecipe(id: listItem.id), cached.hasDetail {
             recipe = cached
-            loadState = .ready
-            await loadRelated(forCategoryID: cached.categoryIDs.first)
+            // US-37 / CL-63 / AC-37.3 (T-640): branch on kind so cached
+            // articles route to `.article(...)` instead of `.ready`.
+            // Recipes follow the existing `.ready` + related-strip path.
+            switch cached.kind {
+            case .recipe:
+                loadState = .ready
+                await loadRelated(forCategoryID: cached.categoryIDs.first)
+            case .article:
+                loadState = .article(cached)
+            // No related-recipes strip on articles per CL-63 decision 5
+            // (articles are often themselves "related recipes" roundup
+            // posts; rendering a four-card strip below would feel
+            // duplicative).
+            }
         } else {
             // Step 2: try fetch + parse.
             await fetchAndParse()
@@ -360,34 +388,8 @@ public final class RecipeDetailViewModel {
         snackbarMessage = nil
     }
 
-    // MARK: - Internal
-
-    private func fetchAndParse() async {
-        do {
-            let html = try await dependencies.fetchHTML(for: canonicalURL)
-            let parsed = try dependencies.parseJSONLD(
-                html: html,
-                merging: listItem,
-                canonicalURL: canonicalURL
-            )
-            try await dependencies.mergeDetail(parsed)
-            recipe = parsed
-            loadState = .ready
-            await loadRelated(forCategoryID: parsed.categoryIDs.first)
-        } catch {
-            DODLog.network.error("recipe detail fetch failed: \(String(describing: error))")
-            try? await dependencies.markJSONLDFailed(id: listItem.id)
-            loadState = .unavailable
-            snackbarMessage = "Recipe unavailable."
-        }
-    }
-
-    private func loadRelated(forCategoryID categoryID: Int?) async {
-        guard let categoryID, await dependencies.isOnline() else {
-            related = []
-            return
-        }
-        let fetched = try? await dependencies.relatedRecipes(forCategoryID: categoryID)
-        related = (fetched ?? []).filter { $0.id != listItem.id }
-    }
+    // Fetch + JSON-LD + article-classification helpers live in
+    // ``RecipeDetailViewModel+Fetch.swift`` (US-37 / CL-63 / T-640
+    // extension), extracted to keep this type under the SwiftLint
+    // body-length cap.
 }

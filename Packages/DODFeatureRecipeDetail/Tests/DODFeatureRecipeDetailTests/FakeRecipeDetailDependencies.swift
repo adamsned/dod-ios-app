@@ -27,6 +27,15 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var telemetryEvents: [AnalyticsEvent] = []
     var fetchCount = 0
 
+    // MARK: - Article-classification test surface (US-37 / CL-63 / T-640)
+
+    /// Canned article body returned by `extractArticleBody(html:)`. Empty by
+    /// default — tests that exercise the article-classification branch set
+    /// this to a non-empty string to drive the view model into `.article`
+    /// state; tests that want the terminal `.unavailable` fallback leave
+    /// it empty (the legacy behavior).
+    var articleBodyToExtract: String = ""
+
     // MARK: - Comments + ratings test surface
 
     /// Pre-loaded rating summary returned from the network. Defaults to a
@@ -79,6 +88,15 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
         if fetchShouldFail { throw URLError(.cannotParseResponse) }
         guard let parsed = parsedRecipe else { throw URLError(.badServerResponse) }
         return parsed
+    }
+
+    /// US-37 / CL-63 / T-640: return the canned `articleBodyToExtract`
+    /// regardless of `html`. The view model only inspects the return
+    /// value's emptiness to decide between `.article` and the terminal
+    /// `.unavailable` path; tests configure `articleBodyToExtract` to
+    /// drive the desired branch.
+    func extractArticleBody(html: String) -> String {
+        articleBodyToExtract
     }
 
     func relatedRecipes(forCategoryID: Int) async throws -> [RecipeListItem] { related }

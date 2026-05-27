@@ -41,6 +41,8 @@ public enum SchemaV2: VersionedSchema {
 ///
 /// - V1 → V2: lightweight (V2 = V1 + `CachedIngredient`).
 /// - V2 → V3: lightweight (V3 = V2 + `CachedComment` + `CachedRating`).
+/// - V3 → V4: lightweight (V4 = V3 + `CachedRecipe.articleBodyHTML` optional column,
+///   per US-37 / CL-63 / T-640).
 ///
 /// Per MIGRATION.md rule 3 every stage has a paired migration test:
 /// - `MigrationTests.lightweightV1toV2OpensCleanly`
@@ -48,13 +50,14 @@ public enum SchemaV2: VersionedSchema {
 public enum MigrationPlan: SchemaMigrationPlan {
 
     public static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self, SchemaV3.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self, SchemaV4.self]
     }
 
     public static var stages: [MigrationStage] {
         [
             .lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self),
             .lightweight(fromVersion: SchemaV2.self, toVersion: SchemaV3.self),
+            .lightweight(fromVersion: SchemaV3.self, toVersion: SchemaV4.self),
         ]
     }
 }

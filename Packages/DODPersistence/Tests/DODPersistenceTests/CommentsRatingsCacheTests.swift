@@ -294,11 +294,15 @@ struct MigrationV3Tests {
         #expect(v3Entities["CachedRating"] != nil, "V3 must include the new CachedRating model")
     }
 
-    @Test func v3MigrationPlanLists3VersionsAnd2Stages() {
+    @Test func migrationPlanListsV1ThroughV4() {
+        // T-640 (US-37 / CL-63) added SchemaV4 — V3 + the
+        // `CachedRecipe.articleBodyHTML` optional column for the article
+        // rendering path. V1→V2, V2→V3, V3→V4 are all lightweight stages
+        // per MIGRATION.md rule 1.
         let schemas = MigrationPlan.schemas
-        #expect(schemas.count == 3, "V1, V2, V3")
+        #expect(schemas.count == 4, "V1, V2, V3, V4")
         let stages = MigrationPlan.stages
-        #expect(stages.count == 2, "V1→V2 and V2→V3")
+        #expect(stages.count == 3, "V1→V2, V2→V3, V3→V4")
     }
 }
 

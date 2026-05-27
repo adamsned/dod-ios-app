@@ -27,13 +27,16 @@ import Testing
         #expect(viewModel.related.count == 2)
     }
 
-    @Test func fetchFailureMarksBlocklistAndTransitionsToUnavailable() async throws {
+    @Test func fetchFailureTransitionsToUnavailable() async throws {
+        // US-37 / CL-63 / T-640: pre-T-640 this also marked the blocklist,
+        // post-T-640 it doesn't (an HTML fetch failure is a transient
+        // network issue, not a missing-JSON-LD signal). The marking-on-
+        // JSON-LD-failure path moved to `ArticlePathClassificationTests`.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.fetchShouldFail = true
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 9)
         await viewModel.onAppear()
         #expect(viewModel.loadState == .unavailable)
-        #expect(dependencies.markedFailedIDs == [9])
     }
 
     @Test func cachedRecipeWithDetailSkipsNetwork() async throws {

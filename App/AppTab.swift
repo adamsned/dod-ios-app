@@ -13,7 +13,14 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .feed: "Recipes"
+        // US-37 / AC-37.1 (T-640, 2026-05-27): "Recipes" → "Recipes & Articles".
+        // Communicates that the tab surfaces both WPRM-instrumented recipes
+        // AND article-style posts (e.g. roundup posts) that route through
+        // `ArticleDetailView` per CL-63. The bottom-tab label and the
+        // `FeedView` nav title both consume this string; the telemetry name
+        // (`telemetryName`, AC-16.4) is unchanged to preserve funnel
+        // comparisons across the rename.
+        case .feed: "Recipes & Articles"
         case .categories: "Categories"
         case .search: "Search"
         case .saved: "Saved"

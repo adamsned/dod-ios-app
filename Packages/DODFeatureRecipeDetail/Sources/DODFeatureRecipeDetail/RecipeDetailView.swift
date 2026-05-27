@@ -98,6 +98,12 @@ public struct RecipeDetailView: View {
             )
         case .ready:
             readyBody
+        // US-37 / CL-63 / AC-37.3 (T-640): article rendering branch.
+        // Posts that lack parseable JSON-LD but have an extractable HTML
+        // body render via `ArticleDetailView` with the carried `Recipe`
+        // (kind == .article, populated `articleBodyHTML`).
+        case .article(let article):
+            ArticleDetailView(recipe: article)
         }
     }
 
