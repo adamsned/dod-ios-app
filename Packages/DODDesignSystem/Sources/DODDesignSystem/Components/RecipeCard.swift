@@ -92,6 +92,14 @@ public struct RecipeCard: View {
     }
 
     private func timeChip(_ display: String) -> some View {
+        Self.timeChip(display)
+    }
+
+    /// US-38 / AC-38.4 / CL-64.4 (T-650, 2026-05-27) — the trailing-edge
+    /// time chip helper, promoted to a static so the `RecipeCard.ListRow`
+    /// sibling can reuse the same visual treatment without copying the
+    /// `Capsule` + `DODColor.castIronBrown.opacity(0.85)` body.
+    static func timeChip(_ display: String) -> some View {
         HStack(spacing: DODSpacing.xxs) {
             Image(systemName: "clock")
             Text(display)
@@ -162,6 +170,108 @@ extension View {
     }
 }
 
+// MARK: - List row variant (US-38 / AC-38.4 / CL-64, T-650)
+
+extension RecipeCard {
+
+    /// US-38 / AC-38.4 / CL-64.4 (T-650, 2026-05-27) — dense single-column
+    /// row variant. Hosted alongside ``RecipeCard`` in the same file
+    /// because it shares the time-chip body + the same `DODColor.surfaceElevated`
+    /// background; lives as a nested struct so call sites read
+    /// `RecipeCard.ListRow(...)` and the affinity to the gallery card is
+    /// visible at the API surface.
+    ///
+    /// Layout (CL-64.4):
+    ///   - 60×60pt `AsyncImage` thumbnail on the leading edge, clipped to
+    ///     a `RoundedRectangle(cornerRadius: DODSpacing.xs)`.
+    ///   - `VStack(.leading)` carrying the title (`.lineLimit(1)`,
+    ///     `DODType.heading`) and the excerpt (`.lineLimit(1)`,
+    ///     `DODType.caption`). The excerpt is single-line in the row
+    ///     variant to keep the density (gallery card uses 2 lines).
+    ///   - Optional time chip on the trailing edge — only rendered when
+    ///     `totalTimeDisplay` is non-nil.
+    ///   - `DODSpacing.sm` vertical padding around the row.
+    ///   - `DODColor.surfaceElevated` background inside a
+    ///     `RoundedRectangle(cornerRadius: DODSpacing.sm)` (matches the
+    ///     gallery card's surface treatment).
+    ///
+    /// Composes with the same ``recipeCardTap(_:)`` +
+    /// ``recipeCardContextMenu(onSave:)`` modifiers the gallery card uses,
+    /// so the row's tap + long-press semantics are byte-identical
+    /// (AC-34.1 preserved).
+    public struct ListRow: View {
+
+        public let title: String
+        public let excerpt: String
+        public let heroImageURL: URL?
+        public let totalTimeDisplay: String?
+
+        public init(
+            title: String,
+            excerpt: String,
+            heroImageURL: URL?,
+            totalTimeDisplay: String? = nil
+        ) {
+            self.title = title
+            self.excerpt = excerpt
+            self.heroImageURL = heroImageURL
+            self.totalTimeDisplay = totalTimeDisplay
+        }
+
+        public var body: some View {
+            HStack(alignment: .center, spacing: DODSpacing.sm) {
+                thumbnail
+                VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                    Text(title)
+                        .dodFont(DODType.heading)
+                        .foregroundStyle(DODColor.label)
+                        .lineLimit(1)
+                    Text(excerpt)
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if let totalTimeDisplay {
+                    RecipeCard.timeChip(totalTimeDisplay)
+                }
+            }
+            .padding(.horizontal, DODSpacing.sm)
+            .padding(.vertical, DODSpacing.sm)
+            .background(DODColor.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous))
+        }
+
+        /// 60×60pt leading thumbnail. AsyncImage states map to the same
+        /// loading / failure visuals the gallery card uses, scaled down
+        /// to the smaller frame. Hidden from accessibility — the parent
+        /// row's `recipeCardTap` modifier collapses children into the
+        /// row's combined label.
+        private var thumbnail: some View {
+            AsyncImage(url: heroImageURL) { phase in
+                switch phase {
+                case .empty:
+                    LoadingSkeleton(cornerRadius: DODSpacing.xs)
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure:
+                    Image(systemName: "photo")
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(DODColor.surface)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous))
+            .accessibilityHidden(true)
+        }
+    }
+}
+
 #Preview("With time chip") {
     RecipeCard(
         title: "Garlic Butter Skillet Corn",
@@ -174,6 +284,25 @@ extension View {
 
 #Preview("No image") {
     RecipeCard(
+        title: "Sourdough Bread",
+        excerpt: "Crusty, chewy, slow-fermented.",
+        heroImageURL: nil
+    )
+    .padding(DODSpacing.md)
+}
+
+#Preview("List row, with time chip") {
+    RecipeCard.ListRow(
+        title: "Garlic Butter Skillet Corn",
+        excerpt: "An easy 15-minute side dish that pairs with everything.",
+        heroImageURL: nil,
+        totalTimeDisplay: "15 min"
+    )
+    .padding(DODSpacing.md)
+}
+
+#Preview("List row, no time chip") {
+    RecipeCard.ListRow(
         title: "Sourdough Bread",
         excerpt: "Crusty, chewy, slow-fermented.",
         heroImageURL: nil

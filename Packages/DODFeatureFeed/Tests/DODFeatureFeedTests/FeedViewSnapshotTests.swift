@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import DODDesignSystem
 import DODDomain
 import SnapshotTesting
 import SwiftUI
@@ -19,6 +20,17 @@ final class FeedViewSnapshotTests: XCTestCase {
     override func setUp() {
         super.setUp()
         isRecording = false
+        // US-38 / AC-38.6 (T-650): ensure each test sees the default
+        // `.gallery` layout; the list-layout tests below override.
+        UserDefaults.standard.removeObject(forKey: RecipeListLayout.storageKey)
+    }
+
+    override func tearDown() {
+        // Reset so per-test layout overrides don't leak into other
+        // FeedView tests (e.g. the existing `_loadedFeed_*` baselines
+        // assume `.gallery`).
+        UserDefaults.standard.removeObject(forKey: RecipeListLayout.storageKey)
+        super.tearDown()
     }
 
     @MainActor
@@ -57,6 +69,36 @@ final class FeedViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 2_400), traits: Self.darkAX5Traits()),
+            record: .missing
+        )
+    }
+
+    // MARK: - US-38 / AC-38.4 / AC-38.6 — list-layout baselines (T-650)
+
+    @MainActor
+    func test_loadedFeed_listLayout_light_defaultDynamicType() async {
+        UserDefaults.standard.set(
+            RecipeListLayout.list.rawValue,
+            forKey: RecipeListLayout.storageKey
+        )
+        let view = await Self.makeHostedFeed()
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
+    @MainActor
+    func test_loadedFeed_listLayout_dark_defaultDynamicType() async {
+        UserDefaults.standard.set(
+            RecipeListLayout.list.rawValue,
+            forKey: RecipeListLayout.storageKey
+        )
+        let view = await Self.makeHostedFeed()
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.darkTraits()),
             record: .missing
         )
     }
