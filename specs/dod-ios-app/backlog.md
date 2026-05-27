@@ -42,6 +42,14 @@ shipped. See "Recently graduated" below for the trail._
 
 _(empty — all items graduated; see "Recently graduated" below.)_
 
+### Captured 2026-05-27 (round 8, @spencer0706) — Post-T-640 regression bundle + new feature parallels
+
+Round-8 captures landed after round-7 PRs (T-620 / T-630 / T-640 / T-650 / T-590 / T-580 / T-610) shipped to `main`. Spencer + dad split the work into four parallel branches: T-660 (this entry — tab-bar truncation), T-670 (phantom searches), T-680 (Shopping List — graduated round-3 dad item), T-690 (Voice Mode — graduated round-3 dad item).
+
+#### Tab-bar truncation after T-640 rename
+
+_(Graduated 2026-05-27 as T-660 / CL-65 — amendment to existing US-37 / AC-37.1, no new US needed. Bottom-tab `Label(...)` now reads `AppTab.tabLabel` ("Recipes" — short) while `FeedView.navigationTitle` keeps reading `AppTab.title` ("Recipes & Articles" — full). See CL-65 for the considered alternatives + the L4 snapshot baseline alignment notes.)_
+
 ### Captured 2026-05-25 (round 3, @adamsned)
 
 User has chosen to defer TestFlight until at least round 3 ships. These
@@ -704,3 +712,21 @@ useful reference.
   flipping the layout in one tab flips it in the other. US-1 / US-3 /
   US-12 / CC-9's 2-column grid contract is preserved in the
   `.gallery` case (still the default). Implementing PR: T-650.
+- **Tab-bar label truncation after T-640 rename (round-8
+  regression)** — graduated to amended **AC-37.1** +
+  [CL-65](clarifications.md) + [T-660](tasks.md). T-640 renamed the
+  Recipes tab to "Recipes & Articles" in both the bottom-tab label
+  and the screen header (both sourced from `AppTab.feed.title`); the
+  rename worked for the screen header but the system tab-bar item's
+  fixed ~80pt width truncated "Recipes & Articles" to "Recipes &
+  Arti..." on standard iPhone widths. T-660 introduces a new
+  `AppTab.tabLabel: String` computed property — short "Recipes" for
+  `.feed`, fallthrough `tabLabel == title` for every other tab — and
+  routes the bottom-tab `Label(...)` inside `RootView.phoneTabs`'s
+  `TabView` block to read `tabLabel`. `FeedView.navigationTitle`
+  continues to read the full "Recipes & Articles" so the screen
+  header preserves the full content semantics introduced by T-640.
+  CL-65 captures the alternatives (abbreviate the full string,
+  `.minimumScaleFactor`, drop the label, alt short words, apply to
+  iPad sidebar) and the why-new-property-and-not-shorter-title
+  argument. Implementing PR: T-660.
