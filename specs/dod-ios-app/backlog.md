@@ -140,7 +140,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 - ~~**"Clear All" button in Search tab should match the gear-icon orange in Recipes tab.**~~ Graduated → US-33 / CL-57 / T-580 as part of the Search-tab tweaks bundle. Token: `DODColor.accent` (the gear icon inherits the app-level `.tint(DODColor.accent)` from `RootView.swift`).
 
-- **List cells + search bars: `#553724` in dark mode, `#FFFFFF` in light mode.** Granular refinement beyond T-570's SurfaceElevated change. Specifically targets `.listCell` and `.searchable` field backgrounds. The current SurfaceElevated (`#5A3520` dark from T-570) is close but Spencer wants a touch warmer — `#553724` ≈ (85, 55, 36) vs current `#5A3520` ≈ (90, 53, 32). Likely best implemented as either (a) further refinement of SurfaceElevated dark hex, OR (b) a new dedicated `CellSurface` / `ChromeSurface` token applied only to list cells + search bars, leaving other SurfaceElevated consumers at `#5A3520`. The (b) approach is cleaner if other consumers (chips, cards in feed grid, etc.) shouldn't shift. Capture the choice in CL when this graduates. Size: **S** (single hex) to **M** (if a new token is introduced + all relevant callsites swept). Will re-record affected baselines.
+- ~~**List cells + search bars: `#553724` in dark mode, `#FFFFFF` in light mode.**~~ — Graduated to CL-59 / T-610 as a further refinement of `SurfaceElevated` dark from `#5A3520` to `#553724` (Option A — single hex tweak; light stays `#FFFFFF`). Snapshot re-record remains T-571's deferred scope.
 
 #### Sizing summary
 
@@ -154,7 +154,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 | Card long-press → Save | S | SwiftUI `.contextMenu` |
 | ~~Recent long-press → Clear~~ | ~~S~~ | Graduated → US-33 / CL-57 / T-580 |
 | ~~Clear All orange color match~~ | ~~XS~~ | Graduated → US-33 / CL-57 / T-580 |
-| List-cell + search-bar color refinement | S–M | Token decision |
+| ~~List-cell + search-bar color refinement~~ | ~~S–M~~ | Graduated → CL-59 / T-610 (Option A: refine `SurfaceElevated` dark `#5A3520` → `#553724`) |
 
 **Next session also picks up these existing items per Spencer's batching note:**
 - Round-3 dad: **Shopping List** (~1.5 weeks)
