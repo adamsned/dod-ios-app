@@ -114,17 +114,7 @@ _(Graduated 2026-05-27 as US-37 / CL-63 / T-640. Spec amends CL-9 + CL-10 + AC-1
 
 #### Layout toggle
 
-- **Gallery ↔ List view toggle.** New button on the Recipes & Articles tab (and Search tab) that swaps between two layouts:
-  - **Gallery view** (current default): the 2-col grid per CC-9.
-  - **List view** (new): smaller images, smaller card text, denser rows for quick scanning.
-
-  Icon toggle:
-  - When in gallery view → button shows `square.grid.2x2` (the icon represents "switch TO list mode" implicitly; *or* read as "currently showing grid" — clarify with user at spec time)
-  - When in list view → button shows `list.bullet`
-
-  Wait — Spencer's wording is: *"if user is in gallery view, the button displays the icon `square.grid.2x2`"* — so the icon represents the CURRENT mode, not the destination. This is the opposite of typical iOS convention (where the toggle shows what you'll switch TO). Either is defensible; capture choice in CL. Whichever wins, both surfaces (Recipes tab + Search tab) need to honor the same convention.
-
-  Size: **M**. Persistence question: does view choice persist across launches? Probably yes — UserDefaults flag.
+_(Graduated 2026-05-27 as US-38 / CL-64 / T-650. Icon-convention choice landed on Spencer's explicit direction — the button shows the CURRENT layout (`square.grid.2x2` in gallery, `list.bullet` in list), opposite of typical iOS "destination" convention. Layout choice persists via `@AppStorage("dod.recipeListLayout")` and the same persisted value drives both the Recipes & Articles tab and the Search tab. See CL-64 for the considered alternatives.)_
 
 #### Long-press context menus
 
@@ -146,7 +136,7 @@ _(Graduated 2026-05-27 as US-37 / CL-63 / T-640. Spec amends CL-9 + CL-10 + AC-1
 | About Ned copy + photo | S | Asset prep open question |
 | Download button | M | Reuse cache, define UX distinction from Save |
 | Recipes & Articles rename + article-rendering path | M | Amends CL-9 / AC-1.7 / AC-4.11 |
-| Gallery ↔ List view toggle | M | Plus icon-direction CL |
+| ~~Gallery ↔ List view toggle~~ | ~~M~~ | Graduated → US-38 / CL-64 / T-650 |
 | Card long-press → Save | S | SwiftUI `.contextMenu` |
 | ~~Recent long-press → Clear~~ | ~~S~~ | Graduated → US-33 / CL-57 / T-580 |
 | ~~Clear All orange color match~~ | ~~XS~~ | Graduated → US-33 / CL-57 / T-580 |
@@ -694,3 +684,23 @@ useful reference.
   color refinement) run on parallel branches against different files —
   spec-file collisions at merge time are expected and the rebaser picks
   the next free CL slot.
+- **Gallery ↔ List view toggle on Recipes & Articles + Search (round-7
+  "Layout toggle")** — graduated to **US-38** (AC-38.1 through AC-38.6) +
+  [CL-64](clarifications.md) + [T-650](tasks.md). New nav-bar button next
+  to the Recipes-tab gear icon (and a matching button on the Search tab)
+  flips a shared `@AppStorage("dod.recipeListLayout")`-backed layout
+  preference between `.gallery` (2-col `LazyVGrid` per CC-9, current
+  default) and `.list` (denser `List` with a smaller hero thumbnail +
+  title + 1-line excerpt + total-time chip). CL-64 captures the icon
+  convention — per Spencer's explicit ask, the button shows the CURRENT
+  layout (`square.grid.2x2` in gallery, `list.bullet` in list), opposite
+  of the typical iOS pattern (where the icon shows the destination).
+  The new `RecipeCard.ListRow` variant lives in `DODDesignSystem`
+  alongside the existing `RecipeCard`; a new `RecipeListLayout` enum in
+  `DODDesignSystem` carries the two cases + the `@AppStorage` key + the
+  toggle's per-case SF Symbol + accessibility label so feature views
+  can render the same button without duplicating the convention. The
+  same persisted state drives both `FeedView` and `SearchView`, so
+  flipping the layout in one tab flips it in the other. US-1 / US-3 /
+  US-12 / CC-9's 2-column grid contract is preserved in the
+  `.gallery` case (still the default). Implementing PR: T-650.
