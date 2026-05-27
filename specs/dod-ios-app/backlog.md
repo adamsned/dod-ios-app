@@ -110,11 +110,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 #### Recipes tab rename + content typing
 
-- **Rename "Recipes" tab → "Recipes & Articles" (both nav header AND tab bar label).** This communicates that the app surfaces more than just recipes, AND gives a structural reason to fix the long-standing "Best Dutch Oven Recipes (30+ Tried and Tested Favorites)" load failure — that post is an *article* (roundup format), not a recipe with WPRM/JSON-LD, so it can never satisfy AC-4.11's "Recipe detail data sourced from JSON-LD" contract. The fix has two parts:
-  1. **Rename:** AppTab.title for `.feed` changes, and the FeedView nav title changes. Capture in CL — supersedes part of the original tab labeling.
-  2. **Article rendering path:** when a post lacks parseable JSON-LD `Recipe`, render it as an article instead of hiding it (AC-1.7 currently hides such posts per CL-9). The hidden-blocklist becomes an article-route instead. Article view is HTML-rendered (sanitized via existing `HTMLSanitizer`) — minimal new UI. Reverses CL-9's "hide on missing JSON-LD" decision.
-
-  Size: **M** — rename is XS, article-rendering path is M. **This amends CL-9 + AC-1.7 + AC-4.11 + CL-10** — capture lineage in the new CL.
+_(Graduated 2026-05-27 as US-37 / CL-63 / T-640. Spec amends CL-9 + CL-10 + AC-1.7 + AC-4.11 — original wording struck through; lineage captured in CL-63.)_
 
 #### Layout toggle
 
