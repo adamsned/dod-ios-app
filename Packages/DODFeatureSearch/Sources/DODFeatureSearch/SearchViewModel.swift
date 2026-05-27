@@ -100,6 +100,18 @@ public final class SearchViewModel {
         recentSearches = recents.recent()
     }
 
+    /// Remove a single term from the persisted recent-searches store
+    /// (case-insensitive match per `RecentSearches.remove(_:)`) and
+    /// refresh the view-bound `recentSearches` array so the FlowLayout
+    /// re-renders without the dropped pill on the next observation tick.
+    ///
+    /// Spec trace: US-33 / AC-33.3 (per-term context-menu Clear),
+    /// CL-57 (recents-store mutations route through the view-model).
+    public func removeRecentSearch(_ query: String) {
+        recents.remove(query)
+        recentSearches = recents.recent()
+    }
+
     /// Load categories so the chip menu and the empty-state suggestions can
     /// render. Idempotent — fetches once per session unless explicitly
     /// refreshed.
