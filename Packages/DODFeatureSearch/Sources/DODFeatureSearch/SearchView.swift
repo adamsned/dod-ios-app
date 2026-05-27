@@ -7,10 +7,18 @@ public struct SearchView: View {
     @State private var viewModel: SearchViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (RecipeListItem) -> Void
+    /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
+    /// `FeedView.onSave` for the contract; same shape applied to search hits.
+    public let onSave: ((RecipeListItem) -> Void)?
 
-    public init(viewModel: SearchViewModel, onSelect: @escaping (RecipeListItem) -> Void) {
+    public init(
+        viewModel: SearchViewModel,
+        onSelect: @escaping (RecipeListItem) -> Void,
+        onSave: ((RecipeListItem) -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
+        self.onSave = onSave
     }
 
     public var body: some View {
@@ -113,6 +121,7 @@ public struct SearchView: View {
                             totalTimeDisplay: item.totalTimeDisplay
                         )
                         .recipeCardTap { onSelect(item) }
+                        .recipeCardContextMenu { onSave?(item) }
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)

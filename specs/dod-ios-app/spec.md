@@ -550,6 +550,26 @@ Added 2026-05-27 (round-7 backlog items, graduated). Two small Search-tab polish
 
 ---
 
+### US-34 — Recipe cards support long-press save via context menu
+**As a** Returning Reader,
+**I want** to long-press any recipe card and tap "Save" from the context menu,
+**so that** I can add a recipe to my Saved tab without opening it first.
+
+Added 2026-05-27 (round-7 backlog item, graduated). Pure UX add — same save code path as the AC-4.7 / AC-5.1 detail-screen bookmark tap (`RecipeStore.toggleSaved(id:)`), just exposed as a second entry point from the list surfaces. The menu shows "Save" with the `bookmark.fill` glyph; CL-60 captures the decision to **not** branch to "Unsave" in v1 (each Feed/Search/Saved/Categories card would need a per-row `isSaved` query that the feature view models don't currently carry — the always-"Save" path is idempotent in practice because tapping Save on an already-saved recipe is a no-op safe failure per `RecipeStore.toggleSaved`'s LRU-eviction contract on the saved → unsaved transition only).
+
+**Acceptance criteria:**
+- **AC-34.1** Long-pressing a `RecipeCard` (in Feed, Search results, Saved list, or Category recipes list) presents a SwiftUI `.contextMenu` with a single "Save" item using the `bookmark.fill` SF Symbol. The menu is the standard iOS context menu — preview includes the card itself per SwiftUI's default behaviour.
+- **AC-34.2** Tapping the "Save" menu item invokes the same save code path as the recipe-detail nav-bar bookmark tap (AC-4.7 / AC-5.1) — `RecipeStore.toggleSaved(id:)` against the recipe's id. The host caches the `RecipeListItem` first via `RecipeStore.cache(listItem:)` so the toggle has a row to mutate (relevant on the Categories + Search surfaces where a freshly-fetched REST result may not have been hydrated by a detail open yet).
+- **AC-34.3** After the save lands, the host kicks the saved-recipes widget snapshot publisher (`SavedRecipesWidgetPublisher.publish()`) so the home-screen widget timeline refreshes the same frame the user expects — mirrors the `LiveRecipeDetailDependencies.publishSavedWidgetSnapshot()` contract on the recipe-detail screen save.
+- **AC-34.4** The context menu does NOT branch to "Unsave" when the recipe is already saved (CL-60). Tapping Save on an already-saved recipe is a no-op safe failure — the SwiftData row's `isSaved` toggles back to `false`, the LRU eviction path kicks in per the existing `toggleSaved` contract, and the user sees no visible regression because the menu copy stays "Save" regardless of cached state. A future story can add the per-row `isSaved` query if user feedback surfaces the asymmetry.
+- **AC-34.5** The existing `recipeCardTap` modifier (the navigation-tap surface, REG-DOD-LIST-SCROLL) is not regressed — tapping the card still pushes the detail screen; the long-press menu is additive. Per SwiftUI's standard composition, `.contextMenu` does not eat the surrounding tap gesture.
+
+**Constitution + spec notes:**
+- No new analytics events, no new design tokens, no new persistence schema, no new wire-format fields, no new deep-link cases. Implementing PR: T-590. The card surface lives in `RecipeCard.swift` (DODDesignSystem); the per-call-site wiring lives in each feature view (Feed/Search/Saved/Categories) per CL-60's per-call-site placement decision.
+- Snapshot tests don't capture `.contextMenu` (the menu pops as a system overlay outside the snapshot host), so no new L4 baselines are recorded for the menu itself — the existing card baselines continue to lock the card's visual identity unchanged.
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.

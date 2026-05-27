@@ -9,6 +9,7 @@ import DODFeatureSearch
 import DODPersistence
 import DODSupport
 import SwiftUI
+import WidgetKit
 
 /// One tab's navigation stack. Each tab gets its own `@State` path so
 /// SwiftUI's binding identity stays stable across re-renders of the host
@@ -64,7 +65,10 @@ struct TabStack: View {
         case .feed:
             FeedView(
                 viewModel: FeedViewModel(dependencies: dependencies.feedDependencies()),
-                onSelect: { item in path.append(.recipe(item: item)) }
+                onSelect: { item in path.append(.recipe(item: item)) },
+                onSave: { item in
+                    Task { await Self.saveFromCard(item: item, store: dependencies.store) }
+                }
             )
         case .categories:
             CategoryListView(
@@ -74,12 +78,23 @@ struct TabStack: View {
         case .search:
             SearchView(
                 viewModel: SearchViewModel(dependencies: dependencies.searchDependencies()),
-                onSelect: { item in path.append(.recipe(item: item)) }
+                onSelect: { item in path.append(.recipe(item: item)) },
+                onSave: { item in
+                    Task { await Self.saveFromCard(item: item, store: dependencies.store) }
+                }
             )
         case .saved:
             SavedView(
                 viewModel: SavedViewModel(dependencies: dependencies.savedDependencies()),
-                onSelect: { recipe in path.append(.recipe(item: Self.listItem(from: recipe))) }
+                onSelect: { recipe in path.append(.recipe(item: Self.listItem(from: recipe))) },
+                onSave: { recipe in
+                    Task {
+                        await Self.saveFromCard(
+                            item: Self.listItem(from: recipe),
+                            store: dependencies.store
+                        )
+                    }
+                }
             )
         }
     }
@@ -109,12 +124,40 @@ struct TabStack: View {
                     category: category,
                     dependencies: dependencies.categoriesDependencies()
                 ),
-                onSelect: { item in path.append(.recipe(item: item)) }
+                onSelect: { item in path.append(.recipe(item: item)) },
+                onSave: { item in
+                    Task { await Self.saveFromCard(item: item, store: dependencies.store) }
+                }
             )
             .onAppear {
                 Telemetry.shared.send(.screenView(name: "category_recipes"))
             }
         }
+    }
+
+    /// US-34 / AC-34.2 / AC-34.3 — execute the same save side-effect as
+    /// the recipe-detail nav-bar bookmark tap (AC-4.7 / AC-5.1), invoked
+    /// from a `RecipeCard`'s long-press context menu. Caches the listItem
+    /// first so freshly-fetched REST hits (Search/Categories) have a row
+    /// to mutate, then toggles `isSaved`, then republishes the
+    /// saved-recipes widget snapshot so the home-screen widget timeline
+    /// refreshes the same frame the user expects. Per CL-59's
+    /// always-"Save" decision, this is idempotent in the user-visible
+    /// sense — a follow-up long-press just toggles state again with no
+    /// user-visible error path. Errors are logged + swallowed so the menu
+    /// never surfaces a crash to the user.
+    private static func saveFromCard(item: RecipeListItem, store: RecipeStore) async {
+        do {
+            try await store.cache(listItem: item)
+            _ = try await store.toggleSaved(id: item.id)
+        } catch {
+            DODLog.persistence.error("save-from-card failed: \(String(describing: error))")
+            return
+        }
+        await SavedRecipesWidgetPublisher(
+            store: store,
+            reload: { WidgetCenter.shared.reloadTimelines(ofKind: "SavedRecipesWidget") }
+        ).publish()
     }
 
     private static func listItem(from recipe: Recipe) -> RecipeListItem {

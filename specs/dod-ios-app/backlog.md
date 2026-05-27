@@ -132,7 +132,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 #### Long-press context menus
 
-- **Recipe/Article card long-press → "Save" with `bookmark.fill` icon.** Standard SwiftUI `.contextMenu` on the card. Tap menu item → save the recipe/article to the Saved tab (same code path as AC-5.1 tap-the-bookmark-on-detail flow). Works in both gallery and list view. Size: **S**.
+- ~~**Recipe/Article card long-press → "Save" with `bookmark.fill` icon.** Standard SwiftUI `.contextMenu` on the card. Tap menu item → save the recipe/article to the Saved tab (same code path as AC-5.1 tap-the-bookmark-on-detail flow). Works in both gallery and list view. Size: **S**.~~ **Graduated 2026-05-27 as US-34 / CL-60 / T-590.**
 
 - ~~**Recent search long-press → "Clear" with `trash` icon, deletes only that term.**~~ Graduated → US-33 / CL-57 / T-580 as part of the Search-tab tweaks bundle.
 
