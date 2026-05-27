@@ -155,6 +155,35 @@ public actor RecipeStore {
         return try modelContext.fetch(descriptor).map(Self.toDomain)
     }
 
+    // MARK: - Explicit download (US-35 / AC-35.2 / AC-35.5)
+
+    /// Mark the recipe as explicitly downloaded for offline use. Sets
+    /// ``CachedRecipe/downloadedAt`` to `.now` on the first call;
+    /// subsequent calls on an already-downloaded row are a no-op (the
+    /// existing timestamp is preserved per AC-35.4). Returns `true` if
+    /// the row was just transitioned to downloaded, `false` if it was
+    /// already downloaded (lets the caller branch the snackbar copy
+    /// between "Recipe downloaded for offline use" and "Already
+    /// downloaded" per AC-35.3).
+    @discardableResult
+    public func markDownloaded(id: Int) throws -> Bool {
+        guard let row = try fetchRecipe(id: id) else { return false }
+        if row.downloadedAt != nil {
+            return false
+        }
+        row.downloadedAt = .now
+        try modelContext.save()
+        return true
+    }
+
+    /// True when the recipe has been explicitly downloaded (US-35).
+    /// Distinct from ``isSaved(id:)`` — a saved recipe is auto-downloaded
+    /// per AC-5.2 but its `downloadedAt` field stays nil unless the user
+    /// also taps the explicit Download button.
+    public func isDownloaded(id: Int) throws -> Bool {
+        try fetchRecipe(id: id)?.downloadedAt != nil
+    }
+
     /// Most-recently-viewed recipes for surfacing in Siri / Spotlight (US-10).
     /// Includes both saved and unsaved rows, sorted by `lastViewedAt` (the
     /// same field LRU eviction uses), newest first. Blocklisted rows are
@@ -220,11 +249,15 @@ public actor RecipeStore {
     // landed. Cap is enforced because actors that grow without
     // restraint become hard to reason about for cross-actor calls.
 
-    /// Trim unsaved CachedRecipes to ``unsavedLRUCap`` by oldest `lastViewedAt`.
-    /// Saved recipes are never evicted (NFR-1).
+    /// Trim unsaved AND non-downloaded CachedRecipes to ``unsavedLRUCap``
+    /// by oldest `lastViewedAt`. Saved recipes are never evicted (NFR-1).
+    /// Explicitly-downloaded recipes (US-35 / AC-35.5) are also pinned —
+    /// the predicate requires both flags clear before a row is eligible
+    /// for eviction, so a user who downloads a recipe for a camping trip
+    /// keeps it on-device even if they never save it.
     public func evictIfNeeded() throws {
         let descriptor = FetchDescriptor<CachedRecipe>(
-            predicate: #Predicate { $0.isSaved == false },
+            predicate: #Predicate { $0.isSaved == false && $0.downloadedAt == nil },
             sortBy: [SortDescriptor(\.lastViewedAt, order: .forward)]
         )
         let unsaved = try modelContext.fetch(descriptor)

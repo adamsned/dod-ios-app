@@ -34,6 +34,15 @@ public final class CachedRecipe {
     /// Non-nil if a detail fetch failed JSON-LD parse — AC-1.7 blocklist signal.
     public var jsonLDFailedAt: Date?
 
+    /// Non-nil once the user has explicitly downloaded this recipe for
+    /// offline use (US-35 / AC-35.2 / AC-35.5). Distinct from `isSaved` —
+    /// a recipe can be downloaded without being saved, saved without an
+    /// explicit download (auto-downloaded per AC-5.2), or both. Pins the
+    /// row from LRU eviction the same way `isSaved` does — see
+    /// ``RecipeStore.evictIfNeeded()``. Additive optional, lightweight
+    /// migration per MIGRATION.md R-5.
+    public var downloadedAt: Date?
+
     // Detail payload — Codable-encoded for flexibility across schema changes.
     public var ingredientsJSON: Data?
     public var instructionsJSON: Data?
@@ -57,7 +66,8 @@ public final class CachedRecipe {
         lastViewedAt: Date = .now,
         isSaved: Bool = false,
         jsonLDParsedAt: Date? = nil,
-        jsonLDFailedAt: Date? = nil
+        jsonLDFailedAt: Date? = nil,
+        downloadedAt: Date? = nil
     ) {
         self.id = id
         self.slug = slug
@@ -72,5 +82,6 @@ public final class CachedRecipe {
         self.isSaved = isSaved
         self.jsonLDParsedAt = jsonLDParsedAt
         self.jsonLDFailedAt = jsonLDFailedAt
+        self.downloadedAt = downloadedAt
     }
 }

@@ -32,6 +32,17 @@ public protocol RecipeDetailDependencies: Sendable {
     /// ``LiveRecipeDetailDependencies`` actually publishes.
     func publishSavedWidgetSnapshot() async
 
+    // MARK: - Explicit download (US-35)
+    //
+    // The protocol methods + the ``DownloadOutcome`` enum + the live
+    // implementation live in `RecipeDetailDependencies+Download.swift`
+    // (extension on this protocol + on `LiveRecipeDetailDependencies`).
+    // Required surface: `isDownloaded(id:) async throws -> Bool` +
+    // `downloadForOffline(recipe:) async throws -> DownloadOutcome`.
+
+    func isDownloaded(id: Int) async throws -> Bool
+    func downloadForOffline(recipe: Recipe) async throws -> DownloadOutcome
+
     // MARK: - Comments + ratings (US-13/14/15)
 
     /// Fetch the public WPRM rating summary. Never throws — degrades to a
@@ -110,6 +121,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     let commentsClient: WPCommentsClient
     let ratingsClient: WPRMRatingsClient
     let guestIdentity: any GuestIdentityStoring
+    let imageLoader: ImageLoader
     private let savedWidgetPublisher: SavedRecipesWidgetPublisher?
 
     public init(
@@ -120,6 +132,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         commentsClient: WPCommentsClient,
         ratingsClient: WPRMRatingsClient,
         guestIdentity: any GuestIdentityStoring,
+        imageLoader: ImageLoader = ImageLoader(),
         savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil
     ) {
         self.client = client
@@ -129,6 +142,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         self.commentsClient = commentsClient
         self.ratingsClient = ratingsClient
         self.guestIdentity = guestIdentity
+        self.imageLoader = imageLoader
         // Default to a publisher rooted in the same store + the live App
         // Group; callers can pass nil to disable the side effect for
         // unit-test wiring that doesn't care about widgets.

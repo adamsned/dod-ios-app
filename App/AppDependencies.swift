@@ -132,6 +132,7 @@ final class AppDependencies {
             commentsClient: commentsClient,
             ratingsClient: ratingsClient,
             guestIdentity: guestIdentityStore,
+            imageLoader: imageLoader,
             savedWidgetPublisher: SavedRecipesWidgetPublisher(
                 store: store,
                 reload: savedWidgetReload
