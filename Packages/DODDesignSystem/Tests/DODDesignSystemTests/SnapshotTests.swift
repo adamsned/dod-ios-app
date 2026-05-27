@@ -96,6 +96,13 @@ final class DesignSystemSnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
     }
 
+    // US-38 / AC-38.4 / CL-64 (T-650) — `RecipeCard.ListRow` snapshot
+    // baselines live in `RecipeCardListRowSnapshotTests.swift` to keep
+    // this file under SwiftLint's 400-line cap (the file overran on the
+    // T-650 PR — the row variant split lands as its own test file for
+    // the same reason `FlowLayout` and `IdleSuggestionsView` split out
+    // of `SearchView.swift`).
+
     /// US-8 first-launch welcome sheet. iPhone 17 logical size is 402×874pt;
     /// rendering at .large detent fills (nearly) the full screen and gives
     /// us a stable baseline to diff against on layout changes.

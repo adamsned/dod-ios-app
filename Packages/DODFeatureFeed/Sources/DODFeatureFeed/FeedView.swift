@@ -11,6 +11,11 @@ public struct FeedView: View {
 
     @State private var viewModel: FeedViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// US-38 / AC-38.2 / CL-64 (T-650, 2026-05-27) — shared with `SearchView`
+    /// via the same `@AppStorage` key. Default `.gallery` preserves CC-9's
+    /// 2-column grid byte-for-byte for users who never tap the toggle.
+    @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
+        RecipeListLayout.gallery.rawValue
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
@@ -52,6 +57,10 @@ public struct FeedView: View {
         // screen's nav-bar title.
         .navigationTitle("Recipes & Articles")
         .toolbar {
+            // US-38 / AC-38.1 / CL-64.5 (T-650): layout toggle declared
+            // BEFORE the gear so the gear stays at the absolute trailing
+            // edge — SwiftUI orders multiple ToolbarItems in the same
+            // group from leading to trailing in declaration order.
             // US-32 AC-32.1: gear icon on the trailing edge of the Recipes
             // nav bar pushes the Settings page. NavigationLink lives in the
             // toolbar so it inherits the standard back button on the pushed
@@ -60,9 +69,15 @@ public struct FeedView: View {
             // the default `.automatic` placement so the package still builds.
             #if os(iOS)
             ToolbarItem(placement: .topBarTrailing) {
+                layoutToggleToolbarButton
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 settingsToolbarLink
             }
             #else
+            ToolbarItem(placement: .automatic) {
+                layoutToggleToolbarButton
+            }
             ToolbarItem(placement: .automatic) {
                 settingsToolbarLink
             }
@@ -87,6 +102,26 @@ public struct FeedView: View {
                 .accessibilityLabel("Settings")
         }
         .accessibilityIdentifier("feed-toolbar-settings")
+    }
+
+    /// US-38 / AC-38.1 / CL-64 (T-650): the layout-toggle button. Sits to
+    /// the leading side of the gear icon in the trailing-edge toolbar
+    /// group. Per CL-64.1 the icon shows the CURRENT layout (opposite
+    /// of the typical iOS destination convention) — VoiceOver users
+    /// hear the destination via the action hint so the affordance is
+    /// still discoverable.
+    private var layoutToggleToolbarButton: some View {
+        let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
+        return Button {
+            var next = layout
+            next.toggle()
+            layoutRaw = next.rawValue
+        } label: {
+            Image(systemName: layout.toggleIconName)
+                .accessibilityLabel(layout.currentStateAccessibilityLabel)
+                .accessibilityHint(layout.destinationActionHint)
+        }
+        .accessibilityIdentifier("feed-toolbar-layout-toggle")
     }
 
     @ViewBuilder
@@ -115,15 +150,18 @@ public struct FeedView: View {
     }
 
     private var list: some View {
-        ScrollView {
-            LazyVGrid(columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: DODSpacing.md) {
-                ForEach(viewModel.items) { item in
-                    FeedRow(item: item)
-                        .recipeCardTap { onSelect(item) }
-                        .recipeCardContextMenu { onSave?(item) }
-                        .task {
-                            await viewModel.loadMoreIfNeeded(currentItem: item)
-                        }
+        // US-38 / AC-38.3 / AC-38.4 (T-650): branch on the persisted
+        // layout. `.gallery` keeps the existing 2-col `LazyVGrid` body
+        // byte-identical (CC-9 contract preserved); `.list` renders a
+        // `LazyVStack` of `RecipeCard.ListRow` rows for denser scanning.
+        let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
+        return ScrollView {
+            Group {
+                switch layout {
+                case .gallery:
+                    galleryContent
+                case .list:
+                    listContent
                 }
             }
             .padding(.horizontal, DODSpacing.md)
@@ -132,6 +170,44 @@ public struct FeedView: View {
             if viewModel.loadState == .loadingMore {
                 ProgressView()
                     .padding(.vertical, DODSpacing.lg)
+            }
+        }
+    }
+
+    /// US-38 / AC-38.3 — the existing 2-col `LazyVGrid` rendering. Body
+    /// byte-identical to the pre-T-650 `list` implementation; CC-9's grid
+    /// contract is preserved unchanged.
+    private var galleryContent: some View {
+        LazyVGrid(columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: DODSpacing.md) {
+            ForEach(viewModel.items) { item in
+                FeedRow(item: item)
+                    .recipeCardTap { onSelect(item) }
+                    .recipeCardContextMenu { onSave?(item) }
+                    .task {
+                        await viewModel.loadMoreIfNeeded(currentItem: item)
+                    }
+            }
+        }
+    }
+
+    /// US-38 / AC-38.4 — the new denser single-column variant. Composes
+    /// the same `recipeCardTap` + `recipeCardContextMenu` modifiers as
+    /// the gallery so tap-to-open + long-press-Save (AC-34.1) work
+    /// identically on both layouts.
+    private var listContent: some View {
+        LazyVStack(spacing: DODSpacing.xs) {
+            ForEach(viewModel.items) { item in
+                RecipeCard.ListRow(
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    heroImageURL: item.heroImage,
+                    totalTimeDisplay: item.totalTimeDisplay
+                )
+                .recipeCardTap { onSelect(item) }
+                .recipeCardContextMenu { onSave?(item) }
+                .task {
+                    await viewModel.loadMoreIfNeeded(currentItem: item)
+                }
             }
         }
     }

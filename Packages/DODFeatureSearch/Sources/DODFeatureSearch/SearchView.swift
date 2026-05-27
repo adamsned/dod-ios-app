@@ -6,6 +6,11 @@ public struct SearchView: View {
 
     @State private var viewModel: SearchViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// US-38 / AC-38.2 / CL-64 (T-650, 2026-05-27) — shared with `FeedView`
+    /// via the same `@AppStorage` key. Default `.gallery` preserves the
+    /// existing search-results 2-column grid byte-for-byte.
+    @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
+        RecipeListLayout.gallery.rawValue
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
     /// `FeedView.onSave` for the contract; same shape applied to search hits.
@@ -32,7 +37,40 @@ public struct SearchView: View {
         }
         .background(DODColor.surface)
         .navigationTitle("Search")
+        .toolbar {
+            // US-38 / AC-38.1 (T-650): layout toggle on the trailing
+            // edge of the Search-tab nav bar. Same `topBarTrailing`
+            // placement as `FeedView`'s toggle, so a user who learns
+            // the affordance on one tab finds it in the same spot on
+            // the other. `#if os(iOS)` mirror of the FeedView pattern.
+            #if os(iOS)
+            ToolbarItem(placement: .topBarTrailing) {
+                layoutToggleToolbarButton
+            }
+            #else
+            ToolbarItem(placement: .automatic) {
+                layoutToggleToolbarButton
+            }
+            #endif
+        }
         .task { await viewModel.loadCategoriesIfNeeded() }
+    }
+
+    /// US-38 / AC-38.1 / CL-64 (T-650): the layout-toggle button. Same
+    /// shape as `FeedView.layoutToggleToolbarButton` — current-state
+    /// icon convention (CL-64.1), destination-aware accessibility hint.
+    private var layoutToggleToolbarButton: some View {
+        let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
+        return Button {
+            var next = layout
+            next.toggle()
+            layoutRaw = next.rawValue
+        } label: {
+            Image(systemName: layout.toggleIconName)
+                .accessibilityLabel(layout.currentStateAccessibilityLabel)
+                .accessibilityHint(layout.destinationActionHint)
+        }
+        .accessibilityIdentifier("search-toolbar-layout-toggle")
     }
 
     private var searchField: some View {
@@ -108,24 +146,59 @@ public struct SearchView: View {
                 message: "Reconnect to search dutchovendaddy.com."
             )
         case .results:
+            // US-38 / AC-38.3 / AC-38.4 (T-650): branch on the persisted
+            // layout. `.gallery` keeps the existing 2-col `LazyVGrid` body
+            // byte-identical; `.list` renders `RecipeCard.ListRow` rows.
+            let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
             ScrollView {
-                LazyVGrid(
-                    columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
-                    spacing: DODSpacing.md
-                ) {
-                    ForEach(viewModel.items) { item in
-                        RecipeCard(
-                            title: item.title,
-                            excerpt: item.excerpt,
-                            heroImageURL: item.heroImage,
-                            totalTimeDisplay: item.totalTimeDisplay
-                        )
-                        .recipeCardTap { onSelect(item) }
-                        .recipeCardContextMenu { onSave?(item) }
+                Group {
+                    switch layout {
+                    case .gallery:
+                        galleryResults
+                    case .list:
+                        listResults
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)
                 .padding(.bottom, DODSpacing.lg)
+            }
+        }
+    }
+
+    /// US-38 / AC-38.3 — existing 2-col grid. Body byte-identical to the
+    /// pre-T-650 `.results` rendering.
+    private var galleryResults: some View {
+        LazyVGrid(
+            columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+            spacing: DODSpacing.md
+        ) {
+            ForEach(viewModel.items) { item in
+                RecipeCard(
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    heroImageURL: item.heroImage,
+                    totalTimeDisplay: item.totalTimeDisplay
+                )
+                .recipeCardTap { onSelect(item) }
+                .recipeCardContextMenu { onSave?(item) }
+            }
+        }
+    }
+
+    /// US-38 / AC-38.4 — dense single-column variant. Composes the same
+    /// tap + context-menu modifiers as the gallery so US-34 / AC-34.1
+    /// long-press-Save works identically.
+    private var listResults: some View {
+        LazyVStack(spacing: DODSpacing.xs) {
+            ForEach(viewModel.items) { item in
+                RecipeCard.ListRow(
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    heroImageURL: item.heroImage,
+                    totalTimeDisplay: item.totalTimeDisplay
+                )
+                .recipeCardTap { onSelect(item) }
+                .recipeCardContextMenu { onSave?(item) }
             }
         }
     }
@@ -235,123 +308,10 @@ struct FilterChipRow: View {
     }
 }
 
-// MARK: - Idle suggestions
-
-/// Idle empty state shown before the user types. Surfaces their recent
-/// queries (US-12 / AC-12.4) and top categories as one-tap suggestions
-/// (US-12 / AC-12.4). When there are no recents and no categories yet —
-/// e.g. truly first launch with no network — falls back to the legacy
-/// "type at least 2 characters" prompt.
-struct IdleSuggestionsView: View {
-    let recents: [String]
-    let topCategories: [DODDomain.Category]
-    let onRecentTap: (String) -> Void
-    let onCategoryTap: (DODDomain.Category) -> Void
-    let onClearRecents: () -> Void
-    /// US-33 / AC-33.3 / CL-57: per-term context-menu removal.
-    let onRemoveRecent: (String) -> Void
-
-    var body: some View {
-        if recents.isEmpty && topCategories.isEmpty {
-            EmptyState(
-                systemImage: "magnifyingglass",
-                title: "Find a recipe",
-                message: "Type at least 2 characters to search."
-            )
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                    if !recents.isEmpty {
-                        // US-29 / AC-29.2 / CL-49.2: the "Recent" section
-                        // header is rendered with the title at the
-                        // leading edge and a "Clear All" button at the
-                        // trailing edge. The button wipes the
-                        // `UserDefaults`-backed recent-searches store
-                        // via `RecentSearches.clear()`.
-                        recentsSection
-                    }
-                    if !topCategories.isEmpty {
-                        section(title: "Try") {
-                            FlowLayout(spacing: DODSpacing.xs) {
-                                ForEach(topCategories) { category in
-                                    pill(text: category.name, systemImage: "tag.fill") {
-                                        onCategoryTap(category)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(DODSpacing.md)
-            }
-        }
-    }
-
-    private var recentsSection: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            HStack {
-                Text("Recent")
-                    .dodFont(DODType.heading)
-                    .foregroundStyle(DODColor.label)
-                Spacer()
-                // US-33 / AC-33.1 / CL-57: orange matches gear icon.
-                Button("Clear All", action: onClearRecents)
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.accent)
-                    .accessibilityLabel("Clear all recent searches")
-            }
-            FlowLayout(spacing: DODSpacing.xs) {
-                ForEach(Array(recents.enumerated()), id: \.offset) { _, query in
-                    pill(text: query, systemImage: "clock") {
-                        onRecentTap(query)
-                    }
-                    // US-33 / AC-33.2 / CL-57: long-press → "Clear".
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            onRemoveRecent(query)
-                        } label: {
-                            Label("Clear", systemImage: "trash")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func section<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            Text(title)
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-            content()
-        }
-    }
-
-    private func pill(
-        text: String,
-        systemImage: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: DODSpacing.xxs) {
-                Image(systemName: systemImage)
-                Text(text).lineLimit(1)
-            }
-            .dodFont(DODType.caption)
-            .foregroundStyle(DODColor.label)
-            .padding(.horizontal, DODSpacing.sm)
-            .padding(.vertical, DODSpacing.xs)
-            .background(Capsule().fill(DODColor.surfaceElevated))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(text), suggestion")
-    }
-}
-
-// `FlowLayout` extracted to `FlowLayout.swift` to keep SearchView.swift
-// under SwiftLint's 400-line cap (the file overran on T-580 / T-590; the
-// split landed in T-620 incidentally — the layout helper has no logical
-// dependency on the SearchView source).
+// `FlowLayout` lives in `FlowLayout.swift` and `IdleSuggestionsView`
+// lives in `IdleSuggestionsView.swift` to keep this file under
+// SwiftLint's 400-line cap (the file overran on T-580 / T-590 then
+// again on T-650 — the `FlowLayout` split landed in T-620 incidentally
+// and the `IdleSuggestionsView` split lands in T-650 for the same
+// reason). Both helpers have no logical dependency on the rest of
+// `SearchView`'s source.
