@@ -531,6 +531,23 @@ Added 2026-05-26 (round-4 backlog item, graduated). v1 of this story ships a **s
 - No new analytics events, no new design tokens, no new persistence schema, no new wire-format fields, no new deep-link cases. The skeleton ships zero behavior beyond the toggle's UserDefaults round-trip and the placeholder About Me push; the WP REST fetch (T-552) and ingredient conversion (T-551) are explicit follow-ups.
 - `SettingsView` lives in `Packages/DODFeatureFeed/Sources/DODFeatureFeed/` rather than a new `DODFeatureSettings` package — CL-56 walks through the rationale (one screen, one entry point, project.yml churn deferred until Settings grows enough to warrant extraction).
 
+### US-33 — Search-tab affordance refinements: brand-orange Clear All, per-term recent removal
+**As a** Returning Reader,
+**I want** the Search tab's "Clear All" button to use the same brand-orange color the Recipes-tab gear icon uses, and to be able to long-press a single recent search to remove just that term without wiping the whole list,
+**so that** the Search tab's affordances match the rest of the app's visual language and I can prune individual recents the way iOS users prune individual items everywhere else (Mail, Messages, Photos).
+
+Added 2026-05-27 (round-7 backlog items, graduated). Two small Search-tab polish items bundled into one PR: (1) the "Clear All" text in `RecentSearchesView` switches from `DODColor.castIronBrown` to `DODColor.accent` so it matches the gear icon (US-32 / T-550) which inherits the app-level `.tint(DODColor.accent)` from `RootView`; (2) each recent-search pill gets a `.contextMenu` with a single destructive "Clear" item (trash icon) that calls a new view-model method `removeRecentSearch(_:)` to remove only the long-pressed term from the persistent recents store. CL-57 captures the brand-color match rationale and the per-term context-menu pattern.
+
+**Acceptance criteria:**
+- **AC-33.1** The "Clear All" `Button` rendered by `IdleSuggestionsView.recentsSection` (in `Packages/DODFeatureSearch/Sources/DODFeatureSearch/SearchView.swift`) uses `.foregroundStyle(DODColor.accent)` instead of `DODColor.castIronBrown`. The bulk wipe-all behavior (US-29 / AC-29.2 / CL-49.2 — calls `viewModel.clearRecentSearches()`) is unchanged.
+- **AC-33.2** Each recent-search pill in `IdleSuggestionsView.recentsSection`'s `FlowLayout` has a `.contextMenu` modifier containing one `Button(role: .destructive)` with `Image(systemName: "trash")` and `Text("Clear")`. Long-pressing a pill surfaces the menu; tapping "Clear" calls the view-model's new `removeRecentSearch(_:)` method with the pill's query string.
+- **AC-33.3** `SearchViewModel.removeRecentSearch(_:)` removes only the matched term from the `UserDefaults`-backed `RecentSearches` store (case-insensitive match, mirroring `RecentSearches.record(_:)`'s dedupe rule) and updates the view-bound `recentSearches` array. If the matched term is the only entry, the "Recent" section disappears on the next observation tick (same path as `clearRecentSearches()`). If no term matches, the call is a no-op.
+- **AC-33.4** US-3 (text-query search), US-12 (recents persistence + filter chips + ingredient index), US-29 (round-6 Search-tab polish bundle) are not regressed. The two-character debounce path, the recents-persist-across-VM-instances contract, the bulk Clear All affordance, the `questionmark.circle` no-results glyph, the `tag.fill` chip iconography, the category-pill-into-query-field path are all unchanged.
+
+**Constitution + spec notes:**
+- No new analytics events, no new design tokens, no new persistence schema, no new wire-format fields, no new deep-link cases. `DODColor.accent` and `DODColor.castIronBrown` both already exist (Colors.swift lines 20 and 24); the change is a one-token swap at one call site. `RecentSearches` gains one new public method (`remove(_:)`) modeled on the existing `record(_:)` / `clear()` shape.
+- Round-7 backlog "Color refinements" and "Long-press context menus" items graduate as a single bundle because both touch `SearchView.swift`'s `RecentSearchesView`, both are S/XS scope, and bundling avoids two near-identical PRs against the same view.
+
 ---
 
 ## Cross-cutting acceptance criteria
