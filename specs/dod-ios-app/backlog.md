@@ -83,6 +83,86 @@ Don't graduate these into spec work without a real user signal — they
 either need a paired web-side effort (Universal Links) or have
 non-trivial scope risk (Watch, Collections).
 
+### Captured 2026-05-26 (round 7, @spencer0706) — Settings expansion, Recipes & Articles rename, view toggle, long-press menus, color refinement
+
+Captured before Spencer headed out for the evening. **Not to be built tonight** — these are for the next session. Per Spencer's direction, the next session should also batch in the existing **Shopping List** (round 3, dad) and **Voice Mode** (round 3, dad) backlog items alongside these. Login + OAuth (round 6) stays paused — Spencer is still discussing the architecture with dad.
+
+#### Settings page expansion
+
+- **Add more standard settings.** Round out the Settings page (T-550) with the rest of what users expect from a recipe-app settings surface. Reasonable candidates to evaluate at spec time: notification preferences (when new recipes drop, weekly digest), default Cook Mode behavior (keep-screen-awake toggle vs always-on), default share format (link vs full text), data + cache management ("Clear image cache" / saved-recipes count), accessibility shortcuts (text size override, reduce motion), telemetry opt-out (per constitution §9), legal links (privacy policy, terms). Size: **M** — the audit-and-pick is the hardest part; each individual row is XS.
+
+- **"About Ned Adams & Dutch Oven Daddy" — shorter paragraph + image.** The current placeholder paragraph in T-550's Settings → About row is too long for a phone screen. Replace with this exact copy:
+
+  > Hi I'm Ned, the Dutch Oven Daddy! I'm a full-time computer nerd and part-time cook. My passion is cast iron cooking with tips, tricks, and delicious recipes. I love using my recipes to bring together family and friends. I believe everything is made better in cast iron!
+
+  Also include the photo of Ned (the one Spencer attached in this round-7 capture — kitchen background, holding a black cast-iron dutch oven, blue shirt + brown leather apron). **Image-to-paragraph ratio should be appropriate** — the image is a portrait accent for the text, not a hero. Recommend ~120pt wide on iPhone, leading-aligned with the paragraph wrapping to its right (like a magazine sidebar layout) OR top-anchored above the paragraph if the wrap doesn't read well.
+
+  **Asset prep:** Spencer attached the image to the conversation but Claude Code's attachment store wasn't reachable from Bash, so the binary wasn't saved to the repo automatically. The next agent that builds this should:
+  1. Ask Spencer for the image again, OR
+  2. Pull it from `https://www.dutchovendaddy.com/about-me/` (the existing About-Me page likely hosts the same photo)
+  3. Save under `App/Assets.xcassets/AboutNed.imageset/` (or as a Markdown-rendered asset if About content is HTML-based)
+
+  Size: **S** for the copy + asset wire-up. Supersedes T-552 (About Me fetch) since the copy is now embedded, not fetched — capture that supersession in the CL when this graduates.
+
+#### New recipe-detail action
+
+- **Download for offline viewing button (`square.and.arrow.down`).** Adds a third nav-bar action next to Save (`bookmark`, AC-4.7) and Share (`AC-4.8`). Tap → download the recipe payload (text + ingredients + steps + hero image at full resolution) for on-device offline access. "Perfect for camping when you don't have access to internet." Semantically distinct from Save (which is "I want to remember this") — Download is "I want to use this without network." A saved recipe is auto-downloaded per AC-5.2; download alone is a save without the bookmarking. Spec question: do Download and Save share storage? Are they separate concepts in the UI? Probably yes-and-yes with a UX distinction. Size: **M** — backend reuse is straightforward, the UX question is what makes it medium.
+
+#### Recipes tab rename + content typing
+
+- **Rename "Recipes" tab → "Recipes & Articles" (both nav header AND tab bar label).** This communicates that the app surfaces more than just recipes, AND gives a structural reason to fix the long-standing "Best Dutch Oven Recipes (30+ Tried and Tested Favorites)" load failure — that post is an *article* (roundup format), not a recipe with WPRM/JSON-LD, so it can never satisfy AC-4.11's "Recipe detail data sourced from JSON-LD" contract. The fix has two parts:
+  1. **Rename:** AppTab.title for `.feed` changes, and the FeedView nav title changes. Capture in CL — supersedes part of the original tab labeling.
+  2. **Article rendering path:** when a post lacks parseable JSON-LD `Recipe`, render it as an article instead of hiding it (AC-1.7 currently hides such posts per CL-9). The hidden-blocklist becomes an article-route instead. Article view is HTML-rendered (sanitized via existing `HTMLSanitizer`) — minimal new UI. Reverses CL-9's "hide on missing JSON-LD" decision.
+
+  Size: **M** — rename is XS, article-rendering path is M. **This amends CL-9 + AC-1.7 + AC-4.11 + CL-10** — capture lineage in the new CL.
+
+#### Layout toggle
+
+- **Gallery ↔ List view toggle.** New button on the Recipes & Articles tab (and Search tab) that swaps between two layouts:
+  - **Gallery view** (current default): the 2-col grid per CC-9.
+  - **List view** (new): smaller images, smaller card text, denser rows for quick scanning.
+
+  Icon toggle:
+  - When in gallery view → button shows `square.grid.2x2` (the icon represents "switch TO list mode" implicitly; *or* read as "currently showing grid" — clarify with user at spec time)
+  - When in list view → button shows `list.bullet`
+
+  Wait — Spencer's wording is: *"if user is in gallery view, the button displays the icon `square.grid.2x2`"* — so the icon represents the CURRENT mode, not the destination. This is the opposite of typical iOS convention (where the toggle shows what you'll switch TO). Either is defensible; capture choice in CL. Whichever wins, both surfaces (Recipes tab + Search tab) need to honor the same convention.
+
+  Size: **M**. Persistence question: does view choice persist across launches? Probably yes — UserDefaults flag.
+
+#### Long-press context menus
+
+- **Recipe/Article card long-press → "Save" with `bookmark.fill` icon.** Standard SwiftUI `.contextMenu` on the card. Tap menu item → save the recipe/article to the Saved tab (same code path as AC-5.1 tap-the-bookmark-on-detail flow). Works in both gallery and list view. Size: **S**.
+
+- **Recent search long-press → "Clear" with `trash` icon, deletes only that term.** Companion to the bulk "Clear All" button (T-500). Standard `.contextMenu`; tap "Clear" removes only the long-pressed term from the recent searches list. Size: **S**.
+
+#### Color refinements
+
+- **"Clear All" button in Search tab should match the gear-icon orange in Recipes tab.** Whatever color `DODColor` token Settings gear-icon uses (likely `.warmGold` or `.burntOrange`), apply the same to the Clear All text/glyph. Size: **XS**.
+
+- **List cells + search bars: `#553724` in dark mode, `#FFFFFF` in light mode.** Granular refinement beyond T-570's SurfaceElevated change. Specifically targets `.listCell` and `.searchable` field backgrounds. The current SurfaceElevated (`#5A3520` dark from T-570) is close but Spencer wants a touch warmer — `#553724` ≈ (85, 55, 36) vs current `#5A3520` ≈ (90, 53, 32). Likely best implemented as either (a) further refinement of SurfaceElevated dark hex, OR (b) a new dedicated `CellSurface` / `ChromeSurface` token applied only to list cells + search bars, leaving other SurfaceElevated consumers at `#5A3520`. The (b) approach is cleaner if other consumers (chips, cards in feed grid, etc.) shouldn't shift. Capture the choice in CL when this graduates. Size: **S** (single hex) to **M** (if a new token is introduced + all relevant callsites swept). Will re-record affected baselines.
+
+#### Sizing summary
+
+| Item | Size | Notes |
+|---|---|---|
+| Standard settings expansion | M | Audit-and-pick |
+| About Ned copy + photo | S | Asset prep open question |
+| Download button | M | Reuse cache, define UX distinction from Save |
+| Recipes & Articles rename + article-rendering path | M | Amends CL-9 / AC-1.7 / AC-4.11 |
+| Gallery ↔ List view toggle | M | Plus icon-direction CL |
+| Card long-press → Save | S | SwiftUI `.contextMenu` |
+| Recent long-press → Clear | S | Companion to "Clear All" |
+| Clear All orange color match | XS | Single token swap |
+| List-cell + search-bar color refinement | S–M | Token decision |
+
+**Next session also picks up these existing items per Spencer's batching note:**
+- Round-3 dad: **Shopping List** (~1.5 weeks)
+- Round-3 dad: **Voice Mode** (~2 weeks)
+
+**Still paused (Spencer + dad architecture conversation in progress):**
+- Round-6 spencer: **Login + OAuth** (XL — requires constitution amendments §1/§3/§4/§9)
+
 ### Captured 2026-05-26 (round 6, @spencer0706) — Search-tab cleanup + new recipe surfacing + design + login
 
 Mix of small Search-tab polish, a real bug (new recipes not surfacing), a design-system overhaul, and one massive feature (login + OAuth) that needs a constitution amendment before any code lands.
