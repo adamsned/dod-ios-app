@@ -53,7 +53,7 @@ Immutable rules. All specs, plans, and tasks must conform. Changes require an ex
 
 ## 6. Testing — required for every PR
 
-The test pyramid has **four** layers. Every PR must keep all layers green.
+The test pyramid has **five** layers. Every PR must keep L1–L4 green; L5 runs selectively (see below). The four-layer pyramid was the constitution shape from v1.0 launch through Phase 10; Phase 11 (2026-05-26) added L5 end-to-end coverage with selective gating — see [`dod-ios-app/test-pyramid-audit.md`](dod-ios-app/test-pyramid-audit.md) and `dod-ios-app/clarifications.md` CL-58 for the rationale.
 
 ### L1 — Unit tests (Swift Testing)
 - Every view model, networking type, and domain transform.
@@ -64,23 +64,38 @@ The test pyramid has **four** layers. Every PR must keep all layers green.
 - Hit the real WordPress REST endpoint + parse a real recipe page.
 - Catch contract drift the unit-test fixtures cannot (the `_embed` / `_fields` interaction that hid hero images in v1 is the canonical example).
 - Tagged `live-api`; runs **nightly in CI**, opt-in locally. Skipped on every PR to avoid flake from blog availability.
+- **Read-only**: L2 tests never POST to dutchovendaddy.com — they pin contract shape on GETs only. The blog's write surfaces (`/wp/v2/comments`, `/wp-recipe-maker/v1/rating`) are exercised at L1 against fakes; L5 will exercise them against stubs once T-610 / T-611 land.
 
 ### L3 — UI smoke tests (XCUITest)
 - Launch the app, navigate the golden path (browse → detail → save → offline read), assert content actually renders.
 - Catch crashes-on-launch and missing-content regressions (the TelemetryDeck pre-init crash and the empty-image bug from v1 are the canonical examples).
 - Run on **every PR** in CI.
+- Scheme: `DODAppUITests` (kept lean — fast reachability checks only; longer user-journey walks belong at L5, see T-612).
 
 ### L4 — Visual regression (snapshot tests)
 - PNG snapshots on disk for every reusable DesignSystem component, top-level Feature view, and key state (loading / loaded / empty / error / offline), in light + dark, iPhone + iPad size classes.
 - Failing snapshot = visible diff in CI artifact. Maintainers approve intentional changes by committing the new snapshots.
 - Run on **every PR**.
 
+### L5 — End-to-end user journeys (XCUITest, label-gated)
+- Behavioral end-to-end coverage of complete user tasks: open app → search → tap recipe → save → cook mode → back. Asserts a meaningful end-state after a multi-screen walk; **not** a reachability check (L3's job) and **not** a pixel-level visual check (L4's job).
+- Scheme: `DODAppE2ETests` (separate from `DODAppUITests` so the L3 smoke scheme stays fast and runs every PR).
+- Tool: **XCUITest** — the same framework as L3, so the author skillset transfers. No Detox / Maestro / WebDriverAgent — adding a new test-harness dependency family would cost more than it adds (see CL-58).
+- Triggers (the four CI surfaces invoked by `.github/workflows/ci.yml` `test-e2e` job):
+  1. `pull_request` events on the `main` branch **only when the PR carries the `e2e` label**.
+  2. `push` to `main` (post-merge safety net — catches any regression that slipped past the per-PR gates).
+  3. `workflow_dispatch` (manual escape hatch from the Actions UI).
+  4. `schedule: '0 7 * * *'` (nightly 7am UTC — environment-drift detector that pairs with the existing nightly live-API job in `.github/workflows/nightly-live-api.yml`).
+- Selective gating: L5 is the **first** layer the constitution allows to skip on a per-PR basis. The skip is **success**, not failure — the `ci-required` aggregator treats a skipped `test-e2e` the same way it treats every other job that the `ios_sim` path filter excludes on a docs-only PR. Rationale: per-PR CI quota + signal-to-noise on changes that have no behavioral risk a user-journey test could catch. The full predicate lives in CL-58.
+- Which PR changes warrant the `e2e` label: navigation/routing, persistence schema, composition root (`App/AppDependencies.swift`, `App/DODApp.swift`, `App/RootView.swift`), widget extension code, Cook Mode state machine, comments/ratings submission path, App Intents / Spotlight / deep-link parser, onboarding flow. The full checklist lives in `CONTRIBUTING.md` § "Does my PR need E2E?".
+
 ### Coverage discipline
 - No numeric coverage threshold gate.
-- Every acceptance criterion in `spec.md` must map to at least one named test across L1–L3. The Validator enforces this.
+- Every acceptance criterion in `spec.md` must map to at least one named test across L1–L3. The Validator enforces this. L5 journeys may pin acceptance criteria too but are not required to — the seed five journeys (T-603) overlap with existing L3 surfaces by design.
 
 ### CI gates
-- All four layers run in CI. Red blocks merge. No `@Test(.disabled)` without a linked issue.
+- L1–L4 run in CI on every PR. Red blocks merge. No `@Test(.disabled)` without a linked issue.
+- L5 runs on the four trigger surfaces above. "Skipped" counts as success in the `ci-required` aggregator. "Failed" blocks merge.
 
 ## 7. Accessibility
 
