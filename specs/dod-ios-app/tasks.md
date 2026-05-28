@@ -1253,6 +1253,7 @@ Round-3 dad backlog item "Shopping list from saved recipes" graduates through th
 - **Deps:** T-680 (spec entries this task implements against — must merge first to give the AC references something to cite).
 - **Est:** 2.5h (the static keyword map's curation is the heavy lift; the classifier + tests are bounded).
 - **||:** P12-shopping (independent of every other T-68N task source-wise — T-681 owns `Packages/DODDomain/Sources/DODDomain/Aisle.swift` + `Packages/DODSupport/Sources/DODSupport/IngredientAisleClassifier.swift` exclusively).
+- **Shipped:** commit <pending-fill-after-commit>
 
 ### T-682 — Persistence: `ShoppingListItem` `@Model` + SchemaV4 migration + L1 migration test (CL-74, US-39 / AC-39.8)
 - **Scope:** Add the new `ShoppingListItem` `@Model` class in `DODPersistence` with the CL-74 shape (`recipeID: Int`, `recipeTitle: String`, `ingredientText: String`, `aisleRaw: String`, `isChecked: Bool`, `addedAt: Date`). Bump the migration plan from V3 to V4: a new `SchemaV4` enum declaring `models: [...everything V3 has, ShoppingListItem.self]` and a lightweight migration stage `V3 → V4` since no existing entity is touched. Recreate the previously-deleted `SchemaV4.swift` (currently a comment-only marker per the T-640 in-place column trap) as the real V4 stage now that we have a legitimately additive entity. Add an L1 migration test mirroring `MigrationV3Tests.V2_to_V3_lightweightMigration`.

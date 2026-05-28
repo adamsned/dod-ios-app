@@ -7,8 +7,22 @@ let package = Package(
     products: [
         .library(name: "DODSupport", targets: ["DODSupport"])
     ],
+    dependencies: [
+        .package(path: "../DODDomain")
+    ],
     targets: [
-        .target(name: "DODSupport"),
-        .testTarget(name: "DODSupportTests", dependencies: ["DODSupport"]),
+        .target(
+            name: "DODSupport",
+            dependencies: [
+                .product(name: "DODDomain", package: "DODDomain")
+            ]
+        ),
+        .testTarget(
+            name: "DODSupportTests",
+            dependencies: [
+                "DODSupport",
+                .product(name: "DODDomain", package: "DODDomain"),
+            ]
+        ),
     ]
 )
