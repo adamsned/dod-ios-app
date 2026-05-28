@@ -22,8 +22,23 @@ public final class SearchViewModel {
     }
 
     public var query: String = "" {
-        didSet { scheduleSearch() }
+        didSet {
+            // Any keystroke (or `selectRecent` call) routes through
+            // `query = ...` directly; only `selectCuratedSuggestion(_:)`
+            // sets the flag AFTER the assignment, so the default reset
+            // here covers the typed + recent-tap paths.
+            queryFromCuratedTap = false
+            scheduleSearch()
+        }
     }
+
+    /// `true` while the current `query` originated from a curated "Try"
+    /// suggestion tap (US-29 / AC-29.1) rather than the user typing. Used
+    /// so `performSearch()` does NOT persist the term to the recent-searches
+    /// store — the user didn't intentionally search for it, they tapped a
+    /// curated pill, and persisting it pollutes Recent with terms the user
+    /// never typed (REG-19 / CL-66 / T-670).
+    private var queryFromCuratedTap: Bool = false
 
     /// Filter chips state. Mutating a filter forces an immediate re-rank of
     /// the cached merged results — no network round trip — so the UI feels
@@ -88,14 +103,37 @@ public final class SearchViewModel {
         self.query = query
     }
 
+    /// Surface a curated "Try" suggestion (US-29 / AC-29.1) — e.g. the
+    /// user tapped a top-category pill in the idle empty state. Same
+    /// debounce + REST path as typing, but the resulting query is
+    /// flagged as `queryFromCuratedTap` so `performSearch()` does NOT
+    /// persist it to the recent-searches store. The user did not type
+    /// the term; persisting curated names ("Bourbon", "Sweet Potato",
+    /// "Brisket", etc.) into Recent makes Clear All look broken because
+    /// the same curated suggestions reappear on the next idle render.
+    ///
+    /// Spec trace: REG-19 / CL-66 / T-670.
+    public func selectCuratedSuggestion(_ query: String) {
+        self.query = query
+        queryFromCuratedTap = true
+    }
+
     /// Wipe the persisted recent-searches store and update the
     /// view-bound `recentSearches` array so the "Recent" section
     /// disappears on the next observation tick. Backed by the existing
     /// `RecentSearches.clear()` method.
     ///
+    /// Also cancels any in-flight debounced search so a `performSearch()`
+    /// that started before Clear All cannot re-record the just-cleared
+    /// query after the wipe completes (REG-19 / CL-66 / T-670 — defensive
+    /// belt on top of the curated-tap skip; covers the typed-then-immediately-
+    /// cleared race too).
+    ///
     /// Spec trace: US-29 / AC-29.2 (Clear All affordance), CL-49.2
-    /// (single-source-of-truth routing through the view-model).
+    /// (single-source-of-truth routing through the view-model), CL-66
+    /// (in-flight cancellation closes the race).
     public func clearRecentSearches() {
+        debounceTask?.cancel()
         recents.clear()
         recentSearches = recents.recent()
     }
@@ -206,9 +244,16 @@ public final class SearchViewModel {
         state = filtered.isEmpty ? .noResults : .results
 
         // Record the recent on a successful query — even if zero results,
-        // because "tried it, didn't work" is still useful history.
-        recents.record(trimmed)
-        recentSearches = recents.recent()
+        // because "tried it, didn't work" is still useful history. Skip
+        // when the query originated from a curated "Try" suggestion tap
+        // (REG-19 / CL-66 / T-670): the user didn't type it, so persisting
+        // it into Recent would surface curated terms the user never asked
+        // for, and tapping Clear All would not actually clear them on the
+        // next idle render.
+        if !queryFromCuratedTap {
+            recents.record(trimmed)
+            recentSearches = recents.recent()
+        }
 
         // AC-3.6: telemetry sends ONLY the hash, never the raw query.
         let hash = StringHasher.sha256Hex(trimmed)

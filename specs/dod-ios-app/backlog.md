@@ -50,6 +50,10 @@ Round-8 captures landed after round-7 PRs (T-620 / T-630 / T-640 / T-650 / T-590
 
 _(Graduated 2026-05-27 as T-660 / CL-65 — amendment to existing US-37 / AC-37.1, no new US needed. Bottom-tab `Label(...)` now reads `AppTab.tabLabel` ("Recipes" — short) while `FeedView.navigationTitle` keeps reading `AppTab.title` ("Recipes & Articles" — full). See CL-65 for the considered alternatives + the L4 snapshot baseline alignment notes.)_
 
+#### Clear All shows 3 phantom searches in Recent ("Bourbon", "Sweet Potato", "Brisket")
+
+_(Graduated 2026-05-27 as T-670 / CL-66 / REG-19 — amendment under existing US-29, no new US needed. Root cause was a recording-path leak (not a view-side leak): the round-7 `onCategoryTap` wiring routed curated "Try" pill taps through the same `recents.record(...)` path as user-typed queries, AND `clearRecentSearches()` did not cancel in-flight debounced searches that could re-record the just-cleared term. Fix: new `SearchViewModel.selectCuratedSuggestion(_:)` flips a `queryFromCuratedTap` flag that `performSearch()` honors; `clearRecentSearches()` now cancels `debounceTask` as a defensive belt; `SearchView.onCategoryTap` routes through the new method. `IdleSuggestionsView` was already correct (Recent section conditioned on `if !recents.isEmpty`). See CL-66 for the full root cause + the rejected-alternatives trail; REG-19 pins the empty-recents-after-Clear-All contract.)_
+
 ### Captured 2026-05-25 (round 3, @adamsned)
 
 User has chosen to defer TestFlight until at least round 3 ships. These
