@@ -123,5 +123,51 @@ struct DODShortcuts: AppShortcutsProvider {
             shortTitle: "Saved Recipes",
             systemImageName: "bookmark.fill"
         )
+        // Voice Mode hands-free commands (US-40 / AC-40.5, CL-83). The
+        // AppIntents metadata processor requires **every** utterance to contain
+        // `\(.applicationName)` (not just phrases that interpolate a
+        // `@Parameter`) — it fails the export otherwise. So each phrase suffixes
+        // `in \(.applicationName)`, matching the recipe intents above. In
+        // practice Siri still matches the bare command once the shortcut is
+        // donated; the token is what scopes the phrase to this app.
+        AppShortcut(
+            intent: NextStepIntent(),
+            phrases: [
+                "Next step in \(.applicationName)",
+                "Next in \(.applicationName)",
+                "Go forward in \(.applicationName)",
+            ],
+            shortTitle: "Next Step",
+            systemImageName: "chevron.right"
+        )
+        AppShortcut(
+            intent: PreviousStepIntent(),
+            phrases: [
+                "Previous step in \(.applicationName)",
+                "Go back in \(.applicationName)",
+                "Back in \(.applicationName)",
+            ],
+            shortTitle: "Previous Step",
+            systemImageName: "chevron.left"
+        )
+        AppShortcut(
+            intent: RepeatStepIntent(),
+            phrases: [
+                "Repeat step in \(.applicationName)",
+                "Repeat that in \(.applicationName)",
+                "Say that again in \(.applicationName)",
+            ],
+            shortTitle: "Repeat Step",
+            systemImageName: "arrow.clockwise"
+        )
+        AppShortcut(
+            intent: PauseVoiceIntent(),
+            phrases: [
+                "Pause reading in \(.applicationName)",
+                "Pause in \(.applicationName)",
+            ],
+            shortTitle: "Pause Reading",
+            systemImageName: "pause.fill"
+        )
     }
 }

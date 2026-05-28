@@ -94,6 +94,10 @@ public final class CookModeViewModel {
         didBegin = true
         priorIdleTimerDisabled = idleTimer.isDisabled
         idleTimer.isDisabled = true
+        // Register as the live target for the Voice Mode Siri intents (US-40 /
+        // AC-40.5, CL-83). The bus holds us weakly and only ever drives the
+        // foreground session; `endCookMode()` clears the registration.
+        VoiceCommandBus.shared.handler = self
     }
 
     /// Called on view disappear: restores the previous idle-timer value
@@ -112,6 +116,13 @@ public final class CookModeViewModel {
         // the moment they leave Cook Mode.
         voiceReader.stop()
         isVoiceModeEnabled = false
+        // Unregister from the Voice Mode command bus so a Siri command fired
+        // after Cook Mode closes is a no-op rather than driving a stale session
+        // (US-40 / AC-40.5, CL-83). Guard against clobbering a newer session
+        // that may already have registered.
+        if VoiceCommandBus.shared.handler === self {
+            VoiceCommandBus.shared.handler = nil
+        }
     }
 
     // MARK: - Voice Mode (US-40)
@@ -121,11 +132,19 @@ public final class CookModeViewModel {
     /// the audio session. Idempotent — setting the same value re-reads the
     /// current step (on) or is a no-op (off).
     public func setVoiceMode(_ enabled: Bool) {
+        let changed = isVoiceModeEnabled != enabled
         isVoiceModeEnabled = enabled
         if enabled {
             speakCurrentStep()
         } else {
             voiceReader.stop()
+        }
+        // AC-40.8 / CL-83 — report the user-driven on/off as an allowlisted
+        // device-state event. Payload is a single boolean — no recipe id, no
+        // free text. Only fire on an actual flip so an idempotent re-set (which
+        // re-reads the current step) doesn't double-count.
+        if changed {
+            Telemetry.shared.send(.voiceModeToggled(on: enabled))
         }
     }
 
@@ -264,6 +283,14 @@ public final class CookModeViewModel {
         }
     }
 }
+
+// MARK: - Voice command handler conformance (US-40 / AC-40.5)
+
+/// The four hands-free control methods (declared above for the in-app wiring
+/// in T-690b) *are* the ``VoiceCommandHandler`` surface — declaring the
+/// conformance lets ``VoiceCommandBus`` forward Siri commands straight into the
+/// live session with no adapter (CL-83).
+extension CookModeViewModel: VoiceCommandHandler {}
 
 // MARK: - Idle timer abstraction
 
