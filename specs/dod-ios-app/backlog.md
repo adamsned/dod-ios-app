@@ -61,7 +61,7 @@ three items each turn a feature the website *can't* easily replicate
 into a reason the native app exists. Tier 1 from the consultant pass on
 2026-05-25.
 
-- **Cooking Voice Mode** — hands-free recipe reading during Cook Mode.
+- ~~**Cooking Voice Mode** — hands-free recipe reading during Cook Mode.
   "Hey Siri, next step / repeat / pause / what was that?" Uses on-device
   `AVSpeechSynthesizer` so no network round-trip, no subscription cost,
   no privacy surface. Pairs with the existing Cook Mode + Live Activity
@@ -70,7 +70,22 @@ into a reason the native app exists. Tier 1 from the consultant pass on
   whether to also wire up an App Intent (`ReadNextStepIntent`) so Siri
   can drive it without the app being foregrounded. Size: **M**
   (~2 weeks). The biggest differentiator we could ship vs. every other
-  food-blog reader on the App Store.
+  food-blog reader on the App Store.~~ _(Graduated 2026-05-27 as
+  US-40 / CL-79 / T-690a + T-690b. v1 reads the current Cook Mode step
+  aloud via on-device `AVSpeechSynthesizer` (system-default voice for
+  `Locale.current` per CL-79), re-reads on every step change, ducks
+  other audio via a `.playback` + `.duckOthers` audio session, exposes
+  four Siri voice commands (next / previous / repeat / pause) via App
+  Intents, and emits one `voiceModeToggled` adoption event — no spoken
+  content ever leaves the device. Split into two tasks: **T-690a** ships
+  the standalone, mock-tested `VoiceReader` core (the synthesizer wrapper
+  + audio-session management + the `SpeechSynthesizing` test seam);
+  **T-690b** wires it into `CookModeView` / `CookModeViewModel` (the
+  toggle + the re-read-on-step-change driver), registers the four
+  `RecipeAppIntents`, and adds the `voiceModeToggled` event + the
+  constitution §9 allowlist amendment. Voice Mode is off-by-default and
+  not persisted across cook sessions per CL-79 so the app never starts
+  talking unexpectedly.)_
 
 - ~~**Shopping list from saved recipes** — select N saved recipes →
   "Add to shopping list" → ingredients grouped by aisle (produce /
