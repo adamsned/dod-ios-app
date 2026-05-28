@@ -7,12 +7,12 @@ import SwiftUI
 /// Spec trace: AC-39.1 (empty state — `EmptyState` with the `cart` glyph),
 /// AC-39.4 (aisle grouping + store-walk order + per-aisle glyph headers),
 /// AC-39.5 (per-row check toggle + strikethrough), AC-39.11 (VoiceOver row
-/// labels). CL-81 (this UI slice: per-recipe rows, ephemeral check +
+/// labels). CL-82 (this UI slice: per-recipe rows, ephemeral check +
 /// already-have state, mock-data-driven; the Saved-tab entry button, the
 /// recipe-picker, the `UIActivityViewController` share, the clear-all toolbar,
 /// SwiftData persistence, and analytics are all T-680c).
 ///
-/// **Grouping (CL-80 / CL-81):** rows group by the six-case
+/// **Grouping (CL-80 / CL-82):** rows group by the six-case
 /// ``IngredientAisleClassifier/Aisle`` shipped by T-680a, in `allCases`
 /// declaration order; empty aisles render no section. The section header is
 /// inline here — the standalone `AisleSectionHeader` DesignSystem primitive
@@ -101,7 +101,7 @@ public struct ShoppingListView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel(for: item))
         .accessibilityAddTraits(checked ? .isSelected : [])
-        // AC-39.5 / CL-81 — the trailing "I already have this" affordance.
+        // AC-39.5 / CL-82 — the trailing "I already have this" affordance.
         .swipeActions(edge: .trailing) {
             Button {
                 viewModel.markAlreadyHave(item)

@@ -6,7 +6,7 @@ import Testing
 @testable import DODFeatureSaved
 
 /// L1 coverage for ``ShoppingListViewModel`` — grouping, the ephemeral check
-/// toggle, and the ephemeral "already have" toggle (CL-81 / US-39 AC-39.4 +
+/// toggle, and the ephemeral "already have" toggle (CL-82 / US-39 AC-39.4 +
 /// AC-39.5). Constitution §6 L1 mandate.
 @MainActor
 @Suite("ShoppingListViewModel (T-680b)") struct ShoppingListViewModelTests {
@@ -82,7 +82,7 @@ import Testing
         #expect(viewModel.uncheckedCount == 1)
     }
 
-    // MARK: - Already-have toggle (CL-81)
+    // MARK: - Already-have toggle (CL-82)
 
     @Test func markAlreadyHaveRemovesRowFromStillNeedList() {
         let keep = Self.item("1 onion", "R", .produce)

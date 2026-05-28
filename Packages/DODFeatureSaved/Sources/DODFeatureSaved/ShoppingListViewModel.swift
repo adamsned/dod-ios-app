@@ -7,20 +7,20 @@ import Observation
 ///
 /// Spec trace: US-39 / AC-39.4 (aisle grouping + store-walk order), AC-39.5
 /// (the per-row check toggle), AC-39.1 (empty state), AC-39.11 (VoiceOver row
-/// labels). CL-81 (this UI-slice scope: per-recipe rows — NOT aggregated, per
+/// labels). CL-82 (this UI-slice scope: per-recipe rows — NOT aggregated, per
 /// CL-70/CL-77; ephemeral check + already-have state; mock-data-driven; lands
 /// in `DODFeatureSaved` ahead of the `DODFeatureShoppingList` extraction).
 /// CL-80 (groups by the six-case `IngredientAisleClassifier.Aisle` shipped by
 /// T-680a; the nine-case render set + the `DODDomain` hoist are a T-680c/T-681
 /// mechanical reconciliation).
 ///
-/// **Per-recipe rows, no merge (CL-70 / CL-77 / CL-81):** three recipes that
+/// **Per-recipe rows, no merge (CL-70 / CL-77 / CL-82):** three recipes that
 /// each call for "yellow onion, diced" produce three separate ``Item`` rows,
 /// each carrying its source-recipe title. The ``IngredientAggregator``
 /// same-unit summation (T-680a) is an available-but-not-default capability and
 /// is intentionally NOT wired here.
 ///
-/// **Ephemeral state (CL-81):** ``checkedIDs`` and ``alreadyHaveIDs`` live in
+/// **Ephemeral state (CL-82):** ``checkedIDs`` and ``alreadyHaveIDs`` live in
 /// memory and reset on re-init — T-680b ships no persistence. T-680c swaps the
 /// sets for the SwiftData `isChecked` round-trip (AC-39.8) with no change to
 /// the view's binding shape.
@@ -66,7 +66,7 @@ public final class ShoppingListViewModel {
     public private(set) var checkedIDs: Set<UUID> = []
 
     /// Rows the user marked "I already have this" — removed from the still-need
-    /// list (CL-81). Ephemeral.
+    /// list (CL-82). Ephemeral.
     public private(set) var alreadyHaveIDs: Set<UUID> = []
 
     public init(items: [Item]) {
@@ -125,7 +125,7 @@ public final class ShoppingListViewModel {
     }
 
     /// Mark a row "I already have this" — it drops out of the still-need list
-    /// (CL-81). Also clears any check state for the row so re-adding it later
+    /// (CL-82). Also clears any check state for the row so re-adding it later
     /// (T-680c) starts clean.
     public func markAlreadyHave(_ item: Item) {
         alreadyHaveIDs.insert(item.id)
@@ -155,7 +155,7 @@ extension ShoppingListViewModel {
     }
 }
 
-// MARK: - Mock fixture (CL-81 — drives the view ahead of the entry surfaces)
+// MARK: - Mock fixture (CL-82 — drives the view ahead of the entry surfaces)
 
 extension ShoppingListViewModel {
 

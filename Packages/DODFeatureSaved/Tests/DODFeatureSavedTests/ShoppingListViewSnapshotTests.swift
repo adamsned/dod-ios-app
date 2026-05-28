@@ -7,7 +7,7 @@ import XCTest
 @testable import DODFeatureSaved
 
 /// L4 visual-regression coverage for ``ShoppingListView``'s loaded state with
-/// the mock fixture, light + dark (CL-81 / US-39 AC-39.4). Mirrors the
+/// the mock fixture, light + dark (CL-82 / US-39 AC-39.4). Mirrors the
 /// `SavedViewSnapshotTests` harness: `record: .missing` lays the baseline PNGs
 /// down on the first iOS-sim run. Constitution §6 L4.
 final class ShoppingListViewSnapshotTests: XCTestCase {
