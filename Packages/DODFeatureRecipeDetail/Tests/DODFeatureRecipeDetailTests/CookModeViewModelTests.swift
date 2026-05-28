@@ -230,7 +230,8 @@ import Testing
         stepCount: Int,
         seed: Set<UUID> = [],
         idleTimer: IdleTimerController = FakeIdleTimerController(),
-        liveActivity: any CookLiveActivityController = FakeLiveActivityController()
+        liveActivity: any CookLiveActivityController = FakeLiveActivityController(),
+        voiceReader: VoiceReader = VoiceReader()
     ) -> CookModeViewModel {
         let instructions = (1...max(stepCount, 1)).map { index in
             RecipeInstruction(step: index, text: "Step \(index) body.")
@@ -248,7 +249,8 @@ import Testing
             recipe: recipe,
             initialCheckedIngredients: seed,
             idleTimer: idleTimer,
-            liveActivity: liveActivity
+            liveActivity: liveActivity,
+            voiceReader: voiceReader
         )
     }
 }

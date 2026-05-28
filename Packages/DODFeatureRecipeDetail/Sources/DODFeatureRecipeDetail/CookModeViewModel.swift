@@ -34,8 +34,14 @@ public final class CookModeViewModel {
     public private(set) var isFinished: Bool = false
     public var checkedIngredientIDs: Set<UUID>
 
+    /// Whether Voice Mode (US-40) is reading steps aloud. **Off** every time
+    /// Cook Mode is entered and **not** persisted across sessions — a deliberate
+    /// v1 choice (CL-79 / AC-40.1) so the app never starts talking unexpectedly.
+    public private(set) var isVoiceModeEnabled: Bool = false
+
     private let idleTimer: any IdleTimerController
     private let liveActivity: any CookLiveActivityController
+    private let voiceReader: VoiceReader
     private var priorIdleTimerDisabled: Bool = false
     private var didBegin: Bool = false
 
@@ -43,12 +49,14 @@ public final class CookModeViewModel {
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
         idleTimer: any IdleTimerController = SystemIdleTimerController(),
-        liveActivity: any CookLiveActivityController = SystemCookLiveActivityController()
+        liveActivity: any CookLiveActivityController = SystemCookLiveActivityController(),
+        voiceReader: VoiceReader = VoiceReader()
     ) {
         self.recipe = recipe
         self.checkedIngredientIDs = initialCheckedIngredients
         self.idleTimer = idleTimer
         self.liveActivity = liveActivity
+        self.voiceReader = voiceReader
     }
 
     /// Total number of steps, derived from the recipe. Zero if the recipe
@@ -99,6 +107,82 @@ public final class CookModeViewModel {
         // ghost activity behind would be the Live Activity equivalent of
         // the "battery still draining" idle-timer bug.
         liveActivity.end()
+        // AC-7.6 / AC-40.1 — stop any in-flight utterance and release the
+        // ducked audio session so the user's music returns to full volume
+        // the moment they leave Cook Mode.
+        voiceReader.stop()
+        isVoiceModeEnabled = false
+    }
+
+    // MARK: - Voice Mode (US-40)
+
+    /// Flip Voice Mode on or off (AC-40.1). Turning it **on** immediately reads
+    /// the current step (AC-40.2); turning it **off** stops reading and releases
+    /// the audio session. Idempotent — setting the same value re-reads the
+    /// current step (on) or is a no-op (off).
+    public func setVoiceMode(_ enabled: Bool) {
+        isVoiceModeEnabled = enabled
+        if enabled {
+            speakCurrentStep()
+        } else {
+            voiceReader.stop()
+        }
+    }
+
+    /// Convenience for the on-screen toggle button (AC-40.1).
+    public func toggleVoiceMode() {
+        setVoiceMode(!isVoiceModeEnabled)
+    }
+
+    /// Re-speak the current step (or the completion line in the Done state).
+    /// Drives AC-40.3's re-read-on-step-change behaviour and AC-40.5's
+    /// "repeat" command. A no-op while Voice Mode is off so navigation never
+    /// makes noise the user didn't ask for. Because ``VoiceReader/speak(_:)``
+    /// stops any in-flight utterance first (AC-40.7), advancing several steps
+    /// quickly never overlaps two voices.
+    private func speakCurrentStep() {
+        guard isVoiceModeEnabled else { return }
+        if isFinished {
+            // AC-40.3 — reaching Done speaks a short completion line rather
+            // than a step body.
+            voiceReader.speak("All done — enjoy your meal")
+        } else if let step = currentStep {
+            voiceReader.speak(step.text)
+        }
+    }
+
+    // MARK: - Voice command surface (US-40 / AC-40.5)
+    //
+    // The four methods below are the in-app control surface the T-690c App
+    // Intents will call to drive Cook Mode hands-free via Siri. They are wired
+    // here (and exercised in-app + by L1 tests) in T-690b; T-690c only exposes
+    // them to SiriKit. Each re-reads through the same AC-40.3 path so a voice
+    // command and an on-screen tap behave identically.
+
+    /// "Next step" — advance one step and re-read it when Voice Mode is on.
+    /// Same path as the on-screen Next control (AC-7.4 / AC-40.5).
+    public func advanceStep() {
+        goNext()
+    }
+
+    /// "Previous step" / "go back" — step back one and re-read it when Voice
+    /// Mode is on. Same path as the on-screen Previous control (AC-40.5).
+    public func previousStep() {
+        goBack()
+    }
+
+    /// "Repeat that" — re-speak the current step without changing position
+    /// (AC-40.5). Implicitly interrupts any paused utterance via the reader's
+    /// stop-before-speak contract (AC-40.7).
+    public func repeatCurrentStep() {
+        speakCurrentStep()
+    }
+
+    /// "Pause" — pause the current utterance at the next word boundary
+    /// (AC-40.4 / AC-40.5). Leaves Voice Mode on so a subsequent navigation or
+    /// "repeat" command resumes reading aloud.
+    public func pauseVoice() {
+        voiceReader.pause()
     }
 
     // MARK: - Live Activity (US-11)
@@ -155,16 +239,19 @@ public final class CookModeViewModel {
         } else {
             isFinished = true
         }
+        // AC-40.3 — re-read whenever the step changes while Voice Mode is on,
+        // whether the change came from an on-screen tap, a swipe, or a voice
+        // command. A no-op when Voice Mode is off.
+        speakCurrentStep()
     }
 
     public func goBack() {
         if isFinished {
             isFinished = false
-            return
-        }
-        if currentStepIndex > 0 {
+        } else if currentStepIndex > 0 {
             currentStepIndex -= 1
         }
+        speakCurrentStep()
     }
 
     // MARK: - Ingredient state
