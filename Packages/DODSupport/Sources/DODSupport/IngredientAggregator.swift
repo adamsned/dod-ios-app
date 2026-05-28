@@ -10,7 +10,7 @@ import Foundation
 /// rolled-up share-text path), AC-39.12 (pure on-device — no view, no
 /// persistence, no network). CL-70 (same-unit summation, option (b)), CL-77
 /// (the v1 *shipped UI* keeps per-recipe rows; this aggregator is a reusable
-/// capability, not a change to that contract), CL-79 (the logic-core split).
+/// capability, not a change to that contract), CL-80 (the logic-core split).
 /// Constitution §6 L1 mandate (every domain transform owns tests).
 ///
 /// **What it merges:** two lines merge into one ``AggregatedItem`` when (a)

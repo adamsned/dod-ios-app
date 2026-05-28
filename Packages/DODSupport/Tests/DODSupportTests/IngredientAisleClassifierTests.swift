@@ -6,7 +6,7 @@ import Testing
 /// Golden L1 coverage for ``IngredientAisleClassifier``.
 ///
 /// Spec trace: US-39 / AC-39.4 (aisle grouping), AC-39.12 (pure on-device).
-/// CL-67 (static keyword-map strategy), CL-79 (logic-core split). Constitution
+/// CL-67 (static keyword-map strategy), CL-80 (logic-core split). Constitution
 /// §6 L1 mandate — every domain transform owns named tests.
 ///
 /// Cases sampled to mirror real dutchovendaddy.com JSON-LD `recipeIngredient`

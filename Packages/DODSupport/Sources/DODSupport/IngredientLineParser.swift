@@ -29,7 +29,7 @@ struct ParsedIngredientLine {
 /// remainder is the name (a leading `"of "` is dropped, whitespace collapsed).
 ///
 /// Spec trace: US-39 / AC-39.4 + AC-39.7 (the substrate ``IngredientAggregator``
-/// merges on). CL-70 + CL-79. The unit list + vulgar-fraction table mirror the
+/// merges on). CL-70 + CL-80. The unit list + vulgar-fraction table mirror the
 /// CL-67 tokenizer regex and ``FractionRenderer`` so the parsers agree.
 enum IngredientLineParser {
 

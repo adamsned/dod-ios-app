@@ -7,7 +7,7 @@ import Foundation
 /// Spec trace: US-39 / AC-39.4 (aisle grouping), AC-39.12 (no network egress
 /// — the classifier is pure on-device). CL-67 (static keyword-map strategy,
 /// chosen over a tagged dictionary, fuzzy matching, or WP-side classification
-/// for v1). CL-79 (the logic-core split — this type ships ahead of the UI as
+/// for v1). CL-80 (the logic-core split — this type ships ahead of the UI as
 /// T-680a). Constitution §6 L1 mandate (every domain transform owns tests).
 ///
 /// **Why a static keyword map and not ML / a tagged dictionary (CL-67):** the
@@ -36,10 +36,10 @@ public enum IngredientAisleClassifier {
     /// Coarse-grained store aisle for an ingredient. Raw-value strings are the
     /// telemetry payload per AC-39.10 and the persisted `aisleRaw` per CL-74.
     ///
-    /// The logic-core v1 set (T-680a / CL-79) is the six aisles below; the
+    /// The logic-core v1 set (T-680a / CL-80) is the six aisles below; the
     /// full nine-case render/persistence set (`meatSeafood` / `bakery` /
     /// `frozen` / `beverages`) is the T-680b concern reconciled against CL-74.
-    /// `Aisle` co-locates here per CL-79 rather than in `DODDomain`; T-681 /
+    /// `Aisle` co-locates here per CL-80 rather than in `DODDomain`; T-681 /
     /// T-680b may hoist it as a mechanical move with no behavior change.
     public enum Aisle: String, CaseIterable, Sendable {
         case produce

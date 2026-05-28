@@ -8,7 +8,7 @@ import Testing
 ///
 /// Spec trace: US-39 / AC-39.4 (aisle grouping), AC-39.7 (rolled-up share
 /// path), AC-39.12 (pure on-device). CL-70 (same-unit summation), CL-77 (the
-/// v1 UI keeps per-recipe rows; this is a reusable capability), CL-79 (the
+/// v1 UI keeps per-recipe rows; this is a reusable capability), CL-80 (the
 /// logic-core split). Constitution §6 L1 mandate.
 @Suite("IngredientAggregator")
 struct IngredientAggregatorTests {
