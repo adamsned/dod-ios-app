@@ -82,7 +82,7 @@ into a reason the native app exists. Tier 1 from the consultant pass on
   static keyword map (good enough for v1), could escalate to a
   category-tagged ingredient dictionary later. Size: **M** (~1.5 weeks).
   Turns the recipe app you cook *from* into the grocery list you shop
-  *from*. Massive utility loop.~~ _(Graduated 2026-05-27 as T-680 / CL-66–CL-77 / US-39 — see "Recently graduated" below. v1 ships the static keyword classifier per CL-66, single global list per CL-68, per-recipe rows per CL-69+CL-76, per-row session toggle per CL-70, `UIActivityViewController` plain-text share per CL-71, three entry surfaces per CL-72, new `ShoppingListItem` `@Model` + SchemaV4 per CL-73, two aisle-only analytics events per CL-74, and the canonical `EmptyState` reuse per CL-75. Three deferred-by-design items: location-based notifications (CL-67), multi-list lifecycle (CL-68), and pantry inventory (CL-70) — each with its own documented activation trigger.)_
+  *from*. Massive utility loop.~~ _(Graduated 2026-05-27 as T-680 / CL-67–CL-78 / US-39 — see "Recently graduated" below. v1 ships the static keyword classifier per CL-67, single global list per CL-69, per-recipe rows per CL-70+CL-77, per-row session toggle per CL-71, `UIActivityViewController` plain-text share per CL-72, three entry surfaces per CL-73, new `ShoppingListItem` `@Model` + SchemaV4 per CL-74, two aisle-only analytics events per CL-75, and the canonical `EmptyState` reuse per CL-76. Three deferred-by-design items: location-based notifications (CL-68), multi-list lifecycle (CL-69), and pantry inventory (CL-71) — each with its own documented activation trigger.)_
 
 _(Graduated — see "Recently graduated" below: US-31 / CL-52 / T-440
 shipped the stepper + `FractionRenderer` + warning copy.)_
@@ -737,29 +737,29 @@ useful reference.
 
 - **Shopping list from saved recipes (round-3 backlog, dad's idea)** —
   graduated to **US-39** (AC-39.1 through AC-39.12) +
-  [CL-66 through CL-77](clarifications.md) + the
+  [CL-67 through CL-78](clarifications.md) + the
   [T-680..T-689 cluster](tasks.md). The original round-3 capture sized
   the feature as `M (~1.5 weeks)` and called the aisle classifier "the
   one open design question." The spec amendment resolves twelve
   design questions, not just the one: aisle classifier strategy
   (static keyword map for v1, escalation path to a tagged dictionary
-  documented — CL-66); list lifecycle (single global list for v1,
-  multi-list deferred — CL-68); quantity merging (per-recipe rows for
-  v1, normalized-unit summation deferred — CL-69); cross-recipe
-  deduplication (3 rows per recipe instead of 1 merged row — CL-76);
+  documented — CL-67); list lifecycle (single global list for v1,
+  multi-list deferred — CL-69); quantity merging (per-recipe rows for
+  v1, normalized-unit summation deferred — CL-70); cross-recipe
+  deduplication (3 rows per recipe instead of 1 merged row — CL-77);
   per-row "I have this" toggle scope (session per-row, no pantry
-  inventory — CL-70); iMessage share format
+  inventory — CL-71); iMessage share format
   (`UIActivityViewController` plain-text, no `MessageUI` dependency —
-  CL-71); entry surfaces (Saved-tab toolbar + per-card long-press +
-  RecipeDetail nav-bar action — CL-72); persistence shape (new
-  `ShoppingListItem` `@Model` in SchemaV4 — CL-73); analytics (two
-  aisle-only events, constitution §9 amendment — CL-74); empty-state
+  CL-72); entry surfaces (Saved-tab toolbar + per-card long-press +
+  RecipeDetail nav-bar action — CL-73); persistence shape (new
+  `ShoppingListItem` `@Model` in SchemaV4 — CL-74); analytics (two
+  aisle-only events, constitution §9 amendment — CL-75); empty-state
   copy (`"Your shopping list is empty"` / `"Tap a saved recipe and add
-  its ingredients here"` / `cart` — CL-75); location-based
+  its ingredients here"` / `cart` — CL-76); location-based
   notifications **DEFERRED** as a Tier-2 future task with a
-  `CLLocationManager` + App Privacy bump scope discussion — CL-67;
+  `CLLocationManager` + App Privacy bump scope discussion — CL-68;
   iPad layout (same `NavigationSplitView` pattern as Saved per CC-8 —
-  CL-77). Implementing PRs: T-680 (this spec PR) + T-681 (domain +
+  CL-78). Implementing PRs: T-680 (this spec PR) + T-681 (domain +
   aisle classifier + L1 tests) + T-682 (SchemaV4 + `ShoppingListItem`
   + migration test) + T-683 (DesignSystem `ShoppingListRow` +
   `AisleSectionHeader` + L4 baselines) + T-684 (new
