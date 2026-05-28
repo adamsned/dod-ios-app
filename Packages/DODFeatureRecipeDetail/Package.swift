@@ -34,6 +34,7 @@ let package = Package(
             name: "DODFeatureRecipeDetailTests",
             dependencies: [
                 "DODFeatureRecipeDetail",
+                "DODAnalytics",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             ],
             resources: [.process("__Snapshots__")]

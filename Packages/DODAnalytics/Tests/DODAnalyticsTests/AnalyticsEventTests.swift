@@ -110,6 +110,42 @@ import Testing
         }
     }
 
+    @Test func voiceModeToggledCarriesOnlyTheBoolean() {
+        // Spec AC-40.8 + constitution §9 (CL-82 amendment): payload is exactly
+        // { on } — no recipe id, no free text.
+        let on = AnalyticsEvent.voiceModeToggled(on: true)
+        let off = AnalyticsEvent.voiceModeToggled(on: false)
+        #expect(on.name == "voice_mode_toggled")
+        #expect(on.payload == ["on": "true"])
+        #expect(off.payload == ["on": "false"])
+        #expect(on.payload.keys.count == 1)
+    }
+
+    @Test func voiceCommandFiredCarriesOnlyTheClosedEnumString() {
+        // Spec AC-40.5 / AC-40.8 + constitution §9 (CL-82 amendment): payload
+        // is exactly { command } where command is one of the four fixed enum
+        // strings — never the user's spoken phrase.
+        let next = AnalyticsEvent.voiceCommandFired(command: .next)
+        #expect(next.name == "voice_command_fired")
+        #expect(next.payload == ["command": "next"])
+        #expect(AnalyticsEvent.voiceCommandFired(command: .previous).payload == ["command": "previous"])
+        #expect(AnalyticsEvent.voiceCommandFired(command: .repeat).payload == ["command": "repeat"])
+        #expect(AnalyticsEvent.voiceCommandFired(command: .pause).payload == ["command": "pause"])
+    }
+
+    @Test func voiceCommandFiredPayloadHasNoFreeText() {
+        // Constitution §9 (CL-82): sweep every command and assert the only
+        // payload value is a known enum string — no raw spoken phrase leaks.
+        let permitted = Set(VoiceCommandName.allCases.map(\.rawValue))
+        for command in VoiceCommandName.allCases {
+            let event = AnalyticsEvent.voiceCommandFired(command: command)
+            for (key, value) in event.payload {
+                #expect(key == "command")
+                #expect(permitted.contains(value), "voice_command_fired leaked free text: \(value)")
+            }
+        }
+    }
+
     @Test func allEventNamesAreUnique() {
         let allNames: [String] = [
             AnalyticsEvent.appOpen.name,
@@ -124,6 +160,8 @@ import Testing
             AnalyticsEvent.recipeRated(recipeID: 1, stars: 5).name,
             AnalyticsEvent.recipeCommentSubmitted(recipeID: 1, awaitingApproval: false).name,
             AnalyticsEvent.widgetOpened(kind: .featured, recipeID: 1).name,
+            AnalyticsEvent.voiceModeToggled(on: true).name,
+            AnalyticsEvent.voiceCommandFired(command: .next).name,
         ]
         #expect(Set(allNames).count == allNames.count)
     }

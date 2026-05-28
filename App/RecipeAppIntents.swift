@@ -123,5 +123,49 @@ struct DODShortcuts: AppShortcutsProvider {
             shortTitle: "Saved Recipes",
             systemImageName: "bookmark.fill"
         )
+        // Voice Mode hands-free commands (US-40 / AC-40.5, CL-82). These
+        // intents take no parameter, so `\(.applicationName)` is optional in
+        // the phrase (the framework only requires it for phrases that
+        // interpolate a `@Parameter`); we suffix it on the primary phrase of
+        // each for Shortcuts-app discoverability.
+        AppShortcut(
+            intent: NextStepIntent(),
+            phrases: [
+                "Next step in \(.applicationName)",
+                "Next step",
+                "Go forward",
+            ],
+            shortTitle: "Next Step",
+            systemImageName: "chevron.right"
+        )
+        AppShortcut(
+            intent: PreviousStepIntent(),
+            phrases: [
+                "Previous step in \(.applicationName)",
+                "Previous step",
+                "Go back",
+            ],
+            shortTitle: "Previous Step",
+            systemImageName: "chevron.left"
+        )
+        AppShortcut(
+            intent: RepeatStepIntent(),
+            phrases: [
+                "Repeat step in \(.applicationName)",
+                "Repeat that",
+                "Say that again",
+            ],
+            shortTitle: "Repeat Step",
+            systemImageName: "arrow.clockwise"
+        )
+        AppShortcut(
+            intent: PauseVoiceIntent(),
+            phrases: [
+                "Pause reading in \(.applicationName)",
+                "Pause reading",
+            ],
+            shortTitle: "Pause Reading",
+            systemImageName: "pause.fill"
+        )
     }
 }

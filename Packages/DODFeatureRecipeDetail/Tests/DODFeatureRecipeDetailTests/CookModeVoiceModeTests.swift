@@ -1,3 +1,4 @@
+import DODAnalytics
 import DODDomain
 import Foundation
 import Testing
@@ -146,6 +147,28 @@ import Testing
         viewModel.repeatCurrentStep()
 
         #expect(mock.calls.isEmpty)
+    }
+
+    /// AC-40.8 / CL-82 — flipping Voice Mode fires `voiceModeToggled(on:)` once
+    /// per actual change, with the right boolean and no other payload. An
+    /// idempotent re-set (same value) does not re-fire.
+    @Test func togglingVoiceModeFiresAnalyticsOnFlipOnly() {
+        let recorder = RecordingTelemetryTransport()
+        Telemetry.shared.replaceTransport(recorder)
+        defer { Telemetry.shared.replaceTransport(RecordingTelemetryTransport()) }
+
+        let mock = MockSpeechSynthesizer()
+        let viewModel = CookModeViewModelTests.makeViewModel(
+            stepCount: 3,
+            voiceReader: VoiceReader(synthesizer: mock)
+        )
+
+        viewModel.setVoiceMode(true)  // flip on -> fires on:true
+        viewModel.setVoiceMode(true)  // idempotent re-read -> no event
+        viewModel.setVoiceMode(false)  // flip off -> fires on:false
+
+        let toggles = recorder.events.filter { $0.name == "voice_mode_toggled" }
+        #expect(toggles.map(\.payload) == [["on": "true"], ["on": "false"]])
     }
 
     /// AC-7.6 — exiting Cook Mode stops the reader and clears Voice Mode.

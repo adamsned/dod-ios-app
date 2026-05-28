@@ -62,6 +62,40 @@ public enum AnalyticsEvent: Sendable, Hashable {
     /// empty-state taps (`dod://saved`, `dod://feed`). No free-text
     /// payload — see constitution §9 allowlist (amended for this event).
     case widgetOpened(kind: WidgetKind, recipeID: Int?)
+
+    /// Voice Mode (US-40) toggled on or off inside Cook Mode. Authorized by
+    /// CL-82 (constitution §9 allowlist amendment) for AC-40.8. Payload carries
+    /// a single boolean — no recipe id, no free text. A device-state / usage
+    /// event in the same spirit as the idle-timer toggle, but unlike that one
+    /// it *is* surfaced as an allowlisted event (the user-driven on/off is a
+    /// product-interaction signal worth tracking).
+    case voiceModeToggled(on: Bool)
+
+    /// A Siri voice command (US-40 / AC-40.5) fired against the active Cook
+    /// Mode session. Authorized by CL-82. The payload carries only the fixed
+    /// ``VoiceCommandName`` enum string identifying which command ran — the
+    /// user's raw spoken phrase is **never** included (the intent layer never
+    /// sees it: SiriKit matches the phrase and hands the app a typed intent).
+    case voiceCommandFired(command: VoiceCommandName)
+}
+
+/// The closed set of Siri voice commands Cook Mode exposes (US-40 / AC-40.5).
+/// Serializes as the lowercase raw value on the analytics wire — a fixed
+/// enum string, not user input, so it satisfies the constitution §9 "no free
+/// text" rule the same way ``WidgetKind`` does for `widgetOpened`.
+public enum VoiceCommandName: String, Sendable, Hashable, CaseIterable {
+
+    /// "next step" / "next" / "go forward" — advances one step.
+    case next
+
+    /// "previous step" / "go back" / "back" — steps back one.
+    case previous
+
+    /// "repeat" / "say that again" — re-reads the current step.
+    case `repeat`
+
+    /// "pause" — pauses the current utterance.
+    case pause
 }
 
 /// Identifier for the widget surface a `widgetOpened` event originated
@@ -95,6 +129,8 @@ extension AnalyticsEvent {
         case .recipeRated: "recipe_rated"
         case .recipeCommentSubmitted: "recipe_comment_submitted"
         case .widgetOpened: "widget_opened"
+        case .voiceModeToggled: "voice_mode_toggled"
+        case .voiceCommandFired: "voice_command_fired"
         }
     }
 
@@ -134,6 +170,12 @@ extension AnalyticsEvent {
             } else {
                 ["kind": kind.rawValue]
             }
+        case .voiceModeToggled(let on):
+            ["on": String(on)]
+        case .voiceCommandFired(let command):
+            // `command` is a closed enum string (next/previous/repeat/pause),
+            // never the user's spoken phrase. Constitution §9: no free text.
+            ["command": command.rawValue]
         }
     }
 }
