@@ -85,6 +85,7 @@ public struct CookModeView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer()
+            voiceModeToggle
             Text(stepCounterLabel)
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
@@ -299,6 +300,30 @@ public struct CookModeView: View {
     private func close() {
         viewModel.endCookMode()
         onClose(viewModel.checkedIngredientIDs)
+    }
+}
+
+// MARK: - Voice Mode toggle (US-40 / AC-40.1)
+
+extension CookModeView {
+    /// Voice Mode toggle (US-40 / AC-40.1) — a `speaker.wave.2` button that
+    /// fills (`speaker.wave.2.fill`) when reading is on. Tapping flips
+    /// ``CookModeViewModel/isVoiceModeEnabled``; turning it on immediately
+    /// reads the current step (AC-40.2), turning it off stops the reader.
+    /// Pulled into an extension so the type body stays under the SwiftLint
+    /// length cap (mirrors `ingredientRow` below).
+    @ViewBuilder
+    fileprivate var voiceModeToggle: some View {
+        Button {
+            viewModel.toggleVoiceMode()
+        } label: {
+            Image(systemName: viewModel.isVoiceModeEnabled ? "speaker.wave.2.fill" : "speaker.wave.2")
+                .foregroundStyle(viewModel.isVoiceModeEnabled ? DODColor.accent : DODColor.label)
+        }
+        .accessibilityIdentifier("cook-mode-voice-toggle")
+        .accessibilityLabel("Voice Mode")
+        .accessibilityHint(viewModel.isVoiceModeEnabled ? "stop reading steps aloud" : "read steps aloud")
+        .accessibilityAddTraits(viewModel.isVoiceModeEnabled ? .isSelected : [])
     }
 }
 
