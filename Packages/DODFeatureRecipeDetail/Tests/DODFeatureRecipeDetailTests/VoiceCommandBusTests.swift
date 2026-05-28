@@ -4,7 +4,7 @@ import Testing
 @testable import DODFeatureRecipeDetail
 
 /// L1 coverage for the Voice Mode Siri-intent dispatch layer (US-40 / T-690c —
-/// AC-40.5, CL-82). The four `AppIntent`s in the App target are thin adapters
+/// AC-40.5, CL-83). The four `AppIntent`s in the App target are thin adapters
 /// that call `VoiceCommandBus.shared.dispatch(_:)`; this suite asserts the bus
 /// forwards each command to the right ``VoiceCommandHandler`` method and that
 /// the weak-handler lifecycle (register on begin, clear on end) makes a
@@ -84,7 +84,7 @@ import Testing
         #expect(spy.calls == [.pause])
     }
 
-    /// CL-82 — a command fired with no active Cook Mode session is a silent
+    /// CL-83 — a command fired with no active Cook Mode session is a silent
     /// no-op (the weak handler is nil). This is the lock-screen-Siri case.
     @Test func commandWithNoHandlerIsANoOp() {
         VoiceCommandBus.shared.handler = nil
@@ -96,7 +96,7 @@ import Testing
         #expect(VoiceCommandBus.shared.handler == nil)
     }
 
-    /// CL-82 — `beginCookMode()` registers the view model as the live handler
+    /// CL-83 — `beginCookMode()` registers the view model as the live handler
     /// and `endCookMode()` clears it, so the bus only ever drives the
     /// foreground session.
     @Test func cookModeLifecycleRegistersAndClearsHandler() {

@@ -149,7 +149,7 @@ import Testing
         #expect(mock.calls.isEmpty)
     }
 
-    /// AC-40.8 / CL-82 — flipping Voice Mode fires `voiceModeToggled(on:)` once
+    /// AC-40.8 / CL-83 — flipping Voice Mode fires `voiceModeToggled(on:)` once
     /// per actual change, with the right boolean and no other payload. An
     /// idempotent re-set (same value) does not re-fire.
     @Test func togglingVoiceModeFiresAnalyticsOnFlipOnly() {

@@ -31,7 +31,7 @@ public protocol VoiceCommandHandler: AnyObject {
 /// outside any SwiftUI view tree, with no handle to the `@State`-owned Cook
 /// Mode view model) and the **live** Cook Mode session.
 ///
-/// Spec trace: US-40 / AC-40.5, CL-82. Mirrors the US-10 ``DeepLinkDispatcher``
+/// Spec trace: US-40 / AC-40.5, CL-83. Mirrors the US-10 ``DeepLinkDispatcher``
 /// pattern, but where the deep-link bus holds a *pending value* the root view
 /// drains on the next render, this bus holds a **weak handler** the active
 /// session registers itself as. Voice commands are imperative and only

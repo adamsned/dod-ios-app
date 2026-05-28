@@ -111,7 +111,7 @@ import Testing
     }
 
     @Test func voiceModeToggledCarriesOnlyTheBoolean() {
-        // Spec AC-40.8 + constitution §9 (CL-82 amendment): payload is exactly
+        // Spec AC-40.8 + constitution §9 (CL-83 amendment): payload is exactly
         // { on } — no recipe id, no free text.
         let on = AnalyticsEvent.voiceModeToggled(on: true)
         let off = AnalyticsEvent.voiceModeToggled(on: false)
@@ -122,7 +122,7 @@ import Testing
     }
 
     @Test func voiceCommandFiredCarriesOnlyTheClosedEnumString() {
-        // Spec AC-40.5 / AC-40.8 + constitution §9 (CL-82 amendment): payload
+        // Spec AC-40.5 / AC-40.8 + constitution §9 (CL-83 amendment): payload
         // is exactly { command } where command is one of the four fixed enum
         // strings — never the user's spoken phrase.
         let next = AnalyticsEvent.voiceCommandFired(command: .next)
@@ -134,7 +134,7 @@ import Testing
     }
 
     @Test func voiceCommandFiredPayloadHasNoFreeText() {
-        // Constitution §9 (CL-82): sweep every command and assert the only
+        // Constitution §9 (CL-83): sweep every command and assert the only
         // payload value is a known enum string — no raw spoken phrase leaks.
         let permitted = Set(VoiceCommandName.allCases.map(\.rawValue))
         for command in VoiceCommandName.allCases {

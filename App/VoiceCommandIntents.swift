@@ -5,7 +5,7 @@ import Foundation
 
 /// Hands-free Cook Mode voice commands exposed to Siri / Shortcuts (US-40).
 ///
-/// Spec trace: US-40 / AC-40.5, CL-82. Each intent is a thin adapter: it posts
+/// Spec trace: US-40 / AC-40.5, CL-83. Each intent is a thin adapter: it posts
 /// a ``VoiceCommand`` onto the process-wide ``VoiceCommandBus`` (which the live
 /// Cook Mode session registers itself with — see
 /// ``CookModeViewModel/beginCookMode()``) and fires a `voiceCommandFired`

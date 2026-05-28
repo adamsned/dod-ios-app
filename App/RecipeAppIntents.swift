@@ -123,7 +123,7 @@ struct DODShortcuts: AppShortcutsProvider {
             shortTitle: "Saved Recipes",
             systemImageName: "bookmark.fill"
         )
-        // Voice Mode hands-free commands (US-40 / AC-40.5, CL-82). The
+        // Voice Mode hands-free commands (US-40 / AC-40.5, CL-83). The
         // AppIntents metadata processor requires **every** utterance to contain
         // `\(.applicationName)` (not just phrases that interpolate a
         // `@Parameter`) — it fails the export otherwise. So each phrase suffixes

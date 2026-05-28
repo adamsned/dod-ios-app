@@ -64,7 +64,7 @@ public enum AnalyticsEvent: Sendable, Hashable {
     case widgetOpened(kind: WidgetKind, recipeID: Int?)
 
     /// Voice Mode (US-40) toggled on or off inside Cook Mode. Authorized by
-    /// CL-82 (constitution §9 allowlist amendment) for AC-40.8. Payload carries
+    /// CL-83 (constitution §9 allowlist amendment) for AC-40.8. Payload carries
     /// a single boolean — no recipe id, no free text. A device-state / usage
     /// event in the same spirit as the idle-timer toggle, but unlike that one
     /// it *is* surfaced as an allowlisted event (the user-driven on/off is a
@@ -72,7 +72,7 @@ public enum AnalyticsEvent: Sendable, Hashable {
     case voiceModeToggled(on: Bool)
 
     /// A Siri voice command (US-40 / AC-40.5) fired against the active Cook
-    /// Mode session. Authorized by CL-82. The payload carries only the fixed
+    /// Mode session. Authorized by CL-83. The payload carries only the fixed
     /// ``VoiceCommandName`` enum string identifying which command ran — the
     /// user's raw spoken phrase is **never** included (the intent layer never
     /// sees it: SiriKit matches the phrase and hands the app a typed intent).
