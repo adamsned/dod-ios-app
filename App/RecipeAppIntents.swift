@@ -123,17 +123,19 @@ struct DODShortcuts: AppShortcutsProvider {
             shortTitle: "Saved Recipes",
             systemImageName: "bookmark.fill"
         )
-        // Voice Mode hands-free commands (US-40 / AC-40.5, CL-82). These
-        // intents take no parameter, so `\(.applicationName)` is optional in
-        // the phrase (the framework only requires it for phrases that
-        // interpolate a `@Parameter`); we suffix it on the primary phrase of
-        // each for Shortcuts-app discoverability.
+        // Voice Mode hands-free commands (US-40 / AC-40.5, CL-82). The
+        // AppIntents metadata processor requires **every** utterance to contain
+        // `\(.applicationName)` (not just phrases that interpolate a
+        // `@Parameter`) — it fails the export otherwise. So each phrase suffixes
+        // `in \(.applicationName)`, matching the recipe intents above. In
+        // practice Siri still matches the bare command once the shortcut is
+        // donated; the token is what scopes the phrase to this app.
         AppShortcut(
             intent: NextStepIntent(),
             phrases: [
                 "Next step in \(.applicationName)",
-                "Next step",
-                "Go forward",
+                "Next in \(.applicationName)",
+                "Go forward in \(.applicationName)",
             ],
             shortTitle: "Next Step",
             systemImageName: "chevron.right"
@@ -142,8 +144,8 @@ struct DODShortcuts: AppShortcutsProvider {
             intent: PreviousStepIntent(),
             phrases: [
                 "Previous step in \(.applicationName)",
-                "Previous step",
-                "Go back",
+                "Go back in \(.applicationName)",
+                "Back in \(.applicationName)",
             ],
             shortTitle: "Previous Step",
             systemImageName: "chevron.left"
@@ -152,8 +154,8 @@ struct DODShortcuts: AppShortcutsProvider {
             intent: RepeatStepIntent(),
             phrases: [
                 "Repeat step in \(.applicationName)",
-                "Repeat that",
-                "Say that again",
+                "Repeat that in \(.applicationName)",
+                "Say that again in \(.applicationName)",
             ],
             shortTitle: "Repeat Step",
             systemImageName: "arrow.clockwise"
@@ -162,7 +164,7 @@ struct DODShortcuts: AppShortcutsProvider {
             intent: PauseVoiceIntent(),
             phrases: [
                 "Pause reading in \(.applicationName)",
-                "Pause reading",
+                "Pause in \(.applicationName)",
             ],
             shortTitle: "Pause Reading",
             systemImageName: "pause.fill"
