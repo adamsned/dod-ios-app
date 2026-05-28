@@ -169,6 +169,64 @@ import Testing
         #expect(scratch.recent().isEmpty)
     }
 
+    // REG-19 / CL-66 / T-670: tapping a curated "Try" suggestion must
+    // NOT persist the tapped term into the recent-searches store, and
+    // tapping Clear All after curated taps must leave Recent empty.
+    // The pre-fix bug: `onCategoryTap` set `viewModel.query =
+    // category.name` directly, which routed through the normal search
+    // path and called `recents.record(...)` on completion — curated
+    // category names ("Bourbon", "Sweet Potato", "Brisket", etc.)
+    // leaked into Recent. Clear All cleared the store, but a later
+    // observation tick / next idle render surfaced them again because
+    // a debounced search that started just before Clear All could
+    // complete after the wipe. This test pins the contract: after
+    // `selectCuratedSuggestion(_:)` runs, no recent is recorded; after
+    // `clearRecentSearches()` runs (regardless of any in-flight
+    // debounce), `recentSearches.isEmpty == true`.
+    @Test func curatedTapDoesNotRecordRecentAndClearAllLeavesRecentEmpty() async {
+        let scratch = Self.scratchRecents()
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["Bourbon"] = [Self.makeItem(1)]
+        dependencies.results["Sweet Potato"] = [Self.makeItem(2)]
+        dependencies.results["Brisket"] = [Self.makeItem(3)]
+        let viewModel = SearchViewModel(dependencies: dependencies, recentSearches: scratch)
+        viewModel.debounceMilliseconds = 0
+
+        // Three curated "Try" pill taps in a row.
+        viewModel.selectCuratedSuggestion("Bourbon")
+        await viewModel.runImmediateSearch()
+        viewModel.selectCuratedSuggestion("Sweet Potato")
+        await viewModel.runImmediateSearch()
+        viewModel.selectCuratedSuggestion("Brisket")
+        await viewModel.runImmediateSearch()
+
+        // Curated taps must not have polluted the recent-searches store.
+        #expect(
+            viewModel.recentSearches.isEmpty,
+            "Curated 'Try' taps must not persist into Recent"
+        )
+        #expect(scratch.recent().isEmpty)
+
+        // Now type a real query so a recent exists; then Clear All.
+        viewModel.query = "pasta"
+        dependencies.results["pasta"] = [Self.makeItem(99)]
+        await viewModel.runImmediateSearch()
+        #expect(viewModel.recentSearches == ["pasta"])
+
+        viewModel.clearRecentSearches()
+        #expect(viewModel.recentSearches.isEmpty)
+        #expect(scratch.recent().isEmpty)
+
+        // And a curated tap immediately after Clear All must also not
+        // refill Recent — the bug-shaped sequence the user reported.
+        viewModel.selectCuratedSuggestion("Bourbon")
+        await viewModel.runImmediateSearch()
+        #expect(
+            viewModel.recentSearches.isEmpty,
+            "Curated tap after Clear All must leave Recent empty"
+        )
+    }
+
     @Test func selectRecentReRunsSearchWithStoredQuery() async {
         let dependencies = FakeSearchDependencies()
         dependencies.results["tacos"] = [Self.makeItem(5, title: "Beef Tacos")]

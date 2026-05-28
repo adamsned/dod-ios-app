@@ -115,8 +115,16 @@ public struct SearchView: View {
                 // hadn't yet hydrated the local category-IDs cache — the
                 // smoking gun behind the "tag search returns no results"
                 // round-6 report. CL-49 documents the full root cause.
+                //
+                // REG-19 / CL-66 / T-670: route through
+                // `selectCuratedSuggestion(_:)` (not raw `query = ...`)
+                // so the resulting REST search does NOT persist the
+                // tapped category name into the recent-searches store.
+                // The user tapped a curated pill; they did not type the
+                // term. Persisting it makes Clear All look broken because
+                // the same curated terms reappear under Recent.
                 onCategoryTap: { category in
-                    viewModel.query = category.name
+                    viewModel.selectCuratedSuggestion(category.name)
                 },
                 onClearRecents: { viewModel.clearRecentSearches() },
                 // US-33 / AC-33.3 / CL-57: per-term context-menu Clear.
