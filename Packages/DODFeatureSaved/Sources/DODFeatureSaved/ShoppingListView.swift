@@ -29,6 +29,27 @@ public struct ShoppingListView: View {
         content
             .background(DODColor.surface)
             .navigationTitle("Shopping List")
+            .toolbar { shareToolbar }
+    }
+
+    /// AC-39.7 / CL-85 decision 3 — "Share via iMessage". A SwiftUI `ShareLink`
+    /// wrapping the plain-text payload from ``ShoppingListFormatter`` (no
+    /// `MessageUI` dependency, per AC-39.7 + CL-72 — the system share sheet
+    /// routes to iMessage / AirDrop / Mail / Notes / Copy). Hidden in the empty
+    /// state (nothing to share, mirroring AC-39.1's hide-share posture). The
+    /// shared text is the still-need subset — checked + already-have rows are
+    /// excluded (CL-85's recorded deviation from CL-72's full-list snapshot).
+    @ToolbarContentBuilder
+    private var shareToolbar: some ToolbarContent {
+        if !viewModel.isEmpty {
+            ToolbarItem(placement: .primaryAction) {
+                ShareLink(item: ShoppingListFormatter.shareText(viewModel)) {
+                    Label("Share via iMessage", systemImage: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("shopping-list-share")
+                .accessibilityLabel("Share shopping list")
+            }
+        }
     }
 
     @ViewBuilder
