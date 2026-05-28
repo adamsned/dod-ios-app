@@ -15,6 +15,15 @@ public struct SavedView: View {
     /// `RecipeStore.toggleSaved`'s contract (CL-59 always-"Save" decision).
     public let onSave: ((Recipe) -> Void)?
 
+    /// US-39 / AC-39.3 / CL-85 — drives the "Make Shopping List" entry. When the
+    /// builder sheet is presented this is `true`; the recipes the user picks
+    /// land in ``builtListRecipes``, which pushes ``ShoppingListView``.
+    @State private var isBuildingShoppingList = false
+    /// The recipes the picker built a list from. Non-nil pushes the shopping
+    /// list onto the navigation stack (AC-39.3 → AC-39.4 render). Wrapped so
+    /// `navigationDestination(item:)` keys on it.
+    @State private var builtListRecipes: ShoppingListSelection?
+
     public init(
         viewModel: SavedViewModel,
         onSelect: @escaping (Recipe) -> Void,
@@ -29,7 +38,34 @@ public struct SavedView: View {
         content
             .background(DODColor.surface)
             .navigationTitle("Saved")
+            .toolbar { shoppingListToolbar }
+            .sheet(isPresented: $isBuildingShoppingList) {
+                ShoppingListBuilderSheet(recipes: viewModel.recipes) { selected in
+                    builtListRecipes = ShoppingListSelection(recipes: selected)
+                }
+            }
+            .navigationDestination(item: $builtListRecipes) { selection in
+                ShoppingListView(viewModel: ShoppingListViewModel(recipes: selection.recipes))
+            }
             .task { await viewModel.refresh() }
+    }
+
+    /// AC-39.3 / CL-85 decision 1 — the Saved-tab entry into the shopping-list
+    /// flow. Rendered only in the `.loaded` state (there are no saved recipes
+    /// to pick from otherwise, mirroring the AC-39.1 hide-when-empty posture).
+    @ToolbarContentBuilder
+    private var shoppingListToolbar: some ToolbarContent {
+        if viewModel.loadState == .loaded {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isBuildingShoppingList = true
+                } label: {
+                    Label("Make Shopping List", systemImage: "cart")
+                }
+                .accessibilityIdentifier("saved-make-shopping-list")
+                .accessibilityLabel("Make Shopping List")
+            }
+        }
     }
 
     @ViewBuilder
@@ -84,5 +120,24 @@ public struct SavedView: View {
         let hours = minutes / 60
         let remainder = minutes % 60
         return remainder == 0 ? "\(hours) hr" : "\(hours)h \(remainder)m"
+    }
+}
+
+// MARK: - Shopping-list navigation payload
+
+/// Wraps the recipes the builder sheet selected so `navigationDestination(item:)`
+/// can key on it (US-39 / AC-39.3 → AC-39.4). Identity is a fresh `UUID` per
+/// build so re-building from the same recipes still pushes a new list. The
+/// `recipes` order matches the picker's source order (CL-77 per-recipe rows).
+struct ShoppingListSelection: Identifiable, Hashable {
+    let id = UUID()
+    let recipes: [Recipe]
+
+    static func == (lhs: ShoppingListSelection, rhs: ShoppingListSelection) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
