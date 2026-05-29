@@ -90,6 +90,31 @@ Directions worth scoping before this graduates:
 
 Likely produces a new US (search overhaul) + clarifications for: client-side fuzzy threshold; ingredient-search scope (title-substring or stem-tokenized); whether to query `wp-json/wp/v2/search` in addition to `?search=`; Spotlight scope (saved-only or all browsed); Recent-searches re-entry tile policy.
 
+### Captured 2026-05-28 (notification trigger — PAUSED pending @adamsned + WordPress)
+
+- **Real-time "new post" notification trigger (the production signal behind US-42).**
+  T-631/T-632 shipped the full **local**-notification plumbing: type-aware copy
+  (recipe vs article), toggle gating, foreground banner, and tap-to-open that
+  **fetches the post on cache-miss** and routes recipe→detail / article→article
+  view (T-632 / REG-20). What's missing is the *trigger* — the app has no signal
+  for "a new post was published." Spencer wants notifications to fire **when a
+  new recipe or article actually drops**, which is genuinely impossible without
+  a server-side push; this is **dad's call** since he controls the WordPress
+  install. Options laid out for the dad conversation:
+
+  | Approach | WordPress / backend side (dad) | iOS side remaining (us) | Notes |
+  |---|---|---|---|
+  | **OneSignal** (lowest effort) | Install OneSignal WP plugin + paste an APNs auth key; it fires a push on `publish_post` and stores device tokens on their servers (free tier) | Add the OneSignal iOS SDK | **New dependency → needs constitution §3 sign-off.** Fastest path to "exactly when it drops." |
+  | **Custom webhook → APNs** | A `publish_post` hook POSTs to a small service that holds device tokens + sends APNs | `registerForRemoteNotifications`, POST the device token to that service, add `aps-environment` entitlement (dad's paid account enables it) | No new iOS dependency, but dad maintains a service. |
+  | **Background-refresh polling** (no WordPress) | nothing | `BGAppRefreshTask` that polls the WP feed for a newer top-of-feed post id than last-seen and fires a local notification | **NOT instant** — fires within iOS's background window (~15-60 min). **Conflicts with NFR-3** ("no background fetch in v1") → needs a constitution amendment. Fallback if dad doesn't want to touch WordPress. |
+
+  **iOS readiness:** display + copy + tap-routing are done (T-631/T-632). For the
+  push options the only iOS additions are remote-notification registration + a
+  device-token handoff; the deep-link routing a push would carry already works.
+  **Do not graduate** until dad picks an approach (it determines whether we add a
+  dependency, a backend, or amend NFR-3). Size: **S** on the iOS side once the
+  approach is chosen; the WordPress/backend side is dad's scope.
+
 ### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
 
 _(empty — all items graduated; see "Recently graduated" below.)_
@@ -168,7 +193,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 #### Settings page expansion
 
-- ~~**Add more standard settings.**~~ Graduated 2026-05-27 as US-36 / CL-62 / T-630 (with T-631 as the APNs follow-up). The audit-and-pick narrowed to five rows: Notifications (UI-only in v1; APNs deferred to T-631), Appearance (Match System / Light / Dark — `.preferredColorScheme` on `RootView`), Default Share Format (link-only / link + recipe text — persisted now, consumer is a future task), Clear Cached Recipe Images (button → `RecipeStore.clearImageCache()` → snackbar with freed-MB count, pinned images preserved), and Share Anonymous Usage Data (toggle, default ON per constitution §9, `TelemetryDeckTransport` short-circuits when OFF). Cook Mode keep-screen-awake, accessibility shortcuts, and legal links were deliberately deferred — see CL-62 for the reasoning.
+- ~~**Add more standard settings.**~~ Graduated 2026-05-27 as US-36 / CL-62 / T-630, with the Notifications row's behavior graduated 2026-05-28 as US-42 / CL-100 / T-631 (**local** notifications, not APNs). The audit-and-pick narrowed to five rows: Notifications (UI-only when T-630 shipped; T-631 wired it to on-device local notifications with recipe-vs-article type-aware copy + tap deep-linking, gated by the toggle), Appearance (Match System / Light / Dark — `.preferredColorScheme` on `RootView`), Default Share Format (link-only / link + recipe text — persisted now, consumer is a future task), Clear Cached Recipe Images (button → `RecipeStore.clearImageCache()` → snackbar with freed-MB count, pinned images preserved), and Share Anonymous Usage Data (toggle, default ON per constitution §9, `TelemetryDeckTransport` short-circuits when OFF). Cook Mode keep-screen-awake, accessibility shortcuts, and legal links were deliberately deferred — see CL-62 for the reasoning.
 
 - **"About Ned Adams & Dutch Oven Daddy" — shorter paragraph + image.** The current placeholder paragraph in T-550's Settings → About row is too long for a phone screen. Replace with this exact copy:
 

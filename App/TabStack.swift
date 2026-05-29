@@ -69,7 +69,12 @@ struct TabStack: View {
                 onSave: { item in
                     Task { await Self.saveFromCard(item: item, store: dependencies.store) }
                 },
-                onClearImageCache: { try await dependencies.store.clearImageCache() }
+                onClearImageCache: { try await dependencies.store.clearImageCache() },
+                // US-42 / AC-42.1 — toggle ON requests local-notification
+                // authorization through the composition root's service.
+                onRequestNotificationAuthorization: {
+                    await dependencies.notificationService.requestAuthorization()
+                }
             )
         case .categories:
             CategoryListView(

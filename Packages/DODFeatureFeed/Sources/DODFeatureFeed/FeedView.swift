@@ -30,17 +30,25 @@ public struct FeedView: View {
     /// pass a non-nil closure that routes through
     /// `RecipeStore.clearImageCache()` and returns freed-byte total.
     public let onClearImageCache: (() async throws -> Int)?
+    /// US-42 / AC-42.1 — authorization seam forwarded into `SettingsView`'s
+    /// `SettingsViewModel` so flipping the notifications toggle ON requests
+    /// system permission. Optional; `nil` means the toggle persists intent
+    /// but reports "not granted" (previews / tests). Production (TabStack)
+    /// passes a closure that calls `NotificationService.requestAuthorization()`.
+    public let onRequestNotificationAuthorization: (@MainActor () async -> Bool)?
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
-        onClearImageCache: (() async throws -> Int)? = nil
+        onClearImageCache: (() async throws -> Int)? = nil,
+        onRequestNotificationAuthorization: (@MainActor () async -> Bool)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.onClearImageCache = onClearImageCache
+        self.onRequestNotificationAuthorization = onRequestNotificationAuthorization
     }
 
     public var body: some View {
@@ -96,7 +104,12 @@ public struct FeedView: View {
     /// routes through the composition root's `RecipeStore` instance.
     private var settingsToolbarLink: some View {
         NavigationLink {
-            SettingsView(onClearImageCache: onClearImageCache)
+            SettingsView(
+                viewModel: SettingsViewModel(
+                    requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
+                ),
+                onClearImageCache: onClearImageCache
+            )
         } label: {
             Image(systemName: "gearshape")
                 .accessibilityLabel("Settings")

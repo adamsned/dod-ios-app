@@ -88,7 +88,7 @@ public struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-toggle-notifications")
             } footer: {
-                Text("Push notifications arrive in a future update.")
+                Text("New-post alerts are delivered on this device only.")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             }
@@ -217,7 +217,14 @@ public struct SettingsView: View {
     private var notificationsEnabledBinding: Binding<Bool> {
         Binding(
             get: { viewModel.notificationsEnabled },
-            set: { viewModel.notificationsEnabled = $0 }
+            // Turning ON requests system authorization (US-42 / AC-42.1);
+            // a denied prompt leaves the persisted flag OFF so the toggle
+            // springs back. The work is async (the system prompt), so it
+            // runs in a Task — the `@Observable` `notificationsEnabled`
+            // write inside `setNotificationsEnabled` re-renders the toggle.
+            set: { newValue in
+                Task { await viewModel.setNotificationsEnabled(newValue) }
+            }
         )
     }
 

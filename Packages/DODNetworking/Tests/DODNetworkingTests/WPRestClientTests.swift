@@ -64,6 +64,51 @@ import Testing
             _ = try await client.posts()
         }
     }
+
+    /// REG-20 / CL-101 (T-632): the single-post-by-id endpoint backing the
+    /// notification deep-link fetch-on-cache-miss path. A notification
+    /// targets a brand-new (uncached) post, so the tap handler fetches it
+    /// here to obtain its `canonicalURL` before routing to recipe-detail.
+    /// The response is a single object (not an array like `posts()`), and
+    /// the request must carry `_embed=wp:featuredmedia` and hit
+    /// `posts/<id>`.
+    private let singlePostFixture = """
+        {
+          "id": 21238,
+          "slug": "garlic-butter-skillet-corn",
+          "link": "https://www.dutchovendaddy.com/garlic-butter-skillet-corn/",
+          "title": { "rendered": "Garlic Butter Skillet Corn" },
+          "excerpt": { "rendered": "<p>Easy 15-minute side dish.</p>" },
+          "date": "2026-05-01T10:00:00",
+          "featured_media": 23019,
+          "categories": [1590, 334]
+        }
+        """
+
+    @Test func fetchesSinglePostByID() async throws {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts/21238", json: Data(singlePostFixture.utf8))
+        let client = WPRestClient(httpClient: fake)
+        let item = try await client.post(id: 21238)
+        #expect(item.id == 21238)
+        #expect(item.title == "Garlic Butter Skillet Corn")
+        // The canonicalURL is the load-bearing field for the deep-link
+        // path — the recipe-detail screen fetches + classifies this URL.
+        #expect(item.canonicalURL?.absoluteString == "https://www.dutchovendaddy.com/garlic-butter-skillet-corn/")
+        let captured = await fake.capturedRequests
+        let url = try #require(captured.first?.url?.absoluteString)
+        #expect(url.contains("posts/21238"))
+        #expect(url.contains("_embed=wp%3Afeaturedmedia") || url.contains("_embed=wp:featuredmedia"))
+    }
+
+    @Test func singlePostHTTPErrorStatusThrows() async throws {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts/999", json: Data("{}".utf8), statusCode: 404)
+        let client = WPRestClient(httpClient: fake)
+        await #expect(throws: WPClientError.httpStatus(404)) {
+            _ = try await client.post(id: 999)
+        }
+    }
 }
 
 @Suite("WPRestClient.search") struct WPRestClientSearchTests {

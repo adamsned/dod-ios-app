@@ -26,6 +26,29 @@ extension WPRestClient {
         return posts.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
     }
 
+    /// Fetch a single post by its WP id and project it to a
+    /// ``RecipeListItem`` (the same lightweight shape `posts()` returns for
+    /// list rows). Used by the notification deep-link path (T-632 / US-42):
+    /// a notification points at a brand-new post that is **never** in the
+    /// local cache, so the tap handler fetches the post here to obtain its
+    /// `canonicalURL`, then routes to recipe-detail — which runs the normal
+    /// JSON-LD parse / article-classification fetch (AC-4.11 / AC-37.2) to
+    /// resolve recipe-vs-article. `_embed=wp:featuredmedia` inlines the
+    /// hero image URL so the detail screen has a cell to render immediately,
+    /// matching `posts()`.
+    ///
+    /// Spec trace: REG-20, CL-101 (notification deep-link fetch-on-miss).
+    public func post(id: Int) async throws -> RecipeListItem {
+        let queryItems: [URLQueryItem] = [
+            // `_embed` and `_fields` interact badly: filtering excludes the
+            // _links field that drives embedding, so omit _fields here
+            // (mirrors `posts()` / `search()`).
+            URLQueryItem(name: "_embed", value: "wp:featuredmedia")
+        ]
+        let post: WPDTO.Post = try await get(path: "posts/\(id)", queryItems: queryItems)
+        return post.toRecipeListItem(heroImage: post.inlineHeroURL)
+    }
+
     /// Search posts by query string.
     ///
     /// Spec trace: AC-3.1, AC-3.2.
