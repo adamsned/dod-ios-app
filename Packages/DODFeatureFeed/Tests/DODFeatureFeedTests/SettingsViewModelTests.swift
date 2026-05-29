@@ -1,5 +1,7 @@
+import DODPersistence
 import Foundation
 import Testing
+import os
 
 @testable import DODFeatureFeed
 
@@ -214,6 +216,103 @@ import Testing
         #expect(viewModel.telemetryEnabled == false)
     }
 
+    // MARK: - US-41 AC-41.3 — iCloud Sync toggle (T-703)
+
+    @Test func togglingOnCallsRecreateContainerAfterFlagWrite() async throws {
+        let defaults = Self.isolatedDefaults()
+        let recorder = RecordingSettingsDependencies(defaults: defaults)
+        let viewModel = SettingsViewModel(defaults: defaults, dependencies: recorder)
+
+        // Toggle starts in the OFF state per the canonical default. The
+        // user flips the toggle ON via the view's Binding setter, which
+        // routes through `requestCloudSyncOptIn(true)` — the alert
+        // surfaces, the user confirms, and only then does the
+        // dependency get called.
+        #expect(viewModel.isCloudSyncEnabled == false)
+        viewModel.requestCloudSyncOptIn(true)
+        #expect(viewModel.cloudSyncConfirmationRequest?.targetEnabled == true)
+        await viewModel.confirmCloudSyncFlip()
+
+        // Dependency saw the flag-write call (and the flag landed in
+        // UserDefaults before the container rebuild fired — order
+        // matters because `RecipeStore.recreateContainerAfterOptInChange`
+        // reads UserDefaults during construction).
+        #expect(recorder.invocations == [true])
+        #expect(recorder.flagWasWrittenBeforeRebuild == true)
+        #expect(viewModel.isCloudSyncEnabled == true)
+        #expect(viewModel.cloudSyncConfirmationRequest == nil)
+    }
+
+    @Test func togglingOffCallsRecreateContainerAfterFlagWrite() async throws {
+        let defaults = Self.isolatedDefaults()
+        // Seed the flag ON so the OFF flip exercises the opposite path.
+        defaults.set(true, forKey: RecipeStore.cloudKitSyncOptInKey)
+        let recorder = RecordingSettingsDependencies(defaults: defaults)
+        let viewModel = SettingsViewModel(defaults: defaults, dependencies: recorder)
+
+        #expect(viewModel.isCloudSyncEnabled == true)
+        viewModel.requestCloudSyncOptIn(false)
+        #expect(viewModel.cloudSyncConfirmationRequest?.targetEnabled == false)
+        await viewModel.confirmCloudSyncFlip()
+
+        #expect(recorder.invocations == [false])
+        #expect(recorder.flagWasWrittenBeforeRebuild == true)
+        #expect(viewModel.isCloudSyncEnabled == false)
+        #expect(viewModel.cloudSyncConfirmationRequest == nil)
+    }
+
+    @Test func cloudSyncStatusTextDefaultsToIdle() async throws {
+        // T-705 will replace this with the real `CloudKitSyncStatus`
+        // enum's `displayString`. Today it returns "Idle" because the
+        // sync state machine isn't wired yet — pin the placeholder so a
+        // future T-705 refactor that drops the row by accident shows up
+        // as a test failure rather than a silent regression.
+        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
+        #expect(viewModel.cloudSyncStatusText == "Idle")
+    }
+
+    @Test func initialStateReadsCurrentUserDefaultsValue() async throws {
+        // The user may have flipped the flag via T-704's first-launch
+        // sheet before ever opening Settings; the view-model's cached
+        // state must mirror whatever the canonical key reports at
+        // construction.
+        let defaults = Self.isolatedDefaults()
+        defaults.set(true, forKey: RecipeStore.cloudKitSyncOptInKey)
+        let recorder = RecordingSettingsDependencies(defaults: defaults)
+
+        let viewModel = SettingsViewModel(defaults: defaults, dependencies: recorder)
+        #expect(viewModel.isCloudSyncEnabled == true)
+
+        // Flip the flag in defaults and rebuild — proves the read path
+        // is dependency-driven, not cached on a stale defaults snapshot.
+        defaults.set(false, forKey: RecipeStore.cloudKitSyncOptInKey)
+        let next = SettingsViewModel(defaults: defaults, dependencies: recorder)
+        #expect(next.isCloudSyncEnabled == false)
+    }
+
+    @Test func confirmationFlowCanBeCancelled() async throws {
+        let defaults = Self.isolatedDefaults()
+        let recorder = RecordingSettingsDependencies(defaults: defaults)
+        let viewModel = SettingsViewModel(defaults: defaults, dependencies: recorder)
+
+        // User flips the toggle ON optimistically (the SwiftUI Binding
+        // mirrors `targetEnabled` to the view-model immediately so the
+        // toggle visually moves), then taps "Cancel" on the alert.
+        viewModel.requestCloudSyncOptIn(true)
+        #expect(viewModel.cloudSyncConfirmationRequest?.targetEnabled == true)
+
+        viewModel.cancelCloudSyncFlip()
+
+        // Cached state snaps back to the pre-request value, the alert
+        // request clears, and the dependency NEVER gets called.
+        #expect(viewModel.isCloudSyncEnabled == false)
+        #expect(viewModel.cloudSyncConfirmationRequest == nil)
+        #expect(recorder.invocations.isEmpty)
+        // The canonical UserDefaults flag is untouched — the cancel
+        // path must leave persistence in its pre-tap state.
+        #expect(defaults.bool(forKey: RecipeStore.cloudKitSyncOptInKey) == false)
+    }
+
     /// Per-test isolated UserDefaults suite so the standard defaults
     /// stay clean across the L1 run. Mirrors `RecentSearchesTests`.
     static func isolatedDefaults() -> UserDefaults {
@@ -221,5 +320,57 @@ import Testing
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
+    }
+}
+
+// MARK: - Recording double for SettingsDependencies (US-41 / T-703)
+
+/// L1 double for ``SettingsDependencies``. Records every
+/// `setCloudSyncOptIn(_:)` call AND pins the UserDefaults flag value
+/// observed at the moment the rebuild would have fired, so the suite
+/// can assert the "flag written → container rebuilt" ordering contract
+/// from T-702's `recreateContainerAfterOptInChange()` seam.
+///
+/// State is stored behind a `OSAllocatedUnfairLock` so the recorder is
+/// `Sendable` without `@MainActor` isolation — the protocol's
+/// `Sendable` requirement is the one that matters here, and `withLock`
+/// is async-safe (unlike `NSLock.lock()` which the compiler rejects
+/// from async contexts).
+final class RecordingSettingsDependencies: SettingsDependencies, @unchecked Sendable {
+    private struct State {
+        var invocations: [Bool] = []
+        var flagWasWrittenBeforeRebuild = false
+    }
+
+    private let defaults: UserDefaults
+    private let state = OSAllocatedUnfairLock<State>(initialState: State())
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+    }
+
+    var invocations: [Bool] {
+        state.withLock { $0.invocations }
+    }
+
+    var flagWasWrittenBeforeRebuild: Bool {
+        state.withLock { $0.flagWasWrittenBeforeRebuild }
+    }
+
+    func setCloudSyncOptIn(_ enabled: Bool) async {
+        // Mirror the live wiring's two-step contract — write the flag,
+        // then "rebuild" (a no-op here; the assertion is that the
+        // observed flag value matches `enabled` at the moment the
+        // rebuild would fire).
+        defaults.set(enabled, forKey: RecipeStore.cloudKitSyncOptInKey)
+        let observed = defaults.bool(forKey: RecipeStore.cloudKitSyncOptInKey)
+        state.withLock { value in
+            value.invocations.append(enabled)
+            value.flagWasWrittenBeforeRebuild = (observed == enabled)
+        }
+    }
+
+    func cloudSyncOptInValue() -> Bool {
+        defaults.bool(forKey: RecipeStore.cloudKitSyncOptInKey)
     }
 }

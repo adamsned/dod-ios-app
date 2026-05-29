@@ -1,7 +1,7 @@
 import DODDesignSystem
 import SwiftUI
 
-/// Settings page (US-32 skeleton, US-36 expansion).
+/// Settings page (US-32 skeleton, US-36 expansion, US-41 iCloud Sync row).
 ///
 /// Reached via the gear icon on the trailing edge of the Recipes (Feed)
 /// tab's nav bar (see ``FeedView``). The list uses `.insetGrouped` with
@@ -33,7 +33,23 @@ import SwiftUI
 ///      `TelemetryDeckTransport` reads the same key at every `send(_:)`
 ///      and short-circuits when false.
 ///
-/// Spec trace: US-32 AC-32.1..AC-32.5; US-36 AC-36.1..AC-36.8.
+/// **US-41 (T-703) iCloud Sync section** (appended below the existing
+/// rows per the task scope — the original CL-89 spec called for the row
+/// to sit between Notifications and Appearance, but the codebase landed
+/// the Settings layout with one row per Section + a footer, so a single
+/// extra Section at the bottom matches the visual rhythm without
+/// disturbing the established ordering):
+///   9. iCloud Sync — `Toggle` bound to
+///      ``SettingsViewModel/isCloudSyncEnabled``. Subtext flips based on
+///      state (off: stays-on-device copy; on: across-devices copy).
+///      Toggling flips fire a confirmation alert per CL-89.
+///  10. Status — read-only row, only visible when the toggle is ON.
+///      Renders ``SettingsViewModel/cloudSyncStatusText`` which today
+///      returns "Idle"; T-705 wires the real `CloudKitSyncStatus`
+///      enum + "Last synced N ago" formatting.
+///
+/// Spec trace: US-32 AC-32.1..AC-32.5; US-36 AC-36.1..AC-36.8;
+/// US-41 AC-41.3, AC-41.4; CL-89 (opt-in flow + confirmation alerts).
 public struct SettingsView: View {
 
     @State private var viewModel: SettingsViewModel
@@ -46,10 +62,17 @@ public struct SettingsView: View {
     public let onClearImageCache: (() async throws -> Int)?
 
     public init(
-        viewModel: SettingsViewModel = SettingsViewModel(),
-        onClearImageCache: (() async throws -> Int)? = nil
+        viewModel: SettingsViewModel? = nil,
+        onClearImageCache: (() async throws -> Int)? = nil,
+        settingsDependencies: (any SettingsDependencies)? = nil
     ) {
-        _viewModel = State(initialValue: viewModel)
+        // Construct a default view-model when none is injected,
+        // honoring the optional `settingsDependencies` so the iCloud
+        // Sync seam (US-41 / AC-41.3) wires through to the composition
+        // root's `LiveSettingsDependencies` without forcing every
+        // caller to materialize a `SettingsViewModel` up-front.
+        let resolved = viewModel ?? SettingsViewModel(dependencies: settingsDependencies)
+        _viewModel = State(initialValue: resolved)
         self.onClearImageCache = onClearImageCache
     }
 
@@ -62,6 +85,11 @@ public struct SettingsView: View {
             .overlay(alignment: .bottom) {
                 snackbarOverlay
             }
+            // US-41 AC-41.3 — toggle-flip confirmation alert. The
+            // modifier lives in `SettingsView+CloudSync.swift` so this
+            // file stays under the file_length cap; the copy + button
+            // styles flip with the request direction per CL-89.
+            .cloudSyncConfirmationAlert(viewModel: viewModel)
     }
 
     @ViewBuilder
@@ -148,6 +176,13 @@ public struct SettingsView: View {
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             }
+
+            // MARK: US-41 / AC-41.3 / AC-41.4 — iCloud Sync section
+
+            // The section view + the confirmation alert modifier live
+            // in `SettingsView+CloudSync.swift` so this file stays under
+            // the file_length cap.
+            CloudSyncSection(viewModel: viewModel)
 
             // MARK: US-32 About + version
 

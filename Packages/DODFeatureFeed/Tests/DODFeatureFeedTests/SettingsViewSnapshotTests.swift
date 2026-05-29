@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import DODPersistence
 import SnapshotTesting
 import SwiftUI
 import UIKit
@@ -16,8 +17,13 @@ import XCTest
 /// were deleted on the T-630 commit; iOS-sim first-run uses
 /// `record: .missing` to lay the expanded PNGs down.
 ///
+/// T-703 (US-41 / AC-41.3) adds three additional baselines specifically
+/// for the new iCloud Sync section: toggle off (no Status row), toggle
+/// on (Status row visible reading "Idle"), and the off → on
+/// confirmation alert visible state.
+///
 /// Spec trace: US-32 AC-32.1..AC-32.4, US-36 AC-36.1..AC-36.8,
-/// CC-1 (light + dark accessibility).
+/// US-41 AC-41.3 + AC-41.4, CC-1 (light + dark accessibility).
 final class SettingsViewSnapshotTests: XCTestCase {
 
     override func setUp() {
@@ -45,17 +51,84 @@ final class SettingsViewSnapshotTests: XCTestCase {
         )
     }
 
+    // MARK: - T-703 / US-41 AC-41.3 — iCloud Sync section baselines
+
+    @MainActor
+    func test_settings_iCloudSyncSection_off_light_defaultDynamicType() async {
+        // Toggle OFF (the default) — section renders the toggle only;
+        // the Status row is hidden because `isCloudSyncEnabled` is
+        // false. Locks the off-state subtext ("Saved recipes stay on
+        // this device.") + the section header rendering.
+        let view = Self.makeHostedView(cloudSyncEnabled: false)
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
+    @MainActor
+    func test_settings_iCloudSyncSection_on_light_defaultDynamicType() async {
+        // Toggle ON — the Status row appears and renders the placeholder
+        // "Idle" copy until T-705 wires the real `CloudKitSyncStatus`.
+        // Locks the on-state subtext + the Status row layout reservation.
+        let view = Self.makeHostedView(cloudSyncEnabled: true)
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
+    @MainActor
+    func test_settings_iCloudSyncSection_alertVisible_light() async {
+        // Confirmation alert visible. Starts with the toggle OFF and
+        // fires an off → on request so the view-model holds a
+        // pending `CloudSyncConfirmationRequest(targetEnabled: true)`.
+        // Note: SwiftUI's `.alert(...)` modifier is presented by the
+        // host UIViewController, not as part of the SwiftUI view tree,
+        // so the visible pixels in this snapshot are the underlying
+        // Settings list (NOT the alert chrome) — the test still locks
+        // the underlying surface rendering during an in-flight alert
+        // request, so a future code path that crashes the view when a
+        // request is pending shows up as a snapshot failure rather
+        // than only firing in a UI test. The actual alert copy is
+        // pinned by the `cloudSyncAlertMessage(for:)` static + the
+        // L1 confirmation flow tests in SettingsViewModelTests.
+        let view = Self.makeHostedView(cloudSyncEnabled: false, pendingFlip: true)
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
     // MARK: - Fixtures
 
     /// Drives `SettingsView` with an isolated UserDefaults suite so the
     /// snapshot is deterministic (no shared-defaults bleed between
     /// concurrent test processes).
+    ///
+    /// `cloudSyncEnabled` seeds the canonical `RecipeStore.cloudKitSyncOptInKey`
+    /// flag before view-model construction so the view-model's cached
+    /// `isCloudSyncEnabled` mirrors the requested state. `pendingFlip`
+    /// fires an off → on toggle request so the confirmation alert
+    /// renders in the snapshot.
     @MainActor
-    static func makeHostedView() -> some View {
+    static func makeHostedView(
+        cloudSyncEnabled: Bool = false,
+        pendingFlip: Bool = false
+    ) -> some View {
         let suite = "SettingsViewSnapshotTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite) ?? .standard
         defaults.removePersistentDomain(forName: suite)
+        defaults.set(cloudSyncEnabled, forKey: RecipeStore.cloudKitSyncOptInKey)
         let viewModel = SettingsViewModel(defaults: defaults)
+        if pendingFlip {
+            // Drive an off → on flip so the confirmation alert is in
+            // its pending state when SwiftUI snapshots the view.
+            viewModel.requestCloudSyncOptIn(!cloudSyncEnabled)
+        }
         return SettingsViewSnapshotHost(viewModel: viewModel)
     }
 

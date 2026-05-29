@@ -30,17 +30,25 @@ public struct FeedView: View {
     /// pass a non-nil closure that routes through
     /// `RecipeStore.clearImageCache()` and returns freed-byte total.
     public let onClearImageCache: (() async throws -> Int)?
+    /// US-41 / AC-41.3 (T-703) — the Settings dependency surface the
+    /// iCloud Sync row uses to write the opt-in flag + trigger the
+    /// container rebuild. Optional so non-production callers (tests,
+    /// previews) compile without wiring; production callers (TabStack)
+    /// always pass a `LiveSettingsDependencies`.
+    public let settingsDependencies: (any SettingsDependencies)?
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
-        onClearImageCache: (() async throws -> Int)? = nil
+        onClearImageCache: (() async throws -> Int)? = nil,
+        settingsDependencies: (any SettingsDependencies)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.onClearImageCache = onClearImageCache
+        self.settingsDependencies = settingsDependencies
     }
 
     public var body: some View {
@@ -96,7 +104,10 @@ public struct FeedView: View {
     /// routes through the composition root's `RecipeStore` instance.
     private var settingsToolbarLink: some View {
         NavigationLink {
-            SettingsView(onClearImageCache: onClearImageCache)
+            SettingsView(
+                onClearImageCache: onClearImageCache,
+                settingsDependencies: settingsDependencies
+            )
         } label: {
             Image(systemName: "gearshape")
                 .accessibilityLabel("Settings")
