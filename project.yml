@@ -86,6 +86,21 @@ targets:
           - CFBundleURLName: com.dutchovendaddy.DODApp.deeplink
             CFBundleURLSchemes:
               - dod
+        # US-41 / AC-41.6 / CL-99 (T-702): silent-push wake-up for the
+        # SwiftData → CloudKit private-DB sync adapter. SwiftData's
+        # default `CKDatabaseSubscription` registers the app for silent
+        # push notifications on private-DB changes; when the user saves
+        # a recipe on Device A, Apple's CloudKit infra fires a silent
+        # push to Device B, which wakes the background sync process and
+        # pulls the change. Per CL-99 we accept SwiftData's default
+        # subscription posture; this background mode is what makes the
+        # silent push deliverable. The entry MUST live both here in
+        # `project.yml` (the canonical source XcodeGen reads) and the
+        # regenerated `App/Info.plist` — the REG-INFO-PLIST-CLOBBER fix
+        # established that `xcodegen generate` rewrites `Info.plist`
+        # from this `properties:` block on every run.
+        UIBackgroundModes:
+          - remote-notification
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp
