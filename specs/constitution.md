@@ -9,6 +9,13 @@ Immutable rules. All specs, plans, and tasks must conform. Changes require an ex
 - Brand: warm, food-forward, readable. Recipes are the hero — chrome is minimal.
 - The app is **mostly** read-only: every recipe is a tap away without sign-in. v1.0 adds **two write surfaces** — submitting a rating (1–5 stars) and posting a comment on a recipe — both of which post directly to the dutchovendaddy.com WordPress install via its REST API. No accounts; see §9 for the guest-identity model.
 
+### 1.1 v1.x sync model (added 2026-05-28 by the US-41 / T-700 amendment per CL-86 / CL-87)
+
+- **No accounts in our system; the user's iCloud account is the sync identity.** v1.x adds optional cross-device sync of saved recipes via CloudKit private database (per US-41). There is no Account icon, no login sheet, no OAuth providers, no password handling, and no login UI in our app. The user's iCloud account *is* the sync identity — accessed via `CKContainer.accountStatus(completionHandler:)` (the system-level affordance, no UI surface of ours). The only configuration surface is a Settings → iCloud Sync toggle (US-41 / AC-41.3).
+- **The "mostly read-only with two write surfaces" framing is preserved.** The CloudKit mirror is a sync mechanism, not a new write surface. The user-facing write surfaces remain Save / Comment / Rate per the existing US-13 / US-14 / US-15. CloudKit reads/writes the *user's own data* (their saved recipes), not the blog's read surface.
+- **Guest identity (US-15) remains unchanged.** Name + email for comments + ratings stay Keychain-stored, per-device, sent only to dutchovendaddy.com over HTTPS, no TelemetryDeck. CloudKit sync does NOT replace or change that — guest identity is for *posting to the blog*, which is unrelated to syncing the user's own saved recipes across their own devices. The two systems don't touch each other (CL-88 explicitly excludes the Keychain guest identity from the sync scope).
+- **App Store compliance.** The CloudKit-private-DB-only posture satisfies Apple App Store Review Guideline 5.1.1(ii) ("If your app doesn't include significant account-based features, let people use it without a login" — locked by AC-41.1 + REG-26) and 5.1.1(v) ("apps that offer account creation must offer account deletion" — non-applicable per CL-92 because there is no account in our system; the AC-41.5 toggle-off + iCloud sign-out paths fully remove the app's data from the user's iCloud space).
+
 ## 2. Platforms & versions
 
 - **Targets:** iPhone and iPad. Universal app, single binary.
@@ -31,6 +38,7 @@ Immutable rules. All specs, plans, and tasks must conform. Changes require an ex
 - **Dependencies:** Swift Package Manager only. New dependencies require justification in the plan and approval at the Phase 3 checkpoint. Default answer is "no new dependency." Currently approved:
   - `TelemetryDeck/SwiftSDK` — analytics transport (§9).
   - `pointfreeco/swift-snapshot-testing` — visual regression (§6, L4). Test target only; never imported by production code.
+  - `CloudKit.framework` — Apple-provided system framework added 2026-05-28 by the US-41 / T-700 amendment per CL-86 / CL-87 / CL-93. **Not a third-party dependency** — ships with iOS, no SPM footprint, no package-manager entry, no annual license. Used by `DODPersistence` for the optional cross-device sync of saved recipes via the user's CloudKit private database (`iCloud.com.dutchovendaddy.DODApp`); accessed through SwiftData's iOS 17+ `ModelConfiguration(_:groupContainer:cloudKitDatabase: .private(...))` adapter rather than directly. The two iCloud entitlement keys (`com.apple.developer.icloud-container-identifiers` + `com.apple.developer.icloud-services` per CL-93) are the only entitlement-cost. Reaffirms "default answer is no new third-party dep" — CloudKit was the deliberate iCloud-sync path because the alternative paths (WordPress users + WP OAuth plugin, Firebase, Supabase, local-only + manual iCloud sync) all required either a third-party SDK, a paired web-backend effort, or a worse UX; see CL-86 for the considered-alternatives trail.
 
 ## 4. Content source
 
@@ -39,6 +47,21 @@ Immutable rules. All specs, plans, and tasks must conform. Changes require an ex
 - **Offline:** All viewed recipes cached locally. Explicitly saved recipes are guaranteed available offline (images included).
 - **No** scraping HTML as a primary source. HTML parsing only as a documented fallback for fields the API does not expose.
 - **No** auth required for reads in v1. Anonymous client.
+
+### 4.1 Data boundaries (added 2026-05-28 by the US-41 / T-700 amendment per CL-86 / CL-87 / CL-88)
+
+This section enumerates the three data categories the app touches and the boundary each crosses. The categorization governs the App Privacy questionnaire (§9) and the per-feature scope decisions.
+
+| Category | Where stored | What leaves the device | To where |
+|---|---|---|---|
+| **Cached data** (existing) | SwiftData local store on device + the App Group container for the widget bridge | None (reads only — the network direction is WP REST → device) | n/a (inbound only) |
+| **Guest identity** (US-15, existing) | iOS Keychain on device only, service `com.dutchovendaddy.DODApp.guest` | Name + email (only when the user posts a comment or rating, per US-13 / US-14) | `dutchovendaddy.com` over HTTPS (the WP REST endpoints `/wp/v2/comments` + `/wp-recipe-maker/v1/rating`) |
+| **Synced records** (US-41, new in v1.x) | SwiftData local store, mirrored via CloudKit's `cloudKitDatabase: .private(...)` adapter | The synced fields on `CachedRecipe` rows where `isSaved == true` (per AC-41.4's enumerated field list) + the relevant `CachedImage` rows | The user's own CloudKit private database under container `iCloud.com.dutchovendaddy.DODApp` (Apple-hosted, user-owned, user-controlled, encrypted in transit + at rest per Apple's CloudKit security model) |
+| **Analytics events** (§9, existing + extended) | n/a (ephemeral) | Closed-enum event names + closed-enum payload values (no PII, no free text) | TelemetryDeck's anonymous endpoint |
+
+- The "Synced records" category does NOT change the §4 "No auth required for reads in v1. Anonymous client." rule — CloudKit reads/writes the user's *own data*, not the blog's read surface. Anonymous-WP-REST-client posture is preserved.
+- Apple's own App Privacy guidance for CloudKit-using-but-private-DB-only apps is at https://developer.apple.com/app-store/app-privacy-details/ — the relevant passage: "If your app uses CloudKit and only sends data to the user's own CloudKit container, you do not need to disclose the data as collected by your app." Per CL-94, the App Privacy questionnaire mapping table in §9 stays unchanged.
+- The CloudKit container identifier `iCloud.com.dutchovendaddy.DODApp` matches the bundle ID prefix per CL-93. Only the **private** database is accessed; the public + shared databases are explicitly out of scope for v1.x (locked by REG-25); the Discoverability API is explicitly out of scope (locked by REG-25). See CL-88 for the full sync-scope enumeration and the deferral triggers.
 
 ## 5. Architecture
 

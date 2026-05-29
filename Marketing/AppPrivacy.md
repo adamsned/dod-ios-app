@@ -1,6 +1,6 @@
 # App Store Privacy Questionnaire — v1.0
 
-**Status:** T-182 draft. Verify line-by-line against constitution §9 before submitting. Amended 2026-05-24 for CL-21 (comments + ratings, US-13/14/15).
+**Status:** T-182 draft. Verify line-by-line against constitution §9 before submitting. Amended 2026-05-24 for CL-21 (comments + ratings, US-13/14/15). Amended 2026-05-28 for CL-94 + CL-95 + CL-96 (CloudKit private-DB sync, US-41 / T-700..T-708) — see the new "What changes for v1.x (CloudKit sync)" section below.
 
 When submitting v1.0 to App Store Connect, answer the **App Privacy** section exactly as below. Every claim here traces to a constitution clause; deviating requires a constitution amendment + a new audit.
 
@@ -88,14 +88,57 @@ Host this at `https://www.dutchovendaddy.com/app-privacy/` (or similar) and past
 
 **Not used.** TelemetryDeck does not require an ATT prompt because it does not access IDFA. If you ever add an SDK that does (e.g. Google Analytics), this becomes a required prompt before any tracking call — and triggers a constitution amendment.
 
-## What changes for v2
+## What changes for v1.x (CloudKit sync — US-41 / T-700..T-708, 2026-05-28)
 
-If you add CloudKit sync for saved recipes (v2):
+**Status:** This section was added by the T-700 spec amendment per CL-94 + CL-95 + CL-96. The previous "What changes for v2 / If you add CloudKit sync for saved recipes (v2)" speculation block is preserved below under the strike-through "Historical speculation (superseded)" subhead — it incorrectly speculated that CloudKit sync would require an "Identifiers — Device ID" disclosure and a "Linked to user — Yes" answer. Per Apple's own App Privacy guidance for CloudKit private-DB-only usage, neither is required.
 
-- Add **Identifiers — Device ID** (if iCloud requires it) to the Data Types table.
-- Re-answer the linkage question: probably **Linked to user** = Yes because iCloud is per-Apple-ID.
+### Question: "Did you make changes to your privacy practices?" (App Store Connect → App Privacy)
 
-If you add push notifications for new recipes:
+**Answer:** **No** for the data-categories table; **Yes** for the analytics-event list (the four new sync events from CL-96 are added to constitution §9's allowlist but fall under the existing "Usage Data — Product Interaction" row, so the questionnaire's category-level answer is "No new categories"). When submitting the build that turns on CloudKit sync, the privacy section requires no structural change to the existing table — only the constitution §9 allowlist gets the four event names appended (paired with T-707).
+
+### Why no new data category to declare
+
+Apple's App Privacy guidance at https://developer.apple.com/app-store/app-privacy-details/ explicitly says: **"If your app uses CloudKit and only sends data to the user's own CloudKit container, you do not need to disclose the data as collected by your app."** Our CloudKit usage is private-database-only (per CL-88's enumerated scope + REG-25's lock on no-public / no-shared / no-Discoverability) — saved recipes mirror to the user's own iCloud private database under `iCloud.com.dutchovendaddy.DODApp`, accessible only to the user on Apple devices signed into their Apple ID. The data is user-to-Apple, not user-to-us; we don't see it, collect it, or have any access to it.
+
+The same pattern applies to iCloud Photos, iCloud Drive, iCloud Keychain, iCloud Notes — none of them disclose synced data as "collected." Our App Privacy questionnaire follows the same Apple-published pattern.
+
+### The four new analytics events (per CL-96)
+
+Constitution §9's "Events tracked are limited to:" sentence is amended (paired with T-707) to add four new closed-enum event names, all falling under the existing "Usage Data — Product Interaction" row in the questionnaire:
+
+| Event | Payload | Where dispatched |
+|---|---|---|
+| `syncEnabled` | empty | AC-41.2 opt-in primary tap; AC-41.3 toggle on |
+| `syncDisabled` | empty | AC-41.3 toggle off (after the AC-41.5 confirmation alert) |
+| `syncCompletedSuccessfully` | empty | After a successful CloudKit round-trip; debounced to fire at most once per 60 seconds |
+| `syncFailed(errorCategory:)` | `errorCategory: SyncErrorCategory` (closed enum: `network` / `accountStatus` / `quotaExceeded` / `serverInternal` / `other`) | After retry-budget exhaustion (3 consecutive failures per AC-41.6) |
+
+**Why allowlist-safe.** All four events are device-state aggregates with no PII, no recipe IDs, no error messages, no device identifiers. The `errorCategory` payload is a closed-set enum (five values total) — the same posture as `widgetOpened.kind` ("featured" / "saved") and `voiceCommandFired.command` ("next" / "previous" / "repeat" / "pause"), both already on the allowlist. The raw `CKError.Code` (which has ~30 values + localized message strings) is **never** sent — only the five-bucket aggregation.
+
+### Apple review template (if questioned)
+
+If App Store review questions the "No new privacy disclosure" claim for the build that turns on CloudKit sync:
+
+> The app uses CloudKit private database for cross-device sync of the user's saved recipes. Per Apple's App Privacy guidance for CloudKit private-DB-only usage, data sent only to the user's own CloudKit container is not disclosed as collected by the app. The container is `iCloud.com.dutchovendaddy.DODApp`; only `CKContainer.privateCloudDatabase` is accessed (no public DB, no shared DB, no Discoverability API). The four new analytics events fall under the existing Usage Data — Product Interaction row already disclosed; no IDFA, no device ID, no Apple ID, no email — the user remains anonymous to us in every analytics surface. The app works fully without iCloud sign-in per App Store Review Guideline 5.1.1(ii); the AC-41.5 Settings toggle-off + iCloud-sign-out paths fully remove the app's data from the user's iCloud space per 5.1.1(v) interpretation for CloudKit-using apps that do not create accounts.
+
+This response template was adopted by 1Password (CloudKit + WebDAV) and Bear (CloudKit) for the same policy interpretation; the standard response pattern stands.
+
+### The TestFlight gate (per CL-95 + AC-41.12)
+
+The build that turns on CloudKit sync MUST NOT submit to TestFlight before the privacy policy at `https://www.dutchovendaddy.com/app-privacy/` contains the new "Optional iCloud Sync" paragraph from CL-95 (verbatim text below). This is a one-time gate; once the policy is live, the gate is satisfied for all subsequent builds.
+
+**Paragraph to paste into the existing privacy policy at `dutchovendaddy.com/app-privacy/`** (between "Saved recipes are stored only on your device" and the comments/ratings paragraph):
+
+> **Optional iCloud Sync.** When you enable iCloud Sync in Settings, the Dutch Oven Daddy app stores your saved recipes in your own iCloud private database under the container `iCloud.com.dutchovendaddy.DODApp`. The synced data — recipe titles, ingredients, instructions, hero image URLs, and the saved-state flag — is stored in your personal iCloud space and is accessible only to you, on Apple devices signed into the same Apple ID. We do not see, collect, or have any access to your iCloud data. To stop syncing, turn off iCloud Sync in Settings or sign out of iCloud entirely — either action removes your saved recipes from your iCloud space (your local saves on the device are preserved). The app continues to work fully without iCloud sync — you can browse, save, share, and cook recipes without signing into iCloud.
+
+### Historical speculation (superseded)
+
+The original "What changes for v2 / If you add CloudKit sync" speculation, written when CloudKit sync was a v2 deferred item per CL-5, incorrectly anticipated that CloudKit would require new data-collection disclosures. CL-86's pivot brings CloudKit into v1.x and CL-94 documents the correct App Privacy framing — no new category. The original wording is preserved as strike-through historical context so a future reader can see why the questionnaire reading changed:
+
+- ~~Add **Identifiers — Device ID** (if iCloud requires it) to the Data Types table.~~ *Not required — `CKContainer.accountStatus(completionHandler:)` returns only an opaque `CKAccountStatus` enum; we never see the user's Apple ID, iCloud email, or any device identifier beyond TelemetryDeck's anonymous client hash.*
+- ~~Re-answer the linkage question: probably **Linked to user** = Yes because iCloud is per-Apple-ID.~~ *Not required — the Usage Data row stays "No, not linked to user" because the four new sync events carry no user identifier (they're per-session device state); the Contact Info row stays "Yes, linked to user" because guest identity hasn't changed.*
+
+If you add push notifications for new recipes (still deferred to a future US — not part of US-41):
 
 - Add **Identifiers — Device ID** (APNs token).
 - Update the purposes column to include "Notifications."

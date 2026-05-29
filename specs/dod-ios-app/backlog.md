@@ -174,7 +174,7 @@ _(Graduated 2026-05-27 as US-38 / CL-64 / T-650. Icon-convention choice landed o
 - Round-3 dad: **Voice Mode** (~2 weeks)
 
 **Still paused (Spencer + dad architecture conversation in progress):**
-- Round-6 spencer: **Login + OAuth** (XL — requires constitution amendments §1/§3/§4/§9)
+- ~~Round-6 spencer: **Login + OAuth** (XL — requires constitution amendments §1/§3/§4/§9)~~ _(Graduated 2026-05-28 as T-700 / CL-86..CL-99 / US-41 — CloudKit private-DB sync replaces Spencer's OAuth framing; see Phase 15 amendments. CloudKit container `iCloud.com.dutchovendaddy.DODApp` + opt-in toggle in Settings → iCloud Sync. App works without iCloud sign-in per AC-41.1 / REG-26 (App Store 5.1.1(ii)); "account deletion" semantics via toggle-off or iCloud sign-out per AC-41.5 (App Store 5.1.1(v)). Constitution §1 / §3 / §4 / §9 amendments smaller than the OAuth variant would have required — no third-party dep (CloudKit.framework is Apple-provided per CL-93), no new App Privacy disclosure (per CL-94 — CloudKit data is the user's iCloud data, not "data we collect"). Google Play deferred as non-applicable per CL-98 — there is no Android target. See "Recently graduated" below for the implementation cluster.)_
 
 ### Captured 2026-05-26 (round 6, @spencer0706) — Search-tab cleanup + new recipe surfacing + design + login
 
@@ -198,18 +198,18 @@ _(Background/foreground color overhaul graduated — see "Recently graduated" be
 
 #### Major feature — needs constitution amendment before code
 
-- **Login + account system (Google + Apple + email).** Account icon in the Recipes tab's top-right nav corner; tap → login sheet with three options. Name + email persist across the app for save / comment / rate flows.
+- ~~**Login + account system (Google + Apple + email).** Account icon in the Recipes tab's top-right nav corner; tap → login sheet with three options. Name + email persist across the app for save / comment / rate flows.~~ _(Graduated 2026-05-28 as T-700 / CL-86..CL-99 / US-41 — see "Recently graduated" below for the implementation cluster. **The OAuth framing is reversed**: there is no Account icon, no login sheet, no providers; the user's iCloud account is the sync identity per CloudKit private DB. CL-87 carries the full reversal trail and CL-98 documents the future-Android Google sign-in path that would re-introduce OAuth if/when constitution §2 is amended to add Android. The five constitutional conflicts Spencer flagged below remain accurate as the **original analysis**, but the CloudKit pivot makes the actual amendments dramatically smaller than the OAuth variant would have required — §3 adds Apple-provided `CloudKit.framework` (no third-party dep per CL-93), §4 adds a "Synced records" data-boundary category, §9 adds four closed-enum events without changing the App Privacy questionnaire (per CL-94, since CloudKit data is the user's iCloud data — not "data we collect"), §1 acknowledges a v2 sync model without changing "no accounts in v1," and CL-5's "iCloud sync deferred to v2" is explicitly reversed per CL-86.)_
 
-  **Constitutional conflicts to surface BEFORE any code:**
-  1. **§1 Product identity:** today says "mostly read-only with two write surfaces." Login changes the app's identity considerably — it stops being anonymous.
-  2. **§4 Content source:** "No auth required for reads in v1. Anonymous client." Would need to amend.
-  3. **§9 Privacy & security:** today uses Keychain-stored guest identity (CL-21/22 — name+email for comments/ratings) sent only to dutchovendaddy.com. OAuth adds Google + Apple as third parties; the App Privacy questionnaire changes meaningfully (now collecting account credentials). The "no IDFA, no cross-app tracking" stance survives Sign in with Apple but breaks under Google Sign-In without careful scope handling.
-  4. **§3 Dependencies:** would need `GoogleSignIn` SDK; `Sign in with Apple` uses system `AuthenticationServices` (no new dep). Both need plan-time approval.
-  5. **CL-5 (iCloud sync deferred to v2):** today says saved recipes are device-local. A real account opens server-side sync of saves + comments + ratings; the spec needs to decide whether login implies sync or whether they're still independent.
+  **Constitutional conflicts Spencer flagged in the original round-6 capture (kept as historical context — disposition per CL-86 / CL-87):**
+  1. **§1 Product identity:** ~~today says "mostly read-only with two write surfaces." Login changes the app's identity considerably — it stops being anonymous.~~ _Partially preserved: the app is still anonymous to us (no account in our system) and just signed-in-to-iCloud, which is the user's relationship with Apple, not ours. §1 amended with a "v2 sync model" subsection, not a wholesale identity shift._
+  2. **§4 Content source:** ~~"No auth required for reads in v1. Anonymous client." Would need to amend.~~ _Preserved unchanged. WP REST reads remain anonymous; only the user's own saves sync via CloudKit, captured by §4's new "Synced records" data-boundary category._
+  3. **§9 Privacy & security:** ~~OAuth adds Google + Apple as third parties; the App Privacy questionnaire changes meaningfully (now collecting account credentials).~~ _Averted entirely. No third parties, App Privacy questionnaire unchanged per CL-94._
+  4. **§3 Dependencies:** ~~would need `GoogleSignIn` SDK; `Sign in with Apple` uses system `AuthenticationServices` (no new dep). Both need plan-time approval.~~ _Averted entirely. CloudKit.framework is Apple-provided per CL-93._
+  5. **CL-5 (iCloud sync deferred to v2):** ~~today says saved recipes are device-local. A real account opens server-side sync of saves + comments + ratings; the spec needs to decide whether login implies sync or whether they're still independent.~~ _Reversed per CL-86. CloudKit sync ships in v1.x; AC-5.7's "reinstall wipes saves" limitation is softened (with sync enabled, reinstall restores)._
 
-  **Backend implications:** dutchovendaddy.com's WordPress doesn't natively support OAuth account creation — adding it requires a WP plugin (e.g., MiniOrange, WPOAuth) or a side service. This is a paired web + iOS effort, not iOS-only.
+  **Backend implications:** ~~dutchovendaddy.com's WordPress doesn't natively support OAuth account creation — adding it requires a WP plugin (e.g., MiniOrange, WPOAuth) or a side service. This is a paired web + iOS effort, not iOS-only.~~ _Averted entirely. No WP plugin, no side service. Per CL-86, CloudKit private DB is iOS-native + Apple-hosted + zero ops surface._
 
-  Size: **XL** (~3–4 weeks for the iOS side alone; backend longer). **Paused pending architecture conversation with dad before graduating.**
+  Original size estimate: **XL** (~3-4 weeks for the iOS side alone; backend longer). _Actual size post-pivot: **M** (~1 week of CloudKit adapter wiring, per the Phase 15 cluster T-700..T-708 estimate of ~29 hours)._ ~~**Paused pending architecture conversation with dad before graduating.**~~ _Graduated 2026-05-28._
 
 #### Sizing summary
 
@@ -221,7 +221,7 @@ _(Background/foreground color overhaul graduated — see "Recently graduated" be
 | ~~4. Remove "All categories" button~~ | ~~XS~~ | Graduated to US-29 / CL-49 / T-500 |
 | ~~5. "Try" suggestions fill search bar~~ | ~~S~~ | Graduated to US-29 / CL-49 / T-500 |
 | ~~6. "Any time" filter composes~~ | ~~M~~ | Graduated → REG-17 / CL-53 / T-530 |
-| 7. Login + OAuth | XL | **Constitution amendment first** |
+| ~~7. Login + OAuth~~ | ~~XL~~ → M | Graduated → US-41 / CL-86..CL-99 / T-700..T-708 (CloudKit private DB, NOT OAuth; see CL-86 / CL-87) |
 | ~~8. New recipes don't surface~~ | ~~M~~ | Graduated → REG-18 / CL-50 / T-510 |
 | ~~9. Background/foreground color overhaul~~ | ~~M~~ | Graduated to US-30 / CL-51 / T-520 |
 
@@ -787,3 +787,76 @@ useful reference.
   Mode, round-3 dad) are running on their own branches against
   different package families, no source-side collisions with
   T-680..T-689.
+
+- **Login + account system (round-6 Spencer, OAuth framing reversed to CloudKit private-DB sync per dad's architecture-conversation outcome)** —
+  graduated to **US-41** (AC-41.1 through AC-41.13) +
+  [CL-86 through CL-99](clarifications.md) + the
+  [T-700..T-708 cluster](tasks.md). The original round-6 capture sized
+  this as `XL (~3-4 weeks iOS side + WP backend longer)` and required
+  four constitution amendments (§1 / §3 / §4 / §9) plus the
+  GoogleSignIn SDK; **dad chose CloudKit** after weighing four
+  alternatives (CloudKit / WordPress users / Firebase or Supabase /
+  local-only + manual iCloud sync — per CL-86's full considered-and-rejected
+  trail). The pivot dramatically simplifies the original framing:
+  there is **no** Account icon, **no** login sheet, **no** OAuth
+  providers; the user's iCloud account *is* the sync identity
+  (CL-87 carries the OAuth-reversal trail). The CloudKit container
+  identifier `iCloud.com.dutchovendaddy.DODApp` matches the bundle-ID
+  prefix convention (CL-93). The four constitutional amendments still
+  happen but are smaller: §1 acknowledges a v2 sync model
+  subsection; §3 adds Apple-provided `CloudKit.framework` to the
+  allow-list (no third-party dep — CL-93); §4 adds a "Synced records"
+  data-boundary category alongside the existing "Cached data" + "Guest
+  identity"; §9 adds four closed-enum analytics events
+  (`syncEnabled` / `syncDisabled` / `syncCompletedSuccessfully` /
+  `syncFailed(errorCategory:)`) **without** changing the App Privacy
+  questionnaire (CL-94 — CloudKit data is the user's iCloud data,
+  not "data we collect" per Apple's own App Privacy guidance for
+  private-DB-only usage). CL-5's "iCloud sync deferred to v2" is
+  explicitly reversed per CL-86; AC-5.7's "reinstall wipes saves"
+  limitation is softened (with sync enabled, reinstalling on the
+  same Apple ID restores the user's saves from their iCloud private
+  DB after the AC-41.2 opt-in flow re-completes). Compliance
+  highlights: **App Store Review Guideline 5.1.1(ii)** (app works
+  without login — locked by AC-41.1 + REG-26); **5.1.1(v)**
+  (account deletion — the AC-41.5 toggle-off + iCloud sign-out path
+  satisfies the rule without an explicit Delete button per CL-92);
+  **CloudKit private DB only** (no public DB, no shared DB, no
+  Discoverability API in v1.0 — locked by REG-25). The Phase 15
+  cluster (T-700..T-708): **T-700** ships the spec amendment (this
+  PR — US-41 + CL-86..CL-99 + §1/§3/§4 constitution touches + the
+  `Marketing/AppPrivacy.md` delta + the `Marketing/TestFlight.md`
+  privacy-policy gate); **T-701** ships entitlements + container
+  provisioning (`com.apple.developer.icloud-container-identifiers`
+  + `com.apple.developer.icloud-services` keys in
+  `App/DODApp.entitlements`; `remote-notification` `UIBackgroundModes`
+  in `App/Info.plist` + `project.yml`; the App Store Connect
+  provisioning steps); **T-702** ships the SwiftData → CloudKit sync
+  adapter (`CloudKitSyncAdapter` in `DODPersistence` using the
+  iOS 17+ `ModelConfiguration(_:groupContainer:cloudKitDatabase: .private(...))`
+  initializer; the `modifiedAt: Date?` additive optional column on
+  `CachedRecipe` for AC-41.8's LWW resolution; the per-write
+  `modifiedAt` timestamp setting in every `RecipeStore` mutating
+  write path); **T-703** ships the Settings → iCloud Sync toggle
+  + status sublabel + the AC-41.5 confirmation alert; **T-704** ships
+  the AC-41.2 first-launch opt-in sheet; **T-705** ships the offline
+  queue + retry + the AC-41.7 status-surface state machine; **T-706**
+  ships the AC-41.8 conflict-resolution `LastWriteWinsMergePolicy`
+  per CL-90 (LWW for mutable fields, OR for `isSaved`, max-value
+  for `lastViewedAt` / `downloadedAt`); **T-707** ships the four new
+  analytics events + the constitution §9 allowlist amendment per
+  CL-96; **T-708** ships the L1 + L3 + L5 test coverage including
+  the `MockCKContainer` testability seam + the
+  `test_appLaunchesUnderNoiCloudAccount` smoke per REG-26 + the
+  `test_cloudKitSyncEnableSaveVerifyDisableCleared` L5 E2E journey
+  (gated by `e2e` label per CL-58). **Two explicit deferrals:** (i)
+  `PersistentShoppingListItem` syncing waits until T-682 ships the
+  SwiftData @Model (per CL-88's sub-decision — shopping list remains
+  per-device until then); (ii) Google Play / Android non-applicability
+  (per CL-98 — no Android target exists; if/when constitution §2 is
+  amended to add Android, the natural path is Firebase Auth + Firestore
+  per the documented re-evaluation trigger). Implementing PRs: T-700
+  (this spec PR) + T-701..T-708. The Phase 15 cluster runs without
+  parallel round-9 work in-flight, so T-700 reserves CL-86..CL-99
+  (CL-84 skipped per the Phase 13 parallel renumbering), US-41,
+  T-700..T-708 cleanly with no rebase collisions.
