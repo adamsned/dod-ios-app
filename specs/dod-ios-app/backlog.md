@@ -38,6 +38,58 @@ Format suggestion (not enforced):
 _All six 2026-05-24 captures have graduated to spec-driven work and
 shipped. See "Recently graduated" below for the trail._
 
+### Captured 2026-05-29 (round 9, @adamsned) — TestFlight 1.0 (2) install feedback
+
+Dad's first real-device feedback after installing build `1.0 (2)` on `nadams-iphone` via TestFlight this morning (~07:50 MST). Captured here while using the app naturally; expect more entries as he keeps cooking with it.
+
+#### Search is too strict — "nachos" doesn't find "Cast Iron Skillet Nachos"
+
+**Real bug, blocks a user finding a recipe they know exists in the catalog.** Repro:
+
+1. Open the app → Search tab
+2. Type `nachos`
+3. Expected: `Cast Iron Skillet Nachos` appears in results
+4. Actual: result set does not include it (other recipes may or may not appear)
+
+The recipe is published, indexed by the live blog, and findable via the WordPress site's own search. Something in the iOS app's search pipeline is filtering it out.
+
+**Where to look — root-cause hypotheses worth checking in order:**
+
+1. **WP REST `?search=` query semantics changed** — `WPRestClient+Posts.swift:32` calls `GET /wp-json/wp/v2/posts?search=<query>&_embed=wp:featuredmedia&page=1&per_page=20`. Recent WordPress versions (6.4+) layered a relevance-scoring pass on top of the underlying `WP_Query` `s=` LIKE match; the relevance pass can demote a post if it has fewer search-keyword occurrences than another match in the same set. If "Cast Iron Skillet Nachos" gets pushed to page 2 and we only fetch page 1, the user perceives it as missing.
+2. **`per_page: 20` cap** — DOD's default page size truncates result sets that the site's own search shows in a single scroll. Bumping to 50 or implementing infinite-scroll in Search results would close the gap.
+3. **Stale `URLCache.shared` / Cloudflare edge cache** — REG-18 (graduated to T-510 / CL-50) traced an identical symptom on the home feed to a CDN serving day-old batches. The fix bypassed both caches for `WPRestClient.get(...)` reads. **Verify the bypass is still in place for the search path specifically** — the fix may have been list-only and not extended to search.
+4. **WP categories filter intersection** — REG-17 (graduated to T-530 / CL-53) found that dropping `Post.categories` from the WP DTO mapping caused the category filter chip to exclude every fresh hit. The current Search filter chips ("Any time" / categories) may be intersecting against a missing-category field and silently dropping matches.
+5. **Slug vs title fall-through** — `RecipeListItem.title` is parsed from the WP `post.title.rendered` HTML. If "Cast Iron Skillet Nachos" has special characters in the title (smart quotes, hyphens, en-dashes) the JSON-LD parse may surface a different display string than the search-match field. Worth a one-grep: `Recipe.title` vs `RecipeListItem.title` divergence.
+
+**Confidence**: high that this is a multi-cause issue, not a single broken line. WP's REST search is a known-soft surface; expect to need a layered fix.
+
+#### "Make search way better than what you have now"
+
+Dad's framing — a clear signal that the bug above is the visible symptom of a broader "search doesn't feel native" complaint. The current Search tab does:
+
+- 300ms debounce → WP REST `?search=` → 20-recipe list, sorted by WP's relevance + date
+- Recent searches (US-29 / CL-46)
+- Curated suggestion pills (US-29 / CL-49 / T-500)
+- Category filter chips (US-29 + REG-17 fix)
+
+Directions worth scoping before this graduates:
+
+- **Fuzzy / typo-tolerant matching.** "nahcos" or "Nachos!" or "skillet nachos" should all find the recipe. WP REST is exact-substring-only; a client-side index over the cached recipe list (the user already has ~100 recipes cached from feed scrolling) would let us do Levenshtein-tolerant matching for the user's catalog.
+- **Search local + remote in parallel.** When the user types, show cached matches instantly (sub-frame), then merge in remote results when they arrive. Offline becomes useful.
+- **Ingredient-name search.** "ground beef" → recipes that USE ground beef, not just recipes with "ground beef" in the title. Requires JSON-LD ingredients to be indexed locally — already cached per US-13 / SchemaV2 `CachedIngredient` (T-074-ish). Big differentiator vs. the website.
+- **Sort by true relevance, not date-tiebreak.** WP's default is `relevance` for `?search=` but ties resolve to `date desc`, which buries older-but-perfect-match recipes. Need to investigate whether the WP RESPONSE relevance scores are even returned in `WPDTO.Post` (probably not — would need `wp-json/wp/v2/search` instead of `posts`).
+- **Highlight match terms in results.** Show "Cast Iron Skillet **Nachos**" with bold on the matched substring. Lifts the result card from a generic title to an explanation of why it matched.
+- **"Did you mean..." suggestions** when results are sparse (< 3). Use a stem-based suggestion table sourced from the cached recipe titles.
+- **Spotlight indexing** via `NSUserActivity` + Core Spotlight. Recipes become searchable from outside the app — type "nachos" in Home Screen pull-down and DOD recipes appear. Big iOS-native win, hard to replicate on the website.
+- **Recent + recommended interleaving on empty state.** Today the empty Search state is curated pills; could also surface 3-4 of the user's recent searches' top results as quick re-entry tiles.
+- **Auto-complete / suggestion as you type.** Inline suggestion below the search bar, debounced at 150ms (faster than the result-fetch debounce). Pulled from cached titles + WP REST `wp-json/wp/v2/search` (which is a different endpoint, specifically for search suggestions).
+
+**Constraints to preserve**: query is hashed before going to TelemetryDeck (US-12 / CL-12 — "search query never leaves device in cleartext"). Any client-side index uses local `CachedRecipe` rows; no new network surface.
+
+**Rough size guess**: **L** if all of the above lands together; **M** if it's just the bug fix + local-fuzzy + ingredient-search subset. Likely splits into 3-4 task IDs.
+
+Likely produces a new US (search overhaul) + clarifications for: client-side fuzzy threshold; ingredient-search scope (title-substring or stem-tokenized); whether to query `wp-json/wp/v2/search` in addition to `?search=`; Spotlight scope (saved-only or all browsed); Recent-searches re-entry tile policy.
+
 ### Captured 2026-05-28 (notification trigger — PAUSED pending @adamsned + WordPress)
 
 - **Real-time "new post" notification trigger (the production signal behind US-42).**
