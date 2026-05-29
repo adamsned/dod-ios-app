@@ -175,6 +175,67 @@ Total user value: the app opens the right page for them, with a moment-of-truth 
 
 **Graduates as a regression** (REG-NN) — likely the same path as REG-T-360 / REG-18 / REG-19 / REG-20, not a new user story. Spec trace stays under US-14.
 
+#### Site ↔ app design coordination — match dutchovendaddy.com so the two surfaces feel seamless
+
+**Feature request from @adamsned**, after observing the live site and the TestFlight 1.0 (2) build side by side. The current app's design language is iOS-native correct but visually diverges from the blog in seven measurable ways. Closing the gap is a contained DesignSystem-only change — no new feature code, no platform constraint, no third-party deps.
+
+**The seven gaps observed against the live site (homepage + `/dutch-oven-recipes/`):**
+
+| # | Gap | dutchovendaddy.com | App today |
+|---|---|---|---|
+| 1 | Primary backdrop color | Pure white `#FFFFFF` | Warm cream `#F9F6EF` |
+| 2 | Card chrome on grids | None — photo + title only, no border, no shadow | Rounded `surfaceElevated` card with corner clip |
+| 3 | Hero photo aspect | **3:4 portrait** (720×960) | Landscape ~16:9 (140pt fixed height + aspect-fill) |
+| 4 | Time chip on cards | Absent | Cast-iron-brown capsule top-right |
+| 5 | Excerpt under title | Absent | Two-line caption |
+| 6 | Numbered "Popular" badge | Burnt-orange filled circles (1, 2, 3, 4) on the rail | Absent |
+| 7 | Brand mark in-nav | Circular dark-brown DOD badge as the masthead | Text nav title only |
+
+**Seven proposed moves to close them**, in graduation-ready spec language:
+
+1. **Surface tier reshuffle** — `Surface` flips from `#F9F6EF` to `#FFFFFF`; `SurfaceElevated` collapses (cards no longer "lift"); a new `SurfaceWarm` (`#FAF6EE`) inherits the cream role specifically for the Saved tab + empty states + Cook Mode background. `CreamSubtle` renames to `SurfaceDivider` so its role (thin section dividers, sticky-header tint) is explicit.
+2. **Drop card chrome on Feed + Categories** — magazine-grid variant of `RecipeCard` removes the elevated fill, corner clip, and shadow. Adds 8pt inter-card margin to replace the visual boundary the corners provided. `RecipeCard.ListRow` stays as-is for Search results + Saved (different mode, different rules).
+3. **Switch the hero to 3:4 portrait, full-bleed** — `heroSection.frame(height: 140pt).aspectRatio(.fill)` becomes `.aspectRatio(3/4, contentMode: .fit)`. At iPhone 17 Pro Max (430pt) / 2 columns the hero is ~210×280pt; at iPad 13" / 3 columns it's ~325×433pt. Same crop, same composition as the site — no "wait, did I lose the picture?" moment when toggling between Safari and the app.
+4. **Nav masthead = circular DOD logo** — reuse `App/AppIcon.icon/Assets/DOD Master.png` at 32pt circular in the toolbar leading position. Tap = scroll-to-top (iOS convention) but with the brand mark visible. Replaces the `"Recipes & Articles"` text title on the Feed tab.
+5. **`DODBadge.Numbered`** — new component, 28pt circle filled `DODColor.burntOrange` (`#C56A24`), 16pt SF Rounded semibold white numeral, drop shadow y=2 blur=4 opacity=0.15, positioned bottom-left of the hero at 8pt inset. Applied only to editorially-curated "Featured" or "Top 5 This Week" rails — NOT every card.
+6. **Demote time chip + excerpt to a peek-state** — primary gallery card carries photo + title only (centered, `.heading` weight, max 2 lines). Long-press peek surface keeps the time + excerpt + Save action. Recipe Detail screen continues to display the full metadata prominently. The Bravest Move — earns the seamlessness most because the site's read-quality comes from trusting the photography to do the work.
+7. **Typography hierarchy alignment** — `displayLarge` + `displayMedium` shift `.semibold` → `.bold` to match the site's section-header weight. `heading` + `caption` adopt SF Rounded for a friendlier card-and-chip register. New `brand` token (`size: 22, design: .rounded, weight: .bold`) reserved for "DUTCH OVEN DADDY" wordmark moments (splash, About, share-sheet preview cards).
+
+**Color tokens — after-state, ready to paste into Colors.xcassets:**
+
+| Token | Light | Dark | Role change |
+|---|---|---|---|
+| `Surface` | `#FFFFFF` | `#1B140E` | Was `#F9F6EF / #42210B` — site-aligned white |
+| `SurfaceElevated` | `#FFFFFF` | `#281F19` | Collapsed (no elevation on Feed) |
+| `SurfaceWarm` | `#FAF6EE` | `#281F19` | **NEW** — cream's new home, Saved tab + warm states |
+| `SurfaceDivider` | `#E6DECF` | `#3D2B1F` | Renamed from `CreamSubtle` |
+| `Accent` / `BurntOrange` | `#C56A24` | `#C56A24` | Unchanged |
+| `CastIronBrown` | `#3D2B1F` | `#3D2B1F` | Unchanged |
+| `WarmGold` | `#D4A24C` | `#D4A24C` | Unchanged |
+| `Label` | `#2C2C2C` | `#E6DECF` | Unchanged |
+| `LabelSecondary` | `#6B6B6B` | `#A8A39A` | Unchanged |
+| `LabelOnAccent` | `#FFFFFF` | `#FFFFFF` | **NEW** — text on `Accent` badges |
+
+**Graduation plan** (constitution-amendment-free — no third-party deps, no new privacy surface, no platform change):
+
+| Phase | Scope | Size |
+|---|---|---|
+| **a — tokens** | Update `Colors.xcassets` + `Typography.swift` + `Spacing.swift`. Re-record every L4 snapshot baseline (every screen, every Dynamic Type size, light + dark + AX5) at the new tokens. Roughly 60-80 PNGs. | **S** (~3 days) |
+| **b — `RecipeCard` magazine variant** | New gallery-grid `RecipeCard` style behind a `DODFeed.layoutVariant` flag. `RecipeCard.ListRow` unchanged. Land side-by-side options so the next TestFlight build can A/B them. Add a Settings → Layout toggle so power users (Spencer) can flip between. | **M** (~1 week) |
+| **c — Nav masthead + `DODBadge.Numbered`** | Logo asset in nav-bar leading toolbar. New badge component. Apply badge to Feed's "Featured" / "This Week" rail (whichever ships first). | **S** (~3 days) |
+| **d — Recipe Detail surface polish** | Recipe Detail picks up the surface change + uses the portrait hero pattern at top. Comments + ratings sections inherit the new surface tier. | **S** (~3 days) |
+
+Total: ~2.5 weeks calendar. **Behind-the-flag per screen** so a regression on any individual surface reverts without backing out the token update.
+
+**Open clarification questions before graduation:**
+
+- **The brave Move #6** — does dad agree the time chip + excerpt come off the gallery card? Or do we keep them and just adopt the site's color + photo aspect changes? (The chip + excerpt are real utility — losing them costs the user a glance.) Recommended: ship Move #6 ONLY on the magazine variant and keep the dense variant unchanged, so the Settings toggle in Phase b decides.
+- **Dark mode parity** — site is light-only. App's dark mode currently uses `#42210B` (warm dark brown) as `Surface`. Should dark mode get the same site-aligned `Surface` shift, or stay warmer to preserve the cooking-mode read-in-low-light affordance? Recommended: keep dark mode warm; the site doesn't have a dark mode to coordinate against.
+- **iPad treatment** — site is responsive but Web. iPad's `NavigationSplitView` sidebar inherits the surface change; the detail pane picks up the portrait hero. Anything specific to iPad worth pinning before Phase b?
+- **A/B duration** — does the layout flag live on for v1.x as a permanent setting, or does it sunset after the magazine variant proves out in TestFlight? Recommended: ship as a permanent Settings → Layout option so users with strong format preferences keep their choice.
+
+**Spec trace**: produces a new US (design coordination — site/app brand parity) + clarifications covering each of the 4 questions above. Likely splits into 4 phase IDs (T-NNNa..d above). **Size: M-L total** depending on how aggressively Move #6 lands.
+
 ### Captured 2026-05-28 (notification trigger — PAUSED pending @adamsned + WordPress)
 
 - **Real-time "new post" notification trigger (the production signal behind US-42).**
