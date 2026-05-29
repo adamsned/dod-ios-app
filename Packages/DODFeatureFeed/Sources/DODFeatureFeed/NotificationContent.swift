@@ -76,10 +76,10 @@ public enum NotificationContentBuilder {
         switch postKind {
         case .recipe:
             title = "New Recipe 🍳"
-            body = "\(postTitle) just dropped — tap to start cooking."
+            body = "\(postTitle) just dropped. Tap to start cooking."
         case .article:
             title = "New Article 📖"
-            body = "\(postTitle) is up — tap to read."
+            body = "\(postTitle) is up. Tap to read."
         }
         // Reuse the existing `dod://` deep-link grammar (US-9 /
         // `WidgetDeepLinkParser`, US-10) — no new URL vocabulary. The host

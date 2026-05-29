@@ -36,25 +36,19 @@ public struct FeedView: View {
     /// but reports "not granted" (previews / tests). Production (TabStack)
     /// passes a closure that calls `NotificationService.requestAuthorization()`.
     public let onRequestNotificationAuthorization: (@MainActor () async -> Bool)?
-    /// US-42 / AC-42.6 — fires the two sample local notifications behind
-    /// the temporary DEBUG test affordance in `SettingsView`. Optional;
-    /// production (TabStack) routes it through `NotificationService`.
-    public let onSimulateNewPosts: (() -> Void)?
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
         onClearImageCache: (() async throws -> Int)? = nil,
-        onRequestNotificationAuthorization: (@MainActor () async -> Bool)? = nil,
-        onSimulateNewPosts: (() -> Void)? = nil
+        onRequestNotificationAuthorization: (@MainActor () async -> Bool)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.onClearImageCache = onClearImageCache
         self.onRequestNotificationAuthorization = onRequestNotificationAuthorization
-        self.onSimulateNewPosts = onSimulateNewPosts
     }
 
     public var body: some View {
@@ -114,8 +108,7 @@ public struct FeedView: View {
                 viewModel: SettingsViewModel(
                     requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
                 ),
-                onClearImageCache: onClearImageCache,
-                onSimulateNewPosts: onSimulateNewPosts
+                onClearImageCache: onClearImageCache
             )
         } label: {
             Image(systemName: "gearshape")

@@ -21,7 +21,7 @@ import Testing
             postID: 1234
         )
         #expect(plan.title == "New Recipe 🍳")
-        #expect(plan.body == "Cast Iron Burgers (Easy Skillet Recipe) just dropped — tap to start cooking.")
+        #expect(plan.body == "Cast Iron Burgers (Easy Skillet Recipe) just dropped. Tap to start cooking.")
     }
 
     @Test func articlePlanUsesArticleCopy() {
@@ -31,7 +31,7 @@ import Testing
             postID: 5678
         )
         #expect(plan.title == "New Article 📖")
-        #expect(plan.body == "Best Dutch Oven Recipes (30+ Tried and Tested Favorites) is up — tap to read.")
+        #expect(plan.body == "Best Dutch Oven Recipes (30+ Tried and Tested Favorites) is up. Tap to read.")
     }
 
     @Test func postTitleIsInterpolatedVerbatim() {

@@ -98,9 +98,8 @@ final class NotificationService {
         content.userInfo = plan.userInfo
 
         // ~1–2s immediate trigger — there is no real publish event in v1,
-        // so the notification fires shortly after it is scheduled (the test
-        // affordance stages two of these ~2s apart to demonstrate both
-        // kinds). `repeats: false` — one-shot.
+        // so the notification fires shortly after it is scheduled.
+        // `repeats: false` — one-shot.
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1.5, repeats: false)
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
@@ -113,41 +112,4 @@ final class NotificationService {
             DODLog.app.error("notification schedule failed: \(String(describing: error))")
         }
     }
-
-    #if DEBUG
-    /// Temporary developer affordance (US-42 / AC-42.6) behind the Settings
-    /// "▸ Test: Simulate New Post" button. Fires two sample notifications
-    /// ~2s apart — an article then a recipe — so the end-to-end path
-    /// (schedule → fire → banner → tap → deep-link) can be exercised in the
-    /// simulator (v1 has no server trigger). Each call routes through
-    /// ``scheduleNewPostNotification(title:postKind:recipeID:)`` so the
-    /// toggle-off suppression (AC-42.4) applies here too. `#if DEBUG` so it
-    /// never ships in a release build.
-    func simulateNewPosts() {
-        Task { @MainActor in
-            // Article: a real roundup post on the live blog (id 23406 —
-            // "Best Dutch Oven Recipes (30+ Tried and Tested Favorites)").
-            // Real id so the tapped deep link actually fetches + opens it
-            // via the T-632 fetch-on-cache-miss path (REG-20 / CL-101) —
-            // the post has no parseable Recipe JSON-LD, so it resolves as
-            // an article and opens `ArticleDetailView`.
-            await scheduleNewPostNotification(
-                title: "Best Dutch Oven Recipes (30+ Tried and Tested Favorites)",
-                postKind: .article,
-                recipeID: 23406
-            )
-            // ~2s later, a recipe — demonstrates the second copy variant +
-            // the recipe deep-link payload. Real id 21238 ("Garlic Butter
-            // Skillet Corn") replaces the fictional "Cast Iron Burgers",
-            // which doesn't exist on the blog (CL-101) — so the tapped
-            // notification resolves to a real recipe detail.
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await scheduleNewPostNotification(
-                title: "Garlic Butter Skillet Corn (Easy 15-Minute Side Dish)",
-                postKind: .recipe,
-                recipeID: 21238
-            )
-        }
-    }
-    #endif
 }

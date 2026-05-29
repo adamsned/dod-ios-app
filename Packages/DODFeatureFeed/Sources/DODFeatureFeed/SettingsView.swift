@@ -45,22 +45,12 @@ public struct SettingsView: View {
     /// always pass a non-nil closure.
     public let onClearImageCache: (() async throws -> Int)?
 
-    /// Fires the two sample local notifications behind the temporary DEBUG
-    /// "Simulate New Post" affordance (US-42 / AC-42.6). Supplied by the
-    /// composition root (routes through `NotificationService`); `nil` in
-    /// previews / snapshot hosts so the button is a no-op there. The
-    /// toggle-off suppression (AC-42.4) lives inside the closure's
-    /// `NotificationService` call, not here — the button always delegates.
-    public let onSimulateNewPosts: (() -> Void)?
-
     public init(
         viewModel: SettingsViewModel = SettingsViewModel(),
-        onClearImageCache: (() async throws -> Int)? = nil,
-        onSimulateNewPosts: (() -> Void)? = nil
+        onClearImageCache: (() async throws -> Int)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onClearImageCache = onClearImageCache
-        self.onSimulateNewPosts = onSimulateNewPosts
     }
 
     public var body: some View {
@@ -97,24 +87,6 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-toggle-notifications")
-
-                #if DEBUG
-                // Temporary developer affordance (US-42 / AC-42.6) — fires
-                // two sample local notifications (one article, one recipe)
-                // ~2s apart so the end-to-end path can be exercised in the
-                // simulator (v1 has no server trigger). Gated by the toggle:
-                // the `NotificationService` behind `onSimulateNewPosts`
-                // schedules nothing when notifications are OFF (AC-42.4).
-                // `#if DEBUG` so it never ships in a release build.
-                Button {
-                    onSimulateNewPosts?()
-                } label: {
-                    Text("▸ Test: Simulate New Post")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.accent)
-                }
-                .accessibilityIdentifier("settings-button-simulate-notification")
-                #endif
             } footer: {
                 Text("New-post alerts are delivered on this device only.")
                     .dodFont(DODType.caption)

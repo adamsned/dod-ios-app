@@ -74,13 +74,6 @@ struct TabStack: View {
                 // authorization through the composition root's service.
                 onRequestNotificationAuthorization: {
                     await dependencies.notificationService.requestAuthorization()
-                },
-                // US-42 / AC-42.6 — DEBUG test affordance fires two sample
-                // notifications (gated by the toggle inside the service).
-                onSimulateNewPosts: {
-                    #if DEBUG
-                    dependencies.notificationService.simulateNewPosts()
-                    #endif
                 }
             )
         case .categories:
