@@ -1,5 +1,6 @@
 import CloudKit
 import DODAnalytics
+import DODDomain
 import DODFeatureCategories
 import DODFeatureFeed
 import DODFeatureRecipeDetail
@@ -188,5 +189,16 @@ final class AppDependencies {
 
     func savedDependencies() -> some SavedDependencies {
         LiveSavedDependencies(store: store, imageLoader: imageLoader)
+    }
+
+    /// Fetch a single post (by WP id) from the live REST API and project it
+    /// to a ``RecipeListItem``. Backs the notification deep-link fetch-on-
+    /// cache-miss path (T-632 / REG-20 / CL-101): a notification targets a
+    /// brand-new post that is never cached, so `RootView.resolveRecipeRoute`
+    /// calls this when `store.recipeWithoutTouching(id:)` misses, then routes
+    /// to recipe-detail (which runs the JSON-LD parse / article
+    /// classification to resolve recipe-vs-article per AC-4.11 / AC-37.2).
+    func fetchListItem(forPostID id: Int) async throws -> RecipeListItem {
+        try await restClient.post(id: id)
     }
 }
