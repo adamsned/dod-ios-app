@@ -24,6 +24,11 @@ final class AppDependencies {
     let store: RecipeStore
     let modelContainer: ModelContainer
 
+    /// On-device local-notification service (US-41 / T-631). Long-lived —
+    /// owns the authorization request the Settings toggle drives and the
+    /// scheduling the (DEBUG) test affordance fires. No APNs / no server.
+    let notificationService: NotificationService
+
     private let restClient: WPRestClient
     private let pageFetcher: RecipePageFetcher
     private let imageLoader: ImageLoader
@@ -52,6 +57,7 @@ final class AppDependencies {
         self.commentsClient = WPCommentsClient()
         self.ratingsClient = WPRMRatingsClient()
         self.guestIdentityStore = KeychainGuestIdentityStore()
+        self.notificationService = NotificationService()
     }
 
     /// Called once from `@main` at app launch.

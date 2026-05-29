@@ -1,0 +1,145 @@
+import DODDomain
+import DODFeatureFeed
+import DODSupport
+import Foundation
+import UserNotifications
+
+/// On-device *local* notification service (spec US-41 / CL-86).
+///
+/// Wraps `UNUserNotificationCenter` for the two things the app needs:
+/// requesting authorization when the Settings toggle is flipped ON
+/// (AC-41.1) and scheduling a type-aware local notification for a newly
+/// published post (AC-41.2 / AC-41.3). There is **no** Apple Push / APNs
+/// in v1 — no device token, no remote payload, no server (CL-86 decision
+/// 1). The single suppression gate (AC-41.4) lives in
+/// ``scheduleNewPostNotification(title:postKind:recipeID:)``: it schedules
+/// nothing unless the persisted toggle is ON **and** the OS has granted
+/// authorization, delegating that truth-table decision to the pure
+/// `NotificationContentBuilder.shouldSchedule(...)` so the gate is
+/// unit-tested in `DODFeatureFeed` without a `UserNotifications` dependency.
+///
+/// `@MainActor` because it is constructed in the composition root and its
+/// authorization closure is handed to `SettingsViewModel` (also MainActor).
+@MainActor
+final class NotificationService {
+
+    private let center: UNUserNotificationCenter
+    private let defaults: UserDefaults
+
+    init(
+        center: UNUserNotificationCenter = .current(),
+        defaults: UserDefaults = .standard
+    ) {
+        self.center = center
+        self.defaults = defaults
+    }
+
+    /// Requests `[.alert, .sound]` authorization (AC-41.1). Returns `true`
+    /// iff the user grants. No `.badge` — v1 has no badge-count source
+    /// (CL-86 decision 1). Errors are logged + treated as "not granted" so
+    /// the toggle reverts rather than claiming notifications are on.
+    func requestAuthorization() async -> Bool {
+        do {
+            return try await center.requestAuthorization(options: [.alert, .sound])
+        } catch {
+            DODLog.app.error("notification authorization failed: \(String(describing: error))")
+            return false
+        }
+    }
+
+    /// Live OS authorization status — `true` for `.authorized`,
+    /// `.provisional`, or `.ephemeral`. Half of the suppression gate
+    /// (AC-41.4); the other half is the persisted toggle.
+    func isAuthorized() async -> Bool {
+        let settings = await center.notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .denied, .notDetermined:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+
+    /// Schedules a single type-aware local notification for a newly
+    /// published post (AC-41.2 / AC-41.3), **gated** by the toggle + OS
+    /// authorization (AC-41.4). When notifications are OFF or permission is
+    /// not granted this schedules nothing and returns — the single choke
+    /// point so "off ⇒ silence" is an invariant, not a per-call-site
+    /// convention.
+    ///
+    /// - Parameters:
+    ///   - title: the post's display title (interpolated into the body).
+    ///   - postKind: drives the title/body copy + the deep-link host.
+    ///   - recipeID: the WP post id baked into the `dod://<kind>/<id>`
+    ///     deep link stamped into `userInfo` for the tap handler.
+    func scheduleNewPostNotification(title: String, postKind: PostKind, recipeID: Int) async {
+        let toggleEnabled = defaults.bool(forKey: SettingsViewModel.notificationsEnabledKey)
+        let authorized = await isAuthorized()
+        guard
+            NotificationContentBuilder.shouldSchedule(
+                toggleEnabled: toggleEnabled,
+                systemAuthorized: authorized
+            )
+        else {
+            return
+        }
+
+        let plan = NotificationContentBuilder.plan(
+            postTitle: title,
+            postKind: postKind,
+            postID: recipeID
+        )
+        let content = UNMutableNotificationContent()
+        content.title = plan.title
+        content.body = plan.body
+        content.sound = .default
+        content.userInfo = plan.userInfo
+
+        // ~1–2s immediate trigger — there is no real publish event in v1,
+        // so the notification fires shortly after it is scheduled (the test
+        // affordance stages two of these ~2s apart to demonstrate both
+        // kinds). `repeats: false` — one-shot.
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1.5, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: trigger
+        )
+        do {
+            try await center.add(request)
+        } catch {
+            DODLog.app.error("notification schedule failed: \(String(describing: error))")
+        }
+    }
+
+    #if DEBUG
+    /// Temporary developer affordance (US-41 / AC-41.6) behind the Settings
+    /// "▸ Test: Simulate New Post" button. Fires two sample notifications
+    /// ~2s apart — an article then a recipe — so the end-to-end path
+    /// (schedule → fire → banner → tap → deep-link) can be exercised in the
+    /// simulator (v1 has no server trigger). Each call routes through
+    /// ``scheduleNewPostNotification(title:postKind:recipeID:)`` so the
+    /// toggle-off suppression (AC-41.4) applies here too. `#if DEBUG` so it
+    /// never ships in a release build.
+    func simulateNewPosts() {
+        Task { @MainActor in
+            // Article: the May-25-2026 real roundup scenario.
+            await scheduleNewPostNotification(
+                title: "Best Dutch Oven Recipes (30+ Tried and Tested Favorites)",
+                postKind: .article,
+                recipeID: 18342
+            )
+            // ~2s later, a recipe — demonstrates the second copy variant +
+            // the recipe deep-link payload.
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await scheduleNewPostNotification(
+                title: "Cast Iron Burgers (Easy Skillet Recipe)",
+                postKind: .recipe,
+                recipeID: 17615
+            )
+        }
+    }
+    #endif
+}
