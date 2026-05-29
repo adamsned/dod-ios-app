@@ -294,20 +294,26 @@ struct MigrationV3Tests {
         #expect(v3Entities["CachedRating"] != nil, "V3 must include the new CachedRating model")
     }
 
-    @Test func v3MigrationPlanLists3VersionsAnd2Stages() {
+    @Test func migrationPlanListsAllVersionsAndStages() {
         // T-640 (US-37 / CL-63) initially added SchemaV4 for the
         // `CachedRecipe.articleBodyHTML` additive column but reverted
-        // the schema stage to avoid the "Duplicate version checksums"
-        // runtime collision SwiftData surfaces when two
-        // `VersionedSchema` definitions reference the same `@Model`
-        // class shape. The column is handled by SwiftData's in-place
-        // additive-optional migration; the migration plan retains
-        // V1 → V2 → V3 lightweight stages. See SchemaV4.swift for the
-        // rationale + future-work note.
+        // it to avoid the "Duplicate version checksums" runtime
+        // collision SwiftData surfaces when two `VersionedSchema`
+        // definitions reference the same `@Model` class shape; the
+        // column is handled by SwiftData's in-place additive-optional
+        // migration. T-702 (US-41 / CL-86 / CL-88 / CL-93) re-introduces
+        // a real `SchemaV4` enum to mark the SwiftData → CloudKit
+        // configuration boundary, but **intentionally does NOT register
+        // V4 in the migration plan** because V4's `models` list is
+        // byte-identical to V3's (no @Model class shape change) — the
+        // production `ModelContainer` references `SchemaV4.models`
+        // and SwiftData's same-fingerprint inference handles the V3 →
+        // V4 no-op transition transparently. The migration plan still
+        // lists V1 → V2 → V3 lightweight stages.
         let schemas = MigrationPlan.schemas
-        #expect(schemas.count == 3, "V1, V2, V3")
+        #expect(schemas.count == 3, "V1, V2, V3 — V4 intentionally absent")
         let stages = MigrationPlan.stages
-        #expect(stages.count == 2, "V1→V2 and V2→V3")
+        #expect(stages.count == 2, "V1→V2 and V2→V3 — no V3→V4 stage")
     }
 }
 

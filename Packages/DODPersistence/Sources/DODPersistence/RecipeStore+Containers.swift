@@ -12,26 +12,105 @@ import SwiftData
 
 extension RecipeStore {
 
-    /// Create the on-disk container for production use. Pinned to the
-    /// latest schema (`SchemaV3`) — older on-disk stores get migrated via
-    /// `MigrationPlan` at open (V1 → V2 → V3, all lightweight). The
-    /// `articleBodyHTML` optional column added for US-37 / CL-63 / T-640
-    /// is an in-place additive optional property on `CachedRecipe`; see
-    /// `SchemaV4.swift` for the rationale on why it's not a separate
-    /// schema stage.
+    /// `UserDefaults` key for the CloudKit sync opt-in flag (US-41 / CL-89
+    /// / AC-41.2). Default `false`. The writer of this flag is the
+    /// UI layer — `T-704`'s first-launch opt-in sheet and `T-703`'s
+    /// Settings → iCloud Sync toggle — and the *reader* lives here, in
+    /// the container factory that decides whether to construct a plain
+    /// SwiftData container or one backed by the CloudKit private DB.
+    /// Pinned as a `public static let` so the UI code uses the exact
+    /// same key string the container reads.
+    public static let cloudKitSyncOptInKey = "dod.cloudkit.syncOptInV1"
+
+    /// CloudKit container identifier per CL-93. Mirrors the bundle ID
+    /// with the Apple-required `iCloud.` prefix. Provisioned by T-701's
+    /// entitlement PR; the value here must match the
+    /// `com.apple.developer.icloud-container-identifiers` array entry in
+    /// `App/DODApp.entitlements`.
+    public static let cloudKitContainerIdentifier =
+        "iCloud.com.dutchovendaddy.DODApp"
+
+    /// Create the on-disk container for production use. Pinned to
+    /// `SchemaV4` — older on-disk stores migrate via `MigrationPlan` at
+    /// open (V1 → V2 → V3 → V4, all lightweight).
+    ///
+    /// **CloudKit gating per CL-86 / CL-88 / CL-89 / CL-93.** When the
+    /// `cloudKitSyncOptInKey` `UserDefaults` flag is `true` (set by
+    /// T-703's Settings toggle or T-704's first-launch sheet), the
+    /// configuration uses `.private(cloudKitContainerIdentifier)` so
+    /// `CachedRecipe` rows where `isSaved == true` mirror to the user's
+    /// iCloud private DB. When the flag is `false` (the default, or the
+    /// user explicitly declined), the configuration is a plain
+    /// `ModelConfiguration()` and CloudKit is never touched — the
+    /// AC-41.1 graceful-fallback contract that keeps the app fully
+    /// functional under no-iCloud-account + sync-declined states.
+    ///
+    /// **Why no `groupContainer:` parameter.** SwiftData's CloudKit
+    /// adapter doesn't require the App Group container path — that's a
+    /// separate widget-bridge concern handled by `WidgetImageBridge`.
+    /// The CloudKit adapter writes the SwiftData store at the default
+    /// app sandbox path; the App Group container is used only for the
+    /// widget snapshot bytes that the widget extension reads.
     public static func productionContainer() throws -> ModelContainer {
-        try ModelContainer(
-            for: Schema(SchemaV3.models),
+        let configuration = makeProductionConfiguration()
+        return try ModelContainer(
+            for: Schema(SchemaV4.models),
             migrationPlan: MigrationPlan.self,
-            configurations: ModelConfiguration()
+            configurations: configuration
         )
+    }
+
+    /// Rebuild the production container after the opt-in flag changes
+    /// (e.g., the user toggles Settings → iCloud Sync on or off). The
+    /// caller is responsible for replacing the stale `ModelContainer` in
+    /// the composition root and re-wiring downstream consumers
+    /// (`RecipeStore`, the App Intents environment, the widget
+    /// publishers). T-703 owns the wiring; T-702 owns this seam.
+    ///
+    /// **Why a public seam instead of observing `UserDefaults` from the
+    /// container.** A `ModelContainer` is constructed once per process
+    /// lifecycle; SwiftData doesn't support swapping its
+    /// `ModelConfiguration` mid-flight. The opt-in transition requires
+    /// the host to discard the old container and build a fresh one with
+    /// the new configuration. Exposing the rebuild as an explicit
+    /// function keeps that contract visible at the call site.
+    public static func recreateContainerAfterOptInChange() throws -> ModelContainer {
+        try productionContainer()
+    }
+
+    /// Internal seam — chooses the right `ModelConfiguration` for the
+    /// current opt-in state. Factored out of `productionContainer()` so
+    /// tests can verify the no-CloudKit branch without spinning up a
+    /// `CKContainer` reference (per AC-41.1 / REG-26).
+    ///
+    /// **Why `.none` is explicit on the opt-out branch.** SwiftData's
+    /// default `ModelConfiguration` uses `.automatic` for the
+    /// `cloudKitDatabase:` parameter, and `.automatic` auto-enables
+    /// CloudKit sync whenever the app's entitlements file declares
+    /// `com.apple.developer.icloud-container-identifiers` (which T-701
+    /// added). Without the explicit `.none` override, auto-enable would
+    /// fire on every cold launch — including for users who haven't
+    /// opted in — and SwiftData would then reject every non-optional
+    /// `@Model` attribute + every unique constraint (CloudKit's
+    /// invariants), crashing the app at container open. Setting
+    /// `.none` explicitly is the AC-41.1 graceful-fallback contract:
+    /// the entitlement stays in place for users who DO opt in, but
+    /// CloudKit is provably not touched until the opt-in flag flips.
+    static func makeProductionConfiguration() -> ModelConfiguration {
+        let optedIn = UserDefaults.standard.bool(forKey: cloudKitSyncOptInKey)
+        if optedIn {
+            return ModelConfiguration(
+                cloudKitDatabase: .private(cloudKitContainerIdentifier)
+            )
+        }
+        return ModelConfiguration(cloudKitDatabase: .none)
     }
 
     /// Create an in-memory container for tests. Uses the current schema so
     /// fixture data exercises the same models the app ships with.
     public static func inMemoryContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(SchemaV3.models),
+            for: Schema(SchemaV4.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
     }
@@ -52,6 +131,16 @@ extension RecipeStore {
     public static func inMemoryContainerV2() throws -> ModelContainer {
         try ModelContainer(
             for: Schema(SchemaV2.models),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+    }
+
+    /// Create an in-memory container at the V3 schema. Used only by the
+    /// V3→V4 migration test to prove a pre-US-41 store opens cleanly
+    /// under V4. Production code never calls this.
+    public static func inMemoryContainerV3() throws -> ModelContainer {
+        try ModelContainer(
+            for: Schema(SchemaV3.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
     }
