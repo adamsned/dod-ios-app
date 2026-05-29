@@ -1,10 +1,17 @@
 import Foundation
 import SwiftUI
+import UserNotifications
 
 @main
 struct DODApp: App {
 
     @State private var dependencies = AppDependencies()
+    /// Installs the `UNUserNotificationCenterDelegate` at launch (US-42 /
+    /// AC-42.3 + AC-42.5). A SwiftUI `App` has no `application(_:didFinish…)`
+    /// hook, so the delegate adaptor bridges UIKit's launch callback where
+    /// the notification-center delegate must be set before any notification
+    /// is delivered.
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
         applyTestLaunchOverrides()
@@ -74,4 +81,27 @@ enum DODEnvironment {
     /// `FakeAppDependencies` to decide whether to swap fixtures into the
     /// composition root.
     nonisolated(unsafe) static var isE2EMode: Bool = false
+}
+
+/// UIKit application delegate bridged into the SwiftUI lifecycle via
+/// `@UIApplicationDelegateAdaptor` (see `DODApp`). Its sole job in v1 is to
+/// install the `UNUserNotificationCenterDelegate` at launch so tapped
+/// local notifications route their deep link (US-42 / AC-42.3) and
+/// foreground notifications surface a banner (AC-42.5).
+///
+/// The `NotificationCoordinator` is retained here for the process lifetime
+/// — `UNUserNotificationCenter.delegate` is a `weak` reference, so a
+/// non-retained coordinator would be deallocated and tap routing would
+/// silently stop working.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+
+    private let notificationCoordinator = NotificationCoordinator()
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = notificationCoordinator
+        return true
+    }
 }
