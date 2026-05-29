@@ -3,7 +3,7 @@ import Foundation
 
 /// Pure, `UNUserNotificationCenter`-free description of a single local
 /// notification the app schedules when a new post is published
-/// (spec US-41 / AC-41.2, AC-41.3).
+/// (spec US-42 / AC-42.2, AC-42.3).
 ///
 /// Splitting the *content* (this type + ``NotificationContentBuilder``)
 /// from the *scheduling* (the app-target `NotificationService` that wraps
@@ -14,21 +14,21 @@ import Foundation
 /// ``title`` / ``body`` into a `UNMutableNotificationContent` and stamps
 /// ``userInfo`` onto it verbatim.
 ///
-/// Spec trace: US-41 / CL-86 (decisions 2 + 4).
+/// Spec trace: US-42 / CL-100 (decisions 2 + 4).
 public struct NotificationPlan: Equatable, Sendable {
 
-    /// Notification title — the type-aware headline (AC-41.2):
+    /// Notification title — the type-aware headline (AC-42.2):
     /// `"New Recipe 🍳"` for a recipe, `"New Article 📖"` for an article.
     public let title: String
 
     /// Notification body — the type-aware sentence interpolating the post
-    /// title (AC-41.2).
+    /// title (AC-42.2).
     public let body: String
 
     /// `userInfo` payload copied onto the `UNMutableNotificationContent`.
     /// Carries the deep-link target under ``NotificationPlan/deepLinkKey``
     /// so the tap handler can route it through the existing
-    /// `WidgetDeepLinkParser` / `DeepLinkDispatcher` path (AC-41.3).
+    /// `WidgetDeepLinkParser` / `DeepLinkDispatcher` path (AC-42.3).
     public let userInfo: [String: String]
 
     public init(title: String, body: String, userInfo: [String: String]) {
@@ -51,17 +51,17 @@ public struct NotificationPlan: Equatable, Sendable {
 ///
 /// The copy mapping is keyed purely on ``PostKind`` (US-37 / CL-63) — the
 /// builder never inspects the post itself, so it is a pure function the
-/// L1 suite pins per kind (AC-41.2) and the deep-link payload shape it
-/// emits is asserted independently (AC-41.3 / AC-41.6).
+/// L1 suite pins per kind (AC-42.2) and the deep-link payload shape it
+/// emits is asserted independently (AC-42.3 / AC-42.6).
 ///
-/// Spec trace: US-41 / CL-86.
+/// Spec trace: US-42 / CL-100.
 public enum NotificationContentBuilder {
 
     /// Build the notification plan for a post of the given ``PostKind``.
     ///
     /// - Parameters:
     ///   - postTitle: the post's display title, interpolated verbatim into
-    ///     the body (AC-41.2). No truncation — the system handles overflow.
+    ///     the body (AC-42.2). No truncation — the system handles overflow.
     ///   - postKind: `.recipe` or `.article` — drives the title + body copy
     ///     and the deep-link host (`recipe` vs. `article`).
     ///   - postID: the integer WP post id used to build the
@@ -93,7 +93,7 @@ public enum NotificationContentBuilder {
         )
     }
 
-    /// The single suppression gate (AC-41.4 / CL-86 decision 3): a local
+    /// The single suppression gate (AC-42.4 / CL-100 decision 3): a local
     /// notification may be scheduled **only** when the user's persisted
     /// intent (`dod.settings.notificationsEnabled`) is on **and** the OS
     /// has granted authorization. Off ⇒ silence, with no edge case that

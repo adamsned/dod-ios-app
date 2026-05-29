@@ -4,14 +4,14 @@ import Foundation
 import UserNotifications
 
 /// `UNUserNotificationCenterDelegate` for the app's local notifications
-/// (spec US-41 / AC-41.3 + AC-41.5).
+/// (spec US-42 / AC-42.3 + AC-42.5).
 ///
 /// Two responsibilities:
-/// - **Foreground banner (AC-41.5):** `willPresent` opts into showing the
+/// - **Foreground banner (AC-42.5):** `willPresent` opts into showing the
 ///   banner + sound while the app is foregrounded, so a notification that
 ///   fires while the app is open is observable rather than silently
 ///   swallowed (important for the simulator test).
-/// - **Tap routing (AC-41.3):** `didReceive` reads the `dod://…` deep-link
+/// - **Tap routing (AC-42.3):** `didReceive` reads the `dod://…` deep-link
 ///   string from `userInfo` (under ``NotificationPlan/deepLinkKey``),
 ///   extracts the integer post id, and routes through the existing
 ///   `DeepLinkDispatcher` — the same dispatcher App Intents / Spotlight
@@ -26,7 +26,7 @@ import UserNotifications
 /// Objective-C protocol. Set as the center's delegate in `AppDelegate`.
 final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
 
-    /// AC-41.5 — present the banner while foregrounded.
+    /// AC-42.5 — present the banner while foregrounded.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -35,7 +35,7 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         completionHandler([.banner, .sound, .list])
     }
 
-    /// AC-41.3 — route the tapped notification's deep link.
+    /// AC-42.3 — route the tapped notification's deep link.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,

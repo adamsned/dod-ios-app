@@ -148,58 +148,18 @@ public struct LiveFeedDependencies: FeedDependencies {
         }
         widgetReload?(Array(entries))
 
-        // T-392: Hero-image precache. Without this, `RecipeStore.cacheImage`
-        // only ran for *saved* recipes via `SavedDependencies`, so the
-        // featured-widget hero file at the bridge path never existed unless
-        // the user happened to have saved today's featured recipe — and
-        // the widget's `AsyncImage` fell back to the gradient placeholder.
-        // We dispatch the fetch on a detached Task so the user-visible feed
-        // load doesn't wait on it; failures are logged and swallowed so the
-        // graceful-fallback contract (AC-21.3) still holds.
-        let heroEntries = Array(entries)
-        let store = self.store
-        Task.detached { [store, heroEntries] in
-            await Self.precacheHeroImages(entries: heroEntries, into: store)
-        }
-    }
-
-    /// Fetch + cache hero image bytes for every snapshot entry that has a
-    /// URL. Calls into the same `store.cacheImage(url:bytes:)` site that
-    /// `SavedDependencies` uses on explicit save — `RecipeStore+ImageCache`
-    /// mirrors each write to ``WidgetImageBridge`` so the widget extension
-    /// can render the bytes without a network fetch. Best-effort by design:
-    /// any per-entry failure (network blip, image absent, decode-time error)
-    /// is logged and skipped; the widget falls back to the gradient
-    /// placeholder for that entry per AC-21.3.
-    ///
-    /// `nonisolated` + `static` so the detached Task closure can call it
-    /// without capturing `self` as a Sendable surface.
-    private static func precacheHeroImages(
-        entries: [WidgetSnapshot.Entry],
-        into store: RecipeStore
-    ) async {
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 5
-        config.timeoutIntervalForResource = 10
-        let session = URLSession(configuration: config)
-        defer { session.invalidateAndCancel() }
-
-        for entry in entries {
-            guard let url = entry.heroImageURL else { continue }
-            do {
-                let (bytes, response) = try await session.data(from: url)
-                if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                    DODLog.app.notice(
-                        "widget hero precache: HTTP \(http.statusCode, privacy: .public) for \(url.absoluteString, privacy: .public)"
-                    )
-                    continue
-                }
-                try await store.cacheImage(url: url, bytes: bytes)
-            } catch {
-                DODLog.app.notice(
-                    "widget hero precache failed for \(url.absoluteString, privacy: .public): \(String(describing: error))"
-                )
-            }
+        // Without this, the widget's deterministic `WidgetImageBridge`
+        // filenames point at files that only existed when the user happened
+        // to have saved today's featured recipe (REG-T-360 / CL-45). The
+        // composition root supplies a prefetcher that routes URLs through
+        // `ImageLoader` + `RecipeStore.cacheImage`; detaching keeps feed-load
+        // latency unaffected, and per-URL failures are logged + swallowed
+        // inside the prefetcher (graceful-fallback contract — AC-21.3).
+        guard let imagePrefetcher else { return }
+        let urls = entries.compactMap(\.heroImageURL)
+        guard !urls.isEmpty else { return }
+        Task.detached { [imagePrefetcher, urls] in
+            await imagePrefetcher(urls)
         }
     }
 }

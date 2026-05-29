@@ -46,10 +46,10 @@ public struct SettingsView: View {
     public let onClearImageCache: (() async throws -> Int)?
 
     /// Fires the two sample local notifications behind the temporary DEBUG
-    /// "Simulate New Post" affordance (US-41 / AC-41.6). Supplied by the
+    /// "Simulate New Post" affordance (US-42 / AC-42.6). Supplied by the
     /// composition root (routes through `NotificationService`); `nil` in
     /// previews / snapshot hosts so the button is a no-op there. The
-    /// toggle-off suppression (AC-41.4) lives inside the closure's
+    /// toggle-off suppression (AC-42.4) lives inside the closure's
     /// `NotificationService` call, not here — the button always delegates.
     public let onSimulateNewPosts: (() -> Void)?
 
@@ -99,12 +99,12 @@ public struct SettingsView: View {
                 .accessibilityIdentifier("settings-toggle-notifications")
 
                 #if DEBUG
-                // Temporary developer affordance (US-41 / AC-41.6) — fires
+                // Temporary developer affordance (US-42 / AC-42.6) — fires
                 // two sample local notifications (one article, one recipe)
                 // ~2s apart so the end-to-end path can be exercised in the
                 // simulator (v1 has no server trigger). Gated by the toggle:
                 // the `NotificationService` behind `onSimulateNewPosts`
-                // schedules nothing when notifications are OFF (AC-41.4).
+                // schedules nothing when notifications are OFF (AC-42.4).
                 // `#if DEBUG` so it never ships in a release build.
                 Button {
                     onSimulateNewPosts?()
@@ -245,7 +245,7 @@ public struct SettingsView: View {
     private var notificationsEnabledBinding: Binding<Bool> {
         Binding(
             get: { viewModel.notificationsEnabled },
-            // Turning ON requests system authorization (US-41 / AC-41.1);
+            // Turning ON requests system authorization (US-42 / AC-42.1);
             // a denied prompt leaves the persisted flag OFF so the toggle
             // springs back. The work is async (the system prompt), so it
             // runs in a Task — the `@Observable` `notificationsEnabled`

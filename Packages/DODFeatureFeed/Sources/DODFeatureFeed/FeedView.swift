@@ -30,13 +30,13 @@ public struct FeedView: View {
     /// pass a non-nil closure that routes through
     /// `RecipeStore.clearImageCache()` and returns freed-byte total.
     public let onClearImageCache: (() async throws -> Int)?
-    /// US-41 / AC-41.1 — authorization seam forwarded into `SettingsView`'s
+    /// US-42 / AC-42.1 — authorization seam forwarded into `SettingsView`'s
     /// `SettingsViewModel` so flipping the notifications toggle ON requests
     /// system permission. Optional; `nil` means the toggle persists intent
     /// but reports "not granted" (previews / tests). Production (TabStack)
     /// passes a closure that calls `NotificationService.requestAuthorization()`.
     public let onRequestNotificationAuthorization: (@MainActor () async -> Bool)?
-    /// US-41 / AC-41.6 — fires the two sample local notifications behind
+    /// US-42 / AC-42.6 — fires the two sample local notifications behind
     /// the temporary DEBUG test affordance in `SettingsView`. Optional;
     /// production (TabStack) routes it through `NotificationService`.
     public let onSimulateNewPosts: (() -> Void)?

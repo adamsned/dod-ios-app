@@ -1,3 +1,4 @@
+import CloudKit
 import DODAnalytics
 import DODFeatureCategories
 import DODFeatureFeed
@@ -24,7 +25,7 @@ final class AppDependencies {
     let store: RecipeStore
     let modelContainer: ModelContainer
 
-    /// On-device local-notification service (US-41 / T-631). Long-lived —
+    /// On-device local-notification service (US-42 / T-631). Long-lived —
     /// owns the authorization request the Settings toggle drives and the
     /// scheduling the (DEBUG) test affordance fires. No APNs / no server.
     let notificationService: NotificationService
@@ -74,6 +75,45 @@ final class AppDependencies {
         // US-10: hand the store to the AppIntents environment so the entity
         // query and Spotlight indexer can read saved + recently-viewed rows.
         AppIntentEnvironment.register(store: store)
+        // US-41 / AC-41.1 (T-702): conditional CloudKit availability
+        // check. Only fires when the user has opted into iCloud sync via
+        // T-703's Settings toggle or T-704's first-launch sheet —
+        // otherwise the app never touches `CKContainer` at all, which is
+        // the AC-41.1 graceful-fallback contract that keeps the existing
+        // v1.0 behavior intact under no-iCloud-account + sync-declined
+        // states.
+        if UserDefaults.standard.bool(forKey: RecipeStore.cloudKitSyncOptInKey) {
+            await checkCloudKitAvailability()
+        }
+    }
+
+    /// US-41 / AC-41.1 + AC-41.7 / REG-25 + REG-26 (T-702). Probe the
+    /// user's iCloud account status so subsequent sync attempts know
+    /// whether to proceed (`.available`) or pause with a status sublabel
+    /// (`.noAccount` / `.restricted` / `.couldNotDetermine` — T-705 owns
+    /// the sublabel surface). Per AC-41.1 the app **must not crash** when
+    /// the account is unavailable — we log + continue, and the existing
+    /// SwiftData store keeps working unchanged on the AC-41.1 fallback
+    /// path.
+    ///
+    /// Surface trace (REG-25): the only `CKContainer` APIs this method
+    /// touches are the initializer + `accountStatus()`. No
+    /// `publicCloudDatabase` / `sharedCloudDatabase` / `discoverUserIdentity`
+    /// surface reference exists in the entire app per the REG-25 contract.
+    private func checkCloudKitAvailability() async {
+        let container = CKContainer(
+            identifier: RecipeStore.cloudKitContainerIdentifier
+        )
+        do {
+            let status = try await container.accountStatus()
+            DODLog.app.info(
+                "CloudKit account status: \(String(describing: status))"
+            )
+        } catch {
+            DODLog.app.notice(
+                "CloudKit availability check failed: \(error.localizedDescription)"
+            )
+        }
     }
 
     // MARK: - Per-feature dependency views

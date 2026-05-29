@@ -42,20 +42,39 @@ public enum SchemaV2: VersionedSchema {
 /// - V1 → V2: lightweight (V2 = V1 + `CachedIngredient`).
 /// - V2 → V3: lightweight (V3 = V2 + `CachedComment` + `CachedRating`).
 ///
-/// **US-37 / CL-63 / T-640 note:** the `articleBodyHTML` optional column
-/// added to `CachedRecipe` for the article-rendering path is NOT a
-/// separate schema stage — SwiftData computes the schema checksum from
-/// the `@Model` class shape, so defining a SchemaV4 that references the
-/// same `CachedRecipe.self` (with the new column) collides with V3
-/// ("Duplicate version checksums detected" at container open). The
-/// additive optional column is instead handled by SwiftData's default
-/// schema-inference migration — new optional properties on a model whose
-/// schema identifier hasn't bumped are accepted in-place at open. See
-/// `SchemaV4.swift` for the rationale and the future-work note.
+/// **SchemaV4 note (US-41 / T-702).** `SchemaV4` exists as a real
+/// `VersionedSchema` in `SchemaV4.swift` and is the schema the
+/// production `ModelContainer` uses — but it is intentionally NOT
+/// registered in the migration plan because its `models` list is
+/// byte-identical to V3's (same `@Model` class shapes). SwiftData
+/// computes the schema fingerprint from the `@Model` class shape, not
+/// the `versionIdentifier`, so registering both V3 and V4 in the
+/// migration plan with identical model lists surfaces the "Duplicate
+/// version checksums detected" runtime error at container open. The
+/// V3 → V4 transition for existing v1.0 users is a no-op at the data
+/// layer — the on-disk store opens cleanly under V4 because the
+/// fingerprint matches V3's. The CloudKit-configuration switch that
+/// makes V4 meaningful happens at the `ModelConfiguration` level (per
+/// `RecipeStore+Containers.swift`'s opt-in gating), not at the
+/// migration-plan level. **If a future PR adds an actual @Model field
+/// change to V4** (e.g., the CL-90 `modifiedAt` LWW timestamp T-706
+/// will need), the right pattern is to register V4 here as a
+/// `MigrationStage.custom` and rename the new-field-bearing model
+/// classes to typealiased names so the fingerprints diverge — see
+/// the `SchemaV4.swift` header for the documented workaround.
+///
+/// **US-37 / CL-63 / T-640 note:** the `articleBodyHTML` optional
+/// column on `CachedRecipe` was added via SwiftData's in-place
+/// additive-optional migration path, NOT a separate schema stage —
+/// new optional properties are accepted when the schema identifier
+/// hasn't bumped.
 ///
 /// Per MIGRATION.md rule 3 every stage has a paired migration test:
 /// - `MigrationTests.lightweightV1toV2OpensCleanly`
 /// - `MigrationV3Tests.V2_to_V3_lightweightMigration`
+/// - `SchemaV4Tests.v3ToV4LightweightMigrationOpensCleanly` (the
+///   no-op identity transition under the byte-identical-models
+///   posture).
 public enum MigrationPlan: SchemaMigrationPlan {
 
     public static var schemas: [any VersionedSchema.Type] {

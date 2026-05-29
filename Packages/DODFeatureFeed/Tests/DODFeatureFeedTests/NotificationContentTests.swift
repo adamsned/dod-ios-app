@@ -5,14 +5,14 @@ import Testing
 @testable import DODFeatureFeed
 
 /// L1 unit coverage for the local-notification content builder + the
-/// suppression gate (spec US-41 / AC-41.2, AC-41.3, AC-41.4, AC-41.6).
+/// suppression gate (spec US-42 / AC-42.2, AC-42.3, AC-42.4, AC-42.6).
 ///
 /// These exercise the pure logic only — the `UNUserNotificationCenter`
 /// scheduling wrapper lives in the app target and is verified by the
 /// build + the manual simulator test (the test affordance), not here.
-@Suite("NotificationContentBuilder (T-631 / US-41)") struct NotificationContentTests {
+@Suite("NotificationContentBuilder (T-631 / US-42)") struct NotificationContentTests {
 
-    // MARK: - AC-41.2 — type-aware copy
+    // MARK: - AC-42.2 — type-aware copy
 
     @Test func recipePlanUsesRecipeCopy() {
         let plan = NotificationContentBuilder.plan(
@@ -44,7 +44,7 @@ import Testing
         #expect(plan.body.contains("Title with — em dash & ampersand"))
     }
 
-    // MARK: - AC-41.3 / AC-41.6 — userInfo deep-link payload shape
+    // MARK: - AC-42.3 / AC-42.6 — userInfo deep-link payload shape
 
     @Test func recipePlanCarriesRecipeDeepLink() {
         let plan = NotificationContentBuilder.plan(
@@ -72,7 +72,7 @@ import Testing
         #expect(NotificationPlan.deepLinkKey == "dod.deeplink")
     }
 
-    // MARK: - AC-41.4 — toggle-off suppression (single gate)
+    // MARK: - AC-42.4 — toggle-off suppression (single gate)
 
     @Test func suppressionGateRequiresBothToggleAndAuthorization() {
         // Only on + authorized may schedule; every other combination is

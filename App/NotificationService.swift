@@ -4,14 +4,14 @@ import DODSupport
 import Foundation
 import UserNotifications
 
-/// On-device *local* notification service (spec US-41 / CL-86).
+/// On-device *local* notification service (spec US-42 / CL-100).
 ///
 /// Wraps `UNUserNotificationCenter` for the two things the app needs:
 /// requesting authorization when the Settings toggle is flipped ON
-/// (AC-41.1) and scheduling a type-aware local notification for a newly
-/// published post (AC-41.2 / AC-41.3). There is **no** Apple Push / APNs
-/// in v1 — no device token, no remote payload, no server (CL-86 decision
-/// 1). The single suppression gate (AC-41.4) lives in
+/// (AC-42.1) and scheduling a type-aware local notification for a newly
+/// published post (AC-42.2 / AC-42.3). There is **no** Apple Push / APNs
+/// in v1 — no device token, no remote payload, no server (CL-100 decision
+/// 1). The single suppression gate (AC-42.4) lives in
 /// ``scheduleNewPostNotification(title:postKind:recipeID:)``: it schedules
 /// nothing unless the persisted toggle is ON **and** the OS has granted
 /// authorization, delegating that truth-table decision to the pure
@@ -34,9 +34,9 @@ final class NotificationService {
         self.defaults = defaults
     }
 
-    /// Requests `[.alert, .sound]` authorization (AC-41.1). Returns `true`
+    /// Requests `[.alert, .sound]` authorization (AC-42.1). Returns `true`
     /// iff the user grants. No `.badge` — v1 has no badge-count source
-    /// (CL-86 decision 1). Errors are logged + treated as "not granted" so
+    /// (CL-100 decision 1). Errors are logged + treated as "not granted" so
     /// the toggle reverts rather than claiming notifications are on.
     func requestAuthorization() async -> Bool {
         do {
@@ -49,7 +49,7 @@ final class NotificationService {
 
     /// Live OS authorization status — `true` for `.authorized`,
     /// `.provisional`, or `.ephemeral`. Half of the suppression gate
-    /// (AC-41.4); the other half is the persisted toggle.
+    /// (AC-42.4); the other half is the persisted toggle.
     func isAuthorized() async -> Bool {
         let settings = await center.notificationSettings()
         switch settings.authorizationStatus {
@@ -63,8 +63,8 @@ final class NotificationService {
     }
 
     /// Schedules a single type-aware local notification for a newly
-    /// published post (AC-41.2 / AC-41.3), **gated** by the toggle + OS
-    /// authorization (AC-41.4). When notifications are OFF or permission is
+    /// published post (AC-42.2 / AC-42.3), **gated** by the toggle + OS
+    /// authorization (AC-42.4). When notifications are OFF or permission is
     /// not granted this schedules nothing and returns — the single choke
     /// point so "off ⇒ silence" is an invariant, not a per-call-site
     /// convention.
@@ -115,13 +115,13 @@ final class NotificationService {
     }
 
     #if DEBUG
-    /// Temporary developer affordance (US-41 / AC-41.6) behind the Settings
+    /// Temporary developer affordance (US-42 / AC-42.6) behind the Settings
     /// "▸ Test: Simulate New Post" button. Fires two sample notifications
     /// ~2s apart — an article then a recipe — so the end-to-end path
     /// (schedule → fire → banner → tap → deep-link) can be exercised in the
     /// simulator (v1 has no server trigger). Each call routes through
     /// ``scheduleNewPostNotification(title:postKind:recipeID:)`` so the
-    /// toggle-off suppression (AC-41.4) applies here too. `#if DEBUG` so it
+    /// toggle-off suppression (AC-42.4) applies here too. `#if DEBUG` so it
     /// never ships in a release build.
     func simulateNewPosts() {
         Task { @MainActor in

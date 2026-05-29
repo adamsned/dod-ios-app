@@ -15,6 +15,87 @@
 - [ ] Accessibility audit completed in simulator per `accessibility-audit.md`.
 - [ ] Cold-launch trace shows < 1.5s per `performance-audit.md`.
 - [ ] Pre-flight comment-system check (added 2026-05-24 for US-13/14/15): the app now writes ratings + comments back to dutchovendaddy.com over the WP REST API, so the WordPress side has to be in the right state before the build hits TestFlight. Confirm WP **Settings → Discussion → "Comment author must fill out name and email"** is **ON** (the app always sends both, but the live blog has to require them so anonymous bot posts get rejected at the source). Confirm **"Users must be registered and logged in to comment"** is **OFF** (the app posts as a guest using name + email — registration would block every submission). Confirm the **comment moderation queue is enabled** (default) so US-14 AC-14.4's `hold` branch actually exercises in production and a human can triage spam before it goes live. Recommend installing a basic anti-spam plugin (Akismet) if not already present — the new write surface is going to attract bot traffic, and Akismet is the path-of-least-resistance defense for a fresh WordPress install.
+- [ ] **Pre-flight CloudKit-sync privacy-policy gate (added 2026-05-28 for US-41 / T-700..T-708 per CL-95 + AC-41.12)** — **MUST verify before any build that enables CloudKit sync submits to TestFlight.** The build that turns on CloudKit sync (T-702 + T-703 + T-704 land together with `dod.cloudKitSyncEnabled` becoming a non-stub flag) requires the privacy policy at `https://www.dutchovendaddy.com/app-privacy/` to contain the new "Optional iCloud Sync" paragraph from CL-95 verbatim. Verification: open `https://www.dutchovendaddy.com/app-privacy/` in a browser and confirm the policy contains the paragraph starting "Optional iCloud Sync. When you enable iCloud Sync in Settings..." (the full paragraph text lives in `Marketing/AppPrivacy.md` § "The TestFlight gate" and in `clarifications.md` § CL-95). This is a one-time gate; once the policy is live, the gate is satisfied for all subsequent builds (until the paragraph is removed or US-41 is itself reverted). **Operational note:** this gate is enforced by the TestFlight submitter (dad or Spencer), not by CI — there is no automated check on the live policy URL. If the gate is missed and a CloudKit-enabling build ships to TestFlight without the policy paragraph live, the fix is to (a) update the policy URL immediately, (b) re-verify, (c) include the policy update in the next build's release notes. App Store **review** would likely flag the missing paragraph during the production submission review (not TestFlight); the gate is for TestFlight specifically to keep the test-flight cohort under the same privacy promise as the eventual production cohort.
+- [ ] **Pre-flight CloudKit-sync container provisioning (added 2026-05-28 for T-701 per CL-93)** — **MUST complete before T-702 submits to TestFlight.** (1) Apple Developer Portal → Identifiers → App IDs → `com.dutchovendaddy.DODApp` → Edit Capabilities → check "iCloud" → check "Include CloudKit support" → save. (2) CloudKit Dashboard (https://icloud.developer.apple.com) → Sign in with the Apple ID that owns the app's team → "Manage" → create container `iCloud.com.dutchovendaddy.DODApp` → confirm "Development" + "Production" environments are both created (default). (3) Before promoting any TestFlight build to production, the schema must be "deployed" from Development → Production via the CloudKit Dashboard UI ("Schema → Deploy Schema Changes"). (4) The development team's provisioning profile must include the iCloud capability — `fastlane match` regenerate to refresh the profile after step (1). The two new entitlement keys (`com.apple.developer.icloud-container-identifiers` + `com.apple.developer.icloud-services`) land via T-701's `App/DODApp.entitlements` edit; the entitlements file edit is paired with the `remote-notification` `UIBackgroundModes` value added to `App/Info.plist` + `project.yml` for the CloudKit silent-push wakeup path per CL-99.
+
+## Verify-after-T-701 — CloudKit container provisioning checklist
+
+T-701 landed the entitlement keys in `App/DODApp.entitlements`
+(`com.apple.developer.icloud-container-identifiers` =
+`iCloud.com.dutchovendaddy.DODApp`,
+`com.apple.developer.icloud-services` = `CloudKit`). The Apple Developer
+Portal + CloudKit Dashboard side is **operational** — it has to happen on
+the team-owner's Apple ID before any build with these entitlements can
+ship to TestFlight. Walk through the six steps below in order. Each step
+is a single click-through; the whole pass takes ~10 minutes if the
+identifier already exists, ~15 if it's the first ship.
+
+1. Open https://developer.apple.com/account/resources/identifiers/list
+   and sign in with the team-owner Apple ID. Filter the list to **App
+   IDs** and find `com.dutchovendaddy.DODApp`. If it's already there
+   (the host App ID was registered for the original v1.0 ship per the
+   "Apple Developer Program" section below), click into it. If it's
+   missing (first-ever ship of this entitlement), click the blue **+**
+   in the top-right → **App IDs** → **App** → continue, fill in the
+   description "Dutch Oven Daddy" and bundle ID `com.dutchovendaddy.DODApp`
+   (Explicit, not Wildcard), then create.
+
+2. Inside the identifier's edit page, scroll the **Capabilities** list
+   to **iCloud** and check its box. The radio selector that appears
+   immediately below offers two options — **"Include CloudKit support"**
+   (the modern container-aware path) and the legacy
+   **"Compatible with Xcode 5"** wrapper. Pick **"Include CloudKit
+   support"** — the legacy option is for pre-CloudKit iCloud Drive
+   apps and will reject our entitlement file. Do **not** save yet — the
+   container assignment in step 4 happens on the same page.
+
+3. In a new tab open https://icloud.developer.apple.com (CloudKit
+   Dashboard) and sign in with the same Apple ID. Click **Manage**
+   under "CloudKit Database", then **+** in the container list. Type
+   the container name **`iCloud.com.dutchovendaddy.DODApp`** exactly as
+   shown — the Apple Developer Portal is strict about the
+   `iCloud.<bundle-id>` prefix + the case-sensitive bundle ID match.
+   Confirm. The container is created with Development + Production
+   environments by default (no toggle needed).
+
+4. Switch back to the Developer Portal tab from step 2. Under the
+   iCloud capability's **Configure** button, the container list now
+   shows `iCloud.com.dutchovendaddy.DODApp` as an available choice.
+   Check its box, then click **Continue → Save** on the identifier
+   edit page. Apple confirms with a "Modify App ID Configuration" page;
+   click **Confirm**.
+
+5. **Regenerate provisioning profiles.** Xcode's "Automatically manage
+   signing" path usually auto-detects the new capability and refreshes
+   the development profile on the next build — open Xcode, select the
+   DODApp target, **Signing & Capabilities** tab, and Xcode should
+   surface a "Provisioning profile out of date" banner with a fix-it
+   button. Click it. If using `fastlane match` (CI builds) instead,
+   run `fastlane match development --force` and
+   `fastlane match appstore --force` to regenerate both profile types
+   with the iCloud entitlement embedded.
+
+6. Back in Xcode, **DODApp target → Signing & Capabilities** —
+   confirm three things: (a) **iCloud** appears in the capability list
+   (Xcode added it automatically from the `.entitlements` file's keys);
+   (b) the **CloudKit** services checkbox is ticked under the iCloud
+   block; (c) `iCloud.com.dutchovendaddy.DODApp` appears in the
+   **Containers** list under CloudKit with its checkbox ticked. If any
+   of those is missing, the next `xcodegen generate` pass usually
+   resolves it — re-run `xcodegen generate` and reopen the project. If
+   Xcode added a container manually that doesn't match the
+   entitlements file, edit `App/DODApp.entitlements` (NOT
+   `project.pbxproj` — that's generated) and re-run xcodegen so the
+   two stay in sync.
+
+**Schema deployment is NOT required for TestFlight builds.** T-702
+introduces SwiftData's CloudKit integration, which auto-defines the
+record types on the first Development-environment sync. The "Deploy
+Schema Changes" step in the CloudKit Dashboard (Development →
+Production) only matters before the production App Store release goes
+live — not before TestFlight. Capture it as a separate operational gate
+in the pre-flight checklist for the production submission build, not
+this one.
 
 ## Apple Developer Program
 

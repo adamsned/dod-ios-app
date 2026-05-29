@@ -63,7 +63,7 @@ public final class SettingsViewModel {
 
     private let defaults: UserDefaults
 
-    /// Authorization seam for the notifications toggle (US-41 / AC-41.1).
+    /// Authorization seam for the notifications toggle (US-42 / AC-42.1).
     /// The composition root injects a closure that calls
     /// `NotificationService.requestAuthorization()` (which wraps
     /// `UNUserNotificationCenter.current().requestAuthorization(...)`);
@@ -141,10 +141,10 @@ public final class SettingsViewModel {
         self.requestNotificationAuthorization = requestNotificationAuthorization
     }
 
-    // MARK: - Notifications toggle (US-41 / AC-41.1)
+    // MARK: - Notifications toggle (US-42 / AC-42.1)
 
     /// Drives the notifications toggle's ON/OFF transition. Turning **ON**
-    /// requests system authorization (AC-41.1): on grant the flag persists
+    /// requests system authorization (AC-42.1): on grant the flag persists
     /// `true`; on deny the flag stays `false` (the toggle reverts) and a
     /// snackbar points the user at iOS Settings. Turning **OFF** simply
     /// persists `false` — no system call. Returns the resolved on/off
@@ -160,7 +160,7 @@ public final class SettingsViewModel {
         notificationsEnabled = granted
         if !granted {
             // Persisted intent stays OFF so the UI never claims notifications
-            // are on while the OS suppresses them (AC-41.1).
+            // are on while the OS suppresses them (AC-42.1).
             snackbarMessage = "Enable notifications in iOS Settings → DOD to get new-post alerts."
         }
         return granted
