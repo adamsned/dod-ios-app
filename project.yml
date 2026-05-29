@@ -17,7 +17,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     GENERATE_INFOPLIST_FILE: NO
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
 
 # Local Swift packages — wired up in T-006
 packages:
@@ -57,6 +57,29 @@ targets:
       # hand-edited keys. We've fixed the same letterbox bug twice now
       # because UILaunchScreen kept getting clobbered — keep it here.
       properties:
+        # User-facing display name (Home Screen, App Switcher, Settings).
+        # Distinct from CFBundleName (canonical PRODUCT_NAME from xcodegen).
+        # Apple's binary-validator (error 90360) requires CFBundleDisplayName
+        # on every app extension; we set it on the host app too for
+        # consistency with what users see on the Home Screen.
+        CFBundleDisplayName: Dutch Oven Daddy
+        # Export-compliance self-classification. `false` declares the app
+        # uses ONLY exempt encryption — i.e. TLS via URLSession, SHA-256
+        # hashing via CryptoKit, Keychain via Security framework. Apple
+        # treats "encryption accessed only through iOS frameworks" as
+        # exempt under EAR Cat 5 Part 2 (no ATEA documentation required).
+        # Baking this here skips the App Store Connect "Missing
+        # Compliance" prompt on every future build. Audit confirms no
+        # CommonCrypto / SecKey direct usage; no proprietary crypto.
+        ITSAppUsesNonExemptEncryption: false
+        # CFBundleVersion is the build number Apple uses to uniquely
+        # identify each TestFlight / App Store submission for this
+        # CFBundleShortVersionString. MUST monotonically increase: a
+        # build number, once accepted by App Store Connect, can never be
+        # re-used. Bump on every upload attempt. xcodegen does NOT read
+        # this from `CURRENT_PROJECT_VERSION`; it hardcodes "1" as the
+        # default unless explicitly set here.
+        CFBundleVersion: "2"
         LSRequiresIPhoneOS: true
         # UILaunchScreen is required for iOS to render edge-to-edge on
         # modern devices (notch, Dynamic Island, home indicator). Without
@@ -152,6 +175,16 @@ targets:
     info:
       path: Widget/Info.plist
       properties:
+        # REQUIRED by Apple's binary-validator for every .appex extension
+        # (error 90360 if missing — App Store Connect rejects the upload).
+        # Shown in iPhone Storage / Settings as the extension's identifier;
+        # the per-widget gallery labels come from each widget's Swift-side
+        # `.configurationDisplayName(...)` call.
+        CFBundleDisplayName: DOD Widgets
+        # MUST match the host app's CFBundleVersion (Apple's bundle-
+        # extension contract — version skew between host + extension
+        # rejected at upload).
+        CFBundleVersion: "2"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -179,6 +212,9 @@ targets:
       path: LiveActivity/Info.plist
       properties:
         CFBundleDisplayName: DOD Live Activity
+        # MUST match the host app's CFBundleVersion (Apple's bundle-
+        # extension contract).
+        CFBundleVersion: "2"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
