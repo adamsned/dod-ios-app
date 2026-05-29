@@ -125,19 +125,27 @@ final class NotificationService {
     /// never ships in a release build.
     func simulateNewPosts() {
         Task { @MainActor in
-            // Article: the May-25-2026 real roundup scenario.
+            // Article: a real roundup post on the live blog (id 23406 —
+            // "Best Dutch Oven Recipes (30+ Tried and Tested Favorites)").
+            // Real id so the tapped deep link actually fetches + opens it
+            // via the T-632 fetch-on-cache-miss path (REG-20 / CL-101) —
+            // the post has no parseable Recipe JSON-LD, so it resolves as
+            // an article and opens `ArticleDetailView`.
             await scheduleNewPostNotification(
                 title: "Best Dutch Oven Recipes (30+ Tried and Tested Favorites)",
                 postKind: .article,
-                recipeID: 18342
+                recipeID: 23406
             )
             // ~2s later, a recipe — demonstrates the second copy variant +
-            // the recipe deep-link payload.
+            // the recipe deep-link payload. Real id 21238 ("Garlic Butter
+            // Skillet Corn") replaces the fictional "Cast Iron Burgers",
+            // which doesn't exist on the blog (CL-101) — so the tapped
+            // notification resolves to a real recipe detail.
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             await scheduleNewPostNotification(
-                title: "Cast Iron Burgers (Easy Skillet Recipe)",
+                title: "Garlic Butter Skillet Corn (Easy 15-Minute Side Dish)",
                 postKind: .recipe,
-                recipeID: 17615
+                recipeID: 21238
             )
         }
     }
