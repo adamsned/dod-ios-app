@@ -90,6 +90,91 @@ Directions worth scoping before this graduates:
 
 Likely produces a new US (search overhaul) + clarifications for: client-side fuzzy threshold; ingredient-search scope (title-substring or stem-tokenized); whether to query `wp-json/wp/v2/search` in addition to `?search=`; Spotlight scope (saved-only or all browsed); Recent-searches re-entry tile policy.
 
+#### Cook Mode voice sounds robotic — want natural-sounding voices + male/female toggle in Settings
+
+**Real-device complaint** from dad after triggering Voice Mode (US-40 / T-690) in Cook Mode. The current `AVSpeechSynthesizer` in `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/VoiceReader.swift` uses `AVSpeechSynthesisVoice(language: Locale.current.identifier)` per CL-79 — that resolves to Apple's **system default** voice, which is the basic-tier "Samantha" (en-US female) or equivalent. Basic-tier voices are concatenative TTS — they sound robotic by design and they were shipping in iOS since iOS 7.
+
+**What needs to change:**
+
+1. **Switch to a Personal Voice / Premium / Enhanced quality voice by default** when one is installed on-device. iOS 17 ships with the **Siri voices** (`com.apple.voice.compact.en-US.Samantha` → `com.apple.ttsbundle.siri_female_en-US_compact`) which sound dramatically more human. iOS 16+ exposes the **Neural** Personal Voice tier via `AVSpeechSynthesisVoice.speechVoices()` filtered on `voice.quality == .premium`. The premium voices are NOT downloaded by default but iOS prompts the user to download (~150 MB) the first time they're requested. Strategy: enumerate available voices, prefer `.premium` over `.enhanced` over `.default`, fall back gracefully if none of the higher tiers are installed.
+
+2. **Settings → Voice section** with a picker. CL-89 already adds an "iCloud Sync" section to Settings (T-703, PR #72 open); the same SettingsView extension pattern works for Voice. The picker should expose at minimum:
+   - A **gender** toggle (Female / Male) bound to a UserDefaults key like `dod.voice.preferredGenderV1`. Default Female (matches Apple's system default).
+   - An **automatic / specific voice** mode. "Automatic" picks the best available voice matching the gender preference; "specific" lets the power user pick from `AVSpeechSynthesisVoice.speechVoices()` filtered to `Locale.current.language`. Display the quality tier (Default / Enhanced / Premium) next to each voice name so users understand the trade-off.
+   - A **"Download more voices"** button that opens Settings → Accessibility → Spoken Content → Voices (deep-link via `UIApplication.openSettingsURLString` + the iOS 17.4 settings URL extension). Premium voices live there and require user-initiated install.
+
+3. **Persist + apply across launches.** The preference reads at `VoiceReader` construction (composition root in `AppDependencies`), survives container recreation, and is `@Sendable`-clean since `AVSpeechSynthesisVoice` is value-typed.
+
+**Open questions for the clarification entry:**
+
+- Should "Male" map to a specific voice (`Aaron` / `Daniel`) or just "any voice whose `gender == .male`"? Apple's voice list isn't tagged with gender directly — we'd need a manual mapping for the common voices.
+- How do we handle non-English locales? Spanish + French both have premium Siri voices; German + Japanese vary by iOS version. Probably "automatic by locale" is the right v1 default, with an explicit-voice picker as the escape hatch.
+- Privacy: voice preference is local-only, never leaves device (consistent with US-40's no-network-roundtrip promise per CL-79). One new analytics event `voicePreferenceChanged(quality:gender:)` would track adoption — count only, no specific voice identifier (PII concern: voice ID could correlate to language-region demographics).
+- Should the gender toggle be a sub-setting of an existing "Voice Mode" toggle, or a top-level Settings entry? Probably top-level — discoverability matters more than visual hierarchy.
+
+**Spec trace**: US-40 (Voice Mode) / CL-79 (current Locale.current default) — amendment territory. **Rough size**: **M** (~1 week — voice enumeration, picker UI, settings wiring, analytics event, 4 new tests). Constitution constraints intact (no third-party TTS dep — all `AVFoundation`).
+
+#### Cast iron photo scanner → walks user through cleaning steps
+
+**New feature request from dad**, observed from the real-device install. The pitch: open the camera, point at a piece of cast iron (rusty, seasoned, sticky, whatever), and the app diagnoses its condition + walks through cleaning + re-seasoning steps. Plays to DOD's brand — "Cast Iron Living" is on the icon — and turns the app from a recipe reader into a cast-iron care companion. Could be the single biggest "why this app exists" moment for a user who just inherited their grandfather's skillet.
+
+**The architecture decision tree:**
+
+| Approach | What it requires | Privacy / cost | Quality |
+|---|---|---|---|
+| **On-device Apple Foundation Models (iOS 26+)** | `FoundationModels` framework + a multi-modal vision request | Best privacy (no image leaves device), zero per-request cost, **iOS 26+ only** | Apple's image-classification quality is improving fast but cast-iron-specific knowledge is generic |
+| **On-device Core ML model fine-tuned for cast iron** | Train a small CoreML model on a labeled dataset of cast iron states (good, rusty, sticky, layered seasoning, cracked) | Best privacy, requires the dataset (~500 labeled photos) + a training pass | Best targeted quality, but the dataset is the bottleneck |
+| **Cloud LLM (Claude / GPT-4V)** with photo upload | Network round-trip + API key + image upload | **NEW privacy surface** (constitution §9 conflict — image data sent to a third party) + per-request cost | Highest immediate quality, no training needed |
+| **Hybrid** — on-device vision detects "is this cast iron?" + opens an articles flow | Apple's built-in Vision framework (free, no model) + a static "cast iron care" article from dutchovendaddy.com | Best privacy, easiest to ship | Zero per-skillet diagnosis — just opens the same article every time. Probably the right **v1** if we ship anything. |
+
+**v1 minimum path I'd recommend:** the hybrid. Add a Cast Iron Care tab/entry (or surface as a Settings → Tools menu item) that:
+
+1. Opens the camera (requires new `NSCameraUsageDescription` Info.plist key — minor App Privacy questionnaire bump for "Camera, used to detect cast iron condition for cleaning guidance, not stored or transmitted").
+2. Snaps a photo, runs `VNDetectRectanglesRequest` + a heuristic check that the photo contains a roughly-circular dark-toned object (cast iron geometry). This is just a "did the user point at something cast-iron-ish" check, not a quality grade.
+3. Routes to a single curated **"How to Clean and Restore Cast Iron"** article hosted on dutchovendaddy.com (dad writes / publishes this). The article walks through the 5 condition states (good, soapy/sticky, rusty, cracked, never-seasoned) with photos and steps for each.
+
+Total user value: the app opens the right page for them, with a moment-of-truth camera interaction that feels native. Cost: one new tab/menu item, one new article on the WordPress side (dad's scope), one Info.plist key, zero ML dependencies. **Punt the actual photo-→-state classification to v1.1** when we either have the labeled dataset or iOS 26 minimum supports the Foundation Models path.
+
+**Open questions for clarification:**
+
+- **Where does the entry point live?** A new tab eats the bottom-bar slot (US-37 / CL-65); a Settings menu item under "Tools" is discoverable but lower-traffic. A discovery card on the Saved tab ("Got a cast iron? Try the scanner") might thread the needle.
+- **What happens when there's no internet?** Offline → "we'll show you when you reconnect," or just open the locally-cached article body (if T-640's article cache covers it). Probably the latter.
+- **Photo permission flow.** First-launch of the scanner requests camera permission; deny → snackbar with a Settings deep-link explaining why we need it. Constitution §9 implications: zero — we never upload the photo for v1.
+- **Constitution conflict on the v2 cloud-LLM path.** If we ever move from the hybrid to the cloud-LLM path, that's a §9 amendment (new third party + new data category in App Privacy + new constitution §3 dep). Capture that explicitly in the clarification so the future graduation has the constraint visible.
+
+**Rough size**: **M** for v1 hybrid (~1.5 weeks: camera permission, scanner view, Vision rect detection, article deep-link, + the cleaning article on WordPress). **XL** for the on-device CoreML classifier path (training dataset + model + integration: months). **Owner check before any code lands** because the cloud-LLM variant is constitution-amendment territory.
+
+#### Comments are broken on the installed TestFlight build — needs investigation + fix
+
+**Real bug, real-device.** Dad confirmed comments don't work on TestFlight 1.0 (2). US-14 / T-650 shipped the comment-write path via `Packages/DODNetworking/Sources/DODNetworking/WPCommentsClient.swift` → `POST https://www.dutchovendaddy.com/wp-json/wp/v2/comments`. Something between the binary on the phone and the WordPress endpoint is broken.
+
+**Where to look — priority-ordered diagnosis:**
+
+1. **Composer flow opens but post tap silently fails.** Check the snackbar / error toast path in `CommentComposerViewModel` — if the WP server returns 401 / 403 / 422 and the error message gets swallowed, the user sees "tap → nothing happens." Hypothesis: the `WPClientError.unexpectedStatus(code:)` mapping reaches the view model but the view model's error toast doesn't surface it. Test path: open Settings → Network → Mobile Data, attempt a comment, watch for the "comment posted" snackbar that should fire on success per AC-14.4.
+2. **WordPress moderation rejected the comment as spam.** Per CL-21 we required the WP "comment author must fill out name + email" setting + the moderation queue. If the moderation queue silently auto-trashes (Akismet aggressive setting + new install + low-reputation IP) the user perceives "I posted and it never appeared." Check WP admin → Comments → Spam / Trash for the test posts.
+3. **WP user-agent or CORS reject from a new bundle ID.** The TestFlight build runs as `com.dutchovendaddy.DODApp` with a different user-agent than the simulator (the simulator gets `DODApp/1.0.0` while the device may carry the codesigned bundle's `CFBundleVersion` differently). If the WP install has a security plugin (Wordfence, etc.) that rate-limits or blocks unknown UAs, the POST returns 403 before reaching wp-json.
+4. **Keychain guest-identity not migrating from device-storage policy.** `GuestIdentityStore.swift` writes to the iOS Keychain. On a fresh TestFlight install, the Keychain entry doesn't exist; the composer should prompt for name + email per US-15. If the prompt is skipped (e.g., a non-nil empty-string default), the WP server receives an anonymous-comment POST without `author_email` → 400 invalid params.
+5. **App Transport Security (ATS) blocking the POST.** Production builds have stricter ATS than Debug — if the WP endpoint is HTTP-redirected anywhere in the chain (unlikely given the cert, but possible if Cloudflare's WAF rule does a 30x → HTTP shim), ATS blocks the request.
+
+**Repro plan** (the entry doesn't graduate until the cause is pinned):
+
+- Foreground the TestFlight build on dad's phone with Console.app attached
+- Filter logs to subsystem `com.dutchovendaddy.DODApp`
+- Attempt a comment post on any recipe with a known-working comment area
+- Capture: the request URL fired, the response status code, the error path taken by `WPCommentsClient.postComment(...)` — these together pin which of (1)-(5) is the actual cause
+- Cross-check WP-side: admin → Comments → All to see if the post landed in Pending / Spam / Trash / never arrived
+
+**Constraints to preserve during the fix:**
+
+- Constitution §6 L1 + L2: any regression has to be expressed as a failing test before the fix lands
+- US-14 / AC-14.2: comments are author-name + email + content only — no extra fields snuck into the POST
+- US-14 / AC-14.4: success and failure paths each surface a distinct user-visible state — no silent fails
+- L5 E2E never writes to the live blog (per the constitution constraint) — the regression test stays at L1 / L2 with `FakeWPHTTPClient`
+
+**Rough size**: **S** if it's hypothesis (1) or (4) (single view-model or single Keychain wiring fix), **M** if it's (2) or (3) (server-side WordPress configuration in dad's scope), **rare-but-possible XL** if it's a CFBundleVersion-driven cert-pinning issue that only manifests on signed builds (would need a code-signing-aware test surface, which we don't currently have).
+
+**Graduates as a regression** (REG-NN) — likely the same path as REG-T-360 / REG-18 / REG-19 / REG-20, not a new user story. Spec trace stays under US-14.
+
 ### Captured 2026-05-28 (notification trigger — PAUSED pending @adamsned + WordPress)
 
 - **Real-time "new post" notification trigger (the production signal behind US-42).**
