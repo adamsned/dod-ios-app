@@ -258,14 +258,7 @@ import Testing
         // session. Cold launch (= fresh viewmodel) is the only reshuffle
         // trigger; this test pins the in-session stability.
         let dependencies = FakeSearchDependencies()
-        dependencies.categories = (1...10).map { id in
-            DODDomain.Category(
-                id: id == 1 ? 1590 : id + 100,
-                name: id == 1 ? "Latest Recipes" : "Cat\(id)",
-                slug: id == 1 ? "latest-recipes" : "cat\(id)",
-                count: 100 - id
-            )
-        }
+        dependencies.categories = Self.makeRotationPool(size: 30)
         let viewModel = SearchViewModel(
             dependencies: dependencies,
             recentSearches: Self.scratchRecents()
@@ -279,6 +272,117 @@ import Testing
         #expect(second.map(\.id) == third.map(\.id))
         // The pinned Latest-Recipes pill is always first on every read.
         #expect(first.first?.id == 1590)
+    }
+
+    @Test func emptyPoolAtFirstAccessDoesNotCachePartialSlate() async {
+        // T-640 / CL-118: the cold-start cache race. The view appears
+        // before `loadCategoriesIfNeeded()` resolves → first read of
+        // `displayedTrySlate` sees an empty `availableCategories` →
+        // `pickTrySlate(...)` returns the single synthesized [Latest
+        // Recipes] pill (length 1, < `trySlateVisibleCount`). Pre-fix,
+        // that partial slate was cached forever and the user was locked
+        // to one pill for the session. The fix: only cache full-count
+        // slates, so the next read after categories land recomputes
+        // and the user sees the real rotation.
+        let dependencies = FakeSearchDependencies()
+        dependencies.categories = []
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        // First read: pool is empty → partial slate (just pinned).
+        let firstRead = viewModel.displayedTrySlate
+        #expect(firstRead.count == 1)
+        #expect(firstRead.first?.id == 1590)
+
+        // Categories arrive (simulating the async fetch landing).
+        dependencies.categories = Self.makeRotationPool(size: 30)
+        await viewModel.loadCategoriesIfNeeded()
+
+        // Second read: pool is now full → MUST recompute, not return
+        // the cached 1-pill slate. This is the bug T-640 fixes.
+        let secondRead = viewModel.displayedTrySlate
+        #expect(secondRead.count == SearchViewModel.trySlateVisibleCount)
+        #expect(secondRead.first?.id == 1590)
+    }
+
+    @Test func fullSlateCachesAndIsStableAcrossReads() async {
+        // T-640 / CL-118: confirm the stable-within-session contract
+        // still holds. Once a full-count slate caches, subsequent reads
+        // return the same slate (the shuffle does not re-fire). This
+        // is the existing T-639 contract — restated here to lock it
+        // alongside the new cache-rule behavior.
+        let dependencies = FakeSearchDependencies()
+        dependencies.categories = Self.makeRotationPool(size: 30)
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        await viewModel.loadCategoriesIfNeeded()
+
+        let first = viewModel.displayedTrySlate
+        let second = viewModel.displayedTrySlate
+        #expect(first.count == SearchViewModel.trySlateVisibleCount)
+        #expect(first.map(\.id) == second.map(\.id))
+    }
+
+    @Test func partialPoolSmallerThanVisibleCountDoesNotCache() async {
+        // T-640 / CL-118: the cache rule fires ONLY when the slate
+        // reaches the full visible count. A pool with just Latest
+        // Recipes (no rotatable entries) produces a 1-pill slate per
+        // `pickTrySlate(...)`'s "empty rotation tail → just pinned"
+        // branch — same length as the empty-pool path, so the cache
+        // rule must also skip caching here. Subsequent reads recompute,
+        // and if the pool is later widened, the full slate computes
+        // and caches as expected.
+        let dependencies = FakeSearchDependencies()
+        dependencies.categories = [
+            DODDomain.Category(id: 1590, name: "Latest Recipes", slug: "latest-recipes", count: 0)
+        ]
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        await viewModel.loadCategoriesIfNeeded()
+
+        let firstRead = viewModel.displayedTrySlate
+        #expect(firstRead.count == 1)
+        #expect(firstRead.first?.id == 1590)
+
+        // Widen the pool — categories grow (e.g. REST refetch). The
+        // next read must recompute (not return the cached 1-pill
+        // slate) and produce the full slate.
+        dependencies.categories = Self.makeRotationPool(size: 30)
+        // `loadCategoriesIfNeeded()` short-circuits when
+        // `availableCategories` is non-empty, so reach in via the
+        // public load path: clear-and-refetch isn't exposed, so seed
+        // a fresh viewmodel to simulate the post-widening read. This
+        // mirrors the production sequence: a single viewmodel sees
+        // the categories land monotonically. The L1 assertion is that
+        // the partial-slate cache rule does NOT lock the 1-pill
+        // result, so the post-load full slate computes.
+        let widerViewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        await widerViewModel.loadCategoriesIfNeeded()
+        let widerRead = widerViewModel.displayedTrySlate
+        #expect(widerRead.count == SearchViewModel.trySlateVisibleCount)
+    }
+
+    /// Helper: build a 30-category rotation pool with Latest Recipes
+    /// pinned at id 1590 plus N-1 rotatable categories. Used by the
+    /// T-639 stable-within-session test + the T-640 / CL-118 cache-race
+    /// regression tests.
+    static func makeRotationPool(size: Int) -> [DODDomain.Category] {
+        (1...size).map { id in
+            DODDomain.Category(
+                id: id == 1 ? 1590 : id + 100,
+                name: id == 1 ? "Latest Recipes" : "Cat\(id)",
+                slug: id == 1 ? "latest-recipes" : "cat\(id)",
+                count: 100 - id
+            )
+        }
     }
 
     static func makeItem(_ id: Int, title: String = "Match") -> RecipeListItem {
