@@ -54,6 +54,16 @@ public protocol SearchDependencies: Sendable {
     /// by ~1.5x at the call site so a few latest-articles-being-articles
     /// still leaves ~N recipes.
     func fetchLatestRecipes(limit: Int) async throws -> [RecipeListItem]
+    /// US-12 / US-29 amendment / CL-121 (T-643): the category-name match
+    /// path in `SearchViewModel.performSearch()`. Thin wrapper around the
+    /// existing `WPRestClient.posts(categoryID:page:perPage:)` (live
+    /// since T-081 / T-091 — no new REST surface; CL-121 explicitly
+    /// requires reuse, not a new endpoint). Fetches up to `limit` posts
+    /// in the named category in WP's natural date-desc order. Per typed
+    /// query the viewmodel calls this at most ``CategoryNameMatcher.maxMatches``
+    /// times (top-2 cap) — so the worst-case wire ceiling is two
+    /// `?categories=<id>&per_page=100` pages.
+    func fetchPosts(categoryID: Int, limit: Int) async throws -> [RecipeListItem]
     /// Set of recipe IDs the user has opened (any cached row). Drives the
     /// "Recently viewed" filter chip.
     func recentlyViewedRecipeIDs() async throws -> Set<Int>
@@ -165,6 +175,17 @@ public struct LiveSearchDependencies: SearchDependencies {
     /// because the phrase appears in many unrelated articles' boilerplate).
     public func fetchLatestRecipes(limit: Int) async throws -> [RecipeListItem] {
         try await client.posts(page: 1, perPage: limit)
+    }
+
+    /// US-12 / US-29 amendment / CL-121 (T-643): the category-name match
+    /// path in `SearchViewModel.performSearch()`. Routes to the existing
+    /// `WPRestClient.posts(categoryID:page:perPage:)` — same surface the
+    /// Feed / Category Recipes screens have been using since T-081 / T-091.
+    /// No new REST endpoint; the category-match path is a pipeline-level
+    /// addition over an existing client method per CL-121's "reuse don't
+    /// add" rule.
+    public func fetchPosts(categoryID: Int, limit: Int) async throws -> [RecipeListItem] {
+        try await client.posts(categoryID: categoryID, page: 1, perPage: limit)
     }
 
     public func recentlyViewedRecipeIDs() async throws -> Set<Int> {

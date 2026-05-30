@@ -21,7 +21,12 @@ struct CategoryNameMatcherTests {
         DODDomain.Category(id: 1590, name: "Latest Recipes", slug: "latest-recipes", count: 240),
         DODDomain.Category(id: 336, name: "Dessert Recipes", slug: "dessert-recipes", count: 53),
         DODDomain.Category(id: 1435, name: "One Pot Dutch Oven Recipes", slug: "one-pot-dutch-oven-recipes", count: 46),
-        DODDomain.Category(id: 338, name: "Chicken and Poultry Recipes", slug: "chicken-and-poultry-recipes", count: 32),
+        DODDomain.Category(
+            id: 338,
+            name: "Chicken and Poultry Recipes",
+            slug: "chicken-and-poultry-recipes",
+            count: 32
+        ),
         DODDomain.Category(id: 339, name: "Beef and Red Meat Recipes", slug: "beef-and-red-meat-recipes", count: 28),
         DODDomain.Category(id: 334, name: "Side Dish Recipes", slug: "side-dish-recipes", count: 28),
         DODDomain.Category(id: 777, name: "Breads and Pizza Recipes", slug: "breads-and-pizza-recipes", count: 27),
