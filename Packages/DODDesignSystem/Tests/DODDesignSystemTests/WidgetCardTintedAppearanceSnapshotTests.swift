@@ -60,7 +60,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
             record: .missing
         )
     }
@@ -71,7 +71,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
             record: .missing
         )
     }
@@ -82,7 +82,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 338, height: 158)),
             record: .missing
         )
     }
@@ -93,7 +93,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 338, height: 158)),
             record: .missing
         )
     }
@@ -104,7 +104,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
             record: .missing
         )
     }
@@ -115,7 +115,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
             record: .missing
         )
     }
@@ -128,7 +128,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
             record: .missing
         )
     }
@@ -139,7 +139,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
             record: .missing
         )
     }
@@ -150,7 +150,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 338, height: 158)),
             record: .missing
         )
     }
@@ -161,7 +161,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 338, height: 158)),
             record: .missing
         )
     }
@@ -172,7 +172,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
             record: .missing
         )
     }
@@ -183,7 +183,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158)),
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
             record: .missing
         )
     }

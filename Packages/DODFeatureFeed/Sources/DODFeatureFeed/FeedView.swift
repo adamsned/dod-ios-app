@@ -205,6 +205,13 @@ public struct FeedView: View {
                     // field, so the cheapest follow-up is the viewmodel-
                     // owned set hydrated alongside the result set.
                     .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                    // Stable L3 handle: `app.buttons.matching(identifier:)`
+                    // targets feed recipe cards directly, so XCUITest can't
+                    // accidentally tap a nav-bar toolbar button (the layout
+                    // toggle / Settings gear) that the old "buttons NOT IN
+                    // tab labels" query swept up. Mirrors `dod.saved.card`.
+                    // Non-visual — does not affect L4 snapshots.
+                    .accessibilityIdentifier("dod.feed.card")
                     .task {
                         await viewModel.loadMoreIfNeeded(currentItem: item)
                     }
@@ -229,6 +236,7 @@ public struct FeedView: View {
                 // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO as
                 // above (CL-60 path-(c) viewmodel-owned saved-IDs set).
                 .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                .accessibilityIdentifier("dod.feed.card")
                 .task {
                     await viewModel.loadMoreIfNeeded(currentItem: item)
                 }

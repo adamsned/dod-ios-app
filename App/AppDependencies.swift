@@ -41,7 +41,16 @@ final class AppDependencies {
 
     init() {
         do {
-            self.modelContainer = try RecipeStore.productionContainer()
+            // L3 isolation hook: `-DODUseInMemoryStore` gives each UI-test
+            // launch a clean, empty SwiftData store so saved recipes don't
+            // persist across runs on a shared CI simulator (the cause of the
+            // flaky "No saved recipes yet" empty-state assertions). Never set
+            // in production — the app always uses the on-disk container.
+            if ProcessInfo.processInfo.arguments.contains("-DODUseInMemoryStore") {
+                self.modelContainer = try RecipeStore.inMemoryContainer()
+            } else {
+                self.modelContainer = try RecipeStore.productionContainer()
+            }
         } catch {
             // Schema migration failure must surface to the user (MIGRATION.md
             // discipline rule 4). For v1 we crash early so the issue is
