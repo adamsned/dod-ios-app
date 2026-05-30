@@ -1619,6 +1619,28 @@ Round-6 Spencer backlog item "Login + account system (Google + Apple + email)" g
 
 ---
 
+## Phase 17 — Voice Mode quality + voice selection (2026-05-29)
+
+Graduates the round-9 backlog item "Cook Mode voice sounds robotic — want natural-sounding voices + male/female toggle in Settings" (US-40 amendment / CL-109). Two tasks: T-720 ships the selection engine (no Settings UI, no conflict with the open PRs); T-721 ships the Settings → Voice picker once the SettingsView-owning PRs land.
+
+### T-720 — Phase a: voice-quality + gender-selection engine (US-40)
+
+- **What:** replace `SystemSpeechSynthesizer`'s `AVSpeechSynthesisVoice(language:)` compact-voice resolution with `VoiceSelector` — picks the best installed quality tier (premium > enhanced > default) honoring a `dod.voice.preferredGenderV1` gender preference (default female), gender-primary + quality-secondary. Falls back to the prior behavior when no installed voice matches the language. The default-female preference means the quality upgrade lands immediately with no UI.
+- **Files:** `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/VoiceSelection.swift` (new — `VoiceGender` / `VoiceQuality` / `VoiceDescriptor` / `VoicePreference` value types + `VoiceSelector` algorithm + `VoicePreferenceStore`), `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/VoiceReader.swift` (`SystemSpeechSynthesizer` rewrite — `resolveVoice` + `descriptor(for:)`), `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/VoiceSelectionTests.swift` (new — 11 L1 selection cases), `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/VoicePreferenceStoreTests.swift` (new — 7 L1 persistence cases).
+- **AC:** 40.9, 40.10, 40.11.
+- **Est:** ~4h (engine + value types + store + 18 L1 tests + spec graduation).
+- **||:** P17-voice. Touches only `Packages/DODFeatureRecipeDetail/**` — zero conflict with the open SettingsView PRs (#72 iCloud Sync, #86 design tokens) or #87 (comments). No `e2e` label (engine-only, no composition-root or routing change).
+
+#### T-721 — Phase b: Settings → Voice picker (US-40, deferred)
+
+- **What:** Settings → Voice section with a Female/Male gender toggle bound to `VoicePreferenceStore`, an automatic/specific-voice mode (specific lets the power user pick from `AVSpeechSynthesisVoice.speechVoices()` filtered to the locale, showing the quality tier per voice), and a "Download more voices" button deep-linking to Settings → Accessibility → Spoken Content → Voices via `UIApplication.openSettingsURLString`. New `voicePreferenceChanged(quality:gender:)` adoption analytics event (count-only, no voice identifier — PII concern per the backlog open question) + constitution §9 allowlist amendment.
+- **Files:** `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (new Voice section), `SettingsViewModel.swift` (voice preference binding), the analytics event, snapshot baselines.
+- **AC:** to be assigned (40.12+ reserved).
+- **Est:** ~3 days.
+- **Deps:** **T-703 / PR #72** (iCloud Sync Settings section) + **PR #86** (design tokens + SettingsViewSnapshotTests re-record) must land first — all three touch `SettingsView` + its snapshot baselines, so T-721 sequences after them to avoid a three-way conflict. Independent of T-720's engine (which it binds to via `VoicePreferenceStore`).
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) = 131
