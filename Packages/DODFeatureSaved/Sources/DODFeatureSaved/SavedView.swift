@@ -107,17 +107,21 @@ public struct SavedView: View {
                             heroImageURL: recipe.heroImage,
                             totalTimeDisplay: totalTimeDisplay(recipe)
                         )
+                        .recipeCardTap { onSelect(recipe) }
                         // T-638 / CL-107 — stable test handle for the L5 E2E
                         // `test_long_press_unsave_from_saved_tab` (long-presses
                         // the card → asserts the context menu reads "Unsave"
                         // not "Save" → taps Unsave → asserts the card is gone
                         // within 0.5s, the frame-tight window that catches a
                         // regression to non-optimistic removal — pins CL-104 /
-                        // T-635 + REG-21). The identifier is static (not
-                        // per-id) because the test queries for any saved card
-                        // and operates on the first match.
+                        // T-635 + REG-21). The identifier is applied AFTER
+                        // `recipeCardTap` so it survives the
+                        // `accessibilityElement(children: .combine)` consolidation
+                        // that the tap modifier applies — the identifier
+                        // attaches to the combined accessibility element,
+                        // which is the element XCUITest queries via
+                        // `app.buttons.matching(identifier:)`.
                         .accessibilityIdentifier("dod.saved.card")
-                        .recipeCardTap { onSelect(recipe) }
                         // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) —
                         // every card in the Saved tab is by definition
                         // saved (the source is `RecipeStore.savedRecipes()`),

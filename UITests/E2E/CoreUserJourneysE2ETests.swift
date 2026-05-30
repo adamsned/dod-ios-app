@@ -268,7 +268,11 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         // Step 1: navigate into a recipe detail and save it. Mirrors the
         // existing Journey 3 normalize-state pattern so the test is robust
         // against prior-run SwiftData state (Phase-1 known gap — T-610's
-        // host-side fakes will make this deterministic).
+        // host-side fakes will make this deterministic). Per US-37 / CL-63
+        // the feed can mix recipes and articles; we walk a small window of
+        // candidate rows until one lands on Ingredients (the recipe-detail
+        // signal), since articles render via `ArticleDetailView` and don't
+        // surface an Ingredients header.
         let recipeButtons = app.buttons.matching(
             NSPredicate(format: "NOT (label IN %@)", Array(E2ETestSupport.tabLabels))
         )
@@ -276,11 +280,34 @@ final class CoreUserJourneysE2ETests: XCTestCase {
             recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
             "Feed should expose at least 2 recipe rows"
         )
-        recipeButtons.element(boundBy: 1).tap()
 
+        // Walk indices 1..4 until we land on a recipe (Ingredients header).
+        // 4 candidates is enough headroom for the typical article ratio on
+        // the live blog without burning the wall-clock budget.
+        var landed = false
+        for index in 1...4 {
+            let candidate = recipeButtons.element(boundBy: index)
+            guard candidate.waitForExistence(timeout: 10) else { continue }
+            candidate.tap()
+            if app.staticTexts["Ingredients"].waitForExistence(timeout: 20) {
+                landed = true
+                break
+            }
+            // Wasn't a recipe — pop back to the feed and try the next index.
+            // The article-detail screen has a back button at the leading
+            // edge of the nav bar (system default).
+            let backButton = app.navigationBars.buttons.element(boundBy: 0)
+            if backButton.exists {
+                backButton.tap()
+            } else {
+                // Fallback: tap the Recipes tab to re-anchor.
+                app.tabBars.firstMatch.buttons["Recipes"].tap()
+            }
+            _ = recipeButtons.element(boundBy: 1).waitForExistence(timeout: 5)
+        }
         XCTAssertTrue(
-            app.staticTexts["Ingredients"].waitForExistence(timeout: 45),
-            "Recipe detail should land (Ingredients header) before tapping Save"
+            landed,
+            "Should land on at least one recipe-detail (Ingredients header) in the first 4 feed rows"
         )
 
         // Normalize: if already saved from a prior test run, unsave first.
