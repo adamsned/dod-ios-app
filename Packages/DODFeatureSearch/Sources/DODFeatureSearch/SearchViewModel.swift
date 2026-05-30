@@ -326,7 +326,11 @@ public final class SearchViewModel {
     /// the mutation of `lastTotalSecondsByRecipe` and the subsequent
     /// `reapplyFilters()` call are race-free.
     func kickOffCookTimeHydrationIfNeeded(against merged: [RecipeListItem]) {
-        guard filters.cookTime != nil else { return }
+        // CL-122 (T-644): the guard checks either bound — the wheel-picker
+        // can leave one side at "Any" (nil) and still need hydration when
+        // the other side is set. `hasCookTimeRange` collapses the two-nil
+        // check + the documented intent into one accessor.
+        guard filters.hasCookTimeRange else { return }
         let unknown = merged.map(\.id).filter { lastTotalSecondsByRecipe[$0] == nil }
         guard !unknown.isEmpty else { return }
         let toFetch = Array(unknown.prefix(Self.hydrationCap))
