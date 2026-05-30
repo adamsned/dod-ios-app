@@ -42,7 +42,9 @@ shipped. See "Recently graduated" below for the trail._
 
 Dad's first real-device feedback after installing build `1.0 (2)` on `nadams-iphone` via TestFlight this morning (~07:50 MST). Captured here while using the app naturally; expect more entries as he keeps cooking with it.
 
-#### Search is too strict — "nachos" doesn't find "Cast Iron Skillet Nachos"
+#### ~~Search is too strict — "nachos" doesn't find "Cast Iron Skillet Nachos"~~ — GRADUATED
+
+_(Graduated 2026-05-30 as **US-12 amendment / US-29 amendment / CL-120 / T-642 / REG-29** — see "Recently graduated" below. The Nacho Bug is fixed: `WPRestClient.searchPageSize` bumps from 20 → 100 so WP's relevance ranker can't bury title-bearing matches past the page cutoff, and `SearchResultMerger.merge(...)` now filters every REST candidate through the new pure helper `TitleSearchMatcher.match(query:title:)` so body-only WP hits never surface. Live-API verified: `?search=nacho` returns 4 nacho-titled posts (ids 524, 274, 5016, 736) — all 4 now show, including the previously-buried [736] Cast Iron Skillet Nachos; the 17 body-matched false positives (incl. the verbatim Cast Iron Bacon Wrapped Pickles) drop to 0. Fuzzy: plural/singular swap + Levenshtein-1 typo tolerance ("nahcoz" → "nachos"). The broader "Make search way better" entry below is kept intact — this fix is the bug subset, not the full overhaul; ingredient-search ships as a labeled tier in a future task per CL-120's v1 deferral.)_
 
 **Real bug, blocks a user finding a recipe they know exists in the catalog.** Repro:
 
@@ -575,6 +577,25 @@ Tasks → Implement. Kept here as a short audit trail; remove entries once
 they're far enough in the rear-view mirror that the spec is the only
 useful reference.
 
+- **Search is too strict — "nachos" doesn't find "Cast Iron Skillet Nachos"** —
+  became **US-12 amendment / US-29 amendment / AC-3.2 amendment** /
+  [T-642](tasks.md) / [CL-120](clarifications.md) / **REG-29**.
+  Graduated 2026-05-30. The Nacho Bug fix pairs a wider candidate pool
+  (`WPRestClient.searchPageSize = 100`, up from `defaultPageSize = 20`)
+  with a client-side title-precision filter — `SearchResultMerger.merge(...)`
+  runs every REST candidate through the new `TitleSearchMatcher.match(query:title:)`
+  helper in `DODSupport` and keeps only those whose title contains the query
+  via one of three tiers: `.exact` > `.substring` > `.fuzzy` (plural/singular
+  swap or Levenshtein-1 typo tolerance). Live-API verified: `?search=nacho`
+  returns the 4 nacho-titled posts (ids 524, 274, 5016, 736) and the
+  previously-buried [736] Cast Iron Skillet Nachos now surfaces; the 17
+  body-matched false positives (including the verbatim Cast Iron Bacon
+  Wrapped Pickles @adamsned called out) drop to 0. The local-ingredient
+  pass is v1-deferred per CL-120 — preserved on the merger signature for
+  source-compat but ignored at runtime; ingredient-search returns as a
+  labeled tier in dad's broader "Make search way better" backlog entry
+  (which is kept intact above — the Nacho Bug fix is the bug subset, not
+  the full search overhaul).
 - **Rotating "Try" pill pool on Search page** — became **US-29 amendment** /
   AC-29.1 amendment + new AC-29.7 / [T-639](tasks.md) / [CL-117](clarifications.md).
   Graduated 2026-05-30. The Search-tab idle "Try" section now rotates per
