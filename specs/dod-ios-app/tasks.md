@@ -1642,6 +1642,17 @@ Round-6 Spencer backlog item "Login + account system (Google + Apple + email)" g
 
 ---
 
+## Phase 16 — Test-infra hardening (2026-05-30)
+
+### T-730 — Stabilize the L4 snapshot suite across Xcode versions (US-16 / US-18, CL-115, REG-28)
+
+- **Scope:** Test-infra + baseline PNGs only — no source/product code. After PR #91 cleared the CI infra wedge (macos-15 / Xcode 26), the L4 job surfaced 29 real failures, all `_dark` tests (every `_light` test passed). Root cause: (1) the `darkImage` helper in `SnapshotTests+AppearanceAudit.swift` had no `precision`/`perceptualPrecision`; (2) the dark `__Snapshots__` baselines were stale — recorded at #42 but the SurfaceElevated dark color was changed afterward at T-570/#47 (`#5A3520`) and T-610/#51 (`#553724`), so `test_recipeCard_full_dark` matched 3.9% of pixels — plus iOS 26 SDK sub-pixel drift (local 26.5 ↔ CI 26.3); (3) the 8 dark `TabBarSnapshotTests` variants are non-deterministic (~0.2% pixel match run-to-run) because iOS 26's translucent `TabView` material composites unstably off-screen; and a latent `#file`-vs-`#filePath` bug made `TabBarSnapshotTests` resolve `__Snapshots__` to the ephemeral simulator dir under `xcodebuild`.
+  - **Test infra (single commit cluster):** `Packages/DODDesignSystem/Tests/DODDesignSystemTests/*SnapshotTests.swift` (perceptual tolerance on every `.image(...)` site incl. the `darkImage` helper; remove the 8 dark `TabBarSnapshotTests` methods + the now-unused `dark` fixture param; change the helper's `file:` default `#file` → `#filePath`), `Packages/DODDesignSystem/Tests/DODDesignSystemTests/__Snapshots__/**` (31 re-recorded dark PNGs under iOS 26 + 8 re-recorded light tab-bar PNGs to source + 8 removed dark tab-bar PNGs), and spec amendments in `specs/dod-ios-app/spec.md` (AC-16.5 → light-only; REG-28 added to AC-T4) + `specs/dod-ios-app/clarifications.md` (CL-115).
+- **AC:** Implements no product ACs; produces REG-28 (deterministic + cross-version-stable L4 snapshot contract) and the amended AC-16.5 (light-only tab-bar baselines). Pins US-18 / AC-18.1 / AC-18.2 (dark-mode component coverage is retained and now actually green). The dark renders were visually confirmed correct (warm `#553724` recipe-card surface) before re-record — a stale-baseline fix, not a regression bless.
+- **Deps:** PR #91 (CI on Xcode 26 — on `main`). Independent of the in-flight design (#86), comments (#87), and voice (#89) branches source-wise (different files); spec-file collisions on `spec.md` / `clarifications.md` / `tasks.md` are expected at merge time and the rebaser picks the next free CL/REG/T slot (T-730 reserves CL-115 + REG-28, chosen above the slots those branches claim). No `e2e` label.
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) = 131

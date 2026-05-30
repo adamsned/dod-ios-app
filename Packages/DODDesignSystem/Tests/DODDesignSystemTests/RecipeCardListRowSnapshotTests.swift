@@ -32,7 +32,11 @@ final class RecipeCardListRowSnapshotTests: XCTestCase {
             totalTimeDisplay: "15 min"
         )
         .frame(width: 358)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+        assertSnapshot(
+            of: view,
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .sizeThatFits),
+            record: .missing
+        )
     }
 
     /// AC-38.4 — list-row variant without the time chip. Verifies the
@@ -45,7 +49,11 @@ final class RecipeCardListRowSnapshotTests: XCTestCase {
             heroImageURL: nil
         )
         .frame(width: 358)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+        assertSnapshot(
+            of: view,
+            as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .sizeThatFits),
+            record: .missing
+        )
     }
 }
 #endif
