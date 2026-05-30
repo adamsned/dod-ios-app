@@ -26,9 +26,9 @@ extension SearchViewModel {
     }
 
     /// The slate of pills the Search-tab idle "Try" section actually
-    /// renders. Computed **once** on first access (lazy semantics via
-    /// `_displayedTrySlate` backing) so the shuffle fires exactly once
-    /// per `SearchViewModel` lifetime — i.e. once per cold launch.
+    /// renders. Computed lazily on first access (cached in
+    /// `cachedTrySlate`) so the shuffle fires exactly once per
+    /// `SearchViewModel` lifetime — i.e. once per cold launch.
     /// Subsequent reads return the cached slate so the row is **stable
     /// within session** across `IdleSuggestionsView` re-creates (tab
     /// switches, navigation pushes/pops).
@@ -36,8 +36,25 @@ extension SearchViewModel {
     /// The slate has a fixed visible count of `Self.trySlateVisibleCount`
     /// (= 6) with "Latest Recipes" always first; see `pickTrySlate(...)`
     /// for the pin-first + shuffle + top-up + empty-pool logic.
+    ///
+    /// **Cache rule: only cache when the slate hits the full visible
+    /// count** (T-640 / CL-118 — fixes the cold-start cache race). The
+    /// view appears before `loadCategoriesIfNeeded()` resolves, so the
+    /// first read of `displayedTrySlate` can fire while
+    /// `availableCategories` is still empty. Without the
+    /// `count >= visibleCount` guard, that empty-pool path returns the
+    /// single synthesized `[Latest Recipes]` pill and caches it forever
+    /// — the user is locked to one pill for the session even after
+    /// categories land milliseconds later. With the guard, the partial
+    /// slate is returned without being cached; SwiftUI's `@Observable`
+    /// triggers a re-render on the `availableCategories` mutation →
+    /// `IdleSuggestionsView` re-reads `displayedTrySlate` → cache miss
+    /// → a full N-pill slate computes and caches. Once a full slate
+    /// caches once, the stable-within-session contract holds exactly as
+    /// before (subsequent reads return the cached slate; the shuffle
+    /// does not re-fire).
     public var displayedTrySlate: [DODDomain.Category] {
-        if let cached = cachedTrySlate {
+        if let cached = cachedTrySlate, cached.count >= Self.trySlateVisibleCount {
             return cached
         }
         var rng: any RandomNumberGenerator = SystemRandomNumberGenerator()
@@ -46,7 +63,15 @@ extension SearchViewModel {
             visibleCount: Self.trySlateVisibleCount,
             using: &rng
         )
-        cachedTrySlate = slate
+        // Only lock the slate when it is a full result. A partial /
+        // single-pill slate means the async category fetch has not
+        // completed; let the next access recompute when
+        // `availableCategories` has populated. See doc comment above
+        // for the full @Observable re-render flow that makes this
+        // self-correcting.
+        if slate.count >= Self.trySlateVisibleCount {
+            cachedTrySlate = slate
+        }
         return slate
     }
 
