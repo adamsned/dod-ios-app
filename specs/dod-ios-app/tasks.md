@@ -1672,6 +1672,42 @@ Graduates the round-9 backlog item "Cook Mode voice sounds robotic — want natu
 - **Est:** ~3 days.
 - **Deps:** **T-703 / PR #72** (iCloud Sync Settings section) + **PR #86** (design tokens + SettingsViewSnapshotTests re-record) must land first — all three touch `SettingsView` + its snapshot baselines, so T-721 sequences after them to avoid a three-way conflict. Independent of T-720's engine (which it binds to via `VoicePreferenceStore`).
 
+## Phase 18 — Site/app design coordination (2026-05-29)
+
+Graduates the round-9 "Site ↔ app design coordination" backlog entry (US-43 / CL-110..CL-114). Closes the seven measurable visual gaps between dutchovendaddy.com and the iOS app over four phases. Phase a (T-710) ships the foundational tokens + typography; Phases b–d (T-711..T-713) deliver the visible compositional changes behind a `DODFeed.layoutVariant` flag so each screen reverts independently if a regression surfaces on real device.
+
+### T-710 — Phase a: design tokens + typography + L4 baseline re-record (US-43)
+
+- **What:** flip `Surface` light to `#FFFFFF`, collapse `SurfaceElevated` to `#FFFFFF` light, add `SurfaceWarm` (`#FAF6EE` / `#281F19`) and `LabelOnAccent` (`#FFFFFF` / `#FFFFFF`) tokens, rename `CreamSubtle` → `SurfaceDivider` (`#E6DECF` / `#3D2B1F` — the dark variant is now distinct), shift `DODType.displayLarge` + `displayMedium` from `.semibold` to `.bold`, switch `heading` + `caption` to SF Rounded (`design: .rounded`), add `DODType.brand` (`.system(size: 22, design: .rounded, weight: .bold)`). Re-record every L4 snapshot baseline that resolves any of the shifted tokens.
+- **Files:** `Packages/DODDesignSystem/Sources/DODDesignSystem/Resources/Colors.xcassets/{Surface,SurfaceElevated,SurfaceWarm,SurfaceDivider,LabelOnAccent}.colorset/Contents.json` (delete `CreamSubtle.colorset`), `Packages/DODDesignSystem/Sources/DODDesignSystem/Colors.swift`, `Packages/DODDesignSystem/Sources/DODDesignSystem/Typography.swift`, `Packages/DODDesignSystem/Tests/DODDesignSystemTests/ColorsTests.swift`, and every `__Snapshots__/**.png` in the workspace that pixel-diffs against the new tokens (expected 60–80 PNGs across `Packages/DODDesignSystem/Tests/DODDesignSystemTests/__Snapshots__/` + `Packages/DODFeatureFeed/Tests/DODFeatureFeedTests/__Snapshots__/` + the other feature packages' snapshot directories).
+- **AC:** 43.1, 43.2, 43.3, 43.4, 43.5, 43.6, 43.7, 43.8, 43.9, 43.10, 43.11.
+- **Est:** ~3 days (~12h: 2h token + Swift edits, 1h spec graduation, 6h baseline re-record across packages, 2h verify + PR, 1h launch-on-sim QA pass).
+- **||:** P16-design-coordination (the PR carries no `e2e` label; the changes are token-level and L4-baseline-only, no behavior change). T-710 owns every `__Snapshots__/**` PNG it re-records exclusively for this PR; if a parallel branch also touches a snapshot file T-710 owns, T-710's value wins because it is the systematic-token regenerate.
+
+#### T-711 — Phase b: magazine `RecipeCard` variant behind `DODFeed.layoutVariant` flag (US-43, deferred)
+
+- **What:** new gallery-grid `RecipeCard` variant — drop card chrome, switch hero to 3:4 portrait full-bleed, photo + title only (Move 6 brave call deferred to CL on this PR per CL-114). `RecipeCard.ListRow` unchanged. New `DODFeed.layoutVariant` UserDefaults flag + Settings → Layout toggle. L4 baselines for both variants.
+- **Files:** `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/RecipeCard.swift` (new `Magazine` subtype variant), `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FeedView.swift` (variant selection), `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (new Layout row), plus snapshot baselines.
+- **AC:** to be assigned (43.12–43.15 reserved).
+- **Est:** ~1 week (~30h).
+- **||:** depends on T-710 landing first (the magazine variant resolves `Surface` → `#FFFFFF`).
+
+#### T-712 — Phase c: nav-bar masthead + `DODBadge.Numbered` component (US-43, deferred)
+
+- **What:** Replace the `"Recipes & Articles"` text title with a circular 32pt DOD logo (reuse `App/AppIcon.icon/Assets/DOD Master.png`). Tap-to-scroll-to-top behavior. New `DODBadge.Numbered(_ n: Int)` component — 28pt burnt-orange circle with SF Rounded white digit + drop shadow. Apply to Feed's "Featured" / "This Week" rail only.
+- **Files:** `App/RootView.swift` (toolbar leading), `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/DODBadge.swift` (new), `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FeedView.swift` (Featured rail). New L4 baselines for `DODBadge.Numbered`.
+- **AC:** to be assigned (43.16–43.18 reserved).
+- **Est:** ~3 days (~12h).
+- **||:** depends on T-710 + T-711 landing first (the badge uses `LabelOnAccent`, the masthead expects the magazine layout).
+
+#### T-713 — Phase d: Recipe Detail surface polish (US-43, deferred)
+
+- **What:** Recipe Detail picks up the surface change + uses portrait hero at top. Comments + ratings sections inherit the new surface tier. Saved tab adopts `SurfaceWarm` (the warmth lands where the user is "at home"). Cook Mode background adopts `SurfaceWarm` (warm under low-light).
+- **Files:** `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/{RecipeDetailView,CommentsSection,RatingsSection,CookModeView}.swift`, `Packages/DODFeatureSaved/Sources/DODFeatureSaved/SavedView.swift`. Snapshot baselines for each.
+- **AC:** to be assigned (43.19–43.20 reserved).
+- **Est:** ~3 days (~12h).
+- **||:** depends on T-710 + T-711 + T-712 landing first.
+
 ---
 
 ## Summary

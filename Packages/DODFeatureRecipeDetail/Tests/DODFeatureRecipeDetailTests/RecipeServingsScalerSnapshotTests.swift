@@ -14,7 +14,7 @@ import XCTest
 /// caption visible). Light + dark for each so the appearance audit
 /// captures both modes.
 ///
-/// First run with `isRecording = true` to create baselines, then revert
+/// First run with `isRecording = false` to create baselines, then revert
 /// and commit. Subsequent runs diff against the baselines.
 ///
 /// Spec trace: constitution §6 L4, US-31 / AC-31.1 + AC-31.6.
