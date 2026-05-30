@@ -22,8 +22,14 @@ import Testing
     }
 
     @Test func successfulSearchPopulatesItems() async {
+        // Titles must contain the query (post-CL-120 / T-642 title-precision
+        // filter); the pre-T-642 `Self.makeItem(_:)` default title was
+        // "Match N" which body-matched nothing and now correctly drops.
         let dependencies = FakeSearchDependencies()
-        dependencies.results["pasta"] = [Self.makeItem(1), Self.makeItem(2)]
+        dependencies.results["pasta"] = [
+            Self.makeItem(1, title: "Pasta"),
+            Self.makeItem(2, title: "Pasta"),
+        ]
         let viewModel = SearchViewModel(
             dependencies: dependencies,
             recentSearches: Self.scratchRecents()
@@ -60,10 +66,19 @@ import Testing
         #expect(dependencies.searches.isEmpty, "REST must not be called when offline")
     }
 
-    @Test func offlineWithLocalIngredientHitsStillShowsResults() async {
-        // US-12 / AC-12.1 graceful degradation: the local ingredient index
-        // works offline, so a recipe whose ingredients match should still
-        // surface even with the network down.
+    @Test func offlineWithLocalIngredientHitsGoesOfflineUnderCL120Deferral() async {
+        // US-12 / AC-12.1 — pre-CL-120 contract said the local ingredient
+        // index continued to surface results offline. **CL-120 / T-642
+        // defers the entire local-ingredient pass for v1** (title
+        // precision is the user's primary contract; ingredient search
+        // returns as a labeled tier in dad's broader "Make search way
+        // better" backlog entry). The post-T-642 behavior: offline +
+        // local-only hits → `.offline` state because the merger no
+        // longer admits the local tier. The local-ingredient code path
+        // is preserved upstream (the dependencies still expose
+        // `searchIngredients` + `cachedListItems`) so the future
+        // re-enablement is a SearchResultMerger edit, not a viewmodel
+        // re-wire.
         let dependencies = FakeSearchDependencies()
         dependencies.online = false
         dependencies.localIngredientIDs["garlic"] = [42]
@@ -74,8 +89,7 @@ import Testing
         )
         viewModel.query = "garlic"
         await viewModel.runImmediateSearch()
-        #expect(viewModel.state == .results)
-        #expect(viewModel.items.map(\.id) == [42])
+        #expect(viewModel.state == .offline, "Local-ingredient pass deferred in v1 of CL-120")
     }
 
     @Test func clearResetsState() async {
