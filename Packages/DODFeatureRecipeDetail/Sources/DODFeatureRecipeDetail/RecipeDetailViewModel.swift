@@ -1,5 +1,6 @@
 import DODAnalytics
 import DODDomain
+import DODNetworking
 import DODSupport
 import Foundation
 import Observation
@@ -273,7 +274,7 @@ public final class RecipeDetailViewModel {
             commentDraft = ""
         } catch {
             DODLog.network.error("post comment failed: \(String(describing: error))")
-            snackbarMessage = "Couldn't post your comment — try again."
+            snackbarMessage = Self.commentErrorSnackbar(for: error)
         }
     }
 

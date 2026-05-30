@@ -38,6 +38,237 @@ Format suggestion (not enforced):
 _All six 2026-05-24 captures have graduated to spec-driven work and
 shipped. See "Recently graduated" below for the trail._
 
+### Captured 2026-05-29 (round 9, @adamsned) — TestFlight 1.0 (2) install feedback
+
+Dad's first real-device feedback after installing build `1.0 (2)` on `nadams-iphone` via TestFlight this morning (~07:50 MST). Captured here while using the app naturally; expect more entries as he keeps cooking with it.
+
+#### Search is too strict — "nachos" doesn't find "Cast Iron Skillet Nachos"
+
+**Real bug, blocks a user finding a recipe they know exists in the catalog.** Repro:
+
+1. Open the app → Search tab
+2. Type `nachos`
+3. Expected: `Cast Iron Skillet Nachos` appears in results
+4. Actual: result set does not include it (other recipes may or may not appear)
+
+The recipe is published, indexed by the live blog, and findable via the WordPress site's own search. Something in the iOS app's search pipeline is filtering it out.
+
+**Where to look — root-cause hypotheses worth checking in order:**
+
+1. **WP REST `?search=` query semantics changed** — `WPRestClient+Posts.swift:32` calls `GET /wp-json/wp/v2/posts?search=<query>&_embed=wp:featuredmedia&page=1&per_page=20`. Recent WordPress versions (6.4+) layered a relevance-scoring pass on top of the underlying `WP_Query` `s=` LIKE match; the relevance pass can demote a post if it has fewer search-keyword occurrences than another match in the same set. If "Cast Iron Skillet Nachos" gets pushed to page 2 and we only fetch page 1, the user perceives it as missing.
+2. **`per_page: 20` cap** — DOD's default page size truncates result sets that the site's own search shows in a single scroll. Bumping to 50 or implementing infinite-scroll in Search results would close the gap.
+3. **Stale `URLCache.shared` / Cloudflare edge cache** — REG-18 (graduated to T-510 / CL-50) traced an identical symptom on the home feed to a CDN serving day-old batches. The fix bypassed both caches for `WPRestClient.get(...)` reads. **Verify the bypass is still in place for the search path specifically** — the fix may have been list-only and not extended to search.
+4. **WP categories filter intersection** — REG-17 (graduated to T-530 / CL-53) found that dropping `Post.categories` from the WP DTO mapping caused the category filter chip to exclude every fresh hit. The current Search filter chips ("Any time" / categories) may be intersecting against a missing-category field and silently dropping matches.
+5. **Slug vs title fall-through** — `RecipeListItem.title` is parsed from the WP `post.title.rendered` HTML. If "Cast Iron Skillet Nachos" has special characters in the title (smart quotes, hyphens, en-dashes) the JSON-LD parse may surface a different display string than the search-match field. Worth a one-grep: `Recipe.title` vs `RecipeListItem.title` divergence.
+
+**Confidence**: high that this is a multi-cause issue, not a single broken line. WP's REST search is a known-soft surface; expect to need a layered fix.
+
+#### "Make search way better than what you have now"
+
+Dad's framing — a clear signal that the bug above is the visible symptom of a broader "search doesn't feel native" complaint. The current Search tab does:
+
+- 300ms debounce → WP REST `?search=` → 20-recipe list, sorted by WP's relevance + date
+- Recent searches (US-29 / CL-46)
+- Curated suggestion pills (US-29 / CL-49 / T-500)
+- Category filter chips (US-29 + REG-17 fix)
+
+Directions worth scoping before this graduates:
+
+- **Fuzzy / typo-tolerant matching.** "nahcos" or "Nachos!" or "skillet nachos" should all find the recipe. WP REST is exact-substring-only; a client-side index over the cached recipe list (the user already has ~100 recipes cached from feed scrolling) would let us do Levenshtein-tolerant matching for the user's catalog.
+- **Search local + remote in parallel.** When the user types, show cached matches instantly (sub-frame), then merge in remote results when they arrive. Offline becomes useful.
+- **Ingredient-name search.** "ground beef" → recipes that USE ground beef, not just recipes with "ground beef" in the title. Requires JSON-LD ingredients to be indexed locally — already cached per US-13 / SchemaV2 `CachedIngredient` (T-074-ish). Big differentiator vs. the website.
+- **Sort by true relevance, not date-tiebreak.** WP's default is `relevance` for `?search=` but ties resolve to `date desc`, which buries older-but-perfect-match recipes. Need to investigate whether the WP RESPONSE relevance scores are even returned in `WPDTO.Post` (probably not — would need `wp-json/wp/v2/search` instead of `posts`).
+- **Highlight match terms in results.** Show "Cast Iron Skillet **Nachos**" with bold on the matched substring. Lifts the result card from a generic title to an explanation of why it matched.
+- **"Did you mean..." suggestions** when results are sparse (< 3). Use a stem-based suggestion table sourced from the cached recipe titles.
+- **Spotlight indexing** via `NSUserActivity` + Core Spotlight. Recipes become searchable from outside the app — type "nachos" in Home Screen pull-down and DOD recipes appear. Big iOS-native win, hard to replicate on the website.
+- **Recent + recommended interleaving on empty state.** Today the empty Search state is curated pills; could also surface 3-4 of the user's recent searches' top results as quick re-entry tiles.
+- **Auto-complete / suggestion as you type.** Inline suggestion below the search bar, debounced at 150ms (faster than the result-fetch debounce). Pulled from cached titles + WP REST `wp-json/wp/v2/search` (which is a different endpoint, specifically for search suggestions).
+
+**Constraints to preserve**: query is hashed before going to TelemetryDeck (US-12 / CL-12 — "search query never leaves device in cleartext"). Any client-side index uses local `CachedRecipe` rows; no new network surface.
+
+**Rough size guess**: **L** if all of the above lands together; **M** if it's just the bug fix + local-fuzzy + ingredient-search subset. Likely splits into 3-4 task IDs.
+
+Likely produces a new US (search overhaul) + clarifications for: client-side fuzzy threshold; ingredient-search scope (title-substring or stem-tokenized); whether to query `wp-json/wp/v2/search` in addition to `?search=`; Spotlight scope (saved-only or all browsed); Recent-searches re-entry tile policy.
+
+#### Cook Mode voice sounds robotic — want natural-sounding voices + male/female toggle in Settings
+
+_(Graduated 2026-05-29 as **US-40 amendment / CL-109 / T-720 + T-721**. **T-720 (Phase a)** ships in `feat/T-720-voice-quality-engine`: the `VoiceSelector` quality + gender-selection engine that reaches past the compact "robotic" tier to the best installed enhanced/premium voice, default-female so the upgrade lands with no UI. **T-721 (Phase b)** — the Settings → Voice picker — is deferred until the SettingsView-owning PRs #72 + #86 land. See "Recently graduated" below.)_
+
+**Real-device complaint** from dad after triggering Voice Mode (US-40 / T-690) in Cook Mode. The current `AVSpeechSynthesizer` in `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/VoiceReader.swift` uses `AVSpeechSynthesisVoice(language: Locale.current.identifier)` per CL-79 — that resolves to Apple's **system default** voice, which is the basic-tier "Samantha" (en-US female) or equivalent. Basic-tier voices are concatenative TTS — they sound robotic by design and they were shipping in iOS since iOS 7.
+
+**What needs to change:**
+
+1. **Switch to a Personal Voice / Premium / Enhanced quality voice by default** when one is installed on-device. iOS 17 ships with the **Siri voices** (`com.apple.voice.compact.en-US.Samantha` → `com.apple.ttsbundle.siri_female_en-US_compact`) which sound dramatically more human. iOS 16+ exposes the **Neural** Personal Voice tier via `AVSpeechSynthesisVoice.speechVoices()` filtered on `voice.quality == .premium`. The premium voices are NOT downloaded by default but iOS prompts the user to download (~150 MB) the first time they're requested. Strategy: enumerate available voices, prefer `.premium` over `.enhanced` over `.default`, fall back gracefully if none of the higher tiers are installed.
+
+2. **Settings → Voice section** with a picker. CL-89 already adds an "iCloud Sync" section to Settings (T-703, PR #72 open); the same SettingsView extension pattern works for Voice. The picker should expose at minimum:
+   - A **gender** toggle (Female / Male) bound to a UserDefaults key like `dod.voice.preferredGenderV1`. Default Female (matches Apple's system default).
+   - An **automatic / specific voice** mode. "Automatic" picks the best available voice matching the gender preference; "specific" lets the power user pick from `AVSpeechSynthesisVoice.speechVoices()` filtered to `Locale.current.language`. Display the quality tier (Default / Enhanced / Premium) next to each voice name so users understand the trade-off.
+   - A **"Download more voices"** button that opens Settings → Accessibility → Spoken Content → Voices (deep-link via `UIApplication.openSettingsURLString` + the iOS 17.4 settings URL extension). Premium voices live there and require user-initiated install.
+
+3. **Persist + apply across launches.** The preference reads at `VoiceReader` construction (composition root in `AppDependencies`), survives container recreation, and is `@Sendable`-clean since `AVSpeechSynthesisVoice` is value-typed.
+
+**Open questions for the clarification entry:**
+
+- Should "Male" map to a specific voice (`Aaron` / `Daniel`) or just "any voice whose `gender == .male`"? Apple's voice list isn't tagged with gender directly — we'd need a manual mapping for the common voices.
+- How do we handle non-English locales? Spanish + French both have premium Siri voices; German + Japanese vary by iOS version. Probably "automatic by locale" is the right v1 default, with an explicit-voice picker as the escape hatch.
+- Privacy: voice preference is local-only, never leaves device (consistent with US-40's no-network-roundtrip promise per CL-79). One new analytics event `voicePreferenceChanged(quality:gender:)` would track adoption — count only, no specific voice identifier (PII concern: voice ID could correlate to language-region demographics).
+- Should the gender toggle be a sub-setting of an existing "Voice Mode" toggle, or a top-level Settings entry? Probably top-level — discoverability matters more than visual hierarchy.
+
+**Spec trace**: US-40 (Voice Mode) / CL-79 (current Locale.current default) — amendment territory. **Rough size**: **M** (~1 week — voice enumeration, picker UI, settings wiring, analytics event, 4 new tests). Constitution constraints intact (no third-party TTS dep — all `AVFoundation`).
+
+#### Cast iron photo scanner → walks user through cleaning steps
+
+**New feature request from dad**, observed from the real-device install. The pitch: open the camera, point at a piece of cast iron (rusty, seasoned, sticky, whatever), and the app diagnoses its condition + walks through cleaning + re-seasoning steps. Plays to DOD's brand — "Cast Iron Living" is on the icon — and turns the app from a recipe reader into a cast-iron care companion. Could be the single biggest "why this app exists" moment for a user who just inherited their grandfather's skillet.
+
+**The architecture decision tree:**
+
+| Approach | What it requires | Privacy / cost | Quality |
+|---|---|---|---|
+| **On-device Apple Foundation Models (iOS 26+)** | `FoundationModels` framework + a multi-modal vision request | Best privacy (no image leaves device), zero per-request cost, **iOS 26+ only** | Apple's image-classification quality is improving fast but cast-iron-specific knowledge is generic |
+| **On-device Core ML model fine-tuned for cast iron** | Train a small CoreML model on a labeled dataset of cast iron states (good, rusty, sticky, layered seasoning, cracked) | Best privacy, requires the dataset (~500 labeled photos) + a training pass | Best targeted quality, but the dataset is the bottleneck |
+| **Cloud LLM (Claude / GPT-4V)** with photo upload | Network round-trip + API key + image upload | **NEW privacy surface** (constitution §9 conflict — image data sent to a third party) + per-request cost | Highest immediate quality, no training needed |
+| **Hybrid** — on-device vision detects "is this cast iron?" + opens an articles flow | Apple's built-in Vision framework (free, no model) + a static "cast iron care" article from dutchovendaddy.com | Best privacy, easiest to ship | Zero per-skillet diagnosis — just opens the same article every time. Probably the right **v1** if we ship anything. |
+
+**v1 minimum path I'd recommend:** the hybrid. Add a Cast Iron Care tab/entry (or surface as a Settings → Tools menu item) that:
+
+1. Opens the camera (requires new `NSCameraUsageDescription` Info.plist key — minor App Privacy questionnaire bump for "Camera, used to detect cast iron condition for cleaning guidance, not stored or transmitted").
+2. Snaps a photo, runs `VNDetectRectanglesRequest` + a heuristic check that the photo contains a roughly-circular dark-toned object (cast iron geometry). This is just a "did the user point at something cast-iron-ish" check, not a quality grade.
+3. Routes to a single curated **"How to Clean and Restore Cast Iron"** article hosted on dutchovendaddy.com (dad writes / publishes this). The article walks through the 5 condition states (good, soapy/sticky, rusty, cracked, never-seasoned) with photos and steps for each.
+
+Total user value: the app opens the right page for them, with a moment-of-truth camera interaction that feels native. Cost: one new tab/menu item, one new article on the WordPress side (dad's scope), one Info.plist key, zero ML dependencies. **Punt the actual photo-→-state classification to v1.1** when we either have the labeled dataset or iOS 26 minimum supports the Foundation Models path.
+
+**Open questions for clarification:**
+
+- **Where does the entry point live?** A new tab eats the bottom-bar slot (US-37 / CL-65); a Settings menu item under "Tools" is discoverable but lower-traffic. A discovery card on the Saved tab ("Got a cast iron? Try the scanner") might thread the needle.
+- **What happens when there's no internet?** Offline → "we'll show you when you reconnect," or just open the locally-cached article body (if T-640's article cache covers it). Probably the latter.
+- **Photo permission flow.** First-launch of the scanner requests camera permission; deny → snackbar with a Settings deep-link explaining why we need it. Constitution §9 implications: zero — we never upload the photo for v1.
+- **Constitution conflict on the v2 cloud-LLM path.** If we ever move from the hybrid to the cloud-LLM path, that's a §9 amendment (new third party + new data category in App Privacy + new constitution §3 dep). Capture that explicitly in the clarification so the future graduation has the constraint visible.
+
+**Rough size**: **M** for v1 hybrid (~1.5 weeks: camera permission, scanner view, Vision rect detection, article deep-link, + the cleaning article on WordPress). **XL** for the on-device CoreML classifier path (training dataset + model + integration: months). **Owner check before any code lands** because the cloud-LLM variant is constitution-amendment territory.
+
+#### Comments are broken on the installed TestFlight build — needs investigation + fix
+
+**Real bug, real-device.** Dad confirmed comments don't work on TestFlight 1.0 (2). US-14 / T-650 shipped the comment-write path via `Packages/DODNetworking/Sources/DODNetworking/WPCommentsClient.swift` → `POST https://www.dutchovendaddy.com/wp-json/wp/v2/comments`. Something between the binary on the phone and the WordPress endpoint is broken.
+
+**Where to look — priority-ordered diagnosis:**
+
+1. **Composer flow opens but post tap silently fails.** Check the snackbar / error toast path in `CommentComposerViewModel` — if the WP server returns 401 / 403 / 422 and the error message gets swallowed, the user sees "tap → nothing happens." Hypothesis: the `WPClientError.unexpectedStatus(code:)` mapping reaches the view model but the view model's error toast doesn't surface it. Test path: open Settings → Network → Mobile Data, attempt a comment, watch for the "comment posted" snackbar that should fire on success per AC-14.4.
+2. **WordPress moderation rejected the comment as spam.** Per CL-21 we required the WP "comment author must fill out name + email" setting + the moderation queue. If the moderation queue silently auto-trashes (Akismet aggressive setting + new install + low-reputation IP) the user perceives "I posted and it never appeared." Check WP admin → Comments → Spam / Trash for the test posts.
+3. **WP user-agent or CORS reject from a new bundle ID.** The TestFlight build runs as `com.dutchovendaddy.DODApp` with a different user-agent than the simulator (the simulator gets `DODApp/1.0.0` while the device may carry the codesigned bundle's `CFBundleVersion` differently). If the WP install has a security plugin (Wordfence, etc.) that rate-limits or blocks unknown UAs, the POST returns 403 before reaching wp-json.
+4. **Keychain guest-identity not migrating from device-storage policy.** `GuestIdentityStore.swift` writes to the iOS Keychain. On a fresh TestFlight install, the Keychain entry doesn't exist; the composer should prompt for name + email per US-15. If the prompt is skipped (e.g., a non-nil empty-string default), the WP server receives an anonymous-comment POST without `author_email` → 400 invalid params.
+5. **App Transport Security (ATS) blocking the POST.** Production builds have stricter ATS than Debug — if the WP endpoint is HTTP-redirected anywhere in the chain (unlikely given the cert, but possible if Cloudflare's WAF rule does a 30x → HTTP shim), ATS blocks the request.
+
+**Repro plan** (the entry doesn't graduate until the cause is pinned):
+
+- Foreground the TestFlight build on dad's phone with Console.app attached
+- Filter logs to subsystem `com.dutchovendaddy.DODApp`
+- Attempt a comment post on any recipe with a known-working comment area
+- Capture: the request URL fired, the response status code, the error path taken by `WPCommentsClient.postComment(...)` — these together pin which of (1)-(5) is the actual cause
+- Cross-check WP-side: admin → Comments → All to see if the post landed in Pending / Spam / Trash / never arrived
+
+**Constraints to preserve during the fix:**
+
+- Constitution §6 L1 + L2: any regression has to be expressed as a failing test before the fix lands
+- US-14 / AC-14.2: comments are author-name + email + content only — no extra fields snuck into the POST
+- US-14 / AC-14.4: success and failure paths each surface a distinct user-visible state — no silent fails
+- L5 E2E never writes to the live blog (per the constitution constraint) — the regression test stays at L1 / L2 with `FakeWPHTTPClient`
+
+**Rough size**: **S** if it's hypothesis (1) or (4) (single view-model or single Keychain wiring fix), **M** if it's (2) or (3) (server-side WordPress configuration in dad's scope), **rare-but-possible XL** if it's a CFBundleVersion-driven cert-pinning issue that only manifests on signed builds (would need a code-signing-aware test surface, which we don't currently have).
+
+**Graduates as a regression** (REG-NN) — likely the same path as REG-T-360 / REG-18 / REG-19 / REG-20, not a new user story. Spec trace stays under US-14.
+
+#### Site ↔ app design coordination — match dutchovendaddy.com so the two surfaces feel seamless
+
+_(Graduated 2026-05-29 as **US-43 / CL-110..CL-114 / T-710..T-713** — see "Recently graduated" below. **T-710 (Phase a)** ships in this graduation PR: foundational tokens + typography + L4 baselines, no view-code change. **T-711..T-713 (Phases b/c/d)** remain deferred per CL-114 — each waits on real-device validation of the prior phase before graduating, behind a `DODFeed.layoutVariant` flag so each screen reverts independently.)_
+
+**Feature request from @adamsned**, after observing the live site and the TestFlight 1.0 (2) build side by side. The current app's design language is iOS-native correct but visually diverges from the blog in seven measurable ways. Closing the gap is a contained DesignSystem-only change — no new feature code, no platform constraint, no third-party deps.
+
+**The seven gaps observed against the live site (homepage + `/dutch-oven-recipes/`):**
+
+| # | Gap | dutchovendaddy.com | App today |
+|---|---|---|---|
+| 1 | Primary backdrop color | Pure white `#FFFFFF` | Warm cream `#F9F6EF` |
+| 2 | Card chrome on grids | None — photo + title only, no border, no shadow | Rounded `surfaceElevated` card with corner clip |
+| 3 | Hero photo aspect | **3:4 portrait** (720×960) | Landscape ~16:9 (140pt fixed height + aspect-fill) |
+| 4 | Time chip on cards | Absent | Cast-iron-brown capsule top-right |
+| 5 | Excerpt under title | Absent | Two-line caption |
+| 6 | Numbered "Popular" badge | Burnt-orange filled circles (1, 2, 3, 4) on the rail | Absent |
+| 7 | Brand mark in-nav | Circular dark-brown DOD badge as the masthead | Text nav title only |
+
+**Seven proposed moves to close them**, in graduation-ready spec language:
+
+1. **Surface tier reshuffle** — `Surface` flips from `#F9F6EF` to `#FFFFFF`; `SurfaceElevated` collapses (cards no longer "lift"); a new `SurfaceWarm` (`#FAF6EE`) inherits the cream role specifically for the Saved tab + empty states + Cook Mode background. `CreamSubtle` renames to `SurfaceDivider` so its role (thin section dividers, sticky-header tint) is explicit.
+2. **Drop card chrome on Feed + Categories** — magazine-grid variant of `RecipeCard` removes the elevated fill, corner clip, and shadow. Adds 8pt inter-card margin to replace the visual boundary the corners provided. `RecipeCard.ListRow` stays as-is for Search results + Saved (different mode, different rules).
+3. **Switch the hero to 3:4 portrait, full-bleed** — `heroSection.frame(height: 140pt).aspectRatio(.fill)` becomes `.aspectRatio(3/4, contentMode: .fit)`. At iPhone 17 Pro Max (430pt) / 2 columns the hero is ~210×280pt; at iPad 13" / 3 columns it's ~325×433pt. Same crop, same composition as the site — no "wait, did I lose the picture?" moment when toggling between Safari and the app.
+4. **Nav masthead = circular DOD logo** — reuse `App/AppIcon.icon/Assets/DOD Master.png` at 32pt circular in the toolbar leading position. Tap = scroll-to-top (iOS convention) but with the brand mark visible. Replaces the `"Recipes & Articles"` text title on the Feed tab.
+5. **`DODBadge.Numbered`** — new component, 28pt circle filled `DODColor.burntOrange` (`#C56A24`), 16pt SF Rounded semibold white numeral, drop shadow y=2 blur=4 opacity=0.15, positioned bottom-left of the hero at 8pt inset. Applied only to editorially-curated "Featured" or "Top 5 This Week" rails — NOT every card.
+6. **Demote time chip + excerpt to a peek-state** — primary gallery card carries photo + title only (centered, `.heading` weight, max 2 lines). Long-press peek surface keeps the time + excerpt + Save action. Recipe Detail screen continues to display the full metadata prominently. The Bravest Move — earns the seamlessness most because the site's read-quality comes from trusting the photography to do the work.
+7. **Typography hierarchy alignment** — `displayLarge` + `displayMedium` shift `.semibold` → `.bold` to match the site's section-header weight. `heading` + `caption` adopt SF Rounded for a friendlier card-and-chip register. New `brand` token (`size: 22, design: .rounded, weight: .bold`) reserved for "DUTCH OVEN DADDY" wordmark moments (splash, About, share-sheet preview cards).
+
+**Color tokens — after-state, ready to paste into Colors.xcassets:**
+
+| Token | Light | Dark | Role change |
+|---|---|---|---|
+| `Surface` | `#FFFFFF` | `#1B140E` | Was `#F9F6EF / #42210B` — site-aligned white |
+| `SurfaceElevated` | `#FFFFFF` | `#281F19` | Collapsed (no elevation on Feed) |
+| `SurfaceWarm` | `#FAF6EE` | `#281F19` | **NEW** — cream's new home, Saved tab + warm states |
+| `SurfaceDivider` | `#E6DECF` | `#3D2B1F` | Renamed from `CreamSubtle` |
+| `Accent` / `BurntOrange` | `#C56A24` | `#C56A24` | Unchanged |
+| `CastIronBrown` | `#3D2B1F` | `#3D2B1F` | Unchanged |
+| `WarmGold` | `#D4A24C` | `#D4A24C` | Unchanged |
+| `Label` | `#2C2C2C` | `#E6DECF` | Unchanged |
+| `LabelSecondary` | `#6B6B6B` | `#A8A39A` | Unchanged |
+| `LabelOnAccent` | `#FFFFFF` | `#FFFFFF` | **NEW** — text on `Accent` badges |
+
+**Graduation plan** (constitution-amendment-free — no third-party deps, no new privacy surface, no platform change):
+
+| Phase | Scope | Size |
+|---|---|---|
+| **a — tokens** | Update `Colors.xcassets` + `Typography.swift` + `Spacing.swift`. Re-record every L4 snapshot baseline (every screen, every Dynamic Type size, light + dark + AX5) at the new tokens. Roughly 60-80 PNGs. | **S** (~3 days) |
+| **b — `RecipeCard` magazine variant** | New gallery-grid `RecipeCard` style behind a `DODFeed.layoutVariant` flag. `RecipeCard.ListRow` unchanged. Land side-by-side options so the next TestFlight build can A/B them. Add a Settings → Layout toggle so power users (Spencer) can flip between. | **M** (~1 week) |
+| **c — Nav masthead + `DODBadge.Numbered`** | Logo asset in nav-bar leading toolbar. New badge component. Apply badge to Feed's "Featured" / "This Week" rail (whichever ships first). | **S** (~3 days) |
+| **d — Recipe Detail surface polish** | Recipe Detail picks up the surface change + uses the portrait hero pattern at top. Comments + ratings sections inherit the new surface tier. | **S** (~3 days) |
+
+Total: ~2.5 weeks calendar. **Behind-the-flag per screen** so a regression on any individual surface reverts without backing out the token update.
+
+**Open clarification questions before graduation:**
+
+- **The brave Move #6** — does dad agree the time chip + excerpt come off the gallery card? Or do we keep them and just adopt the site's color + photo aspect changes? (The chip + excerpt are real utility — losing them costs the user a glance.) Recommended: ship Move #6 ONLY on the magazine variant and keep the dense variant unchanged, so the Settings toggle in Phase b decides.
+- **Dark mode parity** — site is light-only. App's dark mode currently uses `#42210B` (warm dark brown) as `Surface`. Should dark mode get the same site-aligned `Surface` shift, or stay warmer to preserve the cooking-mode read-in-low-light affordance? Recommended: keep dark mode warm; the site doesn't have a dark mode to coordinate against.
+- **iPad treatment** — site is responsive but Web. iPad's `NavigationSplitView` sidebar inherits the surface change; the detail pane picks up the portrait hero. Anything specific to iPad worth pinning before Phase b?
+- **A/B duration** — does the layout flag live on for v1.x as a permanent setting, or does it sunset after the magazine variant proves out in TestFlight? Recommended: ship as a permanent Settings → Layout option so users with strong format preferences keep their choice.
+
+**Spec trace**: produces a new US (design coordination — site/app brand parity) + clarifications covering each of the 4 questions above. Likely splits into 4 phase IDs (T-NNNa..d above). **Size: M-L total** depending on how aggressively Move #6 lands.
+
+### Captured 2026-05-30 (round-10, @spencer0706)
+
+- **Rotating "Try" pill pool on Search page.** Today the Search-tab idle "Try" section (`IdleSuggestionsView`'s second section, populated from `topCategories`) shows a fixed slate of category pills — the same set every time the user opens the app. **Spencer wants the Try pills to draw from a larger pool and shuffle on every app launch**, so a returning user keeps seeing fresh discovery prompts instead of memorizing the same ~6 pills and ignoring the section. The goal is to **encourage exploration beyond the literal pills shown** — the section reads as "here's a sampling, there's more in here" rather than "here are the only six categories that exist." Implementation sketch: keep `topCategories` as the upstream source (or widen it to all categories + a curated handful of seasonal/themed terms), but pick the displayed slate via a per-launch shuffle (stable within a single app session so the user doesn't see pills re-arrange under their finger between sub-views). The pool size and the visible-slate size are the two knobs — recommended starting point: pool ≈ 20-30 terms (the full top categories list + maybe 4-6 hand-picked seasonal terms), visible ≈ 6-8 pills (current count). Stable-within-session means picking the displayed set once on `SearchView` first render and holding it in the viewmodel until the next cold launch. **Considered but rejected:** time-of-day or weather-aware curation (interesting but out of scope; v1 is just a shuffle). Persistent "you've seen these" exclusion across launches (over-engineered for v1; shuffle alone solves the staleness for most users). The "Latest Recipes" pill (T-637) should be **pinned outside the shuffle pool** — it's the canonical "what's new" affordance and shouldn't disappear on a rotation. **The visible pill count is a fixed constant — every cold launch shows exactly the same number of pills (e.g. always 6), never 5 or 7.** Layout shouldn't shift between launches; only the selection inside that fixed slot count rotates. Guard against the pool shrinking below the visible count: if the upstream `topCategories` query returns fewer than the target slate size, top up from the curated-extras list (or repeat the available pool deterministically) rather than rendering a short row. Size: **S** — single-file change in `IdleSuggestionsView` + a small viewmodel field + maybe a small curated-extras list in `SearchDependencies`. No spec change required beyond an AC clarification.
+
+### Captured 2026-05-28 (notification trigger — PAUSED pending @adamsned + WordPress)
+
+- **Real-time "new post" notification trigger (the production signal behind US-42).**
+  T-631/T-632 shipped the full **local**-notification plumbing: type-aware copy
+  (recipe vs article), toggle gating, foreground banner, and tap-to-open that
+  **fetches the post on cache-miss** and routes recipe→detail / article→article
+  view (T-632 / REG-20). What's missing is the *trigger* — the app has no signal
+  for "a new post was published." Spencer wants notifications to fire **when a
+  new recipe or article actually drops**, which is genuinely impossible without
+  a server-side push; this is **dad's call** since he controls the WordPress
+  install. Options laid out for the dad conversation:
+
+  | Approach | WordPress / backend side (dad) | iOS side remaining (us) | Notes |
+  |---|---|---|---|
+  | **OneSignal** (lowest effort) | Install OneSignal WP plugin + paste an APNs auth key; it fires a push on `publish_post` and stores device tokens on their servers (free tier) | Add the OneSignal iOS SDK | **New dependency → needs constitution §3 sign-off.** Fastest path to "exactly when it drops." |
+  | **Custom webhook → APNs** | A `publish_post` hook POSTs to a small service that holds device tokens + sends APNs | `registerForRemoteNotifications`, POST the device token to that service, add `aps-environment` entitlement (dad's paid account enables it) | No new iOS dependency, but dad maintains a service. |
+  | **Background-refresh polling** (no WordPress) | nothing | `BGAppRefreshTask` that polls the WP feed for a newer top-of-feed post id than last-seen and fires a local notification | **NOT instant** — fires within iOS's background window (~15-60 min). **Conflicts with NFR-3** ("no background fetch in v1") → needs a constitution amendment. Fallback if dad doesn't want to touch WordPress. |
+
+  **iOS readiness:** display + copy + tap-routing are done (T-631/T-632). For the
+  push options the only iOS additions are remote-notification registration + a
+  device-token handoff; the deep-link routing a push would carry already works.
+  **Do not graduate** until dad picks an approach (it determines whether we add a
+  dependency, a backend, or amend NFR-3). Size: **S** on the iOS side once the
+  approach is chosen; the WordPress/backend side is dad's scope.
+
 ### Captured 2026-05-24 (post-Phase-8 round 2, @spencer0706)
 
 _(empty — all items graduated; see "Recently graduated" below.)_
@@ -116,7 +347,7 @@ Captured before Spencer headed out for the evening. **Not to be built tonight** 
 
 #### Settings page expansion
 
-- ~~**Add more standard settings.**~~ Graduated 2026-05-27 as US-36 / CL-62 / T-630 (with T-631 as the APNs follow-up). The audit-and-pick narrowed to five rows: Notifications (UI-only in v1; APNs deferred to T-631), Appearance (Match System / Light / Dark — `.preferredColorScheme` on `RootView`), Default Share Format (link-only / link + recipe text — persisted now, consumer is a future task), Clear Cached Recipe Images (button → `RecipeStore.clearImageCache()` → snackbar with freed-MB count, pinned images preserved), and Share Anonymous Usage Data (toggle, default ON per constitution §9, `TelemetryDeckTransport` short-circuits when OFF). Cook Mode keep-screen-awake, accessibility shortcuts, and legal links were deliberately deferred — see CL-62 for the reasoning.
+- ~~**Add more standard settings.**~~ Graduated 2026-05-27 as US-36 / CL-62 / T-630, with the Notifications row's behavior graduated 2026-05-28 as US-42 / CL-100 / T-631 (**local** notifications, not APNs). The audit-and-pick narrowed to five rows: Notifications (UI-only when T-630 shipped; T-631 wired it to on-device local notifications with recipe-vs-article type-aware copy + tap deep-linking, gated by the toggle), Appearance (Match System / Light / Dark — `.preferredColorScheme` on `RootView`), Default Share Format (link-only / link + recipe text — persisted now, consumer is a future task), Clear Cached Recipe Images (button → `RecipeStore.clearImageCache()` → snackbar with freed-MB count, pinned images preserved), and Share Anonymous Usage Data (toggle, default ON per constitution §9, `TelemetryDeckTransport` short-circuits when OFF). Cook Mode keep-screen-awake, accessibility shortcuts, and legal links were deliberately deferred — see CL-62 for the reasoning.
 
 - **"About Ned Adams & Dutch Oven Daddy" — shorter paragraph + image.** The current placeholder paragraph in T-550's Settings → About row is too long for a phone screen. Replace with this exact copy:
 

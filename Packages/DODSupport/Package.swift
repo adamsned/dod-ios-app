@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "DODSupport", targets: ["DODSupport"])
     ],
     dependencies: [
-        .package(path: "../DODDomain"),
+        .package(path: "../DODDomain")
     ],
     targets: [
         .target(

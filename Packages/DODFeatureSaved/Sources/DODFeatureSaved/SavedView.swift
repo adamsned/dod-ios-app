@@ -7,12 +7,17 @@ public struct SavedView: View {
     @State private var viewModel: SavedViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelect: (Recipe) -> Void
-    /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
-    /// `FeedView.onSave`; this surface passes a `Recipe` (not a
-    /// `RecipeListItem`) because the Saved tab already has the full domain
-    /// type at hand. The closure semantics match — long-press → toggle.
-    /// Tapping Save on an already-saved recipe flips it to unsaved per
-    /// `RecipeStore.toggleSaved`'s contract (CL-59 always-"Save" decision).
+    /// US-34 / AC-34.1 / AC-34.6 — long-press → state-aware Save/Unsave
+    /// context menu wiring. See `FeedView.onSave`; this surface passes a
+    /// `Recipe` (not a `RecipeListItem`) because the Saved tab already has
+    /// the full domain type at hand. The closure is a toggle —
+    /// `RecipeStore.toggleSaved(id:)` flips `isSaved` in both directions,
+    /// so a "Save"/"Unsave" tap from the card's context menu routes to the
+    /// same closure regardless of the current saved state. CL-103 (T-634)
+    /// reversed CL-60's "no Unsave branch in v1" decision: the helper now
+    /// renders "Unsave" + outline `bookmark` when `isSaved: true` (always
+    /// the case here) and "Save" + `bookmark.fill` when `isSaved: false`
+    /// (used by Feed/Categories/Search per their respective TODO markers).
     public let onSave: ((Recipe) -> Void)?
 
     /// US-39 / AC-39.3 / CL-85 — drives the "Make Shopping List" entry. When the
@@ -103,7 +108,39 @@ public struct SavedView: View {
                             totalTimeDisplay: totalTimeDisplay(recipe)
                         )
                         .recipeCardTap { onSelect(recipe) }
-                        .recipeCardContextMenu { onSave?(recipe) }
+                        // T-638 / CL-107 — stable test handle for the L5 E2E
+                        // `test_long_press_unsave_from_saved_tab` (long-presses
+                        // the card → asserts the context menu reads "Unsave"
+                        // not "Save" → taps Unsave → asserts the card is gone
+                        // within 0.5s, the frame-tight window that catches a
+                        // regression to non-optimistic removal — pins CL-104 /
+                        // T-635 + REG-21). The identifier is applied AFTER
+                        // `recipeCardTap` so it survives the
+                        // `accessibilityElement(children: .combine)` consolidation
+                        // that the tap modifier applies — the identifier
+                        // attaches to the combined accessibility element,
+                        // which is the element XCUITest queries via
+                        // `app.buttons.matching(identifier:)`.
+                        .accessibilityIdentifier("dod.saved.card")
+                        // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) —
+                        // every card in the Saved tab is by definition
+                        // saved (the source is `RecipeStore.savedRecipes()`),
+                        // so `isSaved: true` is a constant here. The
+                        // `onToggle` closure routes through the same
+                        // `onSave?(recipe)` path; `RecipeStore.toggleSaved`
+                        // flips in both directions, so tapping "Unsave"
+                        // correctly transitions the row to `isSaved == false`.
+                        .recipeCardContextMenu(isSaved: true) {
+                            // T-635 / CL-104 — optimistic local removal so
+                            // the card disappears instantly; the store toggle
+                            // bubbles through `TabStack.saveFromCard(...)`
+                            // without a completion callback, so without this
+                            // the row lingers until the next `.task` cycle
+                            // (tab switch). Order matters: UI first, then
+                            // persistence fires asynchronously.
+                            viewModel.optimisticallyRemove(id: recipe.id)
+                            onSave?(recipe)
+                        }
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)

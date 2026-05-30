@@ -89,6 +89,16 @@ public final class SettingsViewModel {
     /// file_length split forces an internal-but-not-private accessor).
     let cloudSyncDependency: (any SettingsDependencies)?
 
+    /// Authorization seam for the notifications toggle (US-42 / AC-42.1).
+    /// The composition root injects a closure that calls
+    /// `NotificationService.requestAuthorization()` (which wraps
+    /// `UNUserNotificationCenter.current().requestAuthorization(...)`);
+    /// it returns `true` iff the user grants. Defaults to a closure that
+    /// reports "not granted" so previews / snapshot hosts / the L1 suite
+    /// never touch `UserNotifications` — the view-model package builds on
+    /// the macOS `swift test` slice where that framework is unavailable.
+    private let requestNotificationAuthorization: @MainActor () async -> Bool
+
     // MARK: - Persisted state
 
     /// AC-32.4. Reads + writes through ``defaults`` so a parallel write
@@ -186,10 +196,12 @@ public final class SettingsViewModel {
 
     public init(
         defaults: UserDefaults = .standard,
-        dependencies: (any SettingsDependencies)? = nil
+        dependencies: (any SettingsDependencies)? = nil,
+        requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false }
     ) {
         self.defaults = defaults
         self.cloudSyncDependency = dependencies
+        self.requestNotificationAuthorization = requestNotificationAuthorization
         // US-41 AC-41.3 — seed the toggle state from the canonical
         // flag (RecipeStore.cloudKitSyncOptInKey) so users who already
         // opted in via T-704's first-launch sheet see the toggle in the
@@ -202,6 +214,31 @@ public final class SettingsViewModel {
         } else {
             self.isCloudSyncEnabled = defaults.bool(forKey: RecipeStore.cloudKitSyncOptInKey)
         }
+    }
+
+    // MARK: - Notifications toggle (US-42 / AC-42.1)
+
+    /// Drives the notifications toggle's ON/OFF transition. Turning **ON**
+    /// requests system authorization (AC-42.1): on grant the flag persists
+    /// `true`; on deny the flag stays `false` (the toggle reverts) and a
+    /// snackbar points the user at iOS Settings. Turning **OFF** simply
+    /// persists `false` — no system call. Returns the resolved on/off
+    /// state so the view's binding can reflect a denied prompt without a
+    /// separate observation hop.
+    @discardableResult
+    public func setNotificationsEnabled(_ enabled: Bool) async -> Bool {
+        guard enabled else {
+            notificationsEnabled = false
+            return false
+        }
+        let granted = await requestNotificationAuthorization()
+        notificationsEnabled = granted
+        if !granted {
+            // Persisted intent stays OFF so the UI never claims notifications
+            // are on while the OS suppresses them (AC-42.1).
+            snackbarMessage = "Enable notifications in iOS Settings → DOD to get new-post alerts."
+        }
+        return granted
     }
 
     // US-41 / AC-41.3 — iCloud Sync toggle actions live in

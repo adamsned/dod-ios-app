@@ -16,7 +16,7 @@ import SwiftData
 public final class CachedRating {
 
     /// WP post id of the recipe this rating belongs to.
-    @Attribute(.unique) public var recipeID: Int
+    public var recipeID: Int
 
     /// Aggregate average across all rated comments, as WP returned it.
     public var average: Double

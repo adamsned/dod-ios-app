@@ -47,9 +47,28 @@ struct IdleSuggestionsView: View {
                         section(title: "Try") {
                             FlowLayout(spacing: DODSpacing.xs) {
                                 ForEach(topCategories) { category in
-                                    pill(text: category.name, systemImage: "tag.fill") {
+                                    pill(text: category.name, systemImage: "magnifyingglass") {
                                         onCategoryTap(category)
                                     }
+                                    // T-638 / CL-107 — stable test handle for the
+                                    // L5 E2E `test_search_latest_recipes_pill_returns_recent_branch`
+                                    // (taps the matching pill → asserts the
+                                    // result count lands in the 3...8 range,
+                                    // discriminating against the failure mode
+                                    // of a literal text search returning either
+                                    // ~0 or many random matches — pins CL-106
+                                    // part 3 + REG-21). Case-insensitive name
+                                    // match mirrors the same check `SearchView`
+                                    // uses to route the tap to
+                                    // `surfaceLatestRecipes(...)`; the
+                                    // `topCategorySuggestions` rank can drift
+                                    // as recipe counts change so a per-pill
+                                    // identifier on the matching one is the
+                                    // robust hook.
+                                    .accessibilityIdentifier(
+                                        isLatestRecipesCategory(category)
+                                            ? "dod.search.tryPill.latestRecipes" : ""
+                                    )
                                 }
                             }
                         }
@@ -79,12 +98,20 @@ struct IdleSuggestionsView: View {
                         onRecentTap(query)
                     }
                     // US-33 / AC-33.2 / CL-57: long-press → "Clear".
+                    // US-33 / CL-105 (T-636): force `.tint(.red)` on the
+                    // destructive button so the SF Symbol trash icon
+                    // matches the red destructive title text. Without an
+                    // explicit tint the symbol inherits the ancestral
+                    // accent (`DODColor.accent` = orange, per CL-57's
+                    // "Clear All" treatment), which left the icon orange
+                    // while the label rendered red — visually mismatched.
                     .contextMenu {
                         Button(role: .destructive) {
                             onRemoveRecent(query)
                         } label: {
                             Label("Clear", systemImage: "trash")
                         }
+                        .tint(.red)
                     }
                 }
             }
@@ -101,6 +128,16 @@ struct IdleSuggestionsView: View {
                 .foregroundStyle(DODColor.label)
             content()
         }
+    }
+
+    /// T-638 / CL-107 — case-insensitive name match (or id-1590 fallback)
+    /// against the "Latest Recipes" WP category, mirroring the same check
+    /// `SearchView` uses to route the tap to `surfaceLatestRecipes(...)`.
+    /// Kept in sync with that call site by convention (CL-106's id `1590`
+    /// + name-match contract).
+    private func isLatestRecipesCategory(_ category: DODDomain.Category) -> Bool {
+        category.id == 1590
+            || category.name.localizedCaseInsensitiveCompare("Latest Recipes") == .orderedSame
     }
 
     private func pill(

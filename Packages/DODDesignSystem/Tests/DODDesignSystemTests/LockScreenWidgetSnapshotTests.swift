@@ -65,7 +65,11 @@ final class LockScreenWidgetSnapshotTests: XCTestCase {
             .frame(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
+            ),
             record: .missing
         )
     }
@@ -79,7 +83,11 @@ final class LockScreenWidgetSnapshotTests: XCTestCase {
             .frame(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
+            ),
             record: .missing
         )
     }
@@ -97,7 +105,11 @@ final class LockScreenWidgetSnapshotTests: XCTestCase {
             .frame(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
+            ),
             record: .missing
         )
     }

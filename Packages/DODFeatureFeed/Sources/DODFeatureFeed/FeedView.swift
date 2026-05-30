@@ -36,19 +36,27 @@ public struct FeedView: View {
     /// previews) compile without wiring; production callers (TabStack)
     /// always pass a `LiveSettingsDependencies`.
     public let settingsDependencies: (any SettingsDependencies)?
+    /// US-42 / AC-42.1 — authorization seam forwarded into `SettingsView`'s
+    /// `SettingsViewModel` so flipping the notifications toggle ON requests
+    /// system permission. Optional; `nil` means the toggle persists intent
+    /// but reports "not granted" (previews / tests). Production (TabStack)
+    /// passes a closure that calls `NotificationService.requestAuthorization()`.
+    public let onRequestNotificationAuthorization: (@MainActor () async -> Bool)?
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
         onClearImageCache: (() async throws -> Int)? = nil,
-        settingsDependencies: (any SettingsDependencies)? = nil
+        settingsDependencies: (any SettingsDependencies)? = nil,
+        onRequestNotificationAuthorization: (@MainActor () async -> Bool)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.onClearImageCache = onClearImageCache
         self.settingsDependencies = settingsDependencies
+        self.onRequestNotificationAuthorization = onRequestNotificationAuthorization
     }
 
     public var body: some View {
@@ -105,8 +113,11 @@ public struct FeedView: View {
     private var settingsToolbarLink: some View {
         NavigationLink {
             SettingsView(
-                onClearImageCache: onClearImageCache,
-                settingsDependencies: settingsDependencies
+                viewModel: SettingsViewModel(
+                    dependencies: settingsDependencies,
+                    requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
+                ),
+                onClearImageCache: onClearImageCache
             )
         } label: {
             Image(systemName: "gearshape")
@@ -193,7 +204,23 @@ public struct FeedView: View {
             ForEach(viewModel.items) { item in
                 FeedRow(item: item)
                     .recipeCardTap { onSelect(item) }
-                    .recipeCardContextMenu { onSave?(item) }
+                    // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO:
+                    // thread per-card `isSaved` state once a Feed
+                    // viewmodel-owned `Set<Int>` of saved IDs (CL-60
+                    // path-(c)) is wired. Until then `false` keeps the
+                    // pre-T-634 "Save" + `bookmark.fill` copy at this
+                    // surface; the high-value Saved-tab fix is the
+                    // priority for T-634. RecipeListItem has no `isSaved`
+                    // field, so the cheapest follow-up is the viewmodel-
+                    // owned set hydrated alongside the result set.
+                    .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                    // Stable L3 handle: `app.buttons.matching(identifier:)`
+                    // targets feed recipe cards directly, so XCUITest can't
+                    // accidentally tap a nav-bar toolbar button (the layout
+                    // toggle / Settings gear) that the old "buttons NOT IN
+                    // tab labels" query swept up. Mirrors `dod.saved.card`.
+                    // Non-visual — does not affect L4 snapshots.
+                    .accessibilityIdentifier("dod.feed.card")
                     .task {
                         await viewModel.loadMoreIfNeeded(currentItem: item)
                     }
@@ -203,8 +230,8 @@ public struct FeedView: View {
 
     /// US-38 / AC-38.4 — the new denser single-column variant. Composes
     /// the same `recipeCardTap` + `recipeCardContextMenu` modifiers as
-    /// the gallery so tap-to-open + long-press-Save (AC-34.1) work
-    /// identically on both layouts.
+    /// the gallery so tap-to-open + long-press-Save/Unsave (AC-34.1 /
+    /// AC-34.6) work identically on both layouts.
     private var listContent: some View {
         LazyVStack(spacing: DODSpacing.xs) {
             ForEach(viewModel.items) { item in
@@ -215,7 +242,10 @@ public struct FeedView: View {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu { onSave?(item) }
+                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO as
+                // above (CL-60 path-(c) viewmodel-owned saved-IDs set).
+                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                .accessibilityIdentifier("dod.feed.card")
                 .task {
                     await viewModel.loadMoreIfNeeded(currentItem: item)
                 }

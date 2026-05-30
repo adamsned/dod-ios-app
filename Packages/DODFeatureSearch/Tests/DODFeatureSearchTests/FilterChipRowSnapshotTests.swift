@@ -7,16 +7,21 @@ import XCTest
 
 @testable import DODFeatureSearch
 
-/// L4 visual-regression coverage focused on ``FilterChipRow``'s
-/// iconography (US-20 / AC-20.4). Locks the `tag.fill` glyph used by
-/// `categoryChip` after the T-350 swap from `folder`, in both the
-/// unselected (idle) and selected (active filter) chip states across
-/// light + dark appearance.
+/// L4 visual-regression coverage focused on ``FilterChipRow``.
+///
+/// History: pre-T-636 this file locked the `tag.fill` `categoryChip` glyph
+/// (US-20 / AC-20.4, post-T-350 swap from `folder`) in both unselected and
+/// selected states. T-636 / CL-105 removed the category chip (and the
+/// `Recently viewed` toggle chip) because the Categories tab and the
+/// Recent searches section already cover those affordances — the chips
+/// were duplicative. The row now hosts only `cookTimeChip`; this file is
+/// repurposed to lock that chip's idle (unselected) + active (selected)
+/// glyph + capsule treatment so the surviving filter affordance keeps
+/// L4 visual coverage. First post-T-636 iOS-sim run uses `record: .missing`
+/// to lay the new baselines down.
 ///
 /// Scoped to the chip row only — the wider ``SearchView`` baselines
 /// (`SearchViewSnapshotTests`) remain owned by T-335 per the spec.
-/// First iOS-sim test run uses `record: .missing` to lay the
-/// chip-only baselines down.
 final class FilterChipRowSnapshotTests: XCTestCase {
 
     override func setUp() {
@@ -26,7 +31,7 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 
     @MainActor
     func test_filterChipRow_unselected_light() {
-        let view = Self.makeHostedChipRow(selectedCategoryID: nil)
+        let view = Self.makeHostedChipRow(selectedCookTime: nil)
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 64), traits: Self.lightTraits()),
@@ -36,7 +41,7 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 
     @MainActor
     func test_filterChipRow_unselected_dark() {
-        let view = Self.makeHostedChipRow(selectedCategoryID: nil)
+        let view = Self.makeHostedChipRow(selectedCookTime: nil)
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 64), traits: Self.darkTraits()),
@@ -45,8 +50,8 @@ final class FilterChipRowSnapshotTests: XCTestCase {
     }
 
     @MainActor
-    func test_filterChipRow_categorySelected_light() {
-        let view = Self.makeHostedChipRow(selectedCategoryID: 2)
+    func test_filterChipRow_cookTimeSelected_light() {
+        let view = Self.makeHostedChipRow(selectedCookTime: .under30)
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 64), traits: Self.lightTraits()),
@@ -55,8 +60,8 @@ final class FilterChipRowSnapshotTests: XCTestCase {
     }
 
     @MainActor
-    func test_filterChipRow_categorySelected_dark() {
-        let view = Self.makeHostedChipRow(selectedCategoryID: 2)
+    func test_filterChipRow_cookTimeSelected_dark() {
+        let view = Self.makeHostedChipRow(selectedCookTime: .under30)
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 64), traits: Self.darkTraits()),
@@ -66,21 +71,16 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    /// Renders `FilterChipRow` with a deterministic 3-category menu.
-    /// `selectedCategoryID: nil` puts the category chip in its idle
-    /// unselected state ("All categories" + surface-elevated capsule);
-    /// passing an ID flips the chip into its selected state (category
-    /// name + cast-iron-brown capsule), exercising both `isOn` branches
-    /// of the `tag.fill` glyph treatment from AC-20.1.
+    /// Renders `FilterChipRow` with optional cook-time selection.
+    /// `selectedCookTime: nil` puts the cook-time chip in its idle
+    /// unselected state ("Any time" + surface-elevated capsule); passing
+    /// a bucket flips the chip into its selected state (bucket label +
+    /// cast-iron-brown capsule), exercising both `isOn` branches of the
+    /// chip-label treatment.
     @MainActor
-    static func makeHostedChipRow(selectedCategoryID: Int?) -> some View {
-        let categories: [DODDomain.Category] = [
-            .init(id: 1, name: "Beef", slug: "beef", count: 42),
-            .init(id: 2, name: "Chicken", slug: "chicken", count: 56),
-            .init(id: 3, name: "Sides", slug: "sides", count: 18),
-        ]
-        let filters = SearchFilters(categoryID: selectedCategoryID)
-        return FilterChipRowHost(initialFilters: filters, categories: categories)
+    static func makeHostedChipRow(selectedCookTime: CookTimeBucket?) -> some View {
+        let filters = SearchFilters(cookTime: selectedCookTime)
+        return FilterChipRowHost(initialFilters: filters)
     }
 
     // MARK: - Trait helpers
@@ -110,15 +110,13 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 @MainActor
 private struct FilterChipRowHost: View {
     @State var filters: SearchFilters
-    let categories: [DODDomain.Category]
 
-    init(initialFilters: SearchFilters, categories: [DODDomain.Category]) {
+    init(initialFilters: SearchFilters) {
         _filters = State(initialValue: initialFilters)
-        self.categories = categories
     }
 
     var body: some View {
-        FilterChipRow(filters: $filters, categories: categories)
+        FilterChipRow(filters: $filters)
     }
 }
 #endif

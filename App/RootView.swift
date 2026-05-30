@@ -236,13 +236,21 @@ struct RootView: View {
         }
     }
 
+    /// Resolve a deep-link recipe/post id into a route, fetching on a cache
+    /// miss (T-632 / REG-20 / CL-101). Cache-hit (widget / Spotlight) stays
+    /// network-free; cache-miss (notification — the post is brand-new and
+    /// never cached) fetches the post by id so its `canonicalURL` is known,
+    /// then routes to recipe-detail, which classifies recipe-vs-article via
+    /// its existing JSON-LD fetch path (AC-4.11 / AC-37.2). The policy lives
+    /// in ``RecipeRouteResolver`` so it is unit-testable without a SwiftUI
+    /// host; this method just supplies the two live I/O edges.
     private func resolveRecipeRoute(id: Int, autoStartCookMode: Bool) async -> RecipeRoute? {
-        guard let recipe = try? await dependencies.store.recipeWithoutTouching(id: id) else {
-            DODLog.app.error("deep link: recipe \(id) not in cache, ignoring")
-            return nil
-        }
-        let item = RecipeEntityPayload.fromRecipe(recipe).toListItem()
-        return .recipe(item: item, autoStartCookMode: autoStartCookMode)
+        await RecipeRouteResolver.resolve(
+            id: id,
+            autoStartCookMode: autoStartCookMode,
+            cachedLookup: { try await dependencies.store.recipeWithoutTouching(id: $0) },
+            fetch: { try await dependencies.fetchListItem(forPostID: $0) }
+        )
     }
 
     private func indexSpotlight() async {
