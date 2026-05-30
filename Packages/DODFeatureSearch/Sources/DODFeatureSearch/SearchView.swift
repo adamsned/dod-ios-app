@@ -290,6 +290,11 @@ struct FilterChipRow: View {
             )
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+            // T-645 / CL-123 — fill the system sheet chrome with the
+            // brand surface color so the brown (dark) / white (light)
+            // panel reaches the bottom of the screen instead of letting
+            // the default chrome blur show through the safe-area gap.
+            .presentationBackground(DODColor.surface)
         }
     }
 
