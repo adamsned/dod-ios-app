@@ -188,14 +188,20 @@ public struct SearchView: View {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu { onSave?(item) }
+                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO:
+                // thread per-card `isSaved` state once a Search
+                // viewmodel-owned `Set<Int>` of saved IDs (CL-60 path-(c))
+                // is wired. Until then `false` keeps the pre-T-634 "Save"
+                // + `bookmark.fill` copy at this surface; the high-value
+                // Saved-tab fix is the priority for T-634.
+                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
             }
         }
     }
 
     /// US-38 / AC-38.4 — dense single-column variant. Composes the same
     /// tap + context-menu modifiers as the gallery so US-34 / AC-34.1
-    /// long-press-Save works identically.
+    /// / AC-34.6 long-press-Save/Unsave works identically.
     private var listResults: some View {
         LazyVStack(spacing: DODSpacing.xs) {
             ForEach(viewModel.items) { item in
@@ -206,7 +212,9 @@ public struct SearchView: View {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu { onSave?(item) }
+                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO as
+                // above (CL-60 path-(c) viewmodel-owned saved-IDs set).
+                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
             }
         }
     }

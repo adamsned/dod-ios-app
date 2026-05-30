@@ -150,21 +150,45 @@ extension View {
             .accessibilityAddTraits(.isButton)
     }
 
-    /// Attach the standard "Save" long-press context menu to a recipe card
-    /// (US-34 / AC-34.1 / CL-59).
+    /// Attach the state-aware long-press Save/Unsave context menu to a
+    /// recipe card (US-34 / AC-34.1 / AC-34.6 / CL-103).
     ///
-    /// The menu hosts a single `Button` with the `bookmark.fill` SF Symbol
-    /// and the label "Save"; tapping it invokes `onSave`. Menu copy stays
-    /// "Save" regardless of the recipe's current saved state — see CL-59
-    /// for the "no Unsave branch in v1" rationale.
+    /// The menu hosts a single `Button` whose `Label` branches on the
+    /// supplied `isSaved` flag: a saved card surfaces "Unsave" with the
+    /// outline `bookmark` glyph; an unsaved card surfaces "Save" with
+    /// `bookmark.fill`. Tapping invokes `onToggle`, which the caller wires
+    /// through `RecipeStore.toggleSaved(id:)` (the same seam used by the
+    /// detail-screen nav-bar bookmark per AC-4.7 / AC-5.1; the store-side
+    /// `toggleSaved` already flips in both directions, so tapping "Unsave"
+    /// on a saved card correctly transitions the row to `isSaved == false`).
+    ///
+    /// **History.** CL-60 (T-590) originally shipped this helper as
+    /// `recipeCardContextMenu(onSave:)` with always-"Save" + `bookmark.fill`
+    /// regardless of state — the "no Unsave branch in v1" decision deferred
+    /// the per-row `isSaved` plumbing on the basis that Feed/Categories/
+    /// Search viewmodels don't carry a saved-IDs observation surface. CL-103
+    /// (T-634) reverses that decision because the Saved tab is the high-
+    /// value surface where `isSaved` is trivially `true` for every card
+    /// (every card in `SavedView`'s grid is by definition saved), and
+    /// long-pressing a saved card to see "Save" reads as broken even
+    /// though the underlying toggle works. Feed/Categories/Search still
+    /// pass `isSaved: false` with a TODO marker pending the CL-60
+    /// path-(c) follow-up (viewmodel-owned saved-IDs sets hydrated on
+    /// appear).
     ///
     /// The menu composes alongside `recipeCardTap` without eating the tap
     /// gesture (SwiftUI's `.contextMenu` is gesture-distinct from
     /// `.onTapGesture` — REG-DOD-LIST-SCROLL is unaffected).
-    public func recipeCardContextMenu(onSave: @escaping () -> Void) -> some View {
+    public func recipeCardContextMenu(
+        isSaved: Bool,
+        onToggle: @escaping () -> Void
+    ) -> some View {
         self.contextMenu {
-            Button(action: onSave) {
-                Label("Save", systemImage: "bookmark.fill")
+            Button(action: onToggle) {
+                Label(
+                    isSaved ? "Unsave" : "Save",
+                    systemImage: isSaved ? "bookmark" : "bookmark.fill"
+                )
             }
         }
     }
@@ -196,9 +220,9 @@ extension RecipeCard {
     ///     gallery card's surface treatment).
     ///
     /// Composes with the same ``recipeCardTap(_:)`` +
-    /// ``recipeCardContextMenu(onSave:)`` modifiers the gallery card uses,
-    /// so the row's tap + long-press semantics are byte-identical
-    /// (AC-34.1 preserved).
+    /// ``recipeCardContextMenu(isSaved:onToggle:)`` modifiers the gallery
+    /// card uses, so the row's tap + long-press semantics are
+    /// byte-identical (AC-34.1 / AC-34.6 preserved).
     public struct ListRow: View {
 
         public let title: String
