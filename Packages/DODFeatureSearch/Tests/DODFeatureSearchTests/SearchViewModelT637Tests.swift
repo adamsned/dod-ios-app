@@ -64,7 +64,10 @@ import Testing
             dependencies: dependencies,
             recentSearches: Self.scratchRecents()
         )
-        viewModel.filters.cookTime = .under30
+        // CL-122 / T-644: bucket model retired — `cookTime = .under30`
+        // becomes `cookTimeMaxSeconds = 30 * 60` (max-only narrow). The
+        // hydration contract under test is unchanged.
+        viewModel.filters.cookTimeMaxSeconds = 30 * 60
         viewModel.query = "chili"
         await viewModel.runImmediateSearch()
         // Immediately after the search, the cache is empty so the
@@ -78,7 +81,7 @@ import Testing
         }
         #expect(
             viewModel.items.map(\.id) == [1],
-            "After hydration: only item 1 fits the under-30 bucket"
+            "After hydration: only item 1 fits the max-30-min range"
         )
         #expect(
             !dependencies.networkTotalSecondsCalls.isEmpty,
@@ -134,7 +137,9 @@ import Testing
         await viewModel.surfaceLatestRecipes(limit: 2)
         #expect(viewModel.items.count == 2)
 
-        viewModel.filters.cookTime = .under30
+        // CL-122 / T-644: bucket → max-only range. The reapply-against-
+        // latest-recipes contract is byte-identical at the viewmodel surface.
+        viewModel.filters.cookTimeMaxSeconds = 30 * 60
         #expect(viewModel.items.map(\.id) == [201])
     }
 

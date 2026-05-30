@@ -119,7 +119,11 @@ struct SearchResultMergerTests {
         )
         #expect(merged.count == 2, "Pre-filter merge surfaces both recipes")
 
-        let filters = SearchFilters(categoryID: 10, cookTime: .under60)
+        // CL-122 / T-644: bucket model retired — pre-T-644 `cookTime:
+        // .under60` rewrites to `cookTimeMaxSeconds: 60 * 60` (and
+        // `under15` → `15 * 60`). AND-composition contract is unchanged;
+        // the new model just expresses the cap as a real range bound.
+        let filters = SearchFilters(categoryID: 10, cookTimeMaxSeconds: 60 * 60)
         let filtered = filters.apply(
             to: merged,
             categoryIDsByRecipe: [1: [10], 2: [10]],
@@ -128,15 +132,15 @@ struct SearchResultMergerTests {
         )
         #expect(
             filtered.map(\.id) == [1],
-            "AC-12.3 composition: category 10 AND ≤60 min → only the 25-min recipe survives."
+            "AC-12.3 composition: category 10 AND max-60 min → only the 25-min recipe survives."
         )
 
-        // Tightening the cook-time bucket to ≤15 min drops both — the
+        // Tightening the cook-time cap to 15 min drops both — the
         // 25-min recipe still matches the category but exceeds the
         // duration, the 90-min recipe was already over. AND composition
         // means tightening either predicate can only shrink the result
         // set.
-        let stricterFilters = SearchFilters(categoryID: 10, cookTime: .under15)
+        let stricterFilters = SearchFilters(categoryID: 10, cookTimeMaxSeconds: 15 * 60)
         let stricterFiltered = stricterFilters.apply(
             to: merged,
             categoryIDsByRecipe: [1: [10], 2: [10]],
@@ -145,7 +149,7 @@ struct SearchResultMergerTests {
         )
         #expect(
             stricterFiltered.isEmpty,
-            "AC-12.3 composition: category 10 AND ≤15 min → neither recipe matches the duration predicate."
+            "AC-12.3 composition: category 10 AND max-15 min → neither recipe matches the duration predicate."
         )
     }
 

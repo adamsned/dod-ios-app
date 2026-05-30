@@ -31,7 +31,7 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 
     @MainActor
     func test_filterChipRow_unselected_light() {
-        let view = Self.makeHostedChipRow(selectedCookTime: nil)
+        let view = Self.makeHostedChipRow(cookTimeMaxSeconds: nil)
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 64), traits: Self.lightTraits()),
@@ -41,7 +41,7 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 
     @MainActor
     func test_filterChipRow_unselected_dark() {
-        let view = Self.makeHostedChipRow(selectedCookTime: nil)
+        let view = Self.makeHostedChipRow(cookTimeMaxSeconds: nil)
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 64), traits: Self.darkTraits()),
@@ -51,7 +51,10 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 
     @MainActor
     func test_filterChipRow_cookTimeSelected_light() {
-        let view = Self.makeHostedChipRow(selectedCookTime: .under30)
+        // CL-122 / T-644: the bucket fixture (`.under30`) is replaced by
+        // the new max-only range (`cookTimeMaxSeconds: 30 * 60`) — chip
+        // label re-renders to "30 min or less" instead of "≤ 30 min".
+        let view = Self.makeHostedChipRow(cookTimeMaxSeconds: 30 * 60)
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 64), traits: Self.lightTraits()),
@@ -61,7 +64,7 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 
     @MainActor
     func test_filterChipRow_cookTimeSelected_dark() {
-        let view = Self.makeHostedChipRow(selectedCookTime: .under30)
+        let view = Self.makeHostedChipRow(cookTimeMaxSeconds: 30 * 60)
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 64), traits: Self.darkTraits()),
@@ -71,15 +74,16 @@ final class FilterChipRowSnapshotTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    /// Renders `FilterChipRow` with optional cook-time selection.
-    /// `selectedCookTime: nil` puts the cook-time chip in its idle
-    /// unselected state ("Any time" + surface-elevated capsule); passing
-    /// a bucket flips the chip into its selected state (bucket label +
-    /// cast-iron-brown capsule), exercising both `isOn` branches of the
-    /// chip-label treatment.
+    /// Renders `FilterChipRow` with optional cook-time max selection
+    /// (CL-122 / T-644 — pre-T-644 bucket fixture rewritten to the
+    /// min/max model). `cookTimeMaxSeconds: nil` puts the chip in its
+    /// idle unselected state ("Any time" + surface-elevated capsule);
+    /// passing a value flips the chip into its selected state ("<x> or
+    /// less" label + cast-iron-brown capsule), exercising both `isOn`
+    /// branches of the chip-label treatment.
     @MainActor
-    static func makeHostedChipRow(selectedCookTime: CookTimeBucket?) -> some View {
-        let filters = SearchFilters(cookTime: selectedCookTime)
+    static func makeHostedChipRow(cookTimeMaxSeconds: Int?) -> some View {
+        let filters = SearchFilters(cookTimeMaxSeconds: cookTimeMaxSeconds)
         return FilterChipRowHost(initialFilters: filters)
     }
 
