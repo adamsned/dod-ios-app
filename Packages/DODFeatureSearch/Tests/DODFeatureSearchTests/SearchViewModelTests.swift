@@ -242,6 +242,9 @@ import Testing
         #expect(viewModel.items.contains(where: { $0.id == 5 }))
     }
 
+    // CL-106 / T-637 tests live in `SearchViewModelT637Tests.swift` so
+    // this file stays under SwiftLint's `file_length` cap.
+
     static func makeItem(_ id: Int, title: String = "Match") -> RecipeListItem {
         RecipeListItem(
             id: id,

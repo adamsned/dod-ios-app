@@ -85,6 +85,25 @@ struct LiveAPITests {
         #expect(mentioned, "At least one result should mention 'skillet' textually")
     }
 
+    /// CL-106 (T-637): the "Latest Recipes" Try-pill fetch path uses
+    /// `WPRestClient.posts(page: 1, perPage: N)` — the existing
+    /// date-desc-by-default endpoint. This smoke test pins that the
+    /// endpoint returns posts in date-descending order so the pill
+    /// actually surfaces "newest first."
+    @Test func latestPostsReturnsDateDescending() async throws {
+        let client = WPRestClient()
+        let results = try await client.posts(page: 1, perPage: 5)
+        try #require(!results.isEmpty, "Expected at least one recent post")
+        let dates = results.map(\.publishedAt)
+        // Each adjacent pair must be (newer, older) — date desc.
+        for index in 0..<(dates.count - 1) {
+            #expect(
+                dates[index] >= dates[index + 1],
+                "Post \(index) (\(dates[index])) must be newer-or-equal to post \(index + 1) (\(dates[index + 1]))"
+            )
+        }
+    }
+
     /// REG-13: comments endpoint must surface at least one approved comment
     /// for the canary post 21238 along with the pagination headers.
     @Test func commentsEndpointReturnsRealData() async throws {

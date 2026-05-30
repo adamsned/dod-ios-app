@@ -28,6 +28,11 @@ public final class SearchViewModel {
             // sets the flag AFTER the assignment, so the default reset
             // here covers the typed + recent-tap paths.
             queryFromCuratedTap = false
+            // US-29 / AC-29.1 amendment / CL-106 (T-637): a typed query
+            // also reverts the surface back to the default text-search
+            // path; the Latest-Recipes branch only stays "active" while
+            // the items array still reflects the latest-recipes fetch.
+            lastSurface = .textQuery
             scheduleSearch()
         }
     }
@@ -40,6 +45,21 @@ public final class SearchViewModel {
     /// never typed (REG-19 / CL-66 / T-670).
     private var queryFromCuratedTap: Bool = false
 
+    /// US-29 / AC-29.1 amendment / CL-106 (T-637): tracks how the current
+    /// `items` array was sourced so filter mutations re-apply against the
+    /// correct base set instead of re-running `reapplyFilters()` against
+    /// an empty `lastQuery`. The Latest-Recipes branch fetches directly
+    /// via `dependencies.fetchLatestRecipes(...)` without going through
+    /// the normal text-search path; the surface flag lets the cook-time
+    /// re-rank apply correctly when the user toggles a chip while the
+    /// latest-recipes set is visible.
+    enum Surface: Equatable {
+        case textQuery
+        case latestRecipes
+    }
+    // CL-106 (T-637): internal so the +T637 extension can write it.
+    var lastSurface: Surface = .textQuery
+
     /// Filter chips state. Mutating a filter forces an immediate re-rank of
     /// the cached merged results — no network round trip — so the UI feels
     /// instant. If the merged set is empty (idle / cleared), changing a
@@ -51,12 +71,22 @@ public final class SearchViewModel {
         }
     }
 
-    public private(set) var state: State = .idle
+    // CL-106 (T-637): promoted to `public internal(set)` so the
+    // `SearchViewModel+T637.swift` extension can set `.searching` /
+    // `.offline` / `.results` / `.noResults` on the Latest-Recipes branch.
+    public internal(set) var state: State = .idle
     /// The post-filter, post-merge result set bound to the view.
-    public private(set) var items: [RecipeListItem] = []
+    ///
+    /// CL-106 (T-637): promoted from `public private(set)` to
+    /// `public internal(set)` so the same-module
+    /// `SearchViewModel+T637.swift` extension can write the
+    /// Latest-Recipes branch's result set directly. Read surface unchanged.
+    public internal(set) var items: [RecipeListItem] = []
     /// Last user-typed query that produced `items`. Used so filter changes
-    /// can re-merge without re-running the network call.
-    public private(set) var lastQuery: String = ""
+    /// can re-merge without re-running the network call. CL-106 (T-637)
+    /// promotes the setter to `internal` for the same Latest-Recipes
+    /// extension-write reason as `items` above.
+    public internal(set) var lastQuery: String = ""
     /// Categories list for the category chip menu. Loaded lazily.
     public private(set) var availableCategories: [DODDomain.Category] = []
     /// Top-5 suggestions (by recipe count) shown in the idle empty state.
@@ -66,13 +96,20 @@ public final class SearchViewModel {
     /// Newest-first recent queries.
     public private(set) var recentSearches: [String] = []
 
-    private var lastMergedRESTOrdering: [RecipeListItem] = []
-    private var lastMergedLocalOrdering: [RecipeListItem] = []
-    private var lastCategoryIDsByRecipe: [Int: [Int]] = [:]
-    private var lastTotalSecondsByRecipe: [Int: Int] = [:]
-    private var lastRecentlyViewedIDs: Set<Int> = []
+    // CL-106 (T-637): the next five caches and `dependencies` are
+    // `internal` (no access modifier) rather than `private` so the
+    // `SearchViewModel+T637.swift` extension can read/write them when
+    // applying the Latest-Recipes surface or firing cook-time hydration.
+    // Same-module extensions cannot reach `private` storage, and we want
+    // the new code in its own file for the file-length budget. The
+    // public surface is unchanged.
+    var lastMergedRESTOrdering: [RecipeListItem] = []
+    var lastMergedLocalOrdering: [RecipeListItem] = []
+    var lastCategoryIDsByRecipe: [Int: [Int]] = [:]
+    var lastTotalSecondsByRecipe: [Int: Int] = [:]
+    var lastRecentlyViewedIDs: Set<Int> = []
 
-    private let dependencies: SearchDependencies
+    let dependencies: SearchDependencies
     private let recents: RecentSearches
     /// Public for tests to control timing without sleeping for real.
     public var debounceMilliseconds: Int = 300
@@ -94,6 +131,7 @@ public final class SearchViewModel {
         state = .idle
         lastMergedRESTOrdering = []
         lastMergedLocalOrdering = []
+        lastSurface = .textQuery
     }
 
     /// Surface a stored query (e.g. user tapped a recent chip). Sets the
@@ -117,6 +155,12 @@ public final class SearchViewModel {
         self.query = query
         queryFromCuratedTap = true
     }
+
+    // US-29 / AC-29.1 amendment / CL-106 (T-637): the "Latest Recipes"
+    // Try-pill special case (`surfaceLatestRecipes(limit:)`) lives in
+    // `SearchViewModel+T637.swift` so this file stays under SwiftLint's
+    // `file_length` cap. The branch is wired from `SearchView` when the
+    // tapped category matches "Latest Recipes" by name or id 1590.
 
     /// Wipe the persisted recent-searches store and update the
     /// view-bound `recentSearches` array so the "Recent" section
@@ -225,6 +269,7 @@ public final class SearchViewModel {
         lastQuery = trimmed
         lastMergedRESTOrdering = restResults
         lastMergedLocalOrdering = localItems
+        lastSurface = .textQuery
 
         let allIDs = merged.map(\.id)
         lastCategoryIDsByRecipe =
@@ -243,39 +288,101 @@ public final class SearchViewModel {
         items = filtered
         state = filtered.isEmpty ? .noResults : .results
 
-        // Record the recent on a successful query — even if zero results,
-        // because "tried it, didn't work" is still useful history. Skip
-        // when the query originated from a curated "Try" suggestion tap
-        // (REG-19 / CL-66 / T-670): the user didn't type it, so persisting
-        // it into Recent would surface curated terms the user never asked
-        // for, and tapping Clear All would not actually clear them on the
-        // next idle render.
+        await recordRecentAndTelemetry(trimmed: trimmed)
+        kickOffCookTimeHydrationIfNeeded(against: merged)
+    }
+
+    /// Record the recent on a successful query — even if zero results,
+    /// because "tried it, didn't work" is still useful history. Skip
+    /// when the query originated from a curated "Try" suggestion tap
+    /// (REG-19 / CL-66 / T-670): the user didn't type it, so persisting
+    /// it into Recent would surface curated terms the user never asked
+    /// for, and tapping Clear All would not actually clear them on the
+    /// next idle render. Also sends the AC-3.6 SHA-256-hashed query to
+    /// analytics (the raw text never leaves the device).
+    ///
+    /// Extracted from `performSearch` so the parent stays under
+    /// SwiftLint's `function_body_length` cap (CL-106 / T-637's hydration
+    /// kick-off pushed it over).
+    private func recordRecentAndTelemetry(trimmed: String) async {
         if !queryFromCuratedTap {
             recents.record(trimmed)
             recentSearches = recents.recent()
         }
-
-        // AC-3.6: telemetry sends ONLY the hash, never the raw query.
         let hash = StringHasher.sha256Hex(trimmed)
         await dependencies.sendSearchTelemetry(queryHash: hash)
     }
 
+    /// US-12 / AC-12.3 amendment / CL-106 (T-637): when the cook-time
+    /// filter is active and the cached `lastTotalSecondsByRecipe` map is
+    /// missing entries for items in the current result set, kick off a
+    /// network hydration task (capped at 20 items per `hydrationCap`)
+    /// and call `reapplyFilters()` when the data lands. No-op when the
+    /// filter is off or every visible item already has a known total
+    /// time (the cache covers it).
+    ///
+    /// The hydration task runs detached on the same actor (this is the
+    /// `@MainActor` view model — `Task { ... }` inherits the actor) so
+    /// the mutation of `lastTotalSecondsByRecipe` and the subsequent
+    /// `reapplyFilters()` call are race-free.
+    func kickOffCookTimeHydrationIfNeeded(against merged: [RecipeListItem]) {
+        guard filters.cookTime != nil else { return }
+        let unknown = merged.map(\.id).filter { lastTotalSecondsByRecipe[$0] == nil }
+        guard !unknown.isEmpty else { return }
+        let toFetch = Array(unknown.prefix(Self.hydrationCap))
+        Task { [weak self] in
+            guard let self else { return }
+            let fetched = await self.dependencies.fetchTotalSeconds(forRecipeIDs: toFetch)
+            guard !fetched.isEmpty else { return }
+            for (id, seconds) in fetched {
+                self.lastTotalSecondsByRecipe[id] = seconds
+            }
+            self.reapplyFilters()
+        }
+    }
+
+    /// One REST page worth of items — bounds the cook-time hydration
+    /// fan-out so a single filter toggle can't hammer the API. Matches
+    /// `WPRestClient.defaultPageSize` (20) by convention.
+    private static let hydrationCap: Int = 20
+
     /// Re-rank the cached merged set when filters change. Pure function over
-    /// stored state — no I/O.
+    /// stored state — no I/O (apart from the optional cook-time hydration
+    /// path below, which fires only when the cook-time filter just flipped
+    /// on against items whose total time isn't in the cache).
+    ///
+    /// CL-106 (T-637): also handles the Latest-Recipes surface — when
+    /// `lastSurface == .latestRecipes`, the base set is
+    /// `lastMergedRESTOrdering` (no `SearchResultMerger` call because
+    /// there's no text query to re-rank around), so the filter re-runs
+    /// against the latest-recipes fetch result directly.
     private func reapplyFilters() {
-        guard !lastQuery.isEmpty else { return }
-        let merged = SearchResultMerger.merge(
-            query: lastQuery,
-            restResults: lastMergedRESTOrdering,
-            localIngredientResults: lastMergedLocalOrdering
-        )
+        let base: [RecipeListItem]
+        switch lastSurface {
+        case .textQuery:
+            guard !lastQuery.isEmpty else { return }
+            base = SearchResultMerger.merge(
+                query: lastQuery,
+                restResults: lastMergedRESTOrdering,
+                localIngredientResults: lastMergedLocalOrdering
+            )
+        case .latestRecipes:
+            guard !lastMergedRESTOrdering.isEmpty else { return }
+            base = lastMergedRESTOrdering
+        }
         let filtered = filters.apply(
-            to: merged,
+            to: base,
             categoryIDsByRecipe: lastCategoryIDsByRecipe,
             totalSecondsByRecipe: lastTotalSecondsByRecipe,
             recentlyViewedIDs: lastRecentlyViewedIDs
         )
         items = filtered
         state = filtered.isEmpty ? .noResults : .results
+
+        // If the cook-time filter is on and the base set still has items
+        // with unknown total times, fire hydration. The kick-off helper
+        // guards against the cook-time-off case so this is safe to call
+        // unconditionally.
+        kickOffCookTimeHydrationIfNeeded(against: base)
     }
 }
