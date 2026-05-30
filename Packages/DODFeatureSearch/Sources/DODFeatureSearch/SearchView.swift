@@ -288,7 +288,11 @@ struct FilterChipRow: View {
                 },
                 onCancel: { cookTimeSheetPresented = false }
             )
-            .presentationDetents([.medium])
+            // T-646 / CL-124 — content-fitted custom detent (was `.medium`
+            // which left a tall dead-space tail above the home indicator).
+            // 340pt comfortably hosts header + wheels (160) + Apply + Reset
+            // + reduced bottom padding + the home-indicator safe area.
+            .presentationDetents([.height(340)])
             .presentationDragIndicator(.visible)
             // T-645 / CL-123 — fill the system sheet chrome with the
             // brand surface color so the brown (dark) / white (light)

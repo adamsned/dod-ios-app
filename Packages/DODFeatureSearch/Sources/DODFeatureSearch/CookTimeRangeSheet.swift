@@ -68,7 +68,10 @@ struct CookTimeRangeSheet: View {
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.top, DODSpacing.md)
-        .padding(.bottom, DODSpacing.lg)
+        // T-646 / CL-124 — tightened from `lg` to `sm`; combined with the
+        // new `.height(340)` detent this removes the dead-space tail that
+        // made the sheet look like it was floating above the home indicator.
+        .padding(.bottom, DODSpacing.sm)
         .background(DODColor.surface)
     }
 
@@ -97,7 +100,9 @@ struct CookTimeRangeSheet: View {
                 accessibilityIdentifier: "dod.search.cookTimeWheelMax"
             )
         }
-        .frame(maxHeight: 180)
+        // T-646 / CL-124 — was 180; trimmed to 160 to tighten the sheet
+        // alongside the new content-fitted detent.
+        .frame(maxHeight: 160)
     }
 
     @ViewBuilder
