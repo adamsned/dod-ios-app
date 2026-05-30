@@ -214,7 +214,7 @@ jobs:
     needs: [changes, build-app]
     if: needs.changes.outputs.ios_sim == 'true'
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
@@ -244,11 +244,18 @@ jobs:
           fi
           echo "L3 destination -> $destination"
           # XCUITests flake at the infra layer on GitHub macOS runners:
-          # cold-sim races, test-runner SIGKILL before bootstrap, and the
-          # long live-network marketing-screenshot capture. Retry the whole
-          # invocation up to 3x; within each run, retry individual failed
-          # tests (-retry-tests-on-failure) so a single timing blip in one
-          # test doesn't sink the job.
+          # cold-sim races + test-runner SIGKILL before bootstrap. Retry the
+          # whole invocation up to 3x; within each run, retry individual
+          # failed tests (-retry-tests-on-failure) so a single timing blip
+          # doesn't sink the job.
+          #
+          # ScreenshotTests is SKIPPED here (T-704): it is a release-prep
+          # marketing-capture harness, not a regression gate — it drives a
+          # 424s live-network (WP REST) round-trip across every screen and was
+          # the single source of L3 timeouts/cancellations across #72 + #101.
+          # A blocking smoke gate must be fast + hermetic; the genuine
+          # SmokeTests + RecipeDetailRatingsSmokeTests still run. Capture the
+          # marketing shots on-demand (run the ScreenshotTests class directly).
           attempt=0
           until [ "$attempt" -ge 3 ]; do
             attempt=$((attempt + 1))
@@ -258,6 +265,7 @@ jobs:
               -scheme DODApp \
               -destination "$destination" \
               -only-testing:DODAppUITests \
+              -skip-testing:DODAppUITests/ScreenshotTests \
               -retry-tests-on-failure -test-iterations 2 \
               test | xcpretty; then
               echo "::endgroup::"
