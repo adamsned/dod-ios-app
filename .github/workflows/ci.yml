@@ -102,11 +102,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
         # All packages declare swift-tools-version: 6.0. The macos-15
-        # runner's default Xcode is 16.4; we pin Xcode 26 so the toolchain
-        # + iOS 26 SDK match local dev (where the snapshot baselines are
-        # recorded) and so the iOS-Simulator jobs find the iPhone 17 sim.
-        # `Xcode_26.app` is the major-version symlink GitHub maintains.
-        run: sudo xcode-select -s /Applications/Xcode_26.app
+        # runner's default Xcode is 16.4; we pin the newest Xcode 26 so the
+        # toolchain + iOS 26 SDK match local dev (where the snapshot
+        # baselines are recorded) and so the iOS-Simulator jobs find the
+        # iPhone 17 sim. GitHub does NOT ship a bare `Xcode_26.app` symlink
+        # (only versioned paths like Xcode_26.3.app), so glob + sort -V +
+        # tail -1 picks the newest installed 26.x — robust across image
+        # updates that bump the patch version.
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Cache SPM build outputs
         uses: actions/cache@v4
         with:
@@ -136,7 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
-        run: sudo xcode-select -s /Applications/Xcode_26.app
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Test on iOS simulator
         working-directory: Packages/DODDesignSystem
         run: |
@@ -161,7 +164,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
-        run: sudo xcode-select -s /Applications/Xcode_26.app
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
@@ -190,7 +193,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
-        run: sudo xcode-select -s /Applications/Xcode_26.app
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
@@ -215,7 +218,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
-        run: sudo xcode-select -s /Applications/Xcode_26.app
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
@@ -261,7 +264,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
-        run: sudo xcode-select -s /Applications/Xcode_26.app
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
