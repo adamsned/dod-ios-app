@@ -29,7 +29,16 @@ public struct SearchView: View {
     public var body: some View {
         VStack(spacing: 0) {
             searchField
-            FilterChipRow(filters: $viewModel.filters)
+            // US-12 / AC-12.2 amendment / CL-106 (T-637): hide the filter
+            // chip row while idle — the `IdleSuggestionsView` "Try" /
+            // "Recent" layout below already serves as the discovery
+            // surface, and an above-it chip row crowded the layout. The
+            // row renders the moment a search transitions to .searching
+            // / .results / .noResults / .offline so the user can refine
+            // narrowing while results are coming back.
+            if viewModel.state != .idle {
+                FilterChipRow(filters: $viewModel.filters)
+            }
             content
         }
         .background(DODColor.surface)
@@ -121,7 +130,27 @@ public struct SearchView: View {
                 // term. Persisting it makes Clear All look broken because
                 // the same curated terms reappear under Recent.
                 onCategoryTap: { category in
-                    viewModel.selectCuratedSuggestion(category.name)
+                    // US-29 / AC-29.1 amendment / CL-106 (T-637): the
+                    // "Latest Recipes" category (id 1590, slug
+                    // `latest-recipes` — confirmed by SubTypeTests.swift)
+                    // is special-cased. Running `selectCuratedSuggestion`
+                    // with the literal name would fire a fulltext REST
+                    // search for "Latest Recipes" which returns garbage
+                    // (the phrase appears in many unrelated articles'
+                    // boilerplate). Case-insensitive name match is the
+                    // canonical check (robust against future renames);
+                    // the id check is a belt-and-suspenders fallback in
+                    // case the name drifts. Every other category falls
+                    // through to the normal curated-tap path (CL-49).
+                    let isLatestRecipes =
+                        category.id == 1590
+                        || category.name.localizedCaseInsensitiveCompare("Latest Recipes")
+                            == .orderedSame
+                    if isLatestRecipes {
+                        Task { await viewModel.surfaceLatestRecipes() }
+                    } else {
+                        viewModel.selectCuratedSuggestion(category.name)
+                    }
                 },
                 onClearRecents: { viewModel.clearRecentSearches() },
                 // US-33 / AC-33.3 / CL-57: per-term context-menu Clear.
@@ -260,6 +289,13 @@ struct FilterChipRow: View {
             )
         }
         .accessibilityLabel("Cook time filter, \(filters.cookTime?.label ?? "any time")")
+        // T-638 / CL-107 — stable test handle for the L5 E2E
+        // `test_search_chip_row_hidden_on_idle` (negative-asserts the chip is
+        // not queryable on the idle Search tab — pins CL-106 part 1's
+        // `viewModel.state != .idle` gate) and `test_search_cook_time_filter_narrows_results`
+        // (taps the chip → "≤ 30 min" → asserts the filtered result count
+        // narrows via the hydration path — pins CL-106 part 2 + REG-21).
+        .accessibilityIdentifier("dod.search.cookTimeChip")
     }
 
     // US-33 / CL-105 (T-636): the "Recently viewed" toggle chip was
