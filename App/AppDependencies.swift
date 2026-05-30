@@ -24,7 +24,7 @@ import WidgetKit
 final class AppDependencies {
 
     let store: RecipeStore
-    let modelContainer: ModelContainer
+    private(set) var modelContainer: ModelContainer
 
     /// On-device local-notification service (US-42 / T-631). Long-lived —
     /// owns the authorization request the Settings toggle drives and the
@@ -200,6 +200,42 @@ final class AppDependencies {
         LiveSavedDependencies(store: store, imageLoader: imageLoader)
     }
 
+    /// US-41 / AC-41.3 (T-703). Build the Settings dependency surface
+    /// for the iCloud Sync toggle. The returned value drives the
+    /// flag-write → container-rebuild handshake the view-model needs:
+    ///
+    ///   1. write `RecipeStore.cloudKitSyncOptInKey` to UserDefaults
+    ///      (the value `RecipeStore.makeProductionConfiguration()` reads),
+    ///   2. call `RecipeStore.recreateContainerAfterOptInChange()` so the
+    ///      stale `ModelContainer` is discarded and a fresh one is built
+    ///      against the new configuration (CloudKit-backed when ON,
+    ///      `.none` when OFF — per T-702's contract).
+    ///
+    /// **Order matters.** The flag must land *before* the rebuild — the
+    /// factory reads `UserDefaults` at construction time, so swapping
+    /// reads must observe the new value.
+    func settingsDependencies() -> some SettingsDependencies {
+        LiveSettingsDependencies { [weak self] enabled in
+            // Step 1 — write the flag the container factory reads.
+            UserDefaults.standard.set(enabled, forKey: RecipeStore.cloudKitSyncOptInKey)
+            // Step 2 — rebuild the container so the next open observes
+            // the new value. The rebuild is best-effort: if it throws
+            // (rare — only on lower-level SwiftData corruption) we log
+            // and keep the stale container alive so the user can still
+            // use the app per AC-41.1's graceful-fallback contract.
+            do {
+                let rebuilt = try RecipeStore.recreateContainerAfterOptInChange()
+                await MainActor.run { [weak self] in
+                    self?.modelContainer = rebuilt
+                }
+            } catch {
+                DODLog.app.error(
+                    "CloudKit opt-in container rebuild failed: \(error.localizedDescription)"
+                )
+            }
+        }
+    }
+
     /// Fetch a single post (by WP id) from the live REST API and project it
     /// to a ``RecipeListItem``. Backs the notification deep-link fetch-on-
     /// cache-miss path (T-632 / REG-20 / CL-101): a notification targets a
@@ -209,5 +245,33 @@ final class AppDependencies {
     /// classification to resolve recipe-vs-article per AC-4.11 / AC-37.2).
     func fetchListItem(forPostID id: Int) async throws -> RecipeListItem {
         try await restClient.post(id: id)
+    }
+}
+
+// MARK: - US-41 / AC-41.3 (T-703) live Settings wiring
+
+/// Production conformance to ``SettingsDependencies``. Holds a
+/// `@Sendable` closure that runs the two-step flag-write + container
+/// rebuild on a detached `Task` so the SwiftUI alert dismiss isn't
+/// blocked on the I/O. The view-model awaits the closure so the L1
+/// suite can pin the order via `await`.
+///
+/// Spec trace: US-41 AC-41.3, AC-41.4; CL-89.
+struct LiveSettingsDependencies: SettingsDependencies {
+
+    typealias FlagWriteAndRebuild = @Sendable (Bool) async -> Void
+
+    let flagWriteAndRebuild: FlagWriteAndRebuild
+
+    init(flagWriteAndRebuild: @escaping FlagWriteAndRebuild) {
+        self.flagWriteAndRebuild = flagWriteAndRebuild
+    }
+
+    func setCloudSyncOptIn(_ enabled: Bool) async {
+        await flagWriteAndRebuild(enabled)
+    }
+
+    func cloudSyncOptInValue() -> Bool {
+        UserDefaults.standard.bool(forKey: RecipeStore.cloudKitSyncOptInKey)
     }
 }

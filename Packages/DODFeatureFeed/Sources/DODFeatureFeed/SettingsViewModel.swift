@@ -1,15 +1,23 @@
+import DODPersistence
 import Foundation
 import Observation
 
-/// State + persistence for the Settings page (US-32 skeleton, US-36 expansion).
+/// State + persistence for the Settings page (US-32 skeleton, US-36 expansion,
+/// US-41 iCloud Sync row).
 ///
 /// The T-550 skeleton (US-32) owned exactly one piece of persisted state —
 /// the "Use metric units" toggle — and stubbed the rest of the surface as
-/// version footer + About link. T-630 (US-36) expands the view-model to
+/// version footer + About link. T-630 (US-36) expanded the view-model to
 /// also persist the four new round-trip preferences the round-7 backlog
-/// graduated and to own the cache-clear flow's snackbar feedback.
+/// graduated and to own the cache-clear flow's snackbar feedback. T-703
+/// (US-41) further extends the view-model with the iCloud Sync toggle —
+/// reads + writes the canonical `RecipeStore.cloudKitSyncOptInKey`
+/// UserDefaults flag and routes the flag-write + container rebuild through
+/// a `SettingsDependencies` seam so the composition root owns the
+/// `RecipeStore` lifecycle (per CL-89).
 ///
-/// Persistence keys (all under the `dod.settings.*` prefix US-32 established):
+/// Persistence keys (the `dod.settings.*` prefix US-32 established, plus
+/// the `dod.cloudkit.*` namespace T-702 / T-703 own):
 /// - ``useMetricUnitsKey`` — Bool, AC-32.4 (US-32, T-551 follow-up consumes).
 /// - ``notificationsEnabledKey`` — Bool, AC-36.1 (US-36, T-631 follow-up
 ///   wires APNs).
@@ -19,12 +27,19 @@ import Observation
 ///   AC-36.3 (US-36, future task wires `ShareLink`'s payload).
 /// - ``telemetryEnabledKey`` — Bool, AC-36.5 (US-36,
 ///   `TelemetryDeckTransport.send(_:)` consumes the same key).
+/// - `RecipeStore.cloudKitSyncOptInKey` (`dod.cloudkit.syncOptInV1`) — Bool,
+///   AC-41.3 (US-41, T-702's container factory reads it; T-703 / T-704
+///   write it). NOTE: declared in `DODPersistence` so the canonical key
+///   string lives next to the reader; the view-model goes through
+///   ``SettingsDependencies`` rather than touching `UserDefaults` directly
+///   so the post-write `recreateContainerAfterOptInChange()` rebuild fires
+///   atomically.
 ///
 /// `UserDefaults` is constructor-injected so the L1 unit suite can pass an
 /// isolated suite (`UserDefaults(suiteName:)`) without polluting the shared
 /// standard defaults — pattern mirrors `RecentSearches` in `DODFeatureSearch`.
 ///
-/// Spec trace: US-32 AC-32.4; US-36 AC-36.1..AC-36.8.
+/// Spec trace: US-32 AC-32.4; US-36 AC-36.1..AC-36.8; US-41 AC-41.3, AC-41.4.
 @Observable
 @MainActor
 public final class SettingsViewModel {
@@ -62,6 +77,17 @@ public final class SettingsViewModel {
     public nonisolated static let telemetryEnabledKey = "dod.settings.telemetryEnabled"
 
     private let defaults: UserDefaults
+    /// Optional seam for the iCloud Sync row's flag-write +
+    /// container-rebuild dispatch (US-41 / AC-41.3). Constructor-injected
+    /// so the L1 suite can pass a recording double; production wiring
+    /// passes a `LiveSettingsDependencies` value that drives
+    /// `RecipeStore.recreateContainerAfterOptInChange()`. The default
+    /// `nil` keeps existing call sites (previews, snapshot hosts, the
+    /// pre-T-703 test fixtures) compiling without churn — those surfaces
+    /// just won't trigger the rebuild. Read from the iCloud Sync action
+    /// methods that live in `SettingsViewModel+CloudSync.swift` (the
+    /// file_length split forces an internal-but-not-private accessor).
+    let cloudSyncDependency: (any SettingsDependencies)?
 
     /// Authorization seam for the notifications toggle (US-42 / AC-42.1).
     /// The composition root injects a closure that calls
@@ -126,6 +152,41 @@ public final class SettingsViewModel {
         (defaults.object(forKey: Self.telemetryEnabledKey) as? Bool) ?? true
     }
 
+    // MARK: - US-41 / AC-41.3 — iCloud Sync toggle
+
+    /// Cached snapshot of the iCloud sync opt-in flag so the
+    /// `@Observable` machinery emits a change when the view-model
+    /// flips it. The setter is intentionally not the public write
+    /// path — view-layer code calls ``requestCloudSyncOptIn(_:)``
+    /// instead so the confirmation alert flow stays mandatory
+    /// (per AC-41.3 + CL-89). The getter mirrors what the dependency
+    /// reports the first time it's read, so previews + tests that
+    /// don't wire a dependency still get a stable `false` default.
+    /// Setter is `internal` (not `public`) so the iCloud-sync action
+    /// methods in `SettingsViewModel+CloudSync.swift` can mutate it
+    /// while external callers stay locked out.
+    public internal(set) var isCloudSyncEnabled: Bool
+
+    /// Placeholder for the AC-41.7 status sublabel. T-705 wires the
+    /// real `CloudKitSyncStatus` enum + the "Last synced N ago"
+    /// rendering on top of this string; T-703 reserves the surface so
+    /// the Settings row layout doesn't shift when T-705 lands.
+    /// Returns `"Idle"` today — the user just turned sync on, no
+    /// round-trip has happened yet, and we don't crash by trying to
+    /// format a `nil` last-synced date as "N ago".
+    public var cloudSyncStatusText: String { "Idle" }
+
+    /// State for the confirmation alert that fronts every toggle flip
+    /// per AC-41.3 / CL-89. `nil` when no alert is showing; otherwise
+    /// describes the direction (on → off vs off → on) so the view
+    /// renders the right copy + button labels. The view binds an
+    /// `isPresented` binding via ``cloudSyncConfirmationIsPresented``
+    /// and reads the request payload to build the alert.
+    /// Setter is `internal` so the iCloud-sync action methods in
+    /// `SettingsViewModel+CloudSync.swift` can mutate it while
+    /// external callers stay locked out.
+    public internal(set) var cloudSyncConfirmationRequest: CloudSyncConfirmationRequest?
+
     // MARK: - Snackbar feedback (Clear Cache row)
 
     /// AC-36.4. Latest snackbar message from the Clear Cache action.
@@ -135,10 +196,24 @@ public final class SettingsViewModel {
 
     public init(
         defaults: UserDefaults = .standard,
+        dependencies: (any SettingsDependencies)? = nil,
         requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false }
     ) {
         self.defaults = defaults
+        self.cloudSyncDependency = dependencies
         self.requestNotificationAuthorization = requestNotificationAuthorization
+        // US-41 AC-41.3 — seed the toggle state from the canonical
+        // flag (RecipeStore.cloudKitSyncOptInKey) so users who already
+        // opted in via T-704's first-launch sheet see the toggle in the
+        // ON position the first time they open Settings. When no
+        // dependency is wired (previews / snapshot hosts / pre-T-703
+        // test fixtures), fall through to a direct defaults read so
+        // the surface still reflects the persisted value.
+        if let dependencies {
+            self.isCloudSyncEnabled = dependencies.cloudSyncOptInValue()
+        } else {
+            self.isCloudSyncEnabled = defaults.bool(forKey: RecipeStore.cloudKitSyncOptInKey)
+        }
     }
 
     // MARK: - Notifications toggle (US-42 / AC-42.1)
@@ -165,6 +240,11 @@ public final class SettingsViewModel {
         }
         return granted
     }
+
+    // US-41 / AC-41.3 — iCloud Sync toggle actions live in
+    // `SettingsViewModel+CloudSync.swift` to keep this file inside the
+    // SwiftLint 400-line file_length cap (the same partitioning rule
+    // RecipeStore + RecipeStore+Containers.swift follows in DODPersistence).
 
     // MARK: - Clear cached recipe images (AC-36.4)
 
@@ -233,6 +313,10 @@ public final class SettingsViewModel {
         return "v\(version) (\(build))"
     }
 }
+
+// `CloudSyncConfirmationRequest` lives in
+// `SettingsViewModel+CloudSync.swift` alongside the iCloud Sync action
+// methods (file_length split — see that file's header for rationale).
 
 // MARK: - Appearance preference (AC-36.2)
 

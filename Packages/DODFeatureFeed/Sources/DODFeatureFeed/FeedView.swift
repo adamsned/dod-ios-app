@@ -30,6 +30,12 @@ public struct FeedView: View {
     /// pass a non-nil closure that routes through
     /// `RecipeStore.clearImageCache()` and returns freed-byte total.
     public let onClearImageCache: (() async throws -> Int)?
+    /// US-41 / AC-41.3 (T-703) — the Settings dependency surface the
+    /// iCloud Sync row uses to write the opt-in flag + trigger the
+    /// container rebuild. Optional so non-production callers (tests,
+    /// previews) compile without wiring; production callers (TabStack)
+    /// always pass a `LiveSettingsDependencies`.
+    public let settingsDependencies: (any SettingsDependencies)?
     /// US-42 / AC-42.1 — authorization seam forwarded into `SettingsView`'s
     /// `SettingsViewModel` so flipping the notifications toggle ON requests
     /// system permission. Optional; `nil` means the toggle persists intent
@@ -42,12 +48,14 @@ public struct FeedView: View {
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
         onClearImageCache: (() async throws -> Int)? = nil,
+        settingsDependencies: (any SettingsDependencies)? = nil,
         onRequestNotificationAuthorization: (@MainActor () async -> Bool)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.onClearImageCache = onClearImageCache
+        self.settingsDependencies = settingsDependencies
         self.onRequestNotificationAuthorization = onRequestNotificationAuthorization
     }
 
@@ -106,6 +114,7 @@ public struct FeedView: View {
         NavigationLink {
             SettingsView(
                 viewModel: SettingsViewModel(
+                    dependencies: settingsDependencies,
                     requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
                 ),
                 onClearImageCache: onClearImageCache
