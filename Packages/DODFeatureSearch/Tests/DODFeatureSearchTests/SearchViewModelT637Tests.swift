@@ -66,8 +66,12 @@ import Testing
         // Immediately after the search, the cache is empty so the
         // filter rejects every item — the bug T-637 fixes.
         #expect(viewModel.items.isEmpty)
-        // Wait for the fire-and-forget hydration task + reapplyFilters().
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        // Poll for the fire-and-forget hydration task + reapplyFilters(). A
+        // fixed 40ms sleep raced on CI's slower runners; poll up to ~2s and
+        // return as soon as hydration narrows the set.
+        for _ in 0..<200 where viewModel.items.map(\.id) != [1] {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
         #expect(
             viewModel.items.map(\.id) == [1],
             "After hydration: only item 1 fits the under-30 bucket"

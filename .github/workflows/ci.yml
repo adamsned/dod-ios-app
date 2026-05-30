@@ -64,7 +64,7 @@ jobs:
     name: Lint
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +77,7 @@ jobs:
     name: Format check
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -96,21 +96,26 @@ jobs:
     name: L1 Unit · all packages
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 16 (Swift 6.0)
-        # All packages declare swift-tools-version: 6.0. The macos-14
-        # default Xcode is 15.4 / Swift 5.10 which fails immediately;
-        # pin 16.x so `swift test` finds the right toolchain.
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
+        # All packages declare swift-tools-version: 6.0. The macos-15
+        # runner's default Xcode is 16.4; we pin the newest Xcode 26 so the
+        # toolchain + iOS 26 SDK match local dev (where the snapshot
+        # baselines are recorded) and so the iOS-Simulator jobs find the
+        # iPhone 17 sim. GitHub does NOT ship a bare `Xcode_26.app` symlink
+        # (only versioned paths like Xcode_26.3.app), so glob + sort -V +
+        # tail -1 picks the newest installed 26.x — robust across image
+        # updates that bump the patch version.
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Cache SPM build outputs
         uses: actions/cache@v4
         with:
           path: |
             Packages/*/.build
-          key: ${{ runner.os }}-spm-xcode16-${{ hashFiles('Packages/*/Package.swift') }}
+          key: ${{ runner.os }}-spm-xcode26-${{ hashFiles('Packages/*/Package.swift') }}
       - name: Test all packages sequentially
         # Bash loop so a single failure surfaces clearly. `set -e`
         # makes the loop fail-fast at the first broken package.
@@ -129,12 +134,12 @@ jobs:
     name: L4 Snapshots · DODDesignSystem
     needs: [changes, lint, format]
     if: needs.changes.outputs.ios_sim == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 16 (Swift 6.0)
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Test on iOS simulator
         working-directory: Packages/DODDesignSystem
         run: |
@@ -154,12 +159,12 @@ jobs:
     name: Build app (iOS Simulator)
     needs: [changes, lint, format]
     if: needs.changes.outputs.ios_sim == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 16 (Swift 6.0)
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
@@ -183,12 +188,12 @@ jobs:
     name: L1 Unit · DODApp
     needs: [changes, build-app]
     if: needs.changes.outputs.ios_sim == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 16 (Swift 6.0)
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
@@ -208,12 +213,12 @@ jobs:
     name: L3 UI Smoke
     needs: [changes, build-app]
     if: needs.changes.outputs.ios_sim == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 16 (Swift 6.0)
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
@@ -254,12 +259,12 @@ jobs:
       || github.event_name == 'push'
       || github.event_name == 'workflow_dispatch'
       || github.event_name == 'schedule'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 16 (Swift 6.0)
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate project
