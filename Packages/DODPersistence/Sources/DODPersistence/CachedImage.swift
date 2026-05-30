@@ -8,7 +8,7 @@ import SwiftData
 @Model
 public final class CachedImage {
 
-    @Attribute(.unique) public var urlString: String
+    public var urlString: String
     public var bytes: Data
     public var fetchedAt: Date
     public var lastUsedAt: Date

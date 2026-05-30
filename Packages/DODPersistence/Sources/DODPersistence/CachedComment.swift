@@ -17,7 +17,7 @@ import SwiftData
 public final class CachedComment {
 
     /// WordPress comment id (unique within the WP install).
-    @Attribute(.unique) public var id: Int
+    public var id: Int
 
     /// WP post id the comment belongs to. Used as the foreign-key for
     /// `cachedComments(forPostID:)`.
