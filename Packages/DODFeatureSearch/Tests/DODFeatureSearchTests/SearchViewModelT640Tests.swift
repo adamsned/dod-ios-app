@@ -116,6 +116,94 @@ import Testing
         #expect(widerRead.count == SearchViewModel.trySlateVisibleCount)
     }
 
+    // MARK: - T-641 / CL-119 — Uncategorized exclusion
+
+    @Test func topTrySlatePool_excludes_uncategorized() async {
+        // T-641 / CL-119: the rotating Try pool must drop the
+        // "Uncategorized" WP category before the shuffle so it never
+        // surfaces as a pill (tapping it fires a literal text search
+        // for the word, which is meaningless against the cookbook
+        // corpus). Fixture: an Uncategorized entry plus 5 real
+        // categories — the pool must return the 5 real ones and omit
+        // Uncategorized entirely.
+        let dependencies = FakeSearchDependencies()
+        dependencies.categories = [
+            DODDomain.Category(id: 9999, name: "Uncategorized", slug: "uncategorized", count: 1),
+            DODDomain.Category(id: 101, name: "Beef", slug: "beef", count: 50),
+            DODDomain.Category(id: 102, name: "Pork", slug: "pork", count: 40),
+            DODDomain.Category(id: 103, name: "Chicken", slug: "chicken", count: 30),
+            DODDomain.Category(id: 104, name: "Sides", slug: "sides", count: 20),
+            DODDomain.Category(id: 105, name: "Desserts", slug: "desserts", count: 10),
+        ]
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        await viewModel.loadCategoriesIfNeeded()
+
+        let pool = viewModel.topTrySlatePool
+        #expect(pool.count == 5)
+        #expect(!pool.contains(where: { $0.slug == "uncategorized" }))
+    }
+
+    @Test func topTrySlatePool_exclusion_is_case_insensitive_on_slug() async {
+        // T-641 / CL-119: the exclusion-set lookup applies
+        // `$0.slug.lowercased()` to the category side, so an
+        // upper-case-bearing slug like "Uncategorized" is still
+        // filtered. Pin that contract — a WP REST anomaly returning
+        // a non-canonical-cased slug must not silently sneak through.
+        let dependencies = FakeSearchDependencies()
+        dependencies.categories = [
+            DODDomain.Category(id: 9999, name: "Uncategorized", slug: "Uncategorized", count: 1),
+            DODDomain.Category(id: 101, name: "Beef", slug: "beef", count: 50),
+        ]
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        await viewModel.loadCategoriesIfNeeded()
+
+        let pool = viewModel.topTrySlatePool
+        #expect(pool.count == 1)
+        #expect(pool.first?.slug == "beef")
+    }
+
+    @Test func pickTrySlate_does_not_surface_excluded_categories() async {
+        // T-641 / CL-119: end-to-end sanity — the production path
+        // (topTrySlatePool → pickTrySlate → displayedTrySlate) must
+        // not surface Uncategorized in the rendered slate even when
+        // the raw `availableCategories` contains it. The filter at
+        // the pool boundary is upstream of the shuffle, so the
+        // helper never sees Uncategorized in the first place.
+        let dependencies = FakeSearchDependencies()
+        var pool: [DODDomain.Category] = [
+            DODDomain.Category(id: 1590, name: "Latest Recipes", slug: "latest-recipes", count: 100),
+            DODDomain.Category(id: 9999, name: "Uncategorized", slug: "uncategorized", count: 1),
+        ]
+        // Add enough real categories to fill the visible slate so the
+        // deterministic top-up branch doesn't backfill with repeats.
+        for index in 0..<(SearchViewModel.trySlateVisibleCount + 5) {
+            pool.append(
+                DODDomain.Category(
+                    id: 200 + index,
+                    name: "Cat\(index)",
+                    slug: "cat\(index)",
+                    count: 90 - index
+                )
+            )
+        }
+        dependencies.categories = pool
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        await viewModel.loadCategoriesIfNeeded()
+
+        let slate = viewModel.displayedTrySlate
+        #expect(slate.count == SearchViewModel.trySlateVisibleCount)
+        #expect(!slate.contains(where: { $0.slug == "uncategorized" }))
+    }
+
     // MARK: - Fixtures
 
     /// Build a rotation pool with Latest Recipes pinned at id 1590

@@ -21,8 +21,19 @@ extension SearchViewModel {
     /// inventing a hand-maintained curated-extras list (dutchovendaddy.com's
     /// WP taxonomy has 30+ active categories so this is the natural
     /// ceiling). `topCategorySuggestions` stays for backward compat.
+    ///
+    /// **Exclusion filter (T-641 / CL-119):** categories whose lowercased
+    /// slug is in `Self.excludedTryPoolSlugs` (today: `"uncategorized"`)
+    /// are dropped at the pool boundary before sorting / prefixing, so
+    /// junk WP categories never enter the shuffle. Filter is upstream of
+    /// `pickTrySlate(...)` — the helper still sees a clean pool.
     public var topTrySlatePool: [DODDomain.Category] {
-        Array(availableCategories.sorted { $0.count > $1.count }.prefix(Self.trySlatePoolSize))
+        Array(
+            availableCategories
+                .filter { !Self.excludedTryPoolSlugs.contains($0.slug.lowercased()) }
+                .sorted { $0.count > $1.count }
+                .prefix(Self.trySlatePoolSize)
+        )
     }
 
     /// The slate of pills the Search-tab idle "Try" section actually
@@ -78,6 +89,17 @@ extension SearchViewModel {
     /// Source-pool size for the rotation. Top-30-by-count covers
     /// dutchovendaddy.com's active WP categories with room to grow.
     static let trySlatePoolSize: Int = 30
+
+    /// WP category slugs excluded from the rotating Try pool — junk
+    /// categories that don't make for a useful exploratory search. Filter
+    /// is applied at `topTrySlatePool`'s boundary so the slug never enters
+    /// the shuffle. Extend this set as new junk categories appear; use the
+    /// canonical WP slug (lowercase, hyphenated) as the match key — slugs
+    /// are byte-stable across category renames (the visible `name` is
+    /// editor-mutable and the `id` is per-install). The category side is
+    /// `.lowercased()` at compare time so the set entries themselves
+    /// don't need case-insensitive lookup. T-641 / CL-119.
+    static let excludedTryPoolSlugs: Set<String> = ["uncategorized"]
 
     /// Visible pill count for the rotating Try slate — fixed across
     /// every cold launch so the layout never shifts. One pinned Latest
