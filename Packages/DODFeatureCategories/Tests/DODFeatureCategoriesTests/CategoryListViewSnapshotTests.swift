@@ -16,7 +16,7 @@ import XCTest
 /// `.plain` to `.insetGrouped` with a `.searchable` filter) and added the
 /// two iPad-12.9" baselines for the first time.
 ///
-/// First iOS-sim test run uses `record: .missing` to lay any missing
+/// First iOS-sim test run uses `record: .failed` to lay any missing
 /// baseline PNGs down. Spec trace: constitution §6 L4, US-2 AC-2.1..2.2,
 /// US-18 AC-18.1, AC-18.2, US-19 AC-19.1, AC-19.2, AC-19.5.
 final class CategoryListViewSnapshotTests: XCTestCase {
@@ -26,13 +26,19 @@ final class CategoryListViewSnapshotTests: XCTestCase {
         isRecording = false
     }
 
+    override func invokeTest() {
+        withSnapshotTesting(record: .failed) {
+            super.invokeTest()
+        }
+    }
+
     @MainActor
     func test_loadedCategories_light_defaultDynamicType() async {
         let view = await Self.makeHostedList()
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
-            record: .missing
+            record: .failed
         )
     }
 
@@ -42,7 +48,7 @@ final class CategoryListViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 844), traits: Self.darkTraits()),
-            record: .missing
+            record: .failed
         )
     }
 
@@ -52,7 +58,7 @@ final class CategoryListViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 1_800), traits: Self.lightAX5Traits()),
-            record: .missing
+            record: .failed
         )
     }
 
@@ -62,7 +68,7 @@ final class CategoryListViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 1_800), traits: Self.darkAX5Traits()),
-            record: .missing
+            record: .failed
         )
     }
 
@@ -76,7 +82,7 @@ final class CategoryListViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 1_024, height: 1_366), traits: Self.lightTraits()),
-            record: .missing
+            record: .failed
         )
     }
 
@@ -88,7 +94,7 @@ final class CategoryListViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 1_024, height: 1_366), traits: Self.darkTraits()),
-            record: .missing
+            record: .failed
         )
     }
 

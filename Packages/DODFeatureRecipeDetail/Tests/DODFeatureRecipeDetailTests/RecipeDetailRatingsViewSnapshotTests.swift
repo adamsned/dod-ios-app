@@ -14,7 +14,7 @@ import XCTest
 /// disappearing — the user-facing bug that motivated this regression
 /// bundle.
 ///
-/// First run with `isRecording = true` to create baselines, then revert
+/// First run with `isRecording = false` to create baselines, then revert
 /// and commit. Subsequent runs diff against the baselines.
 ///
 /// Spec trace: constitution §6 L4, US-13/14/15.

@@ -17,7 +17,7 @@ import XCTest
 /// baselines are sufficient for v1; richer Dynamic Type / iPad coverage
 /// can layer on if user signal emerges.
 ///
-/// First run with `isRecording = true` to create baselines, then revert
+/// First run with `isRecording = false` to create baselines, then revert
 /// and commit. Subsequent runs diff against the baselines.
 ///
 /// Spec trace: constitution §6 L4, US-37 / AC-37.7.

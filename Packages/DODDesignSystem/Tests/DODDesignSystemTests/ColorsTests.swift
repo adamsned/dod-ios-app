@@ -12,8 +12,11 @@ import Testing
         let semantic: [Color] = [
             DODColor.surface,
             DODColor.surfaceElevated,
+            DODColor.surfaceWarm,
+            DODColor.surfaceDivider,
             DODColor.label,
             DODColor.labelSecondary,
+            DODColor.labelOnAccent,
             DODColor.accent,
         ]
         for color in semantic {
@@ -29,7 +32,6 @@ import Testing
             DODColor.cream,
             DODColor.charcoal,
             DODColor.darkEarth,
-            DODColor.creamSubtle,
         ]
         for color in brand {
             #expect(!color.description.contains("placeholder"))

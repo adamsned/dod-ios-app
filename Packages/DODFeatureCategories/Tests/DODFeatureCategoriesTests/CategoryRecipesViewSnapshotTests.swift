@@ -11,7 +11,7 @@ import XCTest
 /// (the per-category recipe grid) across the {light, dark} ×
 /// {default Dynamic Type, AX5} matrix called out by US-18 / AC-18.1.
 ///
-/// First iOS-sim test run uses `record: .missing` to lay the baseline PNGs
+/// First iOS-sim test run uses `record: .failed` to lay the baseline PNGs
 /// down. T-335 follow-up commits them. Spec trace: constitution §6 L4,
 /// US-18 AC-18.1, AC-18.2.
 final class CategoryRecipesViewSnapshotTests: XCTestCase {
@@ -21,13 +21,19 @@ final class CategoryRecipesViewSnapshotTests: XCTestCase {
         isRecording = false
     }
 
+    override func invokeTest() {
+        withSnapshotTesting(record: .failed) {
+            super.invokeTest()
+        }
+    }
+
     @MainActor
     func test_loadedRecipes_light_defaultDynamicType() async {
         let view = await Self.makeHostedRecipes()
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
-            record: .missing
+            record: .failed
         )
     }
 
@@ -37,7 +43,7 @@ final class CategoryRecipesViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 844), traits: Self.darkTraits()),
-            record: .missing
+            record: .failed
         )
     }
 
@@ -47,7 +53,7 @@ final class CategoryRecipesViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 2_800), traits: Self.lightAX5Traits()),
-            record: .missing
+            record: .failed
         )
     }
 
@@ -57,7 +63,7 @@ final class CategoryRecipesViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 2_800), traits: Self.darkAX5Traits()),
-            record: .missing
+            record: .failed
         )
     }
 
