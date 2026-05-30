@@ -87,9 +87,14 @@ public struct CategoryListView: View {
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.labelSecondary)
                     .accessibilityIdentifier("category-empty-search")
+                    // T-647 / CL-125 — brand brown surface (matches Recipes
+                    // & Articles cards + the post-T-647 Settings cells)
+                    // instead of the system default near-black row bg.
+                    .listRowBackground(DODColor.surfaceElevated)
             } else {
                 ForEach(filtered) { category in
                     categoryRow(category)
+                        .listRowBackground(DODColor.surfaceElevated)
                 }
             }
         }

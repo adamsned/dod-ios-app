@@ -48,6 +48,9 @@ struct CloudSyncSection: View {
                 statusRow
             }
         }
+        // T-647 / CL-125 — match the brand brown surface used by every
+        // other Settings section + the Recipe & Articles cards.
+        .listRowBackground(DODColor.surfaceElevated)
     }
 
     /// AC-41.7 status row reservation. Read-only today; renders

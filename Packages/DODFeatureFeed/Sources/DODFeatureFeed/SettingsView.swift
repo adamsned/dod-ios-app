@@ -98,6 +98,11 @@ public struct SettingsView: View {
         let baseList = List {
             // MARK: US-32 rows
 
+            // T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`
+            // so the Settings cells render in the brand brown (matches the
+            // Recipe & Articles card surface) instead of the system default
+            // near-black `secondarySystemGroupedBackground` in dark mode.
+
             Section {
                 Toggle(isOn: useMetricUnitsBinding) {
                     Text("Use metric units")
@@ -106,6 +111,7 @@ public struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-toggle-metric")
             }
+            .listRowBackground(DODColor.surfaceElevated)
 
             // MARK: US-36 rows
 
@@ -121,6 +127,7 @@ public struct SettingsView: View {
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             }
+            .listRowBackground(DODColor.surfaceElevated)
 
             Section {
                 Picker(selection: appearanceBinding) {
@@ -135,6 +142,7 @@ public struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-picker-appearance")
             }
+            .listRowBackground(DODColor.surfaceElevated)
 
             Section {
                 Picker(selection: shareFormatBinding) {
@@ -149,6 +157,7 @@ public struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-picker-share-format")
             }
+            .listRowBackground(DODColor.surfaceElevated)
 
             // MARK: US-40 / AC-40.10 — Cook Mode voice picker (T-721)
 
@@ -169,6 +178,7 @@ public struct SettingsView: View {
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             }
+            .listRowBackground(DODColor.surfaceElevated)
 
             Section {
                 Button {
@@ -184,6 +194,7 @@ public struct SettingsView: View {
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             }
+            .listRowBackground(DODColor.surfaceElevated)
 
             Section {
                 Toggle(isOn: telemetryEnabledBinding) {
@@ -197,12 +208,15 @@ public struct SettingsView: View {
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             }
+            .listRowBackground(DODColor.surfaceElevated)
 
             // MARK: US-41 / AC-41.3 / AC-41.4 — iCloud Sync section
 
             // The section view + the confirmation alert modifier live
             // in `SettingsView+CloudSync.swift` so this file stays under
-            // the file_length cap.
+            // the file_length cap. T-647 — the brand row background is
+            // applied inside `CloudSyncSection` since the modifier scope
+            // must live with the Section it decorates.
             CloudSyncSection(viewModel: viewModel)
 
             // MARK: US-32 About + version
@@ -217,6 +231,7 @@ public struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-link-about")
             }
+            .listRowBackground(DODColor.surfaceElevated)
 
             Section {
                 EmptyView()
@@ -227,6 +242,7 @@ public struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .accessibilityIdentifier("settings-version-footer")
             }
+            .listRowBackground(DODColor.surfaceElevated)
         }
         .scrollContentBackground(.hidden)
         .background(DODColor.surface)
