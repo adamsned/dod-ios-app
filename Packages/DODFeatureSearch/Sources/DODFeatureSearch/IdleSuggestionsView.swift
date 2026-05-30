@@ -47,7 +47,7 @@ struct IdleSuggestionsView: View {
                         section(title: "Try") {
                             FlowLayout(spacing: DODSpacing.xs) {
                                 ForEach(topCategories) { category in
-                                    pill(text: category.name, systemImage: "tag.fill") {
+                                    pill(text: category.name, systemImage: "magnifyingglass") {
                                         onCategoryTap(category)
                                     }
                                 }
@@ -79,12 +79,20 @@ struct IdleSuggestionsView: View {
                         onRecentTap(query)
                     }
                     // US-33 / AC-33.2 / CL-57: long-press → "Clear".
+                    // US-33 / CL-105 (T-636): force `.tint(.red)` on the
+                    // destructive button so the SF Symbol trash icon
+                    // matches the red destructive title text. Without an
+                    // explicit tint the symbol inherits the ancestral
+                    // accent (`DODColor.accent` = orange, per CL-57's
+                    // "Clear All" treatment), which left the icon orange
+                    // while the label rendered red — visually mismatched.
                     .contextMenu {
                         Button(role: .destructive) {
                             onRemoveRecent(query)
                         } label: {
                             Label("Clear", systemImage: "trash")
                         }
+                        .tint(.red)
                     }
                 }
             }
