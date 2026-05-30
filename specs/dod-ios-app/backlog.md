@@ -92,6 +92,8 @@ Likely produces a new US (search overhaul) + clarifications for: client-side fuz
 
 #### Cook Mode voice sounds robotic — want natural-sounding voices + male/female toggle in Settings
 
+_(Graduated 2026-05-29 as **US-40 amendment / CL-109 / T-720 + T-721**. **T-720 (Phase a)** ships in `feat/T-720-voice-quality-engine`: the `VoiceSelector` quality + gender-selection engine that reaches past the compact "robotic" tier to the best installed enhanced/premium voice, default-female so the upgrade lands with no UI. **T-721 (Phase b)** — the Settings → Voice picker — is deferred until the SettingsView-owning PRs #72 + #86 land. See "Recently graduated" below.)_
+
 **Real-device complaint** from dad after triggering Voice Mode (US-40 / T-690) in Cook Mode. The current `AVSpeechSynthesizer` in `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/VoiceReader.swift` uses `AVSpeechSynthesisVoice(language: Locale.current.identifier)` per CL-79 — that resolves to Apple's **system default** voice, which is the basic-tier "Samantha" (en-US female) or equivalent. Basic-tier voices are concatenative TTS — they sound robotic by design and they were shipping in iOS since iOS 7.
 
 **What needs to change:**

@@ -1652,6 +1652,26 @@ Round-6 Spencer backlog item "Login + account system (Google + Apple + email)" g
 - **Deps:** PR #91 (CI on Xcode 26 — on `main`). Independent of the in-flight design (#86), comments (#87), and voice (#89) branches source-wise (different files); spec-file collisions on `spec.md` / `clarifications.md` / `tasks.md` are expected at merge time and the rebaser picks the next free CL/REG/T slot (T-730 reserves CL-115 + REG-28, chosen above the slots those branches claim). No `e2e` label.
 - **L1-DODApp + L3 follow-on (same PR — green the rest of the post-#91 suite):** the infra fix also unmasked non-snapshot reds. **L1-DODApp:** `AppTabTests.test_titles_matchSpec` asserted `AppTab.feed.title == "Recipes"` but T-640 renamed it to "Recipes & Articles" (CL-65 split `title` (screen header) from `tabLabel` (tab slot)); fixed the assertion + added `test_tabLabels_matchSpec` (the per-CL-65 follow-up). **L3 (6 SmokeTests/RecipeDetailRatings failures, all test-quality not app bugs — proven via the CI failure screenshots + a11y dumps):** (a) the `app.buttons NOT IN {tab labels}` recipe query swept up the nav-bar layout-toggle + Settings gear, so `boundBy:1` tapped Settings (the diagnostic screenshot showed the Settings screen) → added a stable `dod.feed.card` accessibilityIdentifier on the feed `FeedRow` / `RecipeCard.ListRow` (mirrors `dod.saved.card`; non-visual, no L4 impact) and switched the smoke queries to `matching(identifier:)`; (b) the Saved empty-state tests assumed a fresh install but the CI sim retained SwiftData saved recipes across runs → added a `-DODUseInMemoryStore` launch hook in `AppDependencies` (uses the existing `RecipeStore.inMemoryContainer()`) and pass it from both smoke suites' `setUp`. The L5 `CoreUserJourneysE2ETests` share the same fragile button-query pattern (deferred — L5 is `e2e`-gated, not on the default PR run; switch it to `dod.feed.card` as a follow-up).
 
+## Phase 17 — Voice Mode quality + voice selection (2026-05-29)
+
+Graduates the round-9 backlog item "Cook Mode voice sounds robotic — want natural-sounding voices + male/female toggle in Settings" (US-40 amendment / CL-109). Two tasks: T-720 ships the selection engine (no Settings UI, no conflict with the open PRs); T-721 ships the Settings → Voice picker once the SettingsView-owning PRs land.
+
+### T-720 — Phase a: voice-quality + gender-selection engine (US-40)
+
+- **What:** replace `SystemSpeechSynthesizer`'s `AVSpeechSynthesisVoice(language:)` compact-voice resolution with `VoiceSelector` — picks the best installed quality tier (premium > enhanced > default) honoring a `dod.voice.preferredGenderV1` gender preference (default female), gender-primary + quality-secondary. Falls back to the prior behavior when no installed voice matches the language. The default-female preference means the quality upgrade lands immediately with no UI.
+- **Files:** `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/VoiceSelection.swift` (new — `VoiceGender` / `VoiceQuality` / `VoiceDescriptor` / `VoicePreference` value types + `VoiceSelector` algorithm + `VoicePreferenceStore`), `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/VoiceReader.swift` (`SystemSpeechSynthesizer` rewrite — `resolveVoice` + `descriptor(for:)`), `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/VoiceSelectionTests.swift` (new — 11 L1 selection cases), `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/VoicePreferenceStoreTests.swift` (new — 7 L1 persistence cases).
+- **AC:** 40.9, 40.10, 40.11.
+- **Est:** ~4h (engine + value types + store + 18 L1 tests + spec graduation).
+- **||:** P17-voice. Touches only `Packages/DODFeatureRecipeDetail/**` — zero conflict with the open SettingsView PRs (#72 iCloud Sync, #86 design tokens) or #87 (comments). No `e2e` label (engine-only, no composition-root or routing change).
+
+#### T-721 — Phase b: Settings → Voice picker (US-40, deferred)
+
+- **What:** Settings → Voice section with a Female/Male gender toggle bound to `VoicePreferenceStore`, an automatic/specific-voice mode (specific lets the power user pick from `AVSpeechSynthesisVoice.speechVoices()` filtered to the locale, showing the quality tier per voice), and a "Download more voices" button deep-linking to Settings → Accessibility → Spoken Content → Voices via `UIApplication.openSettingsURLString`. New `voicePreferenceChanged(quality:gender:)` adoption analytics event (count-only, no voice identifier — PII concern per the backlog open question) + constitution §9 allowlist amendment.
+- **Files:** `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (new Voice section), `SettingsViewModel.swift` (voice preference binding), the analytics event, snapshot baselines.
+- **AC:** to be assigned (40.12+ reserved).
+- **Est:** ~3 days.
+- **Deps:** **T-703 / PR #72** (iCloud Sync Settings section) + **PR #86** (design tokens + SettingsViewSnapshotTests re-record) must land first — all three touch `SettingsView` + its snapshot baselines, so T-721 sequences after them to avoid a three-way conflict. Independent of T-720's engine (which it binds to via `VoicePreferenceStore`).
+
 ---
 
 ## Summary
