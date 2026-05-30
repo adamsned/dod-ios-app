@@ -29,10 +29,7 @@ public struct SearchView: View {
     public var body: some View {
         VStack(spacing: 0) {
             searchField
-            FilterChipRow(
-                filters: $viewModel.filters,
-                categories: viewModel.availableCategories
-            )
+            FilterChipRow(filters: $viewModel.filters)
             content
         }
         .background(DODColor.surface)
@@ -228,14 +225,11 @@ public struct SearchView: View {
 /// instantly without a network call (US-12 / AC-12.3).
 struct FilterChipRow: View {
     @Binding var filters: SearchFilters
-    let categories: [DODDomain.Category]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DODSpacing.xs) {
-                categoryChip
                 cookTimeChip
-                recentlyViewedChip
             }
             .padding(.horizontal, DODSpacing.md)
             .padding(.bottom, DODSpacing.sm)
@@ -244,33 +238,13 @@ struct FilterChipRow: View {
         .accessibilityLabel("Search filters")
     }
 
-    private var categoryChip: some View {
-        Menu {
-            // US-29 / AC-29.4 / CL-49.4: the "All categories" first row
-            // is intentionally absent — the Categories tab (reachable
-            // via bottom nav) is the canonical "browse all categories"
-            // affordance. To clear a picked category here the user
-            // re-taps the same category in the menu to deselect it.
-            // The chip's display label still reads "All categories"
-            // via `selectedCategoryName` when no category is picked.
-            ForEach(categories) { category in
-                Button(category.name) {
-                    if filters.categoryID == category.id {
-                        filters.categoryID = nil
-                    } else {
-                        filters.categoryID = category.id
-                    }
-                }
-            }
-        } label: {
-            chipLabel(
-                text: selectedCategoryName,
-                systemImage: "tag.fill",
-                isOn: filters.categoryID != nil
-            )
-        }
-        .accessibilityLabel("Category filter, \(selectedCategoryName)")
-    }
+    // US-29 / AC-29.4 / CL-49.4 + CL-105 (T-636): the "All categories"
+    // filter chip was removed because the Categories tab (bottom nav)
+    // already serves as the canonical "browse all categories" surface,
+    // making the chip duplicative. `filters.categoryID` is retained on
+    // the model (always nil here → "all categories" pipeline path) so
+    // the search merge logic remains untouched; only the UI affordance
+    // to mutate it is gone.
 
     private var cookTimeChip: some View {
         Menu {
@@ -288,19 +262,12 @@ struct FilterChipRow: View {
         .accessibilityLabel("Cook time filter, \(filters.cookTime?.label ?? "any time")")
     }
 
-    private var recentlyViewedChip: some View {
-        Button {
-            filters.recentlyViewedOnly.toggle()
-        } label: {
-            chipLabel(
-                text: "Recently viewed",
-                systemImage: "clock.arrow.circlepath",
-                isOn: filters.recentlyViewedOnly
-            )
-        }
-        .accessibilityLabel("Recently viewed only filter")
-        .accessibilityAddTraits(filters.recentlyViewedOnly ? .isSelected : [])
-    }
+    // US-33 / CL-105 (T-636): the "Recently viewed" toggle chip was
+    // removed because the Recent searches section in
+    // `IdleSuggestionsView` already surfaces a user's recent activity,
+    // making the toggle duplicative. `filters.recentlyViewedOnly` is
+    // retained on the model (defaults to false → no-op filter) so the
+    // search pipeline stays unchanged; only the UI to mutate it is gone.
 
     private func chipLabel(text: String, systemImage: String, isOn: Bool) -> some View {
         HStack(spacing: DODSpacing.xxs) {
@@ -314,13 +281,6 @@ struct FilterChipRow: View {
         .background(
             Capsule().fill(isOn ? DODColor.castIronBrown : DODColor.surfaceElevated)
         )
-    }
-
-    private var selectedCategoryName: String {
-        guard let id = filters.categoryID,
-            let category = categories.first(where: { $0.id == id })
-        else { return "All categories" }
-        return category.name
     }
 }
 
