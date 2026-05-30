@@ -117,6 +117,14 @@ public struct SavedView: View {
                         // flips in both directions, so tapping "Unsave"
                         // correctly transitions the row to `isSaved == false`.
                         .recipeCardContextMenu(isSaved: true) {
+                            // T-635 / CL-104 — optimistic local removal so
+                            // the card disappears instantly; the store toggle
+                            // bubbles through `TabStack.saveFromCard(...)`
+                            // without a completion callback, so without this
+                            // the row lingers until the next `.task` cycle
+                            // (tab switch). Order matters: UI first, then
+                            // persistence fires asynchronously.
+                            viewModel.optimisticallyRemove(id: recipe.id)
                             onSave?(recipe)
                         }
                     }
