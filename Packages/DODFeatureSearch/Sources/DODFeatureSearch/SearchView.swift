@@ -111,7 +111,11 @@ public struct SearchView: View {
         case .idle:
             IdleSuggestionsView(
                 recents: viewModel.recentSearches,
-                topCategories: viewModel.topCategorySuggestions,
+                // T-639 / CL-117: source the Try pills from the rotating
+                // `displayedTrySlate` (per-cold-launch shuffle, stable
+                // within session, Latest Recipes pinned first) instead
+                // of the pre-rotation `topCategorySuggestions` top-5.
+                topCategories: viewModel.displayedTrySlate,
                 onRecentTap: { viewModel.selectRecent($0) },
                 // US-29 / AC-29.1 / CL-49.1 + CL-49.5: tapping a "Try"
                 // category pill populates the search field and runs a

@@ -250,6 +250,37 @@ import Testing
     // CL-106 / T-637 tests live in `SearchViewModelT637Tests.swift` so
     // this file stays under SwiftLint's `file_length` cap.
 
+    @Test func displayedTrySlateIsStableAcrossReAccessesWithinSingleViewModel() async {
+        // T-639 / CL-117 / AC-29.7: the rotating Try slate is computed
+        // **once** per `SearchViewModel` lifetime and cached on the
+        // viewmodel so re-accesses (`IdleSuggestionsView` re-creates on
+        // tab switches / navigation) return the same slate within a
+        // session. Cold launch (= fresh viewmodel) is the only reshuffle
+        // trigger; this test pins the in-session stability.
+        let dependencies = FakeSearchDependencies()
+        dependencies.categories = (1...10).map { id in
+            DODDomain.Category(
+                id: id == 1 ? 1590 : id + 100,
+                name: id == 1 ? "Latest Recipes" : "Cat\(id)",
+                slug: id == 1 ? "latest-recipes" : "cat\(id)",
+                count: 100 - id
+            )
+        }
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        await viewModel.loadCategoriesIfNeeded()
+
+        let first = viewModel.displayedTrySlate
+        let second = viewModel.displayedTrySlate
+        let third = viewModel.displayedTrySlate
+        #expect(first.map(\.id) == second.map(\.id))
+        #expect(second.map(\.id) == third.map(\.id))
+        // The pinned Latest-Recipes pill is always first on every read.
+        #expect(first.first?.id == 1590)
+    }
+
     static func makeItem(_ id: Int, title: String = "Match") -> RecipeListItem {
         RecipeListItem(
             id: id,

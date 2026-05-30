@@ -89,10 +89,22 @@ public final class SearchViewModel {
     public internal(set) var lastQuery: String = ""
     /// Categories list for the category chip menu. Loaded lazily.
     public private(set) var availableCategories: [DODDomain.Category] = []
-    /// Top-5 suggestions (by recipe count) shown in the idle empty state.
+    /// Top-5 suggestions (by recipe count). **Preserved for backward
+    /// compatibility only** — `IdleSuggestionsView` consumes
+    /// `displayedTrySlate` (T-639 / CL-117) instead. Kept on the public
+    /// surface in case any future consumer (analytics, snapshot, etc.)
+    /// wants the pre-rotation top-5 view.
     public var topCategorySuggestions: [DODDomain.Category] {
         Array(availableCategories.sorted { $0.count > $1.count }.prefix(5))
     }
+
+    /// US-29 amendment / CL-117 / T-639: the rotating Try slate's storage
+    /// + helpers (`topTrySlatePool`, `displayedTrySlate`, `pickTrySlate`)
+    /// live in `SearchViewModel+T639.swift` to keep this file under
+    /// SwiftLint's `file_length` cap. The backing cache is here because
+    /// stored properties can't live in extensions.
+    var cachedTrySlate: [DODDomain.Category]?
+
     /// Newest-first recent queries.
     public private(set) var recentSearches: [String] = []
 
