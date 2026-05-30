@@ -797,6 +797,38 @@ Added 2026-05-28 (round-8 backlog "Notifications" item, graduated). T-630 (US-36
 
 ---
 
+### US-43 — Site/app design coordination so dutchovendaddy.com and the iOS app feel like one brand
+
+> As a user moving between dutchovendaddy.com and the iOS app, I want the two surfaces to feel like one continuous brand experience so the cognitive cost of switching is zero.
+
+Added 2026-05-29 (round-9 backlog "Site ↔ app design coordination" item, graduated). Captured after @adamsned's first real-device install of TestFlight build `1.0 (2)` and a live design audit of the website's homepage and `/dutch-oven-recipes/` landing. Seven measurable visual gaps observed between the two surfaces: backdrop color (cream vs. white), card chrome (rounded elevated cards vs. none), hero aspect (16:9 landscape vs. 3:4 portrait), time chip presence, excerpt presence, numbered "Popular" badges, and brand-mark masthead. **Phase a (T-710)** lands the foundational token + typography layer; Phases b–d (T-711..T-713) deliver the visible compositional changes behind a `DODFeed.layoutVariant` flag so each screen reverts independently if a regression surfaces on real device. Constitution-amendment-free — all Apple-system primitives (SwiftUI surfaces, SF Pro / SF Rounded fonts, the existing `App/AppIcon.icon/Assets/DOD Master.png` reused at 32pt in the nav bar for Phase c). CL-103..CL-107 capture the per-axis rationale.
+
+**Acceptance criteria (Phase a — T-710, this PR):**
+
+- **AC-43.1 (Primary surface flips to white).** `Surface.colorset` light variant resolves to `#FFFFFF` (was `#F9F6EF`) — matches dutchovendaddy.com's white backdrop. Dark variant resolves to `#1B140E` (was `#42210B`) — deeper warm-brown per CL-104.
+- **AC-43.2 (`SurfaceElevated` collapses).** `SurfaceElevated.colorset` light = `#FFFFFF` / dark = `#281F19`. On light mode the elevated surface visually collapses to `Surface` so cards read as borderless; Phase b's magazine `RecipeCard` variant relies on this collapse.
+- **AC-43.3 (`SurfaceWarm` token added).** New `SurfaceWarm.colorset` token (`#FAF6EE` / `#281F19`) inherits cream's old role; Phase b (T-711) + Phase d (T-713) wire the Saved tab, empty states, and Cook Mode background to it. **Phase a adds the token; no view references it.**
+- **AC-43.4 (`CreamSubtle` renamed to `SurfaceDivider`).** Public API breaking rename. New `SurfaceDivider.colorset` (`#E6DECF` / `#3D2B1F`) replaces `CreamSubtle.colorset`; `DODColor.creamSubtle` → `DODColor.surfaceDivider`. Dark variant changes from the prior single-mode `#E6DECF` to `#3D2B1F` so dividers stay readable in dark Cook Mode. Two call sites updated: `Colors.swift` (the token declaration) and `DODDesignSystemTests/ColorsTests.swift` (the resolution test).
+- **AC-43.5 (`LabelOnAccent` token added).** New `LabelOnAccent.colorset` token (`#FFFFFF` / `#FFFFFF`) for white text on burnt-orange-filled surfaces (Phase c's numbered "Popular" badge). **Phase a adds the token; no view references it.**
+- **AC-43.6 (Display weights shift to bold).** `DODType.displayLarge` and `DODType.displayMedium` change from `.semibold` to `.bold` to match the site's section-header weight.
+- **AC-43.7 (`heading` + `caption` adopt SF Rounded).** `DODType.heading` switches design from `.default` to `.rounded`; `DODType.caption` switches design from `.default` to `.rounded` and weight from default to `.medium`. Friendlier card-and-chip register. No new font asset — system primitives only.
+- **AC-43.8 (`brand` token added).** New `DODType.brand` Font token (`.system(size: 22, design: .rounded, weight: .bold)`) reserved for "DUTCH OVEN DADDY" wordmark moments (splash, About, share-sheet preview cards). **Phase a adds the token; Phase c (T-712) is the first consumer when the nav-bar masthead lands.**
+- **AC-43.9 (L4 baselines re-recorded).** Every snapshot baseline in the workspace that resolves any of `DODColor.surface`, `DODColor.surfaceElevated`, `DODColor.label`, `DODColor.labelSecondary`, `DODType.displayLarge`, `DODType.displayMedium`, `DODType.heading`, `DODType.caption`, or the renamed `DODColor.surfaceDivider` is re-recorded under the new tokens. Visual diffs reviewed and committed in this PR's snapshot directories.
+- **AC-43.10 (No regression on L1, L2, L3).** All pre-existing tests pass against the new tokens. The L1 ColorsTests case that asserts `DODColor.surfaceDivider` resolves is updated; no other L1 test changes.
+- **AC-43.11 (Public API breaking change documented).** The `creamSubtle` → `surfaceDivider` rename is the only breaking change. PR release notes call it out; the only consumers are `Colors.swift` (declaration) and `ColorsTests.swift` (test) — zero feature-package call sites — so no downstream rebuilds blocked.
+
+**Phase b–d acceptance criteria are reserved**: AC-43.12..43.20 are reserved for the magazine `RecipeCard` variant (T-711), the nav-bar masthead + numbered Popular badge (T-712), and the Recipe Detail surface polish (T-713). Those phases ship under their own task IDs with their own AC numbering; the reservation here marks the public-API ceiling.
+
+**Constitution + spec notes:**
+
+- **Constitution-amendment-free.** All seven moves use Apple-system primitives — SwiftUI surfaces, SF Pro / SF Rounded fonts (no webfont asset added; constitution §3 default-no respected), the existing `App/AppIcon.icon/Assets/DOD Master.png` brand asset for Phase c's masthead, and `VNDetectRectanglesRequest` is intentionally **not** part of this US (that's a separate "Cast Iron Photo Scanner" backlog item — see backlog.md round-9 capture).
+- **Dark-mode posture (CL-104).** The site is light-only; the app's dark mode keeps a warm-brown surface (`#1B140E` for `Surface`, `#281F19` for `SurfaceElevated` and `SurfaceWarm`, `#3D2B1F` for `SurfaceDivider`) to preserve the low-light cooking-mode read affordance. No goal to match the site's white in dark — the goal is light-mode coordination only.
+- **Behind-the-flag from Phase b on.** Phase a's token shift is unconditional (every view that resolves `Surface` picks up white on next launch). Phase b–d gate their compositional changes behind a `DODFeed.layoutVariant` flag bound to a UserDefaults key + a Settings → Layout row so power users can A/B variants on real device and revert per-screen if needed.
+- **No App Privacy questionnaire impact.** Visual-token + typography changes do not move data; the App Privacy answers stay byte-identical.
+- **CL-103..CL-107** capture the surface-tier reshuffle rationale (CL-103), the dark-mode parity decision (CL-104), the `creamSubtle` rename trail (CL-105), the typography weight + rounded-design rationale (CL-106), and the Phase b/c/d punt-by-design with the open decisions each future phase still needs (CL-107).
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
