@@ -131,6 +131,22 @@ import Testing
         let url = try #require(captured.first?.url?.absoluteString)
         #expect(url.contains("search=ab"))
     }
+
+    /// CL-120 / T-642 / REG-29: the SEARCH path widens `per_page` to 100
+    /// so the post-fetch title-precision filter has a candidate pool
+    /// big enough to lift WP-relevance-buried title matches above the
+    /// truncation cutoff. Locks the search-specific page-size bump
+    /// separately from the list endpoints' `defaultPageSize` (still 20).
+    @Test func searchUsesWidePageSizeForTitlePrecision() async throws {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts", json: Data("[]".utf8))
+        let client = WPRestClient(httpClient: fake)
+        _ = try await client.search(query: "nachos")
+        let captured = await fake.capturedRequests
+        let url = try #require(captured.first?.url?.absoluteString)
+        #expect(url.contains("per_page=100"), "Search must widen per_page to 100 (CL-120 / T-642)")
+        #expect(url.contains("search=nachos"))
+    }
 }
 
 @Suite("WPRestClient.categories") struct WPRestClientCategoriesTests {

@@ -51,11 +51,24 @@ extension WPRestClient {
 
     /// Search posts by query string.
     ///
-    /// Spec trace: AC-3.1, AC-3.2.
+    /// `perPage` defaults to ``WPRestClient.searchPageSize`` (100, not the
+    /// list-endpoint default of 20) so the candidate pool is wide enough
+    /// for the post-fetch title-precision filter (T-642 / CL-120) to
+    /// catch every title match before the precision step trims body-only
+    /// false positives. The pre-T-642 default of 20 dropped the buried
+    /// "Cast Iron Skillet Nachos" past the WP relevance-rank cutoff;
+    /// widening the pool to 100 means the filter sees all four
+    /// title-bearing posts the live API returns for `?search=nachos`.
+    /// Net wire impact is one ~50 KB JSON page per typed-and-debounced
+    /// query (~3.5× the prior payload) — acceptable for the precision
+    /// win because the filter discards most of it client-side and the
+    /// existing `URLCache` bypass (CL-50) is unchanged.
+    ///
+    /// Spec trace: AC-3.1, AC-3.2, CL-120 (Nacho Bug per_page bump), REG-29.
     public func search(
         query: String,
         page: Int = 1,
-        perPage: Int = WPRestClient.defaultPageSize
+        perPage: Int = WPRestClient.searchPageSize
     ) async throws -> [RecipeListItem] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return [] }
