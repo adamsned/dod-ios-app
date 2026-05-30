@@ -52,7 +52,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158), traits: Self.lightTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 158, height: 158),
+                traits: Self.lightTraits
+            ),
             record: .missing
         )
     }
@@ -62,7 +67,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158), traits: Self.darkTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 158, height: 158),
+                traits: Self.darkTraits
+            ),
             record: .missing
         )
     }
@@ -76,7 +86,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158), traits: Self.lightTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 158, height: 158),
+                traits: Self.lightTraits
+            ),
             record: .missing
         )
     }
@@ -86,7 +101,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158), traits: Self.darkTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 158, height: 158),
+                traits: Self.darkTraits
+            ),
             record: .missing
         )
     }
@@ -98,7 +118,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158), traits: Self.lightTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 338, height: 158),
+                traits: Self.lightTraits
+            ),
             record: .missing
         )
     }
@@ -108,7 +133,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158), traits: Self.darkTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 338, height: 158),
+                traits: Self.darkTraits
+            ),
             record: .missing
         )
     }
@@ -118,7 +148,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158), traits: Self.lightTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 338, height: 158),
+                traits: Self.lightTraits
+            ),
             record: .missing
         )
     }
@@ -128,7 +163,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158), traits: Self.darkTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 338, height: 158),
+                traits: Self.darkTraits
+            ),
             record: .missing
         )
     }
@@ -140,7 +180,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158), traits: Self.lightTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 158, height: 158),
+                traits: Self.lightTraits
+            ),
             record: .missing
         )
     }
@@ -150,7 +195,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 158, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 158, height: 158), traits: Self.darkTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 158, height: 158),
+                traits: Self.darkTraits
+            ),
             record: .missing
         )
     }
@@ -160,7 +210,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158), traits: Self.lightTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 338, height: 158),
+                traits: Self.lightTraits
+            ),
             record: .missing
         )
     }
@@ -170,7 +225,12 @@ final class SavedWidgetSnapshotTests: XCTestCase {
             .frame(width: 338, height: 158)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 338, height: 158), traits: Self.darkTraits),
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: 338, height: 158),
+                traits: Self.darkTraits
+            ),
             record: .missing
         )
     }

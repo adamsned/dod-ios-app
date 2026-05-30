@@ -22,14 +22,21 @@ final class DesignSystemSnapshotTests: XCTestCase {
         isRecording = false
     }
 
+    /// Tolerant `.image(...)` strategy shared by the snapshots in this file.
+    /// `precision` / `perceptualPrecision` absorb cross-Xcode sub-pixel /
+    /// anti-aliasing drift (local 26.5 ↔ CI 26.3) without masking a real
+    /// color or chrome change. See REG-28 / CL-115.
+    private static func tolerantImage<V: View>(
+        layout: SwiftUISnapshotLayout = .sizeThatFits,
+        traits: UITraitCollection = .init()
+    ) -> Snapshotting<V, UIImage> {
+        .image(precision: 0.98, perceptualPrecision: 0.97, layout: layout, traits: traits)
+    }
+
     func test_emptyState_default() {
         let view = EmptyState(title: "No saved recipes yet", message: "Tap the bookmark on any recipe.")
             .frame(width: 390, height: 600)
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .fixed(width: 390, height: 600)),
-            record: .missing
-        )
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 390, height: 600)), record: .missing)
     }
 
     func test_emptyState_withAction() {
@@ -39,25 +46,37 @@ final class DesignSystemSnapshotTests: XCTestCase {
             action: .init(title: "Retry") {}
         )
         .frame(width: 390, height: 600)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)))
+        assertSnapshot(
+            of: view,
+            as: Self.tolerantImage(layout: .fixed(width: 390, height: 600))
+        )
     }
 
     func test_offlineBanner_offline() {
         let view = OfflineBanner(isOffline: true)
             .frame(width: 390, height: 60)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 60)))
+        assertSnapshot(
+            of: view,
+            as: Self.tolerantImage(layout: .fixed(width: 390, height: 60))
+        )
     }
 
     func test_snackbar_plain() {
         let view = Snackbar(message: "Recipe unavailable.")
             .frame(width: 390, height: 80)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 80)))
+        assertSnapshot(
+            of: view,
+            as: Self.tolerantImage(layout: .fixed(width: 390, height: 80))
+        )
     }
 
     func test_snackbar_withUndo() {
         let view = Snackbar(message: "Removed from saved.", action: .init(title: "Undo") {})
             .frame(width: 390, height: 80)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 80)))
+        assertSnapshot(
+            of: view,
+            as: Self.tolerantImage(layout: .fixed(width: 390, height: 80))
+        )
     }
 
     func test_recipeCard_full() {
@@ -68,7 +87,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             totalTimeDisplay: "15 min"
         )
         .frame(width: 358)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .sizeThatFits))
     }
 
     func test_recipeCard_noTimeChip() {
@@ -78,7 +97,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             heroImageURL: nil
         )
         .frame(width: 358)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .sizeThatFits))
     }
 
     /// Exercise RecipeCard at the new ~180pt half-width — the size each card
@@ -93,7 +112,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             totalTimeDisplay: "15 min"
         )
         .frame(width: 180)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .sizeThatFits))
     }
 
     // US-38 / AC-38.4 / CL-64 (T-650) — `RecipeCard.ListRow` snapshot
@@ -130,11 +149,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             onContinue: {}
         )
         .frame(width: 402, height: 874)
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .fixed(width: 402, height: 874)),
-            record: .missing
-        )
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 402, height: 874)), record: .missing)
     }
 
     // MARK: - US-9 home-screen widget
@@ -158,7 +173,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             )
         )
         .frame(width: 158, height: 158)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 158, height: 158)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 158, height: 158)), record: .missing)
     }
 
     /// REG-9.2: medium widget layout at 338×158pt (iPhone 17 medium
@@ -173,7 +188,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             )
         )
         .frame(width: 338, height: 158)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 338, height: 158)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 338, height: 158)), record: .missing)
     }
 
     /// REG-9.3: placeholder layout for when the App Group store has no
@@ -181,7 +196,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
     func test_widgetCard_placeholder() {
         let view = WidgetCard.Placeholder()
             .frame(width: 158, height: 158)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 158, height: 158)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 158, height: 158)), record: .missing)
     }
 
     // US-17 saved-recipes widget snapshot tests live in
@@ -199,7 +214,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             .padding(DODSpacing.md)
             .background(DODColor.surface)
             .frame(width: 280, height: 60)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 280, height: 60)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 280, height: 60)), record: .missing)
     }
 
     /// Empty count → EmptyView; we wrap in a parent to prove "nothing"
@@ -213,7 +228,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
         .padding(DODSpacing.md)
         .background(DODColor.surface)
         .frame(width: 280, height: 100)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 280, height: 100)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 280, height: 100)), record: .missing)
     }
 
     func test_starRatingInput_zero() {
@@ -221,7 +236,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             .padding(DODSpacing.md)
             .background(DODColor.surface)
             .frame(width: 320, height: 80)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 320, height: 80)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 320, height: 80)), record: .missing)
     }
 
     func test_starRatingInput_threeStarsSelected() {
@@ -229,7 +244,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             .padding(DODSpacing.md)
             .background(DODColor.surface)
             .frame(width: 320, height: 80)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 320, height: 80)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 320, height: 80)), record: .missing)
     }
 
     func test_commentRow_withAvatarAndRating() {
@@ -244,7 +259,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
         .padding(DODSpacing.md)
         .background(DODColor.surface)
         .frame(width: 390)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .sizeThatFits), record: .missing)
     }
 
     func test_commentRow_pendingModeration() {
@@ -259,7 +274,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
         .padding(DODSpacing.md)
         .background(DODColor.surface)
         .frame(width: 390)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .sizeThatFits), record: .missing)
     }
 
     /// 600-character body — ensures layout stays sane when a comment is
@@ -281,13 +296,13 @@ final class DesignSystemSnapshotTests: XCTestCase {
         .padding(DODSpacing.md)
         .background(DODColor.surface)
         .frame(width: 390)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .sizeThatFits), record: .missing)
     }
 
     func test_commentComposer_emptyState() {
         let view = StatefulComposerHost(text: "", rating: 0, isSubmitting: false)
             .frame(width: 390, height: 600)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 390, height: 600)), record: .missing)
     }
 
     func test_commentComposer_filledState() {
@@ -297,19 +312,19 @@ final class DesignSystemSnapshotTests: XCTestCase {
             isSubmitting: false
         )
         .frame(width: 390, height: 600)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 390, height: 600)), record: .missing)
     }
 
     func test_guestIdentitySheet_empty() {
         let view = StatefulIdentityHost(name: "", email: "")
             .frame(width: 390, height: 600)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 390, height: 600)), record: .missing)
     }
 
     func test_guestIdentitySheet_filledValid() {
         let view = StatefulIdentityHost(name: "Jamie L.", email: "jamie@example.com")
             .frame(width: 390, height: 600)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 390, height: 600)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 390, height: 600)), record: .missing)
     }
 
     func test_moderationBadge_eachKind() {
@@ -321,7 +336,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
         .padding(DODSpacing.md)
         .background(DODColor.surface)
         .frame(width: 280, height: 180)
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 280, height: 180)), record: .missing)
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 280, height: 180)), record: .missing)
     }
 }
 

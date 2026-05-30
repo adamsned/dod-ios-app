@@ -17,6 +17,8 @@ final class RecipeDetailRatingsSmokeTests: XCTestCase {
         // land on the feed without manual fiddling.
         app.launchEnvironment["DOD_FORCE_NO_TELEMETRY_APPID"] = "1"
         app.launchEnvironment["DOD_SUPPRESS_ONBOARDING"] = "1"
+        // Clean in-memory store per launch (L3 isolation), matching SmokeTests.
+        app.launchArguments.append("-DODUseInMemoryStore")
         app.launch()
     }
 
@@ -26,23 +28,11 @@ final class RecipeDetailRatingsSmokeTests: XCTestCase {
     /// string we can assert without depending on the (network-dependent)
     /// comments themselves.
     func test_recipeDetail_showsRatingsSection_afterRecipeLoads() {
-        // Pick the second recipe row in the feed — the first is often
-        // clipped by the nav bar, which makes the tap unreliable
-        // (same workaround as `SmokeTests.test_recipeDetailOpensAndShowsContent`).
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
-        let recipeButtons = app.buttons
-            .matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        // Open a real recipe detail from the feed (the helper skips roundup
+        // articles that have no Ingredients / Ratings section).
         XCTAssertTrue(
-            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
-            "Feed should show at least 2 recipe buttons"
-        )
-        recipeButtons.element(boundBy: 1).tap()
-
-        // Detail screen lands when the Ingredients header is visible.
-        let ingredientsHeader = app.staticTexts["Ingredients"]
-        XCTAssertTrue(
-            ingredientsHeader.waitForExistence(timeout: 45),
-            "Recipe detail should show Ingredients section"
+            openRecipeDetailFromFeed(),
+            "A feed recipe card should push a recipe detail with an Ingredients section"
         )
 
         // Scroll to the bottom of the detail screen so the ratings
@@ -71,5 +61,27 @@ final class RecipeDetailRatingsSmokeTests: XCTestCase {
             ratingsHeader.waitForExistence(timeout: 10),
             "Ratings & Reviews header should appear after scrolling to the bottom of the recipe detail"
         )
+    }
+
+    /// Opens a real recipe detail from the feed, skipping roundup/article
+    /// posts (the feed is "Recipes & Articles" and `RecipeListItem` carries
+    /// no kind). Taps `dod.feed.card` cards until one shows "Ingredients".
+    /// Mirrors the helper in `SmokeTests`; T-610 fakes are the long-term fix.
+    @discardableResult
+    private func openRecipeDetailFromFeed(maxCards: Int = 5) -> Bool {
+        let cards = app.buttons.matching(identifier: "dod.feed.card")
+        guard cards.element(boundBy: 0).waitForExistence(timeout: 20) else { return false }
+        for index in 0..<maxCards {
+            let card = cards.element(boundBy: index)
+            guard card.waitForExistence(timeout: 5) else { return false }
+            card.tap()
+            if app.staticTexts["Ingredients"].waitForExistence(timeout: 25) {
+                return true
+            }
+            let back = app.navigationBars.buttons.element(boundBy: 0)
+            if back.waitForExistence(timeout: 3) { back.tap() }
+            _ = cards.element(boundBy: 0).waitForExistence(timeout: 10)
+        }
+        return false
     }
 }

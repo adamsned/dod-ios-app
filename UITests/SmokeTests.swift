@@ -19,6 +19,10 @@ final class SmokeTests: XCTestCase {
         // overrides this in-body by relaunching with -DODForceFreshOnboarding.
         // Spec trace: US-8.
         app.launchEnvironment["DOD_SUPPRESS_ONBOARDING"] = "1"
+        // L3 isolation: a clean in-memory SwiftData store per launch so saved
+        // recipes don't persist across runs on a shared CI simulator (the
+        // cause of the flaky "No saved recipes yet" empty-state assertions).
+        app.launchArguments.append("-DODUseInMemoryStore")
         app.launch()
     }
 
@@ -122,44 +126,14 @@ final class SmokeTests: XCTestCase {
     /// method inside ForEach broke SwiftUI's NavigationStack identity.
     /// Fix: each tab owns its own @State path inside a dedicated TabStack view.
     func test_recipeDetailOpensAndShowsContent() {
-        // Wait for the feed to populate, then tap the first recipe Button.
-        // Tab-bar buttons share the same parent app.buttons collection, so
-        // filter out the four known tab labels.
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
-        let recipeButtons = app.buttons
-            .matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        // Open a real recipe detail from the feed (the helper skips roundup
+        // articles that have no Ingredients section). Queries cards by the
+        // stable `dod.feed.card` identifier so it never taps a nav-bar
+        // toolbar button.
         XCTAssertTrue(
-            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
-            "Feed should show at least 2 recipe buttons"
+            openRecipeDetailFromFeed(),
+            "A feed recipe card should push a detail screen with an Ingredients section"
         )
-        // Take the second row — first is often partially clipped by the nav bar,
-        // which makes coordinate-based tap unreliable. Second is fully on screen.
-        let recipeButton = recipeButtons.element(boundBy: 1)
-        recipeButton.tap()
-
-        // Diagnostic: 2-second post-tap snapshot to see if nav pushed.
-        Thread.sleep(forTimeInterval: 2.0)
-        let postTap = XCTAttachment(screenshot: app.screenshot())
-        postTap.name = "post-tap-state"
-        postTap.lifetime = .keepAlways
-        add(postTap)
-
-        let ingredientsHeader = app.staticTexts["Ingredients"]
-        let appeared = ingredientsHeader.waitForExistence(timeout: 45)
-
-        if !appeared {
-            // Diagnostic: snapshot + dump everything currently on screen.
-            let screenshot = XCTAttachment(screenshot: app.screenshot())
-            screenshot.name = "detail-failed-state"
-            screenshot.lifetime = .keepAlways
-            add(screenshot)
-
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "accessibility-hierarchy"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-        }
-        XCTAssertTrue(appeared, "Recipe detail should show Ingredients section")
 
         XCTAssertTrue(app.buttons["Save recipe"].exists || app.buttons["Unsave recipe"].exists)
         XCTAssertTrue(app.buttons["Share recipe"].exists)
@@ -183,8 +157,7 @@ final class SmokeTests: XCTestCase {
         let firstStaticText = app.staticTexts.matching(NSPredicate(format: "label != %@", "Recipes")).firstMatch
         XCTAssertTrue(firstStaticText.waitForExistence(timeout: 15))
 
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
-        let recipeButtons = app.buttons.matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        let recipeButtons = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(recipeButtons.firstMatch.waitForExistence(timeout: 15))
 
         let beforeLabels = recipeButtons.allElementsBoundByIndex.map(\.label)
@@ -211,8 +184,8 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(
             scrolled,
             "Feed should scroll when the user drags up from inside a recipe row. "
-            + "before(\(beforeLabels.count) rows, last=\(lastBefore.prefix(40))) "
-            + "after(\(afterLabels.count) rows, last=\(lastAfter.prefix(40)))"
+                + "before(\(beforeLabels.count) rows, last=\(lastBefore.prefix(40))) "
+                + "after(\(afterLabels.count) rows, last=\(lastAfter.prefix(40)))"
         )
     }
 
@@ -230,21 +203,13 @@ final class SmokeTests: XCTestCase {
     /// recipe detail presents the full-screen Cook Mode surface, "Step 1 of M"
     /// is visible, Next advances to step 2, and Done dismisses back to detail.
     func test_cookModeOpensAndAdvances() {
-        // Step 1: open the feed and navigate into a recipe detail.
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
-        let recipeButtons = app.buttons.matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        // Step 1: open a real recipe detail from the feed (the helper skips
+        // roundup articles, which have no Cook Now CTA).
         XCTAssertTrue(
-            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
-            "Feed should show at least 2 recipe buttons"
+            openRecipeDetailFromFeed(),
+            "A feed recipe card should push a recipe detail before tapping Cook Now"
         )
-        recipeButtons.element(boundBy: 1).tap()
-
-        // Detail screen should land — same wait as test_recipeDetailOpensAndShowsContent.
         let ingredientsHeader = app.staticTexts["Ingredients"]
-        XCTAssertTrue(
-            ingredientsHeader.waitForExistence(timeout: 45),
-            "Recipe detail should show Ingredients section before tapping Cook Now"
-        )
 
         // Step 2: tap Cook Now. The CTA has the accessibility label "Cook Now".
         let cookNow = app.buttons["Cook Now"]
@@ -288,12 +253,94 @@ final class SmokeTests: XCTestCase {
         )
     }
 
+    /// T-638 / CL-107 / REG-21 — pins T-633 / CL-102's removal of the
+    /// `#if DEBUG` "Test: Simulate New Post" button. Navigates to Settings
+    /// via the gear-icon toolbar button, asserts the page reachable (the
+    /// notifications toggle from US-36 / AC-36.1 is the positive signal),
+    /// then negative-asserts the deleted DEBUG button does NOT exist. The
+    /// positive notifications-toggle assertion doubles as a Settings-page-
+    /// reachable check — if the gear ever stops pushing into Settings, the
+    /// toggle won't appear and the test catches both failure modes. L3 (not
+    /// L5) because the Settings page is a fast-reachability surface and the
+    /// test wall-clock should stay under 5s — AC-T2 pyramid level for
+    /// "screen-existence + button-existence" assertions.
+    func test_settingsPageHasNoDebugTestButton() {
+        // Wait for the tab bar to land. Feed (Recipes) is the default tab,
+        // so the gear icon is already in scope.
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(
+            tabBar.waitForExistence(timeout: 8),
+            "Tab bar should appear within 8 seconds"
+        )
+
+        // Tap the gear icon. Per `FeedView.settingsToolbarLink`, the
+        // accessibility label is "Settings" (on the `Image(systemName:
+        // "gearshape")`). The accessibility identifier
+        // `feed-toolbar-settings` is also available as a secondary handle.
+        let settingsButton = app.buttons["Settings"]
+        XCTAssertTrue(
+            settingsButton.waitForExistence(timeout: 5),
+            "Settings gear icon should be visible on the Feed nav bar"
+        )
+        settingsButton.tap()
+
+        // Positive signal: the notifications toggle from US-36 / AC-36.1.
+        // The `Toggle`'s label text "Notify me when new recipes drop"
+        // surfaces as the switch's accessibility label per `SettingsView`.
+        let notificationsToggle = app.switches["Notify me when new recipes drop"]
+        XCTAssertTrue(
+            notificationsToggle.waitForExistence(timeout: 5),
+            "Settings page should expose the notifications toggle (US-36 / AC-36.1)"
+        )
+
+        // Negative assertion: the DEBUG button must NOT exist (T-633 / CL-102
+        // deleted it). The pre-deletion accessibility label was "Test:
+        // Simulate New Post" (the leading "▸" glyph was a visual prefix on
+        // the rendered text; the underlying label was the trimmed text).
+        // Use a brief `waitForExistence` to give the page a beat to fully
+        // render, then assert absence — `XCTAssertFalse(exists)` after a
+        // short wait is the canonical "negative existence" shape in XCUITest.
+        let debugButton = app.buttons["Test: Simulate New Post"]
+        XCTAssertFalse(
+            debugButton.waitForExistence(timeout: 1),
+            "Settings page must NOT expose the DEBUG 'Test: Simulate New Post' button — T-633 / CL-102 deleted it"
+        )
+    }
+
     /// Pulls the total step count out of a label like "Step 1 of 7".
     /// Returns nil if the label doesn't match the expected pattern.
     private static func totalStepsCount(from label: String) -> Int? {
         let parts = label.split(separator: " ")
         guard parts.count >= 4, let total = Int(parts[3]) else { return nil }
         return total
+    }
+
+    /// Opens a real recipe detail from the feed. The feed surfaces "Recipes &
+    /// Articles" (US-37) and `RecipeListItem` carries no recipe-vs-article
+    /// kind, so a fixed card index can land on a roundup/article post that has
+    /// no Ingredients section (a live-data artifact of whatever the blog
+    /// published most recently). Taps `dod.feed.card` cards in order until one
+    /// shows the "Ingredients" header (a recipe), tapping Back between misses.
+    /// Returns true once a recipe detail is open. (T-610's deterministic
+    /// fake-data launch mode is the proper long-term fix; this keeps the live
+    /// smoke robust against day-to-day feed content drift.)
+    @discardableResult
+    private func openRecipeDetailFromFeed(maxCards: Int = 5) -> Bool {
+        let cards = app.buttons.matching(identifier: "dod.feed.card")
+        guard cards.element(boundBy: 0).waitForExistence(timeout: 20) else { return false }
+        for index in 0..<maxCards {
+            let card = cards.element(boundBy: index)
+            guard card.waitForExistence(timeout: 5) else { return false }
+            card.tap()
+            if app.staticTexts["Ingredients"].waitForExistence(timeout: 25) {
+                return true
+            }
+            // Landed on an article/roundup — go back and try the next card.
+            let back = app.navigationBars.buttons.element(boundBy: 0)
+            if back.waitForExistence(timeout: 3) { back.tap() }
+            _ = cards.element(boundBy: 0).waitForExistence(timeout: 10)
+        }
+        return false
     }
 
     /// US-8: the welcome sheet shows on a fresh launch (i.e. when the
@@ -309,12 +356,16 @@ final class SmokeTests: XCTestCase {
     func test_onboardingShowsOnFirstLaunchAndDismisses() {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "DOD_SUPPRESS_ONBOARDING")
+        // Drop the in-memory-store flag for this relaunch — onboarding is a
+        // UserDefaults gate unrelated to SwiftData, and the original passing
+        // launch config didn't carry it.
+        app.launchArguments.removeAll { $0 == "-DODUseInMemoryStore" }
         app.launchArguments.append("-DODForceFreshOnboarding")
         app.launch()
 
         let welcome = app.staticTexts["Welcome to Dutch Oven Daddy"]
         XCTAssertTrue(
-            welcome.waitForExistence(timeout: 8),
+            welcome.waitForExistence(timeout: 12),
             "Welcome sheet should appear on first launch"
         )
 

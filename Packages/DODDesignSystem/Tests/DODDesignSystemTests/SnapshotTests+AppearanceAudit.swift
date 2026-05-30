@@ -73,11 +73,7 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
             totalTimeDisplay: "15 min"
         )
         .frame(width: 358)
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .sizeThatFits, traits: Self.darkTraits()),
-            record: .missing
-        )
+        assertSnapshot(of: view, as: Self.tolerantImage(traits: Self.darkTraits()), record: .missing)
     }
 
     func test_recipeCard_halfWidth_dark() {
@@ -88,11 +84,7 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
             totalTimeDisplay: "15 min"
         )
         .frame(width: 180)
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .sizeThatFits, traits: Self.darkTraits()),
-            record: .missing
-        )
+        assertSnapshot(of: view, as: Self.tolerantImage(traits: Self.darkTraits()), record: .missing)
     }
 
     func test_onboardingSheet_default_dark() {
@@ -152,11 +144,7 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
         .padding(DODSpacing.md)
         .background(DODColor.surface)
         .frame(width: 390)
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .sizeThatFits, traits: Self.darkTraits()),
-            record: .missing
-        )
+        assertSnapshot(of: view, as: Self.tolerantImage(traits: Self.darkTraits()), record: .missing)
     }
 
     func test_commentComposer_filledState_dark() {
@@ -203,11 +191,7 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
             totalTimeDisplay: "15 min"
         )
         .frame(width: 358)
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .sizeThatFits, traits: Self.ax5Traits()),
-            record: .missing
-        )
+        assertSnapshot(of: view, as: Self.tolerantImage(traits: Self.ax5Traits()), record: .missing)
     }
 
     func test_emptyState_withAction_AX5() {
@@ -219,7 +203,7 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
         .frame(width: 390, height: 1_200)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 390, height: 1_200), traits: Self.ax5Traits()),
+            as: Self.tolerantImage(layout: .fixed(width: 390, height: 1_200), traits: Self.ax5Traits()),
             record: .missing
         )
     }
@@ -236,11 +220,7 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
         .padding(DODSpacing.md)
         .background(DODColor.surface)
         .frame(width: 390)
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .sizeThatFits, traits: Self.ax5Traits()),
-            record: .missing
-        )
+        assertSnapshot(of: view, as: Self.tolerantImage(traits: Self.ax5Traits()), record: .missing)
     }
 
     func test_onboardingSheet_default_AX5() {
@@ -253,7 +233,7 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
         .frame(width: 402, height: 1_800)
         assertSnapshot(
             of: view,
-            as: .image(layout: .fixed(width: 402, height: 1_800), traits: Self.ax5Traits()),
+            as: Self.tolerantImage(layout: .fixed(width: 402, height: 1_800), traits: Self.ax5Traits()),
             record: .missing
         )
     }
@@ -277,9 +257,20 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
         ])
     }
 
+    /// Tolerant `.image(...)` strategy shared by every snapshot in this file.
+    /// The `precision` / `perceptualPrecision` tolerance absorbs cross-Xcode
+    /// sub-pixel / anti-aliasing drift (local 26.5 ↔ CI 26.3) without masking
+    /// a real color or chrome change. See REG-28 / CL-115.
+    private static func tolerantImage<V: View>(
+        layout: SwiftUISnapshotLayout = .sizeThatFits,
+        traits: UITraitCollection
+    ) -> Snapshotting<V, UIImage> {
+        .image(precision: 0.98, perceptualPrecision: 0.97, layout: layout, traits: traits)
+    }
+
     /// Convenience for the common "fixed size, dark appearance" pairing.
     private static func darkImage<V: View>(width: CGFloat, height: CGFloat) -> Snapshotting<V, UIImage> {
-        .image(layout: .fixed(width: width, height: height), traits: darkTraits())
+        tolerantImage(layout: .fixed(width: width, height: height), traits: darkTraits())
     }
 
     // MARK: - Fixture helpers
