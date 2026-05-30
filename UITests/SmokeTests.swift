@@ -19,6 +19,10 @@ final class SmokeTests: XCTestCase {
         // overrides this in-body by relaunching with -DODForceFreshOnboarding.
         // Spec trace: US-8.
         app.launchEnvironment["DOD_SUPPRESS_ONBOARDING"] = "1"
+        // L3 isolation: a clean in-memory SwiftData store per launch so saved
+        // recipes don't persist across runs on a shared CI simulator (the
+        // cause of the flaky "No saved recipes yet" empty-state assertions).
+        app.launchArguments.append("-DODUseInMemoryStore")
         app.launch()
     }
 
@@ -122,12 +126,12 @@ final class SmokeTests: XCTestCase {
     /// method inside ForEach broke SwiftUI's NavigationStack identity.
     /// Fix: each tab owns its own @State path inside a dedicated TabStack view.
     func test_recipeDetailOpensAndShowsContent() {
-        // Wait for the feed to populate, then tap the first recipe Button.
-        // Tab-bar buttons share the same parent app.buttons collection, so
-        // filter out the four known tab labels.
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
-        let recipeButtons = app.buttons
-            .matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        // Wait for the feed to populate, then tap a recipe card. Query by the
+        // stable `dod.feed.card` identifier so we only ever match recipe rows
+        // — not the nav-bar layout-toggle / Settings toolbar buttons that the
+        // old "buttons NOT IN tab labels" filter swept up (which made
+        // boundBy:1 tap Settings instead of a recipe under iOS 26).
+        let recipeButtons = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(
             recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
             "Feed should show at least 2 recipe buttons"
@@ -183,8 +187,7 @@ final class SmokeTests: XCTestCase {
         let firstStaticText = app.staticTexts.matching(NSPredicate(format: "label != %@", "Recipes")).firstMatch
         XCTAssertTrue(firstStaticText.waitForExistence(timeout: 15))
 
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
-        let recipeButtons = app.buttons.matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        let recipeButtons = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(recipeButtons.firstMatch.waitForExistence(timeout: 15))
 
         let beforeLabels = recipeButtons.allElementsBoundByIndex.map(\.label)
@@ -211,8 +214,8 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(
             scrolled,
             "Feed should scroll when the user drags up from inside a recipe row. "
-            + "before(\(beforeLabels.count) rows, last=\(lastBefore.prefix(40))) "
-            + "after(\(afterLabels.count) rows, last=\(lastAfter.prefix(40)))"
+                + "before(\(beforeLabels.count) rows, last=\(lastBefore.prefix(40))) "
+                + "after(\(afterLabels.count) rows, last=\(lastAfter.prefix(40)))"
         )
     }
 
@@ -231,8 +234,7 @@ final class SmokeTests: XCTestCase {
     /// is visible, Next advances to step 2, and Done dismisses back to detail.
     func test_cookModeOpensAndAdvances() {
         // Step 1: open the feed and navigate into a recipe detail.
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
-        let recipeButtons = app.buttons.matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        let recipeButtons = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(
             recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
             "Feed should show at least 2 recipe buttons"

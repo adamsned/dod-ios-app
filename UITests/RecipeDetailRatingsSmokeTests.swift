@@ -17,6 +17,8 @@ final class RecipeDetailRatingsSmokeTests: XCTestCase {
         // land on the feed without manual fiddling.
         app.launchEnvironment["DOD_FORCE_NO_TELEMETRY_APPID"] = "1"
         app.launchEnvironment["DOD_SUPPRESS_ONBOARDING"] = "1"
+        // Clean in-memory store per launch (L3 isolation), matching SmokeTests.
+        app.launchArguments.append("-DODUseInMemoryStore")
         app.launch()
     }
 
@@ -26,12 +28,11 @@ final class RecipeDetailRatingsSmokeTests: XCTestCase {
     /// string we can assert without depending on the (network-dependent)
     /// comments themselves.
     func test_recipeDetail_showsRatingsSection_afterRecipeLoads() {
-        // Pick the second recipe row in the feed — the first is often
-        // clipped by the nav bar, which makes the tap unreliable
-        // (same workaround as `SmokeTests.test_recipeDetailOpensAndShowsContent`).
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Search", "Saved"]
-        let recipeButtons = app.buttons
-            .matching(NSPredicate(format: "NOT (label IN %@)", Array(tabLabels)))
+        // Pick the second recipe card in the feed — the first is often
+        // clipped by the nav bar, which makes the tap unreliable. Query by
+        // the stable `dod.feed.card` identifier so we never match a nav-bar
+        // toolbar button (same fix as `SmokeTests`).
+        let recipeButtons = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(
             recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
             "Feed should show at least 2 recipe buttons"

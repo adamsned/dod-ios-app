@@ -56,12 +56,29 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.search.telemetryName, "search")
     }
 
-    /// Title strings are user-visible labels on the tab bar; pin them so
-    /// a casual rename doesn't slip past code review.
+    /// `title` is the **screen-header** string. US-37 / AC-37.1 (T-640)
+    /// renamed the feed header to "Recipes & Articles" once the feed began
+    /// surfacing article posts alongside recipes. The shorter **bottom-tab
+    /// label** is the separate `tabLabel` (pinned by
+    /// `test_tabLabels_matchSpec` below) — CL-65 / T-660 split the two so
+    /// the tab bar's ~80pt slot doesn't truncate "Recipes & Arti…". Pin
+    /// both so a casual rename doesn't slip past code review.
     func test_titles_matchSpec() {
-        XCTAssertEqual(AppTab.feed.title, "Recipes")
+        XCTAssertEqual(AppTab.feed.title, "Recipes & Articles")
         XCTAssertEqual(AppTab.categories.title, "Categories")
         XCTAssertEqual(AppTab.saved.title, "Saved")
         XCTAssertEqual(AppTab.search.title, "Search")
+    }
+
+    /// AC-16.1 / CL-65 (T-660): the feed tab's bottom-tab label is the short
+    /// "Recipes" (the full "Recipes & Articles" lives in `title` for the
+    /// screen header). The other three tabs share one string across `title`
+    /// and `tabLabel`. Pinning `tabLabel` guards the fixed-width tab slot
+    /// against a future rename that would re-introduce the truncation bug.
+    func test_tabLabels_matchSpec() {
+        XCTAssertEqual(AppTab.feed.tabLabel, "Recipes")
+        XCTAssertEqual(AppTab.categories.tabLabel, "Categories")
+        XCTAssertEqual(AppTab.saved.tabLabel, "Saved")
+        XCTAssertEqual(AppTab.search.tabLabel, "Search")
     }
 }
