@@ -289,6 +289,13 @@ struct FilterChipRow: View {
             )
         }
         .accessibilityLabel("Cook time filter, \(filters.cookTime?.label ?? "any time")")
+        // T-638 / CL-107 — stable test handle for the L5 E2E
+        // `test_search_chip_row_hidden_on_idle` (negative-asserts the chip is
+        // not queryable on the idle Search tab — pins CL-106 part 1's
+        // `viewModel.state != .idle` gate) and `test_search_cook_time_filter_narrows_results`
+        // (taps the chip → "≤ 30 min" → asserts the filtered result count
+        // narrows via the hydration path — pins CL-106 part 2 + REG-21).
+        .accessibilityIdentifier("dod.search.cookTimeChip")
     }
 
     // US-33 / CL-105 (T-636): the "Recently viewed" toggle chip was
