@@ -26,8 +26,12 @@ import Testing
     /// the moment a real search is in flight or has produced results,
     /// and stays at `.idle` before any search is initiated.
     @Test func chipRowGatingByStateTransitionsAwayFromIdleOnSearch() async {
+        // Title must contain the query (post-CL-120 / T-642 title-precision
+        // filter). The pre-T-642 `Self.makeItem(_:)` default title "Match"
+        // body-matched nothing and now correctly drops; using "Pizza" as
+        // the title makes the substring tier fire.
         let dependencies = FakeSearchDependencies()
-        dependencies.results["pizza"] = [Self.makeItem(1)]
+        dependencies.results["pizza"] = [Self.makeItem(1, title: "Pizza")]
         let viewModel = SearchViewModel(
             dependencies: dependencies,
             recentSearches: Self.scratchRecents()

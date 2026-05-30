@@ -11,6 +11,16 @@ public struct WPRestClient: Sendable {
     /// Default page size for paginated list endpoints (CL-2).
     public static let defaultPageSize = 20
 
+    /// Wider page size used only by the SEARCH path (CL-120 / T-642 /
+    /// REG-29). The list endpoints stay on the 20-row default because
+    /// the user scrolls them; the search candidate pool needs to be
+    /// wide enough that the post-fetch title-precision filter sees
+    /// every title-bearing match WP's relevance ranker might bury
+    /// past the 20th slot. WP REST caps `per_page` at 100, so this
+    /// is the maximal single-page widening; no pagination bump
+    /// required to close the Nacho-Bug class of failures.
+    public static let searchPageSize = 100
+
     let baseURL: URL
     let httpClient: HTTPClient
     let decoder: JSONDecoder
