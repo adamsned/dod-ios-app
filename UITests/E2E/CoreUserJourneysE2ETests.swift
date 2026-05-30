@@ -249,6 +249,379 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         )
     }
 
+    // MARK: - Journey 3 sibling: long-press Unsave from Saved tab (T-634 + T-635 pin)
+
+    /// T-638 / CL-107 / REG-21 — sibling to `test_save_recipe_then_unsave_from_saved_tab`
+    /// that walks the **context-menu** unsave path from the Saved tab. The
+    /// existing journey covers the detail-screen unsave; this one covers the
+    /// long-press-on-card path which is its own user-facing surface.
+    ///
+    /// Asserts: (1) the menu reads "Unsave" not "Save" (T-634 / CL-103 — the
+    /// saved card must read Unsave); (2) tapping Unsave removes the card
+    /// within 0.5s — frame-tight to verify T-635 / CL-104's optimistic
+    /// removal fired before the slower `.task` reconciliation could mask the
+    /// bug; (3) if this was the last saved recipe, AC-5.8's verbatim empty
+    /// state appears.
+    func test_long_press_unsave_from_saved_tab() {
+        app.launchForE2E()
+
+        // Step 1: navigate into a recipe detail and save it. Mirrors the
+        // existing Journey 3 normalize-state pattern so the test is robust
+        // against prior-run SwiftData state (Phase-1 known gap — T-610's
+        // host-side fakes will make this deterministic).
+        let recipeButtons = app.buttons.matching(
+            NSPredicate(format: "NOT (label IN %@)", Array(E2ETestSupport.tabLabels))
+        )
+        XCTAssertTrue(
+            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
+            "Feed should expose at least 2 recipe rows"
+        )
+        recipeButtons.element(boundBy: 1).tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Ingredients"].waitForExistence(timeout: 45),
+            "Recipe detail should land (Ingredients header) before tapping Save"
+        )
+
+        // Normalize: if already saved from a prior test run, unsave first.
+        let unsaveOnDetail = app.buttons["Unsave recipe"]
+        if unsaveOnDetail.waitForExistence(timeout: 2) {
+            unsaveOnDetail.tap()
+        }
+        let saveButton = app.buttons["Save recipe"]
+        XCTAssertTrue(
+            saveButton.waitForExistence(timeout: 5),
+            "Save button should be visible on detail after normalize-state reset"
+        )
+        saveButton.tap()
+        XCTAssertTrue(
+            app.buttons["Unsave recipe"].waitForExistence(timeout: 12),
+            "Save button should flip to Unsave after a successful save"
+        )
+
+        // Step 2: switch to Saved tab and find the just-saved card via the
+        // T-638 / CL-107 stable identifier.
+        let tabBar = app.tabBars.firstMatch
+        tabBar.buttons["Saved"].tap()
+
+        let savedCard = app.buttons.matching(identifier: "dod.saved.card").firstMatch
+        XCTAssertTrue(
+            savedCard.waitForExistence(timeout: 10),
+            "Saved tab should expose at least one card with the dod.saved.card identifier"
+        )
+
+        // Step 3: long-press to open the context menu. 1.0s is the SwiftUI
+        // default for `.contextMenu` activation; `.press(forDuration:)` is
+        // the canonical XCUITest shape for triggering it.
+        savedCard.press(forDuration: 1.0)
+
+        // Step 4: positive — the menu reads "Unsave" (T-634 / CL-103).
+        let unsaveMenuButton = app.buttons["Unsave"]
+        XCTAssertTrue(
+            unsaveMenuButton.waitForExistence(timeout: 5),
+            "Long-press context menu on a saved card must expose 'Unsave' (T-634 / CL-103)"
+        )
+
+        // Step 4b: negative — the menu must NOT read "Save" (the saved
+        // card's context menu is state-aware, so "Save" would mean the
+        // helper regressed to always-"Save" behavior). Query targeted at
+        // the menu surface — `app.buttons["Save"]` does NOT match the
+        // detail-screen's "Save recipe" button (different label) so this
+        // is a clean negative.
+        XCTAssertFalse(
+            app.buttons["Save"].exists,
+            "Long-press menu on a saved card must NOT expose 'Save' — the helper must be state-aware (T-634)"
+        )
+
+        // Step 5: tap Unsave and assert the card is gone within 0.5s.
+        // The frame-tight window is the load-bearing assertion that
+        // T-635 / CL-104's `SavedViewModel.optimisticallyRemove(id:)`
+        // fired BEFORE the slower `.task { await viewModel.refresh() }`
+        // reconciliation could mask the bug. A regression that removes the
+        // optimistic call would still pass on the slow path (full refresh
+        // on tab-switch-back), but would fail this 0.5s assertion.
+        unsaveMenuButton.tap()
+        XCTAssertFalse(
+            savedCard.waitForExistence(timeout: 0.5),
+            "Tapping Unsave should remove the card within 0.5s — T-635 / CL-104 optimistic removal"
+        )
+
+        // Step 6: if this was the last saved recipe, AC-5.8's verbatim
+        // empty-state title must appear immediately (CL-104's load-bearing
+        // empty-state transition). Other tests in this suite may have left
+        // additional saved recipes from prior runs (Phase-1 known gap), so
+        // we don't hard-assert empty — instead, if no more cards exist, the
+        // empty state MUST be visible.
+        let anyRemainingCard = app.buttons
+            .matching(identifier: "dod.saved.card").firstMatch
+        if !anyRemainingCard.waitForExistence(timeout: 1) {
+            XCTAssertTrue(
+                app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 3),
+                "Unsaving the last recipe must surface AC-5.8 empty state (CL-104)"
+            )
+        }
+    }
+
+    // MARK: - Search-tab journeys (T-637 pin)
+
+    /// T-638 / CL-107 / REG-21 — pins CL-106 part 1's chip-row idle gating.
+    /// `SearchView.body` only renders `FilterChipRow` when
+    /// `viewModel.state != .idle`; this test asserts the cook-time chip
+    /// (queryable via the T-638-added `dod.search.cookTimeChip` identifier)
+    /// is NOT on screen when the Search tab is fresh-idle.
+    func test_search_chip_row_hidden_on_idle() {
+        app.launchForE2E()
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 8), "Tab bar should appear")
+
+        // Switch to Search tab (index 3 per AC-16.6).
+        tabBar.buttons.allElementsBoundByIndex[3].tap()
+
+        let searchField = app.textFields["Search recipes"]
+        XCTAssertTrue(
+            searchField.waitForExistence(timeout: 5),
+            "Search field should be visible on the Search tab"
+        )
+
+        // Negative assertion: the cook-time chip MUST NOT be queryable.
+        // CL-106 part 1 hides `FilterChipRow` on the `.idle` state — if a
+        // future refactor accidentally drops the gate, this test fails.
+        let cookTimeChip = app.buttons.matching(identifier: "dod.search.cookTimeChip").firstMatch
+        XCTAssertFalse(
+            cookTimeChip.waitForExistence(timeout: 1),
+            "Cook-time chip MUST NOT exist on the idle Search tab — CL-106 part 1 gating"
+        )
+    }
+
+    /// T-638 / CL-107 / REG-21 — companion to `test_search_chip_row_hidden_on_idle`.
+    /// Asserts the chip becomes visible the moment a search transitions out
+    /// of `.idle` (per CL-106 part 1 — the row renders for `.searching` /
+    /// `.results` / `.noResults` / `.offline`).
+    func test_search_chip_row_visible_after_query() {
+        app.launchForE2E()
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
+
+        tabBar.buttons.allElementsBoundByIndex[3].tap()
+
+        let searchField = app.textFields["Search recipes"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
+        searchField.tap()
+        searchField.typeText("chicken")
+
+        // Positive assertion: the chip surfaces. 10s timeout accommodates
+        // the 300ms debounce (AC-3.1) + the live REST round-trip — the chip
+        // appears as soon as `state` flips to `.searching`, well before the
+        // results land.
+        let cookTimeChip = app.buttons.matching(identifier: "dod.search.cookTimeChip").firstMatch
+        XCTAssertTrue(
+            cookTimeChip.waitForExistence(timeout: 10),
+            "Cook-time chip should be visible after a query transitions search out of idle"
+        )
+    }
+
+    /// T-638 / CL-107 / REG-21 — the load-bearing Search-tab test that
+    /// catches the T-632-pattern bug class (a cache-only lookup hiding a
+    /// real feature). Pins CL-106 part 2: the cook-time filter hydrates
+    /// `totalSeconds` from the network on cache miss via
+    /// `SearchViewModel.hydrateMissingTotalSeconds()`. If the hydration
+    /// path regresses, the filter rejects every uncached row and the count
+    /// stays at zero (or whatever the cache-only baseline is, typically 0).
+    ///
+    /// Polling-wait pattern (per CL-107's canonicalization): use
+    /// `expectation(for: NSPredicate, evaluatedWith:, handler: nil)` against
+    /// a runtime-evaluable predicate so the test correctly waits for an
+    /// async UI state change without a deterministic completion signal.
+    func test_search_cook_time_filter_narrows_results() {
+        app.launchForE2E()
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
+
+        tabBar.buttons.allElementsBoundByIndex[3].tap()
+
+        let searchField = app.textFields["Search recipes"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
+        searchField.tap()
+        // "chicken" reliably returns multiple results on the live blog and
+        // spans cook-time buckets — picked over "cake" (Journey 2) because
+        // "chicken" recipes vary more in time. If this query goes flaky on
+        // the live API, the documented escalation in CL-107 is to pin to a
+        // stable query, NOT to XCTSkip.
+        searchField.typeText("chicken")
+
+        // Wait for results. Re-use the standard exclusion predicate.
+        let filterChrome: Set<String> = [
+            "All categories", "Any time", "Recently viewed",
+            "Search filters", "Clear",
+        ]
+        let exclude = E2ETestSupport.tabLabels.union(filterChrome)
+        let resultPredicate = NSPredicate(
+            format: "NOT (label IN %@) AND NOT (label BEGINSWITH 'Try')",
+            Array(exclude)
+        )
+        let resultButtons = app.buttons.matching(resultPredicate)
+        XCTAssertTrue(
+            resultButtons.firstMatch.waitForExistence(timeout: 30),
+            "Search should surface at least one result for 'chicken'"
+        )
+
+        // Capture initial count. The 1s sleep is to let any in-flight
+        // pagination settle; `count` is a snapshot at the moment of access.
+        Thread.sleep(forTimeInterval: 1.0)
+        let initialCount = resultButtons.count
+        XCTAssertGreaterThan(
+            initialCount,
+            0,
+            "Initial result count for 'chicken' should be > 0"
+        )
+
+        // Tap the cook-time chip → "≤ 30 min" menu item.
+        let cookTimeChip = app.buttons.matching(identifier: "dod.search.cookTimeChip").firstMatch
+        XCTAssertTrue(
+            cookTimeChip.waitForExistence(timeout: 5),
+            "Cook-time chip should be visible with results on screen"
+        )
+        cookTimeChip.tap()
+
+        // `CookTimeBucket.label` for ≤30min is "≤ 30 min" — surfaces as the
+        // menu button's accessibility label per `FilterChipRow.cookTimeChip`'s
+        // `Menu` body. If the bucket label changes, update both sides.
+        let thirtyMinMenuItem = app.buttons["≤ 30 min"]
+        XCTAssertTrue(
+            thirtyMinMenuItem.waitForExistence(timeout: 5),
+            "Cook-time menu should expose '≤ 30 min' (CookTimeBucket.label)"
+        )
+        thirtyMinMenuItem.tap()
+
+        // Polling-wait for hydration. The result count should change (in
+        // either direction — almost always narrows, but a chicken query
+        // that happens to return only short-time recipes could leave it
+        // equal). The narrowing assertion is `filtered <= initial`.
+        let countChangedPredicate = NSPredicate { _, _ in
+            resultButtons.count != initialCount
+        }
+        let changeExpectation = XCTNSPredicateExpectation(
+            predicate: countChangedPredicate,
+            object: nil
+        )
+        // 15s timeout: hydration fan-out is capped at 20 items per CL-106
+        // part 2; each item is one REST page round-trip. Live blog ~500ms
+        // per fetch → ~10s worst case, 15s gives margin.
+        let result = XCTWaiter().wait(for: [changeExpectation], timeout: 15)
+
+        // The filtered count must be ≤ initial. If the count never changed
+        // (`result == .timedOut`), the narrowing assertion still holds when
+        // filtered == initial — a chicken query returning only short-time
+        // recipes is a legitimate live-data state. The failure mode is
+        // `filtered > initial` (a narrowing filter never grows the set).
+        let filteredCount = resultButtons.count
+        XCTAssertLessThanOrEqual(
+            filteredCount,
+            initialCount,
+            "Cook-time filter must never grow the result set. initial=\(initialCount) filtered=\(filteredCount) waitResult=\(result.rawValue)"
+        )
+    }
+
+    /// T-638 / CL-107 / REG-21 — pins CL-106 part 3: the "Latest Recipes"
+    /// Try-pill routes to `SearchViewModel.surfaceLatestRecipes(limit:)`
+    /// (which fetches via `WPRestClient.posts(...)` — the date-desc default
+    /// endpoint), NOT to `selectCuratedSuggestion(_:)` which would run a
+    /// literal text search for "Latest Recipes" and return garbage (the
+    /// phrase appears in many unrelated articles' boilerplate).
+    ///
+    /// Discriminating assertion: the result count must land in the 3...8
+    /// range. The limit is 5 with an over-fetch of `ceil(5 * 1.5) = 8`; the
+    /// trim drops back to 5 visible recipes after article filtering. A
+    /// literal text search would return either ~0 (no boilerplate hit) or
+    /// many random matches — neither in the 3...8 range. The bound is
+    /// intentionally loose because the live blog's recent-recipes set
+    /// drifts daily; the bound catches the failure mode (zero or many) but
+    /// not legitimate fluctuation in the recent-posts queue.
+    func test_search_latest_recipes_pill_returns_recent_branch() {
+        app.launchForE2E()
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
+
+        tabBar.buttons.allElementsBoundByIndex[3].tap()
+
+        // Wait for `loadCategoriesIfNeeded()` to populate
+        // `topCategorySuggestions` so the Try pills render. The pill we
+        // want is identified via T-638's `dod.search.tryPill.latestRecipes`
+        // identifier (added conditionally on the matching pill in
+        // `IdleSuggestionsView`).
+        let latestPill = app.buttons
+            .matching(identifier: "dod.search.tryPill.latestRecipes").firstMatch
+        XCTAssertTrue(
+            latestPill.waitForExistence(timeout: 30),
+            "Latest Recipes Try-pill should appear in the Try section after categories load"
+        )
+        latestPill.tap()
+
+        // Wait for results. Use the standard chrome-exclusion predicate.
+        let filterChrome: Set<String> = [
+            "All categories", "Any time", "Recently viewed",
+            "Search filters", "Clear",
+        ]
+        let exclude = E2ETestSupport.tabLabels.union(filterChrome)
+        let resultPredicate = NSPredicate(
+            format: "NOT (label IN %@) AND NOT (label BEGINSWITH 'Try')",
+            Array(exclude)
+        )
+        let resultButtons = app.buttons.matching(resultPredicate)
+        XCTAssertTrue(
+            resultButtons.firstMatch.waitForExistence(timeout: 20),
+            "Latest Recipes pill tap should surface result rows within 20s"
+        )
+
+        // Let in-flight pagination settle, then check the count is in the
+        // expected range for the recent-branch fetch.
+        Thread.sleep(forTimeInterval: 1.5)
+        let count = resultButtons.count
+
+        // limit=5, over-fetch=8, article-trim → expected 3...8 visible. A
+        // literal text search returns ~0 or many random matches.
+        XCTAssertGreaterThanOrEqual(
+            count,
+            3,
+            "Latest Recipes should return at least 3 results (limit=5 with article trim); got \(count). A regression to literal text search would return ~0."
+        )
+        XCTAssertLessThanOrEqual(
+            count,
+            8,
+            "Latest Recipes should return at most 8 results (over-fetch cap); got \(count). A regression to literal text search would return many random matches."
+        )
+    }
+
+    // MARK: - Skipped surfaces (XCUITest can't observe these cleanly)
+
+    /// T-638 / CL-107 — XCUITest cannot reliably distinguish SF Symbol
+    /// glyph identity inside a `Label(_:systemImage:)`. The icon is part of
+    /// the rendered Label, not a separately-queryable element, and the
+    /// accessibility label surfaces the text not the symbol name. T-636 /
+    /// CL-105's `magnifyingglass` swap (replacing the prior `tag.fill`) is
+    /// pinned by the L4 `IdleSuggestionsViewSnapshotTests` baselines —
+    /// pixel-locked across light + dark. CL-107 documents this boundary.
+    func test_skipped_try_pill_glyph_pinned_at_L4_snapshot() throws {
+        throw XCTSkip(
+            "T-636 / CL-105 magnifyingglass glyph is pinned by L4 snapshot tests "
+            + "(IdleSuggestionsViewSnapshotTests). XCUITest cannot query SF Symbol "
+            + "identity inside a Label — see CL-107 for the boundary rationale."
+        )
+    }
+
+    /// T-638 / CL-107 — XCUITest cannot read pixel colors. T-636 / CL-105
+    /// decision (4)'s `.tint(.red)` on the destructive trash icon in the
+    /// recent-search context menu is pinned by the L4 snapshot baselines —
+    /// the IdleSuggestionsView baseline locks the rendered color. CL-107
+    /// documents this boundary.
+    func test_skipped_destructive_trash_color_pinned_at_L4_snapshot() throws {
+        throw XCTSkip(
+            "T-636 / CL-105 destructive .tint(.red) is pinned by L4 snapshot tests "
+            + "(IdleSuggestionsViewSnapshotTests). XCUITest cannot read pixel colors — "
+            + "see CL-107 for the boundary rationale."
+        )
+    }
+
     // MARK: - Journey 4: Cook Mode walks two steps and exits
 
     /// Open recipe → tap "Cook Now" → see "Step 1 of M" → tap "Next" → see

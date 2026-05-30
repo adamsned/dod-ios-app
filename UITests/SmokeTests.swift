@@ -288,6 +288,60 @@ final class SmokeTests: XCTestCase {
         )
     }
 
+    /// T-638 / CL-107 / REG-21 — pins T-633 / CL-102's removal of the
+    /// `#if DEBUG` "Test: Simulate New Post" button. Navigates to Settings
+    /// via the gear-icon toolbar button, asserts the page reachable (the
+    /// notifications toggle from US-36 / AC-36.1 is the positive signal),
+    /// then negative-asserts the deleted DEBUG button does NOT exist. The
+    /// positive notifications-toggle assertion doubles as a Settings-page-
+    /// reachable check — if the gear ever stops pushing into Settings, the
+    /// toggle won't appear and the test catches both failure modes. L3 (not
+    /// L5) because the Settings page is a fast-reachability surface and the
+    /// test wall-clock should stay under 5s — AC-T2 pyramid level for
+    /// "screen-existence + button-existence" assertions.
+    func test_settingsPageHasNoDebugTestButton() {
+        // Wait for the tab bar to land. Feed (Recipes) is the default tab,
+        // so the gear icon is already in scope.
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(
+            tabBar.waitForExistence(timeout: 8),
+            "Tab bar should appear within 8 seconds"
+        )
+
+        // Tap the gear icon. Per `FeedView.settingsToolbarLink`, the
+        // accessibility label is "Settings" (on the `Image(systemName:
+        // "gearshape")`). The accessibility identifier
+        // `feed-toolbar-settings` is also available as a secondary handle.
+        let settingsButton = app.buttons["Settings"]
+        XCTAssertTrue(
+            settingsButton.waitForExistence(timeout: 5),
+            "Settings gear icon should be visible on the Feed nav bar"
+        )
+        settingsButton.tap()
+
+        // Positive signal: the notifications toggle from US-36 / AC-36.1.
+        // The `Toggle`'s label text "Notify me when new recipes drop"
+        // surfaces as the switch's accessibility label per `SettingsView`.
+        let notificationsToggle = app.switches["Notify me when new recipes drop"]
+        XCTAssertTrue(
+            notificationsToggle.waitForExistence(timeout: 5),
+            "Settings page should expose the notifications toggle (US-36 / AC-36.1)"
+        )
+
+        // Negative assertion: the DEBUG button must NOT exist (T-633 / CL-102
+        // deleted it). The pre-deletion accessibility label was "Test:
+        // Simulate New Post" (the leading "▸" glyph was a visual prefix on
+        // the rendered text; the underlying label was the trimmed text).
+        // Use a brief `waitForExistence` to give the page a beat to fully
+        // render, then assert absence — `XCTAssertFalse(exists)` after a
+        // short wait is the canonical "negative existence" shape in XCUITest.
+        let debugButton = app.buttons["Test: Simulate New Post"]
+        XCTAssertFalse(
+            debugButton.waitForExistence(timeout: 1),
+            "Settings page must NOT expose the DEBUG 'Test: Simulate New Post' button — T-633 / CL-102 deleted it"
+        )
+    }
+
     /// Pulls the total step count out of a label like "Step 1 of 7".
     /// Returns nil if the label doesn't match the expected pattern.
     private static func totalStepsCount(from label: String) -> Int? {
