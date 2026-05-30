@@ -258,6 +258,10 @@ public struct SearchView: View {
 /// instantly without a network call (US-12 / AC-12.3).
 struct FilterChipRow: View {
     @Binding var filters: SearchFilters
+    /// CL-122 (T-644): the chip is a `Button` that opens the wheel-picker
+    /// half-sheet instead of the pre-T-644 inline `Menu`. The sheet is
+    /// presented from the row so the chip itself stays a one-liner.
+    @State private var cookTimeSheetPresented: Bool = false
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -269,6 +273,24 @@ struct FilterChipRow: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Search filters")
+        // CL-122 (T-644): half-sheet hosting the two-wheel min/max picker.
+        // Drag-down dismisses without applying (no auto-commit on
+        // selection change — Apple-Timer pattern). The sheet's "Apply"
+        // button writes the committed selection back into `$filters`.
+        .sheet(isPresented: $cookTimeSheetPresented) {
+            CookTimeRangeSheet(
+                initialMinSeconds: filters.cookTimeMinSeconds,
+                initialMaxSeconds: filters.cookTimeMaxSeconds,
+                onApply: { newMin, newMax in
+                    filters.cookTimeMinSeconds = newMin
+                    filters.cookTimeMaxSeconds = newMax
+                    cookTimeSheetPresented = false
+                },
+                onCancel: { cookTimeSheetPresented = false }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     // US-29 / AC-29.4 / CL-49.4 + CL-105 (T-636): the "All categories"
@@ -280,25 +302,27 @@ struct FilterChipRow: View {
     // to mutate it is gone.
 
     private var cookTimeChip: some View {
-        Menu {
-            Button("Any time") { filters.cookTime = nil }
-            ForEach(CookTimeBucket.allCases) { bucket in
-                Button(bucket.label) { filters.cookTime = bucket }
-            }
+        let label = cookTimeChipLabel(
+            min: filters.cookTimeMinSeconds,
+            max: filters.cookTimeMaxSeconds
+        )
+        return Button {
+            cookTimeSheetPresented = true
         } label: {
             chipLabel(
-                text: filters.cookTime?.label ?? "Any time",
+                text: label,
                 systemImage: "clock",
-                isOn: filters.cookTime != nil
+                isOn: filters.hasCookTimeRange
             )
         }
-        .accessibilityLabel("Cook time filter, \(filters.cookTime?.label ?? "any time")")
+        .accessibilityLabel("Cook time filter, \(label)")
         // T-638 / CL-107 — stable test handle for the L5 E2E
         // `test_search_chip_row_hidden_on_idle` (negative-asserts the chip is
         // not queryable on the idle Search tab — pins CL-106 part 1's
         // `viewModel.state != .idle` gate) and `test_search_cook_time_filter_narrows_results`
-        // (taps the chip → "≤ 30 min" → asserts the filtered result count
-        // narrows via the hydration path — pins CL-106 part 2 + REG-21).
+        // (taps the chip → opens the wheel sheet → picks max → asserts the
+        // filtered result count narrows via the hydration path — pins
+        // CL-106 part 2 + REG-21 + REG-31).
         .accessibilityIdentifier("dod.search.cookTimeChip")
     }
 
