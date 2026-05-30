@@ -502,7 +502,14 @@ final class CoreUserJourneysE2ETests: XCTestCase {
             "Initial result count for 'chicken' should be > 0"
         )
 
-        // Tap the cook-time chip → "≤ 30 min" menu item.
+        // CL-122 / REG-31 (T-644): the chip now opens an Apple-Timer-style
+        // half-sheet with a two-wheel min/max picker (left wheel "Min",
+        // right wheel "Max"). The L5 contract: tap the chip → wait for
+        // the sheet → scroll the right wheel to "30 min" via the new
+        // `dod.search.cookTimeWheelMax` identifier → tap "Apply" → assert
+        // the result count narrows. Pre-T-644 the test tapped a "≤ 30 min"
+        // menu item; the bucket model is retired and the symbol-bearing
+        // label is gone.
         let cookTimeChip = app.buttons.matching(identifier: "dod.search.cookTimeChip").firstMatch
         XCTAssertTrue(
             cookTimeChip.waitForExistence(timeout: 5),
@@ -510,15 +517,29 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         )
         cookTimeChip.tap()
 
-        // `CookTimeBucket.label` for ≤30min is "≤ 30 min" — surfaces as the
-        // menu button's accessibility label per `FilterChipRow.cookTimeChip`'s
-        // `Menu` body. If the bucket label changes, update both sides.
-        let thirtyMinMenuItem = app.buttons["≤ 30 min"]
+        // Wait for the wheel-picker sheet. The right wheel (Max) carries
+        // the stable `dod.search.cookTimeWheelMax` identifier so we can
+        // pick it without ambiguity vs the left "Min" wheel.
+        let maxWheel = app.pickerWheels.matching(identifier: "dod.search.cookTimeWheelMax").firstMatch
         XCTAssertTrue(
-            thirtyMinMenuItem.waitForExistence(timeout: 5),
-            "Cook-time menu should expose '≤ 30 min' (CookTimeBucket.label)"
+            maxWheel.waitForExistence(timeout: 5),
+            "CookTimeRangeSheet should expose the Max wheel under dod.search.cookTimeWheelMax"
         )
-        thirtyMinMenuItem.tap()
+        // Adjust the wheel to "30 min". `adjust(toPickerWheelValue:)` is
+        // XCUITest's wheel-value setter — exact-string match against the
+        // wheel's row text. The shared duration list in
+        // `CookTimeRangeSheet.durationSeconds` includes a 30-minute entry
+        // whose `CookTimeFormatter.label(seconds: 30 * 60)` renders as
+        // "30 min" (no `≤` per REG-31).
+        maxWheel.adjust(toPickerWheelValue: "30 min")
+
+        // Tap "Apply" to commit the selection back to the filter binding.
+        let applyButton = app.buttons["Apply cook time filter"]
+        XCTAssertTrue(
+            applyButton.waitForExistence(timeout: 3),
+            "CookTimeRangeSheet should expose the Apply button"
+        )
+        applyButton.tap()
 
         // Polling-wait for hydration. The result count should change (in
         // either direction — almost always narrows, but a chicken query
