@@ -38,6 +38,52 @@ import Testing
         #expect(viewModel.loadState == .loaded)
     }
 
+    // T-635 / CL-104 — optimistic removal so the Saved-tab card disappears
+    // instantly on Unsave, without waiting for the next `.task` cycle.
+
+    @Test func optimisticallyRemoveStripsMatchingRecipe() async {
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [
+            Self.makeRecipe(id: 1),
+            Self.makeRecipe(id: 2),
+            Self.makeRecipe(id: 3),
+        ]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+        #expect(viewModel.loadState == .loaded)
+
+        viewModel.optimisticallyRemove(id: 2)
+
+        #expect(viewModel.recipes.map(\.id) == [1, 3])
+        #expect(viewModel.loadState == .loaded)
+    }
+
+    @Test func optimisticallyRemoveTransitionsToEmptyWhenLastRecipeRemoved() async {
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 7)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+        #expect(viewModel.loadState == .loaded)
+
+        viewModel.optimisticallyRemove(id: 7)
+
+        #expect(viewModel.recipes.isEmpty)
+        #expect(viewModel.loadState == .empty)
+    }
+
+    @Test func optimisticallyRemoveIgnoresUnknownId() async {
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+        let before = viewModel.recipes.map(\.id)
+
+        viewModel.optimisticallyRemove(id: 999)
+
+        #expect(viewModel.recipes.map(\.id) == before)
+        #expect(viewModel.loadState == .loaded)
+    }
+
     static func makeRecipe(id: Int) -> Recipe {
         Recipe(
             id: id,

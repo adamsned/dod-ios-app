@@ -3,7 +3,7 @@ import SwiftUI
 /// Typography ramp. Uses system fonts so Dynamic Type works automatically
 /// up to AX5 (constitution §7).
 ///
-/// Plan trace: plan.md §5. US-43 / CL-106 (T-710, 2026-05-29) shifted
+/// Plan trace: plan.md §5. US-43 / CL-113 (T-710, 2026-05-29) shifted
 /// `displayLarge` + `displayMedium` from `.semibold` to `.bold` to match
 /// the dutchovendaddy.com section-header weight; `heading` + `caption`
 /// adopted SF Rounded for the friendlier card-and-chip register; new

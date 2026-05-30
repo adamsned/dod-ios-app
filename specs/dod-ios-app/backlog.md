@@ -177,7 +177,7 @@ Total user value: the app opens the right page for them, with a moment-of-truth 
 
 #### Site ↔ app design coordination — match dutchovendaddy.com so the two surfaces feel seamless
 
-_(Graduated 2026-05-29 as **US-43 / CL-103..CL-107 / T-710..T-713** — see "Recently graduated" below. **T-710 (Phase a)** ships in this graduation PR: foundational tokens + typography + L4 baselines, no view-code change. **T-711..T-713 (Phases b/c/d)** remain deferred per CL-107 — each waits on real-device validation of the prior phase before graduating, behind a `DODFeed.layoutVariant` flag so each screen reverts independently.)_
+_(Graduated 2026-05-29 as **US-43 / CL-110..CL-114 / T-710..T-713** — see "Recently graduated" below. **T-710 (Phase a)** ships in this graduation PR: foundational tokens + typography + L4 baselines, no view-code change. **T-711..T-713 (Phases b/c/d)** remain deferred per CL-114 — each waits on real-device validation of the prior phase before graduating, behind a `DODFeed.layoutVariant` flag so each screen reverts independently.)_
 
 **Feature request from @adamsned**, after observing the live site and the TestFlight 1.0 (2) build side by side. The current app's design language is iOS-native correct but visually diverges from the blog in seven measurable ways. Closing the gap is a contained DesignSystem-only change — no new feature code, no platform constraint, no third-party deps.
 

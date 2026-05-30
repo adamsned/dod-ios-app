@@ -3,7 +3,7 @@ import SwiftUI
 /// Brand palette + semantic colors. Backed by the `Colors.xcassets` catalog
 /// bundled inside this module — light/dark variants are baked in.
 ///
-/// Plan trace: plan.md §5. US-43 / CL-103..CL-107 (T-710, 2026-05-29) added
+/// Plan trace: plan.md §5. US-43 / CL-110..CL-114 (T-710, 2026-05-29) added
 /// `surfaceWarm`, `surfaceDivider`, `labelOnAccent`, and renamed the prior
 /// `creamSubtle` to `surfaceDivider` to make the role-explicit divider
 /// intent clear. `surfaceWarm` + `labelOnAccent` are reserved-but-unused in
@@ -16,7 +16,7 @@ public enum DODColor {
     ///
     /// US-43 / AC-43.1 (T-710, 2026-05-29) — light = `#FFFFFF` (matches the
     /// dutchovendaddy.com white backdrop), dark = `#1B140E` (deeper warm-brown
-    /// than the prior T-520 / CL-51 `#42210B`, per CL-104).
+    /// than the prior T-520 / CL-51 `#42210B`, per CL-111).
     public static let surface = bundleColor("Surface")
     /// Card / sheet surface above ``surface``.
     ///
@@ -30,7 +30,7 @@ public enum DODColor {
     /// US-43 / AC-43.3 (T-710, 2026-05-29) — light = `#FAF6EE`, dark = `#281F19`.
     public static let surfaceWarm = bundleColor("SurfaceWarm")
     /// Thin section dividers + sticky-header tint surfaces. Renamed from
-    /// the prior `creamSubtle` per CL-105 — the role is divider, not warm
+    /// the prior `creamSubtle` per CL-112 — the role is divider, not warm
     /// cream backdrop (use ``surfaceWarm`` for that).
     ///
     /// US-43 / AC-43.4 (T-710, 2026-05-29) — light = `#E6DECF`, dark =

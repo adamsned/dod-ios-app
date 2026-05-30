@@ -29,10 +29,16 @@ public struct SearchView: View {
     public var body: some View {
         VStack(spacing: 0) {
             searchField
-            FilterChipRow(
-                filters: $viewModel.filters,
-                categories: viewModel.availableCategories
-            )
+            // US-12 / AC-12.2 amendment / CL-106 (T-637): hide the filter
+            // chip row while idle — the `IdleSuggestionsView` "Try" /
+            // "Recent" layout below already serves as the discovery
+            // surface, and an above-it chip row crowded the layout. The
+            // row renders the moment a search transitions to .searching
+            // / .results / .noResults / .offline so the user can refine
+            // narrowing while results are coming back.
+            if viewModel.state != .idle {
+                FilterChipRow(filters: $viewModel.filters)
+            }
             content
         }
         .background(DODColor.surface)
@@ -124,7 +130,27 @@ public struct SearchView: View {
                 // term. Persisting it makes Clear All look broken because
                 // the same curated terms reappear under Recent.
                 onCategoryTap: { category in
-                    viewModel.selectCuratedSuggestion(category.name)
+                    // US-29 / AC-29.1 amendment / CL-106 (T-637): the
+                    // "Latest Recipes" category (id 1590, slug
+                    // `latest-recipes` — confirmed by SubTypeTests.swift)
+                    // is special-cased. Running `selectCuratedSuggestion`
+                    // with the literal name would fire a fulltext REST
+                    // search for "Latest Recipes" which returns garbage
+                    // (the phrase appears in many unrelated articles'
+                    // boilerplate). Case-insensitive name match is the
+                    // canonical check (robust against future renames);
+                    // the id check is a belt-and-suspenders fallback in
+                    // case the name drifts. Every other category falls
+                    // through to the normal curated-tap path (CL-49).
+                    let isLatestRecipes =
+                        category.id == 1590
+                        || category.name.localizedCaseInsensitiveCompare("Latest Recipes")
+                            == .orderedSame
+                    if isLatestRecipes {
+                        Task { await viewModel.surfaceLatestRecipes() }
+                    } else {
+                        viewModel.selectCuratedSuggestion(category.name)
+                    }
                 },
                 onClearRecents: { viewModel.clearRecentSearches() },
                 // US-33 / AC-33.3 / CL-57: per-term context-menu Clear.
@@ -188,14 +214,20 @@ public struct SearchView: View {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu { onSave?(item) }
+                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO:
+                // thread per-card `isSaved` state once a Search
+                // viewmodel-owned `Set<Int>` of saved IDs (CL-60 path-(c))
+                // is wired. Until then `false` keeps the pre-T-634 "Save"
+                // + `bookmark.fill` copy at this surface; the high-value
+                // Saved-tab fix is the priority for T-634.
+                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
             }
         }
     }
 
     /// US-38 / AC-38.4 — dense single-column variant. Composes the same
     /// tap + context-menu modifiers as the gallery so US-34 / AC-34.1
-    /// long-press-Save works identically.
+    /// / AC-34.6 long-press-Save/Unsave works identically.
     private var listResults: some View {
         LazyVStack(spacing: DODSpacing.xs) {
             ForEach(viewModel.items) { item in
@@ -206,7 +238,9 @@ public struct SearchView: View {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu { onSave?(item) }
+                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO as
+                // above (CL-60 path-(c) viewmodel-owned saved-IDs set).
+                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
             }
         }
     }
@@ -220,14 +254,11 @@ public struct SearchView: View {
 /// instantly without a network call (US-12 / AC-12.3).
 struct FilterChipRow: View {
     @Binding var filters: SearchFilters
-    let categories: [DODDomain.Category]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DODSpacing.xs) {
-                categoryChip
                 cookTimeChip
-                recentlyViewedChip
             }
             .padding(.horizontal, DODSpacing.md)
             .padding(.bottom, DODSpacing.sm)
@@ -236,33 +267,13 @@ struct FilterChipRow: View {
         .accessibilityLabel("Search filters")
     }
 
-    private var categoryChip: some View {
-        Menu {
-            // US-29 / AC-29.4 / CL-49.4: the "All categories" first row
-            // is intentionally absent — the Categories tab (reachable
-            // via bottom nav) is the canonical "browse all categories"
-            // affordance. To clear a picked category here the user
-            // re-taps the same category in the menu to deselect it.
-            // The chip's display label still reads "All categories"
-            // via `selectedCategoryName` when no category is picked.
-            ForEach(categories) { category in
-                Button(category.name) {
-                    if filters.categoryID == category.id {
-                        filters.categoryID = nil
-                    } else {
-                        filters.categoryID = category.id
-                    }
-                }
-            }
-        } label: {
-            chipLabel(
-                text: selectedCategoryName,
-                systemImage: "tag.fill",
-                isOn: filters.categoryID != nil
-            )
-        }
-        .accessibilityLabel("Category filter, \(selectedCategoryName)")
-    }
+    // US-29 / AC-29.4 / CL-49.4 + CL-105 (T-636): the "All categories"
+    // filter chip was removed because the Categories tab (bottom nav)
+    // already serves as the canonical "browse all categories" surface,
+    // making the chip duplicative. `filters.categoryID` is retained on
+    // the model (always nil here → "all categories" pipeline path) so
+    // the search merge logic remains untouched; only the UI affordance
+    // to mutate it is gone.
 
     private var cookTimeChip: some View {
         Menu {
@@ -280,19 +291,12 @@ struct FilterChipRow: View {
         .accessibilityLabel("Cook time filter, \(filters.cookTime?.label ?? "any time")")
     }
 
-    private var recentlyViewedChip: some View {
-        Button {
-            filters.recentlyViewedOnly.toggle()
-        } label: {
-            chipLabel(
-                text: "Recently viewed",
-                systemImage: "clock.arrow.circlepath",
-                isOn: filters.recentlyViewedOnly
-            )
-        }
-        .accessibilityLabel("Recently viewed only filter")
-        .accessibilityAddTraits(filters.recentlyViewedOnly ? .isSelected : [])
-    }
+    // US-33 / CL-105 (T-636): the "Recently viewed" toggle chip was
+    // removed because the Recent searches section in
+    // `IdleSuggestionsView` already surfaces a user's recent activity,
+    // making the toggle duplicative. `filters.recentlyViewedOnly` is
+    // retained on the model (defaults to false → no-op filter) so the
+    // search pipeline stays unchanged; only the UI to mutate it is gone.
 
     private func chipLabel(text: String, systemImage: String, isOn: Bool) -> some View {
         HStack(spacing: DODSpacing.xxs) {
@@ -306,13 +310,6 @@ struct FilterChipRow: View {
         .background(
             Capsule().fill(isOn ? DODColor.castIronBrown : DODColor.surfaceElevated)
         )
-    }
-
-    private var selectedCategoryName: String {
-        guard let id = filters.categoryID,
-            let category = categories.first(where: { $0.id == id })
-        else { return "All categories" }
-        return category.name
     }
 }
 
