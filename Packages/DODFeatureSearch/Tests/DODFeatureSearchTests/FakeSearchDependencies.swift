@@ -25,6 +25,16 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
     /// CL-106 (T-637): the "Latest Recipes" Try-pill fetch.
     var latestRecipes: [RecipeListItem] = []
     var latestRecipesCalls: [Int] = []
+    /// CL-121 (T-643): the category-match path's `?categories=` fetch
+    /// per matched category. Tests pre-seed `categoryFetchResults[id]`
+    /// with the canned response for each category id the matcher will
+    /// surface; the viewmodel reads the union-deduped result. Set
+    /// `categoryFetchShouldThrow = true` to simulate the Path B failure
+    /// branch (caller should still render Path A results — the graceful
+    /// degradation contract CL-121 locks).
+    var categoryFetchResults: [Int: [RecipeListItem]] = [:]
+    var categoryFetchCalls: [(categoryID: Int, limit: Int)] = []
+    var categoryFetchShouldThrow = false
     var recentlyViewedSet: Set<Int> = []
     var categories: [DODDomain.Category] = []
 
@@ -84,6 +94,20 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
     func fetchLatestRecipes(limit: Int) async throws -> [RecipeListItem] {
         latestRecipesCalls.append(limit)
         return Array(latestRecipes.prefix(limit))
+    }
+
+    /// CL-121 (T-643): simulates the category-match path's `?categories=`
+    /// fetch. Tests pre-seed `categoryFetchResults[id]` for each category
+    /// id that the matcher will surface; the viewmodel reads them in match
+    /// order and unions with Path A. Set `categoryFetchShouldThrow = true`
+    /// to exercise the graceful-degradation branch (Path B failure must
+    /// not block Path A — locked by `SearchViewModelT643Tests`).
+    func fetchPosts(categoryID: Int, limit: Int) async throws -> [RecipeListItem] {
+        categoryFetchCalls.append((categoryID: categoryID, limit: limit))
+        if categoryFetchShouldThrow {
+            throw NSError(domain: "FakeSearchDependencies", code: -643)
+        }
+        return Array((categoryFetchResults[categoryID] ?? []).prefix(limit))
     }
 
     func recentlyViewedRecipeIDs() async throws -> Set<Int> { recentlyViewedSet }

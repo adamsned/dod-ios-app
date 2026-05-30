@@ -249,23 +249,27 @@ public final class SearchViewModel {
         let online = await dependencies.isOnline()
 
         state = .searching
-        var restResults: [RecipeListItem] = []
-        if online {
-            do {
-                restResults = try await dependencies.search(query: trimmed)
-                try? await dependencies.cache(listItems: restResults)
-            } catch {
-                DODLog.network.error("search REST failed: \(String(describing: error))")
-            }
-        }
+        let (restResults, categoryResults) = await fanOutSearchPaths(
+            trimmed: trimmed,
+            online: online
+        )
 
         let localIDs = (try? await dependencies.searchIngredients(matching: trimmed)) ?? []
         let localItems = (try? await dependencies.cachedListItems(forIDs: localIDs)) ?? []
 
-        let merged = SearchResultMerger.merge(
+        let titleMerged = SearchResultMerger.merge(
             query: trimmed,
             restResults: restResults,
             localIngredientResults: localItems
+        )
+        // T-643 / CL-121: union the title-tier-ordered Path A results
+        // with the category-fetched Path B results, deduped by post id.
+        // Path A's tier ordering (exact → substring → fuzzy) survives the
+        // union; Path B-only contributions append in WP's natural date-
+        // desc order. See `CategoryNameMatcher` doc-comment for the rule.
+        let merged = mergeWithCategoryResults(
+            titleMerged: titleMerged,
+            categoryResults: categoryResults
         )
 
         // No results AND we're offline AND there was nothing local — that's
@@ -278,45 +282,29 @@ public final class SearchViewModel {
         }
 
         // Cache the inputs so filter mutations can re-rank without I/O.
+        // T-643: `lastMergedRESTOrdering` carries the **post-union** REST
+        // shape (title + category) so a filter mutation re-runs against
+        // the same set the user sees, not just the title-path subset.
         lastQuery = trimmed
-        lastMergedRESTOrdering = restResults
+        lastMergedRESTOrdering = merged
         lastMergedLocalOrdering = localItems
         lastSurface = .textQuery
 
-        let allIDs = merged.map(\.id)
-        lastCategoryIDsByRecipe =
-            (try? await dependencies.categoryIDs(forRecipeIDs: allIDs)) ?? [:]
-        lastTotalSecondsByRecipe =
-            (try? await dependencies.totalSeconds(forRecipeIDs: allIDs)) ?? [:]
-        lastRecentlyViewedIDs =
-            (try? await dependencies.recentlyViewedRecipeIDs()) ?? []
-
-        let filtered = filters.apply(
-            to: merged,
-            categoryIDsByRecipe: lastCategoryIDsByRecipe,
-            totalSecondsByRecipe: lastTotalSecondsByRecipe,
-            recentlyViewedIDs: lastRecentlyViewedIDs
-        )
-        items = filtered
-        state = filtered.isEmpty ? .noResults : .results
-
-        await recordRecentAndTelemetry(trimmed: trimmed)
-        kickOffCookTimeHydrationIfNeeded(against: merged)
+        await applyFiltersAndFinalize(merged: merged, trimmed: trimmed)
     }
+
+    // CL-121 (T-643): the four `performSearch` helpers (fan-out / Path A
+    // / Path B / merge / finalize) live in `SearchViewModel+T643.swift`
+    // so this file stays under SwiftLint's `file_length` cap. Same split
+    // pattern as the T-637 / T-639 / T-640 extensions above.
 
     /// Record the recent on a successful query — even if zero results,
     /// because "tried it, didn't work" is still useful history. Skip
     /// when the query originated from a curated "Try" suggestion tap
-    /// (REG-19 / CL-66 / T-670): the user didn't type it, so persisting
-    /// it into Recent would surface curated terms the user never asked
-    /// for, and tapping Clear All would not actually clear them on the
-    /// next idle render. Also sends the AC-3.6 SHA-256-hashed query to
-    /// analytics (the raw text never leaves the device).
-    ///
-    /// Extracted from `performSearch` so the parent stays under
-    /// SwiftLint's `function_body_length` cap (CL-106 / T-637's hydration
-    /// kick-off pushed it over).
-    private func recordRecentAndTelemetry(trimmed: String) async {
+    /// (REG-19 / CL-66 / T-670). Also sends the AC-3.6 SHA-256-hashed
+    /// query to analytics. CL-121 (T-643) promoted this from `private`
+    /// to internal so the `+T643` extension's finalize helper can call it.
+    func recordRecentAndTelemetry(trimmed: String) async {
         if !queryFromCuratedTap {
             recents.record(trimmed)
             recentSearches = recents.recent()
@@ -368,16 +356,19 @@ public final class SearchViewModel {
     /// `lastMergedRESTOrdering` (no `SearchResultMerger` call because
     /// there's no text query to re-rank around), so the filter re-runs
     /// against the latest-recipes fetch result directly.
+    ///
+    /// CL-121 (T-643): the `.textQuery` branch now uses the cached
+    /// post-union shape directly (no `SearchResultMerger` re-run). The
+    /// `lastMergedRESTOrdering` field was promoted by `performSearch()`
+    /// to hold the full Path A + Path B union; re-running the merger
+    /// would re-apply the title-precision filter and drop the Path B-only
+    /// category contributions — exactly the regression T-643 fixes.
     private func reapplyFilters() {
         let base: [RecipeListItem]
         switch lastSurface {
         case .textQuery:
-            guard !lastQuery.isEmpty else { return }
-            base = SearchResultMerger.merge(
-                query: lastQuery,
-                restResults: lastMergedRESTOrdering,
-                localIngredientResults: lastMergedLocalOrdering
-            )
+            guard !lastQuery.isEmpty, !lastMergedRESTOrdering.isEmpty else { return }
+            base = lastMergedRESTOrdering
         case .latestRecipes:
             guard !lastMergedRESTOrdering.isEmpty else { return }
             base = lastMergedRESTOrdering
