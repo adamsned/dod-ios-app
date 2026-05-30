@@ -15,8 +15,10 @@ import Foundation
 
 /// The speaker gender of a synthesized voice. Mirrors
 /// `AVSpeechSynthesisVoiceGender` without importing AVFoundation so the
-/// selection logic stays testable on the macOS slice.
-public enum VoiceGender: Sendable, Equatable {
+/// selection logic stays testable on the macOS slice. `CaseIterable` +
+/// `Hashable` let the Settings → Cook Mode Voice picker (T-721) drive it
+/// from a SwiftUI `Picker` / `ForEach`.
+public enum VoiceGender: Sendable, Hashable, CaseIterable {
     case male
     case female
     /// The voice catalog reports no gender (common for older / novelty

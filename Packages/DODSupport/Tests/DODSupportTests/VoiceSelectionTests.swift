@@ -1,7 +1,6 @@
+import DODSupport
 import Foundation
 import Testing
-
-@testable import DODFeatureRecipeDetail
 
 /// L1 coverage for ``VoiceSelector`` — the Cook Mode Voice Mode quality +
 /// gender-selection engine (US-40 / AC-40.9..AC-40.11, T-720). Pure value-type

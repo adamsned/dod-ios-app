@@ -1712,13 +1712,15 @@ Graduates the round-9 backlog item "Cook Mode voice sounds robotic — want natu
 - **Est:** ~4h (engine + value types + store + 18 L1 tests + spec graduation).
 - **||:** P17-voice. Touches only `Packages/DODFeatureRecipeDetail/**` — zero conflict with the open SettingsView PRs (#72 iCloud Sync, #86 design tokens) or #87 (comments). No `e2e` label (engine-only, no composition-root or routing change).
 
-#### T-721 — Phase b: Settings → Voice picker (US-40, deferred)
+#### T-721 — Phase b: Settings → Cook Mode Voice gender picker (US-40) — ✅ shipped 2026-05-30
 
-- **What:** Settings → Voice section with a Female/Male gender toggle bound to `VoicePreferenceStore`, an automatic/specific-voice mode (specific lets the power user pick from `AVSpeechSynthesisVoice.speechVoices()` filtered to the locale, showing the quality tier per voice), and a "Download more voices" button deep-linking to Settings → Accessibility → Spoken Content → Voices via `UIApplication.openSettingsURLString`. New `voicePreferenceChanged(quality:gender:)` adoption analytics event (count-only, no voice identifier — PII concern per the backlog open question) + constitution §9 allowlist amendment.
-- **Files:** `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (new Voice section), `SettingsViewModel.swift` (voice preference binding), the analytics event, snapshot baselines.
-- **AC:** to be assigned (40.12+ reserved).
-- **Est:** ~3 days.
-- **Deps:** **T-703 / PR #72** (iCloud Sync Settings section) + **PR #86** (design tokens + SettingsViewSnapshotTests re-record) must land first — all three touch `SettingsView` + its snapshot baselines, so T-721 sequences after them to avoid a three-way conflict. Independent of T-720's engine (which it binds to via `VoicePreferenceStore`).
+- **Shipped (the round-9 ask).** A **Settings → "Cook Mode voice"** `Picker` (Female / Male / No preference) bound to `SettingsViewModel.voiceGender`, which reads + writes the same `VoicePreferenceStore` (`dod.voice.preferredGenderV1`) the T-720 engine reads at every utterance — so flipping it changes the next step read with **no Cook Mode restart**. Default `.female`; unknown stored value → `.female` (AC-40.11). Accessibility id `settings-picker-voice-gender`.
+- **Supporting refactor (CL-122).** The AVFoundation-free voice types + store (`VoiceGender` / `VoiceQuality` / `VoiceDescriptor` / `VoicePreference` / `VoiceSelector` / `VoicePreferenceStore`) moved from `DODFeatureRecipeDetail` → **`DODSupport`** (beside `GuestIdentityStore`) so `DODFeatureFeed`'s `SettingsView` binds to them **without a feature→feature dependency edge**. `VoiceGender` gained `CaseIterable` + `Hashable` (picker plumbing); `displayName` (UI copy) is a `DODFeatureFeed`-local extension so the domain stays free of view strings. `VoiceReader` consumes the types via `import DODSupport`; the two voice test files moved to `DODSupportTests`.
+- **Files:** moved `Packages/DODSupport/Sources/DODSupport/VoiceSelection.swift` (+ `VoiceSelectionTests` / `VoicePreferenceStoreTests` → `DODSupportTests`), `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/VoiceReader.swift` (import), `Packages/DODFeatureFeed/Sources/DODFeatureFeed/{SettingsView,SettingsViewModel}.swift`, `Packages/DODFeatureFeed/Package.swift` (test-target dep), new `SettingsViewModelVoiceTests.swift` (5 L1 cases).
+- **Verified:** DODSupport 235 tests pass (incl. moved voice tests); DODFeatureFeed 25 SettingsViewModel tests pass (incl. 5 new); DODSupport + DODFeatureRecipeDetail + DODFeatureFeed + app target all build clean.
+- **AC:** US-40 AC-40.10 (selection honors the stored preference) / AC-40.11 (canonical key, female default, unknown→female).
+- **Deferred to a follow-on (NOT the round-9 ask):** the automatic/specific-voice mode (per-locale `speechVoices()` list with quality tier), the "Download more voices" deep-link (`UIApplication.openSettingsURLString`), and the `voicePreferenceChanged` adoption analytics event + constitution §9 allowlist amendment. AC-40.12+ stay reserved for these.
+- **Deps:** **T-703 / PR #72** (iCloud Sync section) + **PR #86** (design tokens) — both landed; T-721 branched off the merged main.
 
 ## Phase 18 — Site/app design coordination (2026-05-29)
 
