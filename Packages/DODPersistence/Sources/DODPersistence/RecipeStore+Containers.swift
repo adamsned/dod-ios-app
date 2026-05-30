@@ -111,7 +111,15 @@ extension RecipeStore {
     public static func inMemoryContainer() throws -> ModelContainer {
         try ModelContainer(
             for: Schema(SchemaV4.models),
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            // `cloudKitDatabase: .none` is REQUIRED, not cosmetic. The app
+            // target's iCloud entitlements (T-701) make SwiftData's default
+            // `.automatic` auto-enable CloudKit, which is invalid for an
+            // in-memory store and crashes at container open. Unit tests run
+            // without the entitlements so they never hit it — but the app
+            // does, via the `-DODUseInMemoryStore` UI-test hook in
+            // `AppDependencies`. Mirrors `makeProductionConfiguration()`'s
+            // explicit `.none` opt-out for the same reason.
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         )
     }
 

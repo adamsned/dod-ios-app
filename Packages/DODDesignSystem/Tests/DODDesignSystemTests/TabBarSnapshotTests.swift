@@ -7,9 +7,10 @@ import XCTest
 
 /// L4 visual-regression baselines for the bottom tab bar (US-16).
 ///
-/// The spec mandates baselines in light + dark, iPhone 13 + iPad 12.9",
-/// with each tab selected (AC-16.5). Source of truth for the order and
-/// icon mapping lives in App-target `AppTab.swift` and is pinned by
+/// The spec mandates light baselines, iPhone 13 + iPad 12.9", with each
+/// tab selected (AC-16.5, amended by CL-115 to drop the dark variants —
+/// see the helper note). Source of truth for the order and icon mapping
+/// lives in App-target `AppTab.swift` and is pinned by
 /// `DODAppUnitTests/AppTabTests`; these snapshots pin the *visual*
 /// result so a font / chrome / icon-asset change surfaces as a pixel
 /// diff in CI.
@@ -37,77 +38,66 @@ final class TabBarSnapshotTests: XCTestCase {
     // MARK: - iPhone 13
 
     func test_tabBar_feedSelected_light_iPhone13() {
-        assertTabBarSnapshot(selected: .feed, dark: false, device: .iPhone13)
+        assertTabBarSnapshot(selected: .feed, device: .iPhone13)
     }
     func test_tabBar_categoriesSelected_light_iPhone13() {
-        assertTabBarSnapshot(selected: .categories, dark: false, device: .iPhone13)
+        assertTabBarSnapshot(selected: .categories, device: .iPhone13)
     }
     func test_tabBar_savedSelected_light_iPhone13() {
-        assertTabBarSnapshot(selected: .saved, dark: false, device: .iPhone13)
+        assertTabBarSnapshot(selected: .saved, device: .iPhone13)
     }
     func test_tabBar_searchSelected_light_iPhone13() {
-        assertTabBarSnapshot(selected: .search, dark: false, device: .iPhone13)
-    }
-    func test_tabBar_feedSelected_dark_iPhone13() {
-        assertTabBarSnapshot(selected: .feed, dark: true, device: .iPhone13)
-    }
-    func test_tabBar_categoriesSelected_dark_iPhone13() {
-        assertTabBarSnapshot(selected: .categories, dark: true, device: .iPhone13)
-    }
-    func test_tabBar_savedSelected_dark_iPhone13() {
-        assertTabBarSnapshot(selected: .saved, dark: true, device: .iPhone13)
-    }
-    func test_tabBar_searchSelected_dark_iPhone13() {
-        assertTabBarSnapshot(selected: .search, dark: true, device: .iPhone13)
+        assertTabBarSnapshot(selected: .search, device: .iPhone13)
     }
 
     // MARK: - iPad 12.9"
 
     func test_tabBar_feedSelected_light_iPad129() {
-        assertTabBarSnapshot(selected: .feed, dark: false, device: .iPad129)
+        assertTabBarSnapshot(selected: .feed, device: .iPad129)
     }
     func test_tabBar_categoriesSelected_light_iPad129() {
-        assertTabBarSnapshot(selected: .categories, dark: false, device: .iPad129)
+        assertTabBarSnapshot(selected: .categories, device: .iPad129)
     }
     func test_tabBar_savedSelected_light_iPad129() {
-        assertTabBarSnapshot(selected: .saved, dark: false, device: .iPad129)
+        assertTabBarSnapshot(selected: .saved, device: .iPad129)
     }
     func test_tabBar_searchSelected_light_iPad129() {
-        assertTabBarSnapshot(selected: .search, dark: false, device: .iPad129)
-    }
-    func test_tabBar_feedSelected_dark_iPad129() {
-        assertTabBarSnapshot(selected: .feed, dark: true, device: .iPad129)
-    }
-    func test_tabBar_categoriesSelected_dark_iPad129() {
-        assertTabBarSnapshot(selected: .categories, dark: true, device: .iPad129)
-    }
-    func test_tabBar_savedSelected_dark_iPad129() {
-        assertTabBarSnapshot(selected: .saved, dark: true, device: .iPad129)
-    }
-    func test_tabBar_searchSelected_dark_iPad129() {
-        assertTabBarSnapshot(selected: .search, dark: true, device: .iPad129)
+        assertTabBarSnapshot(selected: .search, device: .iPad129)
     }
 
     /// Records on missing so the very first run lays down baselines
     /// rather than failing with "no snapshot found". Once committed,
     /// subsequent runs diff against the recorded PNG.
+    ///
+    /// Light appearance only. The dark variants were removed (CL-115 /
+    /// REG-28): iOS 26's translucent tab-bar material composites
+    /// non-deterministically when rendered off-screen (~0.2% pixel match
+    /// run-to-run on the same machine), which no perceptual tolerance can
+    /// absorb. The tab bar's real contract (order / icons / labels) stays
+    /// pinned by `AppTabTests` + `SmokeTests.test_tabBarOrderMatchesSpec`;
+    /// these light snapshots pin the rendered chrome.
+    ///
+    /// `#filePath` (absolute), not `#file` (concise), so the
+    /// `__Snapshots__` dir resolves to the source tree under `xcodebuild`
+    /// rather than the ephemeral simulator data dir.
     private func assertTabBarSnapshot(
         selected: TabBarFixture.Tab,
-        dark: Bool,
         device: TabBarFixture.Device,
-        file: StaticString = #file,
+        file: StaticString = #filePath,
         testName: String = #function,
         line: UInt = #line
     ) {
         let view =
             TabBarFixture(selected: selected)
             .frame(width: device.width, height: device.height)
-            .preferredColorScheme(dark ? .dark : .light)
+            .preferredColorScheme(.light)
         assertSnapshot(
             of: view,
             as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
                 layout: .fixed(width: device.width, height: device.height),
-                traits: UITraitCollection(userInterfaceStyle: dark ? .dark : .light)
+                traits: UITraitCollection(userInterfaceStyle: .light)
             ),
             record: .missing,
             file: file,

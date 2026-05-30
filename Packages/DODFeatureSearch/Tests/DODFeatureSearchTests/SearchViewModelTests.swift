@@ -236,8 +236,13 @@ import Testing
         )
         viewModel.debounceMilliseconds = 0
         viewModel.selectRecent("tacos")
-        // Wait for the debounced search to run.
-        try? await Task.sleep(nanoseconds: 20_000_000)
+        // Poll for the debounced search to land. A fixed 20ms sleep raced on
+        // CI's slower runners (the search hadn't completed → `items` empty →
+        // flaky failure under Xcode-26 CI). Poll up to ~2s, returning as soon
+        // as the result arrives — fast locally, tolerant on CI.
+        for _ in 0..<200 where !viewModel.items.contains(where: { $0.id == 5 }) {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
         #expect(viewModel.query == "tacos")
         #expect(viewModel.items.contains(where: { $0.id == 5 }))
     }
