@@ -88,14 +88,26 @@ extension RecipeStore {
     /// `cloudKitDatabase:` parameter, and `.automatic` auto-enables
     /// CloudKit sync whenever the app's entitlements file declares
     /// `com.apple.developer.icloud-container-identifiers` (which T-701
-    /// added). Without the explicit `.none` override, auto-enable would
-    /// fire on every cold launch — including for users who haven't
-    /// opted in — and SwiftData would then reject every non-optional
-    /// `@Model` attribute + every unique constraint (CloudKit's
-    /// invariants), crashing the app at container open. Setting
-    /// `.none` explicitly is the AC-41.1 graceful-fallback contract:
-    /// the entitlement stays in place for users who DO opt in, but
-    /// CloudKit is provably not touched until the opt-in flag flips.
+    /// added). Setting `.none` explicitly is the AC-41.1 graceful-fallback
+    /// contract: the entitlement stays in place for users who DO opt in,
+    /// but CloudKit is provably not touched until the opt-in flag flips —
+    /// so the app works identically for users not signed into iCloud or
+    /// who declined sync.
+    ///
+    /// **Schema is CloudKit-ready (T-702b).** CloudKit's mirroring
+    /// invariants forbid `@Attribute(.unique)` constraints and require
+    /// every attribute to be optional or defaulted. The five unique
+    /// constraints that shipped through SchemaV4 (`CachedRecipe.id`,
+    /// `CachedComment.id`, `CachedRating.recipeID`, `CachedListPage.key`,
+    /// `CachedImage.urlString`) were dropped — they were redundant, since
+    /// `RecipeStore` already dedups every insert via explicit
+    /// fetch-or-create (`let existing = try fetchRecipe(id:)` …), so the
+    /// DB-level constraint was belt-and-suspenders, not load-bearing. With
+    /// them gone, the `.private(...)` branch opens cleanly instead of
+    /// crashing at container open. The removal is a non-destructive,
+    /// in-place schema relaxation (no row violates a dropped constraint),
+    /// mirroring how the additive `articleBodyHTML` column migrated
+    /// without a dedicated stage.
     static func makeProductionConfiguration() -> ModelConfiguration {
         let optedIn = UserDefaults.standard.bool(forKey: cloudKitSyncOptInKey)
         if optedIn {

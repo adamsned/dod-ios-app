@@ -11,7 +11,7 @@ import SwiftData
 @Model
 public final class CachedListPage {
 
-    @Attribute(.unique) public var key: String
+    public var key: String
     public var pageNumber: Int
     public var recipeIDs: [Int]
     public var fetchedAt: Date

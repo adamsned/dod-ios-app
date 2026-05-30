@@ -18,7 +18,7 @@ import SwiftData
 @Model
 public final class CachedRecipe {
 
-    @Attribute(.unique) public var id: Int
+    public var id: Int
     public var slug: String
     public var title: String
     public var excerptText: String
