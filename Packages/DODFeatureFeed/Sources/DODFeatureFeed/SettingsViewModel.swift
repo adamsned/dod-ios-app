@@ -1,4 +1,5 @@
 import DODPersistence
+import DODSupport
 import Foundation
 import Observation
 
@@ -77,6 +78,11 @@ public final class SettingsViewModel {
     public nonisolated static let telemetryEnabledKey = "dod.settings.telemetryEnabled"
 
     private let defaults: UserDefaults
+
+    /// US-40 / AC-40.10..AC-40.11 (T-721). Backs the Cook Mode voice-gender
+    /// picker. Built against the same injected ``defaults`` so the L1 suite
+    /// drives it through an isolated `UserDefaults(suiteName:)`.
+    private let voicePreferenceStore: VoicePreferenceStore
     /// Optional seam for the iCloud Sync row's flag-write +
     /// container-rebuild dispatch (US-41 / AC-41.3). Constructor-injected
     /// so the L1 suite can pass a recording double; production wiring
@@ -131,6 +137,17 @@ public final class SettingsViewModel {
     public var shareFormat: ShareFormatPreference {
         get { ShareFormatPreference.fromDefaults(defaults) }
         set { defaults.set(newValue.rawValue, forKey: Self.shareFormatPreferenceKey) }
+    }
+
+    /// US-40 / AC-40.10..AC-40.11 (T-721). The user's Cook Mode voice-gender
+    /// preference. Reads + writes via ``VoicePreferenceStore`` (canonical key
+    /// `dod.voice.preferredGenderV1`); defaults to ``VoiceGender/female`` when
+    /// unset. `SystemSpeechSynthesizer` (recipe-detail read-aloud) reads the
+    /// same store, so a change here is honored the next time Cook Mode
+    /// resolves a voice.
+    public var voiceGender: VoiceGender {
+        get { voicePreferenceStore.preference().gender }
+        set { voicePreferenceStore.setGender(newValue) }
     }
 
     /// AC-36.5. Defaults ON (true). The read uses
@@ -200,6 +217,7 @@ public final class SettingsViewModel {
         requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false }
     ) {
         self.defaults = defaults
+        self.voicePreferenceStore = VoicePreferenceStore(defaults: defaults)
         self.cloudSyncDependency = dependencies
         self.requestNotificationAuthorization = requestNotificationAuthorization
         // US-41 AC-41.3 — seed the toggle state from the canonical
@@ -317,80 +335,6 @@ public final class SettingsViewModel {
 // `CloudSyncConfirmationRequest` lives in
 // `SettingsViewModel+CloudSync.swift` alongside the iCloud Sync action
 // methods (file_length split — see that file's header for rationale).
-
-// MARK: - Appearance preference (AC-36.2)
-
-/// User-selected appearance preference. Drives `RootView`'s
-/// `.preferredColorScheme(...)` modifier: `.system` leaves the modifier's
-/// value `nil` (so the OS-level setting wins), `.light` / `.dark` force
-/// the SwiftUI environment value regardless of OS preference.
-///
-/// Raw values are the on-disk wire format — never rename without a
-/// migration shim because the values land in `UserDefaults` on every
-/// user's device that has touched the Appearance picker.
-///
-/// Spec trace: US-36 AC-36.2.
-public enum AppearancePreference: String, CaseIterable, Sendable, Hashable {
-    case system
-    case light
-    case dark
-
-    /// Human-readable label rendered in the picker row.
-    public var displayName: String {
-        switch self {
-        case .system: "Match System"
-        case .light: "Light"
-        case .dark: "Dark"
-        }
-    }
-
-    /// Default-aware read. An absent key OR an unknown raw value falls
-    /// back to ``system`` so a malformed migration / forward-compat
-    /// situation never crashes — Match System is the safe default.
-    public static func fromDefaults(_ defaults: UserDefaults) -> AppearancePreference {
-        guard
-            let raw = defaults.string(forKey: SettingsViewModel.appearancePreferenceKey),
-            let value = AppearancePreference(rawValue: raw)
-        else {
-            return .system
-        }
-        return value
-    }
-}
-
-// MARK: - Share format preference (AC-36.3)
-
-/// Default share format preference. Today the recipe-detail share path
-/// (`RecipeDetailView.ShareLink`) emits the canonical URL only —
-/// ``linkOnly`` preserves that AC-6.2 behavior byte-for-byte. The
-/// ``linkAndText`` case is persisted but not yet consumed: a future
-/// task wires the recipe excerpt into the share payload.
-///
-/// Raw values are the on-disk wire format — same caveat as
-/// ``AppearancePreference``: don't rename without a migration shim.
-///
-/// Spec trace: US-36 AC-36.3.
-public enum ShareFormatPreference: String, CaseIterable, Sendable, Hashable {
-    case linkOnly
-    case linkAndText
-
-    /// Human-readable label rendered in the picker row.
-    public var displayName: String {
-        switch self {
-        case .linkOnly: "Just the link"
-        case .linkAndText: "Link + recipe text"
-        }
-    }
-
-    /// Default-aware read. Absent / malformed values fall back to
-    /// ``linkOnly`` — the existing AC-6.2 share contract.
-    public static func fromDefaults(_ defaults: UserDefaults) -> ShareFormatPreference {
-        guard
-            let raw = defaults.string(forKey: SettingsViewModel.shareFormatPreferenceKey),
-            let value = ShareFormatPreference(rawValue: raw)
-        else {
-            return .linkOnly
-        }
-        return value
-    }
-}
+//
+// The `AppearancePreference` + `ShareFormatPreference` value types live in
+// `SettingsPreferences.swift` (same file_length split, extended by T-721).

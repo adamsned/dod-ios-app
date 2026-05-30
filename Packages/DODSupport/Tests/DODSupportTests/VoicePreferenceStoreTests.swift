@@ -1,7 +1,6 @@
+import DODSupport
 import Foundation
 import Testing
-
-@testable import DODFeatureRecipeDetail
 
 /// L1 coverage for ``VoicePreferenceStore`` (US-40 / AC-40.11, T-720). Uses an
 /// isolated `UserDefaults` suite per test so the device defaults are never
