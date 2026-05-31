@@ -15,14 +15,17 @@ import SwiftData
 @Model
 public final class CachedRating {
 
+    // CloudKit needs every attribute optional-or-defaulted (DOD-CRASH-1);
+    // defaults don't change the schema hash and `init` overwrites them.
+
     /// WP post id of the recipe this rating belongs to.
-    public var recipeID: Int
+    public var recipeID: Int = 0
 
     /// Aggregate average across all rated comments, as WP returned it.
-    public var average: Double
+    public var average: Double = 0
 
     /// Aggregate count across all rated comments.
-    public var count: Int
+    public var count: Int = 0
 
     /// The star value THIS device's guest identity submitted, or `nil` if
     /// the user has never rated this recipe. Used to render the user's
@@ -30,7 +33,7 @@ public final class CachedRating {
     public var userRating: Int?
 
     /// When this row was last refreshed locally.
-    public var cachedAt: Date
+    public var cachedAt = Date.distantPast
 
     public init(
         recipeID: Int,

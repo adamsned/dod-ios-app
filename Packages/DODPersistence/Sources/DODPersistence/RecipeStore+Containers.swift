@@ -94,20 +94,27 @@ extension RecipeStore {
     /// so the app works identically for users not signed into iCloud or
     /// who declined sync.
     ///
-    /// **Schema is CloudKit-ready (T-702b).** CloudKit's mirroring
-    /// invariants forbid `@Attribute(.unique)` constraints and require
-    /// every attribute to be optional or defaulted. The five unique
-    /// constraints that shipped through SchemaV4 (`CachedRecipe.id`,
-    /// `CachedComment.id`, `CachedRating.recipeID`, `CachedListPage.key`,
-    /// `CachedImage.urlString`) were dropped — they were redundant, since
-    /// `RecipeStore` already dedups every insert via explicit
-    /// fetch-or-create (`let existing = try fetchRecipe(id:)` …), so the
-    /// DB-level constraint was belt-and-suspenders, not load-bearing. With
-    /// them gone, the `.private(...)` branch opens cleanly instead of
-    /// crashing at container open. The removal is a non-destructive,
-    /// in-place schema relaxation (no row violates a dropped constraint),
-    /// mirroring how the additive `articleBodyHTML` column migrated
-    /// without a dedicated stage.
+    /// **Schema is CloudKit-ready (T-702b + DOD-CRASH-1).** CloudKit's
+    /// mirroring invariants forbid `@Attribute(.unique)` constraints AND
+    /// require every attribute to be optional or carry a default value.
+    /// Both halves are load-bearing:
+    ///
+    /// 1. The five unique constraints (`CachedRecipe.id`, `CachedComment.id`,
+    ///    `CachedRating.recipeID`, `CachedListPage.key`,
+    ///    `CachedImage.urlString`) were dropped — redundant, since
+    ///    `RecipeStore` dedups every insert via explicit fetch-or-create.
+    /// 2. **DOD-CRASH-1:** dropping the unique constraints alone was NOT
+    ///    enough — the `@Model` classes still had dozens of non-optional
+    ///    attributes with no default value (`id: Int`, `title: String`,
+    ///    `bytes: Data`, …), which CloudKit also rejects. The opt-in
+    ///    `.private(...)` container therefore still threw at open, and
+    ///    `AppDependencies.init`'s `fatalError` crashed the app on every
+    ///    relaunch once sync was enabled (build 3 regression). The fix
+    ///    gives every non-optional attribute a default value; defaults are
+    ///    NOT part of the Core Data version hash, so existing on-disk
+    ///    stores keep opening with no migration. Guarded by
+    ///    `CloudKitSchemaCompatibilityTests` — no prior test built a
+    ///    `.private` container, which is how this shipped.
     static func makeProductionConfiguration() -> ModelConfiguration {
         let optedIn = UserDefaults.standard.bool(forKey: cloudKitSyncOptInKey)
         if optedIn {

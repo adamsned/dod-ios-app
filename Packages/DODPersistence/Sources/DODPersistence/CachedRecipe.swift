@@ -18,21 +18,28 @@ import SwiftData
 @Model
 public final class CachedRecipe {
 
-    public var id: Int
-    public var slug: String
-    public var title: String
-    public var excerptText: String
-    public var canonicalURLString: String
+    // CloudKit mirroring (`cloudKitDatabase: .private`) requires every stored
+    // attribute to be optional or carry a default value, else the container
+    // fails to open and the app crashes at launch once sync is enabled. These
+    // defaults satisfy that at the schema layer; they do NOT change the Core
+    // Data version hash (default values aren't hashed), so existing on-disk
+    // stores keep opening with no migration. `init` always overwrites them
+    // with the real values. (DOD-CRASH-1)
+    public var id: Int = 0
+    public var slug: String = ""
+    public var title: String = ""
+    public var excerptText: String = ""
+    public var canonicalURLString: String = ""
     public var heroImageURLString: String?
     public var heroImageLargeURLString: String?
-    public var categoryIDs: [Int]
-    public var publishedAt: Date
+    public var categoryIDs: [Int] = []
+    public var publishedAt = Date.distantPast
 
     /// Drives LRU ordering. Updated on every detail open.
-    public var lastViewedAt: Date
+    public var lastViewedAt = Date.distantPast
 
     /// Pins the row from LRU eviction (NFR-1).
-    public var isSaved: Bool
+    public var isSaved: Bool = false
 
     /// Non-nil once the JSON-LD parse has populated the detail fields.
     public var jsonLDParsedAt: Date?
