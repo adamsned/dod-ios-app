@@ -17,7 +17,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     GENERATE_INFOPLIST_FILE: NO
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "3"
+    CURRENT_PROJECT_VERSION: "4"
 
 # Local Swift packages — wired up in T-006
 packages:
@@ -79,7 +79,7 @@ targets:
         # re-used. Bump on every upload attempt. xcodegen does NOT read
         # this from `CURRENT_PROJECT_VERSION`; it hardcodes "1" as the
         # default unless explicitly set here.
-        CFBundleVersion: "3"
+        CFBundleVersion: "4"
         LSRequiresIPhoneOS: true
         # UILaunchScreen is required for iOS to render edge-to-edge on
         # modern devices (notch, Dynamic Island, home indicator). Without
@@ -184,7 +184,7 @@ targets:
         # MUST match the host app's CFBundleVersion (Apple's bundle-
         # extension contract — version skew between host + extension
         # rejected at upload).
-        CFBundleVersion: "3"
+        CFBundleVersion: "4"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -214,7 +214,7 @@ targets:
         CFBundleDisplayName: DOD Live Activity
         # MUST match the host app's CFBundleVersion (Apple's bundle-
         # extension contract).
-        CFBundleVersion: "3"
+        CFBundleVersion: "4"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
