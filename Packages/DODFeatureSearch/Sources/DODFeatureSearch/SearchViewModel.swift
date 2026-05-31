@@ -108,6 +108,16 @@ public final class SearchViewModel {
     /// Newest-first recent queries.
     public private(set) var recentSearches: [String] = []
 
+    /// US-12 amendment / US-29 amendment / CL-127 (T-649): "did you
+    /// mean?" suggestion populated by `applyFiltersAndFinalize(...)`
+    /// when the merged result set settles with fewer than 3 items AND
+    /// the user did issue a search. Read by `SearchView` to render the
+    /// tappable rescue banner above the result list. Mutated only on
+    /// the main actor (`@MainActor` view-model) — the setter is
+    /// `internal` so the `+T643` extension can compute the suggestion
+    /// at the finalize hop without forking the storage.
+    public internal(set) var didYouMean: String?
+
     // CL-106 (T-637): the next five caches and `dependencies` are
     // `internal` (no access modifier) rather than `private` so the
     // `SearchViewModel+T637.swift` extension can read/write them when
@@ -144,6 +154,22 @@ public final class SearchViewModel {
         lastMergedRESTOrdering = []
         lastMergedLocalOrdering = []
         lastSurface = .textQuery
+        // CL-127 (T-649): clear the banner too so a fresh search starts
+        // clean. The view re-renders without the prior rescue affordance.
+        didYouMean = nil
+    }
+
+    /// US-12 amendment / US-29 amendment / CL-127 (T-649): apply the
+    /// engine's "did you mean?" suggestion. Overwrites `query` with the
+    /// suggested string and nulls out `didYouMean` so the banner
+    /// disappears immediately; the existing `query.didSet` debounce +
+    /// `performSearch()` path re-runs against the new query and the
+    /// view re-renders with the new result set. No-op when there is no
+    /// current suggestion.
+    public func applyDidYouMean() {
+        guard let suggestion = didYouMean else { return }
+        didYouMean = nil
+        query = suggestion
     }
 
     /// Surface a stored query (e.g. user tapped a recent chip). Sets the
@@ -349,6 +375,15 @@ public final class SearchViewModel {
     /// fan-out so a single filter toggle can't hammer the API. Matches
     /// `WPRestClient.defaultPageSize` (20) by convention.
     private static let hydrationCap: Int = 20
+
+    /// CL-127 (T-649): the result-count threshold below which the
+    /// viewmodel computes a "did you mean?" suggestion. 3 is the
+    /// minimum "result page feels populated" count on the 2-column
+    /// gallery — one card is lonely, two reads as "is that all?",
+    /// three fills the first scrolled row and the user trusts the
+    /// search worked. Below that the banner intervenes. Exposed
+    /// `internal` for the +T643 extension's compute hop.
+    static let didYouMeanThreshold: Int = 3
 
     /// Re-rank the cached merged set when filters change. Pure function over
     /// stored state — no I/O (apart from the optional cook-time hydration

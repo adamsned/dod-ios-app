@@ -37,6 +37,10 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
     var categoryFetchShouldThrow = false
     var recentlyViewedSet: Set<Int> = []
     var categories: [DODDomain.Category] = []
+    /// CL-127 (T-649): pre-seed the "did you mean?" engine's source
+    /// pool. Defaults to empty so tests that don't exercise the
+    /// suggestion path implicitly land at `didYouMean == nil`.
+    var cachedTitlesArray: [String] = []
 
     func search(query: String) async throws -> [RecipeListItem] {
         searches.append(query)
@@ -111,6 +115,9 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
     }
 
     func recentlyViewedRecipeIDs() async throws -> Set<Int> { recentlyViewedSet }
+
+    /// CL-127 (T-649): returns the pre-seeded cached-titles fixture.
+    func cachedRecipeTitles() async throws -> [String] { cachedTitlesArray }
 
     func allCategories() async throws -> [DODDomain.Category] { categories }
 

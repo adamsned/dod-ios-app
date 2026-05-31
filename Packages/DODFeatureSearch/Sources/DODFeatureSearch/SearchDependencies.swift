@@ -67,6 +67,14 @@ public protocol SearchDependencies: Sendable {
     /// Set of recipe IDs the user has opened (any cached row). Drives the
     /// "Recently viewed" filter chip.
     func recentlyViewedRecipeIDs() async throws -> Set<Int>
+    /// US-12 amendment / US-29 amendment / CL-127 (T-649): every cached
+    /// recipe's title, used as the source pool for the "did you mean?"
+    /// suggestion engine when the result set settles with fewer than
+    /// 3 items. Wraps the existing `RecipeStore` cache; no new schema,
+    /// no new REST surface. Returns `[]` on a fresh install (cold
+    /// cache); the viewmodel short-circuits to a `nil` suggestion in
+    /// that case.
+    func cachedRecipeTitles() async throws -> [String]
 
     // MARK: - Filter chip data + empty-state suggestions
     /// All WP categories, alphabetized. Empty array on REST failure — the
@@ -190,6 +198,14 @@ public struct LiveSearchDependencies: SearchDependencies {
 
     public func recentlyViewedRecipeIDs() async throws -> Set<Int> {
         try await store.recentlyViewedRecipeIDs()
+    }
+
+    /// US-12 amendment / US-29 amendment / CL-127 (T-649): wraps
+    /// `RecipeStore.cachedRecipeTitles()`. The store reads the same
+    /// `CachedRecipe` rows the rest of Search already touches; this
+    /// path is read-only and additive.
+    public func cachedRecipeTitles() async throws -> [String] {
+        try await store.cachedRecipeTitles()
     }
 
     public func allCategories() async throws -> [DODDomain.Category] {
