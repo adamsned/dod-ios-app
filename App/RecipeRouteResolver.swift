@@ -56,8 +56,8 @@ enum RecipeRouteResolver {
     static func resolve(
         id: Int,
         autoStartCookMode: Bool,
-        cachedLookup: (Int) async throws -> Recipe?,
-        fetch: (Int) async throws -> RecipeListItem
+        cachedLookup: sending (Int) async throws -> Recipe?,
+        fetch: sending (Int) async throws -> RecipeListItem
     ) async -> RecipeRoute? {
         // Cache-first: widgets / Spotlight always hit here, so their
         // behavior is unchanged (no network, no LRU touch).

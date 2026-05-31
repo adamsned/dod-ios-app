@@ -98,7 +98,7 @@ extension RecipeStore {
         var freedBytes = 0
         for row in unpinned {
             freedBytes += row.bytes.count
-            URL(string: row.urlString).map { WidgetImageBridge.deleteImage(for: $0) }
+            if let url = URL(string: row.urlString) { WidgetImageBridge.deleteImage(for: url) }
             modelContext.delete(row)
         }
         try modelContext.save()
@@ -120,7 +120,7 @@ extension RecipeStore {
         guard total > Self.imageBudgetBytes else { return }
         for row in all where row.pinnedToSavedRecipeID == nil {
             let size = row.bytes.count
-            URL(string: row.urlString).map { WidgetImageBridge.deleteImage(for: $0) }
+            if let url = URL(string: row.urlString) { WidgetImageBridge.deleteImage(for: url) }
             modelContext.delete(row)
             total -= size
             if total <= Self.imageBudgetBytes { break }

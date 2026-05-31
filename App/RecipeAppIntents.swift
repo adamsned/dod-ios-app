@@ -9,14 +9,14 @@ import SwiftUI
 /// `RootView.onOpenURL` then routes into the Feed tab's NavigationStack.
 struct OpenRecipeIntent: AppIntent {
 
-    static var title: LocalizedStringResource = "Open Recipe"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Open Recipe"
+    static let description = IntentDescription(
         "Opens a Dutch Oven Daddy recipe by name in the app."
     )
 
     /// Allow Siri to launch the app on invocation. Without this the intent
     /// can still run but the user has to be in the app already.
-    static var openAppWhenRun: Bool = true
+    static let openAppWhenRun: Bool = true
 
     @Parameter(title: "Recipe")
     var recipe: RecipeEntity
@@ -39,12 +39,12 @@ struct OpenRecipeIntent: AppIntent {
 /// screen and then immediately presents Cook Mode once the recipe is loaded.
 struct StartCookModeIntent: AppIntent {
 
-    static var title: LocalizedStringResource = "Start Cook Mode"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Start Cook Mode"
+    static let description = IntentDescription(
         "Opens a recipe and jumps straight to hands-free Cook Mode."
     )
 
-    static var openAppWhenRun: Bool = true
+    static let openAppWhenRun: Bool = true
 
     @Parameter(title: "Recipe")
     var recipe: RecipeEntity
@@ -66,12 +66,12 @@ struct StartCookModeIntent: AppIntent {
 /// Spec trace: US-10 / AC-10.1.
 struct OpenSavedRecipesIntent: AppIntent {
 
-    static var title: LocalizedStringResource = "Show Saved Recipes"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Show Saved Recipes"
+    static let description = IntentDescription(
         "Opens the list of recipes you've saved for offline cooking."
     )
 
-    static var openAppWhenRun: Bool = true
+    static let openAppWhenRun: Bool = true
 
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
