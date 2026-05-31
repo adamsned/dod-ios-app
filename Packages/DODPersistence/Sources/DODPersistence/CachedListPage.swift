@@ -11,10 +11,12 @@ import SwiftData
 @Model
 public final class CachedListPage {
 
-    public var key: String
-    public var pageNumber: Int
-    public var recipeIDs: [Int]
-    public var fetchedAt: Date
+    // CloudKit needs every attribute optional-or-defaulted (DOD-CRASH-1);
+    // defaults don't change the schema hash and `init` overwrites them.
+    public var key: String = ""
+    public var pageNumber: Int = 0
+    public var recipeIDs: [Int] = []
+    public var fetchedAt = Date.distantPast
 
     public init(key: String, pageNumber: Int, recipeIDs: [Int], fetchedAt: Date = .now) {
         self.key = key

@@ -14,14 +14,17 @@ import SwiftData
 @Model
 public final class CachedIngredient {
 
+    // CloudKit needs every attribute optional-or-defaulted (DOD-CRASH-1);
+    // defaults don't change the schema hash and `init` overwrites them.
+
     /// Recipe these ingredient lines belong to.
-    public var recipeID: Int
+    public var recipeID: Int = 0
 
     /// Lowercased, whitespace-trimmed ingredient text — the form a search
     /// predicate matches against. Original casing is not preserved here
     /// because the index is search-only; the user-visible text comes from
     /// `CachedRecipe.ingredientsJSON`.
-    public var normalizedText: String
+    public var normalizedText: String = ""
 
     public init(recipeID: Int, normalizedText: String) {
         self.recipeID = recipeID

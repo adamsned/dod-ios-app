@@ -8,10 +8,12 @@ import SwiftData
 @Model
 public final class CachedImage {
 
-    public var urlString: String
-    public var bytes: Data
-    public var fetchedAt: Date
-    public var lastUsedAt: Date
+    // CloudKit needs every attribute optional-or-defaulted (DOD-CRASH-1);
+    // defaults don't change the schema hash and `init` overwrites them.
+    public var urlString: String = ""
+    public var bytes = Data()
+    public var fetchedAt = Date.distantPast
+    public var lastUsedAt = Date.distantPast
     public var pinnedToSavedRecipeID: Int?
 
     public init(

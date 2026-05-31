@@ -16,29 +16,32 @@ import SwiftData
 @Model
 public final class CachedComment {
 
+    // CloudKit needs every attribute optional-or-defaulted (DOD-CRASH-1);
+    // defaults don't change the schema hash and `init` overwrites them.
+
     /// WordPress comment id (unique within the WP install).
-    public var id: Int
+    public var id: Int = 0
 
     /// WP post id the comment belongs to. Used as the foreign-key for
     /// `cachedComments(forPostID:)`.
-    public var postID: Int
+    public var postID: Int = 0
 
     /// Parent comment id when this is a reply, else `nil`.
     public var parentID: Int?
 
     /// Display name as WP echoed it back (already HTML-decoded by the
     /// network layer).
-    public var authorName: String
+    public var authorName: String = ""
 
     /// Avatar URL — may be `nil` when WP returns an empty Gravatar.
     public var avatarURLString: String?
 
     /// Posted-at timestamp in GMT. The view layer converts to local for
     /// display.
-    public var dateGMT: Date
+    public var dateGMT = Date.distantPast
 
     /// Comment body as plain text (already HTML-stripped).
-    public var bodyText: String
+    public var bodyText: String = ""
 
     /// Star rating attached to the comment if the user submitted a rating
     /// at the same time, else `nil`. WP Recipe Maker stores ratings on the
@@ -48,18 +51,18 @@ public final class CachedComment {
     /// Raw `RecipeComment.Status` rawValue. Persisted as `String` so the
     /// schema doesn't need a SwiftData-aware enum encoding — conversion to
     /// the Domain enum happens in `RecipeStore`.
-    public var statusRaw: String
+    public var statusRaw: String = ""
 
     /// When this row was last refreshed locally. Lets the comment feed
     /// view layer show a "cached as of …" line on offline open.
-    public var cachedAt: Date
+    public var cachedAt = Date.distantPast
 
     /// True when this row was posted by THIS device's guest identity and
     /// is currently in WP's moderation queue. Surfacing rule (US-14): the
     /// public list hides it for everyone, but the author still sees their
     /// own comment with an "Awaiting approval" label so they don't think
     /// the submit silently failed.
-    public var isPendingFromThisDevice: Bool
+    public var isPendingFromThisDevice: Bool = false
 
     public init(
         id: Int,

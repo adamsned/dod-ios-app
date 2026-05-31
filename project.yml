@@ -17,7 +17,17 @@ settings:
     CODE_SIGN_STYLE: Automatic
     GENERATE_INFOPLIST_FILE: NO
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "3"
+    CURRENT_PROJECT_VERSION: "4"
+
+# Signing team is injected from a gitignored xcconfig so the Apple Team ID
+# stays out of this public repo. Without this, `xcodegen generate` produces a
+# project with no DEVELOPMENT_TEAM and every Archive fails with "Signing for
+# 'DODApp' requires a development team." The file is recreated locally per
+# clone (see App/DODApp.xcconfig for the one-liner). Applied to both configs
+# at the project level so the app + both extensions inherit it.
+configFiles:
+  Debug: App/DODApp.xcconfig
+  Release: App/DODApp.xcconfig
 
 # Local Swift packages — wired up in T-006
 packages:
@@ -79,7 +89,7 @@ targets:
         # re-used. Bump on every upload attempt. xcodegen does NOT read
         # this from `CURRENT_PROJECT_VERSION`; it hardcodes "1" as the
         # default unless explicitly set here.
-        CFBundleVersion: "3"
+        CFBundleVersion: "4"
         LSRequiresIPhoneOS: true
         # UILaunchScreen is required for iOS to render edge-to-edge on
         # modern devices (notch, Dynamic Island, home indicator). Without
@@ -184,7 +194,7 @@ targets:
         # MUST match the host app's CFBundleVersion (Apple's bundle-
         # extension contract — version skew between host + extension
         # rejected at upload).
-        CFBundleVersion: "3"
+        CFBundleVersion: "4"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -214,7 +224,7 @@ targets:
         CFBundleDisplayName: DOD Live Activity
         # MUST match the host app's CFBundleVersion (Apple's bundle-
         # extension contract).
-        CFBundleVersion: "3"
+        CFBundleVersion: "4"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

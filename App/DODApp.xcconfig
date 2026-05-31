@@ -1,0 +1,14 @@
+// Committed signing base (no secret). project.yml's `configFiles` points here.
+//
+// The Apple Developer Team ID must NOT live in this public repo, so it's kept
+// in a gitignored local override that this file optionally pulls in. The `?`
+// makes the include tolerant of a missing file:
+//   - CI / fresh clones have no local override → no Team ID → xcodegen +
+//     simulator builds still work (CI signs nothing).
+//   - Locally, App/DODApp.local.xcconfig supplies DEVELOPMENT_TEAM so device
+//     builds and Archives sign without the "requires a development team" error.
+//
+// Create the override after a fresh clone with your Team ID (the OU field of
+// your signing cert — `security find-certificate … | openssl x509 -noout -subject`):
+//   echo 'DEVELOPMENT_TEAM = XXXXXXXXXX' > App/DODApp.local.xcconfig
+#include? "DODApp.local.xcconfig"

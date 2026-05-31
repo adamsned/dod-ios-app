@@ -30,6 +30,11 @@ Package.resolved
 # Secrets (constitution §9)
 *.xcconfig
 !*.xcconfig.example
+# App/DODApp.xcconfig is a committed signing *wrapper* (no secret) that
+# project.yml's configFiles points to; it #include?s the gitignored
+# App/DODApp.local.xcconfig which holds the Team ID. The wrapper MUST be
+# tracked or CI's `xcodegen generate` fails with "Invalid config file".
+!App/DODApp.xcconfig
 
 # macOS
 .DS_Store
