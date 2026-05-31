@@ -77,6 +77,31 @@ public enum AnalyticsEvent: Sendable, Hashable {
     /// user's raw spoken phrase is **never** included (the intent layer never
     /// sees it: SiriKit matches the phrase and hands the app a typed intent).
     case voiceCommandFired(command: VoiceCommandName)
+
+    /// iCloud Sync (US-41) turned ON — via the AC-41.2 first-launch opt-in
+    /// prompt (T-704) or the AC-41.3 Settings toggle (T-703). Empty payload:
+    /// sync is a session-level state, not a per-recipe action (`recipeSaved`
+    /// already covers per-recipe granularity). Authorized by CL-124
+    /// (constitution §9 allowlist amendment). Spec: AC-41.9 (T-707).
+    case syncEnabled
+
+    /// iCloud Sync (US-41) turned OFF — via the AC-41.3 Settings toggle only
+    /// (the prompt's "Not now" declines without ever disabling). Empty
+    /// payload. Authorized by CL-124. Spec: AC-41.9 (T-707).
+    case syncDisabled
+
+    /// A CloudKit sync round-trip completed successfully (US-41 / AC-41.9),
+    /// debounced upstream to at most once per 60s so a burst of mirror events
+    /// never spams the transport. Empty payload. Authorized by CL-124. The
+    /// dispatch site (observing `NSPersistentCloudKitContainer` events) lands
+    /// with T-705's sync-status machinery; T-707 defines the event.
+    case syncCompletedSuccessfully
+
+    /// A CloudKit sync attempt failed after the AC-41.6 retry budget (US-41 /
+    /// AC-41.9). The payload carries only the closed-set ``SyncErrorCategory``
+    /// string — never the raw `CKError` code/message (constitution §9: no free
+    /// text / no PII). Authorized by CL-124. Dispatch lands with T-705.
+    case syncFailed(errorCategory: SyncErrorCategory)
 }
 
 /// The closed set of Siri voice commands Cook Mode exposes (US-40 / AC-40.5).
@@ -113,6 +138,29 @@ public enum WidgetKind: String, Sendable, Hashable, CaseIterable {
     case saved
 }
 
+/// Closed-set category for a `syncFailed` event (US-41 / AC-41.9). The wire
+/// value is the case name — **never** the raw `CKError` code or message
+/// (constitution §9: no free text, no PII). Mirrors the closed-enum posture
+/// of ``WidgetKind`` + ``VoiceCommandName``.
+public enum SyncErrorCategory: String, Sendable, Hashable, CaseIterable {
+
+    /// No connectivity / transient network failure.
+    case network
+
+    /// iCloud account unavailable (`.noAccount` / `.restricted`).
+    case accountStatus
+
+    /// The user's iCloud storage quota is exhausted.
+    case quotaExceeded
+
+    /// A CloudKit server-side internal error.
+    case serverInternal
+
+    /// Any other / uncategorized failure (the catch-all so the closed set
+    /// never needs a free-text escape hatch).
+    case other
+}
+
 extension AnalyticsEvent {
     /// Stable event name as sent to the upstream analytics transport.
     public var name: String {
@@ -131,6 +179,10 @@ extension AnalyticsEvent {
         case .widgetOpened: "widget_opened"
         case .voiceModeToggled: "voice_mode_toggled"
         case .voiceCommandFired: "voice_command_fired"
+        case .syncEnabled: "sync_enabled"
+        case .syncDisabled: "sync_disabled"
+        case .syncCompletedSuccessfully: "sync_completed_successfully"
+        case .syncFailed: "sync_failed"
         }
     }
 
@@ -176,6 +228,15 @@ extension AnalyticsEvent {
             // `command` is a closed enum string (next/previous/repeat/pause),
             // never the user's spoken phrase. Constitution §9: no free text.
             ["command": command.rawValue]
+        case .syncEnabled:
+            [:]
+        case .syncDisabled:
+            [:]
+        case .syncCompletedSuccessfully:
+            [:]
+        case .syncFailed(let errorCategory):
+            // Closed-set category only — never the raw CKError. Constitution §9.
+            ["error_category": errorCategory.rawValue]
         }
     }
 }

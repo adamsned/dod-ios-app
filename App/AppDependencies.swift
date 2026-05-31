@@ -218,6 +218,13 @@ final class AppDependencies {
         LiveSettingsDependencies { [weak self] enabled in
             // Step 1 — write the flag the container factory reads.
             UserDefaults.standard.set(enabled, forKey: RecipeStore.cloudKitSyncOptInKey)
+            // Step 1b (T-707 / AC-41.9) — record the opt-in change. This is the
+            // single dispatch point for `syncEnabled` / `syncDisabled`: BOTH the
+            // AC-41.3 Settings toggle and the AC-41.2 first-launch prompt route
+            // through this seam, so firing here covers both with no duplication.
+            // The prompt's "Not now" never calls the seam, so declining
+            // correctly emits nothing.
+            Telemetry.shared.send(enabled ? .syncEnabled : .syncDisabled)
             // Step 2 — rebuild the container so the next open observes
             // the new value. The rebuild is best-effort: if it throws
             // (rare — only on lower-level SwiftData corruption) we log

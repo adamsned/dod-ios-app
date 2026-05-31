@@ -146,6 +146,49 @@ import Testing
         }
     }
 
+    // MARK: - US-41 / AC-41.9 (T-707) — iCloud Sync events
+
+    @Test func syncEnabledIsNameOnlyWithEmptyPayload() {
+        // AC-41.9 + constitution §9 (CL-124): sync is a session-level state,
+        // not a per-recipe action — payload is empty (no recipe id, no PII).
+        let event = AnalyticsEvent.syncEnabled
+        #expect(event.name == "sync_enabled")
+        #expect(event.payload.isEmpty)
+    }
+
+    @Test func syncDisabledIsNameOnlyWithEmptyPayload() {
+        let event = AnalyticsEvent.syncDisabled
+        #expect(event.name == "sync_disabled")
+        #expect(event.payload.isEmpty)
+    }
+
+    @Test func syncCompletedSuccessfullyIsNameOnlyWithEmptyPayload() {
+        let event = AnalyticsEvent.syncCompletedSuccessfully
+        #expect(event.name == "sync_completed_successfully")
+        #expect(event.payload.isEmpty)
+    }
+
+    @Test func syncFailedCarriesOnlyTheClosedCategoryString() {
+        // AC-41.9 + constitution §9 (CL-124): the only payload is the closed
+        // SyncErrorCategory string — never the raw CKError code/message.
+        let event = AnalyticsEvent.syncFailed(errorCategory: .network)
+        #expect(event.name == "sync_failed")
+        #expect(event.payload == ["error_category": "network"])
+        #expect(event.payload.keys.count == 1)
+    }
+
+    @Test func syncFailedPayloadHasNoFreeText() {
+        // Sweep every category: the only value is a known closed-enum string.
+        let permitted = Set(SyncErrorCategory.allCases.map(\.rawValue))
+        for category in SyncErrorCategory.allCases {
+            let event = AnalyticsEvent.syncFailed(errorCategory: category)
+            for (key, value) in event.payload {
+                #expect(key == "error_category")
+                #expect(permitted.contains(value), "sync_failed leaked free text: \(value)")
+            }
+        }
+    }
+
     @Test func allEventNamesAreUnique() {
         let allNames: [String] = [
             AnalyticsEvent.appOpen.name,
@@ -162,6 +205,10 @@ import Testing
             AnalyticsEvent.widgetOpened(kind: .featured, recipeID: 1).name,
             AnalyticsEvent.voiceModeToggled(on: true).name,
             AnalyticsEvent.voiceCommandFired(command: .next).name,
+            AnalyticsEvent.syncEnabled.name,
+            AnalyticsEvent.syncDisabled.name,
+            AnalyticsEvent.syncCompletedSuccessfully.name,
+            AnalyticsEvent.syncFailed(errorCategory: .other).name,
         ]
         #expect(Set(allNames).count == allNames.count)
     }
