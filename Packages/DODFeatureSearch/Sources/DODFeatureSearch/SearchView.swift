@@ -28,7 +28,21 @@ public struct SearchView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            searchField
+            // US-3 / AC-3.5 amendment / CL-126 / REG-32 (T-648, 2026-05-30):
+            // the inline `searchField` `HStack`-with-`RoundedRectangle` is
+            // replaced by the shared `DODSearchField` so this bar and the
+            // Categories-tab bar both render `DODColor.surfaceElevated`
+            // brand brown inside a `Capsule(style: .continuous)` shape.
+            // The `onClear` closure routes to `viewModel.clear()` so the
+            // clear button preserves the full VM-side state/items/lastQuery/
+            // debounce-cancel cleanup, not just the query-string clear.
+            DODSearchField(
+                text: $viewModel.query,
+                placeholder: "Search recipes",
+                onClear: { viewModel.clear() }
+            )
+            .padding(DODSpacing.md)
+            .accessibilityIdentifier("dod.search.field.search")
             // US-12 / AC-12.2 amendment / CL-106 (T-637): hide the filter
             // chip row while idle — the `IdleSuggestionsView` "Try" /
             // "Recent" layout below already serves as the discovery
@@ -77,32 +91,6 @@ public struct SearchView: View {
                 .accessibilityHint(layout.destinationActionHint)
         }
         .accessibilityIdentifier("search-toolbar-layout-toggle")
-    }
-
-    private var searchField: some View {
-        HStack(spacing: DODSpacing.xs) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(DODColor.labelSecondary)
-            TextField("Search recipes", text: $viewModel.query)
-                .autocorrectionDisabled()
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-            if !viewModel.query.isEmpty {
-                Button {
-                    viewModel.clear()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(DODColor.labelSecondary)
-                }
-                .accessibilityLabel("Clear")
-            }
-        }
-        .padding(DODSpacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
-                .fill(DODColor.surfaceElevated)
-        )
-        .padding(DODSpacing.md)
     }
 
     @ViewBuilder
