@@ -55,9 +55,9 @@ public final class RecipeDetailViewModel {
     public internal(set) var snackbarMessage: String?
     /// T-732 / CL-129 / AC-4.12: rich blocks for the recipe's narrative
     /// blurb (the prose preceding the WPRM recipe card). Populated by the
-    /// fetch path via `ArticleBodyExtractor.extractRecipeBlurb(html:)` +
-    /// `ArticleHTMLParser.parse(html:)`; empty when extraction fails so the
-    /// view falls back to the collapsed-only state.
+    /// fetch path. T-733 / CL-130: capped to 1-2 paragraphs via the
+    /// extractor's `paragraphLimit`; ``hasExpandableBlurb`` (in
+    /// `RecipeDetailViewModel+Blurb.swift`) is the visibility gate.
     public internal(set) var blurbBlocks: [ArticleBlock] = []
 
     // MARK: - Servings scaler (US-31)

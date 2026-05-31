@@ -90,30 +90,65 @@ public enum ArticleBodyExtractor {
         return ""
     }
 
-    /// T-732 / CL-129 / AC-4.12: recipe-detail blurb extractor. Returns the
-    /// narrative HTML blocks of the `entry-content` slice that precede the
-    /// WPRM recipe card (the `<div class="wprm-recipe-container">` wrapper
-    /// every WPRM theme uses to hold the structured ingredients + instructions
-    /// + meta the JSON-LD parse already surfaces in AC-4.2 / AC-4.3). Cropping
-    /// here keeps the recipe-card structured content out of the rich blurb
-    /// render — without this crop the expanded blurb would duplicate the
-    /// ingredient/instruction sections it sits above.
+    /// T-732 / CL-129 / AC-4.12 (amended by T-733 / CL-130): recipe-detail
+    /// blurb extractor. Returns the narrative HTML blocks of the
+    /// `entry-content` slice that precede the WPRM recipe card (the
+    /// `<div class="wprm-recipe-container">` wrapper every WPRM theme uses to
+    /// hold the structured ingredients + instructions + meta the JSON-LD parse
+    /// already surfaces in AC-4.2 / AC-4.3), capped at the first
+    /// `paragraphLimit` `<p>` blocks (T-733 / CL-130 — see below). Cropping at
+    /// the WPRM boundary keeps the recipe-card structured content out of the
+    /// rich blurb render; the paragraph cap keeps long-form blog-style
+    /// recipes (30-40 intro `<p>` blocks observed in 2026-05-31 live-API
+    /// sampling) from dumping their full intro prose into the expanded blurb.
+    ///
+    /// - Parameters:
+    ///   - html: the full rendered HTML page.
+    ///   - paragraphLimit: maximum number of `<p>` blocks to retain in the
+    ///     returned HTML (T-733 / CL-130). The walk truncates at the Nth
+    ///     `</p>` close tag; headings / images / lists that sit BEFORE the
+    ///     Nth `<p>` boundary are preserved (they're context for the
+    ///     surrounding paragraphs); content after is dropped. If the source
+    ///     has fewer than `paragraphLimit` paragraphs total, returns what it
+    ///     has (no padding). `paragraphLimit: 0` returns empty
+    ///     (degenerate-but-safe). Default `2` — the 1-2 paragraph user ask
+    ///     per CL-130. Article callers wanting the FULL body do not use this
+    ///     entry point (they call ``extract(html:)`` / ``extractContentHTML(html:)``
+    ///     instead — both unaffected by the cap).
     ///
     /// **Fallback:** when no WPRM card is found in the `entry-content` slice
     /// (rare — a recipe page without WPRM, a custom theme, a malformed page),
-    /// the full `entry-content` slice is returned unchanged so the expanded
-    /// blurb still has prose to render. When no `entry-content` slice exists
-    /// at all (the post page is genuinely unrenderable), returns the empty
-    /// string and the view falls back to the collapsed-only state.
+    /// the cap is applied to the full `entry-content` slice so the expanded
+    /// blurb still has prose to render but stays bounded. When no
+    /// `entry-content` slice exists at all (the post page is genuinely
+    /// unrenderable), returns the empty string and the view falls back to the
+    /// collapsed-only state.
     ///
     /// **Specialized over reusing ``extractContentHTML(html:)`` directly**
     /// (option (b) in the CL-129 decision): option (a) would have dragged the
     /// recipe card's structured content into the blurb render, duplicating
     /// what AC-4.2 / AC-4.3 already render below.
-    public static func extractRecipeBlurb(html: String) -> String {
+    public static func extractRecipeBlurb(html: String, paragraphLimit: Int = 2) -> String {
         guard let entryContent = extractEntryContentSlice(in: html) else {
             return ""
         }
+        // T-733 / CL-130: degenerate-but-safe — `limit: 0` means "no paragraphs"
+        // which means an empty blurb. Skip the WPRM scan entirely.
+        guard paragraphLimit > 0 else {
+            return ""
+        }
+        // First crop at the WPRM recipe card boundary (T-732 / CL-129); then
+        // apply the paragraph cap to the cropped region (T-733 / CL-130).
+        let preCardSlice = sliceBeforeWPRMCard(in: entryContent)
+        return cappingAtParagraphLimit(preCardSlice, limit: paragraphLimit)
+    }
+
+    /// Helper: returns the substring of `entryContent` preceding the first
+    /// `<div class="wprm-recipe-container">` open tag, or the full
+    /// `entryContent` if no WPRM card is present. Extracted from
+    /// ``extractRecipeBlurb(html:paragraphLimit:)`` so the WPRM-crop logic
+    /// stays separate from the T-733 / CL-130 paragraph cap.
+    static func sliceBeforeWPRMCard(in entryContent: String) -> String {
         // WPRM's canonical recipe-card wrapper. Match the literal class token
         // anywhere in an open `<div ...>` tag — WPRM uses the same class on
         // every theme, with sibling classes like
@@ -152,6 +187,44 @@ public enum ArticleBodyExtractor {
         // Defensive fallthrough — `while` exits if `cursor >= endIndex` with
         // no match. Same fallback as the no-WPRM-card branch above.
         return entryContent
+    }
+
+    /// T-733 / CL-130: cap an HTML slice at the Nth `</p>` close tag.
+    /// Headings / images / lists / any other tags that sit BEFORE the Nth
+    /// `<p>` boundary are preserved verbatim; content after the Nth `</p>` is
+    /// dropped. If the source has fewer than `limit` paragraphs, returns the
+    /// full source (no padding). Assumes `limit > 0` — caller must short-
+    /// circuit to empty for `limit == 0`.
+    ///
+    /// **Walk:** scan forward for `</p>` close tags (case-insensitive).
+    /// Increment the count on each. When count == `limit`, slice up through
+    /// the close tag (inclusive, so the paragraph is delivered as a complete
+    /// `<p>...</p>` HTML block to the downstream parser). If we reach end
+    /// without finding `limit` close tags, return the full source.
+    static func cappingAtParagraphLimit(_ html: String, limit: Int) -> String {
+        precondition(limit > 0, "limit must be > 0; caller short-circuits for 0")
+        var cursor = html.startIndex
+        var paragraphsSeen = 0
+        while cursor < html.endIndex {
+            guard
+                let closeRange = html.range(
+                    of: "</p>",
+                    options: .caseInsensitive,
+                    range: cursor..<html.endIndex
+                )
+            else {
+                // Fewer than `limit` paragraphs total — return what we have.
+                return html
+            }
+            paragraphsSeen += 1
+            if paragraphsSeen >= limit {
+                // Slice through the close tag inclusive so the Nth paragraph
+                // is delivered as a complete `<p>...</p>` block.
+                return String(html[html.startIndex..<closeRange.upperBound])
+            }
+            cursor = closeRange.upperBound
+        }
+        return html
     }
 
     // MARK: - Helpers
