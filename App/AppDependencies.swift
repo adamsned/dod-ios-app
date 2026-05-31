@@ -39,6 +39,11 @@ final class AppDependencies {
     private let ratingsClient: WPRMRatingsClient
     private let guestIdentityStore: any GuestIdentityStoring
 
+    /// Diagnostic observer for the SwiftData ↔ CloudKit mirror (round-12
+    /// backlog bug — "CloudKit recipe sync doesn't work"). Started from
+    /// `bootstrap()` only when the iCloud-Sync opt-in is on.
+    private let cloudKitDiagnostics = CloudKitSyncDiagnostics()
+
     init() {
         do {
             // L3 isolation hook: `-DODUseInMemoryStore` gives each UI-test
@@ -93,6 +98,10 @@ final class AppDependencies {
         // v1.0 behavior intact under no-iCloud-account + sync-declined
         // states.
         if UserDefaults.standard.bool(forKey: RecipeStore.cloudKitSyncOptInKey) {
+            // Round-12 backlog bug: log every CloudKit mirror event so an
+            // on-device run reveals which layer fails (schema / account /
+            // never-enabled). Pairs with the account-status probe below.
+            cloudKitDiagnostics.start()
             await checkCloudKitAvailability()
         }
     }
