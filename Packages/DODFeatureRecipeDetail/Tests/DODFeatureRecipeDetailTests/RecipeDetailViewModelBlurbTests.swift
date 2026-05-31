@@ -113,6 +113,67 @@ struct RecipeDetailViewModelBlurbTests {
         #expect(viewModel.blurbBlocks.count == 1)
     }
 
+    // MARK: - hasExpandableBlurb (T-733 / CL-130)
+
+    /// `hasExpandableBlurb` returns true when `blurbBlocks` contains at
+    /// least one `.paragraph` block — the broadened-but-narrower More/Less
+    /// visibility gate per CL-130.
+    @Test func hasExpandableBlurbTrueWhenParagraphPresent() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 230,
+            withDetail: true
+        )
+        dependencies.htmlToReturn = """
+            <html><body>
+            <div class="entry-content">
+            <p>A blurb paragraph.</p>
+            <div class="wprm-recipe-container"><p>card</p></div>
+            </div>
+            </body></html>
+            """
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 230)
+        await viewModel.onAppear()
+
+        #expect(viewModel.hasExpandableBlurb)
+    }
+
+    /// `hasExpandableBlurb` returns false when `blurbBlocks` is empty —
+    /// no extraction succeeded, no expansion content.
+    @Test func hasExpandableBlurbFalseWhenBlocksEmpty() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 231,
+            withDetail: true
+        )
+        // No entry-content wrapper → extractor returns empty → no blocks.
+        dependencies.htmlToReturn = "<html><body><p>No entry content.</p></body></html>"
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 231)
+        await viewModel.onAppear()
+
+        #expect(viewModel.blurbBlocks.isEmpty)
+        #expect(!viewModel.hasExpandableBlurb)
+    }
+
+    /// `hasExpandableBlurb` returns false when `blurbBlocks` contains only
+    /// non-paragraph blocks (heading, image, list). Pre-CL-130 the
+    /// `!isEmpty` gate would have surfaced a More button here with nothing
+    /// meaningful behind it; the broadened-but-narrower `.paragraph`-only
+    /// gate correctly hides it. Constructed by direct assignment to keep
+    /// the test independent of the HTML fixture path.
+    @Test func hasExpandableBlurbFalseWhenOnlyNonParagraphBlocks() throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 232)
+        let imageURL = try #require(URL(string: "https://example.com/x.png"))
+        viewModel.blurbBlocks = [
+            .heading(level: 2, text: AttributedString("A heading")),
+            .image(url: imageURL, caption: nil),
+            .list(ordered: false, items: [AttributedString("item")]),
+        ]
+
+        #expect(!viewModel.hasExpandableBlurb)
+    }
+
     // MARK: - Helpers
 
     static func makeViewModel(
