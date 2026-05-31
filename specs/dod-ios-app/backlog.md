@@ -38,6 +38,32 @@ Format suggestion (not enforced):
 _All six 2026-05-24 captures have graduated to spec-driven work and
 shipped. See "Recently graduated" below for the trail._
 
+### Captured 2026-05-31 (round 12, @adamsned) — build-5 bug: CloudKit recipe sync doesn't work
+
+Dad's build-4 (TestFlight) feedback. After the relaunch-crash fix (DOD-CRASH-1 / #111) made the `.private` CloudKit container open cleanly, **saved recipes still don't sync between his iPhone and iPad.** Save a recipe on one device → it never appears in Saved on the other. **Build-5 priority alongside the 25 Swift 6 warnings (round 11).**
+
+**Repro (expected vs actual):**
+
+1. Sign both iPhone + iPad into the same iCloud account; enable Settings → iCloud Sync on both.
+2. iPhone: open a recipe → Save.
+3. iPad: open the Saved tab.
+4. Expected: the saved recipe appears within a few seconds.
+5. Actual: it never appears — no cross-device propagation.
+
+**Root-cause hypotheses, in triage order (mix of infra + code — expect a layered fix):**
+
+1. **[INFRA — most likely for a TestFlight build] CloudKit schema never deployed to the *Production* environment.** `NSPersistentCloudKitContainer` auto-creates record types only in the **Development** CloudKit environment (Xcode dev runs). **TestFlight + App Store builds use *Production*, which never auto-creates schema** — the Dev schema must be explicitly deployed via the CloudKit Console (`Schema → Deploy Schema Changes…`). Compounding it: build 3 *crashed* at `.private` container open (DOD-CRASH-1), so the record types may never have been written even in Development. So Production is almost certainly empty → every mirror op silently no-ops on-device. **Fix is user-side, no app code:** (a) run a Debug build with iCloud Sync ON and save a recipe so the record types appear in the Console's *Development* env; (b) **Deploy Schema Changes → Production**; (c) re-test on-device. **Verify this first — it likely explains the whole symptom.**
+
+2. **[CODE — confirmed in source] Runtime opt-in toggle doesn't re-wire the live store; sync only engages after a cold relaunch.** `AppDependencies.settingsDependencies()` (`App/AppDependencies.swift:233-237`) rebuilds the container on toggle and assigns `self.modelContainer = rebuilt`, **but never rebuilds `self.store`** — `self.store = RecipeStore(modelContainer:)` is constructed once in `init()` (`:60`) and keeps the original `.none` `ModelContext`. The SwiftUI `.modelContainer`, App Intents env, and widget publishers are likewise wired at launch. So flipping iCloud Sync ON does nothing to the running session; it only takes effect at the next cold launch (where `init → productionContainer()` re-reads the flag). The container factory's own doc-comment already calls this out — *"The caller is responsible for replacing the stale ModelContainer in the composition root and re-wiring downstream consumers (RecipeStore, the App Intents environment, the widget publishers)"* (`RecipeStore+Containers.swift:64-68`) — but that re-wire is not implemented. **Fix:** either (a) rebuild + re-inject every consumer on toggle, or (b) for v1 present a "Relaunch to enable sync" notice and treat the flag as launch-time-only. Add a test: toggling the flag then re-resolving the store yields a CloudKit-backed context.
+
+3. **[ENTITLEMENT — confirmed absent] No Push Notifications capability (`aps-environment`).** `App/DODApp.entitlements` declares the iCloud container + CloudKit service, and `App/Info.plist` has the `remote-notification` background mode — but there's **no `aps-environment` entitlement** (added by enabling the *Push Notifications* capability + the App ID's APNs service). Without it, CloudKit's silent remote-change pushes aren't delivered, so even when mirroring works the other device only pulls on its *next* foreground/launch (no live propagation). Reads as "sync is broken" when it's really "sync is launch-only." **Fix:** add Push Notifications to the App ID (Apple Dev portal) + `aps-environment` to the entitlements via xcodegen.
+
+4. **[EXPECTATION — verify] Opt-in is OFF by default + needs the same iCloud account on both devices.** Sync engages only after the user enables it (`cloudKitSyncOptInKey` defaults `false`; `RecipeStore+Containers.swift:111-118`). Confirm: toggle ON on **both** devices, both signed into the **same** Apple ID with iCloud Drive on, network available. If only one device opted in, nothing syncs.
+
+**Confidence:** high that #1 (Production schema not deployed) is the dominant cause on TestFlight, with #2 (no runtime re-wire) and #3 (no push) as real secondary gaps that would still bite after #1. **Diagnostic-only first pass:** add temporary `NSPersistentCloudKitContainer` event logging (import/export progress + errors) to confirm which layer fails on-device before committing a fix.
+
+**Suggested graduation:** US-41 amendment ("sync actually functions end-to-end") → tasks T-7xx-a (Production schema deploy + on-device verify, infra), T-7xx-b (re-wire store on opt-in toggle + test), T-7xx-c (Push Notifications capability + entitlement), T-7xx-d (surface sync status / relaunch UX).
+
 ### Captured 2026-05-29 (round 9, @adamsned) — TestFlight 1.0 (2) install feedback
 
 Dad's first real-device feedback after installing build `1.0 (2)` on `nadams-iphone` via TestFlight this morning (~07:50 MST). Captured here while using the app naturally; expect more entries as he keeps cooking with it.
