@@ -29,6 +29,33 @@ import Testing
         #expect(!result.contains("chrome"))
     }
 
+    /// DOD-ART-1: `extractContentHTML` is the rich-rendering counterpart to
+    /// `extract` — it returns the entry-content slice as **HTML** (tags
+    /// intact) so ``ArticleHTMLParser`` can render native blocks, where
+    /// `extract` strips everything to plain text. Same fallback chain.
+    @Test func extractContentHTMLKeepsTags() {
+        let html = """
+            <html><body>
+            <header>chrome</header>
+            <div class="entry-content">
+            <h2>Best Recipes</h2>
+            <p>Welcome to my <strong>roundup</strong>.</p>
+            <figure><img src="https://example.com/a.jpg" alt="A"></figure>
+            </div>
+            <footer>also chrome</footer>
+            </body></html>
+            """
+        let result = ArticleBodyExtractor.extractContentHTML(html: html)
+        // Structural HTML is preserved (unlike `extract`, which strips it).
+        #expect(result.contains("<h2>Best Recipes</h2>"))
+        #expect(result.contains("<strong>roundup</strong>"))
+        #expect(result.contains("<img"))
+        // Still scoped to entry-content — page chrome excluded.
+        #expect(!result.contains("chrome"))
+        // Contrast: the plain-text path on the same input drops the tags.
+        #expect(!ArticleBodyExtractor.extract(html: html).contains("<h2>"))
+    }
+
     @Test func entryContentWinsOverArticle() {
         // Both wrappers present; entry-content is the canonical WP body,
         // so it should win the priority lookup.
