@@ -263,6 +263,37 @@ import Testing
         #expect(ArticleHTMLParser.parse(html: "").isEmpty)
     }
 
+    // MARK: - Malformed input / robustness (review DOD-ART-1)
+
+    /// Regression for the inline-scanner hang: a stray `<` with no following
+    /// `>` in prose ("Cook for <5 min") must render as a literal character.
+    /// Before the fix the cursor never advanced past the lone `<`, looping
+    /// forever and freezing the article screen — so if this regresses the
+    /// suite HANGS (times out), which is the intended guard.
+    @Test func strayLessThanInProseRendersLiterallyWithoutHanging() {
+        let blocks = ArticleHTMLParser.parse(
+            html: #"<div class="entry-content"><p>Cook for <5 min, then serve.</p></div>"#
+        )
+        #expect(blocks.count == 1)
+        guard case .paragraph(let body) = blocks.first else {
+            Issue.record("expected one paragraph, got \(blocks)")
+            return
+        }
+        #expect(text(body) == "Cook for <5 min, then serve.")
+    }
+
+    /// A `<` at the very end of a block's inner content (no following `>`)
+    /// also terminates rather than hanging.
+    @Test func trailingBareLessThanTerminates() {
+        let blocks = ArticleHTMLParser.parse(html: "<p>Serve hot <</p>")
+        #expect(blocks.count == 1)
+        guard case .paragraph(let body) = blocks.first else {
+            Issue.record("expected one paragraph, got \(blocks)")
+            return
+        }
+        #expect(text(body) == "Serve hot <")
+    }
+
     // MARK: - Fixture
 
     /// A focused multi-block fixture mirroring the live round-up (post 23406):

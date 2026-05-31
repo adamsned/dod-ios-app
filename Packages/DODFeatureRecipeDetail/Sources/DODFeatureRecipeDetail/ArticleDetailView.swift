@@ -78,14 +78,20 @@ struct ArticleDetailView: View {
     @ViewBuilder
     private var articleBody: some View {
         if blocks.isEmpty {
-            let fallback = recipe.articleBodyHTML ?? ""
+            // Parser found no blocks — a legacy plain-text cache row, or an
+            // article whose body uses only shapes the block scan doesn't emit
+            // (a bare <table>, an <iframe> embed, etc.). `articleBodyHTML` now
+            // holds raw HTML, so strip it to readable text rather than dumping
+            // literal `<table>`/`<p>` tags on screen. No accessibilityLabel
+            // override here — the Text content IS the body, so VoiceOver should
+            // read it, not a generic "Article body". (review DOD-ART-1)
+            let fallback = HTMLSanitizer.plainText(from: recipe.articleBodyHTML ?? "")
             if !fallback.isEmpty {
                 Text(fallback)
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.label)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
-                    .accessibilityLabel("Article body")
             }
         } else {
             VStack(alignment: .leading, spacing: DODSpacing.md) {
@@ -156,7 +162,10 @@ struct ArticleDetailView: View {
                     placeholder
                 }
             }
-            .frame(maxWidth: .infinity)
+            // Cap height so a tall vertical infographic / Pinterest pin
+            // (e.g. 1200×4000) can't render many screens tall; scaledToFit
+            // keeps the aspect ratio within the bound. (review DOD-ART-1)
+            .frame(maxWidth: .infinity, maxHeight: Self.imageMaxHeight)
             .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm))
             .accessibilityLabel(caption ?? "Article image")
 
@@ -175,6 +184,9 @@ struct ArticleDetailView: View {
             .aspectRatio(3.0 / 2.0, contentMode: .fit)
             .frame(maxWidth: .infinity)
     }
+
+    /// Max on-screen height for an inline article photo (review DOD-ART-1).
+    private static let imageMaxHeight: CGFloat = 480
 
     /// Shared formatter for the VoiceOver fallback label (the `style: .relative`
     /// Text view doesn't expose a stable string for the accessibility layer).

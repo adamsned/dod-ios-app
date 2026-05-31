@@ -1,20 +1,5 @@
 import Foundation
 
-/// A single rendered block of a WordPress article body, produced by
-/// ``ArticleHTMLParser/parse(html:)`` and rendered in document order. The v1.x
-/// rich replacement for the plain-text ``ArticleBodyExtractor``, which
-/// collapsed round-up posts into one unreadable text wall.
-public enum ArticleBlock: Equatable, Sendable {
-    /// `<h1>`…`<h6>`; `level` is clamped to `1...6`.
-    case heading(level: Int, text: AttributedString)
-    /// A `<p>` (or `<blockquote>`, rendered as a paragraph).
-    case paragraph(AttributedString)
-    /// An `<img>` (optionally in `<figure>`); caption = `<figcaption>` else `alt`.
-    case image(url: URL, caption: String?)
-    /// A `<ul>` (`ordered: false`) / `<ol>` (`ordered: true`), one item per `<li>`.
-    case list(ordered: Bool, items: [AttributedString])
-}
-
 /// Native HTML → ``ArticleBlock`` parser for WordPress article bodies.
 ///
 /// Block-level scan over the sanitized `entry-content`, emitting blocks in
@@ -218,9 +203,20 @@ extension ArticleHTMLParser {
         var state = InlineState()
         var cursor = html.startIndex
         while cursor < html.endIndex {
-            if html[cursor] == "<", let close = html.range(of: ">", range: cursor..<html.endIndex) {
-                applyTag(html[html.index(after: cursor)..<close.lowerBound], state: &state, into: &result)
-                cursor = close.upperBound
+            if html[cursor] == "<" {
+                if let close = html.range(of: ">", range: cursor..<html.endIndex) {
+                    applyTag(html[html.index(after: cursor)..<close.lowerBound], state: &state, into: &result)
+                    cursor = close.upperBound
+                } else {
+                    // Lone `<` with no closing `>` (e.g. prose like
+                    // "Cook for <5 min"): emit it as a literal character so the
+                    // cursor always advances. Without this, the run-accumulation
+                    // below finds the same `<` at `cursor`, `runEnd == cursor`,
+                    // the cursor never moves, and the parse hangs the article
+                    // screen on any stray `<`. (review DOD-ART-1)
+                    appendTextRun("<", state: state, into: &result)
+                    cursor = html.index(after: cursor)
+                }
                 continue
             }
             // Accumulate a text run up to the next `<`.
