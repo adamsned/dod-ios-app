@@ -75,6 +75,13 @@ struct ArticleDetailView: View {
 
     /// The rendered article body: native blocks when the HTML parsed, else a
     /// single plain-text fallback (legacy cache / unparseable body).
+    ///
+    /// T-732 / CL-129: the non-empty-blocks branch now delegates to the shared
+    /// ``ArticleBlocksView`` so the recipe-detail expanded blurb (AC-4.12) and
+    /// articles share a single source of truth for per-block styling. Render
+    /// tree + per-block fonts/colors/spacing are byte-identical to the
+    /// pre-T-732 inline `VStack { ForEach { blockView(...) } }` so the L4
+    /// `ArticleDetailViewSnapshotTests` baselines are unaffected.
     @ViewBuilder
     private var articleBody: some View {
         if blocks.isEmpty {
@@ -94,99 +101,11 @@ struct ArticleDetailView: View {
                     .textSelection(.enabled)
             }
         } else {
-            VStack(alignment: .leading, spacing: DODSpacing.md) {
-                ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                    blockView(block)
-                }
-            }
-            .tint(DODColor.accent)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Article body")
+            ArticleBlocksView(blocks: blocks)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Article body")
         }
     }
-
-    /// Render one parsed ``ArticleBlock`` as a native view.
-    @ViewBuilder
-    private func blockView(_ block: ArticleBlock) -> some View {
-        switch block {
-        case .heading(let level, let text):
-            Text(text)
-                .dodFont(level <= 2 ? DODType.displayMedium : DODType.heading)
-                .foregroundStyle(DODColor.label)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, DODSpacing.sm)
-
-        case .paragraph(let text):
-            Text(text)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
-
-        case .image(let url, let caption):
-            articleImage(url: url, caption: caption)
-
-        case .list(let ordered, let items):
-            VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                    HStack(alignment: .firstTextBaseline, spacing: DODSpacing.sm) {
-                        Text(ordered ? "\(index + 1)." : "•")
-                            .dodFont(DODType.body)
-                            .foregroundStyle(DODColor.labelSecondary)
-                        Text(item)
-                            .dodFont(DODType.body)
-                            .foregroundStyle(DODColor.label)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
-        }
-    }
-
-    /// A full-width article photo with an optional caption. Mirrors
-    /// `RecipeDetailHero`'s `AsyncImage` phase handling; an unloaded /failed
-    /// image shows a neutral placeholder rather than collapsing the layout.
-    private func articleImage(url: URL, caption: String?) -> some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                case .failure:
-                    placeholder
-                case .empty:
-                    placeholder
-                @unknown default:
-                    placeholder
-                }
-            }
-            // Cap height so a tall vertical infographic / Pinterest pin
-            // (e.g. 1200×4000) can't render many screens tall; scaledToFit
-            // keeps the aspect ratio within the bound. (review DOD-ART-1)
-            .frame(maxWidth: .infinity, maxHeight: Self.imageMaxHeight)
-            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm))
-            .accessibilityLabel(caption ?? "Article image")
-
-            if let caption, !caption.isEmpty {
-                Text(caption)
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    private var placeholder: some View {
-        RoundedRectangle(cornerRadius: DODSpacing.sm)
-            .fill(DODColor.surfaceElevated)
-            .aspectRatio(3.0 / 2.0, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-    }
-
-    /// Max on-screen height for an inline article photo (review DOD-ART-1).
-    private static let imageMaxHeight: CGFloat = 480
 
     /// Shared formatter for the VoiceOver fallback label (the `style: .relative`
     /// Text view doesn't expose a stable string for the accessibility layer).

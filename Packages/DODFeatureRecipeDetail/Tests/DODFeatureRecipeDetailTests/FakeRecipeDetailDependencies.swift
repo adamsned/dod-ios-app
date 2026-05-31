@@ -26,6 +26,12 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var markedFailedIDs: [Int] = []
     var telemetryEvents: [AnalyticsEvent] = []
     var fetchCount = 0
+    /// T-732 / CL-129: lets blurb-extraction tests drive
+    /// ``ArticleBodyExtractor/extractRecipeBlurb(html:)`` through the
+    /// real production path. Default is the legacy `"<html></html>"`
+    /// shape that pre-T-732 tests relied on (empty extract → empty
+    /// `blurbBlocks` → backward-compatible).
+    var htmlToReturn: String = "<html></html>"
     /// US-35 spy state: recipe IDs the test has flagged as downloaded
     /// (mirrors `CachedRecipe.downloadedAt != nil`). Production routes
     /// through `RecipeStore.markDownloaded(id:)`.
@@ -92,7 +98,7 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     func fetchHTML(for url: URL) async throws -> String {
         fetchCount += 1
         if fetchShouldFail { throw URLError(.notConnectedToInternet) }
-        return "<html></html>"
+        return htmlToReturn
     }
 
     func parseJSONLD(html: String, merging: RecipeListItem, canonicalURL: URL) throws -> Recipe {

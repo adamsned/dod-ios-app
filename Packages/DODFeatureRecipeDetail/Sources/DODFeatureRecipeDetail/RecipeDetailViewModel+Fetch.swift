@@ -38,6 +38,17 @@ extension RecipeDetailViewModel {
             )
             try await dependencies.mergeDetail(parsed)
             recipe = parsed
+            // T-732 / CL-129 / AC-4.12: extract the recipe blurb (the
+            // narrative HTML preceding the WPRM recipe card) and parse it
+            // into native `ArticleBlock`s for the expand-collapse blurb
+            // surface. Failure / empty result → `blurbBlocks` stays at
+            // its default `[]` and the view falls back to the
+            // collapsed-only state gracefully.
+            let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+            blurbBlocks =
+                blurbHTML.isEmpty
+                ? []
+                : ArticleHTMLParser.parse(html: blurbHTML)
             loadState = .ready
             await loadRelated(forCategoryID: parsed.categoryIDs.first)
         } catch {

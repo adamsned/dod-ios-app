@@ -90,6 +90,70 @@ public enum ArticleBodyExtractor {
         return ""
     }
 
+    /// T-732 / CL-129 / AC-4.12: recipe-detail blurb extractor. Returns the
+    /// narrative HTML blocks of the `entry-content` slice that precede the
+    /// WPRM recipe card (the `<div class="wprm-recipe-container">` wrapper
+    /// every WPRM theme uses to hold the structured ingredients + instructions
+    /// + meta the JSON-LD parse already surfaces in AC-4.2 / AC-4.3). Cropping
+    /// here keeps the recipe-card structured content out of the rich blurb
+    /// render — without this crop the expanded blurb would duplicate the
+    /// ingredient/instruction sections it sits above.
+    ///
+    /// **Fallback:** when no WPRM card is found in the `entry-content` slice
+    /// (rare — a recipe page without WPRM, a custom theme, a malformed page),
+    /// the full `entry-content` slice is returned unchanged so the expanded
+    /// blurb still has prose to render. When no `entry-content` slice exists
+    /// at all (the post page is genuinely unrenderable), returns the empty
+    /// string and the view falls back to the collapsed-only state.
+    ///
+    /// **Specialized over reusing ``extractContentHTML(html:)`` directly**
+    /// (option (b) in the CL-129 decision): option (a) would have dragged the
+    /// recipe card's structured content into the blurb render, duplicating
+    /// what AC-4.2 / AC-4.3 already render below.
+    public static func extractRecipeBlurb(html: String) -> String {
+        guard let entryContent = extractEntryContentSlice(in: html) else {
+            return ""
+        }
+        // WPRM's canonical recipe-card wrapper. Match the literal class token
+        // anywhere in an open `<div ...>` tag — WPRM uses the same class on
+        // every theme, with sibling classes like
+        // `wprm-recipe-container wprm-recipe-template-default`. The
+        // class-token matcher ignores ordering and other classes.
+        let wprmToken = "wprm-recipe-container"
+        var cursor = entryContent.startIndex
+        while cursor < entryContent.endIndex {
+            guard
+                let openTagStart = entryContent.range(
+                    of: "<div",
+                    options: .caseInsensitive,
+                    range: cursor..<entryContent.endIndex
+                )
+            else {
+                // No more `<div` openings — no WPRM card present; return the
+                // full entry-content slice as the fallback.
+                return entryContent
+            }
+            guard
+                let openTagEnd = entryContent.range(
+                    of: ">",
+                    range: openTagStart.upperBound..<entryContent.endIndex
+                )
+            else {
+                return entryContent
+            }
+            let attributes = entryContent[openTagStart.upperBound..<openTagEnd.lowerBound]
+            if hasClassToken(attributes: attributes, token: wprmToken) {
+                // Found the WPRM recipe card — return everything before its
+                // opening `<div`. That preceding region is the blurb.
+                return String(entryContent[entryContent.startIndex..<openTagStart.lowerBound])
+            }
+            cursor = openTagEnd.upperBound
+        }
+        // Defensive fallthrough — `while` exits if `cursor >= endIndex` with
+        // no match. Same fallback as the no-WPRM-card branch above.
+        return entryContent
+    }
+
     // MARK: - Helpers
 
     /// Find the first `<div class="entry-content">…</div>` block. WP wraps
