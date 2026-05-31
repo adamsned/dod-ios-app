@@ -44,6 +44,10 @@ struct RootView: View {
     @State private var feedExternalRoute: RecipeRoute?
     @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// The system `openURL`, captured before RootView overrides it for its
+    /// descendants — used to defer non-recipe article links to the browser
+    /// (DOD-ART-2).
+    @Environment(\.openURL) private var systemOpenURL
 
     init(dependencies: AppDependencies) {
         _dependencies = State(initialValue: dependencies)
@@ -110,6 +114,12 @@ struct RootView: View {
             firstLaunchSheet(for: sheet)
                 .presentationDetents([.large])
         }
+        // Intercept in-app link taps (DOD-ART-2): a dutchovendaddy.com recipe
+        // link inside a rendered article opens the recipe in-app instead of
+        // bouncing to Safari. Set on the whole tree so it reaches the article
+        // body's `Text` links in every tab; non-recipe / off-site URLs defer
+        // to the system handler.
+        .environment(\.openURL, OpenURLAction { url in handleArticleLinkTap(url) })
     }
 
     /// The three highlight rows shown on first launch. Declared as a static so
@@ -349,5 +359,31 @@ struct RootView: View {
         case .light: .light
         case .dark: .dark
         }
+    }
+}
+
+// MARK: - DOD-ART-2 in-app article-link routing
+
+extension RootView {
+    /// Custom `openURL` handler for in-app article recipe links. A
+    /// `dutchovendaddy.com` link is resolved to its post and pushed into the
+    /// Feed stack (the same surface Spotlight / Siri / notifications route to);
+    /// a non-recipe `dutchovendaddy.com` URL or any off-site URL opens in the
+    /// browser. Returns synchronously — the resolve is a fire-and-forget Task.
+    /// Lives in an extension so the deep-link addition stays under the
+    /// `type_body_length` cap on the (already large) `RootView` struct.
+    func handleArticleLinkTap(_ url: URL) -> OpenURLAction.Result {
+        guard AppDependencies.recipeSlug(fromDODURL: url) != nil else {
+            return .systemAction
+        }
+        Task { @MainActor in
+            if let item = await dependencies.resolveRecipe(forArticleLink: url) {
+                selectedTab = .feed
+                feedExternalRoute = .recipe(item: item, autoStartCookMode: false)
+            } else {
+                systemOpenURL(url)
+            }
+        }
+        return .handled
     }
 }

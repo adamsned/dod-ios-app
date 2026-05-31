@@ -49,6 +49,25 @@ extension WPRestClient {
         return post.toRecipeListItem(heroImage: post.inlineHeroURL)
     }
 
+    /// Fetch a single post by its URL **slug**, projecting to a
+    /// ``RecipeListItem``. Backs the in-app article recipe-link deep-link
+    /// (DOD-ART-2): a round-up article's `<a href>` links are canonical URLs,
+    /// not ids, so tapping one resolves the slug here to obtain the post (id +
+    /// `canonicalURL`) before routing to recipe-detail.
+    ///
+    /// Returns `nil` when the slug matches no post — e.g. a link to a WP
+    /// *page* (`/about-me/`, `/app-privacy/`) rather than a recipe/article
+    /// post — so the caller can fall back to opening the URL in the browser.
+    /// `_embed=wp:featuredmedia` inlines the hero image, matching `post(id:)`.
+    public func post(slug: String) async throws -> RecipeListItem? {
+        let queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "slug", value: slug),
+            URLQueryItem(name: "_embed", value: "wp:featuredmedia"),
+        ]
+        let posts: [WPDTO.Post] = try await get(path: "posts", queryItems: queryItems)
+        return posts.first.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
+    }
+
     /// Search posts by query string.
     ///
     /// `perPage` defaults to ``WPRestClient.searchPageSize`` (100, not the
