@@ -45,6 +45,10 @@ extension SettingsViewModel {
             await dependency.setCloudSyncOptIn(request.targetEnabled)
         }
         isCloudSyncEnabled = request.targetEnabled
+        // SwiftData can't swap the container mid-process, so the new on/off
+        // state only engages on the next cold launch — surface that so a
+        // silent flip doesn't read as "sync is broken" (round-12 backlog bug).
+        cloudSyncPendingRelaunch = true
     }
 
     /// Cancels the pending flip — reverts the cached toggle state to

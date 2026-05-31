@@ -271,6 +271,21 @@ import os
         #expect(viewModel.cloudSyncStatusText == "Idle")
     }
 
+    @Test func confirmingSyncFlipMarksRelaunchPendingInSublabel() async throws {
+        // Round-12 backlog bug: SwiftData builds the container once per
+        // process, so a confirmed toggle only engages on the next cold
+        // launch. The sublabel must say so instead of silently staying "Idle".
+        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
+        #expect(viewModel.cloudSyncPendingRelaunch == false)
+        #expect(viewModel.cloudSyncStatusText == "Idle")
+
+        viewModel.requestCloudSyncOptIn(true)
+        await viewModel.confirmCloudSyncFlip()
+
+        #expect(viewModel.cloudSyncPendingRelaunch == true)
+        #expect(viewModel.cloudSyncStatusText == "Relaunch DOD to apply")
+    }
+
     @Test func initialStateReadsCurrentUserDefaultsValue() async throws {
         // The user may have flipped the flag via T-704's first-launch
         // sheet before ever opening Settings; the view-model's cached

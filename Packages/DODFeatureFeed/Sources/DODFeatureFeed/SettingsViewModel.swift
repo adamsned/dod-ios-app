@@ -184,14 +184,26 @@ public final class SettingsViewModel {
     /// while external callers stay locked out.
     public internal(set) var isCloudSyncEnabled: Bool
 
-    /// Placeholder for the AC-41.7 status sublabel. T-705 wires the
-    /// real `CloudKitSyncStatus` enum + the "Last synced N ago"
-    /// rendering on top of this string; T-703 reserves the surface so
-    /// the Settings row layout doesn't shift when T-705 lands.
-    /// Returns `"Idle"` today — the user just turned sync on, no
-    /// round-trip has happened yet, and we don't crash by trying to
-    /// format a `nil` last-synced date as "N ago".
-    public var cloudSyncStatusText: String { "Idle" }
+    /// Set when the user flips the iCloud Sync toggle *this session*.
+    /// SwiftData builds its `ModelContainer` once per process and cannot
+    /// swap the CloudKit configuration mid-flight (the contract
+    /// `RecipeStore.recreateContainerAfterOptInChange()` documents), so a
+    /// flip only actually engages on the next cold launch. Surfacing this
+    /// stops the "I toggled it and nothing synced" confusion (round-12
+    /// backlog bug). Not persisted — a relaunch clears it by construction.
+    /// Setter is `internal` so the action methods in
+    /// `SettingsViewModel+CloudSync.swift` can set it.
+    public internal(set) var cloudSyncPendingRelaunch = false
+
+    /// AC-41.7 status sublabel under the iCloud Sync row. Tells the user a
+    /// just-flipped toggle needs a relaunch to take effect; otherwise stays
+    /// the reserved `"Idle"` placeholder so the row layout (and its L4
+    /// snapshot baseline) doesn't shift. The richer "Up to date / Syncing… /
+    /// Sync error" surface wired to the `NSPersistentCloudKitContainer`
+    /// mirror events — see `CloudKitSyncDiagnostics` — is the T-705 follow-up.
+    public var cloudSyncStatusText: String {
+        cloudSyncPendingRelaunch ? "Relaunch DOD to apply" : "Idle"
+    }
 
     /// State for the confirmation alert that fronts every toggle flip
     /// per AC-41.3 / CL-89. `nil` when no alert is showing; otherwise
