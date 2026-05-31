@@ -22,6 +22,10 @@ public enum HTMLSanitizer {
         return collapseWhitespace(withDecodedEntities)
     }
 
+    /// Decode named + numeric HTML entities WITHOUT stripping tags or collapsing
+    /// whitespace — used by the rich article parser to decode inline text runs.
+    public static func decodingEntities(_ html: String) -> String { decodeEntities(html) }
+
     // MARK: - Steps
 
     private static func stripTags(_ input: String) -> String {

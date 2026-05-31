@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODDomain
+import DODSupport
 import SwiftUI
 
 /// Article-rendering screen for posts that lack parseable JSON-LD `@type: Recipe`
@@ -7,30 +8,41 @@ import SwiftUI
 /// Tested Favorites)" that the user wants to read in-app without the post
 /// being hidden from lists per the pre-T-640 CL-9 contract.
 ///
-/// **What `ArticleDetailView` shows (US-37 / AC-37.3):**
+/// **What `ArticleDetailView` shows (US-37 / AC-37.3 + DOD-ART-1):**
 /// - Hero image (`RecipeDetailHero`, same primitive the recipe screen uses).
 /// - Title + published date caption.
-/// - Sanitized plain-text article body (extracted by
-///   ``DODSupport/ArticleBodyExtractor`` from the rendered HTML page).
+/// - The article body rendered as **native blocks** — styled headings, photos
+///   with captions, bulleted/numbered lists, and paragraphs with tappable
+///   links + bold/italic — parsed from the stored body HTML by
+///   ``DODSupport/ArticleHTMLParser``. This replaces the v1 plain-text wall
+///   that collapsed a 30+ recipe round-up (44 photos / 90 links) into one
+///   unreadable blob (CL-63 "plain text for v1" → DOD-ART-1 rich follow-up).
+///
+/// **Legacy / fallback path.** Articles cached before DOD-ART-1 stored stripped
+/// plain text (no tags), and a malformed body parses to zero blocks; either
+/// way the view falls back to a single plain-text `Text` so nothing renders
+/// blank. The body re-fetches as HTML on the next online open.
 ///
 /// **What `ArticleDetailView` deliberately does NOT show (CL-63 decision 5):**
-/// - Ingredients section (no `Recipe.ingredients` data on articles).
-/// - Cook Mode CTA (US-7 needs `recipeInstructions` — articles have none).
-/// - Servings stepper (US-31 needs `recipeYield` — articles have none).
-/// - Rating summary + composer (US-13).
-/// - Comments composer (US-14).
-/// - Related-recipes strip (US-4 / AC-4.6 — articles are themselves often
-///   related-recipes content; the strip would be visually redundant).
+/// Ingredients, Cook Mode CTA, servings stepper, ratings, comments, related
+/// strip — articles carry none of the `Recipe` data those need. Save + Share
+/// inherit from the parent `RecipeDetailView` toolbar (AC-4.7 + AC-4.8).
 ///
-/// Save + Share affordances inherit from the parent `RecipeDetailView`'s
-/// nav-bar toolbar (AC-4.7 + AC-4.8 preserved — any post is shareable and
-/// saveable). The parent view's `.toolbar` modifier renders the buttons
-/// regardless of the active `LoadState` branch.
-///
-/// Spec trace: US-37, CL-63, AC-37.3, AC-37.5, AC-37.6, CC-1 / CC-7 / CC-8.
+/// Spec trace: US-37, CL-63, AC-37.3, AC-37.5, AC-37.6, DOD-ART-1, CC-1.
 struct ArticleDetailView: View {
 
     let recipe: Recipe
+
+    /// Parsed once per view identity (synchronously in `init`) so the first
+    /// frame is already rich — no plain-text-then-rich flash — and snapshot
+    /// rendering is deterministic. An 87 KB round-up parses in single-digit
+    /// milliseconds, so the one-time cost on article open is invisible.
+    @State private var blocks: [ArticleBlock]
+
+    init(recipe: Recipe) {
+        self.recipe = recipe
+        _blocks = State(initialValue: ArticleHTMLParser.parse(html: recipe.articleBodyHTML ?? ""))
+    }
 
     var body: some View {
         ScrollView {
@@ -42,7 +54,7 @@ struct ArticleDetailView: View {
 
                 VStack(alignment: .leading, spacing: DODSpacing.md) {
                     publishedDateCaption
-                    bodyText
+                    articleBody
                 }
                 .padding(.horizontal, DODSpacing.md)
                 .padding(.bottom, DODSpacing.xl)
@@ -52,8 +64,6 @@ struct ArticleDetailView: View {
     }
 
     /// Small caption showing "Published <relative-date>" above the body.
-    /// Helps the reader distinguish current advice from older content
-    /// per CL-63 decision 5 (third bullet).
     private var publishedDateCaption: some View {
         Text("Published \(recipe.publishedAt, style: .relative) ago")
             .dodFont(DODType.caption)
@@ -63,17 +73,107 @@ struct ArticleDetailView: View {
             )
     }
 
-    /// The sanitized article body. Plain text for v1 per CL-63 decision 4 —
-    /// rich HTML rendering (preserve `<h2>` / `<ul>` / `<a href>` styling) is
-    /// a v1.x follow-up. The text supports Dynamic Type up to AX5 per
-    /// constitution §7 / CC-1.
-    private var bodyText: some View {
-        Text(recipe.articleBodyHTML ?? "")
-            .dodFont(DODType.body)
-            .foregroundStyle(DODColor.label)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .textSelection(.enabled)
+    /// The rendered article body: native blocks when the HTML parsed, else a
+    /// single plain-text fallback (legacy cache / unparseable body).
+    @ViewBuilder
+    private var articleBody: some View {
+        if blocks.isEmpty {
+            let fallback = recipe.articleBodyHTML ?? ""
+            if !fallback.isEmpty {
+                Text(fallback)
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Article body")
+            }
+        } else {
+            VStack(alignment: .leading, spacing: DODSpacing.md) {
+                ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                    blockView(block)
+                }
+            }
+            .tint(DODColor.accent)
+            .accessibilityElement(children: .contain)
             .accessibilityLabel("Article body")
+        }
+    }
+
+    /// Render one parsed ``ArticleBlock`` as a native view.
+    @ViewBuilder
+    private func blockView(_ block: ArticleBlock) -> some View {
+        switch block {
+        case .heading(let level, let text):
+            Text(text)
+                .dodFont(level <= 2 ? DODType.displayMedium : DODType.heading)
+                .foregroundStyle(DODColor.label)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, DODSpacing.sm)
+
+        case .paragraph(let text):
+            Text(text)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+
+        case .image(let url, let caption):
+            articleImage(url: url, caption: caption)
+
+        case .list(let ordered, let items):
+            VStack(alignment: .leading, spacing: DODSpacing.sm) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    HStack(alignment: .firstTextBaseline, spacing: DODSpacing.sm) {
+                        Text(ordered ? "\(index + 1)." : "•")
+                            .dodFont(DODType.body)
+                            .foregroundStyle(DODColor.labelSecondary)
+                        Text(item)
+                            .dodFont(DODType.body)
+                            .foregroundStyle(DODColor.label)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+
+    /// A full-width article photo with an optional caption. Mirrors
+    /// `RecipeDetailHero`'s `AsyncImage` phase handling; an unloaded /failed
+    /// image shows a neutral placeholder rather than collapsing the layout.
+    private func articleImage(url: URL, caption: String?) -> some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                case .failure:
+                    placeholder
+                case .empty:
+                    placeholder
+                @unknown default:
+                    placeholder
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm))
+            .accessibilityLabel(caption ?? "Article image")
+
+            if let caption, !caption.isEmpty {
+                Text(caption)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var placeholder: some View {
+        RoundedRectangle(cornerRadius: DODSpacing.sm)
+            .fill(DODColor.surfaceElevated)
+            .aspectRatio(3.0 / 2.0, contentMode: .fit)
+            .frame(maxWidth: .infinity)
     }
 
     /// Shared formatter for the VoiceOver fallback label (the `style: .relative`

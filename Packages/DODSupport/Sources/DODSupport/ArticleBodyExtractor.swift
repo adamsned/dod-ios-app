@@ -60,6 +60,36 @@ public enum ArticleBodyExtractor {
         return ""
     }
 
+    /// Extract the article body as **HTML** (not plain text) — the rich
+    /// counterpart to ``extract(html:)`` (DOD-ART-1). Returns the
+    /// `entry-content` slice verbatim (falling back to `<article>` / `<main>`
+    /// / `<body>`) so ``ArticleHTMLParser`` can render it as native blocks —
+    /// headings, photos, lists, and tappable links — instead of the v1
+    /// plain-text wall that collapsed round-up posts (US-37 / CL-63 rich-
+    /// rendering follow-up). Script/style blocks are left in place; the
+    /// parser drops them at render time.
+    ///
+    /// Stored in `Recipe.articleBodyHTML` (the field name has always implied
+    /// HTML; before DOD-ART-1 it actually held stripped plain text). The only
+    /// consumer that reads the *content* is `ArticleDetailView`; every other
+    /// site treats the field as a non-empty "is renderable article" flag, so
+    /// switching the stored form from plain text to HTML is behavior-safe.
+    public static func extractContentHTML(html: String) -> String {
+        if let slice = extractEntryContentSlice(in: html) {
+            return slice
+        }
+        if let slice = extractFirstBlock(tag: "article", in: html) {
+            return slice
+        }
+        if let slice = extractFirstBlock(tag: "main", in: html) {
+            return slice
+        }
+        if let slice = extractFirstBlock(tag: "body", in: html) {
+            return slice
+        }
+        return ""
+    }
+
     // MARK: - Helpers
 
     /// Find the first `<div class="entry-content">…</div>` block. WP wraps
