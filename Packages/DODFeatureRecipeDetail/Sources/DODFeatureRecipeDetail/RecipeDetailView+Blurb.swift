@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODSupport
 import SwiftUI
 
 /// T-732 / CL-129 / AC-4.12: recipe-detail blurb expand/collapse helpers.
@@ -6,55 +7,72 @@ import SwiftUI
 /// Extracted from ``RecipeDetailView`` so the main file stays under
 /// SwiftLint's file-length cap. The `excerptText` body + the
 /// `strippingExcerptTruncationTail(from:)` pure helper + the
-/// `recognizedTruncationTails` table all live here. The expanded blurb's
-/// rich-block rendering goes through the shared ``ArticleBlocksView`` (in
-/// `ArticleBlocksView.swift`) so articles and recipes use the same per-block
-/// styling.
+/// `recognizedTruncationTails` table all live here. Both the collapsed
+/// (T-734 / CL-131) and expanded (T-732 / CL-129) blurb states render
+/// through the shared ``ArticleBlocksView`` (in `ArticleBlocksView.swift`)
+/// so articles, the collapsed recipe-blurb, and the expanded recipe-blurb
+/// all use the same per-block styling — same color, font, bold / italic,
+/// and link treatment.
 ///
-/// Spec trace: AC-4.12, CL-129, REG-33.
+/// Spec trace: AC-4.12, CL-129, CL-130, CL-131, REG-33.
 extension RecipeDetailView {
 
-    /// T-732 / CL-129 / AC-4.12 (amended by T-733 / CL-130): collapse-by-
-    /// default + tappable "More" → rich-block-expanded blurb + "Less" →
-    /// collapse contract on the recipe description.
+    /// T-732 / CL-129 / AC-4.12 (amended by T-733 / CL-130 and T-734 /
+    /// CL-131): collapse-by-default + tappable "More" → rich-block-expanded
+    /// blurb + "Less" → collapse contract on the recipe description.
     ///
-    /// **Collapsed (`isBlurbExpanded == false`, default):** renders the
+    /// **Collapsed (`isBlurbExpanded == false`, default) with rich blocks
+    /// (`hasExpandableBlurb == true`):** renders the first paragraph block
+    /// from `viewModel.blurbBlocks` via the shared ``ArticleBlocksView``
+    /// (T-734 / CL-131 — same view, same per-block styling, same
+    /// `DODColor.label` foreground, same inline bold / italic / link
+    /// treatment as the expanded surface; pre-T-734 this branch rendered
+    /// plain `Text(strippedExcerpt + "...")` with `.labelSecondary`, which
+    /// drifted visually from the expanded `ArticleBlocksView` render). The
+    /// literal `"..."` tail (T-733 / CL-130 — the app's own visible
+    /// continuation cue, NEVER from the WP source) attaches inline to the
+    /// first paragraph's `AttributedString` via
+    /// ``appendingEllipsisTail(to:)`` which preserves the paragraph's inline
+    /// bold / italic / link attribute runs and appends a plain `"..."` run
+    /// at the end. The "More" affordance (`.dodFont(DODType.caption)` +
+    /// `.foregroundStyle(DODColor.accent)`) sits below the rendered
+    /// paragraph as a separate row (kept out of the inline prose so the
+    /// tap target stays clean).
+    ///
+    /// **Collapsed (`isBlurbExpanded == false`) with no rich blocks
+    /// (`hasExpandableBlurb == false`):** falls back to rendering the
     /// list-item `excerpt` with the WordPress `the_excerpt()` server-side
     /// `[…]` / `[...]` truncation tail stripped via
-    /// ``strippingExcerptTruncationTail(from:)`` AND a literal `"..."` tail
-    /// concatenated directly to the prose (T-733 / CL-130 — the app's own
-    /// visible continuation cue, NOT the WP source's truncation marker; the
-    /// WP source's tail is still stripped first, then "..." attached at
-    /// display time so the visible result is consistent across the six
-    /// WP-source variants the strip helper recognizes), followed by an
-    /// inline "More" affordance (`.dodFont(DODType.caption)` +
-    /// `.foregroundStyle(DODColor.accent)`) when the view model reports
-    /// `hasExpandableBlurb == true` (T-733 / CL-130 broadened the gate from
-    /// `!blurbBlocks.isEmpty` to "any `.paragraph` block in `blurbBlocks`"
-    /// so a recipe whose pre-WPRM content is only a heading / image / list
-    /// — no narrative paragraph — correctly gets no More button).
+    /// ``strippingExcerptTruncationTail(from:)``, using
+    /// `.foregroundStyle(DODColor.label)` (T-734 / CL-131 — not
+    /// `.labelSecondary`, so even the fallback path matches the article
+    /// visual register). No `"..."` tail and no "More" button — there's
+    /// nothing to expand into. This is the cached-recipe path where the
+    /// source HTML wasn't fetched fresh OR a recipe whose pre-WPRM content
+    /// is only a heading / image / list (T-733 / CL-130 broadened the gate
+    /// from `!blurbBlocks.isEmpty` to "any `.paragraph` block in
+    /// `blurbBlocks`" so this fallback fires whenever no narrative
+    /// paragraph is available); the next online open repopulates
+    /// `blurbBlocks` via the fetch path.
     ///
     /// **Expanded (`isBlurbExpanded == true`):** renders the parsed
     /// `viewModel.blurbBlocks` via the shared ``ArticleBlocksView`` (same
-    /// per-block styling articles use per AC-37.3 — Spencer's "articles look
-    /// great now" feedback preserved; capped to 1-2 additional paragraphs
-    /// per T-733 / CL-130 via the extractor's `paragraphLimit`), followed by
-    /// an inline "Less" affordance with identical styling. The `"..."` tail
-    /// from the collapsed state is NOT rendered here — the rich blocks
-    /// continue the prose so no ellipsis is needed.
-    ///
-    /// **No rich content (`hasExpandableBlurb == false`):** renders only the
-    /// stripped excerpt with no `"..."` tail and no "More" button — there's
-    /// nothing to expand into. This is the cached-recipe path where the
-    /// source HTML wasn't fetched fresh OR a recipe whose pre-WPRM content
-    /// is only a heading / image / list; the next online open repopulates
-    /// `blurbBlocks` via the fetch path.
+    /// per-block styling articles use per AC-37.3; capped to 1-2 additional
+    /// paragraphs per T-733 / CL-130 via the extractor's `paragraphLimit`),
+    /// followed by a "Less" affordance with the same caption + accent
+    /// styling. The `"..."` tail from the collapsed state is NOT rendered
+    /// here — the rich blocks continue the prose so no ellipsis is needed.
     @ViewBuilder
     var excerptText: some View {
         let strippedExcerpt = Self.strippingExcerptTruncationTail(
             from: viewModel.listItem.excerpt
         )
-        if !strippedExcerpt.isEmpty || (viewModel.hasExpandableBlurb && isBlurbExpanded) {
+        let collapsedBlocks = Self.collapsedBlurbBlocks(from: viewModel.blurbBlocks)
+        let canRenderCollapsedRich = !collapsedBlocks.isEmpty
+        let shouldRender =
+            !strippedExcerpt.isEmpty || canRenderCollapsedRich
+            || (viewModel.hasExpandableBlurb && isBlurbExpanded)
+        if shouldRender {
             VStack(alignment: .leading, spacing: DODSpacing.sm) {
                 if isBlurbExpanded, viewModel.hasExpandableBlurb {
                     ArticleBlocksView(blocks: viewModel.blurbBlocks)
@@ -66,20 +84,16 @@ extension RecipeDetailView {
                             .foregroundStyle(DODColor.accent)
                     }
                     .accessibilityLabel("Show less of the recipe description")
-                } else {
-                    if !strippedExcerpt.isEmpty {
-                        // T-733 / CL-130: append a literal "..." tail to the
-                        // displayed excerpt only when there's something to
-                        // expand into (hasExpandableBlurb). When the gate is
-                        // false there's no More button, and the "..." would
-                        // be a dangling cue with no follow-through — so omit
-                        // it. The "..." is view-only — NEVER appended to the
-                        // model's excerpt, NEVER stored, NEVER rendered in
-                        // the expanded state.
-                        Text(viewModel.hasExpandableBlurb ? strippedExcerpt + "..." : strippedExcerpt)
-                            .dodFont(DODType.body)
-                            .foregroundStyle(DODColor.labelSecondary)
-                    }
+                } else if canRenderCollapsedRich {
+                    // T-734 / CL-131: render the collapsed surface via the
+                    // same ArticleBlocksView the expanded surface uses, so
+                    // typography / color / bold / italic / link styling
+                    // agree byte-identically across the two states. The
+                    // "..." tail attaches inline to the first paragraph's
+                    // AttributedString via appendingEllipsisTail — view-
+                    // only, NEVER stored, NEVER rendered in the expanded
+                    // state.
+                    ArticleBlocksView(blocks: collapsedBlocks)
                     if viewModel.hasExpandableBlurb {
                         Button {
                             withAnimation { isBlurbExpanded = true }
@@ -90,11 +104,50 @@ extension RecipeDetailView {
                         }
                         .accessibilityLabel("Show more of the recipe description")
                     }
+                } else if !strippedExcerpt.isEmpty {
+                    // T-734 / CL-131: empty-`blurbBlocks` fallback. Render
+                    // the WP excerpt with `.label` (NOT `.labelSecondary`)
+                    // so even the fallback path matches the article-
+                    // rendering visual register. No "..." tail and no
+                    // "More" button — nothing to expand into per the
+                    // T-733 / CL-130 `hasExpandableBlurb` gate.
+                    Text(strippedExcerpt)
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, DODSpacing.md)
         }
+    }
+
+    /// T-734 / CL-131: returns the blocks the collapsed surface should
+    /// render via ``ArticleBlocksView``. Takes the first block of the input
+    /// (which is the first paragraph per the `hasExpandableBlurb` gate's
+    /// `.paragraph`-presence guarantee — when that gate is true, the first
+    /// `.paragraph` is always near the front; pre-paragraph headings /
+    /// images / lists from the parser are bounded to typical
+    /// `entry-content` HTML shapes), appends a literal `"..."` tail to its
+    /// `AttributedString` (preserving inline bold / italic / link attribute
+    /// runs for the prose before the appended text), and returns
+    /// `[firstBlockWithEllipsis]`. Returns `[]` for empty input. Static for
+    /// L1 test access via `@testable import`.
+    static func collapsedBlurbBlocks(from blocks: [ArticleBlock]) -> [ArticleBlock] {
+        guard let first = blocks.first else { return [] }
+        return [appendingEllipsisTail(to: first)]
+    }
+
+    /// T-734 / CL-131: appends a literal `"..."` tail to a `.paragraph`
+    /// block's `AttributedString`. The append preserves the source string's
+    /// inline attribute runs (bold / italic / link spans that ended before
+    /// the end of the paragraph remain attributed); the appended `"..."`
+    /// carries no attributes (plain run, inherits the paragraph's base
+    /// styling). Non-`.paragraph` blocks pass through unchanged. Pure
+    /// function; static for L1 test access via `@testable import`.
+    static func appendingEllipsisTail(to block: ArticleBlock) -> ArticleBlock {
+        guard case .paragraph(var text) = block else { return block }
+        text.append(AttributedString("..."))
+        return .paragraph(text)
     }
 
     /// Strip the WordPress `the_excerpt()` server-side truncation tail from
