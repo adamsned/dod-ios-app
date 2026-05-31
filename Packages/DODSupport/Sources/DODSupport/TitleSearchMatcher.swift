@@ -161,6 +161,11 @@ public enum TitleSearchMatcher {
     /// space; no third-party dependency. Used by ``levenshteinFuzzyMatches``
     /// gated on a `|len(a) - len(b)| ≤ 1` shortcut so the matrix is
     /// only built for plausibly-near pairs.
+    ///
+    /// CL-127 (T-649): also used by ``SearchSuggestionEngine`` in this
+    /// module for the "did you mean?" path; the access stays
+    /// module-internal so the math has one canonical definition for
+    /// every search-precision consumer in `DODSupport`.
     static func levenshteinDistance(_ lhs: String, _ rhs: String) -> Int {
         let lhsChars = Array(lhs)
         let rhsChars = Array(rhs)

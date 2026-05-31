@@ -238,6 +238,19 @@ public actor RecipeStore {
         try modelContext.save()
     }
 
+    /// Every cached recipe's title. Used by Search's "did you mean?"
+    /// suggestion engine (T-649 / CL-127) — the cached titles are the
+    /// source pool the engine tokenizes to find the closest-Levenshtein
+    /// neighbor for a sparse-result query. Reads the same `CachedRecipe`
+    /// rows the cook-time hydration path already touches; no new schema.
+    /// Returns an empty array on a fresh install (cold cache) — the
+    /// caller short-circuits to `nil` suggestion when the source pool
+    /// is empty.
+    public func cachedRecipeTitles() throws -> [String] {
+        let descriptor = FetchDescriptor<CachedRecipe>()
+        return try modelContext.fetch(descriptor).map(\.title)
+    }
+
     /// List-friendly query: returns RecipeListItems for the requested ids.
     ///
     /// US-37 / CL-63 / AC-37.4 (T-640): articles are no longer filtered

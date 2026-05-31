@@ -108,6 +108,10 @@ public final class SearchViewModel {
     /// Newest-first recent queries.
     public private(set) var recentSearches: [String] = []
 
+    /// CL-127 (T-649): "did you mean?" suggestion populated by the
+    /// `+T643` finalize hop when results settle < 3 items.
+    public internal(set) var didYouMean: String?
+
     // CL-106 (T-637): the next five caches and `dependencies` are
     // `internal` (no access modifier) rather than `private` so the
     // `SearchViewModel+T637.swift` extension can read/write them when
@@ -144,6 +148,7 @@ public final class SearchViewModel {
         lastMergedRESTOrdering = []
         lastMergedLocalOrdering = []
         lastSurface = .textQuery
+        didYouMean = nil  // CL-127 (T-649): wipe the rescue banner too.
     }
 
     /// Surface a stored query (e.g. user tapped a recent chip). Sets the

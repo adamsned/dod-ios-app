@@ -127,7 +127,35 @@ extension SearchViewModel {
         items = filtered
         state = filtered.isEmpty ? .noResults : .results
 
+        // CL-127 (T-649): compute the "did you mean?" suggestion when
+        // the result set settles sparse (fewer than 3 items). The
+        // suggestion engine is pure; the only I/O is the cached-titles
+        // fetch from the existing `RecipeStore` cache, no network. We
+        // gate on `!trimmed.isEmpty` (the trimmed query the caller
+        // validated has at least 2 chars per `scheduleSearch`) so a
+        // cleared query never produces a suggestion.
+        await computeDidYouMean(itemCount: filtered.count, trimmed: trimmed)
+
         await recordRecentAndTelemetry(trimmed: trimmed)
         kickOffCookTimeHydrationIfNeeded(against: merged)
+    }
+
+    /// US-12 amendment / US-29 amendment / CL-127 (T-649): the
+    /// suggestion compute hop. Runs only when the result set is sparse
+    /// (< 3 items); clears `didYouMean` otherwise so a follow-up search
+    /// that lands a populated result page wipes a stale banner. The
+    /// cached-titles fetch is wrapped in `try?` so a cold cache fall-
+    /// through degrades to `nil` (engine returns nil on an empty pool,
+    /// same outcome).
+    func computeDidYouMean(itemCount: Int, trimmed: String) async {
+        guard itemCount < Self.didYouMeanThreshold, !trimmed.isEmpty else {
+            didYouMean = nil
+            return
+        }
+        let cachedTitles = (try? await dependencies.cachedRecipeTitles()) ?? []
+        didYouMean = SearchSuggestionEngine.suggest(
+            query: trimmed,
+            cachedTitles: cachedTitles
+        )
     }
 }
