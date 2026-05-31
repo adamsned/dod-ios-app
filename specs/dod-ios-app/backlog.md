@@ -38,6 +38,48 @@ Format suggestion (not enforced):
 _All six 2026-05-24 captures have graduated to spec-driven work and
 shipped. See "Recently graduated" below for the trail._
 
+### Captured 2026-05-30 (round 11, @adamsned) — build-5 priorities
+
+#### ⭐ TOP PRIORITY for build 5 — land the 25 Swift 6 build-warning fixes (PR #110)
+
+A clean build surfaces **25 unique compiler warnings, every one tagged
+_"this is an error in the Swift 6 language mode."_** They are the work that
+has to land before `SWIFT_VERSION` / strict-concurrency can flip to Swift 6
+proper, and they re-noise every local + CI build until then.
+
+**All 25 are already fixed in PR #110** ("fix: resolve 25 Swift 6 build
+warnings"), which is **green (CLEAN)** and was deliberately held out of the
+build-4 crash hotfix (#111) to keep that PR surgical. **The build-5 action
+is simply: merge #110** (rebase first — it predates the #111 build-4 bump,
+so its Info.plist commit is now obsolete; keep the warning-fix commit). If
+#110 has gone stale by build 5, the same fixes re-derive from the list below.
+
+The 25, grouped by fix (8 files):
+
+- **AppIntent metadata (17)** — `static var` → `static let` for
+  `title` / `description` / `openAppWhenRun` (each is _"not concurrency-safe
+  because it is nonisolated global shared mutable state"_):
+  - `App/RecipeAppIntents.swift` — 9 (lines 12, 13, 19, 42, 43, 47, 69, 70, 74)
+  - `App/VoiceCommandIntents.swift` — 8 (lines 26, 27, 42, 43, 58, 59, 74, 75)
+- **`sending` closures (2)** — `App/RootView.swift:305` passes two
+  non-Sendable closures into `RecipeRouteResolver.resolve` across an
+  isolation boundary; mark the params `sending`.
+- **MainActor hop (1)** — `App/NotificationCoordinator.swift:56` reaches the
+  `@MainActor DeepLinkDispatcher.shared` from a nonisolated delegate
+  callback; wrap the dispatch in `Task { @MainActor in … }`.
+- **nonisolated cleanup (1)** — `FeedViewModel.swift:36`
+  _"'nonisolated(unsafe)' has no effect on property 'connectivityTask'"_;
+  add `@ObservationIgnored` so it becomes a real stored property and the
+  annotation applies (the `@Observable` macro otherwise makes it a no-op).
+- **misc (4)** — redundant `await` (`SearchViewModel.swift:234`); no-op
+  `let` catch-pattern (`WPRMRatingsClient.swift:48`); two unused `.map`
+  results → `if let` (`RecipeStore+ImageCache.swift:101, 123`).
+
+Size: **already done** — cost at build 5 is a rebase + merge + CI, not new
+work. No spec change (build-hygiene under constitution §6; pure
+mechanical / isolation-annotation edits, no behavior change). Graduates
+trivially — this entry can be struck once #110 lands.
+
 ### Captured 2026-05-29 (round 9, @adamsned) — TestFlight 1.0 (2) install feedback
 
 Dad's first real-device feedback after installing build `1.0 (2)` on `nadams-iphone` via TestFlight this morning (~07:50 MST). Captured here while using the app naturally; expect more entries as he keeps cooking with it.
