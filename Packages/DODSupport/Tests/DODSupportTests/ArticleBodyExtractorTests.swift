@@ -181,4 +181,76 @@ import Testing
         #expect(!result.contains("<strong>"))
         #expect(!result.contains("&amp;"))
     }
+
+    // MARK: - extractRecipeBlurb (T-732 / CL-129 / AC-4.12)
+
+    /// Recipe page with a WPRM card: the blurb extractor returns only the
+    /// narrative HTML preceding the `<div class="wprm-recipe-container">`
+    /// card. The structured ingredient/instruction content inside the card
+    /// stays out of the blurb so the rich-rendered blurb in the recipe
+    /// detail view doesn't duplicate what AC-4.2 / AC-4.3 already render.
+    @Test func extractRecipeBlurbCropsAtWPRMCard() {
+        let html = """
+            <html><body>
+            <div class="entry-content">
+            <p>This is the blurb above the recipe card.</p>
+            <p>Another paragraph of the blurb.</p>
+            <div class="wprm-recipe-container wprm-recipe-template-default">
+            <h2>Recipe Card Title</h2>
+            <ul><li>1 cup flour</li><li>1 tsp salt</li></ul>
+            <ol><li>Mix.</li><li>Bake.</li></ol>
+            </div>
+            <p>Notes after the card.</p>
+            </div>
+            </body></html>
+            """
+        let result = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        #expect(result.contains("This is the blurb above the recipe card."))
+        #expect(result.contains("Another paragraph of the blurb."))
+        // Recipe-card structured content must NOT leak into the blurb.
+        #expect(!result.contains("wprm-recipe-container"))
+        #expect(!result.contains("Recipe Card Title"))
+        #expect(!result.contains("1 cup flour"))
+        #expect(!result.contains("Notes after the card."))
+    }
+
+    /// No WPRM card present (rare — custom theme or non-WPRM recipe page):
+    /// fall back to returning the entire `entry-content` slice so the
+    /// expanded blurb still has prose to render.
+    @Test func extractRecipeBlurbReturnsFullContentWhenNoWPRMCard() {
+        let html = """
+            <html><body>
+            <div class="entry-content">
+            <p>A blurb without a WPRM card.</p>
+            <p>More blurb prose.</p>
+            </div>
+            </body></html>
+            """
+        let result = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        #expect(result.contains("A blurb without a WPRM card."))
+        #expect(result.contains("More blurb prose."))
+    }
+
+    /// No `entry-content` slice exists at all (the post page is genuinely
+    /// unrenderable): returns the empty string so the view falls back to the
+    /// collapsed-only state.
+    @Test func extractRecipeBlurbReturnsEmptyWhenNoEntryContent() {
+        let html = "<html><body><p>No entry content wrapper.</p></body></html>"
+        let result = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        #expect(result.isEmpty)
+    }
+
+    /// WPRM card class can appear in any order in the `class=` list — the
+    /// class-token matcher must tolerate sibling classes.
+    @Test func extractRecipeBlurbHandlesWPRMCardWithSiblingClasses() {
+        let html = """
+            <div class="entry-content">
+            <p>Blurb prose.</p>
+            <div class="foo wprm-recipe-container bar"><p>Recipe card stuff.</p></div>
+            </div>
+            """
+        let result = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        #expect(result.contains("Blurb prose."))
+        #expect(!result.contains("Recipe card stuff."))
+    }
 }

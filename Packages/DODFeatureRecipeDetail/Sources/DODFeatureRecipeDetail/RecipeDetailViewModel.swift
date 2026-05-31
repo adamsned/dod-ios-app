@@ -53,21 +53,21 @@ public final class RecipeDetailViewModel {
     public internal(set) var isDownloaded: Bool = false
     public private(set) var checkedIngredientIDs: Set<UUID> = []
     public internal(set) var snackbarMessage: String?
+    /// T-732 / CL-129 / AC-4.12: rich blocks for the recipe's narrative
+    /// blurb (the prose preceding the WPRM recipe card). Populated by the
+    /// fetch path via `ArticleBodyExtractor.extractRecipeBlurb(html:)` +
+    /// `ArticleHTMLParser.parse(html:)`; empty when extraction fails so the
+    /// view falls back to the collapsed-only state.
+    public internal(set) var blurbBlocks: [ArticleBlock] = []
 
     // MARK: - Servings scaler (US-31)
 
-    /// Current user-selected serving count. Defaults to the recipe's
-    /// source `recipeYield` (JSON-LD per AC-4.11) once the detail loads;
-    /// stays at the AC-31.3 default sentinel `4` until then so the stepper
-    /// has a stable starting value during the loading window. Spec trace:
-    /// AC-31.1, AC-31.2 (range 1..24), AC-31.3 (default = source servings),
-    /// AC-31.8 (source `Recipe.servings` is never mutated).
+    /// Current user-selected serving count. Defaults to the recipe's source
+    /// `recipeYield` once the detail loads; stays at the AC-31.3 default
+    /// sentinel `4` until then. AC-31.1 / AC-31.2 / AC-31.3 / AC-31.8.
     public private(set) var userServings: Int = RecipeDetailViewModel.defaultServings
-    /// Servings stepper range (AC-31.2). Lower bound 1 (a single serving
-    /// is the smallest reasonable scale); upper bound 24 keeps the
-    /// stepper usable on the smallest iPhone screens, while still reaching
-    /// roughly 4× a typical 6-serving recipe before requiring a manual
-    /// math step.
+    /// Servings stepper range (AC-31.2). 1..24 — single serving up to
+    /// roughly 4× a typical 6-serving recipe.
     public let userServingsRange: ClosedRange<Int> = 1...24
     /// Fallback default when the recipe hasn't loaded yet or didn't
     /// publish a `recipeYield` block (AC-31.3 second sentence).

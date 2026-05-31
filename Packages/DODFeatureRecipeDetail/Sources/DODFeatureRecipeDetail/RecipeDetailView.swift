@@ -15,7 +15,11 @@ public struct RecipeDetailView: View {
         case instructions
     }
 
-    @State private var viewModel: RecipeDetailViewModel
+    // `internal` (default) access so the `RecipeDetailView+Blurb.swift`
+    // extension can read `viewModel` + `isBlurbExpanded` to render the
+    // expand/collapse blurb surface (Swift extensions don't see
+    // `private`/`fileprivate` declarations from a sibling file).
+    @State var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
     @State private var isCookModePresented: Bool = false
     /// True when the screen was entered via the StartCookModeIntent deep
@@ -23,6 +27,12 @@ public struct RecipeDetailView: View {
     /// soon as the recipe has instructions to render. Resets to false
     /// after firing so a manual exit + re-entry behaves normally.
     @State private var pendingAutoCookMode: Bool
+    /// T-732 / CL-129 / AC-4.12: expand-collapse state for the recipe blurb.
+    /// Default collapsed (`false`); tapping "More" flips to `true` with a
+    /// `withAnimation` transition; tapping "Less" flips back. View-local
+    /// state — collapsing does not persist across screen re-entries (matches
+    /// the AC-4.2 ingredient check lifetime contract: view-lifetime state).
+    @State var isBlurbExpanded: Bool = false
     @Environment(\.dismiss) private var dismiss
     public let onSelectRelated: (RecipeListItem) -> Void
 
@@ -165,15 +175,14 @@ public struct RecipeDetailView: View {
         )
     }
 
-    @ViewBuilder
-    private var excerptText: some View {
-        if !viewModel.listItem.excerpt.isEmpty {
-            Text(viewModel.listItem.excerpt)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.labelSecondary)
-                .padding(.horizontal, DODSpacing.md)
-        }
-    }
+    // T-732 / CL-129 / AC-4.12: the `excerptText` body + the
+    // `strippingExcerptTruncationTail(from:)` pure helper + the
+    // `recognizedTruncationTails` table live in
+    // `RecipeDetailView+Blurb.swift` (extension on `RecipeDetailView`) so
+    // this file stays under the SwiftLint file-length cap. The expanded
+    // blurb's rich-block rendering goes through the shared
+    // `ArticleBlocksView` (in `ArticleBlocksView.swift`) so articles and
+    // recipes use the same per-block styling.
 
     /// AC-7.1 CTA. Hidden until the recipe detail has parsed instructions
     /// — without those, Cook Mode would open onto an empty step list.
