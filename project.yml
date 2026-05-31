@@ -19,6 +19,16 @@ settings:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "4"
 
+# Signing team is injected from a gitignored xcconfig so the Apple Team ID
+# stays out of this public repo. Without this, `xcodegen generate` produces a
+# project with no DEVELOPMENT_TEAM and every Archive fails with "Signing for
+# 'DODApp' requires a development team." The file is recreated locally per
+# clone (see App/DODApp.xcconfig for the one-liner). Applied to both configs
+# at the project level so the app + both extensions inherit it.
+configFiles:
+  Debug: App/DODApp.xcconfig
+  Release: App/DODApp.xcconfig
+
 # Local Swift packages — wired up in T-006
 packages:
   DODDomain:
