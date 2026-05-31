@@ -53,6 +53,17 @@ public struct SearchView: View {
             if viewModel.state != .idle {
                 FilterChipRow(filters: $viewModel.filters)
             }
+            // US-12 amendment / US-29 amendment / CL-127 (T-649): the
+            // "did you mean?" rescue banner. Renders above the result
+            // list (or the no-results empty state) whenever the
+            // viewmodel computed a non-nil suggestion AND the result
+            // set has settled — gated on `state == .results || state ==
+            // .noResults` so the banner never flashes during the
+            // `.searching` transition. Tap re-runs the search with the
+            // suggested term via `viewModel.applyDidYouMean()`.
+            if let suggestion = viewModel.didYouMean, shouldShowDidYouMeanBanner {
+                didYouMeanBanner(suggestion: suggestion)
+            }
             content
         }
         .background(DODColor.surface)
@@ -74,6 +85,39 @@ public struct SearchView: View {
             #endif
         }
         .task { await viewModel.loadCategoriesIfNeeded() }
+    }
+
+    /// CL-127 (T-649): gate the banner on a settled state so it never
+    /// flashes during `.searching`. Computed property keeps the
+    /// `if let ..., shouldShow` call site under SwiftLint's
+    /// brace-spacing rule.
+    private var shouldShowDidYouMeanBanner: Bool {
+        viewModel.state == .results || viewModel.state == .noResults
+    }
+
+    /// US-12 amendment / US-29 amendment / CL-127 (T-649): the
+    /// "did you mean?" tappable banner. Brand accent + underline so
+    /// it reads as a one-tap rescue affordance over the sparse result
+    /// list. Combined accessibility element so VoiceOver announces
+    /// the full intent in one swipe.
+    private func didYouMeanBanner(suggestion: String) -> some View {
+        HStack(spacing: DODSpacing.xs) {
+            Text("Did you mean:")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+            Text(suggestion)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.accent)
+                .underline()
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { viewModel.applyDidYouMean() }
+        .padding(.horizontal, DODSpacing.md)
+        .padding(.vertical, DODSpacing.sm)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Did you mean \(suggestion)? Tap to search.")
+        .accessibilityIdentifier("dod.search.didYouMean")
     }
 
     /// US-38 / AC-38.1 / CL-64 (T-650): the layout-toggle button. Same

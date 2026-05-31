@@ -58,52 +58,27 @@ public enum SearchSuggestionEngine {
         guard !frequency.isEmpty else { return nil }
 
         // Score each query token against every cache token in the
-        // distance band. The best candidate wins by (smaller distance,
-        // higher frequency); ties on both are broken by the alphabetical
-        // order of the cache token so the output is deterministic
-        // across runs.
-        var bestQueryTokenIndex: Int?
-        var bestSuggestion: String?
-        var bestDistance: Int = .max
-        var bestFrequency: Int = 0
-
+        // distance band; the per-query-token search is delegated to
+        // `bestCandidate(for:in:...)` so this entry point keeps
+        // SwiftLint's `cyclomatic_complexity` cap happy.
+        var winner: Candidate?
         for (index, queryToken) in queryTokens.enumerated() {
-            guard queryToken.count >= 3 else { continue }
-            // Skip query tokens that already exist in the cache. The
-            // user typed a word that's a real recipe token — they don't
-            // need a suggestion to swap it for a neighbor. Without this
-            // guard, "cast iron naxhos" would suggest swapping "cast"
-            // for "iron" (distance 4, within the band) because both are
-            // valid cache tokens; the typo token "naxhos" wouldn't win
-            // since distance 2 vs 4 is a closer tie that the
-            // greedy-distance pass doesn't always resolve in our favor.
-            if frequency[queryToken] != nil { continue }
-            for (cacheToken, count) in frequency where cacheToken != queryToken {
-                let widthDelta = abs(cacheToken.count - queryToken.count)
-                if widthDelta > maxDistance { continue }
-                let distance = TitleSearchMatcher.levenshteinDistance(queryToken, cacheToken)
-                guard distance > minDistance, distance <= maxDistance else { continue }
-                let improvesDistance = distance < bestDistance
-                let tiesDistance = distance == bestDistance
-                let beatsFrequency = count > bestFrequency
-                let tiesFrequency = count == bestFrequency
-                let breaksTieAlphabetically =
-                    tiesFrequency && (bestSuggestion.map { cacheToken < $0 } ?? true)
-                let candidateWins =
-                    improvesDistance
-                    || (tiesDistance && (beatsFrequency || breaksTieAlphabetically))
-                if candidateWins {
-                    bestQueryTokenIndex = index
-                    bestSuggestion = cacheToken
-                    bestDistance = distance
-                    bestFrequency = count
-                }
+            guard queryToken.count >= 3, frequency[queryToken] == nil else { continue }
+            let candidate = bestCandidate(
+                for: queryToken,
+                queryTokenIndex: index,
+                in: frequency,
+                minDistance: minDistance,
+                maxDistance: maxDistance
+            )
+            if let candidate, candidate.improvesOver(winner) {
+                winner = candidate
             }
         }
 
-        guard let index = bestQueryTokenIndex, let suggestion = bestSuggestion else {
-            return nil
-        }
+        guard let winner else { return nil }
+        let index = winner.queryTokenIndex
+        let suggestion = winner.cacheToken
 
         let rebuilt = substitute(
             tokenAt: index,
@@ -118,6 +93,65 @@ public enum SearchSuggestionEngine {
             return nil
         }
         return rebuilt
+    }
+
+    // MARK: - Candidate scoring
+
+    /// A scored (queryToken, cacheToken) pair. Compared by
+    /// `improvesOver(_:)` so the outer loop only needs the one
+    /// expression to keep its candidate-vs-winner comparison.
+    /// Skip query tokens that already exist in the cache. The user
+    /// typed a word that's a real recipe token — they don't need a
+    /// suggestion to swap it for a neighbor. Without that guard,
+    /// "cast iron naxxos" would let the tie-break pull "cast" → "iron"
+    /// (both length 4, distance 4, both in cache).
+    struct Candidate {
+        let queryTokenIndex: Int
+        let cacheToken: String
+        let distance: Int
+        let frequency: Int
+
+        /// Better-than-current rule: lower distance always wins; on a
+        /// distance tie, higher frequency wins; on a frequency tie,
+        /// the alphabetically-earlier cache token wins so the output
+        /// is deterministic across hash-map iteration orders.
+        func improvesOver(_ other: Candidate?) -> Bool {
+            guard let other else { return true }
+            if distance != other.distance { return distance < other.distance }
+            if frequency != other.frequency { return frequency > other.frequency }
+            return cacheToken < other.cacheToken
+        }
+    }
+
+    /// Per-query-token sweep: scan every cache token in the
+    /// `(minDistance, maxDistance]` band and return the best one (or
+    /// nil if nothing in the band passes the length-delta gate).
+    /// Extracted from `suggest(...)` to keep that function under
+    /// SwiftLint's cyclomatic-complexity cap.
+    static func bestCandidate(
+        for queryToken: String,
+        queryTokenIndex: Int,
+        in frequency: [String: Int],
+        minDistance: Int,
+        maxDistance: Int
+    ) -> Candidate? {
+        var best: Candidate?
+        for (cacheToken, count) in frequency where cacheToken != queryToken {
+            let widthDelta = abs(cacheToken.count - queryToken.count)
+            if widthDelta > maxDistance { continue }
+            let distance = TitleSearchMatcher.levenshteinDistance(queryToken, cacheToken)
+            guard distance > minDistance, distance <= maxDistance else { continue }
+            let candidate = Candidate(
+                queryTokenIndex: queryTokenIndex,
+                cacheToken: cacheToken,
+                distance: distance,
+                frequency: count
+            )
+            if candidate.improvesOver(best) {
+                best = candidate
+            }
+        }
+        return best
     }
 
     // MARK: - Tokenization
@@ -156,9 +190,8 @@ public enum SearchSuggestionEngine {
         with replacement: String,
         into originalQuery: String
     ) -> String {
-        let originalTokens = originalQuery.split(
-            whereSeparator: { $0.isWhitespace || $0.isNewline }
-        ).map(String.init)
+        let splits = originalQuery.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+        let originalTokens = splits.map(String.init)
         // Defensive: the normalized-token index can drift if the
         // original had pure-punctuation tokens that normalize away.
         // In that case fall back to a whole-string replacement.

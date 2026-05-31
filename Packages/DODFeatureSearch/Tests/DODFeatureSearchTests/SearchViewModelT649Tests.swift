@@ -75,7 +75,7 @@ struct SearchViewModelT649Tests {
         // the assignment).
         let dependencies = FakeSearchDependencies()
         dependencies.results["naxxos"] = [
-            SearchViewModelTests.makeItem(1, title: "Naxxos"),
+            SearchViewModelTests.makeItem(1, title: "Naxxos")
         ]
         dependencies.cachedTitlesArray = ["Cast Iron Skillet Nachos"]
         let viewModel = SearchViewModel(
