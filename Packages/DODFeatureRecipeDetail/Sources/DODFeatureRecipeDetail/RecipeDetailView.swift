@@ -188,12 +188,14 @@ public struct RecipeDetailView: View {
     }
 
     private var metaPillItems: [RecipeDetailMetaPills.Item] {
+        // T-732 / CL-129: the servings mini-chip is removed — the
+        // `RecipeServingsScaler` row (AC-31.1) directly below the meta pills
+        // is the single Serves indicator on the screen. The pre-T-732 chip
+        // ("\(servings) servings") duplicated the stepper's canonical
+        // "Serves \(userServings)" / "Recipe makes N." display.
         var result: [RecipeDetailMetaPills.Item] = []
         if let total = viewModel.recipe?.totalTime {
             result.append(.init(icon: "clock", label: format(duration: total)))
-        }
-        if let servings = viewModel.recipe?.servings {
-            result.append(.init(icon: "person.2", label: "\(servings) servings"))
         }
         return result
     }
