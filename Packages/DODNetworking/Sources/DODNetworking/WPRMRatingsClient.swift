@@ -45,7 +45,7 @@ public struct WPRMRatingsClient: Sendable {
         let (data, response): (Data, HTTPURLResponse)
         do {
             (data, response) = try await httpClient.data(for: request)
-        } catch let WPClientError.networkUnavailable {
+        } catch WPClientError.networkUnavailable {
             // REG-14: degrade gracefully when the device is offline.
             return Self.zeroRating(for: recipeID)
         }

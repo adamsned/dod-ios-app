@@ -236,7 +236,7 @@ public final class SearchViewModel {
         }
         debounceTask = Task { [weak self] in
             guard let self else { return }
-            let delay = await self.debounceMilliseconds
+            let delay = self.debounceMilliseconds
             try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
             if Task.isCancelled { return }
             await self.performSearch()

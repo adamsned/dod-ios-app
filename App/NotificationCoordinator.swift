@@ -53,7 +53,7 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         // Reuse the existing dispatcher (US-10) — RootView observes
         // `pending` and resolves the route from the cache. Works for both
         // recipe and article kinds (PostKind lives on Recipe).
-        DeepLinkDispatcher.shared.dispatch(.openRecipe(id: id))
+        Task { @MainActor in DeepLinkDispatcher.shared.dispatch(.openRecipe(id: id)) }
     }
 
     /// Extracts the integer post id from a `dod://recipe/<id>` or

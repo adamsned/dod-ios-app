@@ -31,9 +31,12 @@ public final class FeedViewModel {
     private let dependencies: FeedDependencies
     private var currentPage: Int = 0
     private var reachedEnd: Bool = false
-    /// `nonisolated(unsafe)` so `deinit` can cancel without main-actor hop;
-    /// Task is Sendable and deinit fires exactly once.
-    nonisolated(unsafe) private var connectivityTask: Task<Void, Never>?
+    /// Subscription handle for connectivity changes. `@ObservationIgnored`
+    /// because no view observes it (a private lifecycle detail) — that also
+    /// makes it a real stored property so `nonisolated(unsafe)` applies
+    /// meaningfully, letting the nonisolated `deinit` cancel it. `Task` is
+    /// `Sendable` and `deinit` fires exactly once, so the access is safe.
+    @ObservationIgnored nonisolated(unsafe) private var connectivityTask: Task<Void, Never>?
 
     private static let listKey = "home"
 

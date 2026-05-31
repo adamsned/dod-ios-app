@@ -23,8 +23,8 @@ import Foundation
 /// "Next step" — advance one step in the active Cook Mode session.
 struct NextStepIntent: AppIntent {
 
-    static var title: LocalizedStringResource = "Next Step"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Next Step"
+    static let description = IntentDescription(
         "Advances to the next step in Cook Mode."
     )
 
@@ -39,8 +39,8 @@ struct NextStepIntent: AppIntent {
 /// "Previous step" / "go back" — step back one in the active Cook Mode session.
 struct PreviousStepIntent: AppIntent {
 
-    static var title: LocalizedStringResource = "Previous Step"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Previous Step"
+    static let description = IntentDescription(
         "Goes back to the previous step in Cook Mode."
     )
 
@@ -55,8 +55,8 @@ struct PreviousStepIntent: AppIntent {
 /// "Repeat" / "say that again" — re-read the current step without moving.
 struct RepeatStepIntent: AppIntent {
 
-    static var title: LocalizedStringResource = "Repeat Step"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Repeat Step"
+    static let description = IntentDescription(
         "Reads the current Cook Mode step aloud again."
     )
 
@@ -71,8 +71,8 @@ struct RepeatStepIntent: AppIntent {
 /// "Pause" — pause the current spoken step at the next word boundary.
 struct PauseVoiceIntent: AppIntent {
 
-    static var title: LocalizedStringResource = "Pause Reading"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Pause Reading"
+    static let description = IntentDescription(
         "Pauses Cook Mode reading the current step aloud."
     )
 
