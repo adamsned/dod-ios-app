@@ -6,10 +6,16 @@ import SwiftUI
 ///
 /// Layout follows iOS-stock conventions per US-19 / CL-31..33:
 /// `.insetGrouped` list style (system rounded card with native separators),
-/// system disclosure indicators on each row, a `.searchable`-backed
-/// client-side name filter. No custom DesignSystem tokens are introduced;
-/// the row composition uses only existing `DODType` / `DODColor` /
-/// `DODSpacing` values per CL-31.
+/// system disclosure indicators on each row. The name-filter search bar is
+/// the shared `DODSearchField` (T-648 / CL-126 / REG-32) slotted into a
+/// `VStack` above the List so this surface matches the Search-tab bar
+/// visually — both render `DODColor.surfaceElevated` brand brown inside
+/// a `Capsule(style: .continuous)` shape. The deliberate trade for
+/// visual unity: the bar no longer slides into a nav-bar drawer the way
+/// the pre-T-648 `.searchable` modifier did; it sits as a sticky element
+/// above the List. No custom DesignSystem tokens are introduced; the row
+/// composition uses only existing `DODType` / `DODColor` / `DODSpacing`
+/// values per CL-31.
 ///
 /// Surface color follows the post-T-520 `DODColor.surface` contract
 /// (US-30 / CL-51): the scroll surround paints `DODColor.surface`
@@ -64,18 +70,22 @@ public struct CategoryListView: View {
         }
     }
 
-    /// `.insetGrouped` list of categories with a `.searchable` filter
-    /// scoped to `category.name` (case-insensitive). When the typed
-    /// query has no matches, an inline secondary-label row replaces
-    /// the result rows so the search field itself remains visible
-    /// (per AC-19.6).
+    /// `.insetGrouped` list of categories with a `DODSearchField` name
+    /// filter scoped to `category.name` (case-insensitive). When the
+    /// typed query has no matches, an inline secondary-label row
+    /// replaces the result rows so the search field itself remains
+    /// visible (per AC-19.6).
     ///
-    /// The iOS-only modifiers (`.listStyle(.insetGrouped)` and
-    /// `.searchable(... placement: .navigationBarDrawer)`) are guarded
-    /// with `#if os(iOS)` so the package still compiles on the macOS
-    /// test slice. On macOS the list falls back to SwiftUI's default
-    /// style — production runs are iOS-only, so the macOS branch only
-    /// keeps `swift test` (which builds for the host platform) green.
+    /// T-648 / CL-126 / REG-32: the pre-T-648 `.searchable(text:placement:
+    /// .navigationBarDrawer(displayMode: .automatic))` modifier is
+    /// replaced by the shared `DODSearchField` slotted into a
+    /// `VStack(spacing: 0)` above the `List` so this bar matches the
+    /// Search-tab bar visually (both render `DODColor.surfaceElevated`
+    /// brand brown inside a `Capsule(style: .continuous)` shape). The
+    /// `#if os(iOS)` guard remains for `.listStyle(.insetGrouped)`
+    /// (iOS-only modifier); production runs are iOS-only, so the macOS
+    /// branch only keeps `swift test` (which builds for the host
+    /// platform) green.
     private var loadedList: some View {
         let filtered = CategoryListView.filtered(
             categories: viewModel.categories,
@@ -101,18 +111,27 @@ public struct CategoryListView: View {
         .scrollContentBackground(.hidden)
         .background(DODColor.surface)
 
+        return VStack(spacing: 0) {
+            DODSearchField(text: $searchText, placeholder: "Search")
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.bottom, DODSpacing.sm)
+                .accessibilityIdentifier("dod.search.field.categories")
+            applyListStyle(baseList)
+        }
+        .background(DODColor.surface)
+    }
+
+    /// Applies the iOS-only `.listStyle(.insetGrouped)` to the base list.
+    /// Split into a helper so the `loadedList` body stays an expression
+    /// the type-checker resolves quickly and the `#if os(iOS)` branch
+    /// doesn't fight `some View`'s opaque-type inference inside a
+    /// `VStack` builder.
+    @ViewBuilder
+    private func applyListStyle<L: View>(_ baseList: L) -> some View {
         #if os(iOS)
-        return
-            baseList
-            .listStyle(.insetGrouped)
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .automatic)
-            )
+        baseList.listStyle(.insetGrouped)
         #else
-        return
-            baseList
-            .searchable(text: $searchText)
+        baseList
         #endif
     }
 

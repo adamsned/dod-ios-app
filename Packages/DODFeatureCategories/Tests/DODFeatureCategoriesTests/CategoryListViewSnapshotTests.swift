@@ -16,6 +16,13 @@ import XCTest
 /// `.plain` to `.insetGrouped` with a `.searchable` filter) and added the
 /// two iPad-12.9" baselines for the first time.
 ///
+/// T-648 / CL-126 / REG-32 (2026-05-30): the prior baselines were deleted
+/// because the search field is now the shared `DODSearchField` slotted
+/// above the List (sticky content-area pill — `DODColor.surfaceElevated`
+/// brand brown inside a `Capsule(style: .continuous)` shape) instead of
+/// the `.searchable` nav-bar-drawer system bar. The `.failed` record
+/// mode lays the new baselines down on the next iOS-sim test run.
+///
 /// First iOS-sim test run uses `record: .failed` to lay any missing
 /// baseline PNGs down. Spec trace: constitution §6 L4, US-2 AC-2.1..2.2,
 /// US-18 AC-18.1, AC-18.2, US-19 AC-19.1, AC-19.2, AC-19.5.
@@ -161,9 +168,10 @@ final class CategoryListViewSnapshotTests: XCTestCase {
 // MARK: - Stateful host
 //
 // Wraps `CategoryListView` with a `NavigationStack` so the navigation title
-// and (T-340) the `.searchable` field render correctly, and absorbs the
-// `onSelect` closure required by the view's init. Test-target-only —
-// never in the production target.
+// renders correctly (T-648 / CL-126: the search field is no longer a
+// `.searchable` nav-bar-drawer; it's the shared `DODSearchField` slotted
+// above the List), and absorbs the `onSelect` closure required by the
+// view's init. Test-target-only — never in the production target.
 
 @MainActor
 private struct CategoryListStatefulHost: View {
