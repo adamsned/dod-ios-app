@@ -109,6 +109,30 @@ import Testing
             _ = try await client.post(id: 999)
         }
     }
+
+    @Test func fetchesPostBySlug() async throws {
+        // DOD-ART-2: tapping an article's recipe link resolves the URL slug to
+        // a post via `?slug=`.
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts", json: Data(fixture.utf8))
+        let client = WPRestClient(httpClient: fake)
+        let item = try await client.post(slug: "garlic-butter-skillet-corn")
+        #expect(item?.id == 21238)
+        #expect(item?.title == "Garlic Butter Skillet Corn")
+        let captured = await fake.capturedRequests
+        let url = try #require(captured.first?.url?.absoluteString)
+        #expect(url.contains("slug=garlic-butter-skillet-corn"))
+    }
+
+    @Test func postBySlugReturnsNilWhenNoMatch() async throws {
+        // A link to a WP *page* (not a recipe post) → empty array → nil, so
+        // RootView falls back to opening it in the browser.
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts", json: Data("[]".utf8))
+        let client = WPRestClient(httpClient: fake)
+        let item = try await client.post(slug: "about-me")
+        #expect(item == nil)
+    }
 }
 
 @Suite("WPRestClient.search") struct WPRestClientSearchTests {
