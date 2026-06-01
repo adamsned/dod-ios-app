@@ -30,6 +30,24 @@ extension RecipeStore {
     public static let cloudKitContainerIdentifier =
         "iCloud.com.dutchovendaddy.DODApp"
 
+    /// The single source-of-truth read for the CloudKit-sync opt-in flag
+    /// (DUT-6). Every decision that depends on "is sync on?" — the
+    /// container-configuration branch (``makeProductionConfiguration()``),
+    /// the launch-time diagnostics gate in `AppDependencies.bootstrap()`,
+    /// and the Settings view-model's seed state — funnels through this one
+    /// reader so they can never disagree. Defaults to `false` for an absent
+    /// key (a fresh install or a user who never opted in), which is the
+    /// AC-41.1 graceful-fallback starting state.
+    ///
+    /// Exposed as a `nonisolated static` over an injectable `UserDefaults`
+    /// so the L1 suite can pin the flag-as-source-of-truth contract against
+    /// an isolated suite without touching `.standard`.
+    public nonisolated static func cloudKitSyncOptIn(
+        in defaults: UserDefaults = .standard
+    ) -> Bool {
+        defaults.bool(forKey: cloudKitSyncOptInKey)
+    }
+
     /// Create the on-disk container for production use. Pinned to
     /// `SchemaV4` — older on-disk stores migrate via `MigrationPlan` at
     /// open (V1 → V2 → V3 → V4, all lightweight).
@@ -52,28 +70,138 @@ extension RecipeStore {
     /// app sandbox path; the App Group container is used only for the
     /// widget snapshot bytes that the widget extension reads.
     public static func productionContainer() throws -> ModelContainer {
-        let configuration = makeProductionConfiguration()
-        return try ModelContainer(
-            for: Schema(SchemaV4.models),
-            migrationPlan: MigrationPlan.self,
-            configurations: configuration
+        try productionContainer(defaults: .standard).container
+    }
+
+    /// Outcome of building the production container, distinguishing the
+    /// CloudKit-backed open from the DOD-CRASH-1 safety fallback (DUT-6).
+    /// The host (`AppDependencies`) reads ``usedCloudKitFallback`` to log
+    /// the degraded state; the diagnostics surface keys off it so a user
+    /// whose `.private` open failed sees a sensible status instead of a
+    /// crash.
+    public struct ContainerBuildResult {
+        public let container: ModelContainer
+        /// `true` when the opt-in flag was ON but the CloudKit-backed
+        /// `.private` open threw, so we fell back to a plain local
+        /// container. `false` on the normal opt-in or opt-out paths.
+        public let usedCloudKitFallback: Bool
+    }
+
+    /// Build the production container for the *current persisted opt-in
+    /// flag*, with a DOD-CRASH-1 safety net (DUT-6).
+    ///
+    /// The opt-in flag (read via ``cloudKitSyncOptIn(in:)``) is the single
+    /// source of truth: ON ⇒ attempt a CloudKit-backed `.private`
+    /// container; OFF ⇒ a plain local container. **If the opt-in path
+    /// throws** — the `NSPersistentCloudKitContainer` open can fail when
+    /// the Production schema was never deployed, the account is
+    /// unavailable, or PushKit can't register — we **fall back to a plain
+    /// local container** rather than letting the error propagate to
+    /// `AppDependencies.init`'s `fatalError`. That `fatalError` is exactly
+    /// what caused the build-3 DOD-CRASH-1 launch crash; this fallback is
+    /// defense-in-depth so even a future schema regression degrades to
+    /// "saved recipes stay on this device" instead of an unlaunchable app.
+    /// The user's local data is untouched (the on-disk store path is the
+    /// same for both configurations), so sync simply stays dormant until
+    /// the underlying CloudKit problem is resolved and the app relaunches.
+    ///
+    /// The opt-OUT path is never wrapped in the fallback — a plain
+    /// container that fails to open is a genuine, unrecoverable migration
+    /// failure that MUST surface (MIGRATION.md discipline rule 4), so it
+    /// rethrows for the caller's `fatalError` to catch.
+    ///
+    /// `inMemory` is a test-only seam: the L1 suite drives the exact same
+    /// flag-branch + fallback logic against an in-memory store so it never
+    /// touches the shared on-disk `default.store` (which carries whatever
+    /// model version the host's prior runs left behind). Production always
+    /// passes `false` so the real on-disk container is used.
+    public static func productionContainer(
+        defaults: UserDefaults,
+        inMemory: Bool = false
+    ) throws -> ContainerBuildResult {
+        let schema = Schema(SchemaV4.models)
+        guard cloudKitSyncOptIn(in: defaults) else {
+            // Opt-out: plain local store. A failure here is a real
+            // migration error and must propagate.
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: inMemory ? nil : MigrationPlan.self,
+                configurations: localConfiguration(inMemory: inMemory)
+            )
+            return ContainerBuildResult(container: container, usedCloudKitFallback: false)
+        }
+        // Opt-in: try the CloudKit-backed container first, falling back to
+        // a plain local container if the `.private` open throws.
+        return try buildCloudKitWithFallback(
+            cloudKitBuild: {
+                try ModelContainer(
+                    for: schema,
+                    migrationPlan: inMemory ? nil : MigrationPlan.self,
+                    configurations: ModelConfiguration(
+                        isStoredInMemoryOnly: inMemory,
+                        cloudKitDatabase: .private(cloudKitContainerIdentifier)
+                    )
+                )
+            },
+            localBuild: {
+                try ModelContainer(
+                    for: schema,
+                    migrationPlan: inMemory ? nil : MigrationPlan.self,
+                    configurations: localConfiguration(inMemory: inMemory)
+                )
+            }
         )
     }
 
-    /// Rebuild the production container after the opt-in flag changes
-    /// (e.g., the user toggles Settings → iCloud Sync on or off). The
-    /// caller is responsible for replacing the stale `ModelContainer` in
-    /// the composition root and re-wiring downstream consumers
-    /// (`RecipeStore`, the App Intents environment, the widget
-    /// publishers). T-703 owns the wiring; T-702 owns this seam.
+    /// The DOD-CRASH-1 safety net, extracted so the fallback branch is
+    /// unit-testable by injection (a `.private` `NSPersistentCloudKitContainer`
+    /// open can't be made to throw hermetically in a unit-test process —
+    /// it needs the app's CloudKit/push entitlements — so the L1 suite
+    /// drives a throwing `cloudKitBuild` directly to prove the catch path).
     ///
-    /// **Why a public seam instead of observing `UserDefaults` from the
-    /// container.** A `ModelContainer` is constructed once per process
-    /// lifecycle; SwiftData doesn't support swapping its
-    /// `ModelConfiguration` mid-flight. The opt-in transition requires
-    /// the host to discard the old container and build a fresh one with
-    /// the new configuration. Exposing the rebuild as an explicit
-    /// function keeps that contract visible at the call site.
+    /// Attempts `cloudKitBuild`; on **any thrown error** (schema not
+    /// deployed in Production, account unavailable, PushKit registration
+    /// failure) degrades to `localBuild` and reports `usedCloudKitFallback
+    /// == true`, so the app launches instead of `fatalError`-ing. If the
+    /// local fallback ALSO throws, that's a genuine migration failure and
+    /// it rethrows for the caller's `fatalError` to surface.
+    static func buildCloudKitWithFallback(
+        cloudKitBuild: () throws -> ModelContainer,
+        localBuild: () throws -> ModelContainer
+    ) throws -> ContainerBuildResult {
+        do {
+            return ContainerBuildResult(container: try cloudKitBuild(), usedCloudKitFallback: false)
+        } catch {
+            return ContainerBuildResult(container: try localBuild(), usedCloudKitFallback: true)
+        }
+    }
+
+    /// The plain, CloudKit-free configuration used by the opt-out path and
+    /// the DOD-CRASH-1 fallback. `cloudKitDatabase: .none` is explicit (not
+    /// cosmetic): SwiftData's default `.automatic` auto-enables CloudKit
+    /// whenever the app's iCloud entitlement is present, so the explicit
+    /// `.none` is what keeps the opt-out / fallback store genuinely local.
+    private static func localConfiguration(inMemory: Bool) -> ModelConfiguration {
+        ModelConfiguration(isStoredInMemoryOnly: inMemory, cloudKitDatabase: .none)
+    }
+
+    /// Build a fresh production container matching the *current* persisted
+    /// opt-in flag. Retained as a named seam for symmetry with the launch
+    /// path, but **the opt-in toggle no longer hot-swaps the live store**
+    /// (DUT-6): SwiftData binds a `ModelContainer` (and the `@ModelActor`
+    /// `RecipeStore` built from it) once per process and cannot swap the
+    /// `cloudKitDatabase` configuration mid-flight, and the app injects no
+    /// `ModelContainer` into the SwiftUI environment, so reassigning a
+    /// rebuilt container in the composition root re-wired nothing while
+    /// adding a transient second `NSPersistentCloudKitContainer` (a
+    /// DOD-CRASH-1 risk surface).
+    ///
+    /// The persisted flag is therefore the single source of truth, read at
+    /// the *next* launch by ``productionContainer(defaults:)``. The toggle's
+    /// job is just to write the flag (and tell the user a relaunch applies
+    /// it); this function exists for any caller that genuinely wants a
+    /// flag-matched container instance (e.g. a future cold re-bootstrap),
+    /// not for mid-session swapping.
     public static func recreateContainerAfterOptInChange() throws -> ModelContainer {
         try productionContainer()
     }
@@ -116,8 +244,7 @@ extension RecipeStore {
     ///    `CloudKitSchemaCompatibilityTests` — no prior test built a
     ///    `.private` container, which is how this shipped.
     static func makeProductionConfiguration() -> ModelConfiguration {
-        let optedIn = UserDefaults.standard.bool(forKey: cloudKitSyncOptInKey)
-        if optedIn {
+        if cloudKitSyncOptIn() {
             return ModelConfiguration(
                 cloudKitDatabase: .private(cloudKitContainerIdentifier)
             )

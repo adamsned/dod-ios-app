@@ -93,6 +93,11 @@ public struct SettingsView: View {
             // file stays under the file_length cap; the copy + button
             // styles flip with the request direction per CL-89.
             .cloudSyncConfirmationAlert(viewModel: viewModel)
+            // DUT-6 cause B — pull the latest CloudKit mirror status into the
+            // iCloud Sync row's status sublabel when the screen appears.
+            .task {
+                viewModel.refreshCloudSyncStatus()
+            }
     }
 
     @ViewBuilder
