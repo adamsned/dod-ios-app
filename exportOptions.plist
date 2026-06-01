@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Export options for `xcodebuild -exportArchive`, used by
+  .github/workflows/release.yml to turn the Release .xcarchive into an
+  App Store (.ipa) ready for TestFlight upload.
+
+  NO SECRETS LIVE IN THIS FILE. It is committed to a PUBLIC repo.
+
+  - method: app-store-connect is the current key (Xcode 26). It replaced
+    the older `app-store` value; xcodebuild 26 still accepts `app-store`
+    as a deprecated alias but emits a warning, so we use the new spelling.
+  - signingStyle: automatic lets Xcode's cloud-signing create/refresh the
+    App Store distribution certificate + provisioning profiles for the app
+    and BOTH app extensions (Widget, LiveActivity) at archive time. This is
+    why the archive step passes -allowProvisioningUpdates and an App Store
+    Connect API key (see the workflow): managed signing needs to talk to
+    App Store Connect to mint the profiles.
+  - teamID is intentionally NOT hard-coded here (public repo / constitution
+    rule: never commit the Apple Team ID to a tracked file). The workflow injects
+    it at run time from the APPLE_TEAM_ID GitHub secret by writing a
+    <key>teamID</key> entry into a copy of this plist with PlistBuddy before
+    calling -exportArchive. If you ever run -exportArchive by hand, pass the
+    team via that same PlistBuddy edit or an -exportOptionsPlist override.
+  - uploadSymbols: include dSYMs so TestFlight/Organizer get symbolicated
+    crash logs.
+  - manageAppVersionAndBuildNumber: false - we manage CFBundleVersion
+    ourselves in the workflow (UTC-timestamp scheme, see Marketing/CICD.md),
+    so Xcode must not auto-rewrite it during export.
+-->
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>export</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>
