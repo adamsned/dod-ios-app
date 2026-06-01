@@ -156,16 +156,10 @@ public enum ArticleBodyExtractor {
         sliceBeforeRecipeCard(in: entryContent)
     }
 
-    /// T-735 / CL-132: priority-ordered list of `<div class="...">` tokens
-    /// that mark the start of a recipe card. WPRM is first (the dominant
-    /// case on `dutchovendaddy.com` — 8 of 9 successfully-fetched recipes
-    /// in the 2026-05-31 live-API audit use it); the additional tokens are
-    /// defensive coverage for guest posts / future plugin migrations
-    /// (Tasty Recipes — `tasty-recipes`; Meal Vista — `mv-create`; the
-    /// Gutenberg-block variant of Tasty — `wp-block-tasty-recipes-recipe-card`).
-    /// The 2026-05-31 sample found ZERO recipes using the additional
-    /// plugins, but adding the boundaries now means the next guest-post
-    /// or plugin migration doesn't regress the blurb surface.
+    /// T-735 / CL-132: `<div class="...">` tokens that mark a recipe-card
+    /// boundary. WPRM dominates on `dutchovendaddy.com` (8 of 9 live-API
+    /// samples); the others are defensive coverage for Tasty Recipes /
+    /// Meal Vista / Gutenberg-Tasty plugins on future guest posts.
     static let recipeCardBoundaryTokens: [String] = [
         "wprm-recipe-container",
         "tasty-recipes",
@@ -173,13 +167,10 @@ public enum ArticleBodyExtractor {
         "wp-block-tasty-recipes-recipe-card",
     ]
 
-    /// T-735 / CL-132: scan `entryContent` for the first `<div ...>` tag
-    /// whose `class=` attribute contains ANY of the
-    /// ``recipeCardBoundaryTokens`` (WPRM first, then Tasty / MV / wp-
-    /// block-tasty). Returns everything before that open tag, or the full
-    /// `entryContent` if no boundary is present. The class-token matcher
-    /// ignores ordering and tolerates sibling classes (e.g.
-    /// `wprm-recipe-container wprm-recipe-template-default`).
+    /// T-735 / CL-132: return the substring before the first `<div ...>`
+    /// whose `class=` attribute contains ANY of ``recipeCardBoundaryTokens``,
+    /// or the full input if no boundary is present. Class-token matching
+    /// ignores attribute order and tolerates sibling classes.
     static func sliceBeforeRecipeCard(in entryContent: String) -> String {
         var cursor = entryContent.startIndex
         while cursor < entryContent.endIndex {
@@ -215,12 +206,8 @@ public enum ArticleBodyExtractor {
         return entryContent
     }
 
-    /// T-735 / CL-132: returns true when the attribute string contains a
-    /// `class=` value whose whitespace-delimited tokens include ANY of the
-    /// supplied `tokens`. Loops over ``hasClassToken(attributes:token:)``;
-    /// short-circuits on the first match. Used by
-    /// ``sliceBeforeRecipeCard(in:)`` to scan for WPRM / Tasty / MV / wp-
-    /// block-tasty boundary markers in priority order.
+    /// T-735 / CL-132: short-circuits true when the `class=` attribute
+    /// contains ANY of `tokens` as a whitespace-delimited class token.
     static func hasAnyClassToken<S: StringProtocol>(attributes: S, tokens: [String]) -> Bool {
         for token in tokens where hasClassToken(attributes: attributes, token: token) {
             return true
