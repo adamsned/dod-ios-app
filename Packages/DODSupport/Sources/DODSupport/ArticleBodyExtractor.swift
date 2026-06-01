@@ -144,17 +144,43 @@ public enum ArticleBodyExtractor {
     }
 
     /// Helper: returns the substring of `entryContent` preceding the first
-    /// `<div class="wprm-recipe-container">` open tag, or the full
-    /// `entryContent` if no WPRM card is present. Extracted from
-    /// ``extractRecipeBlurb(html:paragraphLimit:)`` so the WPRM-crop logic
-    /// stays separate from the T-733 / CL-130 paragraph cap.
+    /// recipe-card boundary (WPRM by default; T-735 / CL-132 broadens to
+    /// Tasty Recipes / Meal Vista / wp-block-tasty class tokens as well).
+    /// Returns the full `entryContent` if no recipe card is present.
+    /// Extracted from ``extractRecipeBlurb(html:paragraphLimit:)`` so the
+    /// boundary-crop logic stays separate from the T-733 / CL-130 paragraph
+    /// cap. Kept under the pre-T-735 name (``sliceBeforeWPRMCard``) for
+    /// source-compatibility — the implementation delegates to the broadened
+    /// ``sliceBeforeRecipeCard(in:)`` helper.
     static func sliceBeforeWPRMCard(in entryContent: String) -> String {
-        // WPRM's canonical recipe-card wrapper. Match the literal class token
-        // anywhere in an open `<div ...>` tag — WPRM uses the same class on
-        // every theme, with sibling classes like
-        // `wprm-recipe-container wprm-recipe-template-default`. The
-        // class-token matcher ignores ordering and other classes.
-        let wprmToken = "wprm-recipe-container"
+        sliceBeforeRecipeCard(in: entryContent)
+    }
+
+    /// T-735 / CL-132: priority-ordered list of `<div class="...">` tokens
+    /// that mark the start of a recipe card. WPRM is first (the dominant
+    /// case on `dutchovendaddy.com` — 8 of 9 successfully-fetched recipes
+    /// in the 2026-05-31 live-API audit use it); the additional tokens are
+    /// defensive coverage for guest posts / future plugin migrations
+    /// (Tasty Recipes — `tasty-recipes`; Meal Vista — `mv-create`; the
+    /// Gutenberg-block variant of Tasty — `wp-block-tasty-recipes-recipe-card`).
+    /// The 2026-05-31 sample found ZERO recipes using the additional
+    /// plugins, but adding the boundaries now means the next guest-post
+    /// or plugin migration doesn't regress the blurb surface.
+    static let recipeCardBoundaryTokens: [String] = [
+        "wprm-recipe-container",
+        "tasty-recipes",
+        "mv-create",
+        "wp-block-tasty-recipes-recipe-card",
+    ]
+
+    /// T-735 / CL-132: scan `entryContent` for the first `<div ...>` tag
+    /// whose `class=` attribute contains ANY of the
+    /// ``recipeCardBoundaryTokens`` (WPRM first, then Tasty / MV / wp-
+    /// block-tasty). Returns everything before that open tag, or the full
+    /// `entryContent` if no boundary is present. The class-token matcher
+    /// ignores ordering and tolerates sibling classes (e.g.
+    /// `wprm-recipe-container wprm-recipe-template-default`).
+    static func sliceBeforeRecipeCard(in entryContent: String) -> String {
         var cursor = entryContent.startIndex
         while cursor < entryContent.endIndex {
             guard
@@ -164,8 +190,8 @@ public enum ArticleBodyExtractor {
                     range: cursor..<entryContent.endIndex
                 )
             else {
-                // No more `<div` openings — no WPRM card present; return the
-                // full entry-content slice as the fallback.
+                // No more `<div` openings — no recipe card present; return
+                // the full entry-content slice as the fallback.
                 return entryContent
             }
             guard
@@ -177,16 +203,29 @@ public enum ArticleBodyExtractor {
                 return entryContent
             }
             let attributes = entryContent[openTagStart.upperBound..<openTagEnd.lowerBound]
-            if hasClassToken(attributes: attributes, token: wprmToken) {
-                // Found the WPRM recipe card — return everything before its
-                // opening `<div`. That preceding region is the blurb.
+            if hasAnyClassToken(attributes: attributes, tokens: recipeCardBoundaryTokens) {
+                // Found a recipe-card boundary — return everything before
+                // its opening `<div`. That preceding region is the blurb.
                 return String(entryContent[entryContent.startIndex..<openTagStart.lowerBound])
             }
             cursor = openTagEnd.upperBound
         }
         // Defensive fallthrough — `while` exits if `cursor >= endIndex` with
-        // no match. Same fallback as the no-WPRM-card branch above.
+        // no match. Same fallback as the no-card branch above.
         return entryContent
+    }
+
+    /// T-735 / CL-132: returns true when the attribute string contains a
+    /// `class=` value whose whitespace-delimited tokens include ANY of the
+    /// supplied `tokens`. Loops over ``hasClassToken(attributes:token:)``;
+    /// short-circuits on the first match. Used by
+    /// ``sliceBeforeRecipeCard(in:)`` to scan for WPRM / Tasty / MV / wp-
+    /// block-tasty boundary markers in priority order.
+    static func hasAnyClassToken<S: StringProtocol>(attributes: S, tokens: [String]) -> Bool {
+        for token in tokens where hasClassToken(attributes: attributes, token: token) {
+            return true
+        }
+        return false
     }
 
     /// T-733 / CL-130: cap an HTML slice at the Nth `</p>` close tag.

@@ -253,4 +253,76 @@ import Testing
         #expect(result.contains("Blurb prose."))
         #expect(!result.contains("Recipe card stuff."))
     }
+
+    // MARK: - extractRecipeBlurb broadened boundary detection (T-735 / CL-132)
+
+    /// T-735 / CL-132: Tasty Recipes plugin emits the recipe card as
+    /// `<div class="tasty-recipes ...">`. The broadened boundary scanner
+    /// recognizes the `tasty-recipes` class token in addition to WPRM's
+    /// `wprm-recipe-container`, so a recipe page using Tasty instead of
+    /// WPRM also gets a clean pre-card crop. Live-API audit on 2026-05-31
+    /// found zero recipes using Tasty on `dutchovendaddy.com`; this is
+    /// defensive coverage for future plugin migrations or guest posts.
+    @Test func extractRecipeBlurbCropsAtTastyRecipesBoundary() {
+        let html = """
+            <html><body>
+            <div class="entry-content">
+            <p>This is the blurb above a Tasty Recipes card.</p>
+            <div class="tasty-recipes tasty-recipes-modern">
+            <h2>Tasty Card Title</h2>
+            <ul><li>1 cup flour</li></ul>
+            </div>
+            </div>
+            </body></html>
+            """
+        let result = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        #expect(result.contains("This is the blurb above a Tasty Recipes card."))
+        // Tasty-card structured content must NOT leak into the blurb.
+        #expect(!result.contains("Tasty Card Title"))
+        #expect(!result.contains("1 cup flour"))
+    }
+
+    /// T-735 / CL-132: Meal Vista plugin emits the card as
+    /// `<div class="mv-create ...">`. Same broadened-boundary contract —
+    /// the blurb crops at the first MV card boundary.
+    @Test func extractRecipeBlurbCropsAtMealVistaBoundary() {
+        let html = """
+            <html><body>
+            <div class="entry-content">
+            <p>Intro before a Meal Vista card.</p>
+            <div class="mv-create mv-create-card">
+            <p>Meal Vista card body.</p>
+            </div>
+            </div>
+            </body></html>
+            """
+        let result = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        #expect(result.contains("Intro before a Meal Vista card."))
+        #expect(!result.contains("Meal Vista card body."))
+    }
+
+    /// T-735 / CL-132: when MULTIPLE recipe-card boundary tokens appear
+    /// in the same page, the extractor crops at the FIRST one regardless
+    /// of which plugin emitted it. Verifies the
+    /// ``recipeCardBoundaryTokens`` priority-ordered scan picks the
+    /// earliest boundary, not the first one by token-list priority.
+    @Test func extractRecipeBlurbCropsAtEarliestBoundaryRegardlessOfPlugin() {
+        // Tasty appears BEFORE WPRM in the HTML — even though WPRM is
+        // first in the priority list, the FIRST boundary in document
+        // order wins (the user-visible blurb is everything before any
+        // recipe card, period).
+        let html = """
+            <div class="entry-content">
+            <p>Blurb prose.</p>
+            <div class="tasty-recipes">Tasty card body.</div>
+            <p>Between cards (should NOT appear).</p>
+            <div class="wprm-recipe-container">WPRM body.</div>
+            </div>
+            """
+        let result = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        #expect(result.contains("Blurb prose."))
+        #expect(!result.contains("Between cards"))
+        #expect(!result.contains("Tasty card body."))
+        #expect(!result.contains("WPRM body."))
+    }
 }
