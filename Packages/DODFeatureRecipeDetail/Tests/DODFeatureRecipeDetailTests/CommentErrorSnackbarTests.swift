@@ -36,6 +36,16 @@ struct CommentErrorSnackbarTests {
         #expect(snackbar == "Couldn't post your comment (server said 403).")
     }
 
+    /// DUT-7 / AC-14.4: when WordPress hands back a reason, the snackbar
+    /// surfaces the code AND the message — not just the number — so the
+    /// user (and a TestFlight reporter reading the chip) sees *why* it failed.
+    @Test func httpStatusWithBodySurfacesCodeAndServerMessage() {
+        let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
+            for: WPClientError.httpStatusWithBody(400, message: "Comment content is invalid.")
+        )
+        #expect(snackbar == "Couldn't post your comment (server said 400): Comment content is invalid.")
+    }
+
     @Test func decodingSurfacesReplyMessage() {
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
             for: WPClientError.decoding(message: "bad JSON")

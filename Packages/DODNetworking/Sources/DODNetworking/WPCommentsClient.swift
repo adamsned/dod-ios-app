@@ -97,6 +97,17 @@ public struct WPCommentsClient: Sendable {
         if let ratingValue, !(1...5).contains(ratingValue) {
             throw WPClientError.underlying(message: "ratingValue must be 1...5; got \(ratingValue)")
         }
+        // DUT-7 hypothesis #4, network-layer backstop: WordPress requires a
+        // non-empty author name + email for an anonymous (no-auth) comment
+        // POST and 400s otherwise. The view model gates on this already, but
+        // guard here too so the failure is a typed, descriptive error at the
+        // seam — never a silent empty-field 400 — regardless of caller.
+        guard !authorName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw WPClientError.underlying(message: "author name must not be empty")
+        }
+        guard !authorEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw WPClientError.underlying(message: "author email must not be empty")
+        }
         let url = try buildURL(path: "comments", queryItems: [])
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
@@ -110,16 +121,84 @@ public struct WPCommentsClient: Sendable {
             ratingValue: ratingValue
         )
 
+        // DUT-7 diagnostic breadcrumb: log the POST target so the owner can
+        // confirm on-device (Console.app, subsystem com.dutchovendaddy.DODApp)
+        // that the request actually reached the wp-json endpoint and which URL
+        // it hit. Privacy-safe — URL + post ID only, never the comment body or
+        // the author's name/email.
+        DODLog.network.notice(
+            "comment POST → \(url.absoluteString, privacy: .public) (post=\(postID, privacy: .public))"
+        )
+
         let (data, response) = try await httpClient.data(for: request)
         guard (200..<300).contains(response.statusCode) else {
+            // DUT-7 hypothesis #1: a swallowed non-2xx is exactly the "tap,
+            // nothing happens" report. Surface the status AND WordPress's own
+            // error message (it explains *why* — moderation, spam, missing
+            // field, blocked UA) so the snackbar and the on-device log both
+            // pin the cause instead of collapsing to a bare code.
+            let serverMessage = Self.extractWPErrorMessage(from: data)
+            DODLog.network.error(
+                "comment POST failed status=\(response.statusCode, privacy: .public) message=\(serverMessage ?? "<none>", privacy: .public)"
+            )
+            if let serverMessage {
+                throw WPClientError.httpStatusWithBody(response.statusCode, message: serverMessage)
+            }
             throw WPClientError.httpStatus(response.statusCode)
         }
         do {
             let dto = try decoder.decode(WPDTO.Comment.self, from: data)
+            DODLog.network.notice(
+                "comment POST ok status=\(response.statusCode, privacy: .public) id=\(dto.id, privacy: .public) wpStatus=\(dto.status ?? "<unknown>", privacy: .public)"
+            )
             return dto.toDomain()
         } catch {
+            DODLog.network.error("comment POST decode failed: \(String(describing: error), privacy: .public)")
             throw WPClientError.decoding(message: String(describing: error))
         }
+    }
+
+    /// Pull the human-readable `message` out of a WordPress REST error body.
+    /// WP returns rejected writes as `{"code":"...","message":"...",
+    /// "data":{"status":NNN}}`; some security plugins (Wordfence) return an
+    /// HTML block instead. Returns `nil` when the body has no usable message
+    /// so the caller falls back to the status-only ``WPClientError/httpStatus(_:)``.
+    /// HTML bodies are reduced to a short tag-stripped snippet so a 403 HTML
+    /// challenge page still surfaces *something* the owner can recognize.
+    static func extractWPErrorMessage(from data: Data) -> String? {
+        guard !data.isEmpty else { return nil }
+        // If the body is a JSON object, trust ONLY its `message` field — a
+        // structured WP error with no usable message (e.g. `{}` or a blank
+        // string) yields nil rather than dumping the raw JSON at the user.
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            guard let message = object["message"] as? String else { return nil }
+            let cleaned = Self.stripHTML(message).trimmingCharacters(in: .whitespacesAndNewlines)
+            return cleaned.isEmpty ? nil : String(cleaned.prefix(140))
+        }
+        // Not a JSON object (e.g. a Wordfence HTML challenge page). Strip
+        // tags + clamp so a 403 challenge still surfaces something readable.
+        guard let raw = String(data: data, encoding: .utf8) else { return nil }
+        let stripped = Self.stripHTML(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !stripped.isEmpty else { return nil }
+        return String(stripped.prefix(140))
+    }
+
+    /// Minimal tag stripper — WP `message` fields can contain inline `<code>`
+    /// / `<a>` markup, and security-plugin bodies are full HTML pages. Keeps
+    /// the snackbar readable without pulling in a full HTML parser.
+    static func stripHTML(_ string: String) -> String {
+        let withoutTags = string.replacingOccurrences(
+            of: "<[^>]+>",
+            with: " ",
+            options: .regularExpression
+        )
+        return
+            withoutTags
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&#039;", with: "'")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Result types
