@@ -13,9 +13,11 @@ import Observation
 /// graduated and to own the cache-clear flow's snackbar feedback. T-703
 /// (US-41) further extends the view-model with the iCloud Sync toggle —
 /// reads + writes the canonical `RecipeStore.cloudKitSyncOptInKey`
-/// UserDefaults flag and routes the flag-write + container rebuild through
-/// a `SettingsDependencies` seam so the composition root owns the
-/// `RecipeStore` lifecycle (per CL-89).
+/// UserDefaults flag through a `SettingsDependencies` seam so the
+/// composition root owns the `RecipeStore` lifecycle (per CL-89). Per DUT-6
+/// the flag is the launch-time source of truth — the toggle persists it and
+/// surfaces a relaunch-to-apply hint rather than (futilely) rebuilding the
+/// live container mid-session.
 ///
 /// Persistence keys (the `dod.settings.*` prefix US-32 established, plus
 /// the `dod.cloudkit.*` namespace T-702 / T-703 own):
@@ -33,8 +35,8 @@ import Observation
 ///   write it). NOTE: declared in `DODPersistence` so the canonical key
 ///   string lives next to the reader; the view-model goes through
 ///   ``SettingsDependencies`` rather than touching `UserDefaults` directly
-///   so the post-write `recreateContainerAfterOptInChange()` rebuild fires
-///   atomically.
+///   so the composition root owns the write (and the paired analytics +
+///   launch-time container selection that depend on it) per DUT-6.
 ///
 /// `UserDefaults` is constructor-injected so the L1 unit suite can pass an
 /// isolated suite (`UserDefaults(suiteName:)`) without polluting the shared
@@ -83,16 +85,19 @@ public final class SettingsViewModel {
     /// picker. Built against the same injected ``defaults`` so the L1 suite
     /// drives it through an isolated `UserDefaults(suiteName:)`.
     private let voicePreferenceStore: VoicePreferenceStore
-    /// Optional seam for the iCloud Sync row's flag-write +
-    /// container-rebuild dispatch (US-41 / AC-41.3). Constructor-injected
-    /// so the L1 suite can pass a recording double; production wiring
-    /// passes a `LiveSettingsDependencies` value that drives
-    /// `RecipeStore.recreateContainerAfterOptInChange()`. The default
+    /// Optional seam for the iCloud Sync row (US-41 / AC-41.3; DUT-6).
+    /// Constructor-injected so the L1 suite can pass a recording double;
+    /// production wiring passes a `LiveSettingsDependencies` value that
+    /// **(1)** persists the `RecipeStore.cloudKitSyncOptInKey` flag (the
+    /// launch-time source of truth — there is no mid-session container
+    /// rebuild any more, per DUT-6) and **(2)** reports the latest CloudKit
+    /// mirror status for the row's status sublabel (cause B). The default
     /// `nil` keeps existing call sites (previews, snapshot hosts, the
     /// pre-T-703 test fixtures) compiling without churn — those surfaces
-    /// just won't trigger the rebuild. Read from the iCloud Sync action
-    /// methods that live in `SettingsViewModel+CloudSync.swift` (the
-    /// file_length split forces an internal-but-not-private accessor).
+    /// just won't persist the flag or refresh the status. Read from the
+    /// iCloud Sync action methods that live in
+    /// `SettingsViewModel+CloudSync.swift` (the file_length split forces an
+    /// internal-but-not-private accessor).
     let cloudSyncDependency: (any SettingsDependencies)?
 
     /// Authorization seam for the notifications toggle (US-42 / AC-42.1).
@@ -195,14 +200,38 @@ public final class SettingsViewModel {
     /// `SettingsViewModel+CloudSync.swift` can set it.
     public internal(set) var cloudSyncPendingRelaunch = false
 
-    /// AC-41.7 status sublabel under the iCloud Sync row. Tells the user a
-    /// just-flipped toggle needs a relaunch to take effect; otherwise stays
-    /// the reserved `"Idle"` placeholder so the row layout (and its L4
-    /// snapshot baseline) doesn't shift. The richer "Up to date / Syncing… /
-    /// Sync error" surface wired to the `NSPersistentCloudKitContainer`
-    /// mirror events — see `CloudKitSyncDiagnostics` — is the T-705 follow-up.
+    /// Latest coarse sync status, pushed in from the App-target
+    /// `NSPersistentCloudKitContainer` mirror observer
+    /// (`CloudKitSyncDiagnostics`) via ``updateCloudSyncStatus(_:)`` (DUT-6,
+    /// cause B). Defaults to ``CloudKitSyncStatus/off`` — the resting state
+    /// before any mirror event is observed, which renders as the reserved
+    /// `"Idle"` placeholder so the row layout (and its L4 snapshot baseline)
+    /// doesn't shift. `internal(set)` so only the update method (and tests)
+    /// mutate it.
+    public internal(set) var cloudSyncStatus: CloudKitSyncStatus = .off
+
+    /// AC-41.7 status sublabel under the iCloud Sync row (DUT-6, cause B).
+    ///
+    /// A just-flipped toggle needs a relaunch before the live mirror status
+    /// means anything (SwiftData builds the container once per process), so
+    /// ``cloudSyncPendingRelaunch`` wins and the row reads "Relaunch DOD to
+    /// apply". Otherwise it renders the mapped ``cloudSyncStatus`` —
+    /// "Idle" / "Syncing…" / "Sync error" — driven by the mirror events
+    /// `CloudKitSyncDiagnostics` observes. Defaults to "Idle" until an event
+    /// arrives, preserving the pre-DUT-6 placeholder.
     public var cloudSyncStatusText: String {
-        cloudSyncPendingRelaunch ? "Relaunch DOD to apply" : "Idle"
+        cloudSyncPendingRelaunch
+            ? CloudKitSyncStatus.relaunchPending.displayString
+            : cloudSyncStatus.displayString
+    }
+
+    /// Push a fresh sync status in from the App-target mirror observer
+    /// (DUT-6, cause B). Kept a tiny method (not a public setter) so the
+    /// composition root has one clear seam to forward
+    /// `CloudKitSyncDiagnostics` events through, and the L1 suite can pin
+    /// the status → sublabel mapping.
+    public func updateCloudSyncStatus(_ status: CloudKitSyncStatus) {
+        cloudSyncStatus = status
     }
 
     /// State for the confirmation alert that fronts every toggle flip

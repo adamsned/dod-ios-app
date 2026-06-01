@@ -36,6 +36,13 @@ final class CloudKitSyncDiagnostics {
     /// entire app run — exactly the window we want sync events logged over.
     private var started = false
 
+    /// Latest coarse sync status mapped from the most recent mirror event
+    /// (DUT-6, cause B). The Settings → iCloud Sync row reads this (via the
+    /// `SettingsDependencies` seam) when it appears, so the status sublabel
+    /// can show idle / syncing / error. `.off` until the first event arrives
+    /// (or whenever sync is opted out and the observer was never started).
+    private(set) var latestStatus: CloudKitSyncStatus = .off
+
     /// Begin logging CloudKit mirror events. Idempotent — a second call while
     /// already observing is a no-op.
     func start() {
@@ -46,7 +53,7 @@ final class CloudKitSyncDiagnostics {
             forName: NSPersistentCloudKitContainer.eventChangedNotification,
             object: nil,
             queue: .main
-        ) { note in
+        ) { [weak self] note in
             guard
                 let event = note.userInfo?[
                     NSPersistentCloudKitContainer.eventNotificationUserInfoKey
@@ -57,6 +64,12 @@ final class CloudKitSyncDiagnostics {
                 DODLog.app.error("\(summary.logLine, privacy: .public)")
             } else {
                 DODLog.app.info("\(summary.logLine, privacy: .public)")
+            }
+            // DUT-6 cause B: keep the coarse status fresh so the Settings
+            // row can surface idle / syncing / error. The observer fires on
+            // the main queue, so this `@MainActor` mutation is safe.
+            MainActor.assumeIsolated {
+                self?.latestStatus = CloudKitSyncStatus(event: summary)
             }
         }
     }
