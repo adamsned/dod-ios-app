@@ -251,6 +251,7 @@ import Testing
 
     @Test func httpErrorStatusThrows() async throws {
         let fake = FakeHTTPClient()
+        // A bodyless (or message-less) error still surfaces the bare status.
         await fake.stub(urlContaining: "comments", json: Data("{}".utf8), statusCode: 500)
         let client = WPCommentsClient(httpClient: fake)
         await #expect(throws: WPClientError.httpStatus(500)) {

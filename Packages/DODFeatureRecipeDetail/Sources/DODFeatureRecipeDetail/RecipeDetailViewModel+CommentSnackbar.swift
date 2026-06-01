@@ -27,6 +27,13 @@ extension RecipeDetailViewModel {
             return "The server took too long — try again."
         case .httpStatus(let code):
             return "Couldn't post your comment (server said \(code))."
+        case .httpStatusWithBody(let code, let message):
+            // DUT-7 / AC-14.4: WordPress handed back a reason (moderation
+            // rejection, spam verdict, missing field, blocked UA). Surface it
+            // verbatim after the code so the user — and a TestFlight reporter
+            // reading the chip — sees *why*, not just the number. The body is
+            // already tag-stripped + clamped in WPCommentsClient.
+            return "Couldn't post your comment (server said \(code)): \(message)"
         case .decoding:
             return "Couldn't read the server's reply — try again."
         case .underlying:
