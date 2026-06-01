@@ -70,11 +70,15 @@ struct RecipeDetailViewModelBlurbTests {
         #expect(viewModel.blurbBlocks.isEmpty)
     }
 
-    /// Cached-recipe path skips the network fetch — `blurbBlocks` stays at
-    /// its empty default until the next online open repopulates via the
-    /// fresh-fetch path. The view falls back to collapsed-only gracefully.
-    @Test func blurbBlocksEmptyOnCachedRecipePath() async throws {
+    /// Cached-recipe path + offline: skips the network refresh entirely —
+    /// `blurbBlocks` stays at its empty default and the view renders the
+    /// collapsed-only fallback. Pre-T-736 / CL-133 this was the contract
+    /// for cached paths IN GENERAL; T-736 / CL-133 narrowed it to the
+    /// offline subset (online cache-hits now trigger a background
+    /// `refreshBlurbBlocks(forCanonicalURL:)` call — see the next test).
+    @Test func blurbBlocksEmptyOnCachedRecipePathWhenOffline() async throws {
         let dependencies = FakeRecipeDetailDependencies()
+        dependencies.online = false
         dependencies.cachedRecipes[202] = RecipeDetailTestFixtures.makeRecipe(
             id: 202,
             withDetail: true
@@ -83,8 +87,11 @@ struct RecipeDetailViewModelBlurbTests {
         await viewModel.onAppear()
 
         #expect(viewModel.loadState == .ready)
-        // Cache hit means fetchHTML was never called → no HTML to extract from
-        // → blurbBlocks is empty (the graceful-fallback contract).
+        // Offline cache hit means fetchHTML was never called → no HTML to
+        // extract from → blurbBlocks is empty (the graceful-fallback
+        // contract — the view's empty-`blurbBlocks` fallback path renders
+        // `Text(strippedExcerpt)` which is acceptable when there's no
+        // fresh data anyway).
         #expect(dependencies.fetchCount == 0)
         #expect(viewModel.blurbBlocks.isEmpty)
     }
