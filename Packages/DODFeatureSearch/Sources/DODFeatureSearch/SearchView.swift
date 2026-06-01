@@ -41,6 +41,9 @@ public struct SearchView: View {
                 placeholder: "Search recipes",
                 onClear: { viewModel.clear() }
             )
+            // DUT-25: border + subtle fill + soft shadow so the field is no
+            // longer white-on-white (camouflaged) on the light background.
+            .dodSearchFieldAffordance()
             .padding(DODSpacing.md)
             .accessibilityIdentifier("dod.search.field.search")
             // US-12 / AC-12.2 amendment / CL-106 (T-637): hide the filter
@@ -391,10 +394,7 @@ struct FilterChipRow: View {
     }
 }
 
-// `FlowLayout` lives in `FlowLayout.swift` and `IdleSuggestionsView`
-// lives in `IdleSuggestionsView.swift` to keep this file under
-// SwiftLint's 400-line cap (the file overran on T-580 / T-590 then
-// again on T-650 — the `FlowLayout` split landed in T-620 incidentally
-// and the `IdleSuggestionsView` split lands in T-650 for the same
-// reason). Both helpers have no logical dependency on the rest of
-// `SearchView`'s source.
+// `FlowLayout` (FlowLayout.swift), `IdleSuggestionsView`
+// (IdleSuggestionsView.swift), and the DUT-25 search-field affordance
+// (SearchFieldAffordance.swift) live in their own files to keep this one
+// under SwiftLint's 400-line cap. None depend on `SearchView`'s source.
