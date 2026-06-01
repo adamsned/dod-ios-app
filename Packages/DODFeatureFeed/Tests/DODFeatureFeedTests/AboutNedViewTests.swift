@@ -8,7 +8,7 @@ import UIKit
 
 /// L1 coverage for ``AboutNedView`` — the About destination graduated
 /// from T-550's "Coming soon — fetched from /about-me/" placeholder via
-/// T-738 / CL-133 (DUT-14). Pins:
+/// T-738 / CL-134 (DUT-14). Pins:
 ///   1. The verbatim DUT-14 copy. Any future paraphrase trips this test
 ///      so the change has to land via a deliberate spec amendment + CL
 ///      bump rather than silently shipping a drift to the user.
@@ -19,7 +19,7 @@ import UIKit
 ///      against a mis-wired `Image(_:)` lookup or a SwiftUI body that
 ///      blows up under default trait collections.
 ///
-/// Spec trace: US-32 AC-32.6 (the new AC graduated in T-738 / CL-133).
+/// Spec trace: US-32 AC-32.6 (the new AC graduated in T-738 / CL-134).
 @MainActor
 @Suite("AboutNedView (T-738 / DUT-14)") struct AboutNedViewTests {
 

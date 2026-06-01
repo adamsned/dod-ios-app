@@ -50,17 +50,17 @@ final class CoreUserJourneysE2ETests: XCTestCase {
             "Tab bar should appear after dismissing the welcome sheet"
         )
 
-        // Tap the second recipe row — first is often partially clipped by
-        // the nav bar at iPhone 17 sim baseline, which makes a coordinate
-        // tap unreliable. Same workaround SmokeTests uses.
-        let recipeButtons = app.buttons.matching(
-            NSPredicate(format: "NOT (label IN %@)", Array(E2ETestSupport.tabLabels))
-        )
+        // T-737 / L5: target feed cards via the stable `dod.feed.card`
+        // identifier so we can't accidentally tap a nav-bar toolbar button
+        // (the layout toggle / Settings gear) that the old "buttons NOT IN
+        // tab labels" predicate swept up. First is often partially clipped
+        // by the nav bar so we tap index 1 — same workaround SmokeTests uses.
+        let recipeCards = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(
-            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
-            "Feed should expose at least 2 recipe rows after onboarding dismisses"
+            recipeCards.element(boundBy: 1).waitForExistence(timeout: 20),
+            "Feed should expose at least 2 recipe cards after onboarding dismisses"
         )
-        recipeButtons.element(boundBy: 1).tap()
+        recipeCards.element(boundBy: 1).tap()
 
         // End-state assertion: recipe detail's Ingredients header is the
         // canonical "we made it to detail" signal — same heuristic
@@ -107,22 +107,14 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         searchField.typeText("cake")
 
         // REST debounce is 300ms (AC-3.1); the live blog round-trip +
-        // render is typically <5s but can flake on cold-CDN paths. The
-        // button predicate excludes the four tab labels AND the visible
-        // filter-chip labels ("All categories", "Any time", "Recently
-        // viewed") so the firstMatch lands on a real recipe row, not on
-        // chrome.
-        let filterChrome: Set<String> = [
-            "All categories", "Any time", "Recently viewed",
-            "Search filters", "Clear",
-        ]
-        let exclude = E2ETestSupport.tabLabels.union(filterChrome)
-        let recipeButtons = app.buttons.matching(
-            NSPredicate(format: "NOT (label IN %@) AND NOT (label BEGINSWITH 'Try')", Array(exclude))
-        )
+        // render is typically <5s but can flake on cold-CDN paths. T-737
+        // / L5: target search result rows via the stable `dod.search.card`
+        // identifier so chrome (layout toggle / filter chips / "Try" pills
+        // / tab labels) can't shadow the firstMatch.
+        let recipeCards = app.buttons.matching(identifier: "dod.search.card")
         XCTAssertTrue(
-            recipeButtons.firstMatch.waitForExistence(timeout: 30),
-            "Search should surface at least one recipe-row button for query 'cake'"
+            recipeCards.firstMatch.waitForExistence(timeout: 30),
+            "Search should surface at least one recipe-card row for query 'cake'"
         )
 
         // Tap the first result and wait for the detail's Ingredients
@@ -131,7 +123,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         // pops us back to search and Ingredients never appears.
         // T-610's fakes make this deterministic; until then it stays a
         // Phase-1 known-flaky surface (see test-pyramid-audit.md).
-        recipeButtons.firstMatch.tap()
+        recipeCards.firstMatch.tap()
         XCTAssertTrue(
             app.staticTexts["Ingredients"].waitForExistence(timeout: 30),
             "Tapping a search result should land on recipe detail (Ingredients header visible)"
@@ -156,14 +148,15 @@ final class CoreUserJourneysE2ETests: XCTestCase {
     func test_save_recipe_then_unsave_from_saved_tab() {
         app.launchForE2E()
 
-        let recipeButtons = app.buttons.matching(
-            NSPredicate(format: "NOT (label IN %@)", Array(E2ETestSupport.tabLabels))
-        )
+        // T-737 / L5: target feed cards via the stable `dod.feed.card`
+        // identifier so chrome (layout toggle / Settings gear) can't
+        // shadow `element(boundBy: 1)`.
+        let recipeCards = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(
-            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
-            "Feed should expose at least 2 recipe rows"
+            recipeCards.element(boundBy: 1).waitForExistence(timeout: 20),
+            "Feed should expose at least 2 recipe cards"
         )
-        recipeButtons.element(boundBy: 1).tap()
+        recipeCards.element(boundBy: 1).tap()
 
         XCTAssertTrue(
             app.staticTexts["Ingredients"].waitForExistence(timeout: 45),
@@ -517,13 +510,21 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         )
         cookTimeChip.tap()
 
-        // Wait for the wheel-picker sheet. The right wheel (Max) carries
-        // the stable `dod.search.cookTimeWheelMax` identifier so we can
-        // pick it without ambiguity vs the left "Min" wheel.
-        let maxWheel = app.pickerWheels.matching(identifier: "dod.search.cookTimeWheelMax").firstMatch
+        // Wait for the wheel-picker sheet. The right column (Max) carries
+        // the stable `dod.search.cookTimeWheelMax` identifier on a
+        // `.accessibilityElement(children: .contain)` container — the
+        // SwiftUI `Picker(.wheel)` doesn't propagate `accessibilityIdentifier`
+        // down to the internal `XCUIElementTypePickerWheel`, so we drill
+        // from the column container into its picker-wheel descendant.
+        let maxColumn = app.otherElements["dod.search.cookTimeWheelMax"]
+        XCTAssertTrue(
+            maxColumn.waitForExistence(timeout: 5),
+            "CookTimeRangeSheet should expose the Max wheel under dod.search.cookTimeWheelMax"
+        )
+        let maxWheel = maxColumn.pickerWheels.firstMatch
         XCTAssertTrue(
             maxWheel.waitForExistence(timeout: 5),
-            "CookTimeRangeSheet should expose the Max wheel under dod.search.cookTimeWheelMax"
+            "Max column should contain a pickerWheel descendant"
         )
         // Adjust the wheel to "30 min". `adjust(toPickerWheelValue:)` is
         // XCUITest's wheel-value setter — exact-string match against the
@@ -689,14 +690,15 @@ final class CoreUserJourneysE2ETests: XCTestCase {
     func test_cook_mode_walks_two_steps_then_exits() {
         app.launchForE2E()
 
-        let recipeButtons = app.buttons.matching(
-            NSPredicate(format: "NOT (label IN %@)", Array(E2ETestSupport.tabLabels))
-        )
+        // T-737 / L5: target feed cards via the stable `dod.feed.card`
+        // identifier so chrome (layout toggle / Settings gear) can't
+        // shadow `element(boundBy: 1)`.
+        let recipeCards = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(
-            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
-            "Feed should expose at least 2 recipe rows"
+            recipeCards.element(boundBy: 1).waitForExistence(timeout: 20),
+            "Feed should expose at least 2 recipe cards"
         )
-        recipeButtons.element(boundBy: 1).tap()
+        recipeCards.element(boundBy: 1).tap()
 
         let ingredientsHeader = app.staticTexts["Ingredients"]
         XCTAssertTrue(
@@ -780,27 +782,28 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         // changing the method signature or the CI run that invokes it.
         app.launchForE2E()
 
-        let recipeButtons = app.buttons.matching(
-            NSPredicate(format: "NOT (label IN %@)", Array(E2ETestSupport.tabLabels))
-        )
+        // T-737 / L5: target feed cards via the stable `dod.feed.card`
+        // identifier so chrome (layout toggle / Settings gear) can't
+        // shadow `element(boundBy: 1)`.
+        let recipeCards = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(
-            recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
-            "Feed should expose at least 2 recipe rows for the deep-link probe"
+            recipeCards.element(boundBy: 1).waitForExistence(timeout: 20),
+            "Feed should expose at least 2 recipe cards for the deep-link probe"
         )
 
         // Capture the recipe row label so the assertion at detail-land can
         // sanity-check (a non-empty label means the probe found a real
         // recipe).
-        let probedLabel = recipeButtons.element(boundBy: 1).label
+        let probedLabel = recipeCards.element(boundBy: 1).label
         XCTAssertFalse(
             probedLabel.isEmpty,
-            "Probed recipe row should expose a non-empty accessibility label"
+            "Probed recipe card should expose a non-empty accessibility label"
         )
 
         // Phase 1 walks the journey via direct tap. T-610 will replace
         // this with a relaunch carrying the deep-link URL once the
         // host-side handler lands.
-        recipeButtons.element(boundBy: 1).tap()
+        recipeCards.element(boundBy: 1).tap()
         XCTAssertTrue(
             app.staticTexts["Ingredients"].waitForExistence(timeout: 45),
             "Deep-link probe journey should end on recipe detail (Ingredients header)"

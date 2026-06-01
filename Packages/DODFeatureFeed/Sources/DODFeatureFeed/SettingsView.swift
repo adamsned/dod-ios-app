@@ -14,7 +14,7 @@ import SwiftUI
 ///      (UserDefaults round-trip; T-551 follow-up wires consumption).
 ///   2. About Dutch Oven Daddy — `NavigationLink` to ``AboutNedView``
 ///      (the embedded DUT-14 copy + Ned's photo bundled as a local
-///      asset per T-738 / CL-133; supersedes the T-552 WP REST fetch
+///      asset per T-738 / CL-134; supersedes the T-552 WP REST fetch
 ///      plan since the copy is now embedded verbatim, not fetched).
 ///   3. Version footer.
 ///
@@ -360,4 +360,4 @@ extension VoiceGender {
 }
 
 // `AboutNedView` lives in `AboutNedView.swift` so the host file stays
-// under the 400-line `file_length` cap (T-738 / CL-133, DUT-14).
+// under the 400-line `file_length` cap (T-738 / CL-134, DUT-14).

@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Destination for the About Dutch Oven Daddy row.
 ///
-/// T-738 / CL-133 (2026-05-31, DUT-14) graduated this from the original
+/// T-738 / CL-134 (2026-05-31, DUT-14) graduated this from the original
 /// T-550 "Coming soon — fetched from /about-me/" placeholder to the
 /// embedded DUT-14 copy + Ned's photo bundled as a local asset. T-552
 /// (the planned WP REST `/about-me/` fetch path) is superseded — the

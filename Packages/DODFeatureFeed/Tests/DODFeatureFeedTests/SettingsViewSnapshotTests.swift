@@ -107,7 +107,7 @@ final class SettingsViewSnapshotTests: XCTestCase {
 
     @MainActor
     func test_aboutNedView_light_defaultDynamicType() async {
-        // The graduated About destination (T-738 / CL-133, DUT-14) —
+        // The graduated About destination (T-738 / CL-134, DUT-14) —
         // verbatim DUT-14 copy + bundled `AboutNed` photo in a
         // magazine-sidebar layout. Locks the 120pt leading image clip
         // + the right-side paragraph wrap.
