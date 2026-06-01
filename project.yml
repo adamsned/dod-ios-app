@@ -140,6 +140,16 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"  # iPhone + iPad
         INFOPLIST_FILE: App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # The App target's capabilities are driven entirely by this entitlements
+        # file (xcodegen has no first-class capability block; automatic signing +
+        # -allowProvisioningUpdates provision whatever it declares). It carries:
+        # iCloud/CloudKit, App Groups, and - added for DUT-6 cause #3 - the Push
+        # Notifications capability (aps-environment), which is what makes
+        # CloudKit live-change pushes DELIVERABLE so the other device syncs
+        # instantly instead of on next launch. Pairs with the Info.plist
+        # UIBackgroundModes: [remote-notification] above (the signing-neutral
+        # half). The App ID must have Push enabled in the Developer portal first;
+        # see App/DODApp.entitlements and this feature's PR for the owner step.
         CODE_SIGN_ENTITLEMENTS: App/DODApp.entitlements
     dependencies:
       - package: DODDomain
