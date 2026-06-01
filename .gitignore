@@ -47,6 +47,10 @@ Package.resolved
 *.profraw
 *.profdata
 
+# Python (bin/ tooling such as the CI test-bug filer)
+__pycache__/
+*.pyc
+
 # Fastlane (in case it gets added later)
 fastlane/report.xml
 fastlane/Preview.html

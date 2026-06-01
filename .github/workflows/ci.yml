@@ -369,3 +369,57 @@ jobs:
             exit 1
           fi
           echo "All required CI jobs passed (or were skipped by path filter / label gating)."
+
+  # Auto-file a single rollup bug in Linear when the suite goes red on main.
+  # Reporter only: it never fails the build (the gate is `ci-required` above).
+  #
+  # Gating: `failure()` is true only when at least one job in `needs` failed;
+  # combined with the ref guard this job is a strict no-op on green runs and on
+  # EVERY pull request (PR runs have github.ref = refs/pull/<n>/merge, not
+  # refs/heads/main). The filer itself is also idempotent by commit SHA, so a
+  # re-run on the same red commit updates the existing issue instead of filing
+  # a duplicate. See bin/file_test_bugs.py and Marketing/CICD.md.
+  report-failures:
+    name: Report failures to Linear
+    needs: [changes, lint, format, test-unit-packages, test-unit-app,
+            test-snapshots-designsystem, build-app, test-ui-smoke,
+            test-e2e]
+    if: ${{ failure() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: File rollup bug in Linear
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          # The whole needs.* context as JSON: { "<job>": { "result": ... } }.
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          # Build --failed-jobs from the job ids whose result is "failure".
+          # (cancelled/skipped are not "failure" and are intentionally ignored;
+          # a cancelled run is usually a superseded push, not a real red.)
+          failed=$(printf '%s' "$NEEDS_JSON" \
+            | jq -r 'to_entries
+                     | map(select(.value.result == "failure") | .key)
+                     | join(",")')
+          echo "Failed jobs: ${failed:-<none>}"
+
+          if [ -z "$failed" ]; then
+            echo "No jobs in the failure() set resolved to result==failure; nothing to file."
+            exit 0
+          fi
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "::warning::LINEAR_API_KEY secret is not set; skipping Linear bug filing."
+            echo "Add it under Settings -> Secrets and variables -> Actions (see Marketing/CICD.md)."
+            exit 0
+          fi
+
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Reporter must never fail the build: swallow any filer error to a
+          # warning. The required gate is `ci-required`, which already failed.
+          python3 bin/file_test_bugs.py \
+            --sha "${{ github.sha }}" \
+            --run-url "$run_url" \
+            --failed-jobs "$failed" \
+          || echo "::warning::file_test_bugs.py failed; see log above. Not failing the build (reporter only)."
