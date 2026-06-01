@@ -13,9 +13,11 @@ import Observation
 /// graduated and to own the cache-clear flow's snackbar feedback. T-703
 /// (US-41) further extends the view-model with the iCloud Sync toggle —
 /// reads + writes the canonical `RecipeStore.cloudKitSyncOptInKey`
-/// UserDefaults flag and routes the flag-write + container rebuild through
-/// a `SettingsDependencies` seam so the composition root owns the
-/// `RecipeStore` lifecycle (per CL-89).
+/// UserDefaults flag through a `SettingsDependencies` seam so the
+/// composition root owns the `RecipeStore` lifecycle (per CL-89). Per DUT-6
+/// the flag is the launch-time source of truth — the toggle persists it and
+/// surfaces a relaunch-to-apply hint rather than (futilely) rebuilding the
+/// live container mid-session.
 ///
 /// Persistence keys (the `dod.settings.*` prefix US-32 established, plus
 /// the `dod.cloudkit.*` namespace T-702 / T-703 own):
@@ -33,8 +35,8 @@ import Observation
 ///   write it). NOTE: declared in `DODPersistence` so the canonical key
 ///   string lives next to the reader; the view-model goes through
 ///   ``SettingsDependencies`` rather than touching `UserDefaults` directly
-///   so the post-write `recreateContainerAfterOptInChange()` rebuild fires
-///   atomically.
+///   so the composition root owns the write (and the paired analytics +
+///   launch-time container selection that depend on it) per DUT-6.
 ///
 /// `UserDefaults` is constructor-injected so the L1 unit suite can pass an
 /// isolated suite (`UserDefaults(suiteName:)`) without polluting the shared
@@ -99,32 +101,31 @@ public final class SettingsViewModel {
 
     /// US-40 / AC-40.12..AC-40.13 (T-721 quality readout + Preview, T-722
     /// nudge). Catalog + preview seam for the Settings voice section. Optional
-    /// so previews / snapshot hosts / the pre-T-721 fixtures construct a
-    /// view-model without an AVFoundation dependency — when `nil` the quality
-    /// readout reads "unknown" and the nudge stays hidden (a missing catalog
-    /// must never surface a false "you're on a robotic voice" claim). The
-    /// composition root passes a ``SystemVoicePreviewer``; the L1 suite passes
-    /// a recording double. `internal` (not `private`) so the voice-section
-    /// accessors in `SettingsViewModel+Voice.swift` reach it across the
-    /// file_length split.
+    /// so previews / snapshot hosts / pre-T-721 fixtures build a view-model
+    /// without an AVFoundation dependency — when `nil` the readout reads
+    /// "unknown" and the nudge stays hidden (a missing catalog must never
+    /// surface a false "you're on a robotic voice" claim). `internal` (not
+    /// `private`) so the accessors in `SettingsViewModel+Voice.swift` reach
+    /// it across the file_length split.
     let voicePreviewer: (any VoicePreviewing)?
 
     /// The language whose installed voices drive the quality readout + nudge +
-    /// preview — the device's current language per AC-40.2 / CL-79, so the
-    /// Settings surface reasons about the exact voices a Cook Mode session on
-    /// this device would resolve. Captured at init. `internal` for the same
-    /// cross-file-extension reason as ``voicePreviewer``.
+    /// preview — the device's current language per AC-40.2 / CL-79. Captured at
+    /// init. `internal` for the same cross-file-extension reason as
+    /// ``voicePreviewer``.
     let voiceLanguageCode: String?
-    /// Optional seam for the iCloud Sync row's flag-write +
-    /// container-rebuild dispatch (US-41 / AC-41.3). Constructor-injected
-    /// so the L1 suite can pass a recording double; production wiring
-    /// passes a `LiveSettingsDependencies` value that drives
-    /// `RecipeStore.recreateContainerAfterOptInChange()`. The default
-    /// `nil` keeps existing call sites (previews, snapshot hosts, the
-    /// pre-T-703 test fixtures) compiling without churn — those surfaces
-    /// just won't trigger the rebuild. Read from the iCloud Sync action
-    /// methods that live in `SettingsViewModel+CloudSync.swift` (the
-    /// file_length split forces an internal-but-not-private accessor).
+
+    /// Optional seam for the iCloud Sync row (US-41 / AC-41.3; DUT-6).
+    /// Constructor-injected so the L1 suite can pass a recording double;
+    /// production wiring passes a `LiveSettingsDependencies` value that
+    /// **(1)** persists the `RecipeStore.cloudKitSyncOptInKey` flag (the
+    /// launch-time source of truth — no mid-session container rebuild any
+    /// more, per DUT-6) and **(2)** reports the latest CloudKit mirror status
+    /// for the row's status sublabel (cause B). The default `nil` keeps
+    /// existing call sites (previews, snapshot hosts, pre-T-703 fixtures)
+    /// compiling without churn. Read from the action methods in
+    /// `SettingsViewModel+CloudSync.swift` (the file_length split forces an
+    /// internal-but-not-private accessor).
     let cloudSyncDependency: (any SettingsDependencies)?
 
     /// Authorization seam for the notifications toggle (US-42 / AC-42.1).
@@ -203,49 +204,61 @@ public final class SettingsViewModel {
 
     // MARK: - US-41 / AC-41.3 — iCloud Sync toggle
 
-    /// Cached snapshot of the iCloud sync opt-in flag so the
-    /// `@Observable` machinery emits a change when the view-model
-    /// flips it. The setter is intentionally not the public write
-    /// path — view-layer code calls ``requestCloudSyncOptIn(_:)``
-    /// instead so the confirmation alert flow stays mandatory
-    /// (per AC-41.3 + CL-89). The getter mirrors what the dependency
-    /// reports the first time it's read, so previews + tests that
-    /// don't wire a dependency still get a stable `false` default.
-    /// Setter is `internal` (not `public`) so the iCloud-sync action
-    /// methods in `SettingsViewModel+CloudSync.swift` can mutate it
-    /// while external callers stay locked out.
+    /// Cached snapshot of the iCloud sync opt-in flag so the `@Observable`
+    /// machinery emits a change when the view-model flips it. The setter is
+    /// intentionally not the public write path — view-layer code calls
+    /// ``requestCloudSyncOptIn(_:)`` instead so the confirmation alert flow
+    /// stays mandatory (per AC-41.3 + CL-89). Seeded from the dependency at
+    /// init, so previews + tests that don't wire one still get a stable
+    /// `false` default. Setter is `internal` (not `public`) so the action
+    /// methods in `SettingsViewModel+CloudSync.swift` can mutate it while
+    /// external callers stay locked out.
     public internal(set) var isCloudSyncEnabled: Bool
 
-    /// Set when the user flips the iCloud Sync toggle *this session*.
-    /// SwiftData builds its `ModelContainer` once per process and cannot
-    /// swap the CloudKit configuration mid-flight (the contract
-    /// `RecipeStore.recreateContainerAfterOptInChange()` documents), so a
-    /// flip only actually engages on the next cold launch. Surfacing this
-    /// stops the "I toggled it and nothing synced" confusion (round-12
-    /// backlog bug). Not persisted — a relaunch clears it by construction.
-    /// Setter is `internal` so the action methods in
-    /// `SettingsViewModel+CloudSync.swift` can set it.
+    /// Set when the user flips the iCloud Sync toggle *this session*. SwiftData
+    /// builds its `ModelContainer` once per process and cannot swap the CloudKit
+    /// configuration mid-flight (the `recreateContainerAfterOptInChange()`
+    /// contract), so a flip only engages on the next cold launch — surfacing
+    /// this stops the "I toggled it and nothing synced" confusion (round-12
+    /// backlog bug). Not persisted; a relaunch clears it. Setter is `internal`
+    /// so the action methods in `SettingsViewModel+CloudSync.swift` can set it.
     public internal(set) var cloudSyncPendingRelaunch = false
 
-    /// AC-41.7 status sublabel under the iCloud Sync row. Tells the user a
-    /// just-flipped toggle needs a relaunch to take effect; otherwise stays
-    /// the reserved `"Idle"` placeholder so the row layout (and its L4
-    /// snapshot baseline) doesn't shift. The richer "Up to date / Syncing… /
-    /// Sync error" surface wired to the `NSPersistentCloudKitContainer`
-    /// mirror events — see `CloudKitSyncDiagnostics` — is the T-705 follow-up.
+    /// Latest coarse sync status, pushed in from the App-target
+    /// `NSPersistentCloudKitContainer` mirror observer (`CloudKitSyncDiagnostics`)
+    /// via ``updateCloudSyncStatus(_:)`` (DUT-6, cause B). Defaults to
+    /// ``CloudKitSyncStatus/off`` — the resting state before any mirror event,
+    /// which renders as the reserved `"Idle"` placeholder so the row layout
+    /// (and its L4 snapshot baseline) doesn't shift. `internal(set)` so only
+    /// the update method (and tests) mutate it.
+    public internal(set) var cloudSyncStatus: CloudKitSyncStatus = .off
+
+    /// AC-41.7 status sublabel under the iCloud Sync row (DUT-6, cause B). A
+    /// just-flipped toggle needs a relaunch before the live mirror status means
+    /// anything (SwiftData builds the container once per process), so
+    /// ``cloudSyncPendingRelaunch`` wins and the row reads "Relaunch DOD to
+    /// apply". Otherwise it renders the mapped ``cloudSyncStatus`` — "Idle" /
+    /// "Syncing…" / "Sync error" — defaulting to "Idle" until an event arrives.
     public var cloudSyncStatusText: String {
-        cloudSyncPendingRelaunch ? "Relaunch DOD to apply" : "Idle"
+        cloudSyncPendingRelaunch
+            ? CloudKitSyncStatus.relaunchPending.displayString
+            : cloudSyncStatus.displayString
     }
 
-    /// State for the confirmation alert that fronts every toggle flip
-    /// per AC-41.3 / CL-89. `nil` when no alert is showing; otherwise
-    /// describes the direction (on → off vs off → on) so the view
-    /// renders the right copy + button labels. The view binds an
-    /// `isPresented` binding via ``cloudSyncConfirmationIsPresented``
-    /// and reads the request payload to build the alert.
-    /// Setter is `internal` so the iCloud-sync action methods in
-    /// `SettingsViewModel+CloudSync.swift` can mutate it while
-    /// external callers stay locked out.
+    /// Push a fresh sync status in from the App-target mirror observer (DUT-6,
+    /// cause B). Kept a tiny method (not a public setter) so the composition
+    /// root has one clear seam to forward `CloudKitSyncDiagnostics` events
+    /// through, and the L1 suite can pin the status → sublabel mapping.
+    public func updateCloudSyncStatus(_ status: CloudKitSyncStatus) {
+        cloudSyncStatus = status
+    }
+
+    /// State for the confirmation alert that fronts every toggle flip per
+    /// AC-41.3 / CL-89. `nil` when no alert is showing; otherwise describes the
+    /// direction (on → off vs off → on) so the view renders the right copy +
+    /// button labels via ``cloudSyncConfirmationIsPresented``. Setter is
+    /// `internal` so the action methods in `SettingsViewModel+CloudSync.swift`
+    /// can mutate it while external callers stay locked out.
     public internal(set) var cloudSyncConfirmationRequest: CloudSyncConfirmationRequest?
 
     // MARK: - Snackbar feedback (Clear Cache row)
@@ -380,9 +393,7 @@ public final class SettingsViewModel {
     }
 }
 
-// `CloudSyncConfirmationRequest` lives in
-// `SettingsViewModel+CloudSync.swift` alongside the iCloud Sync action
-// methods (file_length split — see that file's header for rationale).
-//
-// The `AppearancePreference` + `ShareFormatPreference` value types live in
-// `SettingsPreferences.swift` (same file_length split, extended by T-721).
+// `CloudSyncConfirmationRequest` lives in `SettingsViewModel+CloudSync.swift`
+// alongside the iCloud Sync action methods (file_length split). The
+// `AppearancePreference` + `ShareFormatPreference` value types live in
+// `SettingsPreferences.swift` (same split, extended by T-721).

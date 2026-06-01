@@ -217,3 +217,111 @@ Notes and gotchas:
 - No third-party tooling (no fastlane, no Ruby/Gemfile) is added; the pipeline
   is pure xcodebuild + xcrun + the App Store Connect API key, per the
   constitution default of no new third-party dependencies.
+
+
+# Auto-filing test-failure bugs in Linear
+
+When the CI test suite goes red on `main`, CI files one rollup bug issue in
+Linear automatically. This is separate from the TestFlight pipeline above and
+from the nightly live-API job (`.github/workflows/nightly-live-api.yml`, which
+opens a GitHub issue, not a Linear one). This section explains the mechanism and
+the one-time owner setup.
+
+
+## What it does, end to end
+
+1. The `report-failures` job in `.github/workflows/ci.yml` runs at the end of
+   every CI run, but only when `failure() && github.ref == 'refs/heads/main'` is
+   true. That means it is a strict no-op on green runs and on every pull request
+   (PR runs have a `refs/pull/<n>/merge` ref, never `refs/heads/main`), so PR
+   branches never file issues.
+2. It collects which needed jobs failed by reading the `needs.*.result` contexts
+   (serialized with `toJSON(needs)` and filtered with `jq` to the job ids whose
+   result is exactly `failure`).
+3. It invokes `bin/file_test_bugs.py` with the commit SHA, a link to the GitHub
+   Actions run, and the comma-separated list of failed job ids, passing the
+   Linear key as the `LINEAR_API_KEY` environment variable from
+   `secrets.LINEAR_API_KEY`.
+4. The script talks to the Linear GraphQL API (https://api.linear.app/graphql)
+   using only the Python standard library (no pip, no SwiftPM dependency). It
+   resolves the "Dutch Oven Daddy" team, the `bug` and `test-failure` labels
+   (creating either if missing), and the team's unstarted "Todo" workflow state.
+5. Dedup is idempotent by commit SHA. The script searches the team's open
+   `test-failure`-labeled issues for a hidden marker
+   `<!-- dod-bugfiler:sha=<full-sha> -->` in the description:
+   - If found, it adds a comment ("Still red on re-run: <run-url>") to that
+     existing issue instead of opening a duplicate.
+   - If not found, it creates one new rollup issue.
+   So re-running CI on the same red commit updates the same issue; a new red
+   commit opens a new rollup issue.
+6. The reporter job never fails the build. The required gate is the existing
+   `ci-required` job; `report-failures` only reports, and any filer error is
+   downgraded to a warning.
+
+
+## The rollup issue
+
+- Title: `Test suite red on main @ <short-sha>`.
+- Description: the list of failed jobs annotated with their CI layer, the full
+  commit SHA, a link to the GitHub run, and the hidden dedup marker.
+- Labels: `bug` and `test-failure`.
+- State: the team's unstarted "Todo" workflow state.
+- Priority: the maximum severity among the failed layers, by this map:
+
+      L2 build      / L0 tooling   -> Urgent (1)
+      L1 unit       / L3 UI smoke  -> High   (2)
+      L4 snapshot                  -> Medium (3)
+      L5 live-API / E2E            -> Low    (4)
+
+  Each failed GitHub job is mapped to a layer by its job id / display name (for
+  example `build-app` -> L2, `test-ui-smoke` -> L3, `test-snapshots-designsystem`
+  -> L4, `test-e2e` -> L5, `lint` / `format` / `changes` -> L0). A job that
+  cannot be mapped defaults to High, so it is never silently dropped.
+
+
+## Running it locally / dry run
+
+The script supports `--dry-run`, which prints the exact GraphQL operations it
+would send and makes no network calls (so it needs no key):
+
+    python3 bin/file_test_bugs.py \
+      --sha 0123456789abcdef0123456789abcdef01234567 \
+      --run-url "https://github.com/adamsned/dod-ios-app/actions/runs/123" \
+      --failed-jobs "build-app,test-ui-smoke,test-snapshots-designsystem" \
+      --dry-run
+
+Unit tests (standard library `unittest`, no key required) cover the priority
+mapping, marker build/parse, the dedup decision, and payload construction:
+
+    python3 -m unittest discover -s bin -p 'test_*.py'
+
+
+## Owner setup (one time)
+
+The mechanism is committed and inert until you add one repository secret. Until
+then, a red run on `main` logs a warning ("LINEAR_API_KEY secret is not set;
+skipping Linear bug filing") and files nothing; it never breaks the build.
+
+1. Create a Linear Personal API key: in Linear, open Settings -> Account ->
+   Security & Access -> Personal API keys -> "New key" (some Linear builds label
+   this menu "Security & access"). Give it a name such as "DOD CI bug filer".
+   A key restricted to Create issues and Create comments on the Dutch Oven Daddy
+   team is sufficient; full access also works. Copy the key value (shown once).
+2. Add it as a GitHub Actions repository secret. In GitHub, open the repository
+   Settings -> Secrets and variables -> Actions -> New repository secret. Name it
+   exactly `LINEAR_API_KEY` and paste the key as the value. The repository is
+   public, so the key must only ever live as this secret, never in a tracked
+   file.
+3. That is all. The first real issue is filed the next time `main` goes red
+   after the secret is added. Nothing is back-filled for past failures.
+
+Notes:
+
+- Linear personal API keys are sent as the raw key in the `Authorization` header
+  with no `Bearer` prefix (verified against developers.linear.app). The script
+  does this and never logs the key.
+- The team id (`6ca2f53d-4a1b-4f1d-b7a5-b26564d09705`) is not a credential and is
+  hardcoded in the script; only the API key is secret.
+- The reporter runs on `ubuntu-latest` (not a macOS runner) because the filer is
+  pure Python standard library and does no Xcode work, which keeps it fast and
+  cheap.

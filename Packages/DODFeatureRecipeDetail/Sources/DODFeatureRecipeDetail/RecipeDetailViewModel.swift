@@ -76,13 +76,17 @@ public final class RecipeDetailViewModel {
     // MARK: - Comments + ratings state (US-13/14/15)
 
     public private(set) var ratingSummary: RecipeRating?
-    public private(set) var comments: [RecipeComment] = []
+    // `internal(set)` (not `private(set)`) so the comment-submit path in
+    // `RecipeDetailViewModel+CommentSubmit.swift` can mutate the visible
+    // thread + draft + in-flight flag after extraction (DUT-7). Public
+    // read-only contract is unchanged — external callers still can't write.
+    public internal(set) var comments: [RecipeComment] = []
     public private(set) var commentsLoadState: CommentsLoadState = .idle
     /// Current selection in the `StarRatingInput` before the user taps
     /// "Submit rating". 0 means "no selection".
     public private(set) var pendingUserRating: Int = 0
-    public private(set) var commentDraft: String = ""
-    public private(set) var isSubmittingComment: Bool = false
+    public internal(set) var commentDraft: String = ""
+    public internal(set) var isSubmittingComment: Bool = false
     public private(set) var isSubmittingRating: Bool = false
     /// True when the Keychain has no guest identity yet — the view layer
     /// uses this to gate the rating / composer affordances behind the
@@ -122,19 +126,14 @@ public final class RecipeDetailViewModel {
         // Step 1: hydrate from cache if present (fast path).
         if let cached = try? await dependencies.cachedRecipe(id: listItem.id), cached.hasDetail {
             recipe = cached
-            // US-37 / CL-63 / AC-37.3 (T-640): branch on kind so cached
-            // articles route to `.article(...)` instead of `.ready`.
-            // Recipes follow the existing `.ready` + related-strip path.
+            // US-37 / CL-63 / AC-37.3 (T-640): articles route to `.article`;
+            // recipes use the `.ready` + related-strip path (no related
+            // strip on articles per CL-63 decision 5).
+            // T-736 / CL-133: cache-hit recipe path also fires a background
+            // `refreshBlurbBlocks` — see helper for the contract.
             switch cached.kind {
-            case .recipe:
-                loadState = .ready
-                await loadRelated(forCategoryID: cached.categoryIDs.first)
-            case .article:
-                loadState = .article(cached)
-            // No related-recipes strip on articles per CL-63 decision 5
-            // (articles are often themselves "related recipes" roundup
-            // posts; rendering a four-card strip below would feel
-            // duplicative).
+            case .recipe: await hydrateCachedRecipe(cached)
+            case .article: loadState = .article(cached)
             }
         } else {
             // Step 2: try fetch + parse.
@@ -238,45 +237,10 @@ public final class RecipeDetailViewModel {
         }
     }
 
-    /// Submit the in-progress comment draft (and the pending rating, if
-    /// non-zero). Gated behind the guest-identity sheet. AC-14.3 /
-    /// AC-14.4 / AC-14.7.
-    public func submitComment() async {
-        let trimmed = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        guard let identity = await dependencies.loadGuestIdentity() else {
-            requiresGuestIdentity = true
-            return
-        }
-        isSubmittingComment = true
-        defer { isSubmittingComment = false }
-
-        do {
-            let ratingToSend = pendingUserRating > 0 ? pendingUserRating : nil
-            let posted = try await dependencies.postComment(
-                postID: listItem.id,
-                body: trimmed,
-                name: identity.name,
-                email: identity.email,
-                rating: ratingToSend
-            )
-            let awaitingApproval = posted.status != .approved
-            if !awaitingApproval {
-                // Prepend the approved comment so the user sees it land.
-                comments.insert(posted, at: 0)
-                await dependencies.cacheComments(comments, postID: listItem.id)
-                snackbarMessage = "Comment posted."
-            } else {
-                // AC-14.4: held comments are NOT prepended to the visible
-                // list — we only render approved rows.
-                snackbarMessage = "Submitted for moderation."
-            }
-            commentDraft = ""
-        } catch {
-            DODLog.network.error("post comment failed: \(String(describing: error))")
-            snackbarMessage = Self.commentErrorSnackbar(for: error)
-        }
-    }
+    // `submitComment()` lives in `RecipeDetailViewModel+CommentSubmit.swift`
+    // (extracted with the DUT-7 author-identity guard so this file stays
+    // under the SwiftLint 400-line `file_length` cap — same pattern as the
+    // `+CommentSnackbar` / `+Fetch` extensions).
 
     /// Persist the captured display name + email and unblock the pending
     /// rate / post action. AC-15.2.

@@ -72,6 +72,11 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var postRatingShouldFail = false
     var postedCommentResult: RecipeComment?
     var postCommentShouldFail = false
+    /// When non-nil, `postComment` throws this specific error (takes
+    /// precedence over `postCommentShouldFail`). Lets DUT-7 tests inject a
+    /// typed `WPClientError` (e.g. `.httpStatusWithBody`) to assert the
+    /// view-model surfaces the right category-specific snackbar.
+    var postCommentError: Error?
     var guestIdentity: (name: String, email: String)?
     var saveGuestIdentityShouldFail = false
 
@@ -219,6 +224,7 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
         email: String,
         rating: Int?
     ) async throws -> RecipeComment {
+        if let postCommentError { throw postCommentError }
         if postCommentShouldFail { throw URLError(.badServerResponse) }
         let result =
             postedCommentResult

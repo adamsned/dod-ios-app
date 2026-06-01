@@ -39,13 +39,20 @@ import Testing
         #expect(viewModel.loadState == .unavailable)
     }
 
-    @Test func cachedRecipeWithDetailSkipsNetwork() async throws {
+    @Test func cachedRecipeWithDetailSkipsNetworkWhenOffline() async throws {
+        // T-736 / CL-133: cache-hit + online now triggers a background
+        // blurb-refresh fetch — so to pin the original "cache hit reaches
+        // .ready without a network round-trip blocking it" contract, the
+        // test now sets `online = false` to isolate the cache-hit fast
+        // path from the new background refresh. With online = true the
+        // refresh fires (covered by `RecipeDetailViewModelBlurbRefreshTests`).
         let dependencies = FakeRecipeDetailDependencies()
+        dependencies.online = false
         dependencies.cachedRecipes[42] = RecipeDetailTestFixtures.makeRecipe(id: 42, withDetail: true)
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 42)
         await viewModel.onAppear()
         #expect(viewModel.loadState == .ready)
-        #expect(dependencies.fetchCount == 0, "Cache hit must not fetch")
+        #expect(dependencies.fetchCount == 0, "Offline cache hit must not fetch")
     }
 
     @Test func toggleSavedSendsTelemetryAndShowsSnackbar() async throws {

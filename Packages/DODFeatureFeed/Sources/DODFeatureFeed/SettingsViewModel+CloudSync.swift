@@ -51,6 +51,19 @@ extension SettingsViewModel {
         cloudSyncPendingRelaunch = true
     }
 
+    /// Pull the latest coarse sync status from the dependency (the
+    /// App-target CloudKit mirror observer) into ``cloudSyncStatus`` so the
+    /// status sublabel reflects idle / syncing / error (DUT-6, cause B).
+    /// Called when the Settings screen appears. A no-op when no dependency
+    /// is wired (previews / snapshot hosts) — the default `.off` stays,
+    /// rendering the reserved "Idle" placeholder. Skipped while a flip is
+    /// pending relaunch, since the live status is meaningless until the
+    /// container is rebuilt at next launch (the relaunch copy wins anyway).
+    public func refreshCloudSyncStatus() {
+        guard !cloudSyncPendingRelaunch, let dependency = cloudSyncDependency else { return }
+        updateCloudSyncStatus(dependency.currentCloudSyncStatus())
+    }
+
     /// Cancels the pending flip — reverts the cached toggle state to
     /// the pre-request value (so the optimistic flip the SwiftUI
     /// `Toggle` performed gets undone on the next read) and clears the

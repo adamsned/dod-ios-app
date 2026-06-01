@@ -24,7 +24,11 @@ import WidgetKit
 final class AppDependencies {
 
     let store: RecipeStore
-    private(set) var modelContainer: ModelContainer
+    /// Built once per process from the persisted opt-in flag (DUT-6) and
+    /// never swapped — SwiftData can't hot-swap a container's CloudKit
+    /// configuration mid-flight, so the flag is re-read at the next launch
+    /// instead. `let`, not `var`, to make that immutability enforced.
+    let modelContainer: ModelContainer
 
     /// On-device local-notification service (US-42 / T-631). Long-lived —
     /// owns the authorization request the Settings toggle drives and the
@@ -44,7 +48,16 @@ final class AppDependencies {
     /// `bootstrap()` only when the iCloud-Sync opt-in is on.
     private let cloudKitDiagnostics = CloudKitSyncDiagnostics()
 
+    /// `true` when the persisted opt-in flag was ON but the CloudKit-backed
+    /// `.private` container failed to open at launch, so the DOD-CRASH-1
+    /// safety net (DUT-6) degraded to a plain local container. Surfaced to
+    /// the diagnostics log; sync stays dormant (local data intact) until the
+    /// underlying CloudKit problem — most likely an undeployed Production
+    /// schema — is fixed and the app relaunches.
+    private let usedCloudKitFallback: Bool
+
     init() {
+        var fellBackToLocal = false
         do {
             // L3 isolation hook: `-DODUseInMemoryStore` gives each UI-test
             // launch a clean, empty SwiftData store so saved recipes don't
@@ -54,7 +67,19 @@ final class AppDependencies {
             if ProcessInfo.processInfo.arguments.contains("-DODUseInMemoryStore") {
                 self.modelContainer = try RecipeStore.inMemoryContainer()
             } else {
-                self.modelContainer = try RecipeStore.productionContainer()
+                // DUT-6: build the container to match the persisted opt-in
+                // flag (the single source of truth, read at launch) WITH the
+                // DOD-CRASH-1 safety net. If sync is ON but the CloudKit
+                // `.private` open throws (e.g. the Production schema was never
+                // deployed), `productionContainer(defaults:)` falls back to a
+                // plain local container instead of throwing — so the app
+                // launches cleanly rather than crash-looping the way build 3
+                // did. A plain opt-out container that fails to open is still a
+                // real migration error and surfaces via the `fatalError`
+                // below (MIGRATION.md discipline rule 4).
+                let result = try RecipeStore.productionContainer(defaults: .standard)
+                self.modelContainer = result.container
+                fellBackToLocal = result.usedCloudKitFallback
             }
         } catch {
             // Schema migration failure must surface to the user (MIGRATION.md
@@ -62,6 +87,7 @@ final class AppDependencies {
             // unambiguous in TestFlight feedback.
             fatalError("SwiftData migration failed: \(error)")
         }
+        self.usedCloudKitFallback = fellBackToLocal
         self.store = RecipeStore(modelContainer: modelContainer)
         self.restClient = WPRestClient()
         self.pageFetcher = RecipePageFetcher()
@@ -97,11 +123,26 @@ final class AppDependencies {
         // the AC-41.1 graceful-fallback contract that keeps the existing
         // v1.0 behavior intact under no-iCloud-account + sync-declined
         // states.
-        if UserDefaults.standard.bool(forKey: RecipeStore.cloudKitSyncOptInKey) {
+        if RecipeStore.cloudKitSyncOptIn() {
             // Round-12 backlog bug: log every CloudKit mirror event so an
             // on-device run reveals which layer fails (schema / account /
             // never-enabled). Pairs with the account-status probe below.
             cloudKitDiagnostics.start()
+            // DUT-6: if the CloudKit container couldn't open at launch we
+            // already degraded to a local store (DOD-CRASH-1 safety net);
+            // make that explicit in the log so a device run shows "sync was
+            // on but the mirror never engaged" rather than silence. The most
+            // likely cause is a Production schema that was never deployed.
+            if usedCloudKitFallback {
+                DODLog.app.error(
+                    """
+                    CloudKit sync is ON but the CloudKit container failed to open; \
+                    running on a local-only store this launch (saved recipes stay on \
+                    this device). Most likely the CloudKit Production schema was never \
+                    deployed — deploy it from the CloudKit Console, then relaunch.
+                    """
+                )
+            }
             await checkCloudKitAvailability()
         }
     }
@@ -209,47 +250,47 @@ final class AppDependencies {
         LiveSavedDependencies(store: store, imageLoader: imageLoader)
     }
 
-    /// US-41 / AC-41.3 (T-703). Build the Settings dependency surface
-    /// for the iCloud Sync toggle. The returned value drives the
-    /// flag-write → container-rebuild handshake the view-model needs:
+    /// US-41 / AC-41.3 (T-703) + DUT-6. Build the Settings dependency
+    /// surface for the iCloud Sync toggle. Its single job is to **persist
+    /// the opt-in flag** — `RecipeStore.cloudKitSyncOptInKey` is the single
+    /// source of truth, read at the *next* launch by
+    /// `RecipeStore.productionContainer(defaults:)` to decide whether to
+    /// build a CloudKit-backed or a plain local container.
     ///
-    ///   1. write `RecipeStore.cloudKitSyncOptInKey` to UserDefaults
-    ///      (the value `RecipeStore.makeProductionConfiguration()` reads),
-    ///   2. call `RecipeStore.recreateContainerAfterOptInChange()` so the
-    ///      stale `ModelContainer` is discarded and a fresh one is built
-    ///      against the new configuration (CloudKit-backed when ON,
-    ///      `.none` when OFF — per T-702's contract).
-    ///
-    /// **Order matters.** The flag must land *before* the rebuild — the
-    /// factory reads `UserDefaults` at construction time, so swapping
-    /// reads must observe the new value.
+    /// **Why no mid-session container rebuild (the DUT-6 fix).** The
+    /// pre-DUT-6 code rebuilt the `ModelContainer` here and reassigned
+    /// `self.modelContainer`. That re-wired *nothing*: SwiftData binds a
+    /// container (and the `@ModelActor` `RecipeStore` built from it) once
+    /// per process and can't hot-swap the `cloudKitDatabase` configuration
+    /// mid-flight, the live `RecipeStore` was never rebuilt, and the app
+    /// injects no `ModelContainer` into the SwiftUI environment — so the
+    /// reassignment only added a transient second
+    /// `NSPersistentCloudKitContainer` (a DOD-CRASH-1 risk surface) while
+    /// the running store kept its old configuration. Sync therefore only
+    /// ever engaged on the next cold launch anyway. We make that honest:
+    /// write the flag, let the view-model tell the user a relaunch applies
+    /// it, and build the right container deterministically at launch.
     func settingsDependencies() -> some SettingsDependencies {
-        LiveSettingsDependencies { [weak self] enabled in
-            // Step 1 — write the flag the container factory reads.
-            UserDefaults.standard.set(enabled, forKey: RecipeStore.cloudKitSyncOptInKey)
-            // Step 1b (T-707 / AC-41.9) — record the opt-in change. This is the
-            // single dispatch point for `syncEnabled` / `syncDisabled`: BOTH the
-            // AC-41.3 Settings toggle and the AC-41.2 first-launch prompt route
-            // through this seam, so firing here covers both with no duplication.
-            // The prompt's "Not now" never calls the seam, so declining
-            // correctly emits nothing.
-            Telemetry.shared.send(enabled ? .syncEnabled : .syncDisabled)
-            // Step 2 — rebuild the container so the next open observes
-            // the new value. The rebuild is best-effort: if it throws
-            // (rare — only on lower-level SwiftData corruption) we log
-            // and keep the stale container alive so the user can still
-            // use the app per AC-41.1's graceful-fallback contract.
-            do {
-                let rebuilt = try RecipeStore.recreateContainerAfterOptInChange()
-                await MainActor.run { [weak self] in
-                    self?.modelContainer = rebuilt
-                }
-            } catch {
-                DODLog.app.error(
-                    "CloudKit opt-in container rebuild failed: \(error.localizedDescription)"
-                )
+        let diagnostics = cloudKitDiagnostics
+        return LiveSettingsDependencies(
+            flagWrite: { enabled in
+                // Persist the flag the launch-time container factory reads.
+                UserDefaults.standard.set(enabled, forKey: RecipeStore.cloudKitSyncOptInKey)
+                // T-707 / AC-41.9 — record the opt-in change. This is the
+                // single dispatch point for `syncEnabled` / `syncDisabled`:
+                // BOTH the AC-41.3 Settings toggle and the AC-41.2
+                // first-launch prompt route through this seam, so firing here
+                // covers both with no duplication. The prompt's "Not now"
+                // never calls the seam, so declining correctly emits nothing.
+                Telemetry.shared.send(enabled ? .syncEnabled : .syncDisabled)
+            },
+            statusProvider: {
+                // DUT-6 cause B: surface the App-target mirror observer's
+                // latest coarse status to the Settings row. Read on the main
+                // actor (the Settings view calls this on appear).
+                MainActor.assumeIsolated { diagnostics.latestStatus }
             }
-        }
+        )
     }
 
     /// Fetch a single post (by WP id) from the live REST API and project it
@@ -291,27 +332,37 @@ final class AppDependencies {
 // MARK: - US-41 / AC-41.3 (T-703) live Settings wiring
 
 /// Production conformance to ``SettingsDependencies``. Holds a
-/// `@Sendable` closure that runs the two-step flag-write + container
-/// rebuild on a detached `Task` so the SwiftUI alert dismiss isn't
-/// blocked on the I/O. The view-model awaits the closure so the L1
-/// suite can pin the order via `await`.
+/// `@Sendable` closure that persists the opt-in flag (DUT-6 — there is no
+/// mid-session container rebuild any more; the flag is the launch-time
+/// source of truth) and a status provider that reads the App-target
+/// CloudKit mirror observer's latest coarse status (cause B).
 ///
-/// Spec trace: US-41 AC-41.3, AC-41.4; CL-89.
+/// Spec trace: US-41 AC-41.3, AC-41.4; CL-89; DUT-6.
 struct LiveSettingsDependencies: SettingsDependencies {
 
-    typealias FlagWriteAndRebuild = @Sendable (Bool) async -> Void
+    typealias FlagWrite = @Sendable (Bool) async -> Void
+    typealias StatusProvider = @Sendable () -> CloudKitSyncStatus
 
-    let flagWriteAndRebuild: FlagWriteAndRebuild
+    let flagWrite: FlagWrite
+    let statusProvider: StatusProvider
 
-    init(flagWriteAndRebuild: @escaping FlagWriteAndRebuild) {
-        self.flagWriteAndRebuild = flagWriteAndRebuild
+    init(
+        flagWrite: @escaping FlagWrite,
+        statusProvider: @escaping StatusProvider = { .off }
+    ) {
+        self.flagWrite = flagWrite
+        self.statusProvider = statusProvider
     }
 
     func setCloudSyncOptIn(_ enabled: Bool) async {
-        await flagWriteAndRebuild(enabled)
+        await flagWrite(enabled)
     }
 
     func cloudSyncOptInValue() -> Bool {
-        UserDefaults.standard.bool(forKey: RecipeStore.cloudKitSyncOptInKey)
+        RecipeStore.cloudKitSyncOptIn()
+    }
+
+    func currentCloudSyncStatus() -> CloudKitSyncStatus {
+        statusProvider()
     }
 }

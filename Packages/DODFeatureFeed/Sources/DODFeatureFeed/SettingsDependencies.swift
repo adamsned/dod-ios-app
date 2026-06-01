@@ -1,3 +1,4 @@
+import DODPersistence
 import Foundation
 
 /// Narrow surface the Settings page needs from external modules for
@@ -28,11 +29,13 @@ import Foundation
 /// Spec trace: US-41 AC-41.3; CL-89 (the toggle's opt-in contract).
 public protocol SettingsDependencies: Sendable {
 
-    /// Writes the CloudKit sync opt-in flag and rebuilds the production
-    /// `ModelContainer` so the next open observes the new configuration.
-    /// **Order matters** — the flag is written before the rebuild so
-    /// the rebuild sees the new value (per T-702's
-    /// `recreateContainerAfterOptInChange()` contract).
+    /// Persists the CloudKit sync opt-in flag (DUT-6). The flag is the
+    /// single source of truth, re-read at the *next* launch by
+    /// `RecipeStore.productionContainer(defaults:)` to choose the
+    /// CloudKit-backed vs plain container — there is no mid-session
+    /// container rebuild (SwiftData can't hot-swap the configuration, and
+    /// the running `RecipeStore`/store env aren't re-wired by one). The
+    /// view-model surfaces a relaunch-to-apply hint after this returns.
     func setCloudSyncOptIn(_ enabled: Bool) async
 
     /// Reads the current opt-in flag value. Provided as a synchronous
@@ -40,4 +43,17 @@ public protocol SettingsDependencies: Sendable {
     /// flag is at construction (the user may have flipped it via
     /// T-704's first-launch sheet before ever opening Settings).
     func cloudSyncOptInValue() -> Bool
+
+    /// Reads the latest coarse CloudKit sync status (DUT-6, cause B) from
+    /// the App-target `NSPersistentCloudKitContainer` mirror observer. The
+    /// Settings row pulls this when it appears to refresh its status
+    /// sublabel (idle / syncing / error). Defaults to
+    /// ``CloudKitSyncStatus/off`` for conformers that don't observe the
+    /// mirror (previews, snapshot hosts, the L1 recording double), so
+    /// existing call sites stay source-compatible.
+    func currentCloudSyncStatus() -> CloudKitSyncStatus
+}
+
+extension SettingsDependencies {
+    public func currentCloudSyncStatus() -> CloudKitSyncStatus { .off }
 }

@@ -32,7 +32,15 @@ import Testing
         // Earlier wiring bugs that swallowed `loadRatingsAndComments()`
         // inside the cache-hit branch would have left the summary nil
         // and the spy counters at zero.
+        //
+        // T-736 / CL-133: the cache-hit branch now ALSO triggers a
+        // background blurb-refresh fetch when online; force `online = false`
+        // here so this test still asserts the original "HTML fetch is
+        // skipped" intent without measuring the new refresh path (which
+        // has its own dedicated `RecipeDetailViewModelBlurbRefreshTests`
+        // coverage).
         let dependencies = FakeRecipeDetailDependencies()
+        dependencies.online = false
         dependencies.cachedRecipes[401] = RecipeDetailTestFixtures.makeRecipe(
             id: 401,
             withDetail: true
@@ -48,7 +56,7 @@ import Testing
 
         await viewModel.onAppear()
 
-        #expect(dependencies.fetchCount == 0, "Cache hit must skip the HTML fetch")
+        #expect(dependencies.fetchCount == 0, "Offline cache hit must skip the HTML fetch")
         #expect(
             dependencies.fetchRatingSummaryCallCount >= 1,
             "Ratings summary must load even on the cache-hit branch"
