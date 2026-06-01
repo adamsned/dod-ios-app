@@ -1,0 +1,284 @@
+name: Release (TestFlight)
+
+# Continuous Deployment: archive a Release build and upload it to TestFlight.
+#
+# This runs ON TOP OF ci.yml (which gates simulator builds + tests on every
+# PR). It does NOT replace CI and does NOT run on pull_request - it only
+# archives + uploads when you explicitly ask for a release.
+#
+# CREDENTIALS ARE REQUIRED TO ACTUALLY UPLOAD. Until the maintainer adds the
+# App Store Connect API key + team id secrets (see Marketing/CICD.md), the
+# archive/sign/upload steps cannot authenticate to Apple and will fail at the
+# signing step. The `xcodegen generate` + project-resolves steps run without
+# secrets, so a no-secret run still validates the project graph.
+#
+# Full operator guide + the exact secrets to add: Marketing/CICD.md
+
+on:
+  # Manual trigger from the Actions tab. Optional inputs let you dry-run
+  # (archive + export, skip the upload) and tweak which lane you target.
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: "Archive + export only, do NOT upload to TestFlight (dry run)"
+        type: boolean
+        default: false
+  # Tag-driven release. Push a tag like `release-2026.05.31` (or any
+  # `release-*`) to trigger an automated TestFlight build. Tags are a
+  # deliberate, auditable release signal - unlike push-to-main, which would
+  # fire an upload on every merge.
+  push:
+    tags:
+      - "release-*"
+
+# Never run two releases at once: a second upload racing the first can land
+# a lower build number after a higher one. Do NOT cancel an in-flight
+# release (cancel-in-progress: false) - a half-finished upload is worse than
+# a queued one.
+concurrency:
+  group: release-testflight
+  cancel-in-progress: false
+
+# Least privilege: the upload talks to Apple, not to GitHub. `contents: read`
+# is all the checkout needs. (No write permissions are granted.)
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: Archive + upload to TestFlight
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      # --- App identity (mirrors project.yml; kept here so the steps read
+      #     from one place). ---
+      SCHEME: DODApp
+      CONFIGURATION: Release
+      # Where the App Store Connect API .p8 gets written + where altool /
+      # xcodebuild look for it. altool searches $API_PRIVATE_KEYS_DIR for a
+      # file literally named AuthKey_<KEY_ID>.p8 (Xcode 26 altool 26.40.x).
+      API_PRIVATE_KEYS_DIR: ${{ github.workspace }}/private_keys
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Mirror ci.yml exactly: GitHub does not ship a bare Xcode_26.app
+      # symlink, so glob the versioned 26.x apps and pick the newest.
+      - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          echo "altool: $(xcrun --find altool)"
+          xcrun altool --version || true
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      # ---------------------------------------------------------------------
+      # Build number management.
+      #
+      # App Store Connect rejects a CFBundleVersion (build number) that has
+      # already been accepted for a given CFBundleShortVersionString. The
+      # maintainer hand-bumps CFBundleVersion in project.yml (a small integer
+      # like "4") for local/manual builds. To avoid colliding with that AND
+      # stay strictly monotonic without a manual bump, CD overrides
+      # CFBundleVersion at archive time with a UTC timestamp in DOTTED form:
+      #
+      #     YYYY.MMDD.HHMM   e.g. 2026.0531.1830
+      #
+      # Why this exact shape:
+      #   * Strictly increases with wall-clock UTC time -> never re-used.
+      #   * Each dotted component stays under 2^32-1, which Apple requires for
+      #     every CFBundleVersion component (a single 12-digit 202605311830
+      #     would EXCEED 2^32 and be rejected - hence the dots).
+      #   * Always sorts ABOVE the maintainer's small hand-bumped integers
+      #     (4, 5, ...), so the manual lane and the CD lane never collide.
+      #   * Independent of MARKETING_VERSION (1.0); only the build number moves.
+      #
+      # Alternative (documented, not used): ${{ github.run_number }}. It is
+      # monotonic per-workflow but starts at 1, so a fresh release.yml would
+      # emit build "1" and collide with the existing manual "4". Switch to it
+      # only after seeding run numbers above the current manual baseline.
+      #
+      # We inject the value with a PlistBuddy write into the three generated
+      # Info.plists (App, Widget, LiveActivity) so the host app and both
+      # extensions stay in lockstep. xcodegen hardcodes CFBundleVersion into
+      # each Info.plist from project.yml, so the Info.plist write (not
+      # CURRENT_PROJECT_VERSION) is what actually controls the build number.
+      # Apple rejects version skew between an app and its .appex bundles.
+      # ---------------------------------------------------------------------
+      - name: Compute build number
+        id: buildnum
+        run: |
+          BUILD_NUMBER="$(date -u +%Y.%m%d.%H%M)"
+          echo "Using CFBundleVersion = $BUILD_NUMBER"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp build number into Info.plists
+        env:
+          BUILD_NUMBER: ${{ steps.buildnum.outputs.build_number }}
+        run: |
+          set -euo pipefail
+          # xcodegen regenerates these on `xcodegen generate`; we overwrite
+          # CFBundleVersion in each so archive + export carry the CD value.
+          for plist in App/Info.plist Widget/Info.plist LiveActivity/Info.plist; do
+            /usr/libexec/PlistBuddy -c \
+              "Set :CFBundleVersion $BUILD_NUMBER" "$plist"
+            echo "  $plist -> CFBundleVersion $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
+          done
+
+      # ---------------------------------------------------------------------
+      # App Store Connect API key.
+      #
+      # The maintainer adds these as repository secrets (see Marketing/CICD.md):
+      #   ASC_KEY_ID      - the key's Key ID (10 chars, e.g. ABCDE12345)
+      #   ASC_ISSUER_ID   - the Issuer ID (a UUID, e.g. 69a6de7e-...-...)
+      #   ASC_KEY_P8_BASE64 - base64 of the downloaded AuthKey_<KEY_ID>.p8
+      #   APPLE_TEAM_ID   - the Apple Developer Team ID (NOT in any tracked file)
+      #
+      # We decode the base64 .p8 to $API_PRIVATE_KEYS_DIR/AuthKey_<KEY_ID>.p8,
+      # the exact name + location altool and xcodebuild auto-discover.
+      # ---------------------------------------------------------------------
+      - name: Import App Store Connect API key
+        id: asc
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ASC_KEY_ID:-}" ] || [ -z "${ASC_ISSUER_ID:-}" ] || [ -z "${ASC_KEY_P8_BASE64:-}" ]; then
+            echo "::error::App Store Connect API key secrets are not set."
+            echo "::error::Add ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64 (and APPLE_TEAM_ID)."
+            echo "::error::See Marketing/CICD.md -> 'What you must do to finish enabling this'."
+            exit 1
+          fi
+          mkdir -p "$API_PRIVATE_KEYS_DIR"
+          # base64 -d is the macOS/BSD spelling; works on the macos-15 runner.
+          echo "$ASC_KEY_P8_BASE64" | base64 -d > "$API_PRIVATE_KEYS_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$API_PRIVATE_KEYS_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          echo "Wrote AuthKey_${ASC_KEY_ID}.p8 to $API_PRIVATE_KEYS_DIR"
+
+      # ---------------------------------------------------------------------
+      # Archive with managed (automatic) cloud signing for distribution.
+      #
+      # -allowProvisioningUpdates + the three -authenticationKey* flags let
+      # Xcode talk to App Store Connect to create/refresh the App Store
+      # distribution cert + provisioning profiles for the app and BOTH
+      # extensions, including the iCloud/CloudKit + App Groups +
+      # remote-notification entitlements they carry. DEVELOPMENT_TEAM comes
+      # from the APPLE_TEAM_ID secret (the gitignored local xcconfig does not
+      # exist on the runner - that is fine, the optional #include? no-ops).
+      # ---------------------------------------------------------------------
+      - name: Archive (Release, automatic distribution signing)
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_TEAM_ID:-}" ]; then
+            echo "::error::APPLE_TEAM_ID secret is not set (the Apple Developer Team ID)."
+            exit 1
+          fi
+          xcodebuild \
+            -project DODApp.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/DODApp.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_PRIVATE_KEYS_DIR/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            archive
+
+      # ---------------------------------------------------------------------
+      # Export the archive into an App Store .ipa using the committed
+      # exportOptions.plist. The team id is NOT in that committed plist
+      # (public repo); we inject it into a runtime copy with PlistBuddy.
+      # ---------------------------------------------------------------------
+      - name: Export .ipa (App Store)
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          # Build a runtime exportOptions with the team id injected.
+          RUNTIME_OPTS="$RUNNER_TEMP/exportOptions.runtime.plist"
+          cp exportOptions.plist "$RUNTIME_OPTS"
+          /usr/libexec/PlistBuddy -c "Add :teamID string $APPLE_TEAM_ID" "$RUNTIME_OPTS" \
+            || /usr/libexec/PlistBuddy -c "Set :teamID $APPLE_TEAM_ID" "$RUNTIME_OPTS"
+          mkdir -p "$RUNNER_TEMP/export"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/DODApp.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNTIME_OPTS" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_PRIVATE_KEYS_DIR/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "Exported:"
+          ls -la "$RUNNER_TEMP/export"
+
+      - name: Locate .ipa
+        id: ipa
+        run: |
+          set -euo pipefail
+          IPA_PATH="$(find "$RUNNER_TEMP/export" -maxdepth 1 -name '*.ipa' | head -1)"
+          if [ -z "$IPA_PATH" ]; then
+            echo "::error::No .ipa produced by export step."
+            exit 1
+          fi
+          echo "Found IPA: $IPA_PATH"
+          echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
+
+      # Always keep the build artifact even on a dry run / upload failure so a
+      # human can upload it from Transporter as a fallback.
+      - name: Upload .ipa as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DODApp-ipa-${{ steps.buildnum.outputs.build_number }}
+          path: ${{ steps.ipa.outputs.ipa_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      # ---------------------------------------------------------------------
+      # Upload to TestFlight.
+      #
+      # `xcrun altool --upload-app` is the Xcode-26 CLI uploader (altool
+      # 26.40.x ships in Xcode 26.x). It authenticates with the same App
+      # Store Connect API key. The .p8 is auto-discovered from
+      # $API_PRIVATE_KEYS_DIR (set above) as AuthKey_<KEY_ID>.p8, so we pass
+      # --apiKey/--apiIssuer (no key path needed).
+      #
+      # Note on altool vs notarytool: notarytool is for NOTARIZING macOS apps,
+      # NOT for App Store / TestFlight delivery. The supported CLI paths for
+      # an iOS App Store upload are altool --upload-app and the Transporter
+      # GUI; altool is the scriptable one and remains current in Xcode 26.
+      # ---------------------------------------------------------------------
+      - name: Upload to TestFlight (altool)
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_upload != true }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcrun altool --upload-app \
+            -f "${{ steps.ipa.outputs.ipa_path }}" \
+            -t ios \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+          echo "Upload submitted. App Store Connect will email when processing finishes."
+
+      - name: Dry run note
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload == true }}
+        run: echo "skip_upload=true -> archived + exported the .ipa but did NOT upload. Grab it from the workflow artifact."
