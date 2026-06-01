@@ -19,13 +19,23 @@ public struct WPCommentsClient: Sendable {
     let baseURL: URL
     let httpClient: HTTPClient
     let decoder: JSONDecoder
+    /// Optional app-identity key sent as the `X-DOD-App-Key` header on the
+    /// comment POST so the WordPress side can allow anonymous comment creation
+    /// for the DOD app only (its `rest_allow_anonymous_comments` filter gates
+    /// on this header). Injected at archive time from the `DOD_COMMENT_API_KEY`
+    /// CI secret via the `DODCommentAPIKey` Info.plist key (see release.yml);
+    /// `nil`/empty in dev + PR builds, where the header is simply omitted.
+    /// DUT-23.
+    let appKey: String?
 
     public init(
         baseURL: URL = WPCommentsClient.defaultBaseURL,
-        httpClient: HTTPClient = URLSessionHTTPClient()
+        httpClient: HTTPClient = URLSessionHTTPClient(),
+        appKey: String? = nil
     ) {
         self.baseURL = baseURL
         self.httpClient = httpClient
+        self.appKey = appKey
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
@@ -146,6 +156,14 @@ public struct WPCommentsClient: Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        // DUT-23: identify this client as the Dutch Oven Daddy app so the
+        // WordPress side can allow anonymous comment creation for the app only
+        // (its `rest_allow_anonymous_comments` filter gates on this header).
+        // Omitted when no key is provisioned (dev / PR builds), leaving the
+        // request unchanged there.
+        if let appKey, !appKey.isEmpty {
+            request.setValue(appKey, forHTTPHeaderField: "X-DOD-App-Key")
+        }
         request.httpBody = try Self.encodePostBody(
             postID: postID,
             authorName: authorName,

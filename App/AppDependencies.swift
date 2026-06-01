@@ -96,7 +96,13 @@ final class AppDependencies {
         // US-13/14/15 integration: the comments + ratings + guest-identity
         // clients are constructed alongside the rest of the long-lived
         // services and handed to `LiveRecipeDetailDependencies` on demand.
-        self.commentsClient = WPCommentsClient()
+        // DUT-23: pass the app-identity key (Info.plist `DODCommentAPIKey`,
+        // injected at archive time from the DOD_COMMENT_API_KEY CI secret) so
+        // the comment POST carries `X-DOD-App-Key` and WordPress allows the
+        // app's anonymous comments. nil/empty in dev + PR builds.
+        self.commentsClient = WPCommentsClient(
+            appKey: Bundle.main.object(forInfoDictionaryKey: "DODCommentAPIKey") as? String
+        )
         self.ratingsClient = WPRMRatingsClient()
         self.guestIdentityStore = KeychainGuestIdentityStore()
         self.notificationService = NotificationService()

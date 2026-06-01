@@ -180,6 +180,11 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          # DUT-23: baked into the archived Info.plist (DODCommentAPIKey) so the
+          # shipped build's comment POST carries X-DOD-App-Key, which the
+          # WordPress rest_allow_anonymous_comments filter checks. Empty when
+          # the secret is unset — the app then simply omits the header.
+          DOD_COMMENT_API_KEY: ${{ secrets.DOD_COMMENT_API_KEY }}
         run: |
           set -euo pipefail
           if [ -z "${APPLE_TEAM_ID:-}" ]; then
@@ -198,6 +203,7 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Automatic \
+            DOD_COMMENT_API_KEY="${DOD_COMMENT_API_KEY:-}" \
             archive
 
       # ---------------------------------------------------------------------
