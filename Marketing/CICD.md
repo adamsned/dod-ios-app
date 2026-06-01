@@ -219,6 +219,145 @@ Notes and gotchas:
   constitution default of no new third-party dependencies.
 
 
+# Deploying the CloudKit schema to Production
+
+Cross-device recipe sync (DUT-6) only works once the CloudKit schema has been
+deployed to the Production environment. This section explains why, what the
+release pipeline now does about it automatically, and the one-time owner setup
+plus the hard prerequisite that no token can satisfy for you.
+
+
+## Why this is needed (the dominant cause of "sync does not work")
+
+The app uses `NSPersistentCloudKitContainer` to mirror saved recipes through a
+private CloudKit database. That mirror auto-creates its record types (the
+`CD_*` types SwiftData generates) ONLY in the **Development** CloudKit
+environment, and only on a build signed with a development provisioning profile.
+
+TestFlight and App Store builds run against the **Production** CloudKit
+environment, which never auto-creates record types. If the schema was only ever
+auto-created in Development and never promoted to Production, the Production
+mirror fails with "Did not find any record types" and cross-device sync silently
+does nothing - which is exactly DUT-6 cause #1.
+
+The fix is to deploy (promote) the schema from Development to Production. In the
+CloudKit Console this is the "Deploy Schema Changes..." button. We now also do
+it programmatically with Apple's `cktool` so you never have to hand-deploy in
+the Console again.
+
+
+## What the pipeline does automatically
+
+`.github/workflows/release.yml` has a `deploy-cloudkit-schema` job that runs
+after a release build successfully uploads (it is skipped on a `skip_upload`
+dry run, and skipped if the upload job did not succeed). On every real release
+it:
+
+1. Selects Xcode 26 (cktool ships inside Xcode as `xcrun cktool`).
+2. Exports the current Development schema:
+   `xcrun cktool export-schema --team-id <APPLE_TEAM_ID>
+   --container-id iCloud.com.dutchovendaddy.DODApp --environment development
+   --output-file schema.ckdb`
+3. Imports (promotes) it into Production with validation:
+   `xcrun cktool import-schema --team-id <APPLE_TEAM_ID>
+   --container-id iCloud.com.dutchovendaddy.DODApp --environment production
+   --validate --file schema.ckdb`
+
+So every shipped release re-asserts that Production matches Development.
+
+This job is dormant until you add one secret, exactly like the Linear bug filer
+below. If `CLOUDKIT_MANAGEMENT_TOKEN` is empty or absent it logs a warning and
+exits without failing the release. It is also best effort: any cktool error is
+downgraded to a warning, because the build is already in TestFlight by the time
+this post-step runs and a schema hiccup must not turn the release red.
+
+How cktool authenticates without a prompt: it reads a CloudKit management token
+from, in order, the `--token` flag, the `CLOUDKIT_MANAGEMENT_TOKEN` environment
+variable, `~/.config/cktool`, then the login keychain. The workflow sets the
+`CLOUDKIT_MANAGEMENT_TOKEN` environment variable from the secret (it does NOT
+pass `--token` on the command line, so the token can never leak through shell
+tracing; GitHub also masks the secret in logs). The container id
+`iCloud.com.dutchovendaddy.DODApp` is not a secret and appears in the workflow
+and in `App/DODApp.entitlements`; only the token is secret.
+
+
+## The hard prerequisite a token cannot satisfy: seed the Development schema
+
+`cktool` promotes whatever is currently in Development. If the Development schema
+is empty there is nothing to deploy and the export is empty (the local script
+errors; the CI job warns). You must populate the Development schema once:
+
+1. Run a **Debug** build on a device or simulator that is signed into iCloud
+   (Debug uses a development profile, which is what lets SwiftData auto-create
+   the record types in the Development environment).
+2. In the app, open Settings and turn **iCloud Sync ON**.
+3. Relaunch the app (the opt-in applies at launch), then **save a recipe**.
+
+That round-trip auto-creates the `CD_*` record types in the Development CloudKit
+environment. Only after this is there a schema to promote.
+
+
+## Owner setup (one time)
+
+1. Seed the Development schema as described directly above. Do this first; the
+   token is useless until Development has a schema to promote.
+
+2. Create a CloudKit **management** token. In CloudKit Console
+   (https://icloud.developer.apple.com), select the container
+   `iCloud.com.dutchovendaddy.DODApp`, open its **Settings**, and create a token
+   under the **API Access / Tokens** area. A management token is long-lived
+   (about one year) and is intended for container configuration such as schema
+   import and export; it cannot read or write your users' data. Copy the token
+   value (shown once). It can be revoked later from the same Settings area.
+
+3. Add it as a GitHub Actions repository secret. In GitHub, open the repository
+   Settings -> Secrets and variables -> Actions -> New repository secret. Name it
+   exactly `CLOUDKIT_MANAGEMENT_TOKEN` and paste the token as the value. The
+   repository is public, so the token must only ever live as this secret, never
+   in a tracked file. (`APPLE_TEAM_ID` is already required by the TestFlight
+   pipeline; the schema job reuses it.)
+
+4. That is all. The next real release promotes the schema automatically. If you
+   want to promote it right now without shipping a build - for example to fix
+   Production before the next release, or to seed Production the very first time
+   - run the local script (next section).
+
+
+## Deploying on demand from your Mac (bin/deploy-cloudkit-schema.sh)
+
+`bin/deploy-cloudkit-schema.sh` does the same Development -> Production promotion
+locally, so you do not have to wait for a release. Use it for the first-ever
+deploy, or whenever CI's best-effort post-step warned that the promotion failed.
+
+Provide the management token either way:
+
+- `export CLOUDKIT_MANAGEMENT_TOKEN=...` then run the script, or
+- run `xcrun cktool save-token --type management` once and follow the secure
+  prompt (it stores the token in your login keychain), after which the script
+  needs no environment variable.
+
+The script takes the Apple Team ID from `APPLE_TEAM_ID` if set, otherwise from
+`DEVELOPMENT_TEAM` in the gitignored `App/DODApp.local.xcconfig` (the same place
+your device builds read it). Then:
+
+    bin/deploy-cloudkit-schema.sh
+
+It exports the Development schema to a temporary `.ckdb` file (cleaned up on
+exit), refuses to proceed if that export is empty (the seed prerequisite was
+skipped), and imports it into Production with `--validate`. The token is never
+echoed and never written to a tracked file; `.gitignore` also excludes `*.ckdb`
+and `.config/cktool` as a belt-and-braces guard.
+
+Notes:
+
+- `cktool` is bundled with Xcode; no extra install. `xcrun --find cktool`
+  confirms it is on your machine.
+- Importing to the production environment is the programmatic equivalent of the
+  CloudKit Console "Deploy Schema Changes..." promotion; it does not delete
+  Production data, it brings the Production schema up to match Development.
+- This adds no third-party tooling, consistent with the rest of the pipeline.
+
+
 # Auto-filing test-failure bugs in Linear
 
 When the CI test suite goes red on `main`, CI files one rollup bug issue in

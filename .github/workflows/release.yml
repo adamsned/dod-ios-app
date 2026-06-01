@@ -282,3 +282,124 @@ jobs:
       - name: Dry run note
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload == true }}
         run: echo "skip_upload=true -> archived + exported the .ipa but did NOT upload. Grab it from the workflow artifact."
+
+  # ---------------------------------------------------------------------------
+  # Promote the CloudKit schema Development -> Production (best effort).
+  #
+  # WHY THIS EXISTS (DUT-6 cause #1). NSPersistentCloudKitContainer auto-creates
+  # the CD_* record types ONLY in the Development CloudKit environment. A
+  # TestFlight / App Store build runs against Production, which never
+  # auto-creates them, so the mirror fails with "Did not find any record types"
+  # and cross-device sync silently does not work. The fix is to deploy (promote)
+  # the schema from Development to Production - historically a manual click in
+  # CloudKit Console ("Deploy Schema Changes..."). This job does that promotion
+  # programmatically with Apple's `cktool` so the owner never hand-deploys again:
+  # every shipped release re-asserts that Production matches Development.
+  #
+  # HOW cktool AUTHENTICATES NON-INTERACTIVELY. `cktool` (bundled in Xcode) reads
+  # a CloudKit *management* token, in this precedence: the `--token` flag, then
+  # the `CLOUDKIT_MANAGEMENT_TOKEN` environment variable, then ~/.config/cktool,
+  # then the keychain. We use the environment variable (NOT --token) so the token
+  # never lands on a command line that `set -x` could echo; GitHub also masks the
+  # secret in logs. `CKTOOL_NO_PROMPT=1` forces a hard error instead of hanging
+  # on a prompt if auth is missing.
+  #
+  # DORMANT UNTIL THE SECRET EXISTS (mirrors the Linear `report-failures` job in
+  # ci.yml). If `CLOUDKIT_MANAGEMENT_TOKEN` is empty/absent the step logs a
+  # warning and exits 0 - it NEVER fails the release. Any cktool error is also
+  # downgraded to a warning: a schema-deploy hiccup must not fail an
+  # already-uploaded build (the .ipa is in TestFlight by the time this runs).
+  #
+  # HARD PREREQUISITE the token alone cannot satisfy: the Development schema must
+  # already be populated. cktool promotes whatever is in Development; if Dev is
+  # empty there is nothing to deploy. The owner seeds Dev once by running a Debug
+  # build with iCloud Sync ON and saving a recipe. Full owner setup:
+  # Marketing/CICD.md -> "Deploying the CloudKit schema to Production".
+  # ---------------------------------------------------------------------------
+  deploy-cloudkit-schema:
+    name: Promote CloudKit schema (Development -> Production)
+    needs: testflight
+    # Only after a build actually shipped: the testflight job must have
+    # succeeded, and a dry run (skip_upload=true) did not upload anything, so
+    # there is no release to match the schema to - skip it there too.
+    if: >-
+      needs.testflight.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' || inputs.skip_upload != true)
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      # NOT secret - the CloudKit container id is public (it appears in the
+      # committed entitlements). Keep it here so the steps read from one place.
+      CK_CONTAINER_ID: iCloud.com.dutchovendaddy.DODApp
+      # Force cktool to error out instead of blocking on an interactive prompt
+      # if the token is somehow missing at the point of use.
+      CKTOOL_NO_PROMPT: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      # cktool ships inside Xcode (xcrun cktool), so select the same Xcode 26
+      # the rest of the pipeline uses. GitHub ships no bare Xcode_26.app symlink;
+      # glob the versioned apps and pick the newest (identical logic to ci.yml).
+      - name: Select Xcode 26
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+
+      - name: Promote CloudKit schema Development -> Production (best effort)
+        env:
+          # The CloudKit management token (owner-created in CloudKit Console ->
+          # the container -> Settings -> API Access / Tokens). cktool auto-reads
+          # this exact variable name; do NOT rename it.
+          CLOUDKIT_MANAGEMENT_TOKEN: ${{ secrets.CLOUDKIT_MANAGEMENT_TOKEN }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          # --- Dormant-until-configured gate (never fails the release). --------
+          if [ -z "${CLOUDKIT_MANAGEMENT_TOKEN:-}" ]; then
+            echo "::warning::CLOUDKIT_MANAGEMENT_TOKEN secret is not set; skipping CloudKit schema deploy."
+            echo "The release already uploaded; this post-step is best effort."
+            echo "To enable automatic schema promotion, add the secret and seed the Development schema once."
+            echo "See Marketing/CICD.md -> 'Deploying the CloudKit schema to Production'."
+            exit 0
+          fi
+          if [ -z "${APPLE_TEAM_ID:-}" ]; then
+            echo "::warning::APPLE_TEAM_ID secret is not set; cannot address the CloudKit team. Skipping schema deploy."
+            exit 0
+          fi
+
+          # --- Best-effort promotion. Any failure -> warning, never a red build.
+          # Wrapped in a function so a single `|| handle` swallows the whole flow.
+          deploy() {
+            echo "Exporting Development schema for $CK_CONTAINER_ID ..."
+            # Token is read from CLOUDKIT_MANAGEMENT_TOKEN (env), not passed on
+            # the command line, so it can't leak via shell tracing.
+            xcrun cktool export-schema \
+              --team-id "$APPLE_TEAM_ID" \
+              --container-id "$CK_CONTAINER_ID" \
+              --environment development \
+              --output-file schema.ckdb
+
+            echo "Development schema exported:"
+            # Size only - do not dump contents into the public log.
+            wc -l schema.ckdb || true
+
+            echo "Importing (promoting) schema into Production ..."
+            # --validate makes cktool check the schema against the Production
+            # container before applying it. Importing to the production
+            # environment is the programmatic equivalent of the CloudKit Console
+            # "Deploy Schema Changes..." promotion.
+            xcrun cktool import-schema \
+              --team-id "$APPLE_TEAM_ID" \
+              --container-id "$CK_CONTAINER_ID" \
+              --environment production \
+              --validate \
+              --file schema.ckdb
+
+            echo "CloudKit Production schema now matches Development."
+          }
+
+          if deploy; then
+            echo "CloudKit schema promotion succeeded."
+          else
+            echo "::warning::cktool schema promotion failed (see log above). NOT failing the release - this is a best-effort post-step."
+            echo "::warning::Most common cause: the Development schema is empty (nothing to promote). Seed it once per Marketing/CICD.md, then re-run a release or deploy locally with bin/deploy-cloudkit-schema.sh."
+          fi

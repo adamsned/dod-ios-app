@@ -36,6 +36,13 @@ Package.resolved
 # tracked or CI's `xcodegen generate` fails with "Invalid config file".
 !App/DODApp.xcconfig
 
+# CloudKit schema tooling (bin/deploy-cloudkit-schema.sh): a locally-exported
+# schema can carry your record-type layout, and a saved cktool token is a
+# credential. Never commit either. (The script writes the schema to a temp file
+# and cleans it up; these patterns guard against a stray copy in the worktree.)
+*.ckdb
+.config/cktool
+
 # macOS
 .DS_Store
 
