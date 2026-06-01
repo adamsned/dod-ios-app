@@ -162,7 +162,8 @@ import Testing
     /// surfaces a tag-stripped snippet rather than collapsing to a bare code
     /// — this is the most likely real-world cause of "Couldn't load comments."
     @Test func getHTMLSecurityChallengeBodyIsStrippedAndSurfaced() async throws {
-        let html = "<html><body><h1>Access Denied</h1><p>This request was blocked by the security plugin.</p></body></html>"
+        let html =
+            "<html><body><h1>Access Denied</h1><p>This request was blocked by the security plugin.</p></body></html>"
         let fake = FakeHTTPClient()
         await fake.stub(urlContaining: "comments", html: html, statusCode: 403)
         let client = WPCommentsClient(httpClient: fake)
