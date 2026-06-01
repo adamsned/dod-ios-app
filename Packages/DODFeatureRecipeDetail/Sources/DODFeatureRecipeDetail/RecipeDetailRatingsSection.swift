@@ -5,36 +5,41 @@ import SwiftUI
 /// "Ratings & Reviews" section that hangs off the bottom of
 /// ``RecipeDetailView``. Composes the existing DesignSystem primitives
 /// (``StarRatingDisplay``, ``StarRatingInput``, ``CommentRow``,
-/// ``CommentComposer``, ``ModerationBadge``) and the
-/// ``RecipeDetailViewModel`` mutation surface added in Wave-2.
+/// ``ModerationBadge``) and the ``RecipeDetailViewModel`` mutation surface.
 ///
 /// Spec trace: US-13 (AC-13.1, AC-13.2, AC-13.3), US-14 (AC-14.1,
-/// AC-14.2, AC-14.3, AC-14.4), US-15 (AC-15.1, AC-15.2).
+/// AC-14.2, AC-14.3, AC-14.4), US-15 (AC-15.1, AC-15.2). DUT-24.
 ///
-/// **Layout note.** This view ships as one top-level section rather than
-/// the four discrete views the task spec named (`RatingsHeader`,
-/// `UserRatingBar`, `CommentsList`, `CommentComposerSection`) — they're
-/// expressed as private `@ViewBuilder` properties below so the host can
-/// drop a single thing onto the scroll content while we still keep each
-/// concern visually separated. The naming matches the spec so future
-/// readers can `grep` for the named pieces.
+/// **DUT-24 consolidation.** The pre-DUT-24 layout shipped TWO interactive
+/// star controls bound to the same `pendingUserRating` — a standalone
+/// "Submit rating" star bar AND a `CommentComposer` that rendered its own
+/// "Rate (optional)" star input plus its own Submit button. Testers saw the
+/// rating doubled. This section now exposes ONE rate-and-review surface:
+/// a single ``StarRatingInput`` + an optional inline comment editor + a
+/// single Submit button (``rateAndReviewCard``). The aggregate
+/// ``StarRatingDisplay`` above it is read-only (a number, not a second
+/// control). The comments-load *error* is no longer surfaced inline here
+/// (it leaked "Couldn't load comments." into the review area) — the
+/// load-failed state degrades to the same neutral empty copy.
+///
+/// **Layout note.** Ships as one top-level section; concerns are split into
+/// private `@ViewBuilder` properties below so the host drops a single thing
+/// onto the scroll content while each piece stays grep-able.
 public struct RecipeDetailRatingsSection: View {
 
     @Bindable public var viewModel: RecipeDetailViewModel
     @State private var isGuestSheetPresented: Bool = false
     @State private var guestNameDraft: String = ""
     @State private var guestEmailDraft: String = ""
-    /// Tracks which intent triggered the guest-identity sheet so we can
-    /// resume the right action once the user finishes the identity flow.
-    @State private var pendingIdentityAction: PendingIdentityAction?
+    /// True when the user tapped Submit but had to clear the guest-identity
+    /// gate first — we resume the consolidated submit once the sheet
+    /// dismisses with an identity in place. DUT-24 collapsed the previous
+    /// per-action enum (rate vs comment) into this single flag because the
+    /// section now has one Submit path.
+    @State private var pendingSubmitAfterIdentity: Bool = false
 
     public init(viewModel: RecipeDetailViewModel) {
         self.viewModel = viewModel
-    }
-
-    private enum PendingIdentityAction: Equatable {
-        case submitRating(Int)
-        case submitComment
     }
 
     public var body: some View {
@@ -43,14 +48,16 @@ public struct RecipeDetailRatingsSection: View {
 
             ratingsHeader
 
-            userRatingBar
+            // DUT-24: single rate (stars) + optional comment + Submit
+            // surface. Replaces the old separate "Submit rating" bar and the
+            // embedded `CommentComposer` (which each carried their own star
+            // input, doubling the rating control).
+            rateAndReviewCard
 
             Divider()
                 .padding(.vertical, DODSpacing.xs)
 
             commentsList
-
-            commentComposerSection
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.lg)
@@ -96,42 +103,104 @@ public struct RecipeDetailRatingsSection: View {
         }
     }
 
-    // MARK: - UserRatingBar
+    // MARK: - RateAndReviewCard
 
-    /// AC-13.2 / AC-13.3 — interactive 1–5 star input plus a "Submit
-    /// rating" button that fires the guest-identity sheet if needed.
-    private var userRatingBar: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            if let userRating = viewModel.ratingSummary?.userRating, userRating > 0 {
-                Text("You rated this \(userRating) star\(userRating == 1 ? "" : "s")")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            } else {
-                Text("Rate this recipe")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
+    /// DUT-24 — the single consolidated rate + optional-comment + Submit
+    /// surface. AC-13.2 / AC-13.3 (rate the recipe) and AC-14.3 (optional
+    /// comment) now live in one card with one star input and one Submit
+    /// button. Submit routes through the guest-identity gate when needed.
+    private var rateAndReviewCard: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            ratingPrompt
+
             StarRatingInput(
                 value: Binding(
                     get: { viewModel.pendingUserRating },
                     set: { viewModel.setPendingRating($0) }
                 ),
                 starSize: 32,
-                isSubmitting: viewModel.isSubmittingRating
+                isSubmitting: viewModel.isSubmittingRatingOrComment
             )
-            Button {
-                triggerSubmitRating()
-            } label: {
-                Text(viewModel.isSubmittingRating ? "Saving…" : "Submit rating")
-                    .dodFont(DODType.bodyEmphasized)
-                    .padding(.horizontal, DODSpacing.md)
-                    .padding(.vertical, DODSpacing.sm)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(DODColor.accent)
-            .disabled(viewModel.pendingUserRating == 0 || viewModel.isSubmittingRating)
-            .accessibilityLabel("Submit rating")
+
+            commentField
+
+            submitButton
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Rate and review this recipe")
+    }
+
+    /// Caption above the stars: reflects the user's prior rating if the
+    /// cache remembers one, otherwise the "Rate this recipe" invitation.
+    @ViewBuilder
+    private var ratingPrompt: some View {
+        if let userRating = viewModel.ratingSummary?.userRating, userRating > 0 {
+            Text("You rated this \(userRating) star\(userRating == 1 ? "" : "s")")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+        } else {
+            Text("Rate this recipe")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+        }
+    }
+
+    /// Optional inline comment editor (AC-14.3). Empty is valid — the user
+    /// can submit a star rating alone. Styling matches the DesignSystem
+    /// `CommentComposer` editor (bordered `TextEditor` + placeholder) so the
+    /// look is unchanged from the old composer, minus its duplicate stars.
+    private var commentField: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            Text("Add a comment (optional)")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                    .stroke(DODColor.labelSecondary.opacity(0.25), lineWidth: 1)
+
+                TextEditor(
+                    text: Binding(
+                        get: { viewModel.commentDraft },
+                        set: { viewModel.setCommentDraft($0) }
+                    )
+                )
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+                .scrollContentBackground(.hidden)
+                .padding(DODSpacing.xs)
+                .frame(minHeight: 120)
+                .disabled(viewModel.isSubmittingRatingOrComment)
+                .accessibilityLabel("Comment (optional)")
+
+                if viewModel.commentDraft.isEmpty {
+                    Text("Share your tips, substitutions, or thoughts.")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.labelSecondary.opacity(0.7))
+                        .padding(.horizontal, DODSpacing.sm)
+                        .padding(.vertical, DODSpacing.sm + 2)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+    }
+
+    /// The one and only Submit control for the section. Enabled when the
+    /// user has set a rating OR typed a comment; routes through the
+    /// guest-identity sheet on first submit.
+    private var submitButton: some View {
+        Button {
+            triggerSubmit()
+        } label: {
+            Text(viewModel.isSubmittingRatingOrComment ? "Submitting…" : "Submit")
+                .dodFont(DODType.bodyEmphasized)
+                .padding(.horizontal, DODSpacing.lg)
+                .padding(.vertical, DODSpacing.sm)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(DODColor.accent)
+        .disabled(!viewModel.canSubmitRatingOrComment || viewModel.isSubmittingRatingOrComment)
+        .accessibilityLabel("Submit rating and review")
     }
 
     // MARK: - CommentsList
@@ -151,8 +220,13 @@ public struct RecipeDetailRatingsSection: View {
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             }
-        case .error(let message):
-            Text(message)
+        case .error:
+            // DUT-24: do NOT surface the comments-load failure ("Couldn't
+            // load comments.") in the review area — testers flagged that
+            // raw error string leaking into the UI. Degrade gracefully to
+            // the same neutral copy as an empty thread; the rate + review
+            // surface above stays fully usable regardless.
+            Text("No comments yet. Be the first to share your tips.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
         case .ready:
@@ -177,52 +251,20 @@ public struct RecipeDetailRatingsSection: View {
         }
     }
 
-    // MARK: - CommentComposerSection
-
-    /// AC-14.3 — composer bound to `viewModel.commentDraft`; the submit
-    /// path runs the guest-identity gate (AC-15.1) before posting.
-    private var commentComposerSection: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            Text("Write a comment")
-                .dodFont(DODType.bodyEmphasized)
-                .foregroundStyle(DODColor.label)
-            CommentComposer(
-                text: Binding(
-                    get: { viewModel.commentDraft },
-                    set: { viewModel.setCommentDraft($0) }
-                ),
-                rating: Binding(
-                    get: { viewModel.pendingUserRating },
-                    set: { viewModel.setPendingRating($0) }
-                ),
-                isSubmitting: viewModel.isSubmittingComment,
-                onSubmit: { triggerSubmitComment() },
-                onCancel: { viewModel.setCommentDraft("") }
-            )
-            .frame(minHeight: 320)
-        }
-    }
-
     // MARK: - Guest identity flow
 
-    private func triggerSubmitRating() {
-        guard viewModel.pendingUserRating > 0 else { return }
+    /// DUT-24 — single submit path for the consolidated card. Fires the
+    /// guest-identity sheet (AC-15.1) on first submit, then routes to the
+    /// view model's ``RecipeDetailViewModel/submitRatingAndComment()`` which
+    /// picks the right underlying network call (comment-with-rating, or
+    /// rating-only) without doubling any UI.
+    private func triggerSubmit() {
+        guard viewModel.canSubmitRatingOrComment else { return }
         if viewModel.requiresGuestIdentity {
-            pendingIdentityAction = .submitRating(viewModel.pendingUserRating)
+            pendingSubmitAfterIdentity = true
             presentGuestSheet()
         } else {
-            Task { await viewModel.submitRating(stars: viewModel.pendingUserRating) }
-        }
-    }
-
-    private func triggerSubmitComment() {
-        let trimmed = viewModel.commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if viewModel.requiresGuestIdentity {
-            pendingIdentityAction = .submitComment
-            presentGuestSheet()
-        } else {
-            Task { await viewModel.submitComment() }
+            Task { await viewModel.submitRatingAndComment() }
         }
     }
 
@@ -242,20 +284,14 @@ public struct RecipeDetailRatingsSection: View {
     }
 
     private func handleGuestSheetDismiss() {
-        // Resume whichever action originally triggered the sheet — but
-        // only if the identity is actually present now (the user may
-        // have cancelled).
-        guard !viewModel.requiresGuestIdentity, let action = pendingIdentityAction else {
-            pendingIdentityAction = nil
+        // Resume the consolidated submit only if the identity is actually
+        // present now (the user may have cancelled the sheet).
+        guard pendingSubmitAfterIdentity, !viewModel.requiresGuestIdentity else {
+            pendingSubmitAfterIdentity = false
             return
         }
-        pendingIdentityAction = nil
-        switch action {
-        case .submitRating(let stars):
-            Task { await viewModel.submitRating(stars: stars) }
-        case .submitComment:
-            Task { await viewModel.submitComment() }
-        }
+        pendingSubmitAfterIdentity = false
+        Task { await viewModel.submitRatingAndComment() }
     }
 
     // MARK: - Helpers

@@ -3,6 +3,46 @@ import Foundation
 
 extension RecipeDetailViewModel {
 
+    /// True when the consolidated rate + review surface has something to
+    /// submit: either a star selection OR a non-blank comment draft.
+    /// DUT-24: the single Submit button binds its disabled-state to this so
+    /// the user can rate, comment, or do both from one control.
+    public var canSubmitRatingOrComment: Bool {
+        let hasRating = pendingUserRating > 0
+        let hasComment =
+            !commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return hasRating || hasComment
+    }
+
+    /// True while either the rating or the comment submit is in flight.
+    /// Drives the consolidated Submit button's busy label + disabled state.
+    public var isSubmittingRatingOrComment: Bool {
+        isSubmittingRating || isSubmittingComment
+    }
+
+    /// DUT-24: single entry point for the consolidated "rate (stars) +
+    /// optional comment + Submit" surface. Routes to the existing,
+    /// unchanged network methods so the rating/comment POST logic stays
+    /// owned by its current paths (this is presentation-layer
+    /// orchestration only, not a new network call):
+    ///
+    /// * a non-blank comment → ``submitComment()``, which already carries
+    ///   the pending star rating alongside the body (AC-14.4);
+    /// * stars only (no comment) → ``submitRating(stars:)``.
+    ///
+    /// The guest-identity gate is enforced by the individual methods (and
+    /// pre-checked by the view), so an empty identity still re-gates rather
+    /// than firing a doomed POST.
+    public func submitRatingAndComment() async {
+        let hasComment =
+            !commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if hasComment {
+            await submitComment()
+        } else if pendingUserRating > 0 {
+            await submitRating(stars: pendingUserRating)
+        }
+    }
+
     /// Submit the in-progress comment draft (and the pending rating, if
     /// non-zero). Gated behind the guest-identity sheet. AC-14.3 /
     /// AC-14.4 / AC-14.7.
