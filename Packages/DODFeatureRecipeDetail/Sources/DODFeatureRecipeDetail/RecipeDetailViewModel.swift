@@ -122,19 +122,14 @@ public final class RecipeDetailViewModel {
         // Step 1: hydrate from cache if present (fast path).
         if let cached = try? await dependencies.cachedRecipe(id: listItem.id), cached.hasDetail {
             recipe = cached
-            // US-37 / CL-63 / AC-37.3 (T-640): branch on kind so cached
-            // articles route to `.article(...)` instead of `.ready`.
-            // Recipes follow the existing `.ready` + related-strip path.
+            // US-37 / CL-63 / AC-37.3 (T-640): articles route to `.article`;
+            // recipes use the `.ready` + related-strip path (no related
+            // strip on articles per CL-63 decision 5).
+            // T-736 / CL-133: cache-hit recipe path also fires a background
+            // `refreshBlurbBlocks` — see helper for the contract.
             switch cached.kind {
-            case .recipe:
-                loadState = .ready
-                await loadRelated(forCategoryID: cached.categoryIDs.first)
-            case .article:
-                loadState = .article(cached)
-            // No related-recipes strip on articles per CL-63 decision 5
-            // (articles are often themselves "related recipes" roundup
-            // posts; rendering a four-card strip below would feel
-            // duplicative).
+            case .recipe: await hydrateCachedRecipe(cached)
+            case .article: loadState = .article(cached)
             }
         } else {
             // Step 2: try fetch + parse.

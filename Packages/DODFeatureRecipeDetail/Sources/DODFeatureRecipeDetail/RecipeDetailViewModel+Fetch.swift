@@ -95,6 +95,71 @@ extension RecipeDetailViewModel {
         loadState = .article(article)
     }
 
+    /// T-736 / CL-133: cache-hit hydration helper for the `.recipe` kind —
+    /// extracted out of `onAppear()` so the cache-hit branch stays terse
+    /// and the view-model file stays under the file-length cap. Mirrors the
+    /// pre-T-736 inline `.ready` + `loadRelated` sequence, plus the new
+    /// background `refreshBlurbBlocks(forCanonicalURL:)` call that closes
+    /// the AC-4.12 cache-hit blurb gap.
+    func hydrateCachedRecipe(_ cached: Recipe) async {
+        loadState = .ready
+        await loadRelated(forCategoryID: cached.categoryIDs.first)
+        await refreshBlurbBlocks(forCanonicalURL: canonicalURL)
+    }
+
+    /// T-736 / CL-133 / AC-4.12 (amended): refresh `blurbBlocks` on a cache-
+    /// hit re-open. `viewModel.blurbBlocks` is view-local state that only
+    /// ever populates via the fresh-fetch path (`fetchAndParse()` line 47-51);
+    /// the cache-hit fast path in `onAppear()` returns via `loadState = .ready`
+    /// WITHOUT touching it, so on every re-open of a previously-cached recipe
+    /// the array holds its initializer default `[]` and the view renders the
+    /// empty-`blurbBlocks` fallback (`Text(strippedExcerpt)` per
+    /// `RecipeDetailView+Blurb.swift` lines 124-134) instead of the rich
+    /// `ArticleBlocksView` path. Spencer's "lots of recipes missing the rich
+    /// blurb" perception came from this gap — the T-736 audit (50 newest +
+    /// 50 oldest + 100 mid-catalog recipes on `dutchovendaddy.com`, 2026-05-31)
+    /// confirmed extractor coverage is effectively 100% (50/50, 50/50, 99/100
+    /// with one transient HTTP fail), so the gap is exclusively in the cache-
+    /// hit branch of `onAppear()`, not in the extractor or the parser.
+    ///
+    /// **Contract.** Four steps:
+    /// 1. Gate on `await dependencies.isOnline()`. Offline cache-hits skip
+    ///    the network call entirely — the fallback `Text` path is an
+    ///    acceptable render when there's no fresh data anyway, and issuing
+    ///    a network call we know will fail wastes battery + adds spurious
+    ///    error-log noise.
+    /// 2. `try?` `dependencies.fetchHTML(for: canonicalURL)`. Fail-silent on
+    ///    transient errors — the cached view is already on screen, surfacing
+    ///    a snackbar would feel like the app is broken in a context where
+    ///    it manifestly is not. The next online open re-attempts the refresh.
+    ///    Matches the `loadRatingsAndComments` no-op-on-failure pattern
+    ///    (REG-14 / AC-14.6).
+    /// 3. Run the same `ArticleBodyExtractor.extractRecipeBlurb` +
+    ///    `ArticleHTMLParser.parse` pipeline `fetchAndParse()` uses (line 47).
+    /// 4. Assign `blurbBlocks` ONLY if the parsed result is non-empty. The
+    ///    non-empty guard prevents a transient parse failure from
+    ///    overwriting a previously-successful population with `[]`,
+    ///    downgrading the view from rich-blurb to fallback-`Text` on a
+    ///    subsequent refresh. (The view-model lives for the duration of
+    ///    `RecipeDetailView`; a second `onAppear` from a deep-link push
+    ///    re-runs the refresh, so worst case is one stale render — but the
+    ///    guard means an empty parse never *downgrades* a previously-
+    ///    successful render.)
+    ///
+    /// **Not called for articles.** Articles persist `articleBodyHTML` in
+    /// the `Recipe` data model itself (US-37 / CL-63 / AC-37.3) so cached
+    /// articles render rich-body on re-open without needing a refresh.
+    /// `onAppear()`'s `.article` case is unchanged by T-736.
+    func refreshBlurbBlocks(forCanonicalURL url: URL) async {
+        guard await dependencies.isOnline() else { return }
+        guard let html = try? await dependencies.fetchHTML(for: url) else { return }
+        let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        guard !blurbHTML.isEmpty else { return }
+        let parsed = ArticleHTMLParser.parse(html: blurbHTML)
+        guard !parsed.isEmpty else { return }
+        blurbBlocks = parsed
+    }
+
     /// Load the related-recipes strip for the recipe path (AC-4.6).
     /// Articles skip this — the caller doesn't invoke `loadRelated` for
     /// `.article` load states per CL-63 decision 5 (articles are
