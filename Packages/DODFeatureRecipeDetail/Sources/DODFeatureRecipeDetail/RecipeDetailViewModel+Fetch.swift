@@ -98,13 +98,24 @@ extension RecipeDetailViewModel {
     /// T-736 / CL-133: cache-hit hydration helper for the `.recipe` kind —
     /// extracted out of `onAppear()` so the cache-hit branch stays terse
     /// and the view-model file stays under the file-length cap. Mirrors the
-    /// pre-T-736 inline `.ready` + `loadRelated` sequence, plus the new
-    /// background `refreshBlurbBlocks(forCanonicalURL:)` call that closes
-    /// the AC-4.12 cache-hit blurb gap.
+    /// pre-T-736 inline `.ready` + `loadRelated` sequence, plus a
+    /// **fire-and-forget** `refreshBlurbBlocks` Task that closes the
+    /// AC-4.12 cache-hit blurb gap without blocking `onAppear()` on a
+    /// network call. The await-inline version broke the L5 E2E journey
+    /// suite under CI (REG-37 / T-737-fixforward) — the test thread saw
+    /// the Ingredients header miss its `waitForExistence` timeout because
+    /// the `await` held `onAppear()` open across a slow live-API fetch.
     func hydrateCachedRecipe(_ cached: Recipe) async {
         loadState = .ready
         await loadRelated(forCategoryID: cached.categoryIDs.first)
-        await refreshBlurbBlocks(forCanonicalURL: canonicalURL)
+        // Fire-and-forget: the cached view is already on screen via
+        // `.ready`; the rich blurb arrives in a later frame when the
+        // background fetch lands. Holding `onAppear()` open on this would
+        // serialize subsequent UI work behind a network call (REG-37).
+        let url = canonicalURL
+        Task { [weak self] in
+            await self?.refreshBlurbBlocks(forCanonicalURL: url)
+        }
     }
 
     /// T-736 / CL-133 / AC-4.12 (amended): refresh `blurbBlocks` on a cache-
