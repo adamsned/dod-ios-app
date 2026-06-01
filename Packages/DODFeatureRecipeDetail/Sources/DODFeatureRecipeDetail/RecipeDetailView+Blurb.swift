@@ -67,15 +67,32 @@ extension RecipeDetailView {
         let strippedExcerpt = Self.strippingExcerptTruncationTail(
             from: viewModel.listItem.excerpt
         )
-        let collapsedBlocks = Self.collapsedBlurbBlocks(from: viewModel.blurbBlocks)
+        // T-735 / CL-132: filter `.image` blocks out of the blurb-rendering
+        // path. The collapsed render, the expanded render, AND the More-
+        // button visibility gate all consume `textOnlyBlocks` — a blurb
+        // whose ONLY content is images correctly hides the More button
+        // (nothing text-y to expand into). Live-API audit on 2026-05-31
+        // found 3 of 11 production recipes carry image-first block
+        // sequences (?p=274, 5016, 524) — pre-T-735 the collapsed surface
+        // rendered an opaque Pinterest-preview photo where the user
+        // expected the first text paragraph. The view-model's blurbBlocks
+        // remains structurally faithful for any future consumer; the
+        // filter is a view-side concern. ArticleDetailView is NOT touched
+        // and continues to render images per AC-37.3.
+        let textOnlyBlocks = Self.textOnlyBlurbBlocks(from: viewModel.blurbBlocks)
+        let hasExpandableTextBlurb = textOnlyBlocks.contains { block in
+            if case .paragraph = block { return true }
+            return false
+        }
+        let collapsedBlocks = Self.collapsedBlurbBlocks(from: textOnlyBlocks)
         let canRenderCollapsedRich = !collapsedBlocks.isEmpty
         let shouldRender =
             !strippedExcerpt.isEmpty || canRenderCollapsedRich
-            || (viewModel.hasExpandableBlurb && isBlurbExpanded)
+            || (hasExpandableTextBlurb && isBlurbExpanded)
         if shouldRender {
             VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                if isBlurbExpanded, viewModel.hasExpandableBlurb {
-                    ArticleBlocksView(blocks: viewModel.blurbBlocks)
+                if isBlurbExpanded, hasExpandableTextBlurb {
+                    ArticleBlocksView(blocks: textOnlyBlocks)
                     Button {
                         withAnimation { isBlurbExpanded = false }
                     } label: {
@@ -94,7 +111,7 @@ extension RecipeDetailView {
                     // only, NEVER stored, NEVER rendered in the expanded
                     // state.
                     ArticleBlocksView(blocks: collapsedBlocks)
-                    if viewModel.hasExpandableBlurb {
+                    if hasExpandableTextBlurb {
                         Button {
                             withAnimation { isBlurbExpanded = true }
                         } label: {
@@ -119,6 +136,26 @@ extension RecipeDetailView {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, DODSpacing.md)
         }
+    }
+
+    /// T-735 / CL-132: filter `.image` blocks out of a `[ArticleBlock]`
+    /// sequence for the blurb-rendering path. The view-model's
+    /// `blurbBlocks` stays structurally faithful (still includes images
+    /// for any future consumer); the filter is view-side. `ArticleDetailView`
+    /// does NOT use this helper — articles still render images per AC-37.3.
+    ///
+    /// Admits `.paragraph` / `.heading` / `.list` and drops `.image`. The
+    /// switch is exhaustive (compiler-checked) so future `ArticleBlock`
+    /// cases force an explicit decision at this call site. Pure function;
+    /// static for L1 test access via `@testable import`.
+    static func textOnlyBlurbBlocks(from blocks: [ArticleBlock]) -> [ArticleBlock] {
+        var result: [ArticleBlock] = []
+        result.reserveCapacity(blocks.count)
+        for block in blocks {
+            if case .image = block { continue }
+            result.append(block)
+        }
+        return result
     }
 
     /// T-734 / CL-131: returns the blocks the collapsed surface should

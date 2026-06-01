@@ -155,4 +155,93 @@ struct RecipeDetailBlurbStylingTests {
         #expect(level == 2)
         #expect(String(text.characters) == "A heading")
     }
+
+    // MARK: - textOnlyBlurbBlocks(from:) — T-735 / CL-132
+
+    /// Empty input returns empty output — degenerate-but-safe.
+    @Test func textOnlyBlurbBlocksEmptyInputReturnsEmpty() {
+        let output = RecipeDetailView.textOnlyBlurbBlocks(from: [])
+        #expect(output.isEmpty)
+    }
+
+    /// Mixed `[paragraph, image, paragraph]` input returns the two
+    /// paragraphs only — the image is dropped. The order of the
+    /// surviving blocks is preserved (stable filter).
+    @Test func textOnlyBlurbBlocksDropsImageBlocks() throws {
+        let imageURL = try #require(URL(string: "https://example.com/x.png"))
+        let input: [ArticleBlock] = [
+            .paragraph(AttributedString("first para")),
+            .image(url: imageURL, caption: nil),
+            .paragraph(AttributedString("second para")),
+        ]
+
+        let output = RecipeDetailView.textOnlyBlurbBlocks(from: input)
+
+        #expect(output.count == 2)
+        let containsImage = output.contains { block in
+            if case .image = block { return true }
+            return false
+        }
+        #expect(!containsImage)
+    }
+
+    /// Image-only input returns empty — the blurb-rendering path sees
+    /// no text to show, so the More button must not appear.
+    @Test func textOnlyBlurbBlocksImageOnlyInputReturnsEmpty() throws {
+        let imageURL = try #require(URL(string: "https://example.com/x.png"))
+        let input: [ArticleBlock] = [
+            .image(url: imageURL, caption: "alt text"),
+            .image(url: imageURL, caption: nil),
+        ]
+
+        let output = RecipeDetailView.textOnlyBlurbBlocks(from: input)
+
+        #expect(output.isEmpty)
+    }
+
+    /// `.heading` and `.list` blocks pass through — only `.image` is
+    /// dropped. Mirrors the live-API case where intro narrative
+    /// paragraphs may be interleaved with section headings or bullet
+    /// lists before the recipe card (recipe ?p=524 in the 2026-05-31
+    /// audit returns a `.list` block between paragraphs).
+    @Test func textOnlyBlurbBlocksPreservesHeadingsAndLists() {
+        let input: [ArticleBlock] = [
+            .heading(level: 2, text: AttributedString("A heading")),
+            .list(ordered: false, items: [AttributedString("item")]),
+            .paragraph(AttributedString("a para")),
+        ]
+
+        let output = RecipeDetailView.textOnlyBlurbBlocks(from: input)
+
+        #expect(output.count == 3)
+    }
+
+    /// Image-first sequence — the most common live-API shape on
+    /// `dutchovendaddy.com` recipes that embed Pinterest social-preview
+    /// images at the top of the entry-content. After filtering, the
+    /// first surviving block is a `.paragraph` and
+    /// `collapsedBlurbBlocks(from:)` correctly attaches the `"..."` tail
+    /// to it (regression test for the pre-T-735 bug where the collapsed
+    /// surface rendered an opaque image instead of the first paragraph).
+    @Test func textOnlyBlurbBlocksImageFirstSequenceProducesParagraphFirst() throws {
+        let imageURL = try #require(URL(string: "https://example.com/pinterest.png"))
+        let input: [ArticleBlock] = [
+            .image(url: imageURL, caption: "Pinterest preview"),
+            .image(url: imageURL, caption: "another preview"),
+            .paragraph(AttributedString("the real first paragraph")),
+            .paragraph(AttributedString("the second paragraph")),
+        ]
+
+        let filtered = RecipeDetailView.textOnlyBlurbBlocks(from: input)
+        let collapsed = RecipeDetailView.collapsedBlurbBlocks(from: filtered)
+
+        // After filtering, the first surviving block is the first
+        // paragraph — collapsedBlurbBlocks attaches "..." to it.
+        #expect(collapsed.count == 1)
+        guard case .paragraph(let attributed) = collapsed[0] else {
+            Issue.record("expected .paragraph in collapsed[0], got \(collapsed[0])")
+            return
+        }
+        #expect(String(attributed.characters) == "the real first paragraph...")
+    }
 }
