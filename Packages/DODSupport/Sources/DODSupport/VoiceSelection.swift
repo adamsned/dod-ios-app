@@ -127,6 +127,57 @@ public enum VoiceSelector {
         return best?.identifier
     }
 
+    /// The highest synthesis-quality tier installed for a language, regardless
+    /// of gender.
+    ///
+    /// T-722 (the "Download a better voice" nudge). This is the load-bearing
+    /// signal behind that nudge: Apple ships only the compact (`.default`,
+    /// "robotic") tier preinstalled, and the app has no public API to download
+    /// or trigger a download of the natural (`.enhanced` / `.premium`) tiers —
+    /// the user has to fetch them in iOS Settings → Accessibility → Spoken
+    /// Content → Voices. So before pointing the user there, the UI asks "is the
+    /// best thing installed for this language still only the robotic tier?".
+    /// Gender is deliberately ignored — a natural voice of *either* gender means
+    /// the user has already done the download and the nudge would be noise (the
+    /// gender picker, not a download, is the fix from there).
+    ///
+    /// - Parameters:
+    ///   - languageCode: BCP-47 tag or bare language code, matched by family
+    ///     prefix exactly as ``bestVoiceIdentifier(from:languageCode:preference:)``
+    ///     does (`"en"` matches `en-US`). `nil` considers every installed voice.
+    ///   - available: the installed voice catalog (value projection).
+    /// - Returns: the best (highest) ``VoiceQuality`` among the matching
+    ///   voices, or `nil` when no voice matches the language at all.
+    public static func bestAvailableQuality(
+        forLanguage languageCode: String?,
+        from available: [VoiceDescriptor]
+    ) -> VoiceQuality? {
+        available
+            .filter { matchesLanguage($0.languageCode, languageCode) }
+            .map(\.quality)
+            .max()
+    }
+
+    /// Whether a natural-sounding (`.enhanced` or `.premium`) voice is installed
+    /// for the language.
+    ///
+    /// T-722. The direct boolean the Settings nudge + the Cook Mode entry point
+    /// gate on: `false` means the only thing installed for this language is the
+    /// compact (robotic) tier, so the "download a better voice" tip should
+    /// surface. `true` (or a `nil` quality — no voice at all, which degrades to
+    /// the platform default and is out of the nudge's remit) means stay quiet.
+    /// Thin wrapper over ``bestAvailableQuality(forLanguage:from:)`` so the call
+    /// site reads as intent, not as a tier comparison.
+    public static func hasNaturalVoice(
+        forLanguage languageCode: String?,
+        in available: [VoiceDescriptor]
+    ) -> Bool {
+        guard let best = bestAvailableQuality(forLanguage: languageCode, from: available) else {
+            return false
+        }
+        return best > .default
+    }
+
     // MARK: - Private
 
     /// A comparable sort key. Lower sorts first (more preferred).

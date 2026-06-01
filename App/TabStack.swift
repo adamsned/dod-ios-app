@@ -75,7 +75,11 @@ struct TabStack: View {
                 // authorization through the composition root's service.
                 onRequestNotificationAuthorization: {
                     await dependencies.notificationService.requestAuthorization()
-                }
+                },
+                // US-40 / AC-40.12 + AC-40.13 — the live AVFoundation-backed
+                // voice catalog + preview seam for the Settings Cook Mode Voice
+                // section (quality readout + Preview + download nudge).
+                voicePreviewer: SystemVoicePreviewer()
             )
         case .categories:
             CategoryListView(

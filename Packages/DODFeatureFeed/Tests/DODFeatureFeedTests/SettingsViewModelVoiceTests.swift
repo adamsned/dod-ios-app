@@ -73,4 +73,200 @@ import Testing
             #expect(SettingsViewModel(defaults: defaults).voiceGender == gender)
         }
     }
+
+    // MARK: - Quality readout (AC-40.12)
+
+    /// Convenience: a view-model wired to a recording previewer over an
+    /// en-US locale and an isolated defaults suite.
+    private func makeViewModel(
+        catalog: [VoiceDescriptor],
+        defaults: UserDefaults? = nil
+    ) -> (SettingsViewModel, RecordingVoicePreviewer) {
+        let previewer = RecordingVoicePreviewer(catalog: catalog)
+        let viewModel = SettingsViewModel(
+            defaults: defaults ?? Self.isolatedDefaults(),
+            voicePreviewer: previewer,
+            voiceLocale: Locale(identifier: "en-US")
+        )
+        return (viewModel, previewer)
+    }
+
+    private func voice(
+        _ id: String,
+        _ gender: VoiceGender,
+        _ quality: VoiceQuality,
+        lang: String = "en-US"
+    ) -> VoiceDescriptor {
+        VoiceDescriptor(identifier: id, languageCode: lang, gender: gender, quality: quality)
+    }
+
+    @Test func qualityReadoutReflectsResolvedTierForPreferredGender() {
+        // Default pref is female. With an enhanced female + compact male
+        // installed, the resolved tier for the (default) female pick is
+        // Enhanced — the user is NOT on a robotic voice.
+        let (viewModel, _) = makeViewModel(catalog: [
+            voice("female.enhanced", .female, .enhanced),
+            voice("male.compact", .male, .default),
+        ])
+        #expect(viewModel.resolvedVoiceQuality == .enhanced)
+    }
+
+    @Test func qualityReadoutTracksGenderPick() {
+        // Enhanced female + only-compact male installed. Flipping the picker to
+        // Male drops the resolved tier to Default — exactly what they'd hear,
+        // and the cue to download the natural male voice.
+        let (viewModel, _) = makeViewModel(catalog: [
+            voice("female.enhanced", .female, .enhanced),
+            voice("male.compact", .male, .default),
+        ])
+        #expect(viewModel.resolvedVoiceQuality == .enhanced)
+
+        viewModel.voiceGender = .male
+        #expect(viewModel.resolvedVoiceQuality == .default)
+    }
+
+    @Test func qualityReadoutIsNilWithNoPreviewer() {
+        // No previewer wired (preview / snapshot host) → no catalog → nil, so
+        // the view renders an honest "Unknown" rather than a guessed tier.
+        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
+        #expect(viewModel.resolvedVoiceQuality == nil)
+    }
+
+    @Test func qualityReadoutIsNilWithEmptyCatalog() {
+        let (viewModel, _) = makeViewModel(catalog: [])
+        #expect(viewModel.resolvedVoiceQuality == nil)
+    }
+
+    // MARK: - Download nudge visibility (AC-40.13)
+
+    @Test func nudgeShowsWhenOnlyCompactInstalled() {
+        // The stock-device case: only the compact voice for en-US is installed,
+        // tip not dismissed → the nudge surfaces.
+        let (viewModel, _) = makeViewModel(catalog: [
+            voice("female.compact", .female, .default)
+        ])
+        #expect(viewModel.shouldShowDownloadVoiceTip)
+    }
+
+    @Test func nudgeHiddenWhenEnhancedInstalled() {
+        // Any natural voice (either gender) installed → the download is done,
+        // so the nudge stays hidden even though the gender picker still applies.
+        let (viewModel, _) = makeViewModel(catalog: [
+            voice("female.compact", .female, .default),
+            voice("male.enhanced", .male, .enhanced),
+        ])
+        #expect(!viewModel.shouldShowDownloadVoiceTip)
+    }
+
+    @Test func nudgeHiddenAfterDismissAndPersists() {
+        let defaults = Self.isolatedDefaults()
+        let (viewModel, _) = makeViewModel(
+            catalog: [voice("female.compact", .female, .default)],
+            defaults: defaults
+        )
+        #expect(viewModel.shouldShowDownloadVoiceTip)
+
+        viewModel.dismissDownloadVoiceTip()
+        #expect(!viewModel.shouldShowDownloadVoiceTip)
+        #expect(viewModel.downloadVoiceTipDismissed)
+
+        // CL-123: dismissal persists — a fresh view-model over the same suite
+        // (next app launch) still suppresses the nudge even with a compact-only
+        // catalog.
+        let previewer = RecordingVoicePreviewer(catalog: [voice("female.compact", .female, .default)])
+        let relaunched = SettingsViewModel(
+            defaults: defaults,
+            voicePreviewer: previewer,
+            voiceLocale: Locale(identifier: "en-US")
+        )
+        #expect(!relaunched.shouldShowDownloadVoiceTip)
+    }
+
+    @Test func nudgeHiddenWithNoPreviewerOrEmptyCatalog() {
+        // No catalog signal → never surface a false "you're on a robotic
+        // voice" nudge.
+        let noPreviewer = SettingsViewModel(defaults: Self.isolatedDefaults())
+        #expect(!noPreviewer.shouldShowDownloadVoiceTip)
+
+        let (emptyCatalog, _) = makeViewModel(catalog: [])
+        #expect(!emptyCatalog.shouldShowDownloadVoiceTip)
+    }
+
+    // MARK: - Preview trigger (AC-40.12)
+
+    @Test func previewVoiceSpeaksSampleLineWithCurrentPick() {
+        let (viewModel, previewer) = makeViewModel(catalog: [
+            voice("female.enhanced", .female, .enhanced)
+        ])
+        viewModel.voiceGender = .female
+
+        viewModel.previewVoice()
+
+        #expect(previewer.spokenSamples.count == 1)
+        let sample = previewer.spokenSamples.first
+        #expect(sample?.text == SettingsViewModel.voicePreviewSampleLine)
+        #expect(sample?.languageCode == "en")
+        #expect(sample?.preference == VoicePreference(gender: .female))
+    }
+
+    @Test func previewVoicePassesUpdatedGenderAfterFlip() {
+        let (viewModel, previewer) = makeViewModel(catalog: [
+            voice("male.enhanced", .male, .enhanced)
+        ])
+        viewModel.voiceGender = .male
+
+        viewModel.previewVoice()
+
+        #expect(previewer.spokenSamples.last?.preference == VoicePreference(gender: .male))
+    }
+
+    @Test func previewVoiceIsNoOpWithoutPreviewer() {
+        // No previewer wired → inert, never crashes (design-surface safety).
+        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
+        viewModel.previewVoice()  // must not trap
+        #expect(viewModel.resolvedVoiceQuality == nil)
+    }
+
+    @Test func stopVoicePreviewForwardsToPreviewer() {
+        let (viewModel, previewer) = makeViewModel(catalog: [
+            voice("female.enhanced", .female, .enhanced)
+        ])
+        viewModel.previewVoice()
+        viewModel.stopVoicePreview()
+        #expect(previewer.stopCount == 1)
+    }
+}
+
+// MARK: - Recording VoicePreviewing double
+
+/// In-memory ``VoicePreviewing`` that records what it was asked to speak +
+/// vends a fixed catalog, so the SettingsViewModel voice logic is asserted
+/// with zero AVFoundation / real-audio dependency (mirrors the
+/// `MockSpeechSynthesizer` pattern in `VoiceReaderTests`).
+@MainActor
+final class RecordingVoicePreviewer: VoicePreviewing {
+
+    struct Sample: Equatable {
+        let text: String
+        let languageCode: String?
+        let preference: VoicePreference
+    }
+
+    private let catalog: [VoiceDescriptor]
+    private(set) var spokenSamples: [Sample] = []
+    private(set) var stopCount = 0
+
+    init(catalog: [VoiceDescriptor]) {
+        self.catalog = catalog
+    }
+
+    func installedVoices() -> [VoiceDescriptor] { catalog }
+
+    func speakPreview(_ text: String, languageCode: String?, preference: VoicePreference) {
+        spokenSamples.append(Sample(text: text, languageCode: languageCode, preference: preference))
+    }
+
+    func stopPreview() {
+        stopCount += 1
+    }
 }

@@ -188,4 +188,74 @@ import Testing
         #expect(forward == "aaa")
         #expect(reversed == "aaa")
     }
+
+    // MARK: - bestAvailableQuality / hasNaturalVoice (T-722 — the nudge signal)
+
+    @Test func bestAvailableQualityReturnsHighestTierIgnoringGender() {
+        // A male premium + a female compact installed for en-US: the best
+        // *available* tier is premium even though it's the opposite gender —
+        // the nudge cares about "is anything natural installed", not gender.
+        let catalog = [
+            voice("female.compact", "en-US", .female, .default),
+            voice("male.premium", "en-US", .male, .premium),
+        ]
+        #expect(
+            VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == .premium
+        )
+    }
+
+    @Test func bestAvailableQualityIsDefaultWhenOnlyCompactInstalled() {
+        // The stock-device case: only the compact voice is installed. This is
+        // exactly the state that should fire the "download a better voice" tip.
+        let catalog = [voice("compact", "en-US", .female, .default)]
+        #expect(
+            VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == .default
+        )
+    }
+
+    @Test func bestAvailableQualityIsNilWhenNoLanguageMatch() {
+        // No en voice at all → nil (the synthesizer falls back to the platform
+        // default; the nudge stays out of it).
+        let catalog = [voice("fr.enhanced", "fr-FR", .female, .enhanced)]
+        #expect(
+            VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == nil
+        )
+    }
+
+    @Test func bestAvailableQualityMatchesByLanguageFamilyPrefix() {
+        // A bare "en" request sees the installed en-US voice's tier.
+        let catalog = [voice("enUS.enhanced", "en-US", .female, .enhanced)]
+        #expect(
+            VoiceSelector.bestAvailableQuality(forLanguage: "en", from: catalog) == .enhanced
+        )
+    }
+
+    @Test func hasNaturalVoiceIsFalseWhenOnlyCompactInstalled() {
+        let catalog = [voice("compact", "en-US", .female, .default)]
+        #expect(!VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
+    }
+
+    @Test func hasNaturalVoiceIsTrueWhenEnhancedInstalled() {
+        let catalog = [
+            voice("compact", "en-US", .female, .default),
+            voice("enhanced", "en-US", .female, .enhanced),
+        ]
+        #expect(VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
+    }
+
+    @Test func hasNaturalVoiceIsTrueWhenPremiumInstalled() {
+        let catalog = [voice("premium", "en-US", .male, .premium)]
+        #expect(VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
+    }
+
+    @Test func hasNaturalVoiceIsFalseWhenNoLanguageMatch() {
+        // No voice for the language at all → not a "missing natural voice"
+        // situation (degrades to platform default); the nudge must stay quiet.
+        let catalog = [voice("fr.premium", "fr-FR", .female, .premium)]
+        #expect(!VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
+    }
+
+    @Test func hasNaturalVoiceIsFalseOnEmptyCatalog() {
+        #expect(!VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: []))
+    }
 }

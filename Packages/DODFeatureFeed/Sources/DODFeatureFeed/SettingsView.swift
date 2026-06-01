@@ -159,26 +159,11 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
-            // MARK: US-40 / AC-40.10 — Cook Mode voice picker (T-721)
-
-            Section {
-                Picker(selection: voiceGenderBinding) {
-                    ForEach(VoiceGender.allCases, id: \.self) { value in
-                        Text(value.displayName)
-                            .tag(value)
-                    }
-                } label: {
-                    Text("Cook Mode voice")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.label)
-                }
-                .accessibilityIdentifier("settings-picker-voice-gender")
-            } footer: {
-                Text("Used when reading recipe steps aloud in Cook Mode.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            .listRowBackground(DODColor.surfaceElevated)
+            // MARK: US-40 / AC-40.10 + AC-40.12 + AC-40.13 — Cook Mode voice
+            // section (gender picker + quality readout + Preview + download
+            // nudge). The section view lives in `SettingsView+Voice.swift` so
+            // this file stays under the file_length cap (T-721 / T-722).
+            VoiceSection(viewModel: viewModel)
 
             Section {
                 Button {
@@ -314,13 +299,6 @@ public struct SettingsView: View {
         )
     }
 
-    private var voiceGenderBinding: Binding<VoiceGender> {
-        Binding(
-            get: { viewModel.voiceGender },
-            set: { viewModel.voiceGender = $0 }
-        )
-    }
-
     private var telemetryEnabledBinding: Binding<Bool> {
         Binding(
             get: { viewModel.telemetryEnabled },
@@ -339,21 +317,6 @@ public struct SettingsView: View {
             return
         }
         await viewModel.clearImageCache(onClear: onClearImageCache)
-    }
-}
-
-// MARK: - VoiceGender display labels (T-721)
-
-extension VoiceGender {
-    /// User-facing label for the Cook Mode voice picker. Kept in the feature
-    /// layer (not `DODSupport`) so the domain model stays free of UI copy —
-    /// mirrors how ``AppearancePreference/displayName`` lives beside its view.
-    var displayName: String {
-        switch self {
-        case .female: return "Female"
-        case .male: return "Male"
-        case .unspecified: return "No preference"
-        }
     }
 }
 

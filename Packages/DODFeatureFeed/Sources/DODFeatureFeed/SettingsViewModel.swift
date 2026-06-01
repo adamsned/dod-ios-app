@@ -77,12 +77,44 @@ public final class SettingsViewModel {
     /// short-circuits when this flag is false.
     public nonisolated static let telemetryEnabledKey = "dod.settings.telemetryEnabled"
 
-    private let defaults: UserDefaults
+    /// US-40 / AC-40.13 (T-722) — "I dismissed the download-a-better-voice
+    /// tip" flag. Bool, defaults false (absent key → tip eligible). Once the
+    /// user taps the tip's dismiss control this flips true and the nudge
+    /// never re-shows, even if they keep only the compact voice installed —
+    /// a nudge they've consciously waved off must not nag (CL-123). `V1`
+    /// suffix mirrors the other canonical keys so a future schema change can
+    /// migrate without colliding.
+    public nonisolated static let downloadVoiceTipDismissedKey = "dod.settings.downloadVoiceTipDismissedV1"
+
+    /// `internal` (not `private`) so the voice-section accessors in
+    /// `SettingsViewModel+Voice.swift` can read the dismissal flag via the same
+    /// store the rest of the view-model uses (the file_length split forces
+    /// internal-but-not-private accessors, exactly as the iCloud Sync split did).
+    let defaults: UserDefaults
 
     /// US-40 / AC-40.10..AC-40.11 (T-721). Backs the Cook Mode voice-gender
     /// picker. Built against the same injected ``defaults`` so the L1 suite
     /// drives it through an isolated `UserDefaults(suiteName:)`.
     private let voicePreferenceStore: VoicePreferenceStore
+
+    /// US-40 / AC-40.12..AC-40.13 (T-721 quality readout + Preview, T-722
+    /// nudge). Catalog + preview seam for the Settings voice section. Optional
+    /// so previews / snapshot hosts / the pre-T-721 fixtures construct a
+    /// view-model without an AVFoundation dependency — when `nil` the quality
+    /// readout reads "unknown" and the nudge stays hidden (a missing catalog
+    /// must never surface a false "you're on a robotic voice" claim). The
+    /// composition root passes a ``SystemVoicePreviewer``; the L1 suite passes
+    /// a recording double. `internal` (not `private`) so the voice-section
+    /// accessors in `SettingsViewModel+Voice.swift` reach it across the
+    /// file_length split.
+    let voicePreviewer: (any VoicePreviewing)?
+
+    /// The language whose installed voices drive the quality readout + nudge +
+    /// preview — the device's current language per AC-40.2 / CL-79, so the
+    /// Settings surface reasons about the exact voices a Cook Mode session on
+    /// this device would resolve. Captured at init. `internal` for the same
+    /// cross-file-extension reason as ``voicePreviewer``.
+    let voiceLanguageCode: String?
     /// Optional seam for the iCloud Sync row's flag-write +
     /// container-rebuild dispatch (US-41 / AC-41.3). Constructor-injected
     /// so the L1 suite can pass a recording double; production wiring
@@ -226,10 +258,14 @@ public final class SettingsViewModel {
     public init(
         defaults: UserDefaults = .standard,
         dependencies: (any SettingsDependencies)? = nil,
+        voicePreviewer: (any VoicePreviewing)? = nil,
+        voiceLocale: Locale = .current,
         requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false }
     ) {
         self.defaults = defaults
         self.voicePreferenceStore = VoicePreferenceStore(defaults: defaults)
+        self.voicePreviewer = voicePreviewer
+        self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies
         self.requestNotificationAuthorization = requestNotificationAuthorization
         // US-41 AC-41.3 — seed the toggle state from the canonical
