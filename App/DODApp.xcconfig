@@ -11,4 +11,12 @@
 // Create the override after a fresh clone with your Team ID (the OU field of
 // your signing cert — `security find-certificate … | openssl x509 -noout -subject`):
 //   echo 'DEVELOPMENT_TEAM = XXXXXXXXXX' > App/DODApp.local.xcconfig
+//
+// DUT-23: app-identity key for anonymous comment POSTs, surfaced to the app as
+// the DODCommentAPIKey Info.plist value and sent as the X-DOD-App-Key header.
+// BLANK here on purpose so NO secret lives in this public repo; CI injects the
+// real value at archive time from the DOD_COMMENT_API_KEY GitHub secret (see
+// .github/workflows/release.yml). To exercise comment posting from a LOCAL
+// build, set a real value in the gitignored DODApp.local.xcconfig override.
+DOD_COMMENT_API_KEY =
 #include? "DODApp.local.xcconfig"

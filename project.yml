@@ -73,6 +73,15 @@ targets:
         # on every app extension; we set it on the host app too for
         # consistency with what users see on the Home Screen.
         CFBundleDisplayName: Dutch Oven Daddy
+        # DUT-23: app-identity key for anonymous comment POSTs. The app sends it
+        # as the `X-DOD-App-Key` header so WordPress's
+        # `rest_allow_anonymous_comments` filter accepts comment creation from
+        # the DOD app only. The value is the `DOD_COMMENT_API_KEY` build setting
+        # — blank in the committed App/DODApp.xcconfig (no secret in this public
+        # repo), injected at archive time from the GitHub `DOD_COMMENT_API_KEY`
+        # secret (see .github/workflows/release.yml). Blank in dev / PR builds,
+        # where the app omits the header.
+        DODCommentAPIKey: "$(DOD_COMMENT_API_KEY)"
         # Export-compliance self-classification. `false` declares the app
         # uses ONLY exempt encryption — i.e. TLS via URLSession, SHA-256
         # hashing via CryptoKit, Keychain via Security framework. Apple
