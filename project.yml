@@ -89,7 +89,7 @@ targets:
         # re-used. Bump on every upload attempt. xcodegen does NOT read
         # this from `CURRENT_PROJECT_VERSION`; it hardcodes "1" as the
         # default unless explicitly set here.
-        CFBundleVersion: "4"
+        CFBundleVersion: "5"
         LSRequiresIPhoneOS: true
         # UILaunchScreen is required for iOS to render edge-to-edge on
         # modern devices (notch, Dynamic Island, home indicator). Without
@@ -194,7 +194,7 @@ targets:
         # MUST match the host app's CFBundleVersion (Apple's bundle-
         # extension contract — version skew between host + extension
         # rejected at upload).
-        CFBundleVersion: "4"
+        CFBundleVersion: "5"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -224,7 +224,7 @@ targets:
         CFBundleDisplayName: DOD Live Activity
         # MUST match the host app's CFBundleVersion (Apple's bundle-
         # extension contract).
-        CFBundleVersion: "4"
+        CFBundleVersion: "5"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
