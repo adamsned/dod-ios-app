@@ -103,6 +103,32 @@ final class SettingsViewSnapshotTests: XCTestCase {
         )
     }
 
+    // MARK: - T-738 / US-32 AC-32.6 — About Ned destination baselines
+
+    @MainActor
+    func test_aboutNedView_light_defaultDynamicType() async {
+        // The graduated About destination (T-738 / CL-134, DUT-14) —
+        // verbatim DUT-14 copy + bundled `AboutNed` photo in a
+        // magazine-sidebar layout. Locks the 120pt leading image clip
+        // + the right-side paragraph wrap.
+        let view = NavigationStack { AboutNedView() }
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
+    @MainActor
+    func test_aboutNedView_dark_defaultDynamicType() async {
+        let view = NavigationStack { AboutNedView() }
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.darkTraits()),
+            record: .missing
+        )
+    }
+
     // MARK: - Fixtures
 
     /// Drives `SettingsView` with an isolated UserDefaults suite so the
