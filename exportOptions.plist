@@ -17,7 +17,7 @@
     Connect API key (see the workflow): managed signing needs to talk to
     App Store Connect to mint the profiles.
   - teamID is intentionally NOT hard-coded here (public repo / constitution
-    rule: never commit the Apple Team ID H5J285H236). The workflow injects
+    rule: never commit the Apple Team ID to a tracked file). The workflow injects
     it at run time from the APPLE_TEAM_ID GitHub secret by writing a
     <key>teamID</key> entry into a copy of this plist with PlistBuddy before
     calling -exportArchive. If you ever run -exportArchive by hand, pass the
