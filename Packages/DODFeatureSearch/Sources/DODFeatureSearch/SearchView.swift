@@ -257,6 +257,9 @@ public struct SearchView: View {
                 // + `bookmark.fill` copy at this surface; the high-value
                 // Saved-tab fix is the priority for T-634.
                 .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                // T-737 / L5: stable handle mirroring `dod.feed.card` so
+                // XCUITest avoids toolbar / chip / "Try" button sweep.
+                .accessibilityIdentifier("dod.search.card")
             }
         }
     }
@@ -274,9 +277,8 @@ public struct SearchView: View {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO as
-                // above (CL-60 path-(c) viewmodel-owned saved-IDs set).
                 .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                .accessibilityIdentifier("dod.search.card")
             }
         }
     }
