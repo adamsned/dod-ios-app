@@ -38,6 +38,15 @@ public struct WPCommentsClient: Sendable {
     /// Uses `_embed=author` so avatar URLs come back in a single round trip
     /// and we don't have to chase per-author `/users/{id}` calls.
     ///
+    /// On a non-2xx the failure is never swallowed: the status is surfaced
+    /// as ``WPClientError/httpStatusWithBody(_:message:)`` carrying
+    /// WordPress's own error text (a `rest_*` JSON message or a tag-stripped
+    /// Wordfence challenge snippet) when the body has one, else the
+    /// status-only ``WPClientError/httpStatus(_:)``. Mirrors ``postComment``
+    /// so the comments read + write paths diagnose identically (DUT-23 /
+    /// DUT-7 — the "Couldn't load comments" report carried no server detail
+    /// because this read path previously threw a bare status).
+    ///
     /// - Parameters:
     ///   - postID: WP post ID for the recipe.
     ///   - page: 1-based page index.
@@ -60,8 +69,32 @@ public struct WPCommentsClient: Sendable {
         request.httpMethod = "GET"
         request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
 
+        // DUT-23 / DUT-7 parity: log the GET target so the owner can confirm
+        // on-device (Console.app, subsystem com.dutchovendaddy.DODApp) which
+        // URL the comments LOAD hit. The TestFlight "Couldn't load comments"
+        // report (DUT-23) gave us no server detail because this read path —
+        // unlike the DUT-7-hardened POST path — emitted no breadcrumb at the
+        // client seam. Privacy-safe: URL + post ID only.
+        DODLog.network.notice(
+            "comment GET → \(url.absoluteString, privacy: .public) (post=\(postID, privacy: .public) page=\(page, privacy: .public))"
+        )
+
         let (data, response) = try await httpClient.data(for: request)
         guard (200..<300).contains(response.statusCode) else {
+            // DUT-23: the "Couldn't load comments" failure is the read-path
+            // twin of DUT-7's swallowed-POST. Surface the status AND
+            // WordPress's own error body (Wordfence HTML challenge, a
+            // `rest_*` JSON error, etc.) so the on-device log pins *why* the
+            // load failed instead of collapsing to a bare code. Mirrors the
+            // POST path's `extractWPErrorMessage` → `httpStatusWithBody`
+            // fallback exactly so both comment paths read identically.
+            let serverMessage = Self.extractWPErrorMessage(from: data)
+            DODLog.network.error(
+                "comment GET failed status=\(response.statusCode, privacy: .public) post=\(postID, privacy: .public) message=\(serverMessage ?? "<none>", privacy: .public)"
+            )
+            if let serverMessage {
+                throw WPClientError.httpStatusWithBody(response.statusCode, message: serverMessage)
+            }
             throw WPClientError.httpStatus(response.statusCode)
         }
         let dtos: [WPDTO.Comment]

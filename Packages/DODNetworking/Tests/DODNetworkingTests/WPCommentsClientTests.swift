@@ -135,6 +135,60 @@ import Testing
         let page = try await client.comments(forPostID: 21238)
         #expect(page.comments.first?.status == .unknown)
     }
+
+    // MARK: - DUT-23: non-2xx surfaces the server reason (read-path parity
+    // with the DUT-7-hardened POST path). The TestFlight "Couldn't load
+    // comments" report carried no server detail because this GET path used
+    // to throw a bare `httpStatus`; these pin the body-surfacing behavior.
+
+    /// A WordPress `rest_*` JSON error on the comments GET surfaces the
+    /// status AND the human-readable message via `httpStatusWithBody`.
+    @Test func getWPJSONErrorIsSurfacedWithStatusAndMessage() async throws {
+        let errorBody = #"""
+            {"code":"rest_forbidden","message":"Sorry, you are not allowed to do that.","data":{"status":401}}
+            """#
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "comments", json: Data(errorBody.utf8), statusCode: 401)
+        let client = WPCommentsClient(httpClient: fake)
+
+        await #expect(
+            throws: WPClientError.httpStatusWithBody(401, message: "Sorry, you are not allowed to do that.")
+        ) {
+            _ = try await client.comments(forPostID: 21238)
+        }
+    }
+
+    /// A Wordfence-style HTML challenge (403, no JSON) on the GET still
+    /// surfaces a tag-stripped snippet rather than collapsing to a bare code
+    /// — this is the most likely real-world cause of "Couldn't load comments."
+    @Test func getHTMLSecurityChallengeBodyIsStrippedAndSurfaced() async throws {
+        let html = "<html><body><h1>Access Denied</h1><p>This request was blocked by the security plugin.</p></body></html>"
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "comments", html: html, statusCode: 403)
+        let client = WPCommentsClient(httpClient: fake)
+
+        do {
+            _ = try await client.comments(forPostID: 21238)
+            Issue.record("Expected a 403 to throw")
+        } catch let WPClientError.httpStatusWithBody(code, message) {
+            #expect(code == 403)
+            #expect(!message.contains("<"), "HTML tags must be stripped")
+            #expect(message.contains("Access Denied"))
+        }
+    }
+
+    /// A bodyless (or message-less) non-2xx falls back to the status-only
+    /// case — still non-silent, just no server text to attach.
+    @Test(arguments: [401, 403, 500])
+    func getBodylessNon2xxFallsBackToStatusOnly(_ status: Int) async throws {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "comments", json: Data("".utf8), statusCode: status)
+        let client = WPCommentsClient(httpClient: fake)
+
+        await #expect(throws: WPClientError.httpStatus(status)) {
+            _ = try await client.comments(forPostID: 21238)
+        }
+    }
 }
 
 @Suite("WPCommentsClient.postComment") struct WPCommentsClientPostTests {
