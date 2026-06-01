@@ -42,6 +42,15 @@ public struct FeedView: View {
     /// but reports "not granted" (previews / tests). Production (TabStack)
     /// passes a closure that calls `NotificationService.requestAuthorization()`.
     public let onRequestNotificationAuthorization: (@MainActor () async -> Bool)?
+    /// US-40 / AC-40.12 + AC-40.13 (T-721 / T-722) — the voice catalog + preview
+    /// seam forwarded into `SettingsView`'s `SettingsViewModel` so the Cook Mode
+    /// Voice section can show the resolved quality tier, preview the voice, and
+    /// decide whether the "download a better voice" nudge applies. Optional;
+    /// `nil` means the quality readout reads "Unknown" and the nudge stays
+    /// hidden (previews / tests). Production (TabStack) passes a
+    /// `SystemVoicePreviewer` (the only AVFoundation-touching path in this
+    /// package).
+    public let voicePreviewer: (any VoicePreviewing)?
 
     public init(
         viewModel: FeedViewModel,
@@ -49,7 +58,8 @@ public struct FeedView: View {
         onSave: ((RecipeListItem) -> Void)? = nil,
         onClearImageCache: (() async throws -> Int)? = nil,
         settingsDependencies: (any SettingsDependencies)? = nil,
-        onRequestNotificationAuthorization: (@MainActor () async -> Bool)? = nil
+        onRequestNotificationAuthorization: (@MainActor () async -> Bool)? = nil,
+        voicePreviewer: (any VoicePreviewing)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
@@ -57,6 +67,7 @@ public struct FeedView: View {
         self.onClearImageCache = onClearImageCache
         self.settingsDependencies = settingsDependencies
         self.onRequestNotificationAuthorization = onRequestNotificationAuthorization
+        self.voicePreviewer = voicePreviewer
     }
 
     public var body: some View {
@@ -115,6 +126,7 @@ public struct FeedView: View {
             SettingsView(
                 viewModel: SettingsViewModel(
                     dependencies: settingsDependencies,
+                    voicePreviewer: voicePreviewer,
                     requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
                 ),
                 onClearImageCache: onClearImageCache

@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import DODPersistence
+import DODSupport
 import SnapshotTesting
 import SwiftUI
 import UIKit
@@ -22,8 +23,14 @@ import XCTest
 /// on (Status row visible reading "Idle"), and the off → on
 /// confirmation alert visible state.
 ///
+/// T-721 / T-722 (US-40 / AC-40.12 + AC-40.13) add two voice-section
+/// baselines: a compact-only catalog (quality readout "Default" + the
+/// "download a better voice" nudge visible) and an enhanced-installed
+/// catalog (readout "Enhanced", no nudge).
+///
 /// Spec trace: US-32 AC-32.1..AC-32.4, US-36 AC-36.1..AC-36.8,
-/// US-41 AC-41.3 + AC-41.4, CC-1 (light + dark accessibility).
+/// US-40 AC-40.12 + AC-40.13, US-41 AC-41.3 + AC-41.4, CC-1 (light +
+/// dark accessibility).
 final class SettingsViewSnapshotTests: XCTestCase {
 
     override func setUp() {
@@ -103,6 +110,33 @@ final class SettingsViewSnapshotTests: XCTestCase {
         )
     }
 
+    // MARK: - T-721 / T-722 (US-40 AC-40.12 + AC-40.13) — voice section baselines
+
+    @MainActor
+    func test_settings_voiceSection_compactOnly_showsNudge_light() async {
+        // Only the compact (robotic) voice installed for en-US → the quality
+        // readout reads "Default" and the "download a better voice" nudge is
+        // visible. Locks the nudge copy + the Open Settings affordance layout.
+        let view = Self.makeHostedView(voiceCatalog: Self.compactOnlyCatalog())
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
+    @MainActor
+    func test_settings_voiceSection_enhancedInstalled_noNudge_light() async {
+        // An enhanced female voice installed → the readout reads "Enhanced"
+        // and the nudge is suppressed. Locks the no-nudge voice-section layout.
+        let view = Self.makeHostedView(voiceCatalog: Self.enhancedCatalog())
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
     // MARK: - T-738 / US-32 AC-32.6 — About Ned destination baselines
 
     @MainActor
@@ -139,23 +173,43 @@ final class SettingsViewSnapshotTests: XCTestCase {
     /// flag before view-model construction so the view-model's cached
     /// `isCloudSyncEnabled` mirrors the requested state. `pendingFlip`
     /// fires an off → on toggle request so the confirmation alert
-    /// renders in the snapshot.
+    /// renders in the snapshot. `voiceCatalog`, when non-nil, wires a
+    /// recording previewer over an en-US locale so the voice section's quality
+    /// readout + download nudge render against a known catalog (T-721 / T-722).
     @MainActor
     static func makeHostedView(
         cloudSyncEnabled: Bool = false,
-        pendingFlip: Bool = false
+        pendingFlip: Bool = false,
+        voiceCatalog: [VoiceDescriptor]? = nil
     ) -> some View {
         let suite = "SettingsViewSnapshotTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite) ?? .standard
         defaults.removePersistentDomain(forName: suite)
         defaults.set(cloudSyncEnabled, forKey: RecipeStore.cloudKitSyncOptInKey)
-        let viewModel = SettingsViewModel(defaults: defaults)
+        let viewModel = SettingsViewModel(
+            defaults: defaults,
+            voicePreviewer: voiceCatalog.map { RecordingVoicePreviewer(catalog: $0) },
+            voiceLocale: Locale(identifier: "en-US")
+        )
         if pendingFlip {
             // Drive an off → on flip so the confirmation alert is in
             // its pending state when SwiftUI snapshots the view.
             viewModel.requestCloudSyncOptIn(!cloudSyncEnabled)
         }
         return SettingsViewSnapshotHost(viewModel: viewModel)
+    }
+
+    /// Stock-device catalog: only the compact en-US voice (fires the nudge).
+    static func compactOnlyCatalog() -> [VoiceDescriptor] {
+        [VoiceDescriptor(identifier: "compact.female", languageCode: "en-US", gender: .female, quality: .default)]
+    }
+
+    /// Catalog with an enhanced female voice installed (suppresses the nudge).
+    static func enhancedCatalog() -> [VoiceDescriptor] {
+        [
+            VoiceDescriptor(identifier: "compact.female", languageCode: "en-US", gender: .female, quality: .default),
+            VoiceDescriptor(identifier: "enhanced.female", languageCode: "en-US", gender: .female, quality: .enhanced),
+        ]
     }
 
     // MARK: - Trait helpers
