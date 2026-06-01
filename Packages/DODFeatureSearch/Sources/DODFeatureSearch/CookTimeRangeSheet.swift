@@ -119,9 +119,18 @@ struct CookTimeRangeSheet: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             picker(selection: selection)
                 .accessibilityLabel(accessibilityLabel)
-                .modifier(OptionalIdentifierModifier(identifier: accessibilityIdentifier))
         }
         .frame(maxWidth: .infinity)
+        // T-737 / L5: `.accessibilityIdentifier` on a SwiftUI `Picker(.wheel)`
+        // doesn't propagate down to the internal `UIPickerView`-backed
+        // `XCUIElementTypePickerWheel`, so XCUITest's
+        // `app.pickerWheels.matching(identifier:)` query never resolves the
+        // wheel. We host the identifier on the column container and treat
+        // it as an accessibility container (`.contain`) so the wheel
+        // descendant remains queryable — the test drills into the column
+        // and grabs `pickerWheels.firstMatch`.
+        .accessibilityElement(children: .contain)
+        .modifier(OptionalIdentifierModifier(identifier: accessibilityIdentifier))
     }
 
     private func picker(selection: Binding<Int>) -> some View {
