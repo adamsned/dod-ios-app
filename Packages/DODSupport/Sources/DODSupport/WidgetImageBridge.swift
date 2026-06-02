@@ -103,6 +103,15 @@ public enum WidgetImageBridge {
                 withIntermediateDirectories: true
             )
         }
+        // DUT-8: relax the directory's data-protection class to
+        // `.completeUntilFirstUserAuthentication` so files an `.atomic`
+        // write swaps into place inherit a widget-readable class even
+        // before `writeImage`'s explicit per-file `setAttributes` runs.
+        // This is the directory-level half of the locked-device read fix;
+        // see `writeImage(bytes:for:appGroupIdentifier:)` for the full
+        // rationale. Best-effort — failures leave the widget on its
+        // gradient-placeholder fallback rather than breaking the write.
+        applyWidgetReadableProtection(to: directoryURL)
         return directoryURL
     }
 
@@ -112,6 +121,29 @@ public enum WidgetImageBridge {
     /// if the write fails the host's SwiftData cache is still authoritative
     /// and the widget gracefully falls back to its gradient placeholder
     /// when the file is absent.
+    ///
+    /// **Data-protection class (DUT-8 root cause).** The file is written
+    /// with `.completeUntilFirstUserAuthentication` rather than the iOS
+    /// default (`.complete`). This is the fix for the "widget still shows
+    /// the fork-and-knife placeholder even though the `.img` files exist on
+    /// disk" regression. A widget extension renders + refreshes its timeline
+    /// in the background, including **while the device is locked** (Lock
+    /// Screen, StandBy, background timeline builds, and the first render
+    /// after a reboot before the user has unlocked). Files written with the
+    /// default `.complete` protection are encrypted-at-rest and become
+    /// **unreadable whenever the device is locked** — so
+    /// `UIImage(contentsOfFile:)` inside `WidgetCard.Hero` returns nil and
+    /// the hero collapses to the gradient placeholder. `.complete` is
+    /// invisible to the L4 snapshot host (no data-protection lock there) and
+    /// to a filesystem-level "are the files present?" check (they are), which
+    /// is exactly why the two prior fixes verified green yet failed on a real
+    /// home screen. `.completeUntilFirstUserAuthentication` keeps the bytes
+    /// encrypted at rest but readable any time after the first unlock
+    /// following boot — the protection class Apple documents for files an
+    /// App-Group-sharing widget must read. We set it explicitly via both the
+    /// write option AND a follow-up `setAttributes` so the class sticks even
+    /// when `.atomic` swaps in a fresh inode whose protection would otherwise
+    /// be re-derived from the directory default.
     @discardableResult
     public static func writeImage(
         bytes: Data,
@@ -126,7 +158,16 @@ public enum WidgetImageBridge {
             isDirectory: false
         )
         do {
-            try bytes.write(to: fileURL, options: .atomic)
+            try bytes.write(to: fileURL, options: [.atomic, widgetReadableProtectionOption])
+            // Belt-and-suspenders: `.atomic` writes to a temp file and
+            // renames it into place, so the visible inode is brand-new and
+            // (on some OS versions) inherits the directory's protection
+            // class rather than the write option's. Re-assert the class on
+            // the final path so a locked-device widget read can never be
+            // blocked by `.complete`. Best-effort — a failure here still
+            // leaves the bytes on disk (just possibly at the default class),
+            // and the diagnostic below records that the write itself landed.
+            applyWidgetReadableProtection(to: fileURL)
             // Diagnostic surface for REG-T-360 / CL-45. Mirror of the
             // debug log inside `RecipeStore.cacheImage(url:bytes:)` so
             // a future "the widget is still showing placeholder" report
@@ -181,5 +222,44 @@ public enum WidgetImageBridge {
             )
             return false
         }
+    }
+
+    // MARK: - Data protection (DUT-8)
+    //
+    // A widget extension reads these files in the background and while the
+    // device is locked. The default iOS file-protection class (`.complete`)
+    // makes the bytes unreadable whenever the device is locked, which is the
+    // on-device-only cause of the "widget shows the placeholder even though
+    // the files exist" regression. We pin `.completeUntilFirstUserAuthentication`
+    // — encrypted at rest, readable after the first post-boot unlock — which
+    // is the class Apple documents for App-Group files a widget must read.
+    //
+    // The `FileProtectionType` / `Data.WritingOptions` data-protection
+    // symbols are iOS-only; the macOS `swift test` slice (DODSupport supports
+    // macOS for its non-visual unit tests) has no per-file data protection,
+    // so the helpers degrade to a no-op / plain `.atomic` write there.
+
+    /// `Data.WritingOptions` that pins the widget-readable protection class
+    /// on the initial write. No-op (`[]`) on macOS where the option and the
+    /// underlying data-protection feature don't exist.
+    static var widgetReadableProtectionOption: Data.WritingOptions {
+        #if os(iOS)
+        return .completeFileProtectionUntilFirstUserAuthentication
+        #else
+        return []
+        #endif
+    }
+
+    /// Re-assert the widget-readable protection class on an already-existing
+    /// file or directory at `url`. Best-effort: data protection is iOS-only,
+    /// and a failure leaves the widget on its gradient-placeholder fallback
+    /// rather than breaking the host's authoritative SwiftData cache.
+    static func applyWidgetReadableProtection(to url: URL) {
+        #if os(iOS)
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
+        #endif
     }
 }

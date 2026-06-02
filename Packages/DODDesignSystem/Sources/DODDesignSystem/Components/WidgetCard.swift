@@ -62,23 +62,10 @@ public enum WidgetCard {
             ZStack(alignment: .bottomLeading) {
                 Hero(url: content.heroImageURL)
 
-                // Contrast scrim per CL-48 / AC-23.7: a full-height linear
-                // gradient from `.clear` at the top to `.black.opacity(0.55)`
-                // at the bottom. Sits BEHIND the title text but IN FRONT of
-                // the hero image, providing the dark-band scaffold the
-                // `.white` foreground needs in iOS 18+ `.accented` (Tinted /
-                // Clear) rendering — `containerBackground` is stripped in
-                // that mode, so without this scrim the `.white` title would
-                // collapse into the wallpaper-tinted default group and
-                // become invisible on light wallpapers (REG-T-390).
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.0),
-                        Color.black.opacity(0.55),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                // Contrast scrim behind the title. See ``TintSafeScrim`` for
+                // why this is a `.fullColor` rasterised `Image` and not a
+                // plain translucent `LinearGradient` (DUT-9 root cause).
+                TintSafeScrim()
 
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                     if let totalTime = content.totalTimeDisplay {
