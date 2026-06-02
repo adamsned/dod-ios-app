@@ -111,13 +111,22 @@ struct RecipeDetailRatingsConsolidationTests {
         #expect(commented == false, "Stars-only submit must NOT POST a comment")
     }
 
-    /// A comment (with stars) → the consolidated submit routes to the
-    /// comment POST, which already carries the pending rating alongside the
-    /// body. It must NOT additionally fire the standalone rating POST.
-    @Test func submitWithCommentRoutesToCommentPostCarryingRating() async throws {
+    /// DUT-31: a comment **with** stars must record the rating via the proven
+    /// WPRM path (`.recipeRated` → `postRating`) AND post the comment
+    /// (`.recipeCommentSubmitted`). The comment meta alone does NOT land the
+    /// rating (WordPress drops `meta.wprm_comment_rating` on REST comment
+    /// create), so the old "comment carries the rating" behavior silently lost
+    /// it. The comment still owns the snackbar.
+    @Test func submitWithCommentAndRatingRecordsRatingViaWPRMAndPostsComment() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 811, withDetail: true)
         dependencies.guestIdentity = (name: "Sam", email: "sam@example.com")
+        dependencies.postedRatingResult = RecipeRating(
+            recipeID: 811,
+            average: 4.8,
+            count: 25,
+            userRating: 5
+        )
         dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
             id: 5001,
             postID: 811,
@@ -131,21 +140,81 @@ struct RecipeDetailRatingsConsolidationTests {
         viewModel.setCommentDraft("Loved it.")
         await viewModel.submitRatingAndComment()
 
+        // The comment owns the final snackbar (rating is recorded quietly).
         #expect(viewModel.snackbarMessage == "Comment posted.")
         #expect(viewModel.comments.first?.id == 5001)
+        // The rating aggregate refreshed from the WPRM round-trip.
+        #expect(viewModel.ratingSummary?.userRating == 5)
+        #expect(viewModel.ratingSummary?.average == 4.8)
         let commented = dependencies.telemetryEvents.contains { event in
             if case .recipeCommentSubmitted = event { return true }
             return false
         }
         let rated = dependencies.telemetryEvents.contains { event in
-            if case .recipeRated = event { return true }
+            if case .recipeRated(_, let stars) = event { return stars == 5 }
             return false
         }
         #expect(commented, "Comment submit must POST the comment")
-        #expect(rated == false, "Comment submit must not also fire the standalone rating POST")
+        #expect(rated, "DUT-31: comment + rating must ALSO record the rating via WPRM")
         // DUT-28: the consolidated submit persists the (pre-filled) identity.
         #expect(dependencies.savedGuestIdentities.count == 1)
         #expect(dependencies.savedGuestIdentities.first?.email == "sam@example.com")
+    }
+
+    /// DUT-31 guard rail: a comment with NO stars must NOT fire the WPRM
+    /// rating POST — only the genuine comment+rating combo records a rating.
+    @Test func submitWithCommentButNoRatingDoesNotRecordRating() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 815, withDetail: true)
+        dependencies.guestIdentity = (name: "Sam", email: "sam@example.com")
+        dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
+            id: 5002,
+            postID: 815,
+            body: "No stars from me.",
+            status: .approved
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 815)
+        await viewModel.onAppear()
+
+        viewModel.setCommentDraft("No stars from me.")
+        await viewModel.submitRatingAndComment()
+
+        #expect(viewModel.snackbarMessage == "Comment posted.")
+        let rated = dependencies.telemetryEvents.contains { event in
+            if case .recipeRated = event { return true }
+            return false
+        }
+        #expect(rated == false, "A comment with no stars must not record a rating")
+    }
+
+    /// DUT-31: even if recording the rating fails, the comment still posts and
+    /// keeps its own success snackbar — a rating hiccup must not surface a
+    /// scary error or block the comment the user actually wrote.
+    @Test func submitCommentAndRatingStillPostsCommentWhenRatingRecordingFails() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 816, withDetail: true)
+        dependencies.guestIdentity = (name: "Sam", email: "sam@example.com")
+        dependencies.postRatingShouldFail = true
+        dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
+            id: 5003,
+            postID: 816,
+            body: "Rating endpoint is down but the comment still lands.",
+            status: .approved
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 816)
+        await viewModel.onAppear()
+
+        viewModel.setPendingRating(4)
+        viewModel.setCommentDraft("Rating endpoint is down but the comment still lands.")
+        await viewModel.submitRatingAndComment()
+
+        #expect(viewModel.snackbarMessage == "Comment posted.")
+        #expect(viewModel.comments.first?.id == 5003)
+        let commented = dependencies.telemetryEvents.contains { event in
+            if case .recipeCommentSubmitted = event { return true }
+            return false
+        }
+        #expect(commented, "Comment must post even when the rating record fails")
     }
 
     /// Nothing entered → the consolidated submit is a no-op (no POST of
