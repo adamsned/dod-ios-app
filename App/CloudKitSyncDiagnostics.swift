@@ -67,10 +67,22 @@ final class CloudKitSyncDiagnostics {
             }
             // DUT-6 cause B: keep the coarse status fresh so the Settings
             // row can surface idle / syncing / error. The observer fires on
-            // the main queue, so this `@MainActor` mutation is safe.
+            // the main queue, so this `@MainActor` mutation is safe. DUT-22:
+            // fold via the stateful reconcile so a non-fatal/transient/setup
+            // blip never repaints a healthy row as "Sync error".
             MainActor.assumeIsolated {
-                self?.latestStatus = CloudKitSyncStatus(event: summary)
+                guard let self else { return }
+                self.latestStatus = self.latestStatus.reconciled(with: summary)
             }
         }
+    }
+
+    /// Mark that the CloudKit container failed to open at launch (the
+    /// DOD-CRASH-1 fallback to a local store). No mirror events fire in that
+    /// case, so without this the Settings row would read a falsely-healthy
+    /// "Idle". Surface the genuine failure so the user can act (most commonly:
+    /// deploy the CloudKit Production schema, then relaunch).
+    func markContainerOpenFailed() {
+        latestStatus = .error("CloudKit container failed to open; sync is paused on this device.")
     }
 }

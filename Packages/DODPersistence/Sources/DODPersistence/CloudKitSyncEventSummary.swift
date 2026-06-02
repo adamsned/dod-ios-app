@@ -1,3 +1,4 @@
+import CloudKit
 import CoreData
 import Foundation
 
@@ -41,19 +42,26 @@ public struct CloudKitSyncEventSummary: Equatable, Sendable {
     public let errorDescription: String?
     /// `endDate - startDate` for a finished event, else `nil`.
     public let durationSeconds: Double?
+    /// The underlying `CKError` code's `rawValue` for a failed event, or `nil`
+    /// when there was no error or the error was not a `CKError`. Lets the
+    /// status layer tell a transient/recoverable CloudKit failure apart from a
+    /// genuine, actionable one.
+    public let errorCode: Int?
 
     public init(
         phase: Phase,
         finished: Bool,
         succeeded: Bool,
         errorDescription: String?,
-        durationSeconds: Double?
+        durationSeconds: Double?,
+        errorCode: Int? = nil
     ) {
         self.phase = phase
         self.finished = finished
         self.succeeded = succeeded
         self.errorDescription = errorDescription
         self.durationSeconds = durationSeconds
+        self.errorCode = errorCode
     }
 
     /// One-line, `os.Logger`-friendly rendering, e.g.
@@ -71,6 +79,35 @@ public struct CloudKitSyncEventSummary: Equatable, Sendable {
         }
         return line
     }
+
+    /// CKError codes CloudKit retries automatically — a finished mirror cycle
+    /// that failed with one of these is not an actionable sync error.
+    static let transientCloudKitErrorCodes: Set<Int> = [
+        CKError.Code.networkUnavailable.rawValue,
+        CKError.Code.networkFailure.rawValue,
+        CKError.Code.serviceUnavailable.rawValue,
+        CKError.Code.requestRateLimited.rawValue,
+        CKError.Code.zoneBusy.rawValue,
+        CKError.Code.serverResponseLost.rawValue,
+        CKError.Code.changeTokenExpired.rawValue,
+        CKError.Code.accountTemporarilyUnavailable.rawValue,
+    ]
+
+    /// True only for a finished, failed event that represents a GENUINE,
+    /// actionable sync failure (e.g. an import/export that failed because the
+    /// CloudKit Production schema was never deployed, or the account is
+    /// unavailable). A `setup`-phase failure (container/subscription bring-up,
+    /// e.g. push-subscription registration without aps-environment) and any
+    /// transient/recoverable CloudKit error return false — they are logged but
+    /// must not paint the Settings row "Sync error".
+    public var failureIsFatal: Bool {
+        guard finished, !succeeded else { return false }
+        if phase == .setup { return false }
+        if let errorCode, Self.transientCloudKitErrorCodes.contains(errorCode) {
+            return false
+        }
+        return true
+    }
 }
 
 extension CloudKitSyncEventSummary {
@@ -87,12 +124,14 @@ extension CloudKitSyncEventSummary {
         @unknown default: phase = .unknown
         }
         let endDate = event.endDate
+        let code = (event.error as? CKError)?.code.rawValue
         self.init(
             phase: phase,
             finished: endDate != nil,
             succeeded: event.succeeded,
             errorDescription: event.error?.localizedDescription,
-            durationSeconds: endDate.map { $0.timeIntervalSince(event.startDate) }
+            durationSeconds: endDate.map { $0.timeIntervalSince(event.startDate) },
+            errorCode: code
         )
     }
 }
