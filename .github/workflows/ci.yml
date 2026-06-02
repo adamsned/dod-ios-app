@@ -342,9 +342,19 @@ jobs:
   # the merge on them stalls PRs long after the real required checks
   # (lint/format/L1/L4/build-app) are green. They still run on every PR
   # (advisory) and on main, where `report-failures` rolls up any reds.
+  #
+  # test-unit-app (L1 · DODApp) is likewise advisory and NOT in this gate
+  # (DUT-32): it needs build-app first, so the chain build-app (~3 min) +
+  # app-target unit tests (~6 min) bounded the gate at ~9 min — over the
+  # 5-min merge-gate budget. Dropping it leaves build-app (L4-class, ~4
+  # min) as the slowest required job, so the gate clears under 5 min. The
+  # job still runs advisory on every PR and on main, where
+  # `report-failures` rolls up any reds. Most domain logic is covered by
+  # test-unit-packages (still required); only App-target-bound types (e.g.
+  # AppTab) lose merge-blocking coverage.
   ci-required:
     name: CI required
-    needs: [changes, lint, format, test-unit-packages, test-unit-app,
+    needs: [changes, lint, format, test-unit-packages,
             test-snapshots-designsystem, build-app]
     if: always()
     runs-on: ubuntu-latest
@@ -354,7 +364,7 @@ jobs:
           # Each input is "success", "failure", "cancelled", or "skipped".
           # Skipped is fine (path filter or label gating excluded the
           # job); failure is not.
-          for name in changes lint format test-unit-packages test-unit-app \
+          for name in changes lint format test-unit-packages \
                      test-snapshots-designsystem build-app; do
             result_var="${name//-/_}_RESULT"
             echo "$name: ${!result_var:-not-run}"
@@ -363,7 +373,6 @@ jobs:
              || "${{ needs.lint.result }}" == "failure" \
              || "${{ needs.format.result }}" == "failure" \
              || "${{ needs.test-unit-packages.result }}" == "failure" \
-             || "${{ needs.test-unit-app.result }}" == "failure" \
              || "${{ needs.test-snapshots-designsystem.result }}" == "failure" \
              || "${{ needs.build-app.result }}" == "failure" ]]; then
             echo "::error::At least one required CI job failed."
