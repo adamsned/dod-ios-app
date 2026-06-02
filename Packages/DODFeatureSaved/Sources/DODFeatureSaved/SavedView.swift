@@ -52,7 +52,15 @@ public struct SavedView: View {
             .navigationDestination(item: $builtListRecipes) { selection in
                 ShoppingListView(viewModel: ShoppingListViewModel(recipes: selection.recipes))
             }
-            .task { await viewModel.refresh() }
+            .task {
+                // DUT-6: subscribe to CloudKit remote-import signals (no-op
+                // if already subscribed) so a recipe saved on another device
+                // surfaces here without a relaunch, then do the appear-time
+                // fetch. The subscription outlives this `.task`; the
+                // debounced re-fetch reconciles on each remote import.
+                viewModel.startObserving()
+                await viewModel.refresh()
+            }
     }
 
     /// AC-39.3 / CL-85 decision 1 — the Saved-tab entry into the shopping-list
