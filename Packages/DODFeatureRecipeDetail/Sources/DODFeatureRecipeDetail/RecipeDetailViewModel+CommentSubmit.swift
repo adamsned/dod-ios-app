@@ -1,18 +1,42 @@
+import DODDesignSystem
 import DODDomain
 import DODSupport
 import Foundation
 
 extension RecipeDetailViewModel {
 
+    /// DUT-28 — true when the on-form "Display name" passes the shared
+    /// ``GuestIdentitySheet/isValidName(_:)`` rule (1–40 chars trimmed).
+    /// Drives the inline field feedback and (with ``isAuthorEmailValid``)
+    /// the Submit enablement.
+    public var isAuthorNameValid: Bool {
+        GuestIdentitySheet.isValidName(commentAuthorName)
+    }
+
+    /// DUT-28 — true when the on-form "Email" passes the shared
+    /// ``GuestIdentitySheet/isValidEmail(_:)`` structural rule.
+    public var isAuthorEmailValid: Bool {
+        GuestIdentitySheet.isValidEmail(commentAuthorEmail)
+    }
+
+    /// DUT-28 — both author fields are present and well-formed. The single
+    /// Submit button additionally requires this so we never fire a POST with
+    /// a blank / malformed author (WP 400s `author_email=""`).
+    public var isAuthorIdentityValid: Bool {
+        isAuthorNameValid && isAuthorEmailValid
+    }
+
     /// True when the consolidated rate + review surface has something to
-    /// submit: either a star selection OR a non-blank comment draft.
-    /// DUT-24: the single Submit button binds its disabled-state to this so
-    /// the user can rate, comment, or do both from one control.
+    /// submit — either a star selection OR a non-blank comment draft — AND
+    /// the on-form author identity is valid (DUT-28). The single Submit
+    /// button binds its disabled-state to this so the user can rate,
+    /// comment, or do both from one control, but only once they've supplied
+    /// a usable name + email.
     public var canSubmitRatingOrComment: Bool {
         let hasRating = pendingUserRating > 0
         let hasComment =
             !commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasRating || hasComment
+        return (hasRating || hasComment) && isAuthorIdentityValid
     }
 
     /// True while either the rating or the comment submit is in flight.
@@ -21,31 +45,50 @@ extension RecipeDetailViewModel {
         isSubmittingRating || isSubmittingComment
     }
 
-    /// DUT-24: single entry point for the consolidated "rate (stars) +
-    /// optional comment + Submit" surface. Routes to the existing,
-    /// unchanged network methods so the rating/comment POST logic stays
-    /// owned by its current paths (this is presentation-layer
-    /// orchestration only, not a new network call):
+    /// DUT-24 / DUT-28: single entry point for the consolidated "name +
+    /// email + rate (stars) + optional comment + Submit" surface. Validates
+    /// the on-form author identity, persists it, then routes to the
+    /// existing, unchanged network methods so the rating/comment POST logic
+    /// stays owned by its current paths (presentation-layer orchestration
+    /// only, not a new network call):
     ///
     /// * a non-blank comment → ``submitComment()``, which already carries
     ///   the pending star rating alongside the body (AC-14.4);
     /// * stars only (no comment) → ``submitRating(stars:)``.
     ///
-    /// The guest-identity gate is enforced by the individual methods (and
-    /// pre-checked by the view), so an empty identity still re-gates rather
-    /// than firing a doomed POST.
+    /// DUT-28: the name + email now live on the form (no pop-up). An invalid
+    /// identity blocks the submit with inline feedback rather than firing a
+    /// doomed POST; a valid identity is persisted to the Keychain so the
+    /// next visit pre-fills it.
     public func submitRatingAndComment() async {
         let hasComment =
             !commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasRating = pendingUserRating > 0
+        guard hasComment || hasRating else { return }
+
+        // DUT-28: block a doomed POST when the on-form identity is invalid;
+        // the view shows the inline field feedback, this surfaces a snackbar.
+        guard isAuthorIdentityValid else {
+            snackbarMessage = "Add your name and a valid email to submit."
+            return
+        }
+
+        // Persist the entered identity before posting so a returning
+        // commenter is pre-filled next time. Best-effort — never blocks the
+        // POST (see ``persistAuthorIdentity(name:email:)``).
+        let name = commentAuthorName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let email = commentAuthorEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        await persistAuthorIdentity(name: name, email: email)
+
         if hasComment {
             await submitComment()
-        } else if pendingUserRating > 0 {
+        } else {
             await submitRating(stars: pendingUserRating)
         }
     }
 
     /// Submit the in-progress comment draft (and the pending rating, if
-    /// non-zero). Gated behind the guest-identity sheet. AC-14.3 /
+    /// non-zero), using the on-form author identity (DUT-28). AC-14.3 /
     /// AC-14.4 / AC-14.7.
     ///
     /// Extracted from `RecipeDetailViewModel.swift` (DUT-7) so the parent
@@ -54,23 +97,15 @@ extension RecipeDetailViewModel {
     public func submitComment() async {
         let trimmed = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        guard let identity = await dependencies.loadGuestIdentity() else {
-            requiresGuestIdentity = true
-            return
-        }
-        // DUT-7 hypothesis #4 guard: a fresh install (or a partially-saved
-        // Keychain row) can hand back an identity whose name or email is
-        // empty / whitespace. Posting that yields `author_email=""` → WP
-        // returns 400 and the comment silently never lands. Re-gate behind
-        // the guest-identity sheet (US-15) instead of firing a doomed POST,
-        // and tell the user why. `loadGuestIdentity()` already maps a missing
-        // field to `nil`, so this catches the empty-string-default case the
-        // Keychain layer cannot.
-        let trimmedName = identity.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedEmail = identity.email.trimmingCharacters(in: .whitespacesAndNewlines)
+        // DUT-28: the author name + email come from the on-form fields, not a
+        // pop-up. Posting a blank `author_email` yields WP 400 and the comment
+        // silently never lands, so block on an invalid/empty identity and tell
+        // the user why instead of firing a doomed POST (the DUT-7 guard, now
+        // sourced from the form).
+        let trimmedName = commentAuthorName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedEmail = commentAuthorEmail.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty, !trimmedEmail.isEmpty else {
-            DODLog.network.error("comment submit blocked: empty author name/email — re-gating identity")
-            requiresGuestIdentity = true
+            DODLog.network.error("comment submit blocked: empty author name/email")
             snackbarMessage = "Add your name and email to post a comment."
             return
         }

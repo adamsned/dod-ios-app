@@ -206,21 +206,24 @@ import Testing
         #expect(ratedEvents.count == 1)
     }
 
-    @Test func submitRatingWithoutIdentitySetsGate() async throws {
+    /// DUT-28: with the pop-up retired, a rating submit with no on-form name
+    /// + email must NOT POST — it blocks with a snackbar instead of firing a
+    /// doomed request (WP 400s a blank author).
+    @Test func submitRatingWithoutIdentityDoesNotPost() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 61, withDetail: true)
-        // No identity preloaded — submit must not POST.
+        // No saved identity and no on-form entry — submit must not POST.
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 61)
         await viewModel.onAppear()
 
         await viewModel.submitRating(stars: 3)
 
-        #expect(viewModel.requiresGuestIdentity == true)
+        #expect(viewModel.snackbarMessage == "Add your name and email to rate this recipe.")
         let ratedEvents = dependencies.telemetryEvents.filter { event in
             if case .recipeRated = event { return true }
             return false
         }
-        #expect(ratedEvents.isEmpty, "Rating must not POST without an identity")
+        #expect(ratedEvents.isEmpty, "Rating must not POST without an on-form identity")
     }
 
     @Test func submitCommentPrependsApprovedAndSnackbars() async throws {
@@ -280,17 +283,37 @@ import Testing
         #expect(submitted == [true])
     }
 
-    @Test func saveGuestIdentityClearsTheGate() async throws {
+    /// DUT-28: a submit with a freshly-typed on-form identity persists it to
+    /// the store (so the next visit pre-fills) and posts the comment with
+    /// those exact values.
+    @Test func submitPersistsOnFormIdentityAndPostsWithIt() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 80, withDetail: true)
+        // No saved identity — the user types one on the form.
+        dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
+            id: 4242,
+            postID: 80,
+            body: "First timer.",
+            status: .approved
+        )
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 80)
         await viewModel.onAppear()
-        #expect(viewModel.requiresGuestIdentity == true)
+        // Nothing pre-filled because nothing was saved.
+        #expect(viewModel.commentAuthorName.isEmpty)
+        #expect(viewModel.commentAuthorEmail.isEmpty)
 
-        await viewModel.saveGuestIdentityAndContinue(name: "Alex", email: "alex@example.com")
+        viewModel.setCommentAuthorName("Alex")
+        viewModel.setCommentAuthorEmail("alex@example.com")
+        viewModel.setCommentDraft("First timer.")
+        await viewModel.submitRatingAndComment()
 
-        #expect(viewModel.requiresGuestIdentity == false)
+        // Persisted to the store for next-visit pre-fill.
         #expect(dependencies.savedGuestIdentities.count == 1)
+        #expect(dependencies.savedGuestIdentities.first?.name == "Alex")
+        #expect(dependencies.savedGuestIdentities.first?.email == "alex@example.com")
+        // Posted with the on-form identity.
+        #expect(viewModel.snackbarMessage == "Comment posted.")
+        #expect(viewModel.comments.first?.id == 4242)
     }
 
     // MARK: - Helpers

@@ -242,10 +242,10 @@ import Testing
         #expect(viewModel.pendingUserRating == 4)
     }
 
-    @Test func loadGuestIdentityFlipsTheGateWhenIdentityIsPresent() async throws {
-        // The guest-identity gate is read on every onAppear so the user
-        // doesn't see the sheet a second time after they entered their
-        // identity for an earlier recipe.
+    @Test func onAppearPreFillsAuthorFieldsFromSavedIdentity() async throws {
+        // DUT-28: the on-form name + email are pre-filled from the saved
+        // guest identity on every onAppear, so a returning commenter sees
+        // their details already populated (and editable) — no pop-up.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 408, withDetail: true)
         dependencies.guestIdentity = (name: "Pat", email: "pat@example.com")
@@ -256,6 +256,27 @@ import Testing
 
         await viewModel.onAppear()
 
-        #expect(viewModel.requiresGuestIdentity == false)
+        #expect(viewModel.commentAuthorName == "Pat")
+        #expect(viewModel.commentAuthorEmail == "pat@example.com")
+        // Both fields valid → the only thing left gating Submit is having
+        // something to submit (a rating or comment).
+        #expect(viewModel.isAuthorIdentityValid)
+    }
+
+    @Test func onAppearLeavesAuthorFieldsEmptyWhenNoSavedIdentity() async throws {
+        // DUT-28: with nothing saved, the fields start empty (the user fills
+        // them in) and the identity is not yet valid.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 409, withDetail: true)
+        let viewModel = RecipeDetailViewModelTests.makeViewModel(
+            dependencies: dependencies,
+            listItemID: 409
+        )
+
+        await viewModel.onAppear()
+
+        #expect(viewModel.commentAuthorName.isEmpty)
+        #expect(viewModel.commentAuthorEmail.isEmpty)
+        #expect(viewModel.isAuthorIdentityValid == false)
     }
 }

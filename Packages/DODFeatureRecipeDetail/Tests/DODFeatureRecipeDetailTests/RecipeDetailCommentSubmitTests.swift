@@ -16,16 +16,16 @@ import Testing
 @Suite("RecipeDetailViewModel.submitComment — DUT-7 guards + surfacing")
 struct RecipeDetailCommentSubmitTests {
 
-    /// A Keychain identity whose email is empty / whitespace must NOT fire a
-    /// doomed POST (WP 400s `author_email=""`). The view model re-gates
-    /// behind the guest-identity sheet and tells the user why, instead of
-    /// silently failing.
-    @Test func submitCommentWithBlankEmailReGatesAndDoesNotPost() async throws {
+    /// DUT-28: an on-form email that is empty / whitespace must NOT fire a
+    /// doomed POST (WP 400s `author_email=""`). The view model blocks and
+    /// tells the user why, instead of silently failing. (A whitespace email
+    /// pre-filled from a partially-saved Keychain row reaches the form via
+    /// `prefillAuthorIdentity()`, so the guard still has to catch it here.)
+    @Test func submitCommentWithBlankEmailBlocksAndDoesNotPost() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 72, withDetail: true)
-        // Identity is present but the email is whitespace-only — the case
-        // `GuestIdentityStore.load()` cannot catch (it only nils a *missing*
-        // field, not an empty string).
+        // Pre-fill seeds a whitespace-only email onto the form — the case a
+        // simple `isEmpty` check on the saved row cannot catch.
         dependencies.guestIdentity = (name: "Sam", email: "   ")
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 72)
         await viewModel.onAppear()
@@ -33,9 +33,8 @@ struct RecipeDetailCommentSubmitTests {
         viewModel.setCommentDraft("My comment.")
         await viewModel.submitComment()
 
-        #expect(viewModel.requiresGuestIdentity == true)
         #expect(viewModel.snackbarMessage == "Add your name and email to post a comment.")
-        // The draft is preserved so the user can retry after entering identity.
+        // The draft is preserved so the user can retry after fixing the email.
         #expect(viewModel.commentDraft == "My comment.")
         // No comment-submitted telemetry → proves no POST fired.
         let submitted = dependencies.telemetryEvents.contains { event in

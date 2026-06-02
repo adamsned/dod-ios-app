@@ -88,10 +88,15 @@ public final class RecipeDetailViewModel {
     public internal(set) var commentDraft: String = ""
     public internal(set) var isSubmittingComment: Bool = false
     public private(set) var isSubmittingRating: Bool = false
-    /// True when the Keychain has no guest identity yet — the view layer
-    /// uses this to gate the rating / composer affordances behind the
-    /// non-dismissible `GuestIdentitySheet` (AC-15.1).
-    public var requiresGuestIdentity: Bool = true
+    /// DUT-28 — the commenter's display name, surfaced directly on the
+    /// consolidated rate + comment form (no more one-time pop-up gate).
+    /// Pre-filled from the saved guest identity on appear; editable inline;
+    /// persisted to the Keychain on a valid Submit. `internal(set)` so the
+    /// submit extension can clear it if a future flow needs to.
+    public internal(set) var commentAuthorName: String = ""
+    /// DUT-28 — the commenter's email, surfaced on the form alongside
+    /// ``commentAuthorName``. Public, never sent to telemetry (AC-15.4).
+    public internal(set) var commentAuthorEmail: String = ""
 
     /// Tracks whether `cookModeStarted` has already been sent this session
     /// for this recipe, so re-entering Cook Mode in the same view session
@@ -153,10 +158,10 @@ public final class RecipeDetailViewModel {
     /// network in the background. Network failures leave the cached
     /// state in place per REG-14 / AC-14.6.
     public func loadRatingsAndComments() async {
-        // Refresh the guest-identity gate so the view picks up a
-        // previously-saved identity (e.g. the user rated a different
-        // recipe earlier this session).
-        requiresGuestIdentity = await dependencies.loadGuestIdentity() == nil
+        // DUT-28: pre-fill the on-form name + email from any saved guest
+        // identity so a returning commenter sees their details already
+        // populated (and can edit them). No hidden pop-up gate any more.
+        await prefillAuthorIdentity()
 
         commentsLoadState = .loading
 
@@ -206,15 +211,41 @@ public final class RecipeDetailViewModel {
         commentDraft = text
     }
 
-    /// Submit a star rating. Gated behind the guest-identity sheet —
-    /// callers should check `requiresGuestIdentity` first and present
-    /// `GuestIdentitySheet` if true. AC-13.2 / AC-13.3 / AC-13.5.
+    /// DUT-28 — bind the on-form "Display name" field.
+    public func setCommentAuthorName(_ name: String) {
+        commentAuthorName = name
+    }
+
+    /// DUT-28 — bind the on-form "Email" field.
+    public func setCommentAuthorEmail(_ email: String) {
+        commentAuthorEmail = email
+    }
+
+    /// DUT-28 — seed ``commentAuthorName`` + ``commentAuthorEmail`` from the
+    /// saved guest identity so a returning commenter sees their details
+    /// pre-filled on the form. Leaves the fields empty if nothing is saved.
+    /// Only seeds a field the user hasn't already typed into this session,
+    /// so a late background refresh never clobbers in-progress edits.
+    public func prefillAuthorIdentity() async {
+        guard let identity = await dependencies.loadGuestIdentity() else { return }
+        if commentAuthorName.isEmpty {
+            commentAuthorName = identity.name
+        }
+        if commentAuthorEmail.isEmpty {
+            commentAuthorEmail = identity.email
+        }
+    }
+
+    /// Submit a star rating using the on-form author identity. DUT-28:
+    /// callers validate name + email first (``canSubmitRatingOrComment``)
+    /// and persist the identity, so this path trusts the trimmed values it
+    /// is handed. AC-13.2 / AC-13.3 / AC-13.5.
     public func submitRating(stars: Int) async {
         guard (1...5).contains(stars) else { return }
-        guard let identity = await dependencies.loadGuestIdentity() else {
-            // Caller should have presented the sheet; flip the gate so
-            // the next render presents it.
-            requiresGuestIdentity = true
+        let name = commentAuthorName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let email = commentAuthorEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !email.isEmpty else {
+            snackbarMessage = "Add your name and email to rate this recipe."
             return
         }
         isSubmittingRating = true
@@ -224,8 +255,8 @@ public final class RecipeDetailViewModel {
             let updated = try await dependencies.postRating(
                 recipeID: listItem.id,
                 stars: stars,
-                name: identity.name,
-                email: identity.email
+                name: name,
+                email: email
             )
             ratingSummary = updated
             pendingUserRating = stars
@@ -242,15 +273,16 @@ public final class RecipeDetailViewModel {
     // under the SwiftLint 400-line `file_length` cap — same pattern as the
     // `+CommentSnackbar` / `+Fetch` extensions).
 
-    /// Persist the captured display name + email and unblock the pending
-    /// rate / post action. AC-15.2.
-    public func saveGuestIdentityAndContinue(name: String, email: String) async {
+    /// DUT-28 — persist the on-form display name + email to the Keychain so
+    /// the next visit pre-fills them. Best-effort: a Keychain write failure
+    /// is logged and surfaced but never blocks the comment/rating POST the
+    /// caller is about to make (the values are still valid in memory).
+    func persistAuthorIdentity(name: String, email: String) async {
         do {
             try await dependencies.saveGuestIdentity(name: name, email: email)
-            requiresGuestIdentity = false
         } catch {
             DODLog.persistence.error("save guest identity failed: \(String(describing: error))")
-            snackbarMessage = "Couldn't save your identity — try again."
+            snackbarMessage = "Couldn't save your name — we'll still post your comment."
         }
     }
 

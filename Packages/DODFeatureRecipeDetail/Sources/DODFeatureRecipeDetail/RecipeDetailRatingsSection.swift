@@ -22,21 +22,21 @@ import SwiftUI
 /// (it leaked "Couldn't load comments." into the review area) — the
 /// load-failed state degrades to the same neutral empty copy.
 ///
+/// **DUT-28 on-form identity.** The display name + email used to live behind
+/// a one-time `GuestIdentitySheet` pop-up. A guest identity saved by an
+/// earlier build silently satisfied that gate, so the prompt never
+/// re-appeared and there was no visible name entry. The name + email now
+/// sit directly on this form (``authorFields``), pre-filled from the saved
+/// identity, editable inline, validated with the shared
+/// `GuestIdentitySheet` validators, and persisted on a valid Submit. The
+/// pop-up is retired.
+///
 /// **Layout note.** Ships as one top-level section; concerns are split into
 /// private `@ViewBuilder` properties below so the host drops a single thing
 /// onto the scroll content while each piece stays grep-able.
 public struct RecipeDetailRatingsSection: View {
 
     @Bindable public var viewModel: RecipeDetailViewModel
-    @State private var isGuestSheetPresented: Bool = false
-    @State private var guestNameDraft: String = ""
-    @State private var guestEmailDraft: String = ""
-    /// True when the user tapped Submit but had to clear the guest-identity
-    /// gate first — we resume the consolidated submit once the sheet
-    /// dismisses with an identity in place. DUT-24 collapsed the previous
-    /// per-action enum (rate vs comment) into this single flag because the
-    /// section now has one Submit path.
-    @State private var pendingSubmitAfterIdentity: Bool = false
 
     public init(viewModel: RecipeDetailViewModel) {
         self.viewModel = viewModel
@@ -49,9 +49,9 @@ public struct RecipeDetailRatingsSection: View {
             ratingsHeader
 
             // DUT-24: single rate (stars) + optional comment + Submit
-            // surface. Replaces the old separate "Submit rating" bar and the
-            // embedded `CommentComposer` (which each carried their own star
-            // input, doubling the rating control).
+            // surface. DUT-28 adds the on-form name + email above the comment
+            // box. Replaces the old separate "Submit rating" bar, the
+            // embedded `CommentComposer`, AND the guest-identity pop-up.
             rateAndReviewCard
 
             Divider()
@@ -62,19 +62,6 @@ public struct RecipeDetailRatingsSection: View {
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.lg)
         .accessibilityElement(children: .contain)
-        .sheet(isPresented: $isGuestSheetPresented, onDismiss: handleGuestSheetDismiss) {
-            GuestIdentitySheet(
-                displayName: $guestNameDraft,
-                email: $guestEmailDraft,
-                isSubmitting: false,
-                onContinue: {
-                    Task { await handleGuestContinue() }
-                }
-            )
-            #if os(iOS)
-            .presentationDetents([.medium, .large])
-            #endif
-        }
     }
 
     // MARK: - Section header
@@ -105,10 +92,11 @@ public struct RecipeDetailRatingsSection: View {
 
     // MARK: - RateAndReviewCard
 
-    /// DUT-24 — the single consolidated rate + optional-comment + Submit
-    /// surface. AC-13.2 / AC-13.3 (rate the recipe) and AC-14.3 (optional
-    /// comment) now live in one card with one star input and one Submit
-    /// button. Submit routes through the guest-identity gate when needed.
+    /// DUT-24 / DUT-28 — the single consolidated name + email + rate +
+    /// optional-comment + Submit surface. AC-13.2 / AC-13.3 (rate the
+    /// recipe) and AC-14.3 (optional comment) live in one card with one star
+    /// input and one Submit button; DUT-28 surfaces the author identity
+    /// inline (``authorFields``) instead of behind a pop-up.
     private var rateAndReviewCard: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
             ratingPrompt
@@ -121,6 +109,8 @@ public struct RecipeDetailRatingsSection: View {
                 starSize: 32,
                 isSubmitting: viewModel.isSubmittingRatingOrComment
             )
+
+            authorFields
 
             commentField
 
@@ -186,11 +176,11 @@ public struct RecipeDetailRatingsSection: View {
     }
 
     /// The one and only Submit control for the section. Enabled when the
-    /// user has set a rating OR typed a comment; routes through the
-    /// guest-identity sheet on first submit.
+    /// user has set a rating OR typed a comment AND the on-form name + email
+    /// are valid (DUT-28). One tap persists the identity and posts.
     private var submitButton: some View {
         Button {
-            triggerSubmit()
+            Task { await viewModel.submitRatingAndComment() }
         } label: {
             Text(viewModel.isSubmittingRatingOrComment ? "Submitting…" : "Submit")
                 .dodFont(DODType.bodyEmphasized)
@@ -251,48 +241,11 @@ public struct RecipeDetailRatingsSection: View {
         }
     }
 
-    // MARK: - Guest identity flow
-
-    /// DUT-24 — single submit path for the consolidated card. Fires the
-    /// guest-identity sheet (AC-15.1) on first submit, then routes to the
-    /// view model's ``RecipeDetailViewModel/submitRatingAndComment()`` which
-    /// picks the right underlying network call (comment-with-rating, or
-    /// rating-only) without doubling any UI.
-    private func triggerSubmit() {
-        guard viewModel.canSubmitRatingOrComment else { return }
-        if viewModel.requiresGuestIdentity {
-            pendingSubmitAfterIdentity = true
-            presentGuestSheet()
-        } else {
-            Task { await viewModel.submitRatingAndComment() }
-        }
-    }
-
-    private func presentGuestSheet() {
-        // Seed the fields from any prior entry the user typed before
-        // dismissing — `@State` already preserves these across re-opens.
-        isGuestSheetPresented = true
-    }
-
-    @MainActor
-    private func handleGuestContinue() async {
-        await viewModel.saveGuestIdentityAndContinue(
-            name: guestNameDraft,
-            email: guestEmailDraft
-        )
-        isGuestSheetPresented = false
-    }
-
-    private func handleGuestSheetDismiss() {
-        // Resume the consolidated submit only if the identity is actually
-        // present now (the user may have cancelled the sheet).
-        guard pendingSubmitAfterIdentity, !viewModel.requiresGuestIdentity else {
-            pendingSubmitAfterIdentity = false
-            return
-        }
-        pendingSubmitAfterIdentity = false
-        Task { await viewModel.submitRatingAndComment() }
-    }
+    // The on-form identity fields (DUT-28) live in
+    // ``RecipeDetailRatingsSection+AuthorFields.swift`` — the `authorFields`
+    // builder plus the `AuthorFieldKind` / `AuthorFieldSpec` helpers — so
+    // this struct body stays under the SwiftLint `type_body_length` cap
+    // (same extraction pattern as the view-model `+CommentSubmit` split).
 
     // MARK: - Helpers
 
