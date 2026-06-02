@@ -68,24 +68,15 @@ struct TabStack: View {
                 onSelect: { item in path.append(.recipe(item: item)) },
                 onSave: { item in
                     Task { await Self.saveFromCard(item: item, store: dependencies.store) }
-                },
-                onClearImageCache: { try await dependencies.store.clearImageCache() },
-                settingsDependencies: dependencies.settingsDependencies(),
-                // US-42 / AC-42.1 — toggle ON requests local-notification
-                // authorization through the composition root's service.
-                onRequestNotificationAuthorization: {
-                    await dependencies.notificationService.requestAuthorization()
-                },
-                // US-40 / AC-40.12 + AC-40.13 — the live AVFoundation-backed
-                // voice catalog + preview seam for the Settings Cook Mode Voice
-                // section (quality readout + Preview + download nudge).
-                voicePreviewer: SystemVoicePreviewer()
+                }
             )
+            .modifier(settingsToolbar(identifierStem: "feed"))
         case .categories:
             CategoryListView(
                 viewModel: CategoryListViewModel(dependencies: dependencies.categoriesDependencies()),
                 onSelect: { category in path.append(.category(category)) }
             )
+            .modifier(settingsToolbar(identifierStem: "categories"))
         case .search:
             SearchView(
                 viewModel: SearchViewModel(dependencies: dependencies.searchDependencies()),
@@ -94,6 +85,7 @@ struct TabStack: View {
                     Task { await Self.saveFromCard(item: item, store: dependencies.store) }
                 }
             )
+            .modifier(settingsToolbar(identifierStem: "search"))
         case .saved:
             SavedView(
                 viewModel: SavedViewModel(dependencies: dependencies.savedDependencies()),
@@ -107,7 +99,35 @@ struct TabStack: View {
                     }
                 }
             )
+            .modifier(settingsToolbar(identifierStem: "saved"))
         }
+    }
+
+    /// DUT-26 — the shared trailing Settings gear, wired with the
+    /// composition root's full Settings dependency surface and applied
+    /// identically to every top-level tab root above so the gear is present
+    /// and consistent on Recipes / Categories / Search / Saved. The deps
+    /// (the iCloud-Sync seam, Clear-Cache closure, notification-auth seam,
+    /// and the AVFoundation voice previewer) are the same ones `FeedView`
+    /// received pre-DUT-26 — only the wiring site moved up here so it is
+    /// declared once instead of per-tab. `identifierStem` gives each tab's
+    /// gear a unique accessibility identifier (`<stem>-toolbar-settings`)
+    /// while the visible label stays "Settings" everywhere.
+    private func settingsToolbar(identifierStem: String) -> SettingsToolbarModifier {
+        SettingsToolbarModifier(
+            identifierStem: identifierStem,
+            settingsDependencies: dependencies.settingsDependencies(),
+            onClearImageCache: { try await dependencies.store.clearImageCache() },
+            // US-42 / AC-42.1 — toggle ON requests local-notification
+            // authorization through the composition root's service.
+            onRequestNotificationAuthorization: {
+                await dependencies.notificationService.requestAuthorization()
+            },
+            // US-40 / AC-40.12 + AC-40.13 — the live AVFoundation-backed
+            // voice catalog + preview seam for the Settings Cook Mode Voice
+            // section (quality readout + Preview + download nudge).
+            voicePreviewer: SystemVoicePreviewer()
+        )
     }
 
     @ViewBuilder

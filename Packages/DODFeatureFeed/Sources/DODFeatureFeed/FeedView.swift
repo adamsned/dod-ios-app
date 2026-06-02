@@ -23,51 +23,15 @@ public struct FeedView: View {
     /// no-op; production callers (TabStack) always pass a non-nil closure
     /// that routes through `RecipeStore.toggleSaved` per CL-59.
     public let onSave: ((RecipeListItem) -> Void)?
-    /// US-36 / AC-36.4 — Clear Cached Recipe Images closure plumbed from
-    /// the composition root through the gear-icon NavigationLink into
-    /// `SettingsView`. Optional so existing callers (tests, previews)
-    /// don't need to plumb it. Production callers (TabStack) always
-    /// pass a non-nil closure that routes through
-    /// `RecipeStore.clearImageCache()` and returns freed-byte total.
-    public let onClearImageCache: (() async throws -> Int)?
-    /// US-41 / AC-41.3 (T-703) — the Settings dependency surface the
-    /// iCloud Sync row uses to write the opt-in flag + trigger the
-    /// container rebuild. Optional so non-production callers (tests,
-    /// previews) compile without wiring; production callers (TabStack)
-    /// always pass a `LiveSettingsDependencies`.
-    public let settingsDependencies: (any SettingsDependencies)?
-    /// US-42 / AC-42.1 — authorization seam forwarded into `SettingsView`'s
-    /// `SettingsViewModel` so flipping the notifications toggle ON requests
-    /// system permission. Optional; `nil` means the toggle persists intent
-    /// but reports "not granted" (previews / tests). Production (TabStack)
-    /// passes a closure that calls `NotificationService.requestAuthorization()`.
-    public let onRequestNotificationAuthorization: (@MainActor () async -> Bool)?
-    /// US-40 / AC-40.12 + AC-40.13 (T-721 / T-722) — the voice catalog + preview
-    /// seam forwarded into `SettingsView`'s `SettingsViewModel` so the Cook Mode
-    /// Voice section can show the resolved quality tier, preview the voice, and
-    /// decide whether the "download a better voice" nudge applies. Optional;
-    /// `nil` means the quality readout reads "Unknown" and the nudge stays
-    /// hidden (previews / tests). Production (TabStack) passes a
-    /// `SystemVoicePreviewer` (the only AVFoundation-touching path in this
-    /// package).
-    public let voicePreviewer: (any VoicePreviewing)?
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
-        onSave: ((RecipeListItem) -> Void)? = nil,
-        onClearImageCache: (() async throws -> Int)? = nil,
-        settingsDependencies: (any SettingsDependencies)? = nil,
-        onRequestNotificationAuthorization: (@MainActor () async -> Bool)? = nil,
-        voicePreviewer: (any VoicePreviewing)? = nil
+        onSave: ((RecipeListItem) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
-        self.onClearImageCache = onClearImageCache
-        self.settingsDependencies = settingsDependencies
-        self.onRequestNotificationAuthorization = onRequestNotificationAuthorization
-        self.voicePreviewer = voicePreviewer
     }
 
     public var body: some View {
@@ -84,29 +48,24 @@ public struct FeedView: View {
         // screen's nav-bar title.
         .navigationTitle("Recipes & Articles")
         .toolbar {
-            // US-38 / AC-38.1 / CL-64.5 (T-650): layout toggle declared
-            // BEFORE the gear so the gear stays at the absolute trailing
-            // edge — SwiftUI orders multiple ToolbarItems in the same
-            // group from leading to trailing in declaration order.
-            // US-32 AC-32.1: gear icon on the trailing edge of the Recipes
-            // nav bar pushes the Settings page. NavigationLink lives in the
-            // toolbar so it inherits the standard back button on the pushed
-            // screen; the existing TabStack NavigationStack hosts the push.
+            // US-38 / AC-38.1 / CL-64.5 (T-650): layout toggle on the
+            // trailing edge. The Settings gear that used to sit to its
+            // trailing side (US-32 AC-32.1) moved to the shared
+            // `SettingsToolbarModifier` applied by `TabStack` (DUT-26) so
+            // every top-level tab carries the same gear at the absolute
+            // trailing edge. Because `TabStack` applies that modifier AFTER
+            // this view in the modifier chain, SwiftUI still orders the gear
+            // to the trailing side of this toggle — the user-visible layout
+            // (toggle then gear) is unchanged on Feed.
             // `.topBarTrailing` is iOS-only; macOS test slice falls back to
             // the default `.automatic` placement so the package still builds.
             #if os(iOS)
             ToolbarItem(placement: .topBarTrailing) {
                 layoutToggleToolbarButton
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                settingsToolbarLink
-            }
             #else
             ToolbarItem(placement: .automatic) {
                 layoutToggleToolbarButton
-            }
-            ToolbarItem(placement: .automatic) {
-                settingsToolbarLink
             }
             #endif
         }
@@ -114,28 +73,6 @@ public struct FeedView: View {
         .refreshable { await viewModel.refresh() }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isOffline)
         .sensoryFeedback(.success, trigger: viewModel.refreshCount)
-    }
-
-    /// The toolbar gear-icon NavigationLink (US-32 AC-32.1). Extracted so
-    /// the `#if os(iOS)` placement branch + the macOS fallback share one
-    /// label definition. The `onClearImageCache` closure (US-36 / AC-36.4)
-    /// is forwarded into `SettingsView` so the Clear Cache row's tap
-    /// routes through the composition root's `RecipeStore` instance.
-    private var settingsToolbarLink: some View {
-        NavigationLink {
-            SettingsView(
-                viewModel: SettingsViewModel(
-                    dependencies: settingsDependencies,
-                    voicePreviewer: voicePreviewer,
-                    requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
-                ),
-                onClearImageCache: onClearImageCache
-            )
-        } label: {
-            Image(systemName: "gearshape")
-                .accessibilityLabel("Settings")
-        }
-        .accessibilityIdentifier("feed-toolbar-settings")
     }
 
     /// US-38 / AC-38.1 / CL-64 (T-650): the layout-toggle button. Sits to
