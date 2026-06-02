@@ -75,7 +75,9 @@ public final class RecipeDetailViewModel {
 
     // MARK: - Comments + ratings state (US-13/14/15)
 
-    public private(set) var ratingSummary: RecipeRating?
+    // `internal(set)` so the `+CommentSubmit` extension can refresh the
+    // aggregate after recording a rating alongside a comment (DUT-31).
+    public internal(set) var ratingSummary: RecipeRating?
     // `internal(set)` (not `private(set)`) so the comment-submit path in
     // `RecipeDetailViewModel+CommentSubmit.swift` can mutate the visible
     // thread + draft + in-flight flag after extraction (DUT-7). Public
@@ -83,8 +85,9 @@ public final class RecipeDetailViewModel {
     public internal(set) var comments: [RecipeComment] = []
     public private(set) var commentsLoadState: CommentsLoadState = .idle
     /// Current selection in the `StarRatingInput` before the user taps
-    /// "Submit rating". 0 means "no selection".
-    public private(set) var pendingUserRating: Int = 0
+    /// "Submit rating". 0 means "no selection". `internal(set)` so the
+    /// combined comment + rating submit (DUT-31) can reaffirm the value.
+    public internal(set) var pendingUserRating: Int = 0
     public internal(set) var commentDraft: String = ""
     public internal(set) var isSubmittingComment: Bool = false
     public private(set) var isSubmittingRating: Bool = false

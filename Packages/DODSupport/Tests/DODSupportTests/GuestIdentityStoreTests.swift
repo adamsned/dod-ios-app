@@ -1,3 +1,5 @@
+import Foundation
+import Security
 import Testing
 
 @testable import DODSupport
@@ -91,5 +93,101 @@ struct KeychainStoreCompileSmokeTests {
         // assertion via the protocol-bound variable below.
         let _: any GuestIdentityStoring = store
         #expect(KeychainGuestIdentityStore.defaultService == "com.dutchovendaddy.DODApp.guest")
+    }
+}
+
+// MARK: - Device-local attribute contract (DUT-30)
+
+/// DUT-30: the build-9 report had "Spencer Adams" pre-filling the comment
+/// form on a device that never typed it — a guest identity that synced in
+/// over iCloud Keychain from another Apple ID that had also commented on the
+/// recipe. The fix makes the Keychain item DEVICE-LOCAL: every `SecItem*`
+/// query (add / read / update / delete) must pin
+/// `kSecAttrSynchronizable: false` so a value saved on one device never
+/// appears on another.
+///
+/// These tests assert on the pure attribute builders rather than calling
+/// `SecItem*`, because `swift test` runs outside a signed bundle where the
+/// real Keychain is unreliable (see the suite note above). Asserting the
+/// dictionaries is the deterministic way to lock the device-local contract on
+/// every PR; the XCUITest L3 target exercises the live round-trip.
+@Suite("KeychainGuestIdentityStore device-local attributes (DUT-30)")
+struct KeychainStoreDeviceLocalTests {
+
+    private static let service = "com.dutchovendaddy.DODApp.guest.test"
+
+    /// The shared base query (used by read + delete) is pinned non-syncable
+    /// AND uses the boolean `false`, not a present-but-truthy value — a query
+    /// that omitted the key, or set it to `kSecAttrSynchronizableAny`, would
+    /// match iCloud-synced rows and reintroduce the cross-device leak.
+    @Test func baseQueryIsNonSynchronizable() {
+        let query = KeychainGuestIdentityStore.baseQuery(
+            service: Self.service,
+            account: KeychainGuestIdentityStore.emailAccount,
+            accessGroup: nil
+        )
+        let sync = try? #require(query[kSecAttrSynchronizable as String])
+        #expect(sync as? Bool == false)
+        // It must be an explicit non-synchronizable flag, never the
+        // "match either" wildcard that would let a synced row through.
+        #expect((query[kSecAttrSynchronizable as String] as? String) != (kSecAttrSynchronizableAny as String))
+    }
+
+    /// The add attributes inherit the device-local flag AND keep the
+    /// after-first-unlock accessibility. Accessibility and synchronizability
+    /// are independent: the pre-fix code set accessibility and *assumed* that
+    /// stopped iCloud sync — it does not. Both must be present.
+    @Test func addAttributesAreNonSynchronizableAndAccessibleAfterFirstUnlock() {
+        let attributes = KeychainGuestIdentityStore.addAttributes(
+            service: Self.service,
+            account: KeychainGuestIdentityStore.displayNameAccount,
+            accessGroup: nil,
+            value: "Ned"
+        )
+        #expect(attributes[kSecAttrSynchronizable as String] as? Bool == false)
+        #expect(
+            (attributes[kSecAttrAccessible as String] as? String)
+                == (kSecAttrAccessibleAfterFirstUnlock as String)
+        )
+        // The bytes we add are the UTF-8 of the value.
+        #expect(attributes[kSecValueData as String] as? Data == Data("Ned".utf8))
+    }
+
+    /// Read, add, AND delete must address the SAME device-local row: all
+    /// three carry `kSecAttrSynchronizable: false` so an identity saved on one
+    /// device is never read, updated, or deleted against an iCloud-synced
+    /// twin. (`delete` and `read` both go through `baseQuery`; `add` through
+    /// `addAttributes`, which is built on `baseQuery`.)
+    @Test func addAndQueryAgreeOnDeviceLocalFlag() {
+        let queryFlag =
+            KeychainGuestIdentityStore.baseQuery(
+                service: Self.service,
+                account: KeychainGuestIdentityStore.emailAccount,
+                accessGroup: nil
+            )[kSecAttrSynchronizable as String] as? Bool
+        let addFlag =
+            KeychainGuestIdentityStore.addAttributes(
+                service: Self.service,
+                account: KeychainGuestIdentityStore.emailAccount,
+                accessGroup: nil,
+                value: "ned@example.com"
+            )[kSecAttrSynchronizable as String] as? Bool
+        #expect(queryFlag == false)
+        #expect(addFlag == false)
+        #expect(queryFlag == addFlag)
+    }
+
+    /// When an access group is configured it is threaded through unchanged
+    /// while the device-local flag stays pinned — the two attributes are
+    /// orthogonal and must not clobber each other.
+    @Test func accessGroupIsPreservedAlongsideDeviceLocalFlag() {
+        let group = "ABCDE12345.com.dutchovendaddy.shared"
+        let query = KeychainGuestIdentityStore.baseQuery(
+            service: Self.service,
+            account: KeychainGuestIdentityStore.emailAccount,
+            accessGroup: group
+        )
+        #expect(query[kSecAttrAccessGroup as String] as? String == group)
+        #expect(query[kSecAttrSynchronizable as String] as? Bool == false)
     }
 }

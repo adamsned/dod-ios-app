@@ -45,15 +45,20 @@ extension RecipeDetailViewModel {
         isSubmittingRating || isSubmittingComment
     }
 
-    /// DUT-24 / DUT-28: single entry point for the consolidated "name +
-    /// email + rate (stars) + optional comment + Submit" surface. Validates
-    /// the on-form author identity, persists it, then routes to the
-    /// existing, unchanged network methods so the rating/comment POST logic
-    /// stays owned by its current paths (presentation-layer orchestration
-    /// only, not a new network call):
+    /// DUT-24 / DUT-28 / DUT-31: single entry point for the consolidated
+    /// "name + email + rate (stars) + optional comment + Submit" surface.
+    /// Validates the on-form author identity, persists it, then routes to the
+    /// existing network methods so the rating/comment POST logic stays owned
+    /// by its current paths (presentation-layer orchestration only):
     ///
-    /// * a non-blank comment → ``submitComment()``, which already carries
-    ///   the pending star rating alongside the body (AC-14.4);
+    /// * comment **and** stars → record the rating via the proven WPRM path
+    ///   (``recordRatingAlongsideComment(stars:)``) **and** post the comment
+    ///   (``submitComment()``). DUT-31: the comment meta alone does NOT land
+    ///   the rating (WordPress drops `meta.wprm_comment_rating` on REST
+    ///   comment create — it is not registered for writes), so the rating has
+    ///   to go through `wp-recipe-maker/v1/rating` — the same mechanism the
+    ///   rating-only path already uses successfully — or it is silently lost.
+    /// * a non-blank comment, no stars → ``submitComment()`` only.
     /// * stars only (no comment) → ``submitRating(stars:)``.
     ///
     /// DUT-28: the name + email now live on the form (no pop-up). An invalid
@@ -81,9 +86,55 @@ extension RecipeDetailViewModel {
         await persistAuthorIdentity(name: name, email: email)
 
         if hasComment {
+            // DUT-31: when the user rated AND commented, record the rating via
+            // the WPRM endpoint FIRST (the comment meta won't carry it), then
+            // post the comment so the comment's snackbar is the final, primary
+            // confirmation the user sees. The rating step is quiet on its own —
+            // it never overwrites the comment's success/failure message.
+            if hasRating {
+                await recordRatingAlongsideComment(stars: pendingUserRating)
+            }
             await submitComment()
         } else {
             await submitRating(stars: pendingUserRating)
+        }
+    }
+
+    /// DUT-31: record the star rating through the proven WPRM path
+    /// (`wp-recipe-maker/v1/rating`, the same call ``submitRating(stars:)``
+    /// makes) as part of a combined comment **+** rating submit, WITHOUT
+    /// touching the snackbar.
+    ///
+    /// Why a separate, quiet helper instead of reusing ``submitRating(stars:)``
+    /// here: in the combined flow the comment is the user's primary action and
+    /// owns the snackbar ("Comment posted." / "…after approval." / an error).
+    /// ``submitRating(stars:)`` would clobber that with "Thanks for rating.",
+    /// and a rating hiccup must not surface a scary "Couldn't save your
+    /// rating" when the comment itself succeeded. So this path updates the
+    /// summary + caches the new aggregate on success and only LOGS on failure
+    /// — the comment, which lands on its own POST, is unaffected either way.
+    func recordRatingAlongsideComment(stars: Int) async {
+        guard (1...5).contains(stars) else { return }
+        let name = commentAuthorName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let email = commentAuthorEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !email.isEmpty else { return }
+        do {
+            let updated = try await dependencies.postRating(
+                recipeID: listItem.id,
+                stars: stars,
+                name: name,
+                email: email
+            )
+            ratingSummary = updated
+            pendingUserRating = stars
+            await dependencies.cacheRatingSummary(updated)
+        } catch {
+            // Quiet on failure: the comment POST owns the user-facing result,
+            // and the rating can be re-submitted from the stars control. Log
+            // for the on-device diagnostic trail (DUT-7 parity).
+            DODLog.network.error(
+                "rating-alongside-comment failed: \(String(describing: error))"
+            )
         }
     }
 
