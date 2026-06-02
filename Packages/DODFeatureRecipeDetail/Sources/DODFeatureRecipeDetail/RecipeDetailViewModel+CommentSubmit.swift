@@ -1,3 +1,4 @@
+import DODDomain
 import DODSupport
 import Foundation
 
@@ -88,18 +89,37 @@ extension RecipeDetailViewModel {
             let awaitingApproval = posted.status != .approved
             if !awaitingApproval {
                 // Prepend the approved comment so the user sees it land.
-                comments.insert(posted, at: 0)
+                insertPostedCommentIfNew(posted)
                 await dependencies.cacheComments(comments, postID: listItem.id)
                 snackbarMessage = "Comment posted."
             } else {
-                // AC-14.4: held comments are NOT prepended to the visible
-                // list — we only render approved rows.
-                snackbarMessage = "Submitted for moderation."
+                // DUT-27: WordPress holds new comments for moderation, so the
+                // returned comment has a pending/hold status and the
+                // approved-comments GET will NOT return it on refresh. The
+                // priority is that the user clearly knows the post SUCCEEDED so
+                // they do not re-submit (the build-8 duplicate loop). Show a
+                // prominent positive confirmation AND optimistically insert the
+                // just-posted comment locally — `CommentRow` renders any
+                // non-approved status with the "Awaiting approval" badge
+                // (US-15), so the user sees their words on screen immediately.
+                insertPostedCommentIfNew(posted)
+                await dependencies.cacheComments(comments, postID: listItem.id)
+                snackbarMessage = "Comment submitted — it will appear after approval."
             }
             commentDraft = ""
         } catch {
             DODLog.network.error("post comment failed: \(String(describing: error))")
             snackbarMessage = Self.commentErrorSnackbar(for: error)
         }
+    }
+
+    /// Prepend a freshly-posted comment to the visible list, skipping it if a
+    /// comment with the same WP id is already present. Guarding on id keeps
+    /// the `ForEach` (keyed by `RecipeComment.id`) free of duplicate-key
+    /// glitches if a submit is somehow retried, and avoids a double row when a
+    /// later refresh returns the now-approved comment. DUT-27.
+    func insertPostedCommentIfNew(_ comment: RecipeComment) {
+        guard !comments.contains(where: { $0.id == comment.id }) else { return }
+        comments.insert(comment, at: 0)
     }
 }

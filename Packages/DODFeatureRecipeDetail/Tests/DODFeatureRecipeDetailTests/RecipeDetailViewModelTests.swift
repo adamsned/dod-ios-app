@@ -265,9 +265,14 @@ import Testing
         viewModel.setCommentDraft("Held comment.")
         await viewModel.submitComment()
 
-        // AC-14.4: held comments must NOT be prepended.
-        #expect(viewModel.comments.contains { $0.id == 1000 } == false)
-        #expect(viewModel.snackbarMessage == "Submitted for moderation.")
+        // DUT-27: a held comment IS optimistically prepended (still flagged
+        // `.hold`, so `CommentRow` shows the "Awaiting approval" badge) and the
+        // confirmation makes the success unmistakable so the user doesn't
+        // re-submit. This supersedes the earlier "held comments are not
+        // prepended" behavior that left the user unsure the post landed.
+        let inserted = try #require(viewModel.comments.first { $0.id == 1000 })
+        #expect(inserted.status == .hold)
+        #expect(viewModel.snackbarMessage == "Comment submitted — it will appear after approval.")
         let submitted = dependencies.telemetryEvents.compactMap { event -> Bool? in
             if case .recipeCommentSubmitted(_, let awaiting) = event { return awaiting }
             return nil
