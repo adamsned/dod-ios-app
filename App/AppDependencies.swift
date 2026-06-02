@@ -257,7 +257,17 @@ final class AppDependencies {
     }
 
     func savedDependencies() -> some SavedDependencies {
-        LiveSavedDependencies(store: store, imageLoader: imageLoader)
+        // DUT-6 (UI-refresh half): feed the Saved view model a stream of
+        // CloudKit remote-import signals so a recipe saved on another device
+        // appears here without a relaunch. The stream is built in the App
+        // target (the only place CloudKit + Core Data are linked) from
+        // `NotificationCenter`; the `DODFeatureSaved` package consumes it
+        // abstractly through the `SavedDependencies.remoteChanges()` seam.
+        LiveSavedDependencies(
+            store: store,
+            imageLoader: imageLoader,
+            remoteChangeStream: { SavedRemoteChangeBridge.makeStream() }
+        )
     }
 
     /// US-41 / AC-41.3 (T-703) + DUT-6. Build the Settings dependency

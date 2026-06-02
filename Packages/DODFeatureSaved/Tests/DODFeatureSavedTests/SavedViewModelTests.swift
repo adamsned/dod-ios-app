@@ -84,6 +84,87 @@ import Testing
         #expect(viewModel.loadState == .loaded)
     }
 
+    // DUT-6 — the Saved tab must re-fetch when CloudKit imports a recipe
+    // saved on another device, instead of staying stale until relaunch. The
+    // view model subscribes to `dependencies.remoteChanges()`; firing a
+    // synthetic signal through the fake must drive `savedRecipes()` again and
+    // surface the newly-arrived recipe.
+
+    @Test func remoteChangeSignalTriggersRefetch() async {
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+
+        viewModel.startObserving()
+        await viewModel.refresh()
+        #expect(viewModel.recipes.map(\.id) == [1])
+
+        // Simulate the remote import: a second recipe lands in the store on
+        // another device, then the CloudKit mirror posts a remote-change.
+        dependencies.recipes = [Self.makeRecipe(id: 2), Self.makeRecipe(id: 1)]
+        dependencies.fireRemoteChange()
+
+        await Self.expectEventually { viewModel.recipes.map(\.id) == [2, 1] }
+        #expect(viewModel.loadState == .loaded)
+    }
+
+    @Test func remoteChangeRefetchSurfacesEmptyStateAfterRemoteUnsave() async {
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+
+        viewModel.startObserving()
+        await viewModel.refresh()
+        #expect(viewModel.loadState == .loaded)
+
+        // The other device unsaved the last recipe; the import empties the
+        // store, and the re-fetch must transition to the empty state.
+        dependencies.recipes = []
+        dependencies.fireRemoteChange()
+
+        await Self.expectEventually { viewModel.loadState == .empty }
+        #expect(viewModel.recipes.isEmpty)
+    }
+
+    @Test func remoteChangeBurstCoalescesIntoOneRefetch() async {
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+
+        viewModel.startObserving()
+        await viewModel.refresh()
+        // The appear-time refresh is the only call so far.
+        #expect(dependencies.savedRecipesCallCount == 1)
+
+        // CloudKit commonly imports several record zones back-to-back. Fire a
+        // burst; the debounce must collapse it to a single re-fetch.
+        dependencies.recipes = [Self.makeRecipe(id: 2), Self.makeRecipe(id: 1)]
+        for _ in 0..<8 {
+            dependencies.fireRemoteChange()
+        }
+
+        await Self.expectEventually { viewModel.recipes.map(\.id) == [2, 1] }
+        // 1 appear-time refresh + exactly 1 debounced refresh for the burst.
+        #expect(dependencies.savedRecipesCallCount == 2)
+    }
+
+    /// Poll `condition` on the main actor until it holds or the timeout
+    /// elapses. The remote-change path debounces with a real `Task.sleep`, so
+    /// tests await the resulting state rather than a fixed delay (avoids both
+    /// flakiness and over-sleeping). Default budget comfortably exceeds the
+    /// 300ms debounce.
+    static func expectEventually(
+        timeout: Duration = .seconds(2),
+        _ condition: @MainActor () -> Bool
+    ) async {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while ContinuousClock.now < deadline {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(condition(), "condition did not become true within \(timeout)")
+    }
+
     static func makeRecipe(id: Int) -> Recipe {
         Recipe(
             id: id,
@@ -102,13 +183,36 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     var recipes: [Recipe] = []
     var shouldFail = false
     var preDownloadedRecipeIDs: [Int] = []
+    /// Number of times ``savedRecipes()`` has been called — lets a test assert
+    /// the view model coalesces a remote-change burst into a single re-fetch.
+    private(set) var savedRecipesCallCount = 0
+
+    /// Synthetic remote-change trigger (DUT-6). The view model subscribes to
+    /// ``remoteChanges()``; a test calls ``fireRemoteChange()`` to simulate a
+    /// CloudKit import landing, then asserts the view model re-fetched.
+    private let remoteChangeStream: AsyncStream<Void>
+    private let remoteChangeContinuation: AsyncStream<Void>.Continuation
+
+    init() {
+        (remoteChangeStream, remoteChangeContinuation) = AsyncStream.makeStream()
+    }
 
     func savedRecipes() async throws -> [Recipe] {
+        savedRecipesCallCount += 1
         if shouldFail { throw URLError(.unknown) }
         return recipes
     }
 
     func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {
         preDownloadedRecipeIDs.append(recipeID)
+    }
+
+    func remoteChanges() -> AsyncStream<Void> {
+        remoteChangeStream
+    }
+
+    /// Simulate one CloudKit remote-import signal reaching the view model.
+    func fireRemoteChange() {
+        remoteChangeContinuation.yield(())
     }
 }
