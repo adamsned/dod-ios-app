@@ -40,6 +40,33 @@ struct WPCommentsClientPostFailureTests {
         }
     }
 
+    /// DUT-27: the build-8 duplicate report. WordPress returns the 409 with a
+    /// `message` that carries the HTML entity `&#8217;` for the apostrophe.
+    /// The surfaced `httpStatusWithBody` message must be entity-decoded so the
+    /// view layer never shows "you&#8217;ve" — it shows "you’ve".
+    @Test func duplicate409EntityInMessageIsDecodedWhenSurfaced() async throws {
+        let errorBody = #"""
+            {"code":"comment_duplicate","message":"Duplicate comment detected; it looks as though you&#8217;ve already said that!","data":{"status":409}}
+            """#
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "comments", json: Data(errorBody.utf8), statusCode: 409)
+        let client = WPCommentsClient(httpClient: fake)
+
+        do {
+            _ = try await client.postComment(
+                postID: 1,
+                authorName: "Ned",
+                authorEmail: "ned@example.com",
+                content: "I love this recipe!"
+            )
+            Issue.record("Expected a 409 to throw")
+        } catch let WPClientError.httpStatusWithBody(code, message) {
+            #expect(code == 409)
+            #expect(!message.contains("&#"), "Entity must be decoded out of the surfaced message")
+            #expect(message.contains("you\u{2019}ve already said that"))
+        }
+    }
+
     /// A Wordfence-style HTML challenge (403, no JSON) still surfaces a
     /// tag-stripped snippet rather than collapsing to a bare code.
     @Test func htmlSecurityChallengeBodyIsStrippedAndSurfaced() async throws {

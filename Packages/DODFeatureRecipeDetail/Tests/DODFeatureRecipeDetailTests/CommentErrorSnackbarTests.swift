@@ -36,6 +36,29 @@ struct CommentErrorSnackbarTests {
         #expect(snackbar == "Couldn't post your comment (server said 403).")
     }
 
+    /// DUT-27 (build 8): a bare 409 is WordPress's duplicate verdict. Show the
+    /// friendly "already posted" line, not "server said 409", so the user
+    /// stops re-submitting a comment that already reached moderation.
+    @Test func bareHTTPStatus409SurfacesDuplicateFriendlyMessage() {
+        let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
+            for: WPClientError.httpStatus(409)
+        )
+        #expect(snackbar == "Looks like you already posted this — it may be awaiting approval.")
+    }
+
+    /// DUT-27 (build 8): the exact shape from the report — a 409 carrying the
+    /// WordPress "Duplicate comment detected …" message. The raw server text
+    /// is replaced with the friendly duplicate line rather than surfaced.
+    @Test func httpStatus409WithBodySurfacesDuplicateFriendlyMessage() {
+        let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
+            for: WPClientError.httpStatusWithBody(
+                409,
+                message: "Duplicate comment detected; it looks as though you\u{2019}ve already said that!"
+            )
+        )
+        #expect(snackbar == "Looks like you already posted this — it may be awaiting approval.")
+    }
+
     /// DUT-7 / AC-14.4: when WordPress hands back a reason, the snackbar
     /// surfaces the code AND the message — not just the number — so the
     /// user (and a TestFlight reporter reading the chip) sees *why* it failed.

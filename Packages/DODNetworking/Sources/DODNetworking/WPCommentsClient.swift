@@ -236,7 +236,10 @@ public struct WPCommentsClient: Sendable {
 
     /// Minimal tag stripper — WP `message` fields can contain inline `<code>`
     /// / `<a>` markup, and security-plugin bodies are full HTML pages. Keeps
-    /// the snackbar readable without pulling in a full HTML parser.
+    /// the snackbar readable without pulling in a full HTML parser. Tags are
+    /// dropped, then HTML entities are decoded so a WordPress message like
+    /// "you&#8217;ve already said that" reads "you've already said that"
+    /// instead of leaking the raw entity (DUT-27).
     static func stripHTML(_ string: String) -> String {
         let withoutTags = string.replacingOccurrences(
             of: "<[^>]+>",
@@ -244,10 +247,7 @@ public struct WPCommentsClient: Sendable {
             options: .regularExpression
         )
         return
-            withoutTags
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&#039;", with: "'")
-            .replacingOccurrences(of: "&quot;", with: "\"")
+            HTMLEntityDecoder.decode(withoutTags)
             .replacingOccurrences(of: "  ", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }

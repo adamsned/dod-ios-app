@@ -68,6 +68,83 @@ struct RecipeDetailCommentSubmitTests {
         #expect(viewModel.comments.first?.id == 1001)
     }
 
+    /// DUT-27: a successful post that WordPress holds for moderation (status
+    /// `.hold`) must (a) show the prominent positive confirmation so the user
+    /// knows it SUCCEEDED and does not re-submit, (b) clear the draft, and
+    /// (c) optimistically insert the pending comment locally so the user sees
+    /// their words — `CommentRow` renders the non-approved status with the
+    /// "Awaiting approval" badge.
+    @Test func submitCommentPendingShowsConfirmationAndInsertsLocally() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 80, withDetail: true)
+        dependencies.guestIdentity = (name: "Ned", email: "ned@example.com")
+        dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
+            id: 5001,
+            postID: 80,
+            body: "I love this recipe!",
+            status: .hold
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 80)
+        await viewModel.onAppear()
+
+        viewModel.setCommentDraft("I love this recipe!")
+        await viewModel.submitComment()
+
+        #expect(viewModel.snackbarMessage == "Comment submitted — it will appear after approval.")
+        // Draft cleared so the field reads "submitted", reducing re-submits.
+        #expect(viewModel.commentDraft.isEmpty)
+        // Optimistically inserted, and still flagged pending so the row shows
+        // the "Awaiting approval" badge.
+        #expect(viewModel.comments.first?.id == 5001)
+        #expect(viewModel.comments.first?.status == .hold)
+        // The pending comment was cached so a relaunch keeps showing it.
+        let cachedWrite = dependencies.cachedCommentWrites.last
+        #expect(cachedWrite?.comments.first?.id == 5001)
+    }
+
+    /// DUT-27 (build 8): a 409 that carries the WordPress "Duplicate comment
+    /// detected …" body surfaces the FRIENDLY duplicate line end-to-end — not
+    /// the raw "server said 409: …" text — and the draft is preserved.
+    @Test func submitCommentDuplicate409ShowsFriendlyMessage() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 81, withDetail: true)
+        dependencies.guestIdentity = (name: "Ned", email: "ned@example.com")
+        dependencies.postCommentError = WPClientError.httpStatusWithBody(
+            409,
+            message: "Duplicate comment detected; it looks as though you\u{2019}ve already said that!"
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 81)
+        await viewModel.onAppear()
+
+        viewModel.setCommentDraft("I love this recipe!")
+        await viewModel.submitComment()
+
+        #expect(
+            viewModel.snackbarMessage == "Looks like you already posted this — it may be awaiting approval."
+        )
+        #expect(viewModel.snackbarMessage?.contains("409") == false)
+        // Draft preserved (the user might be trying to edit + repost).
+        #expect(viewModel.commentDraft == "I love this recipe!")
+    }
+
+    /// DUT-27: a bare `.httpStatus(409)` (no body) on this path is also a
+    /// duplicate verdict and gets the same friendly treatment.
+    @Test func submitCommentBare409ShowsFriendlyMessage() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 82, withDetail: true)
+        dependencies.guestIdentity = (name: "Ned", email: "ned@example.com")
+        dependencies.postCommentError = WPClientError.httpStatus(409)
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 82)
+        await viewModel.onAppear()
+
+        viewModel.setCommentDraft("I love this recipe!")
+        await viewModel.submitComment()
+
+        #expect(
+            viewModel.snackbarMessage == "Looks like you already posted this — it may be awaiting approval."
+        )
+    }
+
     /// A non-2xx with a WP message surfaces the category-specific snackbar
     /// (no silent failure) — the end-to-end view-model assertion for AC-14.4.
     @Test func submitCommentSurfacesServerErrorMessageOnFailure() async throws {
