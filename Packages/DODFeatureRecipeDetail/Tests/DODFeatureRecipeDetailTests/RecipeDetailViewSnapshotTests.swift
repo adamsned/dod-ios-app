@@ -60,6 +60,31 @@ final class RecipeDetailViewSnapshotTests: XCTestCase {
         )
     }
 
+    /// DUT-17 regression lock. A very long ingredient (and a long
+    /// instruction step) must WRAP to multiple lines within the row at a
+    /// narrow device width — never clip at the trailing edge or push the
+    /// document into horizontal scroll. The baseline pins the wrapped shape;
+    /// a regression that drops the row's `.fixedSize(horizontal: false,
+    /// vertical: true)` re-clips the text and fails the diff.
+    @MainActor
+    func test_recipeDetail_longIngredientWraps_doesNotClip() async {
+        let viewModel = await Self.makeReadyViewModelWithLongRows(id: 9103)
+
+        let view = RecipeDetailView(
+            viewModel: viewModel,
+            onSelectRelated: { _ in }
+        )
+        .frame(width: 390, height: 1600)
+        .preferredColorScheme(.light)
+        assertSnapshot(
+            of: view,
+            as: .image(
+                layout: .device(config: .iPhone13),
+                traits: UITraitCollection(userInterfaceStyle: .light)
+            )
+        )
+    }
+
     @MainActor
     func test_recipeDetail_expandedBlurb_renders() async {
         let viewModel = await Self.makeReadyViewModelWithBlurb(id: 9102)
@@ -104,6 +129,55 @@ final class RecipeDetailViewSnapshotTests: XCTestCase {
             </div>
             </body></html>
             """
+        let viewModel = RecipeDetailViewModel(
+            listItem: RecipeDetailTestFixtures.makeListItem(id: id),
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
+                ?? URL(filePath: "/"),
+            dependencies: dependencies
+        )
+        await viewModel.onAppear()
+        return viewModel
+    }
+
+    /// Ready-state view model whose recipe carries a deliberately overlong
+    /// ingredient and instruction step — the DUT-17 reproduction. The
+    /// ingredient mirrors the cut-off row from Spencer's recording
+    /// ("1 1/2 cups oats (old fashioned rolled oats…)"). Used by
+    /// `test_recipeDetail_longIngredientWraps_doesNotClip`.
+    @MainActor
+    static func makeReadyViewModelWithLongRows(id: Int) async -> RecipeDetailViewModel {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = Recipe(
+            id: id,
+            slug: "slug-\(id)",
+            title: "Recipe \(id)",
+            excerpt: "Tasty.",
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
+                ?? URL(filePath: "/"),
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            ingredients: [
+                .init(
+                    text: "1 1/2 cups oats (old fashioned rolled oats, not "
+                        + "quick oats — the extra body keeps the topping from "
+                        + "turning to mush as the cobbler bakes)"
+                ),
+                .init(text: "1/2 tsp salt"),
+            ],
+            instructions: [
+                .init(
+                    step: 1,
+                    text: "Spread the oat topping evenly over the fruit, right "
+                        + "to the edges of the dutch oven, then bake with the "
+                        + "lid off until the top is deep golden brown and the "
+                        + "filling bubbles up around the sides."
+                )
+            ],
+            totalTime: .seconds(15 * 60),
+            servings: 6
+        )
+        // No narrative blurb — keep the snapshot focused on the ingredient +
+        // instruction rows that DUT-17 is about.
+        dependencies.htmlToReturn = "<html><body></body></html>"
         let viewModel = RecipeDetailViewModel(
             listItem: RecipeDetailTestFixtures.makeListItem(id: id),
             canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")

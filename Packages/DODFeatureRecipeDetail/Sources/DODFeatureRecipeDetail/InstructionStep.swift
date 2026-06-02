@@ -23,6 +23,10 @@ public struct InstructionStepView: View {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
                 .lineSpacing(DODSpacing.xxs)
+                // DUT-17: wrap long instruction text to multiple lines rather
+                // than overflowing the row horizontally. See IngredientCheckRow
+                // for the rationale on pairing `.fixedSize` with `.frame`.
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)

@@ -37,6 +37,14 @@ public struct IngredientCheckRow: View {
                     .foregroundStyle(isChecked ? DODColor.labelSecondary : DODColor.label)
                     .strikethrough(isChecked, color: DODColor.labelSecondary)
                     .animation(.easeInOut(duration: 0.15), value: isChecked)
+                    // DUT-17: wrap long ingredient text to multiple lines
+                    // instead of letting it overflow the row's trailing edge
+                    // (which made the recipe detail scroll horizontally).
+                    // `.frame(maxWidth: .infinity)` alone leaves the Text free
+                    // to take its single-line ideal width; pinning the
+                    // horizontal axis forces it to honor the proposed width
+                    // and grow vertically instead.
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.vertical, DODSpacing.xs)
