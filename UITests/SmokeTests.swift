@@ -259,7 +259,7 @@ final class SmokeTests: XCTestCase {
     /// notifications toggle from US-36 / AC-36.1 is the positive signal),
     /// then negative-asserts the deleted DEBUG button does NOT exist. The
     /// positive notifications-toggle assertion doubles as a Settings-page-
-    /// reachable check — if the gear ever stops pushing into Settings, the
+    /// reachable check — if the gear ever stops opening Settings, the
     /// toggle won't appear and the test catches both failure modes. L3 (not
     /// L5) because the Settings page is a fast-reachability surface and the
     /// test wall-clock should stay under 5s — AC-T2 pyramid level for
