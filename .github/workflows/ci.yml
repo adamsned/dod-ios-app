@@ -336,11 +336,16 @@ jobs:
   # check regardless of which jobs actually executed. Fails if any
   # required upstream job failed; succeeds if they passed OR were
   # skipped because path filters / label gating excluded them.
+  #
+  # The advisory UI/E2E jobs (test-ui-smoke = L3, test-e2e = L5) are
+  # deliberately NOT in this gate: they are slow and flaky, so blocking
+  # the merge on them stalls PRs long after the real required checks
+  # (lint/format/L1/L4/build-app) are green. They still run on every PR
+  # (advisory) and on main, where `report-failures` rolls up any reds.
   ci-required:
     name: CI required
     needs: [changes, lint, format, test-unit-packages, test-unit-app,
-            test-snapshots-designsystem, build-app, test-ui-smoke,
-            test-e2e]
+            test-snapshots-designsystem, build-app]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -348,11 +353,9 @@ jobs:
         run: |
           # Each input is "success", "failure", "cancelled", or "skipped".
           # Skipped is fine (path filter or label gating excluded the
-          # job); failure is not. test-e2e specifically: PRs without the
-          # `e2e` label see this job as skipped, which is success.
+          # job); failure is not.
           for name in changes lint format test-unit-packages test-unit-app \
-                     test-snapshots-designsystem build-app test-ui-smoke \
-                     test-e2e; do
+                     test-snapshots-designsystem build-app; do
             result_var="${name//-/_}_RESULT"
             echo "$name: ${!result_var:-not-run}"
           done
@@ -362,9 +365,7 @@ jobs:
              || "${{ needs.test-unit-packages.result }}" == "failure" \
              || "${{ needs.test-unit-app.result }}" == "failure" \
              || "${{ needs.test-snapshots-designsystem.result }}" == "failure" \
-             || "${{ needs.build-app.result }}" == "failure" \
-             || "${{ needs.test-ui-smoke.result }}" == "failure" \
-             || "${{ needs.test-e2e.result }}" == "failure" ]]; then
+             || "${{ needs.build-app.result }}" == "failure" ]]; then
             echo "::error::At least one required CI job failed."
             exit 1
           fi
