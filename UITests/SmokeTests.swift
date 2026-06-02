@@ -273,7 +273,9 @@ final class SmokeTests: XCTestCase {
             "Tab bar should appear within 8 seconds"
         )
 
-        // Tap the gear icon. Per `FeedView.settingsToolbarLink`, the
+        // Tap the gear icon. Per the shared `SettingsToolbarModifier`
+        // (DUT-26 — applied to every tab by `TabStack`, replacing the
+        // pre-DUT-26 per-view `FeedView.settingsToolbarLink`), the
         // accessibility label is "Settings" (on the `Image(systemName:
         // "gearshape")`). The accessibility identifier
         // `feed-toolbar-settings` is also available as a secondary handle.
