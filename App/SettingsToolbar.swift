@@ -1,4 +1,5 @@
 import DODFeatureFeed
+import DODFeatureProfile
 import SwiftUI
 
 /// Shared trailing-edge Settings gear, applied at the composition root so
@@ -39,6 +40,14 @@ struct SettingsToolbarModifier: ViewModifier {
     let onRequestNotificationAuthorization: (@MainActor () async -> Bool)?
     /// US-40 / AC-40.12 + AC-40.13 — Cook Mode Voice catalog + preview seam.
     let voicePreviewer: (any VoicePreviewing)?
+    /// US-44 (T-739) — Keychain-backed profile store consumed by the
+    /// Settings → Profile section and its push-destination
+    /// `ProfileEditView`. Forwarded through to the `SettingsViewModel`
+    /// init so the row reflects the persisted profile on every sheet
+    /// open. `nil` in surfaces (previews, snapshot hosts) that haven't
+    /// wired a store; the section renders the empty "Set up your
+    /// profile" state and the edit-view fallback surfaces a placeholder.
+    let profileStore: (any ProfileStoring)?
 
     /// Drives the Settings sheet. Each tab's modifier instance owns its own
     /// presentation state, so the gear opens that tab's Settings sheet.
@@ -83,6 +92,7 @@ struct SettingsToolbarModifier: ViewModifier {
                 viewModel: SettingsViewModel(
                     dependencies: settingsDependencies,
                     voicePreviewer: voicePreviewer,
+                    profileStore: profileStore,
                     requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
                 ),
                 onClearImageCache: onClearImageCache

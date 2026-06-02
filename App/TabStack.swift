@@ -126,7 +126,10 @@ struct TabStack: View {
             // US-40 / AC-40.12 + AC-40.13 — the live AVFoundation-backed
             // voice catalog + preview seam for the Settings Cook Mode Voice
             // section (quality readout + Preview + download nudge).
-            voicePreviewer: SystemVoicePreviewer()
+            voicePreviewer: SystemVoicePreviewer(),
+            // US-44 (T-739) — the Keychain-backed profile store the
+            // Settings → Profile section + edit view read/write.
+            profileStore: dependencies.profileStore
         )
     }
 

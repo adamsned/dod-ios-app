@@ -12,8 +12,8 @@ import SwiftUI
 ///    matches the basic regex per ``UserProfile/validateEmail(_:)``).
 /// 2. **Profile Picture row** (Phase a stub) — labels the section with
 ///    the current avatar trailing. Tap does nothing yet — the photo
-///    picker + crop UI is Phase b's scope. A `// TODO: Phase b` comment
-///    marks the wire-in point.
+///    picker + crop UI is Phase b's scope. A `// TODO(...)` comment
+///    marks the wire-in point inside ``photoSection``.
 /// 3. **Sign Out** + **Delete Profile** buttons — both clear the
 ///    Keychain entry (identical behavior for local-only v1 per the
 ///    locked decision). The Delete button is `Button(role:
@@ -109,7 +109,7 @@ public struct ProfileEditView: View {
                 .textContentType(.name)
                 .accessibilityIdentifier("profile-edit-displayname")
                 #if os(iOS)
-                .autocapitalization(.words)
+            .autocapitalization(.words)
                 #endif
 
             TextField("Email", text: $email)
@@ -118,9 +118,9 @@ public struct ProfileEditView: View {
                 .textContentType(.emailAddress)
                 .accessibilityIdentifier("profile-edit-email")
                 #if os(iOS)
-                .keyboardType(.emailAddress)
-                .autocapitalization(.none)
-                .autocorrectionDisabled(true)
+            .keyboardType(.emailAddress)
+            .autocapitalization(.none)
+            .autocorrectionDisabled(true)
                 #endif
         } footer: {
             if let emailValidationError {
@@ -135,10 +135,10 @@ public struct ProfileEditView: View {
     @ViewBuilder
     private var photoSection: some View {
         Section {
-            // TODO: Phase b (DUT-36) — wire up PhotosPicker + crop UI.
-            // Tapping the row in Phase a is intentionally a no-op; the
-            // section exists so the visual layout is locked + the
-            // photo flow has a documented home when it lands.
+            // TODO(2026-06-02, spencer): Phase b of DUT-36 — wire up
+            // PhotosPicker + crop UI. Tapping the row in Phase a is
+            // intentionally a no-op; the section exists so the visual
+            // layout is locked + the photo flow has a documented home.
             HStack(spacing: DODSpacing.md) {
                 Text("Profile Picture")
                     .dodFont(DODType.body)

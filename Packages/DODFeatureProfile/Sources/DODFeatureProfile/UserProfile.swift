@@ -84,20 +84,38 @@ public struct UserProfile: Codable, Equatable, Sendable {
     public static func validateEmail(_ value: String) throws -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw ValidationError.emailEmpty }
-        guard Self.emailRegex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) != nil else {
-            throw ValidationError.emailInvalid
-        }
+        guard matchesEmailPattern(trimmed) else { throw ValidationError.emailInvalid }
         return trimmed
     }
 
     /// `^[^@\s]+@[^@\s]+\.[^@\s]+$` — the locked basic email shape per
-    /// CL-136. Compiled once at type-load so per-keystroke validation in
-    /// the edit form is cheap. The intentional looseness (no IDN, no
-    /// length cap, no TLD allow-list) matches the locked decision: client-
-    /// side guard is "obviously well-formed," authoritative validation
-    /// happens server-side when a comment is posted.
-    private static let emailRegex: NSRegularExpression = {
-        // swiftlint:disable:next force_try
-        try! NSRegularExpression(pattern: #"^[^@\s]+@[^@\s]+\.[^@\s]+$"#)
-    }()
+    /// CL-136. The intentional looseness (no IDN, no length cap, no
+    /// TLD allow-list) matches the locked decision: client-side guard
+    /// is "obviously well-formed," authoritative validation happens
+    /// server-side when a comment is posted.
+    ///
+    /// Implemented as three character-class scans rather than an
+    /// `NSRegularExpression` so the static-initialiser path stays
+    /// throw-free (constitution §10 bans force-try) and the per-keystroke
+    /// validation cost is a couple of `String.Index` walks rather than
+    /// regex engine startup. The function is pure + branch-only — no
+    /// allocations beyond the input string's borrowed view.
+    private static func matchesEmailPattern(_ input: String) -> Bool {
+        guard let atIndex = input.firstIndex(of: "@") else { return false }
+        let local = input[..<atIndex]
+        let remainder = input[input.index(after: atIndex)...]
+        guard !local.isEmpty, !remainder.isEmpty else { return false }
+        guard !local.contains("@") else { return false }
+        guard !remainder.contains("@") else { return false }
+        // Both halves must be whitespace-free per the `[^@\s]+` clause.
+        let whitespace: CharacterSet = .whitespacesAndNewlines
+        if local.unicodeScalars.contains(where: whitespace.contains) { return false }
+        if remainder.unicodeScalars.contains(where: whitespace.contains) { return false }
+        // Domain half must carry at least one `.` and at least one
+        // non-`.` character on each side of it.
+        guard let dotIndex = remainder.firstIndex(of: ".") else { return false }
+        let domainHead = remainder[..<dotIndex]
+        let domainTail = remainder[remainder.index(after: dotIndex)...]
+        return !domainHead.isEmpty && !domainTail.isEmpty
+    }
 }
