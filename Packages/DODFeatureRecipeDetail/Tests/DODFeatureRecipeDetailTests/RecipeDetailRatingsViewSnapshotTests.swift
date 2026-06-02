@@ -58,12 +58,11 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
     }
 
     @MainActor
-    func test_section_identityGated_rendersComposer() async {
-        // No guest identity yet — the section still has to render its
-        // composer + submit affordance. The tap path opens the sheet
-        // (state we don't exercise here; sheet presentation is owned by
-        // SwiftUI runtime), but the static section view itself must
-        // remain visible.
+    func test_section_emptyAuthorFields_rendersOnForm() async {
+        // DUT-28: with no saved guest identity, the section renders the
+        // on-form "Display name" + "Email" fields empty (no pop-up) alongside
+        // the star input + comment box. Pins that the identity now lives on
+        // the form rather than behind a gate.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 903, withDetail: true)
         dependencies.fetchedRatingSummary = RecipeRating(recipeID: 903, average: 3.8, count: 5)
@@ -71,7 +70,27 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
         await viewModel.onAppear()
         viewModel.setPendingRating(4)
 
-        XCTAssertTrue(viewModel.requiresGuestIdentity, "Test setup should leave identity gate up")
+        XCTAssertTrue(viewModel.commentAuthorName.isEmpty, "No saved identity → name field empty")
+        XCTAssertFalse(viewModel.isAuthorIdentityValid, "Empty identity is not yet valid")
+
+        let view = RecipeDetailRatingsSection(viewModel: viewModel)
+            .frame(width: 390)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+    }
+
+    @MainActor
+    func test_section_preFilledAuthorFields_renders() async {
+        // DUT-28: a returning commenter's saved identity pre-fills the
+        // on-form fields. Pins the populated layout.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 904, withDetail: true)
+        dependencies.fetchedRatingSummary = RecipeRating(recipeID: 904, average: 3.8, count: 5)
+        dependencies.guestIdentity = (name: "Jamie L.", email: "jamie@example.com")
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 904)
+        await viewModel.onAppear()
+
+        XCTAssertEqual(viewModel.commentAuthorName, "Jamie L.")
+        XCTAssertTrue(viewModel.isAuthorIdentityValid)
 
         let view = RecipeDetailRatingsSection(viewModel: viewModel)
             .frame(width: 390)
