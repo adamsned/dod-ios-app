@@ -61,12 +61,34 @@ public enum CloudKitSyncStatus: Equatable, Sendable {
     /// Map a finished/started mirror event into a coarse status. Only
     /// meaningful while sync is ON; the host gates the call on the opt-in
     /// flag. A started (not-yet-finished) event ⇒ ``syncing``; a finished
-    /// success ⇒ ``idle``; a finished failure ⇒ ``error``.
+    /// success ⇒ ``idle``; a finished *fatal* failure ⇒ ``error``. A finished
+    /// failure that is only setup-phase or transient/recoverable stays
+    /// ``syncing`` (logged, never surfaced as "Sync error").
     public init(event summary: CloudKitSyncEventSummary) {
         guard summary.finished else {
             self = .syncing
             return
         }
-        self = summary.succeeded ? .idle : .error(summary.errorDescription)
+        if summary.succeeded {
+            self = .idle
+            return
+        }
+        self = summary.failureIsFatal ? .error(summary.errorDescription) : .syncing
+    }
+
+    /// Fold a new mirror event into the running status. Unlike ``init(event:)``
+    /// (stateless), this preserves the PRIOR status when a finished cycle failed
+    /// only with a non-fatal/transient/setup condition, so a momentary blip
+    /// never repaints a healthy row as "Sync error" and never hides a real one.
+    public func reconciled(with summary: CloudKitSyncEventSummary) -> CloudKitSyncStatus {
+        guard summary.finished else { return .syncing }
+        if summary.succeeded { return .idle }
+        if summary.failureIsFatal { return .error(summary.errorDescription) }
+        // Non-fatal failure: keep the prior status; only settle a mid-cycle
+        // `.syncing` down to `.idle` since the cycle did finish.
+        switch self {
+        case .syncing: return .idle
+        case .off, .idle, .relaunchPending, .error: return self
+        }
     }
 }

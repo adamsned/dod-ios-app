@@ -148,6 +148,10 @@ final class AppDependencies {
                     deployed — deploy it from the CloudKit Console, then relaunch.
                     """
                 )
+                // DUT-22: this fallback fires NO mirror events, so surface it
+                // as a real error instead of letting the Settings row read a
+                // falsely-healthy "Idle".
+                cloudKitDiagnostics.markContainerOpenFailed()
             }
             await checkCloudKitAvailability()
         }
