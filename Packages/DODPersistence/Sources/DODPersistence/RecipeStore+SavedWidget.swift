@@ -23,10 +23,14 @@ public struct SavedRecipeWidgetRow: Sendable, Equatable {
     /// cache (AC-5.2 pre-download). Drives whether the widget snapshot
     /// carries a filename or `nil`.
     public let heroImageCached: Bool
-    /// Drives sort order in the snapshot. We use `lastViewedAt` because
-    /// `CachedRecipe` does not track a separate `savedAt`: the existing
-    /// `savedRecipes()` query already sorts by this field, so the widget
-    /// inherits the same order the in-app Saved tab uses.
+    /// Drives sort order in the snapshot. We use `CachedRecipe.lastViewedAt`
+    /// because the widget renders only locally-present saved rows — those whose
+    /// hero bytes can already be in the local image cache (AC-17.6 forbids
+    /// widget-side network). Note (DUT-35): the in-app Saved tab now reads the
+    /// synced `SyncedSavedRecipe` set ordered by `savedAt`, so the widget's
+    /// most-recent-first order can differ slightly from the tab's; that is
+    /// acceptable for the home-screen projection, which is intentionally scoped
+    /// to rows that have a renderable cached image.
     public let savedAt: Date
 
     public init(

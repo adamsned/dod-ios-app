@@ -128,6 +128,12 @@ public actor RecipeStore {
             target.jsonLDFailedAt = .now
         }
 
+        // DUT-35: reconcile the local pin with the synced source of truth so a
+        // recipe saved on another device is pinned (LRU/widget) once it's
+        // cached here. `toggleSaved` writes `SyncedSavedRecipe` synchronously,
+        // so a just-saved recipe's pin is preserved, never cleared.
+        target.isSaved = try fetchSyncedSaved(id: recipe.id) != nil
+
         // US-12 / AC-12.1: keep the local ingredient index in sync.
         // Article rows have empty `ingredients`, so this clears any
         // stale entries from a prior recipe-kind merge.
@@ -145,13 +151,24 @@ public actor RecipeStore {
     // MARK: - Save / unsave (AC-5.1)
 
     public func isSaved(id: Int) throws -> Bool {
-        try fetchRecipe(id: id)?.isSaved ?? false
+        // DUT-35: the synced set is the source of truth, so the bookmark glyph
+        // reflects a save made on another device even before the local
+        // `CachedRecipe` pin is reconciled on detail open.
+        try fetchSyncedSaved(id: id) != nil
     }
 
     @discardableResult
     public func toggleSaved(id: Int) throws -> Bool {
         guard let row = try fetchRecipe(id: id) else { return false }
         row.isSaved.toggle()
+        // DUT-35: mirror the local pin into the synced source of truth. Only
+        // `SyncedSavedRecipe` leaves the device, so the saved SET follows the
+        // user across devices while the full recipe cache stays local.
+        if row.isSaved {
+            try upsertSyncedSaved(from: row)
+        } else {
+            try removeSyncedSaved(id: id)
+        }
         try modelContext.save()
         // Eviction only meaningful when transitioning saved -> unsaved.
         try evictIfNeeded()
@@ -159,9 +176,11 @@ public actor RecipeStore {
     }
 
     public func savedRecipes() throws -> [Recipe] {
-        let descriptor = FetchDescriptor<CachedRecipe>(
-            predicate: #Predicate { $0.isSaved == true },
-            sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
+        // DUT-35: read the synced source of truth, newest save first. Full
+        // detail (ingredients/instructions) is NOT synced — a recipe saved on
+        // another device hydrates from the network on first detail open.
+        let descriptor = FetchDescriptor<SyncedSavedRecipe>(
+            sortBy: [SortDescriptor(\.savedAt, order: .reverse)]
         )
         return try modelContext.fetch(descriptor).map(Self.toDomain)
     }
