@@ -106,7 +106,10 @@ enum WPDTO {
         let parent: Int?
         let authorName: String
         let dateGMT: String?
-        let content: RenderedString
+        /// Optional + defaulted to empty at the domain boundary: WordPress can
+        /// return content as null/absent for a freshly held comment, and that
+        /// must not fail the whole comment decode (DUT-27).
+        let content: RenderedString?
         let status: String?
         let authorAvatarURLs: [String: URL]?
         let meta: CommentMeta?
@@ -147,7 +150,16 @@ enum WPDTO {
         }
 
         init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            // WordPress serializes an empty / absent comment meta as an empty
+            // JSON array ([]) for a freshly held comment, which is NOT a keyed
+            // container. Treat that as "no rating" rather than throwing and
+            // failing the entire comment decode (DUT-27: the held-comment POST
+            // response failed to decode, surfacing "Couldn't read the server's
+            // reply" even though the comment posted).
+            guard let container = try? decoder.container(keyedBy: CodingKeys.self) else {
+                self.wprmCommentRating = nil
+                return
+            }
             if let intValue = try? container.decodeIfPresent(Int.self, forKey: .wprmCommentRating) {
                 self.wprmCommentRating = intValue
             } else if let stringValue = try? container.decodeIfPresent(String.self, forKey: .wprmCommentRating) {
@@ -284,7 +296,7 @@ extension WPDTO.Comment {
             authorName: HTMLSanitizer.plainText(from: authorName),
             avatarURL: bestAvatarURL,
             dateGMT: WPDTO.parseWPDate(dateGMT),
-            body: HTMLSanitizer.plainText(from: content.rendered),
+            body: HTMLSanitizer.plainText(from: content?.rendered ?? ""),
             ratingValue: meta?.wprmCommentRating,
             status: mappedStatus
         )
