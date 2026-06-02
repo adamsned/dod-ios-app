@@ -70,6 +70,67 @@ import Testing
         let oldMatch = try await store.searchIngredients(matching: "wrong")
         #expect(oldMatch.isEmpty, "Stale ingredient text must be removed")
     }
+
+    // MARK: - DUT-11: value-type ingredient search
+
+    @Test func recipesUsingIngredientReturnsListItemsForMatchesOnly() async throws {
+        // The headline DUT-11 contract: searching an ingredient term returns
+        // the recipes that USE it (in their ingredient list) even though the
+        // term is NOT in their title — and excludes recipes that don't use it.
+        let store = try await makeStore()
+        // Titles are "Title <id>" (the makeRecipe overload's default), so none
+        // of these contain "ground beef" — the match is purely ingredient-side.
+        try await store.mergeDetail(
+            makeRecipe(id: 1, ingredients: ["1 lb ground beef", "1 onion"])
+        )
+        try await store.mergeDetail(
+            makeRecipe(id: 2, ingredients: ["2 chicken breasts", "salt"])
+        )
+        try await store.mergeDetail(
+            makeRecipe(id: 3, ingredients: ["½ lb ground beef", "taco seasoning"])
+        )
+
+        let hits = try await store.recipesUsingIngredient(matching: "ground beef")
+        #expect(
+            Set(hits.map(\.id)) == [1, 3],
+            "Only recipes whose ingredient lines contain the term are returned"
+        )
+        #expect(
+            hits.allSatisfy { !$0.title.localizedCaseInsensitiveContains("ground beef") },
+            "Matches are ingredient-driven — the term is absent from every title"
+        )
+        // Returns fully-formed list items (title carried through the projection).
+        #expect(hits.contains { $0.title == "Title 1" })
+    }
+
+    @Test func recipesUsingIngredientDedupesAcrossManyIngredientLines() async throws {
+        // A recipe with the term in two separate ingredient lines (and thus
+        // two CachedIngredient rows) must appear exactly once in the result.
+        let store = try await makeStore()
+        try await store.mergeDetail(
+            makeRecipe(id: 1, ingredients: ["1 lb ground beef", "more ground beef", "salt"])
+        )
+        let hits = try await store.recipesUsingIngredient(matching: "ground beef")
+        #expect(hits.map(\.id) == [1], "Multiple matching lines collapse to one recipe row")
+    }
+
+    @Test func recipesUsingIngredientIsCaseAndDiacriticInsensitive() async throws {
+        // normalize() lowercases + folds diacritics on both sides, so a query
+        // with different case/accents still matches the stored line.
+        let store = try await makeStore()
+        try await store.mergeDetail(
+            makeRecipe(id: 1, ingredients: ["1 piece Jalapeño Pepper"])
+        )
+        let upper = try await store.recipesUsingIngredient(matching: "JALAPENO")
+        #expect(upper.map(\.id) == [1], "Case + diacritic folding lets 'JALAPENO' match 'Jalapeño'")
+    }
+
+    @Test func recipesUsingIngredientReturnsEmptyForNoMatch() async throws {
+        let store = try await makeStore()
+        try await store.mergeDetail(makeRecipe(id: 1, ingredients: ["1 cup flour"]))
+        let hits = try await store.recipesUsingIngredient(matching: "ground beef")
+        #expect(hits.isEmpty)
+    }
 }
 
 @Suite("RecipeStore search-filter inputs (US-12)") struct SearchFilterInputsTests {

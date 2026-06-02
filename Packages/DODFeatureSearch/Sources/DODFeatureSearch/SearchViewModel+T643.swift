@@ -101,6 +101,46 @@ extension SearchViewModel {
         return unioned
     }
 
+    /// DUT-11: the tail of `performSearch()` after the title/category union
+    /// is computed. Derives the ingredient tier (recipes that USE the term
+    /// but were NOT already surfaced by title/category, so no row is shown
+    /// twice), applies the both-tiers-empty offline guard, stashes the
+    /// filter-re-rank caches, and hands off to `applyFiltersAndFinalize`.
+    /// Extracted from `performSearch()` so that method stays under SwiftLint's
+    /// `function_body_length` cap.
+    func finishTextSearch(
+        merged: [RecipeListItem],
+        localItems: [RecipeListItem],
+        trimmed: String,
+        online: Bool
+    ) async {
+        let titleIDs = Set(merged.map(\.id))
+        let ingredientOnly = localItems.filter { !titleIDs.contains($0.id) }
+
+        // True offline state only when BOTH tiers are empty. A local
+        // ingredient hit needs no network, so it keeps the user on a results
+        // screen even with REST down — the offline-resilience win DUT-11
+        // unlocks on top of CL-120's title-precision contract.
+        if merged.isEmpty, ingredientOnly.isEmpty, !online {
+            state = .offline
+            items = []
+            ingredientItems = []
+            return
+        }
+
+        // Cache the inputs so filter mutations can re-rank without I/O.
+        // T-643: `lastMergedRESTOrdering` carries the post-union REST shape
+        // (title + category) so a filter mutation re-runs against the same
+        // set the user sees, not just the title-path subset.
+        lastQuery = trimmed
+        lastMergedRESTOrdering = merged
+        lastMergedLocalOrdering = localItems
+        lastSurface = .textQuery
+        ingredientItems = ingredientOnly
+
+        await applyFiltersAndFinalize(merged: merged, trimmed: trimmed)
+    }
+
     /// Final hop of `performSearch()`: hydrate the filter-support maps,
     /// apply the filter chips, set `items` + `state`, and fire the
     /// recents/telemetry + cook-time hydration tails. Extracted so
@@ -125,7 +165,11 @@ extension SearchViewModel {
             recentlyViewedIDs: lastRecentlyViewedIDs
         )
         items = filtered
-        state = filtered.isEmpty ? .noResults : .results
+        // DUT-11: a query can land zero title hits yet still surface recipes
+        // that USE the term (the ingredient tier). Stay on `.results` whenever
+        // EITHER tier has content so the labeled "Recipes using <term>"
+        // section renders; only fall to `.noResults` when both are empty.
+        state = (filtered.isEmpty && ingredientItems.isEmpty) ? .noResults : .results
 
         // CL-127 (T-649): compute the "did you mean?" suggestion when
         // the result set settles sparse (fewer than 3 items). The
@@ -134,7 +178,14 @@ extension SearchViewModel {
         // gate on `!trimmed.isEmpty` (the trimmed query the caller
         // validated has at least 2 chars per `scheduleSearch`) so a
         // cleared query never produces a suggestion.
-        await computeDidYouMean(itemCount: filtered.count, trimmed: trimmed)
+        //
+        // DUT-11: count BOTH tiers toward "sparse" — a query that returns
+        // plenty of recipes-that-use-the-term shouldn't get a "did you mean?"
+        // rescue banner just because the title tier was thin.
+        await computeDidYouMean(
+            itemCount: filtered.count + ingredientItems.count,
+            trimmed: trimmed
+        )
 
         await recordRecentAndTelemetry(trimmed: trimmed)
         kickOffCookTimeHydrationIfNeeded(against: merged)

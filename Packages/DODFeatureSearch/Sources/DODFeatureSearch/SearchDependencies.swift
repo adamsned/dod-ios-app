@@ -17,6 +17,14 @@ public protocol SearchDependencies: Sendable {
     /// Recipe IDs whose locally-indexed ingredients contain `query`.
     /// Empty array is the normal "nothing matched" return — not an error.
     func searchIngredients(matching query: String) async throws -> [Int]
+    /// DUT-11: recipes that USE the given ingredient term, as ready-to-render
+    /// `RecipeListItem`s sourced entirely from the local cache. De-duped (one
+    /// row per recipe) and ordered by the ingredient-index fetch order. This
+    /// is the single hop that backs the "Recipes using <term>" results tier —
+    /// it folds the `searchIngredients(matching:)` + `cachedListItems(forIDs:)`
+    /// round trip into one store call so the view model surfaces the section
+    /// without two awaits. Purely local; works offline.
+    func recipesUsingIngredient(matching query: String) async throws -> [RecipeListItem]
     /// Hydrate `[RecipeListItem]` from the local cache for the given IDs.
     /// Returns items in the same order as `ids`; missing/blocklisted IDs are
     /// silently skipped.
@@ -117,6 +125,13 @@ public struct LiveSearchDependencies: SearchDependencies {
 
     public func searchIngredients(matching query: String) async throws -> [Int] {
         try await store.searchIngredients(matching: query)
+    }
+
+    /// DUT-11: route to the value-type store query that maps matching
+    /// ingredient-index rows to deduped `RecipeListItem`s. Read-only, local,
+    /// no new REST surface — the constraint the ticket pins.
+    public func recipesUsingIngredient(matching query: String) async throws -> [RecipeListItem] {
+        try await store.recipesUsingIngredient(matching: query)
     }
 
     public func cachedListItems(forIDs ids: [Int]) async throws -> [RecipeListItem] {

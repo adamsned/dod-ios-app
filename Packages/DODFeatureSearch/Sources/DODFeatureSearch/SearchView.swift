@@ -4,8 +4,13 @@ import SwiftUI
 
 public struct SearchView: View {
 
-    @State private var viewModel: SearchViewModel
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // DUT-11: `internal` (no modifier) rather than `private` so the
+    // `SearchView+IngredientSection.swift` extension — split out for the
+    // 400-line `file_length` cap — can read the view model and size class
+    // when rendering the ingredient tier. Same cross-file-extension reason
+    // the `SearchViewModel` storage was promoted from `private` (CL-106).
+    @State var viewModel: SearchViewModel
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     /// US-38 / AC-38.2 / CL-64 (T-650, 2026-05-27) — shared with `FeedView`
     /// via the same `@AppStorage` key. Default `.gallery` preserves the
     /// existing search-results 2-column grid byte-for-byte.
@@ -219,28 +224,18 @@ public struct SearchView: View {
                 message: "Reconnect to search dutchovendaddy.com."
             )
         case .results:
-            // US-38 / AC-38.3 / AC-38.4 (T-650): branch on the persisted
-            // layout. `.gallery` keeps the existing 2-col `LazyVGrid` body
-            // byte-identical; `.list` renders `RecipeCard.ListRow` rows.
-            let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
-            ScrollView {
-                Group {
-                    switch layout {
-                    case .gallery:
-                        galleryResults
-                    case .list:
-                        listResults
-                    }
-                }
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.bottom, DODSpacing.lg)
-            }
+            // US-38 / AC-38.3 / AC-38.4 (T-650) + DUT-11: the scrolling
+            // results body (title tier + the labeled "Recipes using <term>"
+            // ingredient tier) lives in `SearchView+IngredientSection.swift`
+            // so this file stays under SwiftLint's 400-line `file_length` cap.
+            resultsScroll(layout: RecipeListLayout(rawValue: layoutRaw) ?? .gallery)
         }
     }
 
     /// US-38 / AC-38.3 — existing 2-col grid. Body byte-identical to the
-    /// pre-T-650 `.results` rendering.
-    private var galleryResults: some View {
+    /// pre-T-650 `.results` rendering. DUT-11: `internal` so the
+    /// `+IngredientSection` extension's `resultsScroll` can compose it.
+    var galleryResults: some View {
         LazyVGrid(
             columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
             spacing: DODSpacing.md
@@ -269,8 +264,9 @@ public struct SearchView: View {
 
     /// US-38 / AC-38.4 — dense single-column variant. Composes the same
     /// tap + context-menu modifiers as the gallery so US-34 / AC-34.1
-    /// / AC-34.6 long-press-Save/Unsave works identically.
-    private var listResults: some View {
+    /// / AC-34.6 long-press-Save/Unsave works identically. DUT-11:
+    /// `internal` so the `+IngredientSection` extension can compose it.
+    var listResults: some View {
         LazyVStack(spacing: DODSpacing.xs) {
             ForEach(viewModel.items) { item in
                 RecipeCard.ListRow(

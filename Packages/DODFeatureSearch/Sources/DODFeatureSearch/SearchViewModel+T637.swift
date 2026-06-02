@@ -32,6 +32,10 @@ extension SearchViewModel {
     /// fetch, not a search).
     public func surfaceLatestRecipes(limit: Int = 5) async {
         state = .searching
+        // DUT-11: the Latest-Recipes pill is a feed fetch, not a text query,
+        // so there's no ingredient term — clear any tier left from a prior
+        // search so it doesn't bleed into the latest-recipes surface.
+        ingredientItems = []
         guard await dependencies.isOnline() else {
             state = .offline
             items = []

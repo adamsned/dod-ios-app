@@ -66,32 +66,6 @@ import Testing
         #expect(dependencies.searches.isEmpty, "REST must not be called when offline")
     }
 
-    @Test func offlineWithLocalIngredientHitsGoesOfflineUnderCL120Deferral() async {
-        // US-12 / AC-12.1 — pre-CL-120 contract said the local ingredient
-        // index continued to surface results offline. **CL-120 / T-642
-        // defers the entire local-ingredient pass for v1** (title
-        // precision is the user's primary contract; ingredient search
-        // returns as a labeled tier in dad's broader "Make search way
-        // better" backlog entry). The post-T-642 behavior: offline +
-        // local-only hits → `.offline` state because the merger no
-        // longer admits the local tier. The local-ingredient code path
-        // is preserved upstream (the dependencies still expose
-        // `searchIngredients` + `cachedListItems`) so the future
-        // re-enablement is a SearchResultMerger edit, not a viewmodel
-        // re-wire.
-        let dependencies = FakeSearchDependencies()
-        dependencies.online = false
-        dependencies.localIngredientIDs["garlic"] = [42]
-        dependencies.cachedItemsByID[42] = Self.makeItem(42, title: "Garlic Bread")
-        let viewModel = SearchViewModel(
-            dependencies: dependencies,
-            recentSearches: Self.scratchRecents()
-        )
-        viewModel.query = "garlic"
-        await viewModel.runImmediateSearch()
-        #expect(viewModel.state == .offline, "Local-ingredient pass deferred in v1 of CL-120")
-    }
-
     @Test func clearResetsState() async {
         let dependencies = FakeSearchDependencies()
         dependencies.results["something"] = [Self.makeItem(1)]

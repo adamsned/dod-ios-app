@@ -34,6 +34,32 @@ extension RecipeStore {
         return ordered
     }
 
+    /// DUT-11: ingredient-name search, value-type return. Given a raw query
+    /// term ("ground beef"), returns the `RecipeListItem`s for every locally
+    /// cached recipe whose ingredient list contains the term — i.e. recipes
+    /// that *use* the ingredient, not just ones with it in the title.
+    ///
+    /// Composes the two existing primitives: ``searchIngredients(matching:)``
+    /// (distinct matching recipe IDs, case/diacritic-insensitive via
+    /// ``CachedIngredient/normalize(_:)``) and ``listItems(forIDs:)`` (the
+    /// `CachedRecipe` → `RecipeListItem` projection). De-duped — each recipe
+    /// appears at most once — and ordered by the ingredient-index fetch order
+    /// (then collapsed to the rows that still have a `CachedRecipe`). Purely
+    /// local: no network, works offline against the cache.
+    ///
+    /// A recipe ID present in the index but missing a `CachedRecipe` row
+    /// (e.g. its row was LRU-evicted while an index row lingered) is simply
+    /// skipped by `listItems(forIDs:)`, so the returned set is always
+    /// renderable.
+    ///
+    /// Spec trace: DUT-11 (ingredient-name search ships as a labeled tier);
+    /// US-12 / AC-12.1 (ingredient-aware results, v1-deferred half now live).
+    public func recipesUsingIngredient(matching query: String) throws -> [RecipeListItem] {
+        let recipeIDs = try searchIngredients(matching: query)
+        guard !recipeIDs.isEmpty else { return [] }
+        return try listItems(forIDs: recipeIDs)
+    }
+
     /// Test/debug accessor: how many index rows exist for a given recipe.
     /// Production code has no reason to call this; tests assert on it.
     public func ingredientIndexCount(forRecipeID id: Int) throws -> Int {
