@@ -41,6 +41,8 @@ public enum SchemaV2: VersionedSchema {
 ///
 /// - V1 → V2: lightweight (V2 = V1 + `CachedIngredient`).
 /// - V2 → V3: lightweight (V3 = V2 + `CachedComment` + `CachedRating`).
+/// - V3 → V5: lightweight (V5 = V4 + `SyncedSavedRecipe`); the phantom V4 is
+///   skipped — see the SchemaV4 / SchemaV5 headers. DUT-35 / DUT-6.
 ///
 /// **SchemaV4 note (US-41 / T-702).** `SchemaV4` exists as a real
 /// `VersionedSchema` in `SchemaV4.swift` and is the schema the
@@ -75,16 +77,24 @@ public enum SchemaV2: VersionedSchema {
 /// - `SchemaV4Tests.v3ToV4LightweightMigrationOpensCleanly` (the
 ///   no-op identity transition under the byte-identical-models
 ///   posture).
+/// - `SchemaV5Tests.v3ToV5LightweightMigrationOpensCleanly` (additive
+///   `SyncedSavedRecipe` entity, two-configuration split; DUT-35).
 public enum MigrationPlan: SchemaMigrationPlan {
 
     public static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self, SchemaV3.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self, SchemaV5.self]
     }
 
     public static var stages: [MigrationStage] {
         [
             .lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self),
             .lightweight(fromVersion: SchemaV2.self, toVersion: SchemaV3.self),
+            // V3 -> V5 (DUT-35 / DUT-6): additive — adds `SyncedSavedRecipe`,
+            // the single CloudKit-mirrored model. The phantom V4 (byte-identical
+            // to V3) stays out of the chain to avoid the duplicate-checksum
+            // trap; existing stores carry the V3/V4 fingerprint and land on V5
+            // with one new entity and no data transform.
+            .lightweight(fromVersion: SchemaV3.self, toVersion: SchemaV5.self),
         ]
     }
 }

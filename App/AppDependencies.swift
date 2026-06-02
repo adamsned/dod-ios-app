@@ -122,6 +122,12 @@ final class AppDependencies {
         // US-10: hand the store to the AppIntents environment so the entity
         // query and Spotlight indexer can read saved + recently-viewed rows.
         AppIntentEnvironment.register(store: store)
+        // DUT-35: one-time backfill of the synced saved-set from any pre-V5
+        // local saves, so the Saved tab isn't empty after the update that
+        // scoped CloudKit sync down to `SyncedSavedRecipe`. Runs regardless of
+        // opt-in (so the synced store is already seeded if the user opts in
+        // later) and exactly once (see `backfillSyncedSavedIfNeeded`).
+        await backfillSyncedSavedIfNeeded()
         // US-41 / AC-41.1 (T-702): conditional CloudKit availability
         // check. Only fires when the user has opted into iCloud sync via
         // T-703's Settings toggle or T-704's first-launch sheet —

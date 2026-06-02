@@ -49,8 +49,8 @@ extension RecipeStore {
     }
 
     /// Create the on-disk container for production use. Pinned to
-    /// `SchemaV4` — older on-disk stores migrate via `MigrationPlan` at
-    /// open (V1 → V2 → V3 → V4, all lightweight).
+    /// `SchemaV5` — older on-disk stores migrate via `MigrationPlan` at
+    /// open (V1 → V2 → V3 → V5, all lightweight; the phantom V4 is skipped).
     ///
     /// **CloudKit gating per CL-86 / CL-88 / CL-89 / CL-93.** When the
     /// `cloudKitSyncOptInKey` `UserDefaults` flag is `true` (set by
@@ -119,35 +119,39 @@ extension RecipeStore {
         defaults: UserDefaults,
         inMemory: Bool = false
     ) throws -> ContainerBuildResult {
-        let schema = Schema(SchemaV4.models)
+        let schema = Schema(SchemaV5.models)
+        // DUT-35: the six cache models are local-only; ONLY `SyncedSavedRecipe`
+        // is a CloudKit-mirror candidate. Both stores live in the same
+        // container, so the `@ModelActor`'s single `ModelContext` reaches both.
+        let local = localCacheConfiguration(inMemory: inMemory)
         guard cloudKitSyncOptIn(in: defaults) else {
-            // Opt-out: plain local store. A failure here is a real
+            // Opt-out: both stores local. A failure here is a real
             // migration error and must propagate.
             let container = try ModelContainer(
                 for: schema,
                 migrationPlan: inMemory ? nil : MigrationPlan.self,
-                configurations: localConfiguration(inMemory: inMemory)
+                configurations: local,
+                syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)
             )
             return ContainerBuildResult(container: container, usedCloudKitFallback: false)
         }
-        // Opt-in: try the CloudKit-backed container first, falling back to
-        // a plain local container if the `.private` open throws.
+        // Opt-in: mirror ONLY the synced store to the CloudKit private DB,
+        // falling back to an all-local layout if the `.private` open throws.
         return try buildCloudKitWithFallback(
             cloudKitBuild: {
                 try ModelContainer(
                     for: schema,
                     migrationPlan: inMemory ? nil : MigrationPlan.self,
-                    configurations: ModelConfiguration(
-                        isStoredInMemoryOnly: inMemory,
-                        cloudKitDatabase: .private(cloudKitContainerIdentifier)
-                    )
+                    configurations: local,
+                    syncedSavedConfiguration(inMemory: inMemory, cloudKit: true)
                 )
             },
             localBuild: {
                 try ModelContainer(
                     for: schema,
                     migrationPlan: inMemory ? nil : MigrationPlan.self,
-                    configurations: localConfiguration(inMemory: inMemory)
+                    configurations: local,
+                    syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)
                 )
             }
         )
@@ -176,13 +180,38 @@ extension RecipeStore {
         }
     }
 
-    /// The plain, CloudKit-free configuration used by the opt-out path and
-    /// the DOD-CRASH-1 fallback. `cloudKitDatabase: .none` is explicit (not
-    /// cosmetic): SwiftData's default `.automatic` auto-enables CloudKit
-    /// whenever the app's iCloud entitlement is present, so the explicit
-    /// `.none` is what keeps the opt-out / fallback store genuinely local.
-    private static func localConfiguration(inMemory: Bool) -> ModelConfiguration {
-        ModelConfiguration(isStoredInMemoryOnly: inMemory, cloudKitDatabase: .none)
+    /// The six cache models, scoped to a **local-only** store (DUT-35). This
+    /// configuration is *unnamed*, so it maps to the existing on-disk
+    /// `default.store`: existing rows are preserved across the V4 -> V5
+    /// migration and the only change for a previously-opted-in user is that the
+    /// store's CloudKit flag flips from `.private` to `.none`. `.none` is
+    /// explicit (not cosmetic): SwiftData's default `.automatic` auto-enables
+    /// CloudKit whenever the app's iCloud entitlement is present, so the
+    /// explicit `.none` is what keeps these six models genuinely on-device.
+    private static func localCacheConfiguration(inMemory: Bool) -> ModelConfiguration {
+        ModelConfiguration(
+            schema: Schema(SchemaV5.localModels),
+            isStoredInMemoryOnly: inMemory,
+            cloudKitDatabase: .none
+        )
+    }
+
+    /// The single `SyncedSavedRecipe` model, in its own *named* store
+    /// (`"SyncedSaved"`) so introducing the entity never rewrites
+    /// `default.store`. Mirrors to the CloudKit private DB only when `cloudKit`
+    /// is true (the opt-in path); `.none` otherwise — the opt-out path, the
+    /// DOD-CRASH-1 fallback, and every in-memory test. This is the ONLY store
+    /// that ever leaves the device (DUT-35 / DUT-6).
+    private static func syncedSavedConfiguration(
+        inMemory: Bool,
+        cloudKit: Bool
+    ) -> ModelConfiguration {
+        ModelConfiguration(
+            "SyncedSaved",
+            schema: Schema(SchemaV5.syncedModels),
+            isStoredInMemoryOnly: inMemory,
+            cloudKitDatabase: cloudKit ? .private(cloudKitContainerIdentifier) : .none
+        )
     }
 
     /// Build a fresh production container matching the *current* persisted
@@ -244,28 +273,27 @@ extension RecipeStore {
     ///    `CloudKitSchemaCompatibilityTests` — no prior test built a
     ///    `.private` container, which is how this shipped.
     static func makeProductionConfiguration() -> ModelConfiguration {
-        if cloudKitSyncOptIn() {
-            return ModelConfiguration(
-                cloudKitDatabase: .private(cloudKitContainerIdentifier)
-            )
-        }
-        return ModelConfiguration(cloudKitDatabase: .none)
+        // DUT-35: the CloudKit flag now lives on the synced sub-store only, so
+        // this seam returns that store's configuration. The opt-in -> `.private`
+        // / opt-out -> `.none` contract stays directly assertable in the L1
+        // suite (CloudKitContainerSelectionTests / SchemaV5Tests).
+        syncedSavedConfiguration(inMemory: false, cloudKit: cloudKitSyncOptIn())
     }
 
     /// Create an in-memory container for tests. Uses the current schema so
     /// fixture data exercises the same models the app ships with.
     public static func inMemoryContainer() throws -> ModelContainer {
+        // Same two-configuration topology as production (DUT-35), both
+        // in-memory and both `.none`. `cloudKitDatabase: .none` is REQUIRED,
+        // not cosmetic: the app target's iCloud entitlements (T-701) make
+        // SwiftData's default `.automatic` auto-enable CloudKit, which is
+        // invalid for an in-memory store and crashes at container open. The app
+        // reaches this via the `-DODUseInMemoryStore` UI-test hook in
+        // `AppDependencies`; the L1 suite reaches it directly.
         try ModelContainer(
-            for: Schema(SchemaV4.models),
-            // `cloudKitDatabase: .none` is REQUIRED, not cosmetic. The app
-            // target's iCloud entitlements (T-701) make SwiftData's default
-            // `.automatic` auto-enable CloudKit, which is invalid for an
-            // in-memory store and crashes at container open. Unit tests run
-            // without the entitlements so they never hit it — but the app
-            // does, via the `-DODUseInMemoryStore` UI-test hook in
-            // `AppDependencies`. Mirrors `makeProductionConfiguration()`'s
-            // explicit `.none` opt-out for the same reason.
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            for: Schema(SchemaV5.models),
+            configurations: localCacheConfiguration(inMemory: true),
+            syncedSavedConfiguration(inMemory: true, cloudKit: false)
         )
     }
 

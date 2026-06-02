@@ -295,25 +295,20 @@ struct MigrationV3Tests {
     }
 
     @Test func migrationPlanListsAllVersionsAndStages() {
-        // T-640 (US-37 / CL-63) initially added SchemaV4 for the
-        // `CachedRecipe.articleBodyHTML` additive column but reverted
-        // it to avoid the "Duplicate version checksums" runtime
-        // collision SwiftData surfaces when two `VersionedSchema`
-        // definitions reference the same `@Model` class shape; the
-        // column is handled by SwiftData's in-place additive-optional
-        // migration. T-702 (US-41 / CL-86 / CL-88 / CL-93) re-introduces
-        // a real `SchemaV4` enum to mark the SwiftData → CloudKit
-        // configuration boundary, but **intentionally does NOT register
-        // V4 in the migration plan** because V4's `models` list is
-        // byte-identical to V3's (no @Model class shape change) — the
-        // production `ModelContainer` references `SchemaV4.models`
-        // and SwiftData's same-fingerprint inference handles the V3 →
-        // V4 no-op transition transparently. The migration plan still
-        // lists V1 → V2 → V3 lightweight stages.
+        // V4 is the phantom schema: byte-identical to V3 (no @Model class-shape
+        // change), so it is intentionally NOT registered in the migration plan
+        // — registering two VersionedSchemas with the same fingerprint surfaces
+        // the "Duplicate version checksums" runtime collision at container open.
+        // DUT-35 adds SchemaV5, which DOES differ from V3/V4 (the additive
+        // `SyncedSavedRecipe` CloudKit-mirror model), so its fingerprint is
+        // distinct and it is safe to register with a lightweight V3 -> V5 stage.
+        // The plan is therefore V1, V2, V3, V5 with V1->V2, V2->V3, V3->V5
+        // stages; the phantom V4 stays out of the chain (existing stores carry
+        // the V3/V4 fingerprint and land on V5 with one additive entity).
         let schemas = MigrationPlan.schemas
-        #expect(schemas.count == 3, "V1, V2, V3 — V4 intentionally absent")
+        #expect(schemas.count == 4, "V1, V2, V3, V5 — phantom V4 intentionally absent")
         let stages = MigrationPlan.stages
-        #expect(stages.count == 2, "V1→V2 and V2→V3 — no V3→V4 stage")
+        #expect(stages.count == 3, "V1→V2, V2→V3, V3→V5 — phantom V4 skipped")
     }
 }
 
