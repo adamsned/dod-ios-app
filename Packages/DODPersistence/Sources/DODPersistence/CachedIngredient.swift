@@ -32,10 +32,21 @@ public final class CachedIngredient {
     }
 
     /// Canonical normalization used both when writing the index and when
-    /// preparing a query string. Lowercased and trimmed of leading/trailing
-    /// whitespace; the rest of the line is left intact so substring matches
-    /// against quantities ("2 cloves garlic") still work.
+    /// preparing a query string. Lowercased, diacritic-folded, and trimmed of
+    /// leading/trailing whitespace; the rest of the line is left intact so
+    /// substring matches against quantities ("2 cloves garlic") still work.
+    ///
+    /// DUT-11 adds the diacritic fold so an accented ingredient ("jalapeño",
+    /// "crème fraîche") matches an un-accented query and vice-versa. The fold
+    /// is applied symmetrically — both the stored `normalizedText` and the
+    /// query pass through here — so the substring predicate stays consistent.
+    /// The index is repopulated lazily on `mergeDetail(_:)` (one row per
+    /// ingredient line as recipes are opened), so rows written before this
+    /// change pick up the folded form the next time their recipe is viewed.
     public static func normalize(_ text: String) -> String {
-        text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        text
+            .folding(options: .diacriticInsensitive, locale: nil)
+            .lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

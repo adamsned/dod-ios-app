@@ -52,6 +52,24 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         return localIngredientIDs[normalized] ?? []
     }
 
+    /// DUT-11: mirrors the live store query — resolve the matching ingredient
+    /// IDs (via the same `localIngredientIDs` fixture the VM's old two-hop
+    /// path used) and project to cached list items, deduped and order-
+    /// preserving. Tests seed `localIngredientIDs[term]` + `cachedItemsByID`
+    /// exactly as before, so existing fixtures keep working unchanged.
+    func recipesUsingIngredient(matching query: String) async throws -> [RecipeListItem] {
+        let ids = try await searchIngredients(matching: query)
+        var seen: Set<Int> = []
+        var items: [RecipeListItem] = []
+        for id in ids where !seen.contains(id) {
+            seen.insert(id)
+            if let item = cachedItemsByID[id] {
+                items.append(item)
+            }
+        }
+        return items
+    }
+
     func cachedListItems(forIDs ids: [Int]) async throws -> [RecipeListItem] {
         ids.compactMap { cachedItemsByID[$0] }
     }

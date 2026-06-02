@@ -82,6 +82,14 @@ public final class SearchViewModel {
     /// `SearchViewModel+T637.swift` extension can write the
     /// Latest-Recipes branch's result set directly. Read surface unchanged.
     public internal(set) var items: [RecipeListItem] = []
+    /// DUT-11: the "Recipes using <term>" tier — recipes whose *ingredient
+    /// list* contains the query but that did NOT already match by title or
+    /// category (never duplicated in `items`). Sourced from the local
+    /// `CachedIngredient` index (so it populates offline) and rendered as a
+    /// labeled section beneath the title results in ``SearchView``, which is
+    /// what tells the user why a title-less recipe matched. Filter chips do
+    /// NOT narrow this discovery tier in v1.
+    public internal(set) var ingredientItems: [RecipeListItem] = []
     /// Last user-typed query that produced `items`. Used so filter changes
     /// can re-merge without re-running the network call. CL-106 (T-637)
     /// promotes the setter to `internal` for the same Latest-Recipes
@@ -143,6 +151,7 @@ public final class SearchViewModel {
     public func clear() {
         query = ""
         items = []
+        ingredientItems = []  // DUT-11: wipe the ingredient tier too.
         lastQuery = ""
         state = .idle
         lastMergedRESTOrdering = []
@@ -231,6 +240,7 @@ public final class SearchViewModel {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else {
             items = []
+            ingredientItems = []  // DUT-11: don't strand a stale tier.
             state = .idle
             return
         }
@@ -248,9 +258,7 @@ public final class SearchViewModel {
         guard trimmed.count >= 2 else { return }
 
         // The local ingredient index works offline; the REST pass does not.
-        // We try both and gracefully degrade: if REST is down but the user
-        // has previously viewed a few recipes that match by ingredient,
-        // they still see results instead of a hard "offline" screen.
+        // We try both and gracefully degrade (see the DUT-11 tier below).
         let online = await dependencies.isOnline()
 
         state = .searching
@@ -259,8 +267,9 @@ public final class SearchViewModel {
             online: online
         )
 
-        let localIDs = (try? await dependencies.searchIngredients(matching: trimmed)) ?? []
-        let localItems = (try? await dependencies.cachedListItems(forIDs: localIDs)) ?? []
+        // DUT-11: the local "Recipes using <term>" tier — works offline.
+        let localItems =
+            (try? await dependencies.recipesUsingIngredient(matching: trimmed)) ?? []
 
         let titleMerged = SearchResultMerger.merge(
             query: trimmed,
@@ -277,31 +286,19 @@ public final class SearchViewModel {
             categoryResults: categoryResults
         )
 
-        // No results AND we're offline AND there was nothing local — that's
-        // the true offline state. If we got even one local hit, we treat
-        // it as a results screen.
-        if merged.isEmpty && !online {
-            state = .offline
-            items = []
-            return
-        }
-
-        // Cache the inputs so filter mutations can re-rank without I/O.
-        // T-643: `lastMergedRESTOrdering` carries the **post-union** REST
-        // shape (title + category) so a filter mutation re-runs against
-        // the same set the user sees, not just the title-path subset.
-        lastQuery = trimmed
-        lastMergedRESTOrdering = merged
-        lastMergedLocalOrdering = localItems
-        lastSurface = .textQuery
-
-        await applyFiltersAndFinalize(merged: merged, trimmed: trimmed)
+        // DUT-11: dedup ingredient tier + offline guard + cache stash
+        // (`finishTextSearch` lives in `+T643` for the body-length cap).
+        await finishTextSearch(
+            merged: merged,
+            localItems: localItems,
+            trimmed: trimmed,
+            online: online
+        )
     }
 
-    // CL-121 (T-643): the four `performSearch` helpers (fan-out / Path A
-    // / Path B / merge / finalize) live in `SearchViewModel+T643.swift`
-    // so this file stays under SwiftLint's `file_length` cap. Same split
-    // pattern as the T-637 / T-639 / T-640 extensions above.
+    // CL-121 (T-643) + DUT-11: the `performSearch` helpers (fan-out / Path A
+    // / Path B / merge / finish / finalize) live in `SearchViewModel+T643.swift`
+    // so this file stays under SwiftLint's `file_length` cap.
 
     /// Record the recent on a successful query — even if zero results,
     /// because "tried it, didn't work" is still useful history. Skip
@@ -389,7 +386,10 @@ public final class SearchViewModel {
             recentlyViewedIDs: lastRecentlyViewedIDs
         )
         items = filtered
-        state = filtered.isEmpty ? .noResults : .results
+        // DUT-11: leave `ingredientItems` untouched — chips re-rank only the
+        // title tier; the ingredient tier stays visible across toggles. Stay
+        // on `.results` when EITHER tier has content.
+        state = (filtered.isEmpty && ingredientItems.isEmpty) ? .noResults : .results
 
         // If the cook-time filter is on and the base set still has items
         // with unknown total times, fire hydration. The kick-off helper
