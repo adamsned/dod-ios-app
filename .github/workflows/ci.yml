@@ -69,19 +69,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Warm Homebrew so `brew install` below skips the bottle download.
-      # We cache Homebrew's download cache + the tool keg(s). On a HIT,
-      # `brew install` finds the bottle already downloaded and the keg
-      # already present, so it just (re)links — seconds instead of ~30-60s.
-      # On a MISS, `brew install` falls back to a normal cold install and
-      # the post-job step repopulates the cache. Correctness is unaffected:
-      # `brew install` always runs and validates/links the tool either way.
+      # Cache ONLY Homebrew's download cache — NOT the tool keg
+      # (/opt/homebrew/Cellar/...). Caching the keg made `brew install` see
+      # the tool as already installed on a cache HIT and skip creating the
+      # /opt/homebrew/bin symlink, so the binary was never on PATH ("command
+      # not found"). With downloads-only, `brew install` always installs +
+      # links the tool (fast, since the bottle is pre-downloaded). Keys are
+      # at -v2 to bypass the poisoned -v1 caches that still hold a keg.
       - name: Cache Homebrew (swiftlint)
         uses: actions/cache@v4
         with:
-          path: |
-            ~/Library/Caches/Homebrew/downloads
-            /opt/homebrew/Cellar/swiftlint
-          key: ${{ runner.os }}-brew-swiftlint-v1
+          path: ~/Library/Caches/Homebrew/downloads
+          key: ${{ runner.os }}-brew-swiftlint-v2
       - name: Install SwiftLint
         run: brew install swiftlint
       - name: Run SwiftLint (strict)
@@ -95,17 +94,15 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      # See the lint job for why this is correctness-safe (HIT relinks,
-      # MISS cold-installs). swift-format ships no prebuilt macOS release
-      # artifact (Apple publishes source-only tags), so caching the
-      # Homebrew bottle is the reliable way to make this install warm.
+      # See the lint job for why we cache downloads only, not the keg.
+      # swift-format ships no prebuilt macOS release artifact (Apple
+      # publishes source-only tags), so caching the Homebrew bottle
+      # download is the reliable way to make this install warm.
       - name: Cache Homebrew (swift-format)
         uses: actions/cache@v4
         with:
-          path: |
-            ~/Library/Caches/Homebrew/downloads
-            /opt/homebrew/Cellar/swift-format
-          key: ${{ runner.os }}-brew-swift-format-v1
+          path: ~/Library/Caches/Homebrew/downloads
+          key: ${{ runner.os }}-brew-swift-format-v2
       - name: Install swift-format
         run: brew install swift-format
       - name: Check formatting
@@ -221,10 +218,8 @@ jobs:
       - name: Cache Homebrew (xcodegen)
         uses: actions/cache@v4
         with:
-          path: |
-            ~/Library/Caches/Homebrew/downloads
-            /opt/homebrew/Cellar/xcodegen
-          key: ${{ runner.os }}-brew-xcodegen-v1
+          path: ~/Library/Caches/Homebrew/downloads
+          key: ${{ runner.os }}-brew-xcodegen-v2
       - name: Install XcodeGen
         run: brew install xcodegen
       # Cache the SwiftPM deps xcodebuild resolves into DerivedData so the
@@ -287,10 +282,8 @@ jobs:
       - name: Cache Homebrew (xcodegen)
         uses: actions/cache@v4
         with:
-          path: |
-            ~/Library/Caches/Homebrew/downloads
-            /opt/homebrew/Cellar/xcodegen
-          key: ${{ runner.os }}-brew-xcodegen-v1
+          path: ~/Library/Caches/Homebrew/downloads
+          key: ${{ runner.os }}-brew-xcodegen-v2
       - name: Cache SPM (DerivedData SourcePackages)
         uses: actions/cache@v4
         with:
@@ -327,10 +320,8 @@ jobs:
       - name: Cache Homebrew (xcodegen)
         uses: actions/cache@v4
         with:
-          path: |
-            ~/Library/Caches/Homebrew/downloads
-            /opt/homebrew/Cellar/xcodegen
-          key: ${{ runner.os }}-brew-xcodegen-v1
+          path: ~/Library/Caches/Homebrew/downloads
+          key: ${{ runner.os }}-brew-xcodegen-v2
       - name: Cache SPM (DerivedData SourcePackages)
         uses: actions/cache@v4
         with:
@@ -434,10 +425,8 @@ jobs:
       - name: Cache Homebrew (xcodegen)
         uses: actions/cache@v4
         with:
-          path: |
-            ~/Library/Caches/Homebrew/downloads
-            /opt/homebrew/Cellar/xcodegen
-          key: ${{ runner.os }}-brew-xcodegen-v1
+          path: ~/Library/Caches/Homebrew/downloads
+          key: ${{ runner.os }}-brew-xcodegen-v2
       - name: Cache SPM (DerivedData SourcePackages)
         uses: actions/cache@v4
         with:
