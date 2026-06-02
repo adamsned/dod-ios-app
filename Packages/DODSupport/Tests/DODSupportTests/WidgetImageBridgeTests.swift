@@ -215,6 +215,53 @@ import Testing
         #expect(WidgetImageBridge.imageSubdirectory == "widget-images")
     }
 
+    // MARK: - Data protection (DUT-8)
+    //
+    // The on-device cause of "the widget shows the placeholder even though
+    // the `.img` files exist" is the file's data-protection class: the iOS
+    // default (`.complete`) makes the bytes unreadable while the device is
+    // locked, and a widget extension reads them in the background / on the
+    // Lock Screen. We can't assert the OS-enforced encryption-at-rest
+    // behaviour from a unit test (there is no device lock in the test host),
+    // so these tests pin the part we CAN verify deterministically: the write
+    // path opts into the widget-readable class, and writes still round-trip.
+
+    @Test func widgetReadableProtectionOptionMatchesPlatform() {
+        // On iOS the write must carry the "until first user auth" file
+        // protection so a locked-device widget read succeeds; on the macOS
+        // test slice there is no per-file data protection, so the option set
+        // is empty (a plain `.atomic` write).
+        #if os(iOS)
+        #expect(
+            WidgetImageBridge.widgetReadableProtectionOption
+                == .completeFileProtectionUntilFirstUserAuthentication
+        )
+        #else
+        #expect(WidgetImageBridge.widgetReadableProtectionOption.isEmpty)
+        #endif
+    }
+
+    @Test func writeStillRoundTripsWithProtectionApplied() throws {
+        // Regression guard: the DUT-8 protection-class change must not break
+        // the existing write/read round-trip. (On iOS the file is also
+        // encrypted-at-rest under `.completeUntilFirstUserAuthentication`;
+        // here we just prove the bytes are still recoverable.)
+        let identifier = "dod.test.bridge.\(UUID().uuidString)"
+        defer { Self.cleanupContainer(identifier: identifier) }
+        let url = try #require(URL(string: "https://example.com/protected.jpg"))
+        let bytes = Data([0xFF, 0xD8, 0xFF, 0xDB, 0x00, 0x43])  // JPEG-ish header
+
+        #expect(WidgetImageBridge.writeImage(bytes: bytes, for: url, appGroupIdentifier: identifier))
+
+        let fileURL = try #require(
+            WidgetImageBridge.fileURL(
+                forFilename: WidgetImageBridge.filename(for: url),
+                appGroupIdentifier: identifier
+            )
+        )
+        #expect(try Data(contentsOf: fileURL) == bytes)
+    }
+
     // MARK: - Helpers
 
     /// Remove the per-test container we created so test runs don't leak
