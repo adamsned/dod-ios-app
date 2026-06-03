@@ -115,24 +115,7 @@ public struct SettingsView: View {
             // + display name + email row when one does. Tap pushes
             // `ProfileEditView`.
             Section {
-                ProfileSection(profile: viewModel.profile) {
-                    if let profileStore = viewModel.profileStore {
-                        ProfileEditView(
-                            store: profileStore,
-                            existingProfile: viewModel.profile,
-                            onProfileChanged: { [weak viewModel] in
-                                await viewModel?.refreshProfile()
-                            }
-                        )
-                    } else {
-                        // Previews + snapshot hosts without a wired
-                        // store: surface a placeholder rather than
-                        // crash. Production always has a store.
-                        Text("Profile editing requires a store.")
-                            .dodFont(DODType.body)
-                            .foregroundStyle(DODColor.labelSecondary)
-                    }
-                }
+                ProfileSettingsRow(viewModel: viewModel)
             }
             .listRowBackground(DODColor.surfaceElevated)
 

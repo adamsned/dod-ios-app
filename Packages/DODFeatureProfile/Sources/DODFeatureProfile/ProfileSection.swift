@@ -1,6 +1,10 @@
 import DODDesignSystem
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// The Profile row at the top of Settings. Two states:
 ///
 /// 1. **Empty (no profile yet).** Renders a single-line "Set up your
@@ -23,7 +27,23 @@ public struct ProfileSection<Destination: View>: View {
 
     public let profile: UserProfile?
     public let destination: () -> Destination
+    #if canImport(UIKit)
+    /// Phase b (T-740) — optional photo store routed into the populated
+    /// row's ``ProfilePhotoView`` so Settings surfaces the uploaded
+    /// photo when one exists (otherwise falls back to the initial-
+    /// letter avatar). `nil` for previews + snapshot hosts. UIKit-gated.
+    public let photoStore: (any ProfilePhotoStoring)?
 
+    public init(
+        profile: UserProfile?,
+        photoStore: (any ProfilePhotoStoring)? = nil,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) {
+        self.profile = profile
+        self.photoStore = photoStore
+        self.destination = destination
+    }
+    #else
     public init(
         profile: UserProfile?,
         @ViewBuilder destination: @escaping () -> Destination
@@ -31,6 +51,7 @@ public struct ProfileSection<Destination: View>: View {
         self.profile = profile
         self.destination = destination
     }
+    #endif
 
     public var body: some View {
         NavigationLink {
@@ -57,7 +78,11 @@ public struct ProfileSection<Destination: View>: View {
     @ViewBuilder
     private func populatedRow(for profile: UserProfile) -> some View {
         HStack(spacing: DODSpacing.md) {
+            #if canImport(UIKit)
+            ProfilePhotoView(profile: profile, diameter: 60, photoStore: photoStore)
+            #else
             ProfilePhotoView(profile: profile, diameter: 60)
+            #endif
             VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                 Text(profile.displayName)
                     .dodFont(DODType.body)

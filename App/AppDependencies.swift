@@ -43,9 +43,13 @@ final class AppDependencies {
     private let commentsClient: WPCommentsClient
     private let ratingsClient: WPRMRatingsClient
     private let guestIdentityStore: any GuestIdentityStoring
-    /// US-44 (T-739) — Keychain-backed profile store routed through
-    /// `SettingsViewModel.profileStore` to the Settings Profile section.
+    /// US-44 (T-739) — Keychain profile store. Phase b (T-740) — wired
+    /// with the photo store so `clear()` also deletes the on-disk JPG.
     let profileStore: KeychainProfileStore
+    /// US-44 Phase b (T-740) — Documents JPG (512×512 @ 0.85). `nil` if
+    /// Documents is unavailable; photo flow falls back to the initial-
+    /// letter avatar. Per CL-137 / AC-44.9.
+    let profilePhotoStore: ProfilePhotoStore?
 
     /// Diagnostic observer for the SwiftData ↔ CloudKit mirror (round-12
     /// backlog bug — "CloudKit recipe sync doesn't work"). Started from
@@ -109,7 +113,13 @@ final class AppDependencies {
         )
         self.ratingsClient = WPRMRatingsClient()
         self.guestIdentityStore = KeychainGuestIdentityStore()
-        self.profileStore = KeychainProfileStore()
+        // Phase b (T-740) — wire the on-disk photo store into the
+        // profile store so Sign Out + Delete Profile clean up both
+        // surfaces per CL-137 / AC-44.9. A throw degrades to nil and
+        // the flow falls back to the initial-letter avatar.
+        let resolvedPhotoStore = try? ProfilePhotoStore()
+        self.profilePhotoStore = resolvedPhotoStore
+        self.profileStore = KeychainProfileStore(photoStore: resolvedPhotoStore)
         self.notificationService = NotificationService()
     }
 
@@ -357,43 +367,5 @@ final class AppDependencies {
             return nil
         }
         return url.pathComponents.first { $0 != "/" && !$0.isEmpty }
-    }
-}
-
-// MARK: - US-41 / AC-41.3 (T-703) live Settings wiring
-
-/// Production conformance to ``SettingsDependencies``. Holds a
-/// `@Sendable` closure that persists the opt-in flag (DUT-6 — there is no
-/// mid-session container rebuild any more; the flag is the launch-time
-/// source of truth) and a status provider that reads the App-target
-/// CloudKit mirror observer's latest coarse status (cause B).
-///
-/// Spec trace: US-41 AC-41.3, AC-41.4; CL-89; DUT-6.
-struct LiveSettingsDependencies: SettingsDependencies {
-
-    typealias FlagWrite = @Sendable (Bool) async -> Void
-    typealias StatusProvider = @Sendable () -> CloudKitSyncStatus
-
-    let flagWrite: FlagWrite
-    let statusProvider: StatusProvider
-
-    init(
-        flagWrite: @escaping FlagWrite,
-        statusProvider: @escaping StatusProvider = { .off }
-    ) {
-        self.flagWrite = flagWrite
-        self.statusProvider = statusProvider
-    }
-
-    func setCloudSyncOptIn(_ enabled: Bool) async {
-        await flagWrite(enabled)
-    }
-
-    func cloudSyncOptInValue() -> Bool {
-        RecipeStore.cloudKitSyncOptIn()
-    }
-
-    func currentCloudSyncStatus() -> CloudKitSyncStatus {
-        statusProvider()
     }
 }
