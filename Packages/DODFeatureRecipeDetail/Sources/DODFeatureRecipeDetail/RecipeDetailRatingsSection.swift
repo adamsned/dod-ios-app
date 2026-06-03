@@ -249,23 +249,15 @@ public struct RecipeDetailRatingsSection: View {
     @ViewBuilder
     private var postingAsHeader: some View {
         if let profile = viewModel.profile {
+            #if canImport(UIKit)
             PostingAsHeader(
                 profile: profile,
-                photoStore: postingAsHeaderPhotoStore
+                photoStore: viewModel.profilePhotoStoreForGate
             )
+            #else
+            PostingAsHeader(profile: profile)
+            #endif
         }
-    }
-
-    /// US-44 / CL-139 — the photo store reference for the header avatar.
-    /// UIKit-gated because ``ProfilePhotoStoring`` returns ``UIImage`` and
-    /// the macOS build doesn't ship the photo flow. Reuses the same
-    /// dependency seam Phase c exposed for ``ProfileEditView``.
-    private var postingAsHeaderPhotoStore: (any ProfilePhotoStoring)? {
-        #if canImport(UIKit)
-        return viewModel.profilePhotoStoreForGate
-        #else
-        return nil
-        #endif
     }
 
     /// Caption above the stars: reflects the user's prior rating if the
@@ -382,63 +374,12 @@ public struct RecipeDetailRatingsSection: View {
         }
     }
 
-    /// US-44 / CL-139 / DUT-36 Phase d — render one comment row, swapping
-    /// the AsyncImage / Gravatar avatar for ``ProfilePhotoView`` when the
-    /// comment's ``RecipeComment/authorEmail`` case-insensitively matches
-    /// the current profile's email. Other users' comments fall through to
-    /// the existing avatar path. Old guest-attributed comments (whose
-    /// empty `authorEmail` doesn't match any real profile email) also
-    /// fall through — AC-44.7 preserved by construction. AC-44.13.
-    @ViewBuilder
-    private func commentRow(for comment: RecipeComment) -> some View {
-        CommentRow(
-            authorName: displayAuthor(for: comment),
-            avatarURL: comment.avatarURL,
-            relativeDate: Self.relativeDateString(comment.dateGMT),
-            bodyText: comment.body,
-            ratingValue: comment.ratingValue,
-            isPendingModeration: comment.status != .approved,
-            avatarOverride: ownCommentAvatarOverride(for: comment)
-        )
-    }
-
-    /// US-44 / CL-139 — return the override view if this row belongs to
-    /// the current profile (case-insensitive email match), else `nil` so
-    /// ``CommentRow`` falls through to its existing AsyncImage path.
-    private func ownCommentAvatarOverride(for comment: RecipeComment) -> AnyView? {
-        guard let profile = viewModel.profile else { return nil }
-        let lhs = comment.authorEmail.lowercased()
-        let rhs = profile.email.lowercased()
-        guard !lhs.isEmpty, lhs == rhs else { return nil }
-        return ownCommentAvatarView(profile: profile)
-    }
-
-    /// US-44 / CL-139 — the photo avatar used in own-comment rows. UIKit
-    /// gated so the macOS build (which doesn't ship ``ProfilePhotoStoring``)
-    /// degrades to the initial-letter avatar (``ProfilePhotoView``'s macOS
-    /// branch already does this for us).
-    private func ownCommentAvatarView(profile: UserProfile) -> AnyView {
-        #if canImport(UIKit)
-        return AnyView(
-            ProfilePhotoView(
-                profile: profile,
-                diameter: 40,
-                photoStore: viewModel.profilePhotoStoreForGate
-            )
-        )
-        #else
-        return AnyView(
-            ProfilePhotoView(profile: profile, diameter: 40)
-        )
-        #endif
-    }
+    // CL-139 / Phase d — `commentRow(for:)` + the own-comment avatar
+    // override helpers live in ``RecipeDetailRatingsSection+PhaseD.swift``
+    // so this struct body stays under the SwiftLint `type_body_length`
+    // cap (same extraction pattern as the retired `+AuthorFields.swift`).
 
     // MARK: - Helpers
-
-    private func displayAuthor(for comment: RecipeComment) -> String {
-        let trimmed = comment.authorName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Anonymous" : trimmed
-    }
 
     /// Cheap relative-date formatter shared by every row. Uses
     /// `RelativeDateTimeFormatter` so output respects the device locale
@@ -450,61 +391,5 @@ public struct RecipeDetailRatingsSection: View {
     }
 }
 
-/// US-44 / CL-139 / DUT-36 Phase d — the static "Posting as <name>"
-/// header that sits above the empty comment editor inside
-/// ``RecipeDetailRatingsSection``'s `rateAndReviewCard`. Replaces the
-/// retired DUT-28 editable "Display name" + "Email" `TextField`s — the
-/// user only chooses stars + types the comment text. The header reads
-/// as plain text ("you're posting as this person"), not as another
-/// input.
-///
-/// **Layout.** `HStack` carrying a 32pt ``ProfilePhotoView`` leading +
-/// a `VStack` with the display name (`DODType.bodyEmphasized`) on top +
-/// the email (`DODType.caption` / secondary label) below + a trailing
-/// `Spacer`. Padding-bottom of `DODSpacing.sm` separates the header
-/// from the star picker / comment editor below. Avatar diameter chosen
-/// at 32pt to sit comfortably inside the composer card (smaller than
-/// the 60pt Settings header avatar + the 40pt comment-row avatar).
-///
-/// **Accessibility.** `.accessibilityElement(children: .combine)` plus
-/// a combined "Posting as <name>, <email>" label so VoiceOver announces
-/// the header as a single read-only element rather than three
-/// independent ones (avatar + name + email).
-///
-/// Spec trace: US-44 AC-44.12; CL-139.
-private struct PostingAsHeader: View {
-
-    let profile: UserProfile
-    #if canImport(UIKit)
-    let photoStore: (any ProfilePhotoStoring)?
-    #else
-    let photoStore: Void? = nil
-    #endif
-
-    var body: some View {
-        HStack(spacing: DODSpacing.xs) {
-            avatar
-            VStack(alignment: .leading, spacing: 2) {
-                Text(profile.displayName)
-                    .dodFont(DODType.bodyEmphasized)
-                    .foregroundStyle(DODColor.label)
-                Text(profile.email)
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.bottom, DODSpacing.sm)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Posting as \(profile.displayName), \(profile.email)")
-    }
-
-    @ViewBuilder
-    private var avatar: some View {
-        #if canImport(UIKit)
-        ProfilePhotoView(profile: profile, diameter: 32, photoStore: photoStore)
-        #else
-        ProfilePhotoView(profile: profile, diameter: 32)
-        #endif
-    }
-}
+// CL-139 / Phase d — ``PostingAsHeader`` struct lives in
+// ``RecipeDetailRatingsSection+PhaseD.swift``.

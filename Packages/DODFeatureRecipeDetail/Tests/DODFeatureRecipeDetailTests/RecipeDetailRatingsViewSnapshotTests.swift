@@ -153,6 +153,76 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
     }
 
+    // MARK: - Phase d (T-742 / CL-139) — composer auto-fill + own-comment photo
+
+    /// AC-44.12: the composer no longer renders the editable "Display
+    /// name" + "Email" fields. The new `PostingAsHeader` (avatar + name
+    /// + email) sits above the comment editor. Pins the new composer
+    /// shape; `record: .missing` records the baseline on first run.
+    @MainActor
+    func test_section_postingAsHeader_renders() async {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 907, withDetail: true)
+        dependencies.fetchedRatingSummary = RecipeRating(recipeID: 907, average: 4.2, count: 9)
+        dependencies.profileToLoad = UserProfile(
+            id: UUID(),
+            displayName: "Spencer Adams",
+            email: "spencer@example.com",
+            photoFilename: nil
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 907)
+        await viewModel.onAppear()
+
+        XCTAssertTrue(viewModel.hasProfile)
+        // Author identity is sourced from the profile, not user input —
+        // the retired `commentAuthorName`/`Email` API still surfaces the
+        // mirrored values (backward-compatible) so existing tests pass.
+        XCTAssertEqual(viewModel.commentAuthorName, "Spencer Adams")
+        XCTAssertEqual(viewModel.commentAuthorEmail, "spencer@example.com")
+
+        let view = RecipeDetailRatingsSection(viewModel: viewModel)
+            .frame(width: 390)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+    }
+
+    /// AC-44.13: own-comment row renders the user's profile photo via the
+    /// case-insensitive `authorEmail == profile.email` match. The fake
+    /// dependency seeds a fetched comment whose `authorEmail` matches
+    /// the profile's email; the section's commentRow builder swaps in
+    /// `ProfilePhotoView`. `record: .missing` records the baseline.
+    @MainActor
+    func test_section_ownCommentRow_renders() async {
+        let profileEmail = "spencer@example.com"
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 908, withDetail: true)
+        dependencies.fetchedRatingSummary = RecipeRating(recipeID: 908, average: 4.2, count: 9)
+        dependencies.profileToLoad = UserProfile(
+            id: UUID(),
+            displayName: "Spencer",
+            email: profileEmail,
+            photoFilename: nil
+        )
+        dependencies.fetchedComments = [
+            RecipeComment(
+                id: 4001,
+                postID: 908,
+                authorName: "Spencer",
+                authorEmail: profileEmail,
+                avatarURL: nil,
+                dateGMT: Date(timeIntervalSince1970: 1_700_000_000),
+                body: "This is my own comment.",
+                ratingValue: 5,
+                status: .approved
+            )
+        ]
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 908)
+        await viewModel.onAppear()
+
+        let view = RecipeDetailRatingsSection(viewModel: viewModel)
+            .frame(width: 390)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
+    }
+
     // MARK: - Helpers
 
     @MainActor
