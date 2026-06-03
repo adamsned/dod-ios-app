@@ -212,7 +212,8 @@ public struct RecipeDetailRatingsSection: View {
     /// "Email" `authorFields` rows were retired — the user only chooses
     /// stars + types the comment text. Author identity is sourced from
     /// the Profile and displayed above the comment editor as a static
-    /// ``PostingAsHeader`` (avatar + name + email, no input). The Phase
+    /// ``PostingAsHeader`` (avatar + name, no input — T-744 / CL-141
+    /// (DUT-37) removed the email row). The Phase
     /// c gate guarantees `profile` is non-nil whenever this card is
     /// interactive, so the header always has a profile to render.
     /// AC-44.12.

@@ -94,19 +94,33 @@ extension RecipeDetailRatingsSection {
 /// input.
 ///
 /// **Layout.** `HStack` carrying a 32pt ``ProfilePhotoView`` leading +
-/// a `VStack` with the display name (`DODType.bodyEmphasized`) on top +
-/// the email (`DODType.caption` / secondary label) below + a trailing
+/// the display name (`DODType.heading` / primary label) + a trailing
 /// `Spacer`. Padding-bottom of `DODSpacing.sm` separates the header
 /// from the star picker / comment editor below. Avatar diameter chosen
 /// at 32pt to sit comfortably inside the composer card (smaller than
 /// the 60pt Settings header avatar + the 40pt comment-row avatar).
 ///
-/// **Accessibility.** `.accessibilityElement(children: .combine)` plus
-/// a combined "Posting as <name>, <email>" label so VoiceOver announces
-/// the header as a single read-only element rather than three
-/// independent ones (avatar + name + email).
+/// **T-744 / CL-141 (DUT-37) — email row removed from the composer
+/// surface.** Published comments never expose `author_email` (verified
+/// at 3 layers: WP REST `/wp/v2/comments` GET redacts the field
+/// server-side per the existing WP privacy posture; ``WPCommentDTO``
+/// zeroes the field on parse; ``CommentRow`` has no email render
+/// path), so the composer's own-email display was inconsistent with
+/// that privacy posture. Email is preserved on Settings → Profile
+/// section header + ``ProfileEditView`` (where the user actively
+/// manages it) and continues to flow through unchanged as
+/// `author_email` in the WP REST submission — only the composer
+/// header UI display changes. The inner `VStack` collapses to a
+/// single `Text(profile.displayName)`.
 ///
-/// Spec trace: US-44 AC-44.12; CL-139.
+/// **Accessibility.** `.accessibilityElement(children: .combine)` plus
+/// a combined "Posting as <name>" label so VoiceOver announces
+/// the header as a single read-only element rather than two
+/// independent ones (avatar + name). The email phrase is dropped from
+/// the label since it's no longer rendered (announcing it would be
+/// misleading to non-sighted users).
+///
+/// Spec trace: US-44 AC-44.12 (amended T-744 / CL-141); CL-139.
 struct PostingAsHeader: View {
 
     let profile: UserProfile
@@ -117,19 +131,14 @@ struct PostingAsHeader: View {
     var body: some View {
         HStack(spacing: DODSpacing.xs) {
             avatar
-            VStack(alignment: .leading, spacing: 2) {
-                Text(profile.displayName)
-                    .dodFont(DODType.bodyEmphasized)
-                    .foregroundStyle(DODColor.label)
-                Text(profile.email)
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
+            Text(profile.displayName)
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.label)
             Spacer(minLength: 0)
         }
         .padding(.bottom, DODSpacing.sm)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Posting as \(profile.displayName), \(profile.email)")
+        .accessibilityLabel("Posting as \(profile.displayName)")
     }
 
     @ViewBuilder
