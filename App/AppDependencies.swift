@@ -3,6 +3,7 @@ import DODAnalytics
 import DODDomain
 import DODFeatureCategories
 import DODFeatureFeed
+import DODFeatureProfile
 import DODFeatureRecipeDetail
 import DODFeatureSaved
 import DODFeatureSearch
@@ -42,6 +43,9 @@ final class AppDependencies {
     private let commentsClient: WPCommentsClient
     private let ratingsClient: WPRMRatingsClient
     private let guestIdentityStore: any GuestIdentityStoring
+    /// US-44 (T-739) — Keychain-backed profile store routed through
+    /// `SettingsViewModel.profileStore` to the Settings Profile section.
+    let profileStore: KeychainProfileStore
 
     /// Diagnostic observer for the SwiftData ↔ CloudKit mirror (round-12
     /// backlog bug — "CloudKit recipe sync doesn't work"). Started from
@@ -105,6 +109,7 @@ final class AppDependencies {
         )
         self.ratingsClient = WPRMRatingsClient()
         self.guestIdentityStore = KeychainGuestIdentityStore()
+        self.profileStore = KeychainProfileStore()
         self.notificationService = NotificationService()
     }
 

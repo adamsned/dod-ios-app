@@ -14,6 +14,10 @@ let package = Package(
         .package(path: "../DODAnalytics"),
         .package(path: "../DODNetworking"),
         .package(path: "../DODPersistence"),
+        // US-44 (T-739) — Profile section + edit view at the top of
+        // Settings. `DODFeatureFeed` owns `SettingsView` so it consumes
+        // the Profile UI surface directly.
+        .package(path: "../DODFeatureProfile"),
         // Test-only — top-level screen visual regression (US-18 / T-332).
         // Pin matches `DODDesignSystem/Package.swift` so the package graph
         // resolves a single `swift-snapshot-testing` version.
@@ -29,6 +33,7 @@ let package = Package(
                 "DODAnalytics",
                 "DODNetworking",
                 "DODPersistence",
+                "DODFeatureProfile",
             ]
         ),
         .testTarget(

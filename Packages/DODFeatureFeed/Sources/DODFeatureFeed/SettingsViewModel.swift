@@ -1,48 +1,31 @@
+import DODFeatureProfile
 import DODPersistence
 import DODSupport
 import Foundation
 import Observation
 
 /// State + persistence for the Settings page (US-32 skeleton, US-36 expansion,
-/// US-41 iCloud Sync row).
+/// US-41 iCloud Sync row, US-44 Profile section).
 ///
-/// The T-550 skeleton (US-32) owned exactly one piece of persisted state —
-/// the "Use metric units" toggle — and stubbed the rest of the surface as
-/// version footer + About link. T-630 (US-36) expanded the view-model to
-/// also persist the four new round-trip preferences the round-7 backlog
-/// graduated and to own the cache-clear flow's snackbar feedback. T-703
-/// (US-41) further extends the view-model with the iCloud Sync toggle —
-/// reads + writes the canonical `RecipeStore.cloudKitSyncOptInKey`
-/// UserDefaults flag through a `SettingsDependencies` seam so the
-/// composition root owns the `RecipeStore` lifecycle (per CL-89). Per DUT-6
-/// the flag is the launch-time source of truth — the toggle persists it and
-/// surfaces a relaunch-to-apply hint rather than (futilely) rebuilding the
-/// live container mid-session.
+/// Persisted keys (`dod.settings.*` + `dod.cloudkit.*`):
+/// - ``useMetricUnitsKey`` — Bool, AC-32.4.
+/// - ``notificationsEnabledKey`` — Bool, AC-36.1 (US-42 / T-631 wires APNs).
+/// - ``appearancePreferenceKey`` — String, AC-36.2 (RootView consumes).
+/// - ``shareFormatPreferenceKey`` — String, AC-36.3.
+/// - ``telemetryEnabledKey`` — Bool, AC-36.5 (TelemetryDeckTransport reads).
+/// - `RecipeStore.cloudKitSyncOptInKey` — Bool, AC-41.3 (launch-time SoT
+///   per DUT-6; routed through ``SettingsDependencies``).
 ///
-/// Persistence keys (the `dod.settings.*` prefix US-32 established, plus
-/// the `dod.cloudkit.*` namespace T-702 / T-703 own):
-/// - ``useMetricUnitsKey`` — Bool, AC-32.4 (US-32, T-551 follow-up consumes).
-/// - ``notificationsEnabledKey`` — Bool, AC-36.1 (US-36, T-631 follow-up
-///   wires APNs).
-/// - ``appearancePreferenceKey`` — `AppearancePreference.rawValue` string,
-///   AC-36.2 (US-36, `RootView.preferredColorScheme(...)` consumes).
-/// - ``shareFormatPreferenceKey`` — `ShareFormatPreference.rawValue` string,
-///   AC-36.3 (US-36, future task wires `ShareLink`'s payload).
-/// - ``telemetryEnabledKey`` — Bool, AC-36.5 (US-36,
-///   `TelemetryDeckTransport.send(_:)` consumes the same key).
-/// - `RecipeStore.cloudKitSyncOptInKey` (`dod.cloudkit.syncOptInV1`) — Bool,
-///   AC-41.3 (US-41, T-702's container factory reads it; T-703 / T-704
-///   write it). NOTE: declared in `DODPersistence` so the canonical key
-///   string lives next to the reader; the view-model goes through
-///   ``SettingsDependencies`` rather than touching `UserDefaults` directly
-///   so the composition root owns the write (and the paired analytics +
-///   launch-time container selection that depend on it) per DUT-6.
+/// US-44 (T-739) Profile section: the on-device ``profile`` and its
+/// Keychain-backed ``profileStore`` are constructor-injected by the
+/// composition root; ``refreshProfile()`` reloads after edit-view
+/// dismiss.
 ///
 /// `UserDefaults` is constructor-injected so the L1 unit suite can pass an
-/// isolated suite (`UserDefaults(suiteName:)`) without polluting the shared
-/// standard defaults — pattern mirrors `RecentSearches` in `DODFeatureSearch`.
+/// isolated `UserDefaults(suiteName:)` — pattern mirrors `RecentSearches`.
 ///
-/// Spec trace: US-32 AC-32.4; US-36 AC-36.1..AC-36.8; US-41 AC-41.3, AC-41.4.
+/// Spec trace: US-32 AC-32.4; US-36 AC-36.1..AC-36.8; US-41 AC-41.3, AC-41.4;
+/// US-44 AC-44.1, AC-44.4.
 @Observable
 @MainActor
 public final class SettingsViewModel {
@@ -115,18 +98,26 @@ public final class SettingsViewModel {
     /// ``voicePreviewer``.
     let voiceLanguageCode: String?
 
-    /// Optional seam for the iCloud Sync row (US-41 / AC-41.3; DUT-6).
-    /// Constructor-injected so the L1 suite can pass a recording double;
-    /// production wiring passes a `LiveSettingsDependencies` value that
-    /// **(1)** persists the `RecipeStore.cloudKitSyncOptInKey` flag (the
-    /// launch-time source of truth — no mid-session container rebuild any
-    /// more, per DUT-6) and **(2)** reports the latest CloudKit mirror status
-    /// for the row's status sublabel (cause B). The default `nil` keeps
-    /// existing call sites (previews, snapshot hosts, pre-T-703 fixtures)
-    /// compiling without churn. Read from the action methods in
-    /// `SettingsViewModel+CloudSync.swift` (the file_length split forces an
-    /// internal-but-not-private accessor).
+    /// Seam for the iCloud Sync row (US-41 / AC-41.3; DUT-6). Production
+    /// wiring persists the `RecipeStore.cloudKitSyncOptInKey` launch-time
+    /// flag and reports the CloudKit mirror status. `nil` for previews +
+    /// pre-T-703 fixtures. Read from `SettingsViewModel+CloudSync.swift`.
     let cloudSyncDependency: (any SettingsDependencies)?
+
+    // MARK: - US-44 (T-739) — Profile section
+
+    /// On-device user profile. `nil` in guest mode (the default).
+    public internal(set) var profile: UserProfile?
+
+    /// Keychain-backed profile store. `nil` for previews / snapshots.
+    let profileStore: (any ProfileStoring)?
+
+    /// Reload `profile` from the store. Fired by `ProfileEditView`'s
+    /// `onProfileChanged` callback after a save / sign-out / delete.
+    public func refreshProfile() async {
+        guard let profileStore else { return }
+        profile = await profileStore.load()
+    }
 
     /// Authorization seam for the notifications toggle (US-42 / AC-42.1).
     /// The composition root injects a closure that calls
@@ -204,24 +195,16 @@ public final class SettingsViewModel {
 
     // MARK: - US-41 / AC-41.3 — iCloud Sync toggle
 
-    /// Cached snapshot of the iCloud sync opt-in flag so the `@Observable`
-    /// machinery emits a change when the view-model flips it. The setter is
-    /// intentionally not the public write path — view-layer code calls
-    /// ``requestCloudSyncOptIn(_:)`` instead so the confirmation alert flow
-    /// stays mandatory (per AC-41.3 + CL-89). Seeded from the dependency at
-    /// init, so previews + tests that don't wire one still get a stable
-    /// `false` default. Setter is `internal` (not `public`) so the action
-    /// methods in `SettingsViewModel+CloudSync.swift` can mutate it while
-    /// external callers stay locked out.
+    /// Cached snapshot of the iCloud sync opt-in flag so `@Observable`
+    /// emits a change when the view-model flips it. Public write path is
+    /// ``requestCloudSyncOptIn(_:)`` (AC-41.3 + CL-89 — confirmation
+    /// alert is mandatory). Seeded from the dependency at init.
     public internal(set) var isCloudSyncEnabled: Bool
 
-    /// Set when the user flips the iCloud Sync toggle *this session*. SwiftData
-    /// builds its `ModelContainer` once per process and cannot swap the CloudKit
-    /// configuration mid-flight (the `recreateContainerAfterOptInChange()`
-    /// contract), so a flip only engages on the next cold launch — surfacing
-    /// this stops the "I toggled it and nothing synced" confusion (round-12
-    /// backlog bug). Not persisted; a relaunch clears it. Setter is `internal`
-    /// so the action methods in `SettingsViewModel+CloudSync.swift` can set it.
+    /// Set when the user flips iCloud Sync *this session*. SwiftData
+    /// builds its `ModelContainer` once per process; the flip only
+    /// engages on the next cold launch. Surfacing this stops the
+    /// "I toggled it and nothing synced" confusion. Not persisted.
     public internal(set) var cloudSyncPendingRelaunch = false
 
     /// Latest coarse sync status, pushed in from the App-target
@@ -273,6 +256,8 @@ public final class SettingsViewModel {
         dependencies: (any SettingsDependencies)? = nil,
         voicePreviewer: (any VoicePreviewing)? = nil,
         voiceLocale: Locale = .current,
+        profileStore: (any ProfileStoring)? = nil,
+        initialProfile: UserProfile? = nil,
         requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false }
     ) {
         self.defaults = defaults
@@ -280,6 +265,8 @@ public final class SettingsViewModel {
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies
+        self.profileStore = profileStore
+        self.profile = initialProfile
         self.requestNotificationAuthorization = requestNotificationAuthorization
         // US-41 AC-41.3 — seed the toggle state from the canonical
         // flag (RecipeStore.cloudKitSyncOptInKey) so users who already
@@ -292,6 +279,15 @@ public final class SettingsViewModel {
             self.isCloudSyncEnabled = dependencies.cloudSyncOptInValue()
         } else {
             self.isCloudSyncEnabled = defaults.bool(forKey: RecipeStore.cloudKitSyncOptInKey)
+        }
+        // US-44 (T-739) — kick off the initial profile load when a store
+        // is wired but no explicit `initialProfile` was supplied. Mirrors
+        // the lazy-warmup pattern `refreshCloudSyncStatus()` uses on the
+        // CloudKit side. Tests + previews that supply `initialProfile`
+        // skip the I/O entirely; the composition root supplies a store
+        // without an `initialProfile` and the load fires once at init.
+        if profileStore != nil, initialProfile == nil {
+            Task { [weak self] in await self?.refreshProfile() }
         }
     }
 
