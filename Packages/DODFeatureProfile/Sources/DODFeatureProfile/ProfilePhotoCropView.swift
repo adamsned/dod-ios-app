@@ -138,15 +138,30 @@ public struct ProfilePhotoCropView: View {
 
     @ViewBuilder
     private func cropOverlay(cropSize: CGFloat, frameSize: CGSize) -> some View {
-        // Dim outside, transparent inside. Drawn as a single rectangle
-        // mask via `.mask` so the transparency cuts a clean square
-        // — no overdraw on the rest of the canvas.
+        // Dim outside, transparent inside. Drawn as a full-frame
+        // rectangle mask with a Circle "hole" punched out via
+        // `.destinationOut` so the transparency cuts a clean circle.
+        // The visible crop window IS a circle so the user sees how
+        // the avatar will actually look post-save (every avatar
+        // render site in the app clips to `Circle()` per AC-44.15).
+        //
+        // **Math UNCHANGED.** `cropRect(for:offset:imageSize:cropSize:)`
+        // still produces a square rect that the renderer samples into
+        // a 512×512 square output bitmap, which `ProfilePhotoStore`
+        // re-encodes to JPG at 0.85 quality (locked per CL-137). Only
+        // the visual overlay shape changes; the saved file stays
+        // square JPG. Render-side `.clipShape(Circle())` is what makes
+        // the user's eye see a circle in the final UI. Rationale for
+        // not switching the on-disk format to PNG-with-alpha: file size
+        // (5-10× larger), couples storage format to presentation shape,
+        // and the user can always re-clip a square source at render
+        // time but cannot recover destroyed corners (CL-140 (2)).
         Rectangle()
             .fill(Color.black.opacity(0.55))
             .mask(
                 Rectangle()
                     .overlay(
-                        Rectangle()
+                        Circle()
                             .frame(width: cropSize, height: cropSize)
                             .blendMode(.destinationOut)
                     )
@@ -155,7 +170,7 @@ public struct ProfilePhotoCropView: View {
             .overlay(
                 // Thin accent stroke on the crop frame so the user can
                 // see the exact boundary even in dim light.
-                Rectangle()
+                Circle()
                     .stroke(DODColor.accent, lineWidth: 1)
                     .frame(width: cropSize, height: cropSize)
             )

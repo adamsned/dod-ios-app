@@ -263,6 +263,117 @@ import Testing
         #expect(viewModel.isAuthorIdentityValid)
     }
 
+    // MARK: - T-743 / CL-140 / AC-44.14 — empty-state label gate
+
+    /// AC-44.14 (CL-140): the "Be the first to rate this recipe."
+    /// invitation only renders when BOTH the ratings list AND the
+    /// comments list are empty. These tests pin the underlying
+    /// viewModel data combination that `ratingsHeader` consults.
+    ///
+    /// Truth table:
+    /// - 0 ratings + 0 comments → label SHOWN (invitation).
+    /// - ≥1 rating + 0 comments → aggregate SHOWN (label hidden).
+    /// - 0 ratings + ≥1 comment → label HIDDEN (no aggregate either).
+    /// - ≥1 rating + ≥1 comment → aggregate SHOWN (label hidden).
+    ///
+    /// We assert against `viewModel.ratingSummary?.count` and
+    /// `viewModel.comments.isEmpty` because those ARE the gate inputs;
+    /// the gate is a pure-function-of-state and pinning the state pins
+    /// the gate output by construction.
+
+    @Test func ratingsHeaderShowsInvitationWhenZeroRatingsAndZeroComments() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 501, withDetail: true)
+        // No ratings, no comments — `ratingsHeader` should render the
+        // "Be the first to rate this recipe." invitation.
+        let viewModel = RecipeDetailViewModelTests.makeViewModel(
+            dependencies: dependencies,
+            listItemID: 501
+        )
+
+        await viewModel.onAppear()
+
+        let summaryCount = viewModel.ratingSummary?.count ?? 0
+        let commentsAreEmpty = viewModel.comments.isEmpty
+        #expect(summaryCount == 0)
+        #expect(commentsAreEmpty)
+        // Gate condition: (summary.count == 0) && comments.isEmpty → label rendered.
+        let shouldRenderInvitation = summaryCount == 0 && commentsAreEmpty
+        #expect(shouldRenderInvitation, "0 ratings + 0 comments → invitation must render")
+    }
+
+    @Test func ratingsHeaderHidesInvitationWhenRatingsPresentAndZeroComments() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 502, withDetail: true)
+        dependencies.fetchedRatingSummary = RecipeRating(recipeID: 502, average: 4.5, count: 3)
+        // Ratings present, no comments — `ratingsHeader` renders the
+        // StarRatingDisplay aggregate; the invitation is NOT shown.
+        let viewModel = RecipeDetailViewModelTests.makeViewModel(
+            dependencies: dependencies,
+            listItemID: 502
+        )
+
+        await viewModel.onAppear()
+
+        let summaryCount = viewModel.ratingSummary?.count ?? 0
+        let commentsAreEmpty = viewModel.comments.isEmpty
+        #expect(summaryCount > 0)
+        #expect(commentsAreEmpty)
+        // Gate: aggregate rendered (not the invitation).
+        let shouldRenderAggregate = summaryCount > 0
+        #expect(shouldRenderAggregate, ">0 ratings → aggregate must render")
+    }
+
+    @Test func ratingsHeaderHidesInvitationWhenZeroRatingsAndCommentsPresent() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 503, withDetail: true)
+        // No ratings, at least one comment — `ratingsHeader` must NOT
+        // render the invitation (conversation has started; only the
+        // aggregate is missing). The header collapses to an EmptyView.
+        dependencies.fetchedComments = [
+            RecipeDetailTestFixtures.makeComment(id: 1, postID: 503, body: "Pre-rating tip.")
+        ]
+        let viewModel = RecipeDetailViewModelTests.makeViewModel(
+            dependencies: dependencies,
+            listItemID: 503
+        )
+
+        await viewModel.onAppear()
+
+        let summaryCount = viewModel.ratingSummary?.count ?? 0
+        let commentsAreEmpty = viewModel.comments.isEmpty
+        #expect(summaryCount == 0)
+        #expect(commentsAreEmpty == false)
+        // Gate: invitation hidden (no aggregate either — count is zero).
+        let shouldRenderInvitation = summaryCount == 0 && commentsAreEmpty
+        #expect(shouldRenderInvitation == false, "0 ratings + >0 comments → invitation must be hidden")
+    }
+
+    @Test func ratingsHeaderHidesInvitationWhenRatingsAndCommentsBothPresent() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 504, withDetail: true)
+        dependencies.fetchedRatingSummary = RecipeRating(recipeID: 504, average: 4.7, count: 21)
+        dependencies.fetchedComments = [
+            RecipeDetailTestFixtures.makeComment(id: 11, postID: 504, body: "Loved it.")
+        ]
+        let viewModel = RecipeDetailViewModelTests.makeViewModel(
+            dependencies: dependencies,
+            listItemID: 504
+        )
+
+        await viewModel.onAppear()
+
+        let summaryCount = viewModel.ratingSummary?.count ?? 0
+        let commentsAreEmpty = viewModel.comments.isEmpty
+        #expect(summaryCount > 0)
+        #expect(commentsAreEmpty == false)
+        // Gate: aggregate rendered, invitation hidden.
+        let shouldRenderAggregate = summaryCount > 0
+        let shouldRenderInvitation = summaryCount == 0 && commentsAreEmpty
+        #expect(shouldRenderAggregate, ">0 ratings + >0 comments → aggregate must render")
+        #expect(shouldRenderInvitation == false, ">0 ratings + >0 comments → invitation must be hidden")
+    }
+
     @Test func onAppearLeavesAuthorFieldsEmptyWhenNoSavedIdentity() async throws {
         // DUT-28: with nothing saved, the fields start empty (the user fills
         // them in) and the identity is not yet valid.

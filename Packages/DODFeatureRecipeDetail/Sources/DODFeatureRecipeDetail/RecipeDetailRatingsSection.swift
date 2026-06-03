@@ -93,15 +93,19 @@ public struct RecipeDetailRatingsSection: View {
 
     // MARK: - RatingsHeader
 
-    /// AC-13.1 — shows the aggregate when count ≥ 1, otherwise the
-    /// "Be the first to rate this recipe." invitation. `summary.count`
-    /// here is the rating-count integer (not a collection size), so the
-    /// `empty_count` rule is misfiring — disabled on this line.
+    /// AC-13.1 / AC-44.14 — aggregate when count ≥ 1; otherwise the
+    /// "Be the first to rate this recipe." invitation when comments
+    /// are ALSO empty (a recipe with 0 ratings AND ≥1 comments isn't
+    /// truly empty — conversation has started, only the aggregate is
+    /// missing, so the header collapses to nothing per CL-140).
+    /// `summary.count` is a rating-count integer (not a collection
+    /// size), so the `empty_count` rule is misfiring — disabled on
+    /// this line.
     @ViewBuilder
     private var ratingsHeader: some View {
         if let summary = viewModel.ratingSummary, summary.count > 0 {  // swiftlint:disable:this empty_count
             StarRatingDisplay(average: summary.average, count: summary.count, starSize: 18)
-        } else {
+        } else if viewModel.comments.isEmpty {
             Text("Be the first to rate this recipe.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
@@ -141,17 +145,14 @@ public struct RecipeDetailRatingsSection: View {
         }
     }
 
-    /// US-44 / CL-138 — the `.sheet(isPresented:)` body. Presents
-    /// ``ProfileEditView`` in a `NavigationStack` (so its Cancel + Done
-    /// toolbar render correctly) with `existingProfile: nil` — the gate
-    /// only fires when no profile exists, so the form is always in
-    /// "New Profile" mode. `onProfileChanged` triggers a refresh
-    /// (covers the Done-save path); `.onDisappear` triggers the same
-    /// refresh (covers the Cancel-dismiss path where the user may have
-    /// signed up via the Settings entry instead and only now opens the
-    /// recipe). Both paths route through ``refreshProfile()`` — the
-    /// `@Observable` re-assignment flips `hasProfile` and reactively
-    /// removes the gate. AC-44.10.
+    /// US-44 / CL-138 / CL-140 — `.sheet(isPresented:)` body. Presents
+    /// ``ProfileEditView`` in a `NavigationStack` (back-chevron + Save
+    /// toolbar) with `existingProfile: nil` (gate only fires when no
+    /// profile exists). `onProfileChanged` + `.onDisappear` both route
+    /// through ``refreshProfile()`` — the `@Observable` re-assignment
+    /// flips `hasProfile` + reactively removes the gate. T-743's
+    /// `.interactiveDismissDisabled(isDirty)` on `ProfileEditView`
+    /// prevents swipe-down past unsaved changes. AC-44.10, AC-44.16.
     @ViewBuilder
     private var profileEditSheet: some View {
         NavigationStack {
