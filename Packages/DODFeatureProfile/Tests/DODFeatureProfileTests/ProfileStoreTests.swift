@@ -117,6 +117,51 @@ struct ProfileStoreTests {
 
     // MARK: - US-15 guest UUID bridge
 
+    #if canImport(UIKit)
+    @Test func clearAlsoClearsThePhotoFile() async throws {
+        // Phase b — AC-44.9. ProfileStore.clear() must also call
+        // `photoStore.clear(filename:)` on the current profile's
+        // photoFilename so Sign Out + Delete Profile leave both
+        // Keychain + Documents in the same clean state. Pinned via the
+        // in-memory photo store fake whose `clearedFilenames` records
+        // every call.
+        let photoStore = InMemoryProfilePhotoStore()
+        let filename = "profile-photo-fixture.jpg"
+        let store = InMemoryProfileStore(photoStore: photoStore)
+        let profile = UserProfile(
+            id: UUID(),
+            displayName: "Spencer",
+            email: "spencer@example.com",
+            photoFilename: filename
+        )
+
+        try await store.save(profile)
+        try await store.clear()
+
+        let cleared = await photoStore.clearedFilenames
+        #expect(cleared == [filename])
+        #expect(await store.hasProfile == false)
+    }
+
+    @Test func clearWithoutPhotoDoesNotCallPhotoStore() async throws {
+        // Sanity check — when the profile has nil `photoFilename` the
+        // clear flow shouldn't speculatively call into the photo store.
+        let photoStore = InMemoryProfilePhotoStore()
+        let store = InMemoryProfileStore(photoStore: photoStore)
+        let profile = UserProfile(
+            id: UUID(),
+            displayName: "Spencer",
+            email: "spencer@example.com"
+        )
+
+        try await store.save(profile)
+        try await store.clear()
+
+        let cleared = await photoStore.clearedFilenames
+        #expect(cleared.isEmpty)
+    }
+    #endif
+
     @Test func saveWithSeededUUIDPreservesIdentity() async throws {
         // The US-15 guest UUID becomes the Profile.id when wrapping —
         // callers (the composition root + the edit view) pass the

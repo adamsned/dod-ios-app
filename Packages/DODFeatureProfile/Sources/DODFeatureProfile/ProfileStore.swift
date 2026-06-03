@@ -1,6 +1,10 @@
 import Foundation
 import Security
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// Failure modes for reading / writing the on-device user profile.
 /// Surfaced so the edit view can render a humane prompt instead of a
 /// silent drop (matches the ``GuestIdentityError`` shape in `DODSupport`).
@@ -86,7 +90,28 @@ public actor KeychainProfileStore: ProfileStoring {
 
     private let service: String
     private let accessGroup: String?
+    #if canImport(UIKit)
+    /// Optional collaborator that owns the on-disk profile photo. When
+    /// non-nil, ``clear()`` reads the existing profile pre-clear and
+    /// calls ``ProfilePhotoStoring/clear(filename:)`` on its
+    /// `photoFilename` if present, so Sign Out + Delete Profile leave
+    /// both Keychain + Documents in the same clean state (AC-44.9).
+    /// `nil` in Phase a / preview hosts where the photo flow isn't
+    /// wired; production threads in a ``ProfilePhotoStore`` from
+    /// `AppDependencies`. UIKit-gated because ``ProfilePhotoStoring``
+    /// returns ``UIImage``.
+    private let photoStore: (any ProfilePhotoStoring)?
 
+    public init(
+        service: String = KeychainProfileStore.defaultService,
+        accessGroup: String? = nil,
+        photoStore: (any ProfilePhotoStoring)? = nil
+    ) {
+        self.service = service
+        self.accessGroup = accessGroup
+        self.photoStore = photoStore
+    }
+    #else
     public init(
         service: String = KeychainProfileStore.defaultService,
         accessGroup: String? = nil
@@ -94,6 +119,7 @@ public actor KeychainProfileStore: ProfileStoring {
         self.service = service
         self.accessGroup = accessGroup
     }
+    #endif
 
     // MARK: - ProfileStoring
 
@@ -122,8 +148,26 @@ public actor KeychainProfileStore: ProfileStoring {
     }
 
     public func clear() async throws {
+        #if canImport(UIKit)
+        // Phase b (CL-137 / AC-44.9) — read the existing profile pre-
+        // clear so its `photoFilename` survives long enough to be passed
+        // to the photo store's clear. Errors from the photo-store clear
+        // are intentionally swallowed: a missing-or-corrupted on-disk
+        // photo shouldn't block the Sign Out / Delete Profile path.
+        await clearPhotoIfPresent()
+        #endif
         try deleteRow()
     }
+
+    #if canImport(UIKit)
+    private func clearPhotoIfPresent() async {
+        guard let photoStore else { return }
+        guard let existing = try? readData() else { return }
+        guard let profile = try? JSONDecoder().decode(UserProfile.self, from: existing) else { return }
+        guard let filename = profile.photoFilename else { return }
+        try? await photoStore.clear(filename: filename)
+    }
+    #endif
 
     public var hasProfile: Bool {
         get async { await load() != nil }
@@ -203,10 +247,25 @@ public actor KeychainProfileStore: ProfileStoring {
 public actor InMemoryProfileStore: ProfileStoring {
 
     private var stored: UserProfile?
+    #if canImport(UIKit)
+    /// Optional photo-store collaborator that mirrors the
+    /// ``KeychainProfileStore`` posture so the ProfileStoreTests
+    /// integration cases can pin the Sign Out + Delete Profile
+    /// cleanup path (AC-44.9) via an in-memory fake.
+    private let photoStore: (any ProfilePhotoStoring)?
 
+    public init(
+        initial: UserProfile? = nil,
+        photoStore: (any ProfilePhotoStoring)? = nil
+    ) {
+        self.stored = initial
+        self.photoStore = photoStore
+    }
+    #else
     public init(initial: UserProfile? = nil) {
         self.stored = initial
     }
+    #endif
 
     public func load() async -> UserProfile? {
         stored
@@ -225,6 +284,14 @@ public actor InMemoryProfileStore: ProfileStoring {
     }
 
     public func clear() async throws {
+        #if canImport(UIKit)
+        // Phase b (CL-137 / AC-44.9) — mirror the production store's
+        // photo-cleanup branch so the integration test surface stays
+        // faithful.
+        if let photoStore, let filename = stored?.photoFilename {
+            try? await photoStore.clear(filename: filename)
+        }
+        #endif
         stored = nil
     }
 
