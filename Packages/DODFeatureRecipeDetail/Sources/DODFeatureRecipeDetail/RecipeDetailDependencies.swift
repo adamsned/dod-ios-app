@@ -1,5 +1,6 @@
 import DODAnalytics
 import DODDomain
+import DODFeatureProfile
 import DODNetworking
 import DODPersistence
 import DODSupport
@@ -112,6 +113,17 @@ public protocol RecipeDetailDependencies: Sendable {
     /// `SecItemAdd` / `SecItemDelete` failure so the UI can surface a
     /// "couldn't save" error.
     func saveGuestIdentity(name: String, email: String) async throws
+
+    // MARK: - User profile (US-44 / DUT-36 Phase c)
+
+    /// Read the on-device ``UserProfile`` if one has been saved (the
+    /// Phase a Settings → Profile flow), else `nil`. Backs the Ratings
+    /// & Reviews write-surface gate in ``RecipeDetailRatingsSection``
+    /// via the ``RecipeDetailViewModel/hasProfile`` derivation. Default
+    /// returns `nil` so existing fakes don't have to opt in — production
+    /// wires through ``LiveRecipeDetailDependencies``. Spec trace:
+    /// US-44 AC-44.10; CL-138.
+    func loadUserProfile() async -> UserProfile?
 }
 
 extension RecipeDetailDependencies {
@@ -119,6 +131,15 @@ extension RecipeDetailDependencies {
     /// in the test suite) don't have to opt in to widget publishing. The
     /// live wiring overrides this — see ``LiveRecipeDetailDependencies``.
     public func publishSavedWidgetSnapshot() async {}
+
+    /// US-44 / CL-138 / DUT-36 Phase c — default returns `nil` so any
+    /// pre-Phase-c test fake (which doesn't care about profile gating)
+    /// keeps compiling AND keeps reporting the "no profile" branch
+    /// that the Phase a/b shipped contract assumes by default. Tests
+    /// that exercise the gated/ungated split override this to return a
+    /// canned ``UserProfile``. Production wires through
+    /// ``LiveRecipeDetailDependencies``.
+    public func loadUserProfile() async -> UserProfile? { nil }
 
     /// US-37 / CL-63 / AC-37.2 (T-640) + DOD-ART-1: default routes to
     /// ``DODSupport/ArticleBodyExtractor/extractContentHTML(html:)`` so
@@ -140,6 +161,12 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     let commentsClient: WPCommentsClient
     let ratingsClient: WPRMRatingsClient
     let guestIdentity: any GuestIdentityStoring
+    /// US-44 / CL-138 / DUT-36 Phase c — backs `loadUserProfile()` so
+    /// the Ratings & Reviews gate can read the current device profile.
+    /// Optional so unit-test wiring that doesn't care about the gate
+    /// stays terse; production passes the singleton
+    /// ``KeychainProfileStore`` from `AppDependencies`.
+    let profileStore: (any ProfileStoring)?
     let imageLoader: ImageLoader
     private let savedWidgetPublisher: SavedRecipesWidgetPublisher?
 
@@ -151,6 +178,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         commentsClient: WPCommentsClient,
         ratingsClient: WPRMRatingsClient,
         guestIdentity: any GuestIdentityStoring,
+        profileStore: (any ProfileStoring)? = nil,
         imageLoader: ImageLoader = ImageLoader(),
         savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil
     ) {
@@ -161,6 +189,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         self.commentsClient = commentsClient
         self.ratingsClient = ratingsClient
         self.guestIdentity = guestIdentity
+        self.profileStore = profileStore
         self.imageLoader = imageLoader
         // Default to a publisher rooted in the same store + the live App
         // Group; callers can pass nil to disable the side effect for
@@ -344,6 +373,17 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
 
     public func saveGuestIdentity(name: String, email: String) async throws {
         try guestIdentity.save(GuestIdentity(displayName: name, email: email))
+    }
+
+    // MARK: - User profile (US-44 / DUT-36 Phase c)
+
+    /// US-44 / CL-138 — read the on-device profile through the injected
+    /// store. `nil` if no store was wired (test-only) or no profile has
+    /// been saved (the guest-mode default). The ``RecipeDetailViewModel``
+    /// uses this for `hasProfile` gating of the Ratings & Reviews write
+    /// surface.
+    public func loadUserProfile() async -> UserProfile? {
+        await profileStore?.load()
     }
 
     // MARK: - Snapshot bridging

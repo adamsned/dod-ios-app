@@ -1,5 +1,6 @@
 import DODAnalytics
 import DODDomain
+import DODFeatureProfile
 import DODNetworking
 import DODSupport
 import Foundation
@@ -101,6 +102,20 @@ public final class RecipeDetailViewModel {
     /// ``commentAuthorName``. Public, never sent to telemetry (AC-15.4).
     public internal(set) var commentAuthorEmail: String = ""
 
+    /// US-44 / CL-138 / DUT-36 Phase c — the on-device ``UserProfile`` if
+    /// the user has set one up via the Settings → Profile flow, else
+    /// `nil` (guest-mode default). Drives the Ratings & Reviews
+    /// write-surface gate in ``RecipeDetailRatingsSection`` via
+    /// ``hasProfile``. `private(set)` so external callers stay
+    /// read-only; ``refreshProfile()`` is the only mutation path.
+    public private(set) var profile: UserProfile?
+
+    /// US-44 / CL-138 — derived from ``profile``. `true` when the user
+    /// has set up a profile and the Ratings & Reviews WRITE composer is
+    /// interactive; `false` when the composer is blurred + overlaid
+    /// with the ``RatingsProfileGate`` popup.
+    public var hasProfile: Bool { profile != nil }
+
     /// Tracks whether `cookModeStarted` has already been sent this session
     /// for this recipe, so re-entering Cook Mode in the same view session
     /// fires at most one telemetry event (spec AC-7.7).
@@ -131,6 +146,12 @@ public final class RecipeDetailViewModel {
         await dependencies.sendTelemetry(.recipeView(recipeID: listItem.id))
         isSaved = (try? await dependencies.isSaved(id: listItem.id)) ?? false
         isDownloaded = (try? await dependencies.isDownloaded(id: listItem.id)) ?? false
+        // US-44 / CL-138 / DUT-36 Phase c — eagerly resolve the profile
+        // so the Ratings & Reviews gate is computed before the user can
+        // scroll to the section. Cheap (Keychain read); never blocks
+        // recipe rendering because the profile is consumed downstream
+        // by `RecipeDetailRatingsSection` not the recipe body.
+        await refreshProfile()
         // Step 1: hydrate from cache if present (fast path).
         if let cached = try? await dependencies.cachedRecipe(id: listItem.id), cached.hasDetail {
             recipe = cached
@@ -152,6 +173,17 @@ public final class RecipeDetailViewModel {
         // immediately and the comments section appears once it's ready
         // — never blocking the recipe load itself (US-13/14 integration).
         await loadRatingsAndComments()
+    }
+
+    /// US-44 / CL-138 / DUT-36 Phase c — re-read the on-device profile
+    /// through the dependency seam. Called from ``onAppear()`` for the
+    /// initial fetch and from the modal sheet's `.onDisappear` after
+    /// the user finishes ``ProfileEditView`` so the Ratings & Reviews
+    /// gate flips reactively (the `@Observable` `profile` assignment
+    /// triggers SwiftUI re-render which dismisses the gate without any
+    /// manual callback wiring).
+    public func refreshProfile() async {
+        profile = await dependencies.loadUserProfile()
     }
 
     // MARK: - Comments + ratings (US-13/14/15)

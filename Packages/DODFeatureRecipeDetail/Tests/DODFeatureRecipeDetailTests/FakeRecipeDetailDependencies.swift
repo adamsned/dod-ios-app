@@ -1,5 +1,6 @@
 import DODAnalytics
 import DODDomain
+import DODFeatureProfile
 import DODNetworking
 import Foundation
 
@@ -79,6 +80,17 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var postCommentError: Error?
     var guestIdentity: (name: String, email: String)?
     var saveGuestIdentityShouldFail = false
+
+    /// US-44 / CL-138 / DUT-36 Phase c — canned profile returned by
+    /// ``loadUserProfile()``. `nil` (the default) keeps the
+    /// pre-Phase-c tests honest — the Ratings & Reviews gate fires
+    /// because no profile is set up. Tests that exercise the
+    /// "ungated" branch set this to a populated ``UserProfile``.
+    var profileToLoad: UserProfile?
+    /// Spy counter so the view-model tests can prove
+    /// ``RecipeDetailViewModel/refreshProfile()`` actually routed
+    /// through the dependency surface (initial load + sheet dismiss).
+    var loadUserProfileCallCount = 0
 
     // Spy state for tests that care about call order / persistence.
     var cachedRatingWrites: [RecipeRating] = []
@@ -257,6 +269,11 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
         }
         savedGuestIdentities.append((name, email))
         guestIdentity = (name, email)
+    }
+
+    func loadUserProfile() async -> UserProfile? {
+        loadUserProfileCallCount += 1
+        return profileToLoad
     }
 }
 
