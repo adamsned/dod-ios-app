@@ -144,6 +144,11 @@ extension View {
                 }
                 .accessibilityIdentifier("profile-edit-photo-replace")
 
+                Button("Edit Photo") {
+                    Task { await view.handleEditPhoto() }
+                }
+                .accessibilityIdentifier("profile-edit-photo-edit")
+
                 Button("Remove Photo", role: .destructive) {
                     view.handleRemovePhoto()
                 }
@@ -184,9 +189,12 @@ extension View {
 #if canImport(UIKit)
 extension ProfileEditView {
 
-    /// Loads the picked image's bytes via `loadTransferable` and presents
-    /// the crop sheet. Surfaces a humane prompt in the save-error footer
-    /// on a load failure rather than silently dropping the selection.
+    /// Loads the picked image's bytes via `loadTransferable`,
+    /// **persists the original** (downscaled to 2048-max per T-745 /
+    /// CL-142) so the Edit Photo flow can re-crop without re-picking,
+    /// and presents the crop sheet for the user's first Done. Surfaces
+    /// a humane prompt in the save-error footer on a load failure
+    /// rather than silently dropping the selection.
     @MainActor
     func loadPickedImage(_ item: PhotosPickerItem) async {
         do {
@@ -196,6 +204,31 @@ extension ProfileEditView {
                 saveError = "Couldn't read the selected photo. Try a different one."
                 pickerSelection = nil
                 return
+            }
+            // T-745 / CL-142 — persist the picked original before
+            // presenting the crop sheet. A photoStore failure here
+            // degrades gracefully: the crop sheet still presents
+            // (using the in-memory `image`), but `inFlightPhotoOriginalFilename`
+            // stays nil so the Edit Photo flow will fall back to
+            // re-cropping the cropped derivative for this profile
+            // (legacy-fallback path).
+            if let photoStore {
+                do {
+                    let originalFilename = try await photoStore.saveOriginal(image)
+                    // Mark the previous original for clean-up if this is
+                    // a Replace flow (previous original was non-nil and
+                    // different from the just-saved UUID-keyed name).
+                    if let previous = inFlightPhotoOriginalFilename, previous != originalFilename {
+                        photoOriginalFilenameToClearOnSave = previous
+                    }
+                    inFlightPhotoOriginalFilename = originalFilename
+                } catch {
+                    // Original-save failure is non-fatal — the crop
+                    // pipeline still works and the user can finish the
+                    // Replace flow. Edit Photo will fall back to the
+                    // cropped derivative on this profile.
+                    saveError = "Couldn't save the original photo. Edit Photo may have reduced quality."
+                }
             }
             cropCandidate = CropCandidate(image: image)
         } catch {
@@ -235,15 +268,67 @@ extension ProfileEditView {
         }
     }
 
-    /// Removes the photo: clears the in-flight filename, schedules the
-    /// previous file for clean-up on Done, falls back to the
-    /// initial-letter avatar in the row.
+    /// T-745 / CL-142 — Edit Photo handler. Loads the user's existing
+    /// source image (preferring the original via `loadOriginal` when
+    /// `photoOriginalFilename` is populated; falling back to the
+    /// cropped derivative via `load` for legacy users who only have
+    /// the cropped 512×512 on disk) and presents `ProfilePhotoCropView`
+    /// for re-crop. On crop Done the existing `handleCroppedImage(_:)`
+    /// writes a new UUID-keyed cropped file and the post-save cleanup
+    /// deletes the orphan via `photoFilenameToClearOnSave`. The
+    /// original stays as-is — only the cropped derivative is
+    /// overwritten on Edit.
+    @MainActor
+    func handleEditPhoto() async {
+        guard let photoStore else {
+            // No store wired — Edit Photo is meaningless without one;
+            // graceful no-op (matches `handleCroppedImage` posture).
+            return
+        }
+        // Prefer the original (T-745 / CL-142) — full-quality source
+        // for a meaningful re-crop. Fall back to the cropped derivative
+        // for legacy users who have only the 512×512 (documented
+        // quality limitation in CL-142 — the re-crop on a 512 source
+        // is functional but at reduced effective resolution).
+        var loadedImage: UIImage?
+        if let originalFilename = inFlightPhotoOriginalFilename {
+            loadedImage = await photoStore.loadOriginal(filename: originalFilename)
+        }
+        if loadedImage == nil, let croppedFilename = inFlightPhotoFilename {
+            loadedImage = await photoStore.load(filename: croppedFilename)
+        }
+        guard let image = loadedImage else {
+            // No source on disk to re-crop — surface a humane prompt.
+            // This shouldn't happen unless the user wiped Documents
+            // via Files.app between picks; the avatar surface already
+            // gracefully degrades in that case.
+            saveError = "Couldn't load your photo. Try Replace Photo instead."
+            return
+        }
+        // Present the crop sheet via the existing `cropCandidate` +
+        // `.sheet(item:)` plumbing — the sheet's onComplete routes to
+        // `handleCroppedImage(_:)` which already handles the new-UUID
+        // write + orphan-cleanup pattern.
+        cropCandidate = CropCandidate(image: image)
+    }
+
+    /// Removes the photo: clears the in-flight filename (cropped +
+    /// original — T-745 / CL-142), schedules both previous files for
+    /// clean-up on Done, falls back to the initial-letter avatar in
+    /// the row.
     @MainActor
     func handleRemovePhoto() {
         if let previous = inFlightPhotoFilename {
             photoFilenameToClearOnSave = previous
         }
         inFlightPhotoFilename = nil
+        // T-745 / CL-142 — also mark the original for cleanup so
+        // Remove leaves the Documents directory in the same clean
+        // state as Sign Out + Delete Profile (both files gone).
+        if let previousOriginal = inFlightPhotoOriginalFilename {
+            photoOriginalFilenameToClearOnSave = previousOriginal
+        }
+        inFlightPhotoOriginalFilename = nil
     }
 }
 #endif

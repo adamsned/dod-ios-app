@@ -92,6 +92,22 @@ public struct ProfileEditView: View {
     /// replaces it — cleared post-save so a mid-flow failure leaves
     /// the previous file intact (write-then-clear-old per CL-137).
     @State var photoFilenameToClearOnSave: String?
+    /// T-745 / CL-142 — the in-flight `photoOriginalFilename`. Seeded
+    /// from `existingProfile?.photoOriginalFilename` on first appear;
+    /// updated when the user picks a new photo (Replace / first
+    /// upload) or removes the existing one. Distinct from
+    /// `inFlightPhotoFilename` so the Edit Photo flow can re-use the
+    /// original as the crop source without re-picking from the
+    /// library. `nil` for legacy users with only the cropped
+    /// derivative — the Edit Photo flow falls back to re-cropping the
+    /// cropped file in that case.
+    @State var inFlightPhotoOriginalFilename: String?
+    /// T-745 / CL-142 — set to the filename of the previously-saved
+    /// original photo when the user replaces or removes it; cleared
+    /// post-save by `handleSave` so a mid-flow failure leaves the
+    /// previous original intact. Parallel to
+    /// `photoFilenameToClearOnSave` for the cropped derivative.
+    @State var photoOriginalFilenameToClearOnSave: String?
     #if canImport(UIKit)
     /// Phase b — `PhotosPicker` selection binding. Becomes non-nil
     /// when the user picks an image; `.onChange` then loads its bytes
@@ -214,6 +230,15 @@ public struct ProfileEditView: View {
             if inFlightPhotoFilename == nil {
                 inFlightPhotoFilename = existingProfile?.photoFilename
             }
+            #if canImport(UIKit)
+            // T-745 / CL-142 — seed the original-filename alongside the
+            // cropped derivative. Guarded by the same first-appear
+            // pattern so a re-mount doesn't clobber the user's in-flight
+            // Edit / Replace edits.
+            if inFlightPhotoOriginalFilename == nil {
+                inFlightPhotoOriginalFilename = existingProfile?.photoOriginalFilename
+            }
+            #endif
             // T-743 / CL-140 — capture the initial-value snapshots for
             // dirty-state tracking. Guarded by `didCaptureInitialValues`
             // so a second `.onAppear` (from a re-mount) doesn't re-seed
@@ -332,11 +357,17 @@ public struct ProfileEditView: View {
         do {
             let cleanedName = try UserProfile.validateDisplayName(displayName)
             let cleanedEmail = try UserProfile.validateEmail(email)
+            #if canImport(UIKit)
+            let originalFilenameToPersist = inFlightPhotoOriginalFilename
+            #else
+            let originalFilenameToPersist: String? = nil
+            #endif
             let profile = UserProfile(
                 id: existingProfile?.id ?? UUID(),
                 displayName: cleanedName,
                 email: cleanedEmail,
-                photoFilename: inFlightPhotoFilename
+                photoFilename: inFlightPhotoFilename,
+                photoOriginalFilename: originalFilenameToPersist
             )
             try await store.save(profile)
             #if canImport(UIKit)
@@ -348,6 +379,14 @@ public struct ProfileEditView: View {
             if let staleFilename = photoFilenameToClearOnSave {
                 try? await photoStore?.clear(filename: staleFilename)
                 photoFilenameToClearOnSave = nil
+            }
+            // T-745 / CL-142 — mirror the same write-then-clear-old
+            // pattern for the original picked image so a mid-flow
+            // failure leaves the previous original intact (the same
+            // tolerable-orphans rationale per CL-137 (h)).
+            if let staleOriginalFilename = photoOriginalFilenameToClearOnSave {
+                try? await photoStore?.clearOriginal(filename: staleOriginalFilename)
+                photoOriginalFilenameToClearOnSave = nil
             }
             #endif
             await onProfileChanged()
