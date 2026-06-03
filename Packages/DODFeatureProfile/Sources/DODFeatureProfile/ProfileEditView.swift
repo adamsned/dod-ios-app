@@ -13,7 +13,7 @@ import UIKit
 /// Three top-level surfaces:
 ///
 /// 1. **Identity fields** — Display Name + Email TextFields. Both
-///    required (Done button disabled until both non-empty + email
+///    required (Save button disabled until both non-empty + email
 ///    matches the basic regex per ``UserProfile/validateEmail(_:)``).
 /// 2. **Profile Picture row** — labels the section with the current
 ///    avatar trailing. Tap (no photo) → presents ``ProfilePhotoPicker``
@@ -31,13 +31,34 @@ import UIKit
 ///    everyday UX). When DUT-16 lands and adds backend state, these
 ///    two diverge — sign-out keeps server data, delete nukes it.
 ///
-/// Toolbar:
-/// - **Cancel** (top-left) — dismisses without saving.
-/// - **Done** (top-right) — saves the profile via
+/// Toolbar (T-743 / CL-140 / AC-44.16):
+/// - **Back chevron** (top-left) — custom `Image(systemName:
+///   "chevron.left")` button; system back is suppressed via
+///   `.navigationBarBackButtonHidden(true)`. When `isDirty` (display
+///   name / email / photo changed since `.onAppear` snapshots), tap
+///   fronts a `.confirmationDialog("You have unsaved changes")` with
+///   "Continue Editing" + "Leave Without Saving" (destructive). When
+///   clean, taps dismiss directly. Replaces the pre-T-743 "Cancel"
+///   button.
+/// - **Save** (top-right) — saves the profile via
 ///   ``ProfileStoring/save(_:)`` and dismisses. Disabled until the form
-///   validates.
+///   validates. Renamed from "Done" in T-743 (clearer about what the
+///   button does).
 ///
-/// Spec trace: US-44 AC-44.2, AC-44.3, AC-44.4, AC-44.8, AC-44.9; CL-136, CL-137.
+/// **Modal-sheet drag-down guard.** `.interactiveDismissDisabled(isDirty)`
+/// blocks the swipe-to-dismiss gesture in the Phase c gate-CTA modal-
+/// sheet context when the form is dirty, so the user must route
+/// through the back chevron (and therefore see the dialog). No-op on
+/// push (push has no swipe-down).
+///
+/// **Sign Out + Delete Profile bypass the unsaved-changes dialog by
+/// construction** — both buttons call `handleClear()` (clear + dismiss)
+/// directly without consulting `isDirty` or `showLeaveConfirmation`.
+/// Delete Profile's existing destructive alert "Delete your profile?"
+/// is preserved and is distinct from the new unsaved-changes dialog.
+///
+/// Spec trace: US-44 AC-44.2, AC-44.3, AC-44.4, AC-44.8, AC-44.9,
+/// AC-44.16; CL-136, CL-137, CL-140.
 public struct ProfileEditView: View {
 
     let store: any ProfileStoring
@@ -63,6 +84,24 @@ public struct ProfileEditView: View {
     @State var saveError: String?
     @State private var showDeleteConfirmation = false
     @State private var isSubmitting = false
+    /// T-743 / CL-140 / AC-44.16 — snapshots of the initial field values
+    /// captured on `.onAppear` so the back-button intercept can compute
+    /// `isDirty`. Seeded once (when their `nil`/empty seed value
+    /// indicates the snapshot hasn't been taken yet); subsequent
+    /// re-renders don't clobber them so the dirty-state comparison
+    /// stays honest across the user's in-flight edits.
+    @State private var initialDisplayName: String = ""
+    @State private var initialEmail: String = ""
+    @State private var initialPhotoFilename: String?
+    /// T-743 / CL-140 / AC-44.16 — `true` while the unsaved-changes
+    /// confirmationDialog is presented. Set by the custom back chevron
+    /// when `isDirty`; cleared by either dialog button.
+    @State private var showLeaveConfirmation = false
+    /// T-743 / CL-140 / AC-44.16 — set once `.onAppear` has captured
+    /// the initial-value snapshots. Prevents a second `.onAppear` (e.g.
+    /// after a sheet-presentation re-mount) from re-seeding the
+    /// snapshots from already-edited field values.
+    @State private var didCaptureInitialValues = false
     /// Phase b — the in-flight `photoFilename`. Seeded from
     /// `existingProfile?.photoFilename` on first appear; updated when
     /// the user crops a new photo (Replace / first upload) or removes
@@ -148,8 +187,14 @@ public struct ProfileEditView: View {
         .navigationTitle(existingProfile == nil ? "New Profile" : "Profile")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         #endif
         .toolbar { toolbarContent }
+        // T-743 / CL-140 / AC-44.16 — prevent drag-to-dismiss past
+        // unsaved changes when presented as a modal sheet (Phase c
+        // gate-CTA path). No-op on push (push has no swipe-down
+        // gesture); safe to apply unconditionally.
+        .interactiveDismissDisabled(isDirty)
         .alert("Delete your profile?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task { await handleClear() }
@@ -157,6 +202,24 @@ public struct ProfileEditView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will remove your display name, email, and any future comments will be attributed to a guest.")
+        }
+        // T-743 / CL-140 / AC-44.16 — the custom back chevron taps into
+        // this dialog when the form is dirty. Sign Out + Delete Profile
+        // bypass by construction (their button closures call
+        // `handleClear()` + `dismiss()` directly without consulting
+        // `isDirty` or setting `showLeaveConfirmation`).
+        .confirmationDialog(
+            "You have unsaved changes",
+            isPresented: $showLeaveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Continue Editing") {
+                showLeaveConfirmation = false
+            }
+            Button("Leave Without Saving", role: .destructive) {
+                showLeaveConfirmation = false
+                dismiss()
+            }
         }
         .profileEditPhotoFlow(view: self)
         .onAppear {
@@ -170,7 +233,61 @@ public struct ProfileEditView: View {
             if inFlightPhotoFilename == nil {
                 inFlightPhotoFilename = existingProfile?.photoFilename
             }
+            // T-743 / CL-140 — capture the initial-value snapshots for
+            // dirty-state tracking. Guarded by `didCaptureInitialValues`
+            // so a second `.onAppear` (from a re-mount) doesn't re-seed
+            // the snapshots from already-edited values.
+            if !didCaptureInitialValues {
+                initialDisplayName = existingProfile?.displayName ?? ""
+                initialEmail = existingProfile?.email ?? ""
+                initialPhotoFilename = existingProfile?.photoFilename
+                didCaptureInitialValues = true
+            }
         }
+    }
+
+    // MARK: - Dirty state (T-743 / CL-140 / AC-44.16)
+
+    /// `true` when the user has edited the display name, email, or
+    /// photo since the form's initial-value snapshots were captured on
+    /// `.onAppear`. Drives the back-chevron's intercept logic +
+    /// `.interactiveDismissDisabled(...)` for the modal-sheet path.
+    /// Delegates to the pure static helper so the L1 test suite can
+    /// pin the four combinations (clean / name-dirty / email-dirty /
+    /// photo-dirty) without spinning up a view host.
+    var isDirty: Bool {
+        Self.computeIsDirty(
+            displayName: displayName,
+            initialDisplayName: initialDisplayName,
+            email: email,
+            initialEmail: initialEmail,
+            photoFilename: inFlightPhotoFilename,
+            initialPhotoFilename: initialPhotoFilename
+        )
+    }
+
+    /// Pure helper that computes the dirty state from the form values
+    /// + the snapshots. `static` so the L1 test suite can pin the
+    /// truth table without a view host.
+    ///
+    /// Truth table:
+    /// - All three pairs equal → clean (`false`).
+    /// - Any single pair differs → dirty (`true`).
+    /// - Two or three pairs differ → dirty (`true`).
+    ///
+    /// Photo comparison uses optional equality — `nil == nil` is
+    /// clean; `nil` vs a populated filename (or vice versa) is dirty.
+    public static func computeIsDirty(
+        displayName: String,
+        initialDisplayName: String,
+        email: String,
+        initialEmail: String,
+        photoFilename: String?,
+        initialPhotoFilename: String?
+    ) -> Bool {
+        displayName != initialDisplayName
+            || email != initialEmail
+            || photoFilename != initialPhotoFilename
     }
 
     // MARK: - Sections
@@ -246,20 +363,53 @@ public struct ProfileEditView: View {
 
     // MARK: - Toolbar
 
+    /// T-743 / CL-140 / AC-44.16 — `.topBarLeading` carries a custom
+    /// back chevron (no text) that intercepts dismissal when `isDirty`
+    /// to front the `.confirmationDialog("You have unsaved changes")`.
+    /// The system back button is suppressed via
+    /// `.navigationBarBackButtonHidden(true)` on the view body so the
+    /// chevron is the only leading affordance. Replaces the pre-T-743
+    /// "Cancel" button. The trailing `.confirmationAction` button is
+    /// renamed `Done` → `Save` (action / disabled state unchanged); the
+    /// accessibility identifier flips to `"profile-edit-save"` so the
+    /// contract matches the visible label.
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .cancellationAction) {
-            Button("Cancel") {
-                dismiss()
+        #if os(iOS)
+        ToolbarItem(placement: .topBarLeading) {
+            Button {
+                if isDirty {
+                    showLeaveConfirmation = true
+                } else {
+                    dismiss()
+                }
+            } label: {
+                Image(systemName: "chevron.left")
             }
-            .accessibilityIdentifier("profile-edit-cancel")
+            .accessibilityLabel("Back")
+            .accessibilityIdentifier("profile-edit-back")
         }
+        #else
+        ToolbarItem(placement: .cancellationAction) {
+            Button {
+                if isDirty {
+                    showLeaveConfirmation = true
+                } else {
+                    dismiss()
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .accessibilityLabel("Back")
+            .accessibilityIdentifier("profile-edit-back")
+        }
+        #endif
         ToolbarItem(placement: .confirmationAction) {
-            Button("Done") {
+            Button("Save") {
                 Task { await handleSave() }
             }
             .disabled(!isFormValid || isSubmitting)
-            .accessibilityIdentifier("profile-edit-done")
+            .accessibilityIdentifier("profile-edit-save")
         }
     }
 
