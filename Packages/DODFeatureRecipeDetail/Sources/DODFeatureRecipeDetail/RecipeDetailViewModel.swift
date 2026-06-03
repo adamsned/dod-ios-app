@@ -116,6 +116,24 @@ public final class RecipeDetailViewModel {
     /// with the ``RatingsProfileGate`` popup.
     public var hasProfile: Bool { profile != nil }
 
+    /// US-44 / CL-138 — expose the profile store reference (when the
+    /// composition root wired one) so ``RecipeDetailRatingsSection``
+    /// can present ``ProfileEditView`` as a modal sheet over the recipe
+    /// from the gate CTA. The `dependencies` property itself stays
+    /// module-internal — this is the narrow public seam the view layer
+    /// needs and nothing else.
+    public var profileStoreForGate: (any ProfileStoring)? {
+        dependencies.profileStoreForGate
+    }
+
+    #if canImport(UIKit)
+    /// US-44 / CL-138 — companion to ``profileStoreForGate`` — UIKit-
+    /// gated because ``ProfilePhotoStoring`` returns ``UIImage``.
+    public var profilePhotoStoreForGate: (any ProfilePhotoStoring)? {
+        dependencies.profilePhotoStoreForGate
+    }
+    #endif
+
     /// Tracks whether `cookModeStarted` has already been sent this session
     /// for this recipe, so re-entering Cook Mode in the same view session
     /// fires at most one telemetry event (spec AC-7.7).

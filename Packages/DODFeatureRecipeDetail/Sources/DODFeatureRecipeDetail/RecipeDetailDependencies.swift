@@ -124,6 +124,24 @@ public protocol RecipeDetailDependencies: Sendable {
     /// wires through ``LiveRecipeDetailDependencies``. Spec trace:
     /// US-44 AC-44.10; CL-138.
     func loadUserProfile() async -> UserProfile?
+
+    /// Surface the ``ProfileStoring`` reference so
+    /// ``RecipeDetailRatingsSection`` can hand it to ``ProfileEditView``
+    /// when the gate CTA presents the modal sheet. Optional so test
+    /// fakes that don't exercise the gate UI keep returning `nil`; the
+    /// gate falls back to a guarded placeholder in that case. Default
+    /// returns `nil` so existing fakes don't have to opt in.
+    var profileStoreForGate: (any ProfileStoring)? { get }
+
+    /// Surface the ``ProfilePhotoStoring`` reference so the modal
+    /// ``ProfileEditView`` can render + persist the photo flow when the
+    /// user creates their profile from the gate CTA. Optional — `nil`
+    /// degrades to the initial-letter avatar (Phase a behavior). UIKit-
+    /// gated platform reference is hidden behind the protocol seam so
+    /// macOS test hosts compile. Default returns `nil`.
+    #if canImport(UIKit)
+    var profilePhotoStoreForGate: (any ProfilePhotoStoring)? { get }
+    #endif
 }
 
 extension RecipeDetailDependencies {
@@ -140,6 +158,19 @@ extension RecipeDetailDependencies {
     /// canned ``UserProfile``. Production wires through
     /// ``LiveRecipeDetailDependencies``.
     public func loadUserProfile() async -> UserProfile? { nil }
+
+    /// US-44 / CL-138 — default returns `nil` so existing fakes keep
+    /// compiling. The gate's CTA falls back to a guarded inline message
+    /// when no store is wired (the test-host condition); production
+    /// always returns the singleton ``KeychainProfileStore``.
+    public var profileStoreForGate: (any ProfileStoring)? { nil }
+
+    #if canImport(UIKit)
+    /// US-44 / CL-138 — default returns `nil` so existing fakes keep
+    /// compiling; photo features in the gate-presented edit view
+    /// degrade gracefully to the initial-letter avatar.
+    public var profilePhotoStoreForGate: (any ProfilePhotoStoring)? { nil }
+    #endif
 
     /// US-37 / CL-63 / AC-37.2 (T-640) + DOD-ART-1: default routes to
     /// ``DODSupport/ArticleBodyExtractor/extractContentHTML(html:)`` so
@@ -165,11 +196,50 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     /// the Ratings & Reviews gate can read the current device profile.
     /// Optional so unit-test wiring that doesn't care about the gate
     /// stays terse; production passes the singleton
-    /// ``KeychainProfileStore`` from `AppDependencies`.
+    /// ``KeychainProfileStore`` from `AppDependencies`. Surfaced via
+    /// ``profileStoreForGate`` so the section can hand it to
+    /// ``ProfileEditView`` when the gate CTA fires.
     let profileStore: (any ProfileStoring)?
+    #if canImport(UIKit)
+    /// US-44 / CL-138 — companion to ``profileStore``: the on-disk
+    /// photo store ``ProfileEditView`` uses for the Photo row. `nil`
+    /// degrades to the initial-letter avatar (Phase a behavior). UIKit-
+    /// gated because ``ProfilePhotoStoring`` returns ``UIImage``.
+    let profilePhotoStore: (any ProfilePhotoStoring)?
+    #endif
     let imageLoader: ImageLoader
     private let savedWidgetPublisher: SavedRecipesWidgetPublisher?
 
+    #if canImport(UIKit)
+    public init(
+        client: WPRestClient,
+        fetcher: RecipePageFetcher,
+        store: RecipeStore,
+        monitor: NetworkMonitor,
+        commentsClient: WPCommentsClient,
+        ratingsClient: WPRMRatingsClient,
+        guestIdentity: any GuestIdentityStoring,
+        profileStore: (any ProfileStoring)? = nil,
+        profilePhotoStore: (any ProfilePhotoStoring)? = nil,
+        imageLoader: ImageLoader = ImageLoader(),
+        savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil
+    ) {
+        self.client = client
+        self.fetcher = fetcher
+        self.store = store
+        self.monitor = monitor
+        self.commentsClient = commentsClient
+        self.ratingsClient = ratingsClient
+        self.guestIdentity = guestIdentity
+        self.profileStore = profileStore
+        self.profilePhotoStore = profilePhotoStore
+        self.imageLoader = imageLoader
+        // Default to a publisher rooted in the same store + the live App
+        // Group; callers can pass nil to disable the side effect for
+        // unit-test wiring that doesn't care about widgets.
+        self.savedWidgetPublisher = savedWidgetPublisher ?? SavedRecipesWidgetPublisher(store: store)
+    }
+    #else
     public init(
         client: WPRestClient,
         fetcher: RecipePageFetcher,
@@ -191,11 +261,9 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         self.guestIdentity = guestIdentity
         self.profileStore = profileStore
         self.imageLoader = imageLoader
-        // Default to a publisher rooted in the same store + the live App
-        // Group; callers can pass nil to disable the side effect for
-        // unit-test wiring that doesn't care about widgets.
         self.savedWidgetPublisher = savedWidgetPublisher ?? SavedRecipesWidgetPublisher(store: store)
     }
+    #endif
 
     public func cachedRecipe(id: Int) async throws -> Recipe? {
         try await store.recipe(id: id)
@@ -385,6 +453,16 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     public func loadUserProfile() async -> UserProfile? {
         await profileStore?.load()
     }
+
+    public var profileStoreForGate: (any ProfileStoring)? {
+        profileStore
+    }
+
+    #if canImport(UIKit)
+    public var profilePhotoStoreForGate: (any ProfilePhotoStoring)? {
+        profilePhotoStore
+    }
+    #endif
 
     // MARK: - Snapshot bridging
 

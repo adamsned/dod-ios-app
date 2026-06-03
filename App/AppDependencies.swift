@@ -261,6 +261,12 @@ final class AppDependencies {
         let savedWidgetReload: SavedRecipesWidgetPublisher.ReloadHook = {
             WidgetCenter.shared.reloadTimelines(ofKind: "SavedRecipesWidget")
         }
+        // US-44 / CL-138 / T-741 — thread the Phase a profile store
+        // and the Phase b photo store into recipe-detail so the
+        // Ratings & Reviews gate can (a) read `hasProfile` via
+        // `loadUserProfile()`, and (b) present `ProfileEditView` as a
+        // modal sheet over the recipe with the same photo flow the
+        // Settings entry path uses.
         return LiveRecipeDetailDependencies(
             client: restClient,
             fetcher: pageFetcher,
@@ -269,6 +275,8 @@ final class AppDependencies {
             commentsClient: commentsClient,
             ratingsClient: ratingsClient,
             guestIdentity: guestIdentityStore,
+            profileStore: profileStore,
+            profilePhotoStore: profilePhotoStore,
             imageLoader: imageLoader,
             savedWidgetPublisher: SavedRecipesWidgetPublisher(
                 store: store,

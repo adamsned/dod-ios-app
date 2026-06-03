@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import DODDomain
+import DODFeatureProfile
 import SnapshotTesting
 import SwiftUI
 import XCTest
@@ -91,6 +92,59 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
 
         XCTAssertEqual(viewModel.commentAuthorName, "Jamie L.")
         XCTAssertTrue(viewModel.isAuthorIdentityValid)
+
+        let view = RecipeDetailRatingsSection(viewModel: viewModel)
+            .frame(width: 390)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+    }
+
+    // MARK: - Phase c (T-741 / CL-138) — profile gate
+
+    @MainActor
+    func test_section_gatedState_renders() async {
+        // AC-44.10: when `hasProfile == false`, the write composer is
+        // blurred + overlaid with the `RatingsProfileGate` popup. The
+        // existing reviews list (`commentsList`) stays readable below
+        // the divider (AC-44.11).
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 905, withDetail: true)
+        dependencies.fetchedRatingSummary = RecipeRating(recipeID: 905, average: 4.2, count: 9)
+        dependencies.fetchedComments = [
+            RecipeDetailTestFixtures.makeComment(id: 21, postID: 905, body: "Loved it — exactly what I needed."),
+        ]
+        dependencies.profileToLoad = nil // The gate's trigger condition.
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 905)
+        await viewModel.onAppear()
+
+        XCTAssertFalse(viewModel.hasProfile, "No profile → composer must be gated")
+
+        let view = RecipeDetailRatingsSection(viewModel: viewModel)
+            .frame(width: 390)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+    }
+
+    @MainActor
+    func test_section_ungatedState_renders() async {
+        // AC-44.10: when `hasProfile == true`, the gate collapses and
+        // the composer is interactive — byte-identical to the pre-
+        // Phase-c layout (the `gatedRateAndReviewCard` ZStack collapses
+        // to just the composer view with no overlay or blur).
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 906, withDetail: true)
+        dependencies.fetchedRatingSummary = RecipeRating(recipeID: 906, average: 4.2, count: 9)
+        dependencies.fetchedComments = [
+            RecipeDetailTestFixtures.makeComment(id: 22, postID: 906, body: "Loved it — exactly what I needed."),
+        ]
+        dependencies.profileToLoad = UserProfile(
+            id: UUID(),
+            displayName: "Spencer",
+            email: "spencer@example.com",
+            photoFilename: nil
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 906)
+        await viewModel.onAppear()
+
+        XCTAssertTrue(viewModel.hasProfile, "Profile populated → composer must be interactive")
 
         let view = RecipeDetailRatingsSection(viewModel: viewModel)
             .frame(width: 390)
