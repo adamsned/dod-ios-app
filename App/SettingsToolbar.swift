@@ -48,6 +48,13 @@ struct SettingsToolbarModifier: ViewModifier {
     /// wired a store; the section renders the empty "Set up your
     /// profile" state and the edit-view fallback surfaces a placeholder.
     let profileStore: (any ProfileStoring)?
+    #if canImport(UIKit)
+    /// US-44 Phase b (T-740) — on-disk photo store routed alongside
+    /// `profileStore` so the Settings Profile section's avatar +
+    /// the edit view's picker flow both surface the persisted photo.
+    /// UIKit-gated because the underlying store returns `UIImage`.
+    let profilePhotoStore: (any ProfilePhotoStoring)?
+    #endif
 
     /// Drives the Settings sheet. Each tab's modifier instance owns its own
     /// presentation state, so the gear opens that tab's Settings sheet.
@@ -89,12 +96,7 @@ struct SettingsToolbarModifier: ViewModifier {
     private var settingsSheet: some View {
         NavigationStack {
             SettingsView(
-                viewModel: SettingsViewModel(
-                    dependencies: settingsDependencies,
-                    voicePreviewer: voicePreviewer,
-                    profileStore: profileStore,
-                    requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
-                ),
+                viewModel: settingsViewModel,
                 onClearImageCache: onClearImageCache
             )
             .toolbar {
@@ -109,6 +111,33 @@ struct SettingsToolbarModifier: ViewModifier {
                 #endif
             }
         }
+    }
+
+    /// Builds the `SettingsViewModel` for the sheet, picking the iOS-
+    /// only convenience init that threads the Phase b
+    /// `ProfilePhotoStoring` collaborator when UIKit is available, and
+    /// falling back to the plain init on other platforms. Extracted into
+    /// a computed property so the `#if canImport(UIKit)` plumbing stays
+    /// inside a single value body rather than straddling a function
+    /// call's argument list and trailing closure (which Swift does not
+    /// allow). T-740 / CL-137.
+    private var settingsViewModel: SettingsViewModel {
+        #if canImport(UIKit)
+        SettingsViewModel(
+            dependencies: settingsDependencies,
+            voicePreviewer: voicePreviewer,
+            profileStore: profileStore,
+            profilePhotoStore: profilePhotoStore,
+            requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
+        )
+        #else
+        SettingsViewModel(
+            dependencies: settingsDependencies,
+            voicePreviewer: voicePreviewer,
+            profileStore: profileStore,
+            requestNotificationAuthorization: onRequestNotificationAuthorization ?? { false }
+        )
+        #endif
     }
 
     private var settingsDoneButton: some View {

@@ -112,6 +112,14 @@ public final class SettingsViewModel {
     /// Keychain-backed profile store. `nil` for previews / snapshots.
     let profileStore: (any ProfileStoring)?
 
+    #if canImport(UIKit)
+    /// Phase b (T-740) — Documents JPG photo store routed into the
+    /// Profile row's avatar + the edit view's picker. `nil` for previews
+    /// (see `SettingsViewModel+Profile.swift`). UIKit-gated. `internal(set)`
+    /// so the convenience init in the extension file can assign it.
+    var profilePhotoStore: (any ProfilePhotoStoring)?
+    #endif
+
     /// Reload `profile` from the store. Fired by `ProfileEditView`'s
     /// `onProfileChanged` callback after a save / sign-out / delete.
     public func refreshProfile() async {
@@ -266,26 +274,21 @@ public final class SettingsViewModel {
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies
         self.profileStore = profileStore
+        #if canImport(UIKit)
+        self.profilePhotoStore = nil
+        #endif
         self.profile = initialProfile
         self.requestNotificationAuthorization = requestNotificationAuthorization
-        // US-41 AC-41.3 — seed the toggle state from the canonical
-        // flag (RecipeStore.cloudKitSyncOptInKey) so users who already
-        // opted in via T-704's first-launch sheet see the toggle in the
-        // ON position the first time they open Settings. When no
-        // dependency is wired (previews / snapshot hosts / pre-T-703
-        // test fixtures), fall through to a direct defaults read so
-        // the surface still reflects the persisted value.
+        // US-41 AC-41.3 — seed the toggle from the canonical opt-in flag
+        // (RecipeStore.cloudKitSyncOptInKey). Fall through to defaults
+        // when no dependency is wired (previews / pre-T-703 fixtures).
         if let dependencies {
             self.isCloudSyncEnabled = dependencies.cloudSyncOptInValue()
         } else {
             self.isCloudSyncEnabled = defaults.bool(forKey: RecipeStore.cloudKitSyncOptInKey)
         }
-        // US-44 (T-739) — kick off the initial profile load when a store
-        // is wired but no explicit `initialProfile` was supplied. Mirrors
-        // the lazy-warmup pattern `refreshCloudSyncStatus()` uses on the
-        // CloudKit side. Tests + previews that supply `initialProfile`
-        // skip the I/O entirely; the composition root supplies a store
-        // without an `initialProfile` and the load fires once at init.
+        // US-44 (T-739) — lazy-warmup the profile when a store is wired
+        // but no `initialProfile` was supplied (composition-root path).
         if profileStore != nil, initialProfile == nil {
             Task { [weak self] in await self?.refreshProfile() }
         }

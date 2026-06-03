@@ -114,6 +114,7 @@ struct TabStack: View {
     /// gear a unique accessibility identifier (`<stem>-toolbar-settings`)
     /// while the visible label stays "Settings" everywhere.
     private func settingsToolbar(identifierStem: String) -> SettingsToolbarModifier {
+        #if canImport(UIKit)
         SettingsToolbarModifier(
             identifierStem: identifierStem,
             settingsDependencies: dependencies.settingsDependencies(),
@@ -129,8 +130,23 @@ struct TabStack: View {
             voicePreviewer: SystemVoicePreviewer(),
             // US-44 (T-739) — the Keychain-backed profile store the
             // Settings → Profile section + edit view read/write.
+            profileStore: dependencies.profileStore,
+            // US-44 Phase b (T-740) — Documents-directory photo store
+            // routed through to the avatar render + picker flow.
+            profilePhotoStore: dependencies.profilePhotoStore
+        )
+        #else
+        SettingsToolbarModifier(
+            identifierStem: identifierStem,
+            settingsDependencies: dependencies.settingsDependencies(),
+            onClearImageCache: { try await dependencies.store.clearImageCache() },
+            onRequestNotificationAuthorization: {
+                await dependencies.notificationService.requestAuthorization()
+            },
+            voicePreviewer: SystemVoicePreviewer(),
             profileStore: dependencies.profileStore
         )
+        #endif
     }
 
     @ViewBuilder
