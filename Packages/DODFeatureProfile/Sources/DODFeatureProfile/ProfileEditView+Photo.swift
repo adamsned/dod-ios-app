@@ -330,5 +330,36 @@ extension ProfileEditView {
         }
         inFlightPhotoOriginalFilename = nil
     }
+
+    /// T-746 / CL-143 — pure async helper that validates the in-flight
+    /// photo filenames against the store's existence checks, nilling
+    /// any reference whose file is missing. Extracted so the L1 test
+    /// suite can pin the truth table without spinning up the view
+    /// host (matches the ``computeIsDirty(...)`` pattern). Inputs:
+    /// the current cropped + original filename optionals + the photo
+    /// store. Output: a tuple of the same shape with stale references
+    /// replaced by `nil`. Self-healing semantics — every consumer of
+    /// the filenames (the row-tap conditional, the avatar's
+    /// `previewProfile`, the dirty-state check, the Save flow) sees
+    /// the corrected state once this helper's output flows back into
+    /// the `@State`. Called from the view-mount `.task` modifier in
+    /// ``ProfileEditView/body``.
+    static func validatePhotoReferences(
+        photoFilename: String?,
+        photoOriginalFilename: String?,
+        photoStore: any ProfilePhotoStoring
+    ) async -> (photoFilename: String?, photoOriginalFilename: String?) {
+        var validatedCropped = photoFilename
+        var validatedOriginal = photoOriginalFilename
+        if let filename = photoFilename,
+            await !photoStore.exists(filename: filename) {
+            validatedCropped = nil
+        }
+        if let filename = photoOriginalFilename,
+            await !photoStore.existsOriginal(filename: filename) {
+            validatedOriginal = nil
+        }
+        return (validatedCropped, validatedOriginal)
+    }
 }
 #endif
