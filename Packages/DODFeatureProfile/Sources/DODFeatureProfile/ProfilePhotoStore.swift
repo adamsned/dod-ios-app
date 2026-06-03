@@ -69,6 +69,25 @@ public protocol ProfilePhotoStoring: Sendable {
     /// missing (matches the existing ``clear(filename:)`` idempotency
     /// contract).
     func clearOriginal(filename: String) async throws
+
+    /// T-746 / CL-143 — returns whether a file with the given filename
+    /// exists in the cropped-photo storage. Sync-shape (cheap file-
+    /// system existence check) but `async` to fit the actor-isolated
+    /// implementation; avoids loading the image bytes when the caller
+    /// only needs the existence answer. Powers the stale-reference
+    /// validation in ``ProfileEditView``'s view-mount `.task` so the
+    /// AC-44.8 conditional picker entry routes correctly when the
+    /// Keychain row carries a `photoFilename` whose file was wiped
+    /// out-of-band (dev-rebuild after `simctl uninstall`/install, or
+    /// the theoretical production edge cases — Files.app delete,
+    /// storage-pressure eviction, partial CloudKit restore).
+    func exists(filename: String) async -> Bool
+
+    /// T-746 / CL-143 — returns whether a file with the given filename
+    /// exists in the original-image storage. Parallel to
+    /// ``exists(filename:)`` for the T-745 / CL-142 `photoOriginalFilename`
+    /// surface; same view-mount validation contract.
+    func existsOriginal(filename: String) async -> Bool
 }
 
 // MARK: - Production implementation
@@ -255,6 +274,31 @@ public actor ProfilePhotoStore: ProfilePhotoStoring {
         }
     }
 
+    // MARK: - Existence checks (T-746 / CL-143)
+
+    public func exists(filename: String) async -> Bool {
+        // Empty filename never matches a real file (the production
+        // filename shape is `profile-photo-<UUID>.jpg`, always non-
+        // empty) but we defensively short-circuit so a degenerate
+        // caller can't accidentally fileExists-check the bare
+        // Documents directory itself.
+        guard !filename.isEmpty else { return false }
+        let url = documentsDirectory.appendingPathComponent(filename)
+        return fileManager.fileExists(atPath: url.path)
+    }
+
+    public func existsOriginal(filename: String) async -> Bool {
+        // Same defensive empty-filename short-circuit + same path-
+        // construction logic as `exists` — `existsOriginal` and
+        // `exists` share the same `documentsDirectory`; the original
+        // and cropped derivatives are distinguished by filename
+        // prefix (`profile-photo-` vs `profile-photo-original-`)
+        // not by directory.
+        guard !filename.isEmpty else { return false }
+        let url = documentsDirectory.appendingPathComponent(filename)
+        return fileManager.fileExists(atPath: url.path)
+    }
+
     /// Pure helper that downscales the input image to longest-side
     /// 2048 (preserving aspect ratio) if it exceeds the cap; returns
     /// the input unchanged otherwise. `static` so the L1 test suite
@@ -355,6 +399,26 @@ public actor InMemoryProfilePhotoStore: ProfilePhotoStoring {
     public func clearOriginal(filename: String) async throws {
         clearedOriginalFilenames.append(filename)
         stored.removeValue(forKey: filename)
+    }
+
+    // MARK: - Existence checks (T-746 / CL-143)
+
+    public func exists(filename: String) async -> Bool {
+        // Empty filename never matches — defensive parity with the
+        // production `ProfilePhotoStore.exists` short-circuit.
+        guard !filename.isEmpty else { return false }
+        return stored[filename] != nil
+    }
+
+    public func existsOriginal(filename: String) async -> Bool {
+        // The in-memory fake stores cropped and original blobs in the
+        // same `stored` dictionary (keyed by filename), so `exists`
+        // and `existsOriginal` resolve to the same dictionary
+        // lookup. The keys themselves are disambiguated by the
+        // production filename-prefix convention (`profile-photo-`
+        // vs `profile-photo-original-`).
+        guard !filename.isEmpty else { return false }
+        return stored[filename] != nil
     }
 }
 #endif
