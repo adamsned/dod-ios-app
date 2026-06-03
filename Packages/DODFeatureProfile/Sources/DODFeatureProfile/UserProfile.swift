@@ -37,19 +37,32 @@ public struct UserProfile: Codable, Equatable, Sendable {
     public var email: String
 
     /// Phase a stubs this as `nil`; Phase b (photo picker + crop) populates
-    /// it with the on-disk filename inside the app's Documents directory.
+    /// it with the on-disk filename of the **cropped 512×512** derivative
+    /// inside the app's Documents directory.
     public var photoFilename: String?
+
+    /// T-745 / CL-142 — the on-disk filename of the **original picked
+    /// image** (downscaled to a longest-dimension cap of 2048 pixels),
+    /// saved alongside the cropped derivative so the user can re-crop
+    /// via the Edit Photo action sheet option without re-picking from
+    /// the photo library. `nil` for legacy profiles persisted before
+    /// T-745 (Codable handles the missing-key path via the synthesized
+    /// `decodeIfPresent` semantics for optionals so old Keychain rows
+    /// decode cleanly into the new struct shape).
+    public var photoOriginalFilename: String?
 
     public init(
         id: UUID,
         displayName: String,
         email: String,
-        photoFilename: String? = nil
+        photoFilename: String? = nil,
+        photoOriginalFilename: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
         self.email = email
         self.photoFilename = photoFilename
+        self.photoOriginalFilename = photoOriginalFilename
     }
 
     // MARK: - Validation
