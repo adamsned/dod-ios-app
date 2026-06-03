@@ -105,7 +105,8 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
         // AC-44.10: when `hasProfile == false`, the write composer is
         // blurred + overlaid with the `RatingsProfileGate` popup. The
         // existing reviews list (`commentsList`) stays readable below
-        // the divider (AC-44.11).
+        // the divider (AC-44.11). `record: .missing` so the first run
+        // records the baseline alongside the existing test pattern.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 905, withDetail: true)
         dependencies.fetchedRatingSummary = RecipeRating(recipeID: 905, average: 4.2, count: 9)
@@ -120,7 +121,7 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
 
         let view = RecipeDetailRatingsSection(viewModel: viewModel)
             .frame(width: 390)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
     }
 
     @MainActor
@@ -129,6 +130,7 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
         // the composer is interactive — byte-identical to the pre-
         // Phase-c layout (the `gatedRateAndReviewCard` ZStack collapses
         // to just the composer view with no overlay or blur).
+        // `record: .missing` so the first run records the baseline.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 906, withDetail: true)
         dependencies.fetchedRatingSummary = RecipeRating(recipeID: 906, average: 4.2, count: 9)
@@ -148,7 +150,7 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
 
         let view = RecipeDetailRatingsSection(viewModel: viewModel)
             .frame(width: 390)
-        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits), record: .missing)
     }
 
     // MARK: - Helpers
