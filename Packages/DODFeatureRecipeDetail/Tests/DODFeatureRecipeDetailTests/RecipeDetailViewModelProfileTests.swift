@@ -90,7 +90,9 @@ import Testing
             // unreachable in this test.
             func cachedRecipe(id: Int) async throws -> Recipe? { nil }
             func fetchHTML(for url: URL) async throws -> String { "" }
-            func parseJSONLD(html: String, merging: RecipeListItem, canonicalURL: URL) throws -> Recipe { throw URLError(.unknown) }
+            func parseJSONLD(html: String, merging: RecipeListItem, canonicalURL: URL) throws -> Recipe {
+                throw URLError(.unknown)
+            }
             func relatedRecipes(forCategoryID: Int) async throws -> [RecipeListItem] { [] }
             func mergeDetail(_ recipe: Recipe) async throws {}
             func markJSONLDFailed(id: Int) async throws {}
@@ -113,7 +115,13 @@ import Testing
             }
             func cachedComments(postID: Int) async -> [RecipeComment] { [] }
             func cacheComments(_ comments: [RecipeComment], postID: Int) async {}
-            func postComment(postID: Int, body: String, name: String, email: String, rating: Int?) async throws -> RecipeComment {
+            func postComment(
+                postID: Int,
+                body: String,
+                name: String,
+                email: String,
+                rating: Int?
+            ) async throws -> RecipeComment {
                 throw URLError(.unknown)
             }
             func loadGuestIdentity() async -> (name: String, email: String)? { nil }

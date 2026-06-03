@@ -91,7 +91,9 @@ public final class RecipeDetailViewModel {
     public internal(set) var pendingUserRating: Int = 0
     public internal(set) var commentDraft: String = ""
     public internal(set) var isSubmittingComment: Bool = false
-    public private(set) var isSubmittingRating: Bool = false
+    /// `internal(set)` so the `+RatingSubmit` extension can flip it
+    /// (the extraction keeps the parent under the `file_length` cap).
+    public internal(set) var isSubmittingRating: Bool = false
     /// DUT-28 — the commenter's display name, surfaced directly on the
     /// consolidated rate + comment form (no more one-time pop-up gate).
     /// Pre-filled from the saved guest identity on appear; editable inline;
@@ -106,9 +108,10 @@ public final class RecipeDetailViewModel {
     /// the user has set one up via the Settings → Profile flow, else
     /// `nil` (guest-mode default). Drives the Ratings & Reviews
     /// write-surface gate in ``RecipeDetailRatingsSection`` via
-    /// ``hasProfile``. `private(set)` so external callers stay
-    /// read-only; ``refreshProfile()`` is the only mutation path.
-    public private(set) var profile: UserProfile?
+    /// ``hasProfile``. `internal(set)` so the `+Profile` extension's
+    /// ``refreshProfile()`` can mutate it; external callers stay
+    /// read-only.
+    public internal(set) var profile: UserProfile?
 
     /// US-44 / CL-138 — derived from ``profile``. `true` when the user
     /// has set up a profile and the Ratings & Reviews WRITE composer is
@@ -116,23 +119,9 @@ public final class RecipeDetailViewModel {
     /// with the ``RatingsProfileGate`` popup.
     public var hasProfile: Bool { profile != nil }
 
-    /// US-44 / CL-138 — expose the profile store reference (when the
-    /// composition root wired one) so ``RecipeDetailRatingsSection``
-    /// can present ``ProfileEditView`` as a modal sheet over the recipe
-    /// from the gate CTA. The `dependencies` property itself stays
-    /// module-internal — this is the narrow public seam the view layer
-    /// needs and nothing else.
-    public var profileStoreForGate: (any ProfileStoring)? {
-        dependencies.profileStoreForGate
-    }
-
-    #if canImport(UIKit)
-    /// US-44 / CL-138 — companion to ``profileStoreForGate`` — UIKit-
-    /// gated because ``ProfilePhotoStoring`` returns ``UIImage``.
-    public var profilePhotoStoreForGate: (any ProfilePhotoStoring)? {
-        dependencies.profilePhotoStoreForGate
-    }
-    #endif
+    // US-44 / CL-138 — `refreshProfile()` + `profileStoreForGate` +
+    // (UIKit-gated) `profilePhotoStoreForGate` live in
+    // `RecipeDetailViewModel+Profile.swift` (`file_length` discipline).
 
     /// Tracks whether `cookModeStarted` has already been sent this session
     /// for this recipe, so re-entering Cook Mode in the same view session
@@ -193,16 +182,7 @@ public final class RecipeDetailViewModel {
         await loadRatingsAndComments()
     }
 
-    /// US-44 / CL-138 / DUT-36 Phase c — re-read the on-device profile
-    /// through the dependency seam. Called from ``onAppear()`` for the
-    /// initial fetch and from the modal sheet's `.onDisappear` after
-    /// the user finishes ``ProfileEditView`` so the Ratings & Reviews
-    /// gate flips reactively (the `@Observable` `profile` assignment
-    /// triggers SwiftUI re-render which dismisses the gate without any
-    /// manual callback wiring).
-    public func refreshProfile() async {
-        profile = await dependencies.loadUserProfile()
-    }
+    // `refreshProfile()` lives in `RecipeDetailViewModel+Profile.swift`.
 
     // MARK: - Comments + ratings (US-13/14/15)
 
@@ -289,37 +269,8 @@ public final class RecipeDetailViewModel {
         }
     }
 
-    /// Submit a star rating using the on-form author identity. DUT-28:
-    /// callers validate name + email first (``canSubmitRatingOrComment``)
-    /// and persist the identity, so this path trusts the trimmed values it
-    /// is handed. AC-13.2 / AC-13.3 / AC-13.5.
-    public func submitRating(stars: Int) async {
-        guard (1...5).contains(stars) else { return }
-        let name = commentAuthorName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let email = commentAuthorEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, !email.isEmpty else {
-            snackbarMessage = "Add your name and email to rate this recipe."
-            return
-        }
-        isSubmittingRating = true
-        defer { isSubmittingRating = false }
-
-        do {
-            let updated = try await dependencies.postRating(
-                recipeID: listItem.id,
-                stars: stars,
-                name: name,
-                email: email
-            )
-            ratingSummary = updated
-            pendingUserRating = stars
-            await dependencies.cacheRatingSummary(updated)
-            snackbarMessage = "Thanks for rating."
-        } catch {
-            DODLog.network.error("post rating failed: \(String(describing: error))")
-            snackbarMessage = "Couldn't save your rating — try again."
-        }
-    }
+    // `submitRating(stars:)` lives in
+    // `RecipeDetailViewModel+RatingSubmit.swift`.
 
     // `submitComment()` lives in `RecipeDetailViewModel+CommentSubmit.swift`
     // (extracted with the DUT-7 author-identity guard so this file stays

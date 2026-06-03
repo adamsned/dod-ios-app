@@ -110,9 +110,9 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 905, withDetail: true)
         dependencies.fetchedRatingSummary = RecipeRating(recipeID: 905, average: 4.2, count: 9)
         dependencies.fetchedComments = [
-            RecipeDetailTestFixtures.makeComment(id: 21, postID: 905, body: "Loved it — exactly what I needed."),
+            RecipeDetailTestFixtures.makeComment(id: 21, postID: 905, body: "Loved it — exactly what I needed.")
         ]
-        dependencies.profileToLoad = nil // The gate's trigger condition.
+        dependencies.profileToLoad = nil  // The gate's trigger condition.
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 905)
         await viewModel.onAppear()
 
@@ -133,7 +133,7 @@ final class RecipeDetailRatingsViewSnapshotTests: XCTestCase {
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 906, withDetail: true)
         dependencies.fetchedRatingSummary = RecipeRating(recipeID: 906, average: 4.2, count: 9)
         dependencies.fetchedComments = [
-            RecipeDetailTestFixtures.makeComment(id: 22, postID: 906, body: "Loved it — exactly what I needed."),
+            RecipeDetailTestFixtures.makeComment(id: 22, postID: 906, body: "Loved it — exactly what I needed.")
         ]
         dependencies.profileToLoad = UserProfile(
             id: UUID(),
