@@ -159,6 +159,64 @@ struct ProfileStoreTests {
 
         let cleared = await photoStore.clearedFilenames
         #expect(cleared.isEmpty)
+        let clearedOriginals = await photoStore.clearedOriginalFilenames
+        #expect(clearedOriginals.isEmpty)
+    }
+
+    @Test func clearAlsoClearsThePhotoOriginalFile() async throws {
+        // T-745 / CL-142 — AC-44.9 amended. ProfileStore.clear() must
+        // also call `photoStore.clearOriginal(filename:)` on the
+        // current profile's `photoOriginalFilename` so Sign Out +
+        // Delete Profile leave both cropped + original on disk in the
+        // same clean state. Pinned via the in-memory photo store
+        // fake whose `clearedOriginalFilenames` records every call.
+        let photoStore = InMemoryProfilePhotoStore()
+        let croppedFilename = "profile-photo-fixture.jpg"
+        let originalFilename = "profile-photo-original-fixture.jpg"
+        let store = InMemoryProfileStore(photoStore: photoStore)
+        let profile = UserProfile(
+            id: UUID(),
+            displayName: "Spencer",
+            email: "spencer@example.com",
+            photoFilename: croppedFilename,
+            photoOriginalFilename: originalFilename
+        )
+
+        try await store.save(profile)
+        try await store.clear()
+
+        let clearedOriginals = await photoStore.clearedOriginalFilenames
+        #expect(clearedOriginals == [originalFilename])
+        // The cropped path is also cleared (preserves the AC-44.9
+        // contract from CL-137 — both files gone after clear()).
+        let cleared = await photoStore.clearedFilenames
+        #expect(cleared == [croppedFilename])
+        #expect(await store.hasProfile == false)
+    }
+
+    @Test func legacyProfileWithOnlyCroppedClearsCroppedNotOriginal() async throws {
+        // Legacy users persisted before T-745 only have the cropped
+        // derivative on disk; their `photoOriginalFilename` is nil.
+        // The clear flow should still clean up the cropped file but
+        // NOT speculatively call clearOriginal with a nil/empty arg.
+        let photoStore = InMemoryProfilePhotoStore()
+        let croppedFilename = "profile-photo-legacy.jpg"
+        let store = InMemoryProfileStore(photoStore: photoStore)
+        let profile = UserProfile(
+            id: UUID(),
+            displayName: "Spencer",
+            email: "spencer@example.com",
+            photoFilename: croppedFilename
+            // photoOriginalFilename intentionally omitted — legacy path.
+        )
+
+        try await store.save(profile)
+        try await store.clear()
+
+        let cleared = await photoStore.clearedFilenames
+        #expect(cleared == [croppedFilename])
+        let clearedOriginals = await photoStore.clearedOriginalFilenames
+        #expect(clearedOriginals.isEmpty)
     }
     #endif
 
