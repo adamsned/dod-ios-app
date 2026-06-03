@@ -29,22 +29,24 @@ extension ProfileEditView {
     /// fallback in Phase a; freshly-cropped photo when one is in-flight)
     /// + a tap target that branches based on whether a photo already
     /// exists: nil → straight to the picker; populated → confirmation
-    /// dialog with Replace + Remove + Cancel (per CL-137 / AC-44.8).
-    /// The row is rendered as a `Button` (not a `NavigationLink` — the
-    /// photo flow is sheet-presented, not pushed) so the tap region
-    /// matches the visible row + the trailing chevron is omitted.
+    /// dialog with Replace + Edit + Remove + Cancel (per CL-137 /
+    /// AC-44.8 + T-745 / CL-142). The row is rendered as a `Button`
+    /// (not a `NavigationLink` — the photo flow is sheet-presented,
+    /// not pushed) so the tap region matches the visible row + the
+    /// trailing chevron is omitted.
+    ///
+    /// **T-745 / CL-142 / DUT-39 — load-bearing direct-picker gate.**
+    /// The `inFlightPhotoFilename != nil` check below is the
+    /// AC-44.8-mandated entry gate: a tap with no photo set goes
+    /// straight to the picker (no action sheet); a tap with a photo
+    /// set surfaces the action sheet for Replace / Edit / Remove /
+    /// Cancel. Pinned as the canonical entry shape — DUT-39 confirmed
+    /// the gate already exists in the production code; the spec entry
+    /// (CL-142) documents the verification and the intent.
     @ViewBuilder
     var profileEditPhotoSection: some View {
         Section {
-            Button {
-                #if canImport(UIKit)
-                if inFlightPhotoFilename != nil {
-                    showPhotoActionDialog = true
-                } else {
-                    isPickerPresented = true
-                }
-                #endif
-            } label: {
+            Button(action: handleProfilePictureRowTap) {
                 HStack(spacing: DODSpacing.md) {
                     Text("Profile Picture")
                         .dodFont(DODType.body)
@@ -83,6 +85,23 @@ extension ProfileEditView {
             #endif
         }
         .listRowBackground(DODColor.surfaceElevated)
+    }
+
+    /// T-745 / CL-142 / DUT-39 — Profile Picture row tap handler.
+    /// Branches based on whether a photo is in-flight: nil → straight
+    /// to the picker (no action sheet); populated → surfaces the
+    /// confirmation dialog for Replace / Edit / Remove / Cancel. The
+    /// conditional gate IS the AC-44.8 entry contract — extracted to
+    /// a named function so the call site reads as a single action +
+    /// the branch logic stays inspectable from the test harness.
+    func handleProfilePictureRowTap() {
+        #if canImport(UIKit)
+        if inFlightPhotoFilename != nil {
+            showPhotoActionDialog = true
+        } else {
+            isPickerPresented = true
+        }
+        #endif
     }
 
     /// A live preview profile used by the photo row's avatar — so the
