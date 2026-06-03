@@ -69,6 +69,15 @@ public protocol ProfilePhotoStoring: Sendable {
     /// missing (matches the existing ``clear(filename:)`` idempotency
     /// contract).
     func clearOriginal(filename: String) async throws
+
+    /// T-746 / CL-143 — returns whether the given cropped filename
+    /// exists. Powers ``ProfileEditView``'s view-mount stale-reference
+    /// validation (DUT-40).
+    func exists(filename: String) async -> Bool
+
+    /// T-746 / CL-143 — parallel to ``exists(filename:)`` for the
+    /// T-745 / CL-142 `photoOriginalFilename` surface.
+    func existsOriginal(filename: String) async -> Bool
 }
 
 // MARK: - Production implementation
@@ -255,6 +264,24 @@ public actor ProfilePhotoStore: ProfilePhotoStoring {
         }
     }
 
+    // MARK: - Existence checks (T-746 / CL-143)
+
+    public func exists(filename: String) async -> Bool {
+        // Empty short-circuit defends against a bare-directory check.
+        guard !filename.isEmpty else { return false }
+        let url = documentsDirectory.appendingPathComponent(filename)
+        return fileManager.fileExists(atPath: url.path)
+    }
+
+    public func existsOriginal(filename: String) async -> Bool {
+        // Cropped + original share `documentsDirectory`; distinguished
+        // by filename prefix (`profile-photo-` vs
+        // `profile-photo-original-`), not directory.
+        guard !filename.isEmpty else { return false }
+        let url = documentsDirectory.appendingPathComponent(filename)
+        return fileManager.fileExists(atPath: url.path)
+    }
+
     /// Pure helper that downscales the input image to longest-side
     /// 2048 (preserving aspect ratio) if it exceeds the cap; returns
     /// the input unchanged otherwise. `static` so the L1 test suite
@@ -355,6 +382,19 @@ public actor InMemoryProfilePhotoStore: ProfilePhotoStoring {
     public func clearOriginal(filename: String) async throws {
         clearedOriginalFilenames.append(filename)
         stored.removeValue(forKey: filename)
+    }
+
+    // MARK: - Existence checks (T-746 / CL-143)
+
+    public func exists(filename: String) async -> Bool {
+        guard !filename.isEmpty else { return false }
+        return stored[filename] != nil
+    }
+
+    public func existsOriginal(filename: String) async -> Bool {
+        // Cropped + original share `stored`; disambiguated by prefix.
+        guard !filename.isEmpty else { return false }
+        return stored[filename] != nil
     }
 }
 #endif

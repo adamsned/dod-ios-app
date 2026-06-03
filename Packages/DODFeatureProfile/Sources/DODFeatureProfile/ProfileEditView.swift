@@ -244,6 +244,30 @@ public struct ProfileEditView: View {
                 didCaptureInitialValues = true
             }
         }
+        #if canImport(UIKit)
+        // T-746 / CL-143 — stale-`photoFilename` self-heal at view
+        // mount. The `.onAppear` above seeded the in-flight filenames
+        // from `existingProfile`, but those can be STALE references
+        // to deleted files (simulator Keychain persists across
+        // `simctl uninstall`/install while Documents is wiped — plus
+        // theoretical prod edge cases: Files.app delete, storage-
+        // pressure eviction, partial CloudKit restore). Validate
+        // against the store; nil any whose file is missing so the
+        // `handleProfilePictureRowTap` conditional + every consumer
+        // sees the corrected state. Next `handleSave()` persists the
+        // cleared state — the inconsistency self-heals permanently.
+        // `.task` (not `.onAppear`) for the async `exists` check.
+        .task {
+            guard let photoStore else { return }
+            let validated = await Self.validatePhotoReferences(
+                photoFilename: inFlightPhotoFilename,
+                photoOriginalFilename: inFlightPhotoOriginalFilename,
+                photoStore: photoStore
+            )
+            inFlightPhotoFilename = validated.photoFilename
+            inFlightPhotoOriginalFilename = validated.photoOriginalFilename
+        }
+        #endif
     }
 
     // `isDirty` + `computeIsDirty(...)` + `toolbarContent` live in
