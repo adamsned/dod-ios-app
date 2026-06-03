@@ -295,7 +295,7 @@ import Testing
 
         let summaryCount = viewModel.ratingSummary?.count ?? 0
         let commentsAreEmpty = viewModel.comments.isEmpty
-        #expect(summaryCount == 0)  // swiftlint:disable:this empty_count
+        #expect(summaryCount == 0)
         #expect(commentsAreEmpty)
         // Gate condition: (summary.count == 0) && comments.isEmpty → label rendered.
         let shouldRenderInvitation = summaryCount == 0 && commentsAreEmpty
@@ -342,7 +342,7 @@ import Testing
 
         let summaryCount = viewModel.ratingSummary?.count ?? 0
         let commentsAreEmpty = viewModel.comments.isEmpty
-        #expect(summaryCount == 0)  // swiftlint:disable:this empty_count
+        #expect(summaryCount == 0)
         #expect(commentsAreEmpty == false)
         // Gate: invitation hidden (no aggregate either — count is zero).
         let shouldRenderInvitation = summaryCount == 0 && commentsAreEmpty
@@ -354,7 +354,7 @@ import Testing
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 504, withDetail: true)
         dependencies.fetchedRatingSummary = RecipeRating(recipeID: 504, average: 4.7, count: 21)
         dependencies.fetchedComments = [
-            RecipeDetailTestFixtures.makeComment(id: 11, postID: 504, body: "Loved it."),
+            RecipeDetailTestFixtures.makeComment(id: 11, postID: 504, body: "Loved it.")
         ]
         let viewModel = RecipeDetailViewModelTests.makeViewModel(
             dependencies: dependencies,

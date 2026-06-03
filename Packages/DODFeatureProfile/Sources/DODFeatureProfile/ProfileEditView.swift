@@ -8,57 +8,38 @@ import UIKit
 
 /// Push destination for editing (or creating) the on-device user
 /// profile. Reached from ``ProfileSection``; back-stack-pushes from
-/// `SettingsView`.
+/// `SettingsView`. Also presented as a modal sheet from the recipe-
+/// detail Ratings gate CTA (Phase c).
 ///
-/// Three top-level surfaces:
+/// Three top-level surfaces: **Identity fields** (Display Name + Email
+/// TextFields, both required, basic regex validation per
+/// ``UserProfile/validateEmail(_:)``); **Profile Picture row** (Phase
+/// b `PhotosPicker` + crop + Documents-directory JPG; Replace / Remove
+/// confirmation when one exists); **Sign Out + Delete Profile**
+/// buttons (both clear Keychain + photo file for local-only v1; Delete
+/// fronts a destructive confirmation alert per App Store 5.1.1(v),
+/// Sign Out is friendlier everyday wording).
 ///
-/// 1. **Identity fields** — Display Name + Email TextFields. Both
-///    required (Save button disabled until both non-empty + email
-///    matches the basic regex per ``UserProfile/validateEmail(_:)``).
-/// 2. **Profile Picture row** — labels the section with the current
-///    avatar trailing. Tap (no photo) → presents ``ProfilePhotoPicker``
-///    (Apple's privacy-preserving `PhotosPicker` — no permission
-///    prompt). Tap (photo exists) → confirmation dialog with Replace
-///    Photo / Remove Photo / Cancel. On crop completion the new file
-///    name is updated in-flight; on Replace the previous file is
-///    cleared post-save (write-then-clear-old so a mid-flow failure
-///    leaves the old file intact). Phase b — CL-137 / AC-44.3 / 8 / 9.
-/// 3. **Sign Out** + **Delete Profile** buttons — both clear the
-///    Keychain entry (identical behavior for local-only v1 per the
-///    locked decision). The Delete button is `Button(role:
-///    .destructive)` + fronts a confirmation alert per App Store
-///    5.1.1(v); Sign Out flips through without the alert (friendlier
-///    everyday UX). When DUT-16 lands and adds backend state, these
-///    two diverge — sign-out keeps server data, delete nukes it.
-///
-/// Toolbar (T-743 / CL-140 / AC-44.16):
-/// - **Back chevron** (top-left) — custom `Image(systemName:
-///   "chevron.left")` button; system back is suppressed via
-///   `.navigationBarBackButtonHidden(true)`. When `isDirty` (display
-///   name / email / photo changed since `.onAppear` snapshots), tap
-///   fronts a `.confirmationDialog("You have unsaved changes")` with
-///   "Continue Editing" + "Leave Without Saving" (destructive). When
-///   clean, taps dismiss directly. Replaces the pre-T-743 "Cancel"
-///   button.
-/// - **Save** (top-right) — saves the profile via
-///   ``ProfileStoring/save(_:)`` and dismisses. Disabled until the form
-///   validates. Renamed from "Done" in T-743 (clearer about what the
-///   button does).
+/// **Toolbar (T-743 / CL-140 / AC-44.16).** Back chevron (top-left)
+/// intercepts dismissal when `isDirty` to front the unsaved-changes
+/// `.confirmationDialog`; system back is suppressed via
+/// `.navigationBarBackButtonHidden(true)`. Save button (top-right;
+/// renamed from "Done") persists + dismisses; disabled until form
+/// validates. The toolbar content + dirty-state machinery live in
+/// `ProfileEditView+DirtyState.swift`.
 ///
 /// **Modal-sheet drag-down guard.** `.interactiveDismissDisabled(isDirty)`
 /// blocks the swipe-to-dismiss gesture in the Phase c gate-CTA modal-
-/// sheet context when the form is dirty, so the user must route
-/// through the back chevron (and therefore see the dialog). No-op on
-/// push (push has no swipe-down).
+/// sheet context when the form is dirty; user routes through the back
+/// chevron (and the dialog). No-op on push.
 ///
 /// **Sign Out + Delete Profile bypass the unsaved-changes dialog by
-/// construction** — both buttons call `handleClear()` (clear + dismiss)
-/// directly without consulting `isDirty` or `showLeaveConfirmation`.
-/// Delete Profile's existing destructive alert "Delete your profile?"
-/// is preserved and is distinct from the new unsaved-changes dialog.
+/// construction** — both call `handleClear()` (clear + dismiss)
+/// without consulting `isDirty`. Delete Profile's existing destructive
+/// alert "Delete your profile?" is preserved and distinct.
 ///
-/// Spec trace: US-44 AC-44.2, AC-44.3, AC-44.4, AC-44.8, AC-44.9,
-/// AC-44.16; CL-136, CL-137, CL-140.
+/// Spec trace: US-44 AC-44.2..AC-44.4, AC-44.8, AC-44.9, AC-44.16;
+/// CL-136, CL-137, CL-140.
 public struct ProfileEditView: View {
 
     let store: any ProfileStoring
@@ -83,24 +64,22 @@ public struct ProfileEditView: View {
     @State private var emailValidationError: String?
     @State var saveError: String?
     @State private var showDeleteConfirmation = false
-    @State private var isSubmitting = false
-    /// T-743 / CL-140 / AC-44.16 — snapshots of the initial field values
-    /// captured on `.onAppear` so the back-button intercept can compute
-    /// `isDirty`. Seeded once (when their `nil`/empty seed value
-    /// indicates the snapshot hasn't been taken yet); subsequent
-    /// re-renders don't clobber them so the dirty-state comparison
-    /// stays honest across the user's in-flight edits.
-    @State private var initialDisplayName: String = ""
-    @State private var initialEmail: String = ""
-    @State private var initialPhotoFilename: String?
-    /// T-743 / CL-140 / AC-44.16 — `true` while the unsaved-changes
-    /// confirmationDialog is presented. Set by the custom back chevron
-    /// when `isDirty`; cleared by either dialog button.
-    @State private var showLeaveConfirmation = false
-    /// T-743 / CL-140 / AC-44.16 — set once `.onAppear` has captured
-    /// the initial-value snapshots. Prevents a second `.onAppear` (e.g.
-    /// after a sheet-presentation re-mount) from re-seeding the
-    /// snapshots from already-edited field values.
+    /// Non-private so `ProfileEditView+DirtyState.swift` can read it
+    /// from the Save button's `.disabled(...)` modifier (T-743).
+    @State var isSubmitting = false
+    /// T-743 / CL-140 / AC-44.16 — initial-value snapshots captured on
+    /// `.onAppear` for the dirty-state comparison. Non-private so
+    /// `ProfileEditView+DirtyState.swift`'s `isDirty` can read them.
+    @State var initialDisplayName: String = ""
+    @State var initialEmail: String = ""
+    @State var initialPhotoFilename: String?
+    /// T-743 / CL-140 — `true` while the unsaved-changes
+    /// `confirmationDialog` is presented. Non-private so
+    /// `ProfileEditView+DirtyState.swift` can set it from the
+    /// back-chevron tap closure.
+    @State var showLeaveConfirmation = false
+    /// T-743 / CL-140 — guards the initial-value snapshot seeding so a
+    /// re-mount doesn't re-seed from already-edited values.
     @State private var didCaptureInitialValues = false
     /// Phase b — the in-flight `photoFilename`. Seeded from
     /// `existingProfile?.photoFilename` on first appear; updated when
@@ -132,7 +111,9 @@ public struct ProfileEditView: View {
     @State var isPickerPresented = false
     #endif
 
-    @Environment(\.dismiss) private var dismiss
+    /// Non-private so `ProfileEditView+DirtyState.swift` can call it
+    /// from the back-chevron tap closure (T-743 / CL-140 / AC-44.16).
+    @Environment(\.dismiss) var dismiss
 
     #if canImport(UIKit)
     public init(
@@ -246,49 +227,10 @@ public struct ProfileEditView: View {
         }
     }
 
-    // MARK: - Dirty state (T-743 / CL-140 / AC-44.16)
-
-    /// `true` when the user has edited the display name, email, or
-    /// photo since the form's initial-value snapshots were captured on
-    /// `.onAppear`. Drives the back-chevron's intercept logic +
-    /// `.interactiveDismissDisabled(...)` for the modal-sheet path.
-    /// Delegates to the pure static helper so the L1 test suite can
-    /// pin the four combinations (clean / name-dirty / email-dirty /
-    /// photo-dirty) without spinning up a view host.
-    var isDirty: Bool {
-        Self.computeIsDirty(
-            displayName: displayName,
-            initialDisplayName: initialDisplayName,
-            email: email,
-            initialEmail: initialEmail,
-            photoFilename: inFlightPhotoFilename,
-            initialPhotoFilename: initialPhotoFilename
-        )
-    }
-
-    /// Pure helper that computes the dirty state from the form values
-    /// + the snapshots. `static` so the L1 test suite can pin the
-    /// truth table without a view host.
-    ///
-    /// Truth table:
-    /// - All three pairs equal → clean (`false`).
-    /// - Any single pair differs → dirty (`true`).
-    /// - Two or three pairs differ → dirty (`true`).
-    ///
-    /// Photo comparison uses optional equality — `nil == nil` is
-    /// clean; `nil` vs a populated filename (or vice versa) is dirty.
-    public static func computeIsDirty(
-        displayName: String,
-        initialDisplayName: String,
-        email: String,
-        initialEmail: String,
-        photoFilename: String?,
-        initialPhotoFilename: String?
-    ) -> Bool {
-        displayName != initialDisplayName
-            || email != initialEmail
-            || photoFilename != initialPhotoFilename
-    }
+    // `isDirty` + `computeIsDirty(...)` + `toolbarContent` live in
+    // `ProfileEditView+DirtyState.swift` (T-743 / CL-140 file_length
+    // split); the cross-file split is why the `initial*` snapshots +
+    // `showLeaveConfirmation` `@State` vars above are non-`private`.
 
     // MARK: - Sections
 
@@ -362,62 +304,16 @@ public struct ProfileEditView: View {
     }
 
     // MARK: - Toolbar
-
-    /// T-743 / CL-140 / AC-44.16 — `.topBarLeading` carries a custom
-    /// back chevron (no text) that intercepts dismissal when `isDirty`
-    /// to front the `.confirmationDialog("You have unsaved changes")`.
-    /// The system back button is suppressed via
-    /// `.navigationBarBackButtonHidden(true)` on the view body so the
-    /// chevron is the only leading affordance. Replaces the pre-T-743
-    /// "Cancel" button. The trailing `.confirmationAction` button is
-    /// renamed `Done` → `Save` (action / disabled state unchanged); the
-    /// accessibility identifier flips to `"profile-edit-save"` so the
-    /// contract matches the visible label.
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        #if os(iOS)
-        ToolbarItem(placement: .topBarLeading) {
-            Button {
-                if isDirty {
-                    showLeaveConfirmation = true
-                } else {
-                    dismiss()
-                }
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .accessibilityLabel("Back")
-            .accessibilityIdentifier("profile-edit-back")
-        }
-        #else
-        ToolbarItem(placement: .cancellationAction) {
-            Button {
-                if isDirty {
-                    showLeaveConfirmation = true
-                } else {
-                    dismiss()
-                }
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .accessibilityLabel("Back")
-            .accessibilityIdentifier("profile-edit-back")
-        }
-        #endif
-        ToolbarItem(placement: .confirmationAction) {
-            Button("Save") {
-                Task { await handleSave() }
-            }
-            .disabled(!isFormValid || isSubmitting)
-            .accessibilityIdentifier("profile-edit-save")
-        }
-    }
+    //
+    // `toolbarContent` (back chevron + Save) lives in
+    // `ProfileEditView+DirtyState.swift` so this file stays under the
+    // SwiftLint caps. See that file for the AC-44.16 contract.
 
     // MARK: - State
 
     /// `true` when display name + email are both non-whitespace AND
-    /// the email matches the basic regex. Drives the Done button.
-    private var isFormValid: Bool {
+    /// the email matches the basic regex. Drives the Save button.
+    var isFormValid: Bool {
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return false }
         return (try? UserProfile.validateEmail(email)) != nil
@@ -426,7 +322,7 @@ public struct ProfileEditView: View {
     // MARK: - Actions
 
     @MainActor
-    private func handleSave() async {
+    func handleSave() async {
         guard !isSubmitting else { return }
         isSubmitting = true
         defer { isSubmitting = false }

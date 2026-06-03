@@ -22,60 +22,45 @@ struct ProfileEditViewDirtyStateTests {
 
     @Test func cleanWhenAllThreePairsMatch() {
         let isDirty = ProfileEditView.computeIsDirty(
-            displayName: "Spencer Adams",
-            initialDisplayName: "Spencer Adams",
-            email: "spencer@example.com",
-            initialEmail: "spencer@example.com",
-            photoFilename: "profile-photo-abc.jpg",
-            initialPhotoFilename: "profile-photo-abc.jpg"
+            displayName: (current: "Spencer Adams", initial: "Spencer Adams"),
+            email: (current: "spencer@example.com", initial: "spencer@example.com"),
+            photoFilename: (current: "profile-photo-abc.jpg", initial: "profile-photo-abc.jpg")
         )
         #expect(isDirty == false)
     }
 
     @Test func cleanWhenAllThreeNilOrEmptyAndMatchInitial() {
         let isDirty = ProfileEditView.computeIsDirty(
-            displayName: "",
-            initialDisplayName: "",
-            email: "",
-            initialEmail: "",
-            photoFilename: nil,
-            initialPhotoFilename: nil
+            displayName: (current: "", initial: ""),
+            email: (current: "", initial: ""),
+            photoFilename: (current: nil, initial: nil)
         )
         #expect(isDirty == false)
     }
 
     @Test func dirtyWhenDisplayNameDiffers() {
         let isDirty = ProfileEditView.computeIsDirty(
-            displayName: "Spencer Adams Edited",
-            initialDisplayName: "Spencer Adams",
-            email: "spencer@example.com",
-            initialEmail: "spencer@example.com",
-            photoFilename: "profile-photo-abc.jpg",
-            initialPhotoFilename: "profile-photo-abc.jpg"
+            displayName: (current: "Spencer Adams Edited", initial: "Spencer Adams"),
+            email: (current: "spencer@example.com", initial: "spencer@example.com"),
+            photoFilename: (current: "profile-photo-abc.jpg", initial: "profile-photo-abc.jpg")
         )
         #expect(isDirty)
     }
 
     @Test func dirtyWhenEmailDiffers() {
         let isDirty = ProfileEditView.computeIsDirty(
-            displayName: "Spencer Adams",
-            initialDisplayName: "Spencer Adams",
-            email: "spencer-new@example.com",
-            initialEmail: "spencer@example.com",
-            photoFilename: "profile-photo-abc.jpg",
-            initialPhotoFilename: "profile-photo-abc.jpg"
+            displayName: (current: "Spencer Adams", initial: "Spencer Adams"),
+            email: (current: "spencer-new@example.com", initial: "spencer@example.com"),
+            photoFilename: (current: "profile-photo-abc.jpg", initial: "profile-photo-abc.jpg")
         )
         #expect(isDirty)
     }
 
     @Test func dirtyWhenPhotoFilenameDiffers() {
         let isDirty = ProfileEditView.computeIsDirty(
-            displayName: "Spencer Adams",
-            initialDisplayName: "Spencer Adams",
-            email: "spencer@example.com",
-            initialEmail: "spencer@example.com",
-            photoFilename: "profile-photo-NEW.jpg",
-            initialPhotoFilename: "profile-photo-abc.jpg"
+            displayName: (current: "Spencer Adams", initial: "Spencer Adams"),
+            email: (current: "spencer@example.com", initial: "spencer@example.com"),
+            photoFilename: (current: "profile-photo-NEW.jpg", initial: "profile-photo-abc.jpg")
         )
         #expect(isDirty)
     }
@@ -84,12 +69,9 @@ struct ProfileEditViewDirtyStateTests {
         // User uploaded their first photo: initial nil, current
         // populated. Tap-back-now should fire the dialog.
         let isDirty = ProfileEditView.computeIsDirty(
-            displayName: "Spencer Adams",
-            initialDisplayName: "Spencer Adams",
-            email: "spencer@example.com",
-            initialEmail: "spencer@example.com",
-            photoFilename: "profile-photo-fresh.jpg",
-            initialPhotoFilename: nil
+            displayName: (current: "Spencer Adams", initial: "Spencer Adams"),
+            email: (current: "spencer@example.com", initial: "spencer@example.com"),
+            photoFilename: (current: "profile-photo-fresh.jpg", initial: nil)
         )
         #expect(isDirty)
     }
@@ -98,24 +80,18 @@ struct ProfileEditViewDirtyStateTests {
         // User had a photo on appear, then removed it: initial
         // populated, current nil. Tap-back-now should fire the dialog.
         let isDirty = ProfileEditView.computeIsDirty(
-            displayName: "Spencer Adams",
-            initialDisplayName: "Spencer Adams",
-            email: "spencer@example.com",
-            initialEmail: "spencer@example.com",
-            photoFilename: nil,
-            initialPhotoFilename: "profile-photo-was-here.jpg"
+            displayName: (current: "Spencer Adams", initial: "Spencer Adams"),
+            email: (current: "spencer@example.com", initial: "spencer@example.com"),
+            photoFilename: (current: nil, initial: "profile-photo-was-here.jpg")
         )
         #expect(isDirty)
     }
 
     @Test func dirtyWhenAllThreeDiffer() {
         let isDirty = ProfileEditView.computeIsDirty(
-            displayName: "New Name",
-            initialDisplayName: "Spencer Adams",
-            email: "new@example.com",
-            initialEmail: "spencer@example.com",
-            photoFilename: nil,
-            initialPhotoFilename: "profile-photo-abc.jpg"
+            displayName: (current: "New Name", initial: "Spencer Adams"),
+            email: (current: "new@example.com", initial: "spencer@example.com"),
+            photoFilename: (current: nil, initial: "profile-photo-abc.jpg")
         )
         #expect(isDirty)
     }
