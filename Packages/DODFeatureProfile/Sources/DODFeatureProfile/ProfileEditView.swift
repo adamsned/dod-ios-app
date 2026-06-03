@@ -61,7 +61,10 @@ public struct ProfileEditView: View {
 
     @State var displayName: String = ""
     @State var email: String = ""
-    @State private var emailValidationError: String?
+    /// Non-private so `ProfileEditView+Save.swift` can write to it
+    /// when the email validation fails (T-745 / CL-142 file_length
+    /// split).
+    @State var emailValidationError: String?
     @State var saveError: String?
     @State private var showDeleteConfirmation = false
     /// Non-private so `ProfileEditView+DirtyState.swift` can read it
@@ -92,6 +95,13 @@ public struct ProfileEditView: View {
     /// replaces it — cleared post-save so a mid-flow failure leaves
     /// the previous file intact (write-then-clear-old per CL-137).
     @State var photoFilenameToClearOnSave: String?
+    /// T-745 / CL-142 — the in-flight `photoOriginalFilename`. Parallel
+    /// to `inFlightPhotoFilename`; nil for legacy users with only the
+    /// cropped derivative (Edit Photo falls back to re-cropping that).
+    @State var inFlightPhotoOriginalFilename: String?
+    /// T-745 / CL-142 — write-then-clear-old mirror of
+    /// `photoFilenameToClearOnSave` for the original picked image.
+    @State var photoOriginalFilenameToClearOnSave: String?
     #if canImport(UIKit)
     /// Phase b — `PhotosPicker` selection binding. Becomes non-nil
     /// when the user picks an image; `.onChange` then loads its bytes
@@ -214,6 +224,15 @@ public struct ProfileEditView: View {
             if inFlightPhotoFilename == nil {
                 inFlightPhotoFilename = existingProfile?.photoFilename
             }
+            #if canImport(UIKit)
+            // T-745 / CL-142 — seed the original-filename alongside the
+            // cropped derivative. Guarded by the same first-appear
+            // pattern so a re-mount doesn't clobber the user's in-flight
+            // Edit / Replace edits.
+            if inFlightPhotoOriginalFilename == nil {
+                inFlightPhotoOriginalFilename = existingProfile?.photoOriginalFilename
+            }
+            #endif
             // T-743 / CL-140 — capture the initial-value snapshots for
             // dirty-state tracking. Guarded by `didCaptureInitialValues`
             // so a second `.onAppear` (from a re-mount) doesn't re-seed
@@ -320,51 +339,11 @@ public struct ProfileEditView: View {
     }
 
     // MARK: - Actions
-
-    @MainActor
-    func handleSave() async {
-        guard !isSubmitting else { return }
-        isSubmitting = true
-        defer { isSubmitting = false }
-        emailValidationError = nil
-        saveError = nil
-
-        do {
-            let cleanedName = try UserProfile.validateDisplayName(displayName)
-            let cleanedEmail = try UserProfile.validateEmail(email)
-            let profile = UserProfile(
-                id: existingProfile?.id ?? UUID(),
-                displayName: cleanedName,
-                email: cleanedEmail,
-                photoFilename: inFlightPhotoFilename
-            )
-            try await store.save(profile)
-            #if canImport(UIKit)
-            // Phase b — clear the previous photo file only after the
-            // Keychain row has been updated with the new filename, so
-            // a mid-flow save failure leaves the previous photo intact
-            // (the new one is also on disk but unreferenced; orphans
-            // are tolerable, half-overwritten primary photos are not).
-            if let staleFilename = photoFilenameToClearOnSave {
-                try? await photoStore?.clear(filename: staleFilename)
-                photoFilenameToClearOnSave = nil
-            }
-            #endif
-            await onProfileChanged()
-            dismiss()
-        } catch let error as UserProfile.ValidationError {
-            switch error {
-            case .displayNameEmpty:
-                saveError = "Add your name to save your profile."
-            case .emailEmpty:
-                emailValidationError = "Add your email to save your profile."
-            case .emailInvalid:
-                emailValidationError = "Enter a valid email address."
-            }
-        } catch {
-            saveError = "Couldn't save your profile — try again."
-        }
-    }
+    //
+    // `handleSave()` lives in `ProfileEditView+Save.swift` so this file
+    // stays under the SwiftLint file_length cap after the T-745 / CL-142
+    // additions (two-file storage + post-save cleanup for both cropped +
+    // original).
 
     @MainActor
     private func handleClear() async {

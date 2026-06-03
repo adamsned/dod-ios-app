@@ -164,8 +164,18 @@ public actor KeychainProfileStore: ProfileStoring {
         guard let photoStore else { return }
         guard let existing = try? readData() else { return }
         guard let profile = try? JSONDecoder().decode(UserProfile.self, from: existing) else { return }
-        guard let filename = profile.photoFilename else { return }
-        try? await photoStore.clear(filename: filename)
+        if let filename = profile.photoFilename {
+            try? await photoStore.clear(filename: filename)
+        }
+        // T-745 / CL-142 — also clear the original picked image so
+        // Sign Out + Delete Profile leave both Documents files in
+        // the same clean state. Errors are intentionally swallowed
+        // for the same reason as the cropped path: a missing-or-
+        // corrupted on-disk original shouldn't block the Sign Out /
+        // Delete Profile path.
+        if let originalFilename = profile.photoOriginalFilename {
+            try? await photoStore.clearOriginal(filename: originalFilename)
+        }
     }
     #endif
 
@@ -290,6 +300,12 @@ public actor InMemoryProfileStore: ProfileStoring {
         // faithful.
         if let photoStore, let filename = stored?.photoFilename {
             try? await photoStore.clear(filename: filename)
+        }
+        // T-745 / CL-142 — also clear the original picked image so
+        // the in-memory fake's integration test mirrors the
+        // KeychainProfileStore's two-file cleanup contract.
+        if let photoStore, let originalFilename = stored?.photoOriginalFilename {
+            try? await photoStore.clearOriginal(filename: originalFilename)
         }
         #endif
         stored = nil
