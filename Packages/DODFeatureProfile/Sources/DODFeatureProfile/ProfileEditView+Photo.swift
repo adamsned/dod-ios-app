@@ -351,13 +351,13 @@ extension ProfileEditView {
     ) async -> (photoFilename: String?, photoOriginalFilename: String?) {
         var validatedCropped = photoFilename
         var validatedOriginal = photoOriginalFilename
-        if let filename = photoFilename,
-            await !photoStore.exists(filename: filename) {
-            validatedCropped = nil
+        if let filename = photoFilename {
+            let exists = await photoStore.exists(filename: filename)
+            if !exists { validatedCropped = nil }
         }
-        if let filename = photoOriginalFilename,
-            await !photoStore.existsOriginal(filename: filename) {
-            validatedOriginal = nil
+        if let filename = photoOriginalFilename {
+            let exists = await photoStore.existsOriginal(filename: filename)
+            if !exists { validatedOriginal = nil }
         }
         return (validatedCropped, validatedOriginal)
     }
