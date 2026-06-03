@@ -116,24 +116,12 @@ public struct RecipeDetailRatingsSection: View {
 
     /// AC-44.10 — wraps ``rateAndReviewCard`` in a ZStack with a blur +
     /// ``RatingsProfileGate`` popup when ``RecipeDetailViewModel/hasProfile``
-    /// is `false`. The composer is `.disabled` so even if a touch leaks
-    /// through the blur, no action fires; it carries
-    /// `.accessibilityHidden(true)` so VoiceOver announces only the popup
-    /// ("Set up your profile…") not the unreadable haze. When the user
-    /// has a profile, the ZStack collapses to just the interactive
-    /// composer — no popup, no blur — and the layout is byte-identical
-    /// to the pre-Phase-c shape.
-    ///
-    /// **T-747 / CL-144 (DUT-41) — Material dim overlay removed.** Pre-
-    /// T-747 the ZStack also composed a `Rectangle().fill(.ultraThinMaterial)`
-    /// view between the blurred composer and the popup to dim the
-    /// composer further. In dark mode the Material reads as a translucent
-    /// warm-grey wash framing the popup card — Spencer described it as
-    /// the "grey square" around the popup. The composer's `.blur(radius: 10)`
-    /// alone communicates "this is gated"; the additional dim layer is
-    /// redundant. Dropping it removes the grey frame without changing
-    /// the gate's interaction model (composer is still `.disabled` +
-    /// `.accessibilityHidden`).
+    /// is `false`. Composer is `.disabled` + `.accessibilityHidden`. When
+    /// the user has a profile the ZStack collapses to just the composer
+    /// (byte-identical to the pre-Phase-c shape). T-747 / CL-144 (DUT-41)
+    /// removed the previous `Rectangle().fill(.ultraThinMaterial)` sibling
+    /// — its grey-in-dark-mode perimeter framed the popup; the composer's
+    /// own blur is sufficient on its own.
     @ViewBuilder
     private var gatedRateAndReviewCard: some View {
         ZStack {
