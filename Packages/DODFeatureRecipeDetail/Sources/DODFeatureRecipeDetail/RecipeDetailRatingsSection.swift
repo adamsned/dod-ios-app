@@ -93,15 +93,25 @@ public struct RecipeDetailRatingsSection: View {
 
     // MARK: - RatingsHeader
 
-    /// AC-13.1 — shows the aggregate when count ≥ 1, otherwise the
-    /// "Be the first to rate this recipe." invitation. `summary.count`
-    /// here is the rating-count integer (not a collection size), so the
+    /// AC-13.1 / AC-44.14 — shows the aggregate when count ≥ 1, otherwise the
+    /// "Be the first to rate this recipe." invitation, but the invitation
+    /// is suppressed when there are ≥1 comments (a recipe with 0 ratings
+    /// AND ≥1 comments isn't actually empty — the conversation has
+    /// started; only the aggregate is missing). `summary.count` here is
+    /// the rating-count integer (not a collection size), so the
     /// `empty_count` rule is misfiring — disabled on this line.
+    ///
+    /// **Truth table (CL-140).** 0 ratings + 0 comments → invitation
+    /// shown. ≥1 rating + 0 comments → `StarRatingDisplay` (aggregate).
+    /// 0 ratings + ≥1 comment → label hidden (no aggregate to render —
+    /// the rating count is zero). ≥1 rating + ≥1 comment →
+    /// `StarRatingDisplay` (aggregate). The `commentsList` below is
+    /// independent of this gate.
     @ViewBuilder
     private var ratingsHeader: some View {
         if let summary = viewModel.ratingSummary, summary.count > 0 {  // swiftlint:disable:this empty_count
             StarRatingDisplay(average: summary.average, count: summary.count, starSize: 18)
-        } else {
+        } else if viewModel.comments.isEmpty {
             Text("Be the first to rate this recipe.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
