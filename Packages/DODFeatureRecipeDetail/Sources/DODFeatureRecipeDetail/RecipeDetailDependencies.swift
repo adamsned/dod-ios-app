@@ -1,5 +1,6 @@
 import DODAnalytics
 import DODDomain
+import DODFeatureProfile
 import DODNetworking
 import DODPersistence
 import DODSupport
@@ -112,6 +113,20 @@ public protocol RecipeDetailDependencies: Sendable {
     /// `SecItemAdd` / `SecItemDelete` failure so the UI can surface a
     /// "couldn't save" error.
     func saveGuestIdentity(name: String, email: String) async throws
+
+    // MARK: - User profile (US-44 / DUT-36 Phase c, CL-138)
+    //
+    // Backs the Ratings & Reviews write-surface gate. Defaults +
+    // live impls live in `RecipeDetailDependencies+Profile.swift`.
+    // `loadUserProfile` drives `RecipeDetailViewModel.hasProfile`; the
+    // two `*ForGate` accessors surface the store references the
+    // section view hands to `ProfileEditView` when the gate CTA fires.
+
+    func loadUserProfile() async -> UserProfile?
+    var profileStoreForGate: (any ProfileStoring)? { get }
+    #if canImport(UIKit)
+    var profilePhotoStoreForGate: (any ProfilePhotoStoring)? { get }
+    #endif
 }
 
 extension RecipeDetailDependencies {
@@ -119,6 +134,12 @@ extension RecipeDetailDependencies {
     /// in the test suite) don't have to opt in to widget publishing. The
     /// live wiring overrides this — see ``LiveRecipeDetailDependencies``.
     public func publishSavedWidgetSnapshot() async {}
+
+    // US-44 / CL-138 / DUT-36 Phase c profile-gate defaults
+    // (`loadUserProfile()`, `profileStoreForGate`,
+    // `profilePhotoStoreForGate`) live in
+    // `RecipeDetailDependencies+Profile.swift` — extracted so this
+    // file stays under the SwiftLint 400-line `file_length` cap.
 
     /// US-37 / CL-63 / AC-37.2 (T-640) + DOD-ART-1: default routes to
     /// ``DODSupport/ArticleBodyExtractor/extractContentHTML(html:)`` so
@@ -140,9 +161,19 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     let commentsClient: WPCommentsClient
     let ratingsClient: WPRMRatingsClient
     let guestIdentity: any GuestIdentityStoring
+    /// US-44 / CL-138 / DUT-36 Phase c — Phase a Keychain profile
+    /// store (and Phase b photo store) routed in by `AppDependencies`
+    /// so the Ratings & Reviews gate can read `hasProfile` and hand
+    /// the stores to ``ProfileEditView`` from the gate CTA. Optional
+    /// for terse test wiring.
+    let profileStore: (any ProfileStoring)?
+    #if canImport(UIKit)
+    let profilePhotoStore: (any ProfilePhotoStoring)?
+    #endif
     let imageLoader: ImageLoader
     private let savedWidgetPublisher: SavedRecipesWidgetPublisher?
 
+    #if canImport(UIKit)
     public init(
         client: WPRestClient,
         fetcher: RecipePageFetcher,
@@ -151,6 +182,8 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         commentsClient: WPCommentsClient,
         ratingsClient: WPRMRatingsClient,
         guestIdentity: any GuestIdentityStoring,
+        profileStore: (any ProfileStoring)? = nil,
+        profilePhotoStore: (any ProfilePhotoStoring)? = nil,
         imageLoader: ImageLoader = ImageLoader(),
         savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil
     ) {
@@ -161,12 +194,39 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         self.commentsClient = commentsClient
         self.ratingsClient = ratingsClient
         self.guestIdentity = guestIdentity
+        self.profileStore = profileStore
+        self.profilePhotoStore = profilePhotoStore
         self.imageLoader = imageLoader
         // Default to a publisher rooted in the same store + the live App
         // Group; callers can pass nil to disable the side effect for
         // unit-test wiring that doesn't care about widgets.
         self.savedWidgetPublisher = savedWidgetPublisher ?? SavedRecipesWidgetPublisher(store: store)
     }
+    #else
+    public init(
+        client: WPRestClient,
+        fetcher: RecipePageFetcher,
+        store: RecipeStore,
+        monitor: NetworkMonitor,
+        commentsClient: WPCommentsClient,
+        ratingsClient: WPRMRatingsClient,
+        guestIdentity: any GuestIdentityStoring,
+        profileStore: (any ProfileStoring)? = nil,
+        imageLoader: ImageLoader = ImageLoader(),
+        savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil
+    ) {
+        self.client = client
+        self.fetcher = fetcher
+        self.store = store
+        self.monitor = monitor
+        self.commentsClient = commentsClient
+        self.ratingsClient = ratingsClient
+        self.guestIdentity = guestIdentity
+        self.profileStore = profileStore
+        self.imageLoader = imageLoader
+        self.savedWidgetPublisher = savedWidgetPublisher ?? SavedRecipesWidgetPublisher(store: store)
+    }
+    #endif
 
     public func cachedRecipe(id: Int) async throws -> Recipe? {
         try await store.recipe(id: id)
@@ -217,170 +277,11 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         await savedWidgetPublisher?.publish()
     }
 
-    // MARK: - Comments + ratings
-
-    public func fetchRatingSummary(recipeID: Int) async -> RecipeRating {
-        // REG-14: never throw — degrade to a zero-valued summary on any
-        // failure. The underlying client already handles 401/403/offline
-        // that way; this wrapper catches anything that slips past
-        // (timeouts, 5xx, decoding hiccups WPRMRatingsClient surfaces).
-        do {
-            return try await ratingsClient.summary(forRecipeID: recipeID)
-        } catch {
-            DODLog.network.error("rating summary fetch failed: \(String(describing: error))")
-            return RecipeRating(recipeID: recipeID, average: 0, count: 0, userRating: nil)
-        }
-    }
-
-    public func cachedRatingSummary(recipeID: Int) async -> RecipeRating? {
-        do {
-            guard let snapshot = try await store.cachedRating(forRecipeID: recipeID) else {
-                return nil
-            }
-            return RecipeRating(
-                recipeID: snapshot.recipeID,
-                average: snapshot.average,
-                count: snapshot.count,
-                userRating: snapshot.userRating
-            )
-        } catch {
-            DODLog.persistence.error("cached rating read failed: \(String(describing: error))")
-            return nil
-        }
-    }
-
-    public func cacheRatingSummary(_ summary: RecipeRating) async {
-        let snapshot = CachedRatingSnapshot(
-            recipeID: summary.recipeID,
-            average: summary.average,
-            count: summary.count,
-            userRating: summary.userRating
-        )
-        do {
-            try await store.cacheRating(snapshot)
-        } catch {
-            DODLog.persistence.error("cache rating failed: \(String(describing: error))")
-        }
-    }
-
-    public func postRating(
-        recipeID: Int,
-        stars: Int,
-        name: String,
-        email: String
-    ) async throws -> RecipeRating {
-        let updated = try await ratingsClient.postRating(
-            recipeID: recipeID,
-            stars: stars,
-            authorName: name,
-            authorEmail: email
-        )
-        // Telemetry only AFTER the network call returns successfully (per
-        // task spec) — and never carries name/email (AC-15.4).
-        await sendTelemetry(.recipeRated(recipeID: recipeID, stars: stars))
-        return updated
-    }
-
-    public func fetchComments(
-        postID: Int,
-        page: Int
-    ) async throws -> WPCommentsClient.CommentsPage {
-        try await commentsClient.comments(forPostID: postID, page: page)
-    }
-
-    public func cachedComments(postID: Int) async -> [RecipeComment] {
-        do {
-            let snapshots = try await store.cachedComments(forPostID: postID)
-            return snapshots.map(Self.snapshotToComment)
-        } catch {
-            DODLog.persistence.error("cached comments read failed: \(String(describing: error))")
-            return []
-        }
-    }
-
-    public func cacheComments(_ comments: [RecipeComment], postID: Int) async {
-        let snapshots = comments.map { Self.commentToSnapshot($0, postID: postID) }
-        do {
-            try await store.cacheComments(snapshots)
-        } catch {
-            DODLog.persistence.error("cache comments failed: \(String(describing: error))")
-        }
-    }
-
-    public func postComment(
-        postID: Int,
-        body: String,
-        name: String,
-        email: String,
-        rating: Int?
-    ) async throws -> RecipeComment {
-        let posted = try await commentsClient.postComment(
-            postID: postID,
-            authorName: name,
-            authorEmail: email,
-            content: body,
-            ratingValue: rating
-        )
-        // Telemetry only AFTER the network call returns. `awaitingApproval`
-        // mirrors WP's `hold` (or anything not explicitly `approved`).
-        await sendTelemetry(
-            .recipeCommentSubmitted(
-                recipeID: postID,
-                awaitingApproval: posted.status != .approved
-            )
-        )
-        return posted
-    }
-
-    public func loadGuestIdentity() async -> (name: String, email: String)? {
-        do {
-            guard let identity = try guestIdentity.load() else { return nil }
-            return (name: identity.displayName, email: identity.email)
-        } catch {
-            DODLog.persistence.error("guest identity load failed: \(String(describing: error))")
-            return nil
-        }
-    }
-
-    public func saveGuestIdentity(name: String, email: String) async throws {
-        try guestIdentity.save(GuestIdentity(displayName: name, email: email))
-    }
-
-    // MARK: - Snapshot bridging
-
-    /// Convert the persistence-layer snapshot to the Domain comment type.
-    /// Wave-1 sub 3 deliberately kept `CachedComment` independent of the
-    /// Domain type (timing decoupling); we stitch them together here.
-    static func snapshotToComment(_ snapshot: CachedCommentSnapshot) -> RecipeComment {
-        RecipeComment(
-            id: snapshot.id,
-            postID: snapshot.postID,
-            parentID: snapshot.parentID,
-            authorName: snapshot.authorName,
-            avatarURL: snapshot.avatarURLString.flatMap { URL(string: $0) },
-            dateGMT: snapshot.dateGMT,
-            body: snapshot.bodyText,
-            ratingValue: snapshot.ratingValue,
-            status: RecipeComment.Status(rawValue: snapshot.statusRaw) ?? .unknown
-        )
-    }
-
-    /// Inverse of ``snapshotToComment(_:)``. `postID` is taken from the
-    /// caller because the WP DTO carries it on every row, but the Domain
-    /// type also stores it — we trust the caller to pass the same id.
-    static func commentToSnapshot(_ comment: RecipeComment, postID: Int) -> CachedCommentSnapshot {
-        CachedCommentSnapshot(
-            id: comment.id,
-            postID: postID,
-            parentID: comment.parentID,
-            authorName: comment.authorName,
-            avatarURLString: comment.avatarURL?.absoluteString,
-            dateGMT: comment.dateGMT,
-            bodyText: comment.body,
-            ratingValue: comment.ratingValue,
-            statusRaw: comment.status.rawValue,
-            cachedAt: .now,
-            isPendingFromThisDevice: false
-        )
-    }
+    // US-13/14/15 — WPRM ratings + WP comments + guest identity live
+    // impls live in `RecipeDetailDependencies+CommentsRatings.swift`.
+    // US-44 / CL-138 — Phase c profile-gate live impls live in
+    // `RecipeDetailDependencies+Profile.swift`. Snapshot-bridging
+    // helpers live in `RecipeDetailDependencies+SnapshotBridging.swift`.
+    // The split keeps this file under the SwiftLint 400-line
+    // `file_length` cap.
 }

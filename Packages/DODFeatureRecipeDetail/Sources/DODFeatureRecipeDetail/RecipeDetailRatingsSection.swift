@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODDomain
+import DODFeatureProfile
 import SwiftUI
 
 /// "Ratings & Reviews" section that hangs off the bottom of
@@ -38,6 +39,14 @@ public struct RecipeDetailRatingsSection: View {
 
     @Bindable public var viewModel: RecipeDetailViewModel
 
+    /// US-44 / CL-138 / DUT-36 Phase c — drives the modal sheet
+    /// presentation of ``ProfileEditView`` over the recipe when the
+    /// user taps the ``RatingsProfileGate`` CTA. Sheet dismiss
+    /// triggers ``RecipeDetailViewModel/refreshProfile()`` via
+    /// `.onDisappear`, which reactively flips `hasProfile` and removes
+    /// the gate.
+    @State private var showProfileSheet: Bool = false
+
     public init(viewModel: RecipeDetailViewModel) {
         self.viewModel = viewModel
     }
@@ -52,7 +61,13 @@ public struct RecipeDetailRatingsSection: View {
             // surface. DUT-28 adds the on-form name + email above the comment
             // box. Replaces the old separate "Submit rating" bar, the
             // embedded `CommentComposer`, AND the guest-identity pop-up.
-            rateAndReviewCard
+            //
+            // US-44 / CL-138 / DUT-36 Phase c — wrapped in a ZStack +
+            // blur + popup overlay when the user has no profile (see
+            // `gatedRateAndReviewCard`). AC-44.11: only this WRITE
+            // surface is gated; `commentsList` below stays readable in
+            // all states.
+            gatedRateAndReviewCard
 
             Divider()
                 .padding(.vertical, DODSpacing.xs)
@@ -62,6 +77,9 @@ public struct RecipeDetailRatingsSection: View {
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.lg)
         .accessibilityElement(children: .contain)
+        .sheet(isPresented: $showProfileSheet) {
+            profileEditSheet
+        }
     }
 
     // MARK: - Section header
@@ -87,6 +105,98 @@ public struct RecipeDetailRatingsSection: View {
             Text("Be the first to rate this recipe.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
+        }
+    }
+
+    // MARK: - GatedRateAndReviewCard (US-44 / CL-138 / DUT-36 Phase c)
+
+    /// AC-44.10 — wraps ``rateAndReviewCard`` in a ZStack with a blur +
+    /// ultraThinMaterial overlay + ``RatingsProfileGate`` popup when
+    /// ``RecipeDetailViewModel/hasProfile`` is `false`. The composer is
+    /// `.disabled` so even if a touch leaks through the blur, no action
+    /// fires; it carries `.accessibilityHidden(true)` so VoiceOver
+    /// announces only the popup ("Set up your profile…") not the
+    /// unreadable haze. The Material overlay carries
+    /// `.allowsHitTesting(false)` so it doesn't eat the popup's tap.
+    /// When the user has a profile, the ZStack collapses to just the
+    /// interactive composer — no overlay, no blur — and the layout is
+    /// byte-identical to the pre-Phase-c shape.
+    @ViewBuilder
+    private var gatedRateAndReviewCard: some View {
+        ZStack {
+            rateAndReviewCard
+                .blur(radius: viewModel.hasProfile ? 0 : 10)
+                .disabled(!viewModel.hasProfile)
+                .accessibilityHidden(!viewModel.hasProfile)
+
+            if !viewModel.hasProfile {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .allowsHitTesting(false)
+
+                RatingsProfileGate {
+                    showProfileSheet = true
+                }
+            }
+        }
+    }
+
+    /// US-44 / CL-138 — the `.sheet(isPresented:)` body. Presents
+    /// ``ProfileEditView`` in a `NavigationStack` (so its Cancel + Done
+    /// toolbar render correctly) with `existingProfile: nil` — the gate
+    /// only fires when no profile exists, so the form is always in
+    /// "New Profile" mode. `onProfileChanged` triggers a refresh
+    /// (covers the Done-save path); `.onDisappear` triggers the same
+    /// refresh (covers the Cancel-dismiss path where the user may have
+    /// signed up via the Settings entry instead and only now opens the
+    /// recipe). Both paths route through ``refreshProfile()`` — the
+    /// `@Observable` re-assignment flips `hasProfile` and reactively
+    /// removes the gate. AC-44.10.
+    @ViewBuilder
+    private var profileEditSheet: some View {
+        NavigationStack {
+            profileEditSheetBody
+        }
+        .onDisappear {
+            Task { await viewModel.refreshProfile() }
+        }
+    }
+
+    /// US-44 / CL-138 — extracted so the `#if canImport(UIKit)` /
+    /// `#else` split lives inside a single `@ViewBuilder` rather than
+    /// straddling the `NavigationStack { ... }` call boundary. Production
+    /// always has a profile store wired (`AppDependencies`'s singleton);
+    /// the `else` branch is the test-host / preview fallback.
+    @ViewBuilder
+    private var profileEditSheetBody: some View {
+        if let profileStore = viewModel.profileStoreForGate {
+            #if canImport(UIKit)
+            ProfileEditView(
+                store: profileStore,
+                existingProfile: nil,
+                onProfileChanged: { [weak viewModel] in
+                    await viewModel?.refreshProfile()
+                },
+                photoStore: viewModel.profilePhotoStoreForGate
+            )
+            #else
+            ProfileEditView(
+                store: profileStore,
+                existingProfile: nil,
+                onProfileChanged: { [weak viewModel] in
+                    await viewModel?.refreshProfile()
+                }
+            )
+            #endif
+        } else {
+            // Test-host / preview fallback — production always wires a
+            // store via `AppDependencies`. Surfaces a neutral message
+            // instead of a crash if a future test path forgets to set
+            // it up.
+            Text("Profile setup unavailable.")
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelSecondary)
+                .padding(DODSpacing.lg)
         }
     }
 
