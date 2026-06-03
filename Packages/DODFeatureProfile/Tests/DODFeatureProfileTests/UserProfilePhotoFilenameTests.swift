@@ -126,13 +126,13 @@ struct UserProfilePhotoFilenameTests {
         // missing key decodes to nil rather than throwing. Pin that the
         // legacy Keychain row decodes cleanly into the new struct shape.
         let legacyJSON = """
-        {
-            "id": "12345678-1234-1234-1234-123456789012",
-            "displayName": "Spencer",
-            "email": "spencer@example.com",
-            "photoFilename": "profile-photo-legacy.jpg"
-        }
-        """
+            {
+                "id": "12345678-1234-1234-1234-123456789012",
+                "displayName": "Spencer",
+                "email": "spencer@example.com",
+                "photoFilename": "profile-photo-legacy.jpg"
+            }
+            """
         guard let data = legacyJSON.data(using: .utf8) else {
             Issue.record("Test fixture data conversion failed")
             return

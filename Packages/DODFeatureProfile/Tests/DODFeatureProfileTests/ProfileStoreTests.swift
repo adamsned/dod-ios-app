@@ -207,7 +207,7 @@ struct ProfileStoreTests {
             displayName: "Spencer",
             email: "spencer@example.com",
             photoFilename: croppedFilename
-            // photoOriginalFilename intentionally omitted — legacy path.
+                // photoOriginalFilename intentionally omitted — legacy path.
         )
 
         try await store.save(profile)

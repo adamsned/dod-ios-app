@@ -61,7 +61,10 @@ public struct ProfileEditView: View {
 
     @State var displayName: String = ""
     @State var email: String = ""
-    @State private var emailValidationError: String?
+    /// Non-private so `ProfileEditView+Save.swift` can write to it
+    /// when the email validation fails (T-745 / CL-142 file_length
+    /// split).
+    @State var emailValidationError: String?
     @State var saveError: String?
     @State private var showDeleteConfirmation = false
     /// Non-private so `ProfileEditView+DirtyState.swift` can read it
@@ -92,21 +95,12 @@ public struct ProfileEditView: View {
     /// replaces it — cleared post-save so a mid-flow failure leaves
     /// the previous file intact (write-then-clear-old per CL-137).
     @State var photoFilenameToClearOnSave: String?
-    /// T-745 / CL-142 — the in-flight `photoOriginalFilename`. Seeded
-    /// from `existingProfile?.photoOriginalFilename` on first appear;
-    /// updated when the user picks a new photo (Replace / first
-    /// upload) or removes the existing one. Distinct from
-    /// `inFlightPhotoFilename` so the Edit Photo flow can re-use the
-    /// original as the crop source without re-picking from the
-    /// library. `nil` for legacy users with only the cropped
-    /// derivative — the Edit Photo flow falls back to re-cropping the
-    /// cropped file in that case.
+    /// T-745 / CL-142 — the in-flight `photoOriginalFilename`. Parallel
+    /// to `inFlightPhotoFilename`; nil for legacy users with only the
+    /// cropped derivative (Edit Photo falls back to re-cropping that).
     @State var inFlightPhotoOriginalFilename: String?
-    /// T-745 / CL-142 — set to the filename of the previously-saved
-    /// original photo when the user replaces or removes it; cleared
-    /// post-save by `handleSave` so a mid-flow failure leaves the
-    /// previous original intact. Parallel to
-    /// `photoFilenameToClearOnSave` for the cropped derivative.
+    /// T-745 / CL-142 — write-then-clear-old mirror of
+    /// `photoFilenameToClearOnSave` for the original picked image.
     @State var photoOriginalFilenameToClearOnSave: String?
     #if canImport(UIKit)
     /// Phase b — `PhotosPicker` selection binding. Becomes non-nil
@@ -345,65 +339,11 @@ public struct ProfileEditView: View {
     }
 
     // MARK: - Actions
-
-    @MainActor
-    func handleSave() async {
-        guard !isSubmitting else { return }
-        isSubmitting = true
-        defer { isSubmitting = false }
-        emailValidationError = nil
-        saveError = nil
-
-        do {
-            let cleanedName = try UserProfile.validateDisplayName(displayName)
-            let cleanedEmail = try UserProfile.validateEmail(email)
-            #if canImport(UIKit)
-            let originalFilenameToPersist = inFlightPhotoOriginalFilename
-            #else
-            let originalFilenameToPersist: String? = nil
-            #endif
-            let profile = UserProfile(
-                id: existingProfile?.id ?? UUID(),
-                displayName: cleanedName,
-                email: cleanedEmail,
-                photoFilename: inFlightPhotoFilename,
-                photoOriginalFilename: originalFilenameToPersist
-            )
-            try await store.save(profile)
-            #if canImport(UIKit)
-            // Phase b — clear the previous photo file only after the
-            // Keychain row has been updated with the new filename, so
-            // a mid-flow save failure leaves the previous photo intact
-            // (the new one is also on disk but unreferenced; orphans
-            // are tolerable, half-overwritten primary photos are not).
-            if let staleFilename = photoFilenameToClearOnSave {
-                try? await photoStore?.clear(filename: staleFilename)
-                photoFilenameToClearOnSave = nil
-            }
-            // T-745 / CL-142 — mirror the same write-then-clear-old
-            // pattern for the original picked image so a mid-flow
-            // failure leaves the previous original intact (the same
-            // tolerable-orphans rationale per CL-137 (h)).
-            if let staleOriginalFilename = photoOriginalFilenameToClearOnSave {
-                try? await photoStore?.clearOriginal(filename: staleOriginalFilename)
-                photoOriginalFilenameToClearOnSave = nil
-            }
-            #endif
-            await onProfileChanged()
-            dismiss()
-        } catch let error as UserProfile.ValidationError {
-            switch error {
-            case .displayNameEmpty:
-                saveError = "Add your name to save your profile."
-            case .emailEmpty:
-                emailValidationError = "Add your email to save your profile."
-            case .emailInvalid:
-                emailValidationError = "Enter a valid email address."
-            }
-        } catch {
-            saveError = "Couldn't save your profile — try again."
-        }
-    }
+    //
+    // `handleSave()` lives in `ProfileEditView+Save.swift` so this file
+    // stays under the SwiftLint file_length cap after the T-745 / CL-142
+    // additions (two-file storage + post-save cleanup for both cropped +
+    // original).
 
     @MainActor
     private func handleClear() async {
