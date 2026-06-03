@@ -172,10 +172,17 @@ extension RecipeDetailViewModel {
                 email: trimmedEmail,
                 rating: ratingToSend
             )
-            let awaitingApproval = posted.status != .approved
+            // CL-139 / Phase d: stamp the just-posted comment's
+            // `authorEmail` with the value we sent so own-comment row
+            // rendering can match against the current profile's email
+            // case-insensitively. WordPress's GET response doesn't
+            // include `author_email`, so the local stamp is the only
+            // way the row picks up the profile photo in-session.
+            let stamped = Self.stampAuthorEmail(posted, email: trimmedEmail)
+            let awaitingApproval = stamped.status != .approved
             if !awaitingApproval {
                 // Prepend the approved comment so the user sees it land.
-                insertPostedCommentIfNew(posted)
+                insertPostedCommentIfNew(stamped)
                 await dependencies.cacheComments(comments, postID: listItem.id)
                 snackbarMessage = "Comment posted."
             } else {
@@ -188,7 +195,7 @@ extension RecipeDetailViewModel {
                 // just-posted comment locally — `CommentRow` renders any
                 // non-approved status with the "Awaiting approval" badge
                 // (US-15), so the user sees their words on screen immediately.
-                insertPostedCommentIfNew(posted)
+                insertPostedCommentIfNew(stamped)
                 await dependencies.cacheComments(comments, postID: listItem.id)
                 snackbarMessage = "Comment submitted — it will appear after approval."
             }
@@ -207,5 +214,29 @@ extension RecipeDetailViewModel {
     func insertPostedCommentIfNew(_ comment: RecipeComment) {
         guard !comments.contains(where: { $0.id == comment.id }) else { return }
         comments.insert(comment, at: 0)
+    }
+
+    /// CL-139 / DUT-36 Phase d — return a copy of the just-posted
+    /// comment with its `authorEmail` field set to the value we sent on
+    /// the wire. WordPress's public `/wp/v2/comments` GET response does
+    /// NOT include `author_email` (privacy — moderation-only field), so
+    /// the wire-format `WPDTO.Comment.toDomain()` maps `authorEmail`
+    /// to `""`. This helper rewrites that field on the returned domain
+    /// model so own-comment row rendering can match the current
+    /// profile's email case-insensitively and swap in
+    /// ``ProfilePhotoView``. AC-44.13.
+    static func stampAuthorEmail(_ comment: RecipeComment, email: String) -> RecipeComment {
+        RecipeComment(
+            id: comment.id,
+            postID: comment.postID,
+            parentID: comment.parentID,
+            authorName: comment.authorName,
+            authorEmail: email,
+            avatarURL: comment.avatarURL,
+            dateGMT: comment.dateGMT,
+            body: comment.body,
+            ratingValue: comment.ratingValue,
+            status: comment.status
+        )
     }
 }

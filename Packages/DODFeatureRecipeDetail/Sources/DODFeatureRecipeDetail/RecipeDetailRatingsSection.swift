@@ -202,13 +202,23 @@ public struct RecipeDetailRatingsSection: View {
 
     // MARK: - RateAndReviewCard
 
-    /// DUT-24 / DUT-28 — the single consolidated name + email + rate +
+    /// DUT-24 / DUT-28 / DUT-36 Phase d — the single consolidated rate +
     /// optional-comment + Submit surface. AC-13.2 / AC-13.3 (rate the
     /// recipe) and AC-14.3 (optional comment) live in one card with one star
-    /// input and one Submit button; DUT-28 surfaces the author identity
-    /// inline (``authorFields``) instead of behind a pop-up.
+    /// input and one Submit button.
+    ///
+    /// **CL-139 / DUT-36 Phase d.** The DUT-28 inline "Display name" +
+    /// "Email" `authorFields` rows were retired — the user only chooses
+    /// stars + types the comment text. Author identity is sourced from
+    /// the Profile and displayed above the comment editor as a static
+    /// ``PostingAsHeader`` (avatar + name + email, no input). The Phase
+    /// c gate guarantees `profile` is non-nil whenever this card is
+    /// interactive, so the header always has a profile to render.
+    /// AC-44.12.
     private var rateAndReviewCard: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            postingAsHeader
+
             ratingPrompt
 
             StarRatingInput(
@@ -220,14 +230,34 @@ public struct RecipeDetailRatingsSection: View {
                 isSubmitting: viewModel.isSubmittingRatingOrComment
             )
 
-            authorFields
-
             commentField
 
             submitButton
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Rate and review this recipe")
+    }
+
+    /// US-44 / CL-139 / DUT-36 Phase d — the static "Posting as <name>"
+    /// header that sits above the empty comment editor. Replaces the
+    /// retired DUT-28 editable Name + Email `TextField`s. Reads as plain
+    /// text ("you're posting as this person"), not as another input. When
+    /// the profile is `nil` the header collapses to `EmptyView()` —
+    /// although the Phase c gate guarantees the composer is non-
+    /// interactive in that state anyway, so this branch is just defensive
+    /// (e.g. previews + test hosts that bypass the gate). AC-44.12.
+    @ViewBuilder
+    private var postingAsHeader: some View {
+        if let profile = viewModel.profile {
+            #if canImport(UIKit)
+            PostingAsHeader(
+                profile: profile,
+                photoStore: viewModel.profilePhotoStoreForGate
+            )
+            #else
+            PostingAsHeader(profile: profile)
+            #endif
+        }
     }
 
     /// Caption above the stars: reflects the user's prior rating if the
@@ -337,32 +367,19 @@ public struct RecipeDetailRatingsSection: View {
             } else {
                 LazyVStack(alignment: .leading, spacing: DODSpacing.md) {
                     ForEach(viewModel.comments) { comment in
-                        CommentRow(
-                            authorName: displayAuthor(for: comment),
-                            avatarURL: comment.avatarURL,
-                            relativeDate: Self.relativeDateString(comment.dateGMT),
-                            bodyText: comment.body,
-                            ratingValue: comment.ratingValue,
-                            isPendingModeration: comment.status != .approved
-                        )
+                        commentRow(for: comment)
                     }
                 }
             }
         }
     }
 
-    // The on-form identity fields (DUT-28) live in
-    // ``RecipeDetailRatingsSection+AuthorFields.swift`` — the `authorFields`
-    // builder plus the `AuthorFieldKind` / `AuthorFieldSpec` helpers — so
-    // this struct body stays under the SwiftLint `type_body_length` cap
-    // (same extraction pattern as the view-model `+CommentSubmit` split).
+    // CL-139 / Phase d — `commentRow(for:)` + the own-comment avatar
+    // override helpers live in ``RecipeDetailRatingsSection+PhaseD.swift``
+    // so this struct body stays under the SwiftLint `type_body_length`
+    // cap (same extraction pattern as the retired `+AuthorFields.swift`).
 
     // MARK: - Helpers
-
-    private func displayAuthor(for comment: RecipeComment) -> String {
-        let trimmed = comment.authorName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Anonymous" : trimmed
-    }
 
     /// Cheap relative-date formatter shared by every row. Uses
     /// `RelativeDateTimeFormatter` so output respects the device locale
@@ -373,3 +390,6 @@ public struct RecipeDetailRatingsSection: View {
         return formatter.localizedString(for: date, relativeTo: .now)
     }
 }
+
+// CL-139 / Phase d — ``PostingAsHeader`` struct lives in
+// ``RecipeDetailRatingsSection+PhaseD.swift``.

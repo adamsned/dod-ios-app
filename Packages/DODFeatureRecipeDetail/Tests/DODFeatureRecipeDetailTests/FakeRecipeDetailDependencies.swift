@@ -73,6 +73,15 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var postRatingShouldFail = false
     var postedCommentResult: RecipeComment?
     var postCommentShouldFail = false
+    /// US-44 / CL-139 / DUT-36 Phase d — spy capture of the (name, email)
+    /// pair the comment-submit path handed to ``postComment(...)``. Lets
+    /// the L1 tests assert the WP REST payload's `author_name` +
+    /// `author_email` are sourced from the profile, not from a retired
+    /// on-form field.
+    var lastPostCommentNameEmail: (name: String, email: String)?
+    /// US-44 / CL-139 — same spy for ``postRating(...)`` so the rating-
+    /// only path is covered too.
+    var lastPostRatingNameEmail: (name: String, email: String)?
     /// When non-nil, `postComment` throws this specific error (takes
     /// precedence over `postCommentShouldFail`). Lets DUT-7 tests inject a
     /// typed `WPClientError` (e.g. `.httpStatusWithBody`) to assert the
@@ -197,6 +206,7 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
         name: String,
         email: String
     ) async throws -> RecipeRating {
+        lastPostRatingNameEmail = (name, email)
         if postRatingShouldFail { throw URLError(.badServerResponse) }
         let result =
             postedRatingResult
@@ -236,6 +246,7 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
         email: String,
         rating: Int?
     ) async throws -> RecipeComment {
+        lastPostCommentNameEmail = (name, email)
         if let postCommentError { throw postCommentError }
         if postCommentShouldFail { throw URLError(.badServerResponse) }
         let result =

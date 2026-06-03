@@ -294,6 +294,15 @@ extension WPDTO.Comment {
             postID: post,
             parentID: normalizedParent,
             authorName: HTMLSanitizer.plainText(from: authorName),
+            // CL-139: WordPress's public `/wp/v2/comments` GET does NOT
+            // include `author_email` in the response (privacy — email is
+            // moderation-only data, only visible to admins via the
+            // moderation queue or the authenticated `?context=edit` view).
+            // The app uses the anonymous public endpoint, so every
+            // FETCHED comment carries an empty `authorEmail`. The submit
+            // path stamps `profile.email` locally on the just-posted
+            // comment so own-comment photos render in-session.
+            authorEmail: "",
             avatarURL: bestAvatarURL,
             dateGMT: WPDTO.parseWPDate(dateGMT),
             body: HTMLSanitizer.plainText(from: content?.rendered ?? ""),

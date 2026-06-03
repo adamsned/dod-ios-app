@@ -44,7 +44,20 @@ extension RecipeDetailViewModel {
     /// gate flips reactively (the `@Observable` `profile` assignment
     /// triggers SwiftUI re-render which dismisses the gate without any
     /// manual callback wiring).
+    ///
+    /// **CL-139 / DUT-36 Phase d.** When a profile lands, mirror its
+    /// `displayName` + `email` into ``commentAuthorName`` /
+    /// ``commentAuthorEmail`` so the comment-submit + rating-submit
+    /// paths route the WP REST `author_name` + `author_email` payload
+    /// values from the profile. The composer's editable Name / Email
+    /// inputs were retired in Phase d — the values are sourced from the
+    /// profile, displayed as a static `PostingAsHeader` above the
+    /// comment editor, never typed in by the user.
     public func refreshProfile() async {
         profile = await dependencies.loadUserProfile()
+        if let profile {
+            commentAuthorName = profile.displayName
+            commentAuthorEmail = profile.email
+        }
     }
 }

@@ -24,6 +24,16 @@ public struct RecipeComment: Sendable, Hashable, Identifiable, Codable {
     /// comments — view layer handles the "Anonymous" fallback.
     public let authorName: String
 
+    /// US-44 / CL-139 / DUT-36 Phase d — commenter email. Almost always
+    /// empty (`""`) at the wire boundary: WordPress's public `/wp/v2/comments`
+    /// GET does NOT include `author_email` in the response (privacy — email
+    /// is moderation-only data only visible to admins). The submit path
+    /// stamps this field locally on the just-posted comment so own-comment
+    /// rendering can render the user's profile photo immediately in-session.
+    /// `Codable` synthesis uses the empty-string default for older cached
+    /// JSON that pre-dates Phase d. AC-44.13.
+    public let authorEmail: String
+
     /// Highest-resolution Gravatar URL the API returned (96px when
     /// available). `nil` if the API returned no avatar map.
     public let avatarURL: URL?
@@ -63,6 +73,7 @@ public struct RecipeComment: Sendable, Hashable, Identifiable, Codable {
         postID: Int,
         parentID: Int? = nil,
         authorName: String,
+        authorEmail: String = "",
         avatarURL: URL? = nil,
         dateGMT: Date,
         body: String,
@@ -73,10 +84,38 @@ public struct RecipeComment: Sendable, Hashable, Identifiable, Codable {
         self.postID = postID
         self.parentID = parentID
         self.authorName = authorName
+        self.authorEmail = authorEmail
         self.avatarURL = avatarURL
         self.dateGMT = dateGMT
         self.body = body
         self.ratingValue = ratingValue
         self.status = status
+    }
+
+    // MARK: - Codable
+
+    /// Custom decoder defaults `authorEmail` to `""` when the field is
+    /// absent from the JSON — keeps older cached comments (encoded before
+    /// CL-139 added the field) decoding cleanly without a schema bump.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(Int.self, forKey: .id)
+        self.postID = try container.decode(Int.self, forKey: .postID)
+        self.parentID = try container.decodeIfPresent(Int.self, forKey: .parentID)
+        self.authorName = try container.decode(String.self, forKey: .authorName)
+        self.authorEmail = try container.decodeIfPresent(String.self, forKey: .authorEmail) ?? ""
+        self.avatarURL = try container.decodeIfPresent(URL.self, forKey: .avatarURL)
+        self.dateGMT = try container.decode(Date.self, forKey: .dateGMT)
+        self.body = try container.decode(String.self, forKey: .body)
+        self.ratingValue = try container.decodeIfPresent(Int.self, forKey: .ratingValue)
+        self.status = try container.decode(Status.self, forKey: .status)
+    }
+
+    /// `Codable` keys mirror the property names — `authorEmail` is a new
+    /// CL-139 field; the custom `init(from:)` above tolerates older JSON
+    /// without it.
+    enum CodingKeys: String, CodingKey {
+        case id, postID, parentID, authorName, authorEmail, avatarURL
+        case dateGMT, body, ratingValue, status
     }
 }

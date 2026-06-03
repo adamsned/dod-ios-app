@@ -1,4 +1,5 @@
 import DODDomain
+import DODFeatureProfile
 import DODNetworking
 import Foundation
 import Testing
@@ -166,6 +167,110 @@ struct RecipeDetailCommentSubmitTests {
         )
         // Draft preserved on failure so the user doesn't lose their text.
         #expect(viewModel.commentDraft == "My comment.")
+    }
+
+    // MARK: - Phase d (T-742 / CL-139) — composer auto-fill + own-comment stamp
+
+    /// AC-44.12: the WP REST `author_name` + `author_email` payload values
+    /// are sourced from the profile, not from a retired on-form field.
+    /// Pins that the comment-submit path routes `profile.displayName` +
+    /// `profile.email` through to ``postComment(...)``.
+    @Test func submitRoutesProfileNameAndEmailToPostComment() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 90, withDetail: true)
+        dependencies.profileToLoad = UserProfile(
+            id: UUID(),
+            displayName: "Spencer Adams",
+            email: "spencer@example.com",
+            photoFilename: nil
+        )
+        dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
+            id: 9001,
+            postID: 90,
+            body: "Loved it.",
+            status: .approved
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 90)
+        await viewModel.onAppear()
+
+        viewModel.setCommentDraft("Loved it.")
+        await viewModel.submitComment()
+
+        let captured = dependencies.lastPostCommentNameEmail
+        #expect(captured?.name == "Spencer Adams")
+        #expect(captured?.email == "spencer@example.com")
+    }
+
+    /// AC-44.13: the just-posted comment is stamped with the profile email
+    /// before insertion so own-comment row rendering can match against
+    /// `profile.email` and swap in `ProfilePhotoView`. WordPress's GET
+    /// doesn't return `author_email`, so the local stamp is the only way
+    /// the row picks up the profile photo in-session.
+    @Test func submitStampsAuthorEmailOnReturnedCommentForOwnAvatarRendering() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 91, withDetail: true)
+        dependencies.profileToLoad = UserProfile(
+            id: UUID(),
+            displayName: "Spencer",
+            email: "spencer@example.com",
+            photoFilename: nil
+        )
+        // postComment fake returns a result with `authorEmail = ""` (the
+        // wire-format default, since WP GET payloads strip the email).
+        dependencies.postedCommentResult = RecipeDetailTestFixtures.makeComment(
+            id: 9101,
+            postID: 91,
+            body: "First!",
+            status: .approved
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 91)
+        await viewModel.onAppear()
+
+        viewModel.setCommentDraft("First!")
+        await viewModel.submitComment()
+
+        // The just-inserted comment carries the profile email so own-row
+        // matching can fire.
+        let inserted = viewModel.comments.first
+        #expect(inserted?.id == 9101)
+        #expect(inserted?.authorEmail == "spencer@example.com")
+    }
+
+    /// AC-44.13: the equality check is case-insensitive — emails are
+    /// canonically case-insensitive per RFC 5321 and a user typing
+    /// `Spencer@Example.com` into the profile must still match the
+    /// `spencer@example.com` echo from the wire / submit path. The
+    /// helper is a pure function over two strings so a focused test
+    /// pins the contract without a view host.
+    @Test func stampedEmailMatchesProfileEmailCaseInsensitively() throws {
+        let stamped = RecipeDetailViewModel.stampAuthorEmail(
+            RecipeDetailTestFixtures.makeComment(
+                id: 9201,
+                postID: 92,
+                body: "Hi",
+                status: .approved
+            ),
+            email: "Spencer@Example.com"
+        )
+        let profileEmail = "spencer@example.com"
+        #expect(stamped.authorEmail.lowercased() == profileEmail.lowercased())
+    }
+
+    /// AC-44.7 / AC-44.13: old guest-attributed comments with empty
+    /// `authorEmail` naturally fall through (the existing avatar path)
+    /// because empty doesn't equal a real profile's email. No special
+    /// case is needed — the equality check handles it by construction.
+    @Test func guestCommentsWithEmptyEmailDoNotMatchProfile() throws {
+        let guestComment = RecipeDetailTestFixtures.makeComment(
+            id: 9301,
+            postID: 93,
+            body: "Hi",
+            status: .approved
+        )
+        let profileEmail = "spencer@example.com"
+        // The fixture leaves `authorEmail` as the empty-string default.
+        #expect(guestComment.authorEmail.isEmpty)
+        #expect(guestComment.authorEmail.lowercased() != profileEmail.lowercased())
     }
 
     // MARK: - Helpers

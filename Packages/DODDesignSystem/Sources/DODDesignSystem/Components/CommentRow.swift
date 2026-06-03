@@ -16,6 +16,13 @@ public struct CommentRow: View {
     public let bodyText: String
     public let ratingValue: Int?
     public let isPendingModeration: Bool
+    /// US-44 / CL-139 / DUT-36 Phase d — optional caller-supplied avatar
+    /// that replaces the AsyncImage / Gravatar path when non-nil. The
+    /// caller is responsible for the same `40×40 Circle` frame the
+    /// default avatar uses (a `ProfilePhotoView(diameter: 40)` matches
+    /// out of the box). `nil` (the default) preserves the pre-Phase-d
+    /// rendering for backward compatibility. AC-44.13.
+    public let avatarOverride: AnyView?
 
     public init(
         authorName: String,
@@ -23,7 +30,8 @@ public struct CommentRow: View {
         relativeDate: String,
         bodyText: String,
         ratingValue: Int? = nil,
-        isPendingModeration: Bool = false
+        isPendingModeration: Bool = false,
+        avatarOverride: AnyView? = nil
     ) {
         self.authorName = authorName
         self.avatarURL = avatarURL
@@ -31,6 +39,7 @@ public struct CommentRow: View {
         self.bodyText = bodyText
         self.ratingValue = ratingValue
         self.isPendingModeration = isPendingModeration
+        self.avatarOverride = avatarOverride
     }
 
     public var body: some View {
@@ -59,22 +68,33 @@ public struct CommentRow: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
+    @ViewBuilder
     private var avatar: some View {
-        AsyncImage(url: avatarURL) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            case .empty, .failure:
-                fallbackAvatar
-            @unknown default:
-                fallbackAvatar
+        if let avatarOverride {
+            // CL-139 / Phase d: the caller supplied a custom avatar (e.g.
+            // ``ProfilePhotoView`` for own-comment rows). Render in the
+            // same 40×40 circular frame so the row layout is identical.
+            avatarOverride
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+                .accessibilityHidden(true)
+        } else {
+            AsyncImage(url: avatarURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .empty, .failure:
+                    fallbackAvatar
+                @unknown default:
+                    fallbackAvatar
+                }
             }
+            .frame(width: 40, height: 40)
+            .clipShape(Circle())
+            .accessibilityHidden(true)
         }
-        .frame(width: 40, height: 40)
-        .clipShape(Circle())
-        .accessibilityHidden(true)
     }
 
     private var fallbackAvatar: some View {
