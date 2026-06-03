@@ -112,19 +112,16 @@ public struct RecipeDetailRatingsSection: View {
         }
     }
 
-    // MARK: - GatedRateAndReviewCard (US-44 / CL-138 / DUT-36 Phase c)
+    // MARK: - GatedRateAndReviewCard (US-44 / CL-138 / DUT-36 Phase c, amended T-747 / CL-144)
 
     /// AC-44.10 — wraps ``rateAndReviewCard`` in a ZStack with a blur +
-    /// ultraThinMaterial overlay + ``RatingsProfileGate`` popup when
-    /// ``RecipeDetailViewModel/hasProfile`` is `false`. The composer is
-    /// `.disabled` so even if a touch leaks through the blur, no action
-    /// fires; it carries `.accessibilityHidden(true)` so VoiceOver
-    /// announces only the popup ("Set up your profile…") not the
-    /// unreadable haze. The Material overlay carries
-    /// `.allowsHitTesting(false)` so it doesn't eat the popup's tap.
-    /// When the user has a profile, the ZStack collapses to just the
-    /// interactive composer — no overlay, no blur — and the layout is
-    /// byte-identical to the pre-Phase-c shape.
+    /// ``RatingsProfileGate`` popup when ``RecipeDetailViewModel/hasProfile``
+    /// is `false`. Composer is `.disabled` + `.accessibilityHidden`. When
+    /// the user has a profile the ZStack collapses to just the composer
+    /// (byte-identical to the pre-Phase-c shape). T-747 / CL-144 (DUT-41)
+    /// removed the previous `Rectangle().fill(.ultraThinMaterial)` sibling
+    /// — its grey-in-dark-mode perimeter framed the popup; the composer's
+    /// own blur is sufficient on its own.
     @ViewBuilder
     private var gatedRateAndReviewCard: some View {
         ZStack {
@@ -134,10 +131,6 @@ public struct RecipeDetailRatingsSection: View {
                 .accessibilityHidden(!viewModel.hasProfile)
 
             if !viewModel.hasProfile {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .allowsHitTesting(false)
-
                 RatingsProfileGate {
                     showProfileSheet = true
                 }
