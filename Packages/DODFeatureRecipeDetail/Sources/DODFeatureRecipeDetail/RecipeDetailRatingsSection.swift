@@ -151,17 +151,20 @@ public struct RecipeDetailRatingsSection: View {
         }
     }
 
-    /// US-44 / CL-138 — the `.sheet(isPresented:)` body. Presents
-    /// ``ProfileEditView`` in a `NavigationStack` (so its Cancel + Done
-    /// toolbar render correctly) with `existingProfile: nil` — the gate
-    /// only fires when no profile exists, so the form is always in
-    /// "New Profile" mode. `onProfileChanged` triggers a refresh
-    /// (covers the Done-save path); `.onDisappear` triggers the same
-    /// refresh (covers the Cancel-dismiss path where the user may have
-    /// signed up via the Settings entry instead and only now opens the
-    /// recipe). Both paths route through ``refreshProfile()`` — the
-    /// `@Observable` re-assignment flips `hasProfile` and reactively
-    /// removes the gate. AC-44.10.
+    /// US-44 / CL-138 / CL-140 — the `.sheet(isPresented:)` body.
+    /// Presents ``ProfileEditView`` in a `NavigationStack` (so its
+    /// back-chevron + Save toolbar render correctly) with
+    /// `existingProfile: nil` — the gate only fires when no profile
+    /// exists, so the form is always in "New Profile" mode.
+    /// `onProfileChanged` triggers a refresh (covers the Save path);
+    /// `.onDisappear` triggers the same refresh (covers the back-
+    /// chevron-dismiss path where the user may have signed up via the
+    /// Settings entry instead and only now opens the recipe). Both
+    /// paths route through ``refreshProfile()`` — the `@Observable`
+    /// re-assignment flips `hasProfile` and reactively removes the
+    /// gate. T-743's `.interactiveDismissDisabled(isDirty)` on
+    /// `ProfileEditView` prevents swipe-down past unsaved changes in
+    /// this modal-sheet context. AC-44.10, AC-44.16.
     @ViewBuilder
     private var profileEditSheet: some View {
         NavigationStack {
