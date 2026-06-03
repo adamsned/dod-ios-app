@@ -21,22 +21,21 @@ import SwiftUI
 /// The popup card uses a solid ``DODColor/surface`` background (light
 /// mode `#FFFFFF`, dark mode `#1B140E` deep warm-brown — matches the
 /// recipe-detail page background `DODColor.surface`) so the card reads
-/// as a solid, on-brand surface instead of a washed-out grey haze.
-/// **Root cause + fix.** Pre-T-744 the body composed the background
-/// fill + shadow into a single `RoundedRectangle.fill(.surface).shadow(...)`
-/// chain inside `.background(...)`. Applying `.shadow(...)` to a filled
-/// shape inside the background renders fill + shadow into a single
-/// off-screen layer; the shadow's antialiased perimeter + the rounded
-/// corners' slight rendering translucency was enough for the SwiftUI
-/// compositor (and the user's eye) to blend the card's interior with
-/// the underlying `.ultraThinMaterial` `Rectangle` overlay (which dims
-/// the blurred composer below the popup). The fix is to hoist the
-/// `.shadow(...)` OUT of the `.background(...)` fill chain so the fill
-/// commits to its own opaque layer first, then the shadow applies to
-/// the composed card on the outside. The ZStack composition in
-/// ``RecipeDetailRatingsSection/gatedRateAndReviewCard`` is preserved
-/// verbatim per AC-44.10 — only the card's own background composition
-/// changes.
+/// as a solid, on-brand surface. `.shadow(...)` is applied OUTSIDE the
+/// `.background(...)` fill chain so the fill commits to its own opaque
+/// layer first; the shadow then applies to the composed card on the
+/// outside (vs. composing fill + shadow into a single offscreen layer,
+/// which would leave the corners visibly translucent against any
+/// backdrop).
+///
+/// **T-747 / CL-144 (DUT-41) — sibling Material dim overlay removed.**
+/// The earlier T-744 note here described the popup's neighbour in the
+/// ``RecipeDetailRatingsSection/gatedRateAndReviewCard`` ZStack as a
+/// `Rectangle().fill(.ultraThinMaterial)` that dimmed the blurred
+/// composer behind the popup. T-747 deleted that view entirely — the
+/// composer's `.blur(radius: 10)` alone communicates "this is gated"
+/// without the additional dim layer reading as a grey frame around the
+/// popup. The popup card's own background composition is unchanged.
 ///
 /// Accessibility: the CTA carries ``accessibilityIdentifier`` so a
 /// future L5 E2E journey ("set up a profile from the recipe gate") can
@@ -45,7 +44,7 @@ import SwiftUI
 /// as one coherent "Set up your profile…" element rather than three
 /// separate Text rows.
 ///
-/// Spec trace: US-44 AC-44.10 (amended T-744 / CL-141); CL-138; DUT-36 Phase c.
+/// Spec trace: US-44 AC-44.10 (amended T-744 / CL-141, again T-747 / CL-144); CL-138; DUT-36 Phase c.
 public struct RatingsProfileGate: View {
 
     let onSetUpProfile: () -> Void
