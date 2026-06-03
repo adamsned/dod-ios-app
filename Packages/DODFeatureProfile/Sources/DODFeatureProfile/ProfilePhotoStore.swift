@@ -70,23 +70,13 @@ public protocol ProfilePhotoStoring: Sendable {
     /// contract).
     func clearOriginal(filename: String) async throws
 
-    /// T-746 / CL-143 — returns whether a file with the given filename
-    /// exists in the cropped-photo storage. Sync-shape (cheap file-
-    /// system existence check) but `async` to fit the actor-isolated
-    /// implementation; avoids loading the image bytes when the caller
-    /// only needs the existence answer. Powers the stale-reference
-    /// validation in ``ProfileEditView``'s view-mount `.task` so the
-    /// AC-44.8 conditional picker entry routes correctly when the
-    /// Keychain row carries a `photoFilename` whose file was wiped
-    /// out-of-band (dev-rebuild after `simctl uninstall`/install, or
-    /// the theoretical production edge cases — Files.app delete,
-    /// storage-pressure eviction, partial CloudKit restore).
+    /// T-746 / CL-143 — returns whether the given cropped filename
+    /// exists. Powers ``ProfileEditView``'s view-mount stale-reference
+    /// validation (DUT-40).
     func exists(filename: String) async -> Bool
 
-    /// T-746 / CL-143 — returns whether a file with the given filename
-    /// exists in the original-image storage. Parallel to
-    /// ``exists(filename:)`` for the T-745 / CL-142 `photoOriginalFilename`
-    /// surface; same view-mount validation contract.
+    /// T-746 / CL-143 — parallel to ``exists(filename:)`` for the
+    /// T-745 / CL-142 `photoOriginalFilename` surface.
     func existsOriginal(filename: String) async -> Bool
 }
 
@@ -277,23 +267,16 @@ public actor ProfilePhotoStore: ProfilePhotoStoring {
     // MARK: - Existence checks (T-746 / CL-143)
 
     public func exists(filename: String) async -> Bool {
-        // Empty filename never matches a real file (the production
-        // filename shape is `profile-photo-<UUID>.jpg`, always non-
-        // empty) but we defensively short-circuit so a degenerate
-        // caller can't accidentally fileExists-check the bare
-        // Documents directory itself.
+        // Empty short-circuit defends against a bare-directory check.
         guard !filename.isEmpty else { return false }
         let url = documentsDirectory.appendingPathComponent(filename)
         return fileManager.fileExists(atPath: url.path)
     }
 
     public func existsOriginal(filename: String) async -> Bool {
-        // Same defensive empty-filename short-circuit + same path-
-        // construction logic as `exists` — `existsOriginal` and
-        // `exists` share the same `documentsDirectory`; the original
-        // and cropped derivatives are distinguished by filename
-        // prefix (`profile-photo-` vs `profile-photo-original-`)
-        // not by directory.
+        // Cropped + original share `documentsDirectory`; distinguished
+        // by filename prefix (`profile-photo-` vs
+        // `profile-photo-original-`), not directory.
         guard !filename.isEmpty else { return false }
         let url = documentsDirectory.appendingPathComponent(filename)
         return fileManager.fileExists(atPath: url.path)
@@ -404,19 +387,12 @@ public actor InMemoryProfilePhotoStore: ProfilePhotoStoring {
     // MARK: - Existence checks (T-746 / CL-143)
 
     public func exists(filename: String) async -> Bool {
-        // Empty filename never matches — defensive parity with the
-        // production `ProfilePhotoStore.exists` short-circuit.
         guard !filename.isEmpty else { return false }
         return stored[filename] != nil
     }
 
     public func existsOriginal(filename: String) async -> Bool {
-        // The in-memory fake stores cropped and original blobs in the
-        // same `stored` dictionary (keyed by filename), so `exists`
-        // and `existsOriginal` resolve to the same dictionary
-        // lookup. The keys themselves are disambiguated by the
-        // production filename-prefix convention (`profile-photo-`
-        // vs `profile-photo-original-`).
+        // Cropped + original share `stored`; disambiguated by prefix.
         guard !filename.isEmpty else { return false }
         return stored[filename] != nil
     }
