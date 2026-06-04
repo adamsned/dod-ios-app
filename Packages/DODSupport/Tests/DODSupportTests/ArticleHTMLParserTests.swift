@@ -32,12 +32,12 @@ import Testing
         let blocks = ArticleHTMLParser.parse(
             html: """
                 <h2 id="quick-look-at-this-roundup"   class="wp-block-heading" >Quick Look at this Roundup</h2>
-                <h3 class="wp-block-heading" id="h-summarize">Summarize and Save the Recipe</h3>
+                <h3 class="wp-block-heading" id="ingredients">Ingredients You'll Need</h3>
                 """
         )
         #expect(blocks.count == 2)
         #expect(blocks[0] == .heading(level: 2, text: AttributedString("Quick Look at this Roundup")))
-        #expect(blocks[1] == .heading(level: 3, text: AttributedString("Summarize and Save the Recipe")))
+        #expect(blocks[1] == .heading(level: 3, text: AttributedString("Ingredients You'll Need")))
     }
 
     @Test func clampsHeadingLevelRange() {
@@ -198,7 +198,7 @@ import Testing
             return
         }
         #expect(blocks[1] == .heading(level: 2, text: AttributedString("Quick Look at this Roundup")))
-        #expect(blocks[2] == .heading(level: 3, text: AttributedString("Summarize and Save the Recipe")))
+        #expect(blocks[2] == .heading(level: 3, text: AttributedString("Best Overall Pick")))
         guard case .paragraph = blocks[3] else {
             Issue.record("block 3 should be the paragraph")
             return
@@ -307,7 +307,7 @@ import Testing
         alt="The Best Dutch Oven Recipes. " srcset="https://www.dutchovendaddy.com/ignore.jpg 1200w" \
         class="wp-image-23423"></figure>
         <h2 id="quick-look-at-this-roundup"   class="wp-block-heading" >Quick Look at this Roundup</h2>
-        <h3 class="wp-block-heading" id="h-summarize-and-save-the-recipe">Summarize and Save the Recipe</h3>
+        <h3 class="wp-block-heading" id="best-overall-pick">Best Overall Pick</h3>
         <p>These are the <strong>best dutch oven recipes</strong> — all <em>tested dozens of times</em> — \
         starting with <a href="https://www.dutchovendaddy.com/dutch-oven-chili/">our chili</a>.</p>
         <ul class="wp-block-list"><li>&#9989;&nbsp;<strong>Total Recipes:</strong>&nbsp;30+</li>\

@@ -19,6 +19,10 @@ public enum ArticleHTMLParser {
         for tag in ["script", "style", "noscript", "svg"] {
             content = removeBlock(tag: tag, from: content)
         }
+        // Strip the Feast-theme "SEO action button" cluster (DUT-21) — see
+        // `removeFeastSEOBlocks`. Runs after the svg removal so the Trusted-
+        // Source block's inline icon is already gone before the div walk.
+        content = removeFeastSEOBlocks(from: content)
         return scanBlocks(content)
     }
 }
