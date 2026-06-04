@@ -50,7 +50,8 @@ public enum JSONLDRecipeParser {
                 return mapRecipe(
                     jsonLD: recipeObject,
                     listItem: listItem,
-                    canonicalURL: canonicalURL
+                    canonicalURL: canonicalURL,
+                    html: html
                 )
             }
         }
@@ -125,10 +126,13 @@ public enum JSONLDRecipeParser {
     static func mapRecipe(
         jsonLD: [String: Any],
         listItem: RecipeListItem,
-        canonicalURL: URL
+        canonicalURL: URL,
+        html: String
     ) -> Recipe {
-        let ingredients = mapIngredients(jsonLD["recipeIngredient"])
-        let instructions = mapInstructions(jsonLD["recipeInstructions"])
+        let (ingredients, instructions) = ingredientsAndInstructions(
+            jsonLD: jsonLD,
+            html: html
+        )
         let prep = parseISO8601Duration(jsonLD["prepTime"] as? String)
         let cook = parseISO8601Duration(jsonLD["cookTime"] as? String)
         let total = parseISO8601Duration(jsonLD["totalTime"] as? String)
@@ -155,6 +159,36 @@ public enum JSONLDRecipeParser {
             nutrition: nutrition,
             video: video
         )
+    }
+
+    /// Resolve the ingredient + instruction lists, with the DUT-42 WPRM
+    /// fallback applied **per field**. JSON-LD is the primary source; only when
+    /// a field's JSON-LD list is empty do we fill it from the page's WP Recipe
+    /// Maker card (some posts ship a `Recipe` node that omits
+    /// `recipeIngredient` / `recipeInstructions` even though the data is in the
+    /// rendered WPRM HTML — confirmed `dutch-oven-7-can-soup`, 2026-06-04). A
+    /// recipe with complete JSON-LD is unchanged: the WPRM card is scanned
+    /// **only** when at least one field is empty (the scan is skipped entirely
+    /// for the common complete-JSON-LD case).
+    static func ingredientsAndInstructions(
+        jsonLD: [String: Any],
+        html: String
+    ) -> (ingredients: [RecipeIngredient], instructions: [RecipeInstruction]) {
+        var ingredients = mapIngredients(jsonLD["recipeIngredient"])
+        var instructions = mapInstructions(jsonLD["recipeInstructions"])
+        guard ingredients.isEmpty || instructions.isEmpty else {
+            return (ingredients, instructions)
+        }
+        let card = WPRMRecipeCardParser.parse(html: html)
+        if ingredients.isEmpty {
+            ingredients = card.ingredients.map { RecipeIngredient(text: $0) }
+        }
+        if instructions.isEmpty {
+            instructions = card.instructions.enumerated().map { index, text in
+                RecipeInstruction(step: index + 1, text: text)
+            }
+        }
+        return (ingredients, instructions)
     }
 
     static func mapIngredients(_ raw: Any?) -> [RecipeIngredient] {

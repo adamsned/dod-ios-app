@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!--
+  DUT-42 golden fixture: a trimmed-but-REAL capture of
+  https://www.dutchovendaddy.com/dutch-oven-7-can-soup/ (post 563, WPRM
+  recipe 3921), captured 2026-06-04.
+
+  This page reproduces DUT-42: its JSON-LD "Recipe" node carries name, times,
+  yield, and nutrition but OMITS recipeIngredient and recipeInstructions, so
+  the JSON-LD parse yields an EMPTY ingredient list. The ingredient data is
+  present only in the server-rendered WPRM card below, where this particular
+  post expresses each ingredient as a <h4 class="wprm-recipe-ingredient-group-name">
+  group header (it has no <li class="wprm-recipe-ingredient"> line rows at all).
+  The WPRM fallback recovers the ingredients from those group headers.
+
+  Note: the live 7 Can Soup card genuinely has NO instruction rows in its WPRM
+  markup, so instructions stay empty for THIS page (faithful to reality). The
+  standard line-row + instruction-row shapes are covered by the unit tests in
+  DODSupport (WPRMRecipeCardParserTests) and by the synthetic standard-card
+  golden assertion in JSONLDRecipeParserTests.
+-->
+<html lang="en-US">
+<head>
+<meta charset="UTF-8">
+<title>Dutch Oven 7 Can Soup (20-Minute Recipe) - Dutch Oven Daddy</title>
+<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https://schema.org","@graph":[{"@type":"Article","@id":"https://www.dutchovendaddy.com/dutch-oven-7-can-soup/#article","headline":"Dutch Oven 7 Can Soup"},{
+  "@context": "https://schema.org/",
+  "@type": "Recipe",
+  "name": "Dutch Oven 7 Can Soup",
+  "datePublished": "2022-11-02T18:57:00+00:00",
+  "description": "Dutch Oven 7 Can Soup is a dump and go dinner that uses seven canned pantry staples and a packet of taco seasoning. Budget friendly, feeds a crowd, and ready in just 20 minutes.",
+  "prepTime": "PT5M",
+  "cookTime": "PT15M",
+  "totalTime": "PT20M",
+  "recipeYield": ["10"],
+  "nutrition": {
+    "@type": "NutritionInformation",
+    "calories": "291 kcal",
+    "carbohydrateContent": "44 g",
+    "proteinContent": "14 g",
+    "fatContent": "9 g",
+    "servingSize": "1 serving"
+  }
+}]}</script>
+</head>
+<body>
+<div class="entry-content">
+<p>This Dutch Oven 7 Can Soup uses simple pantry staples for a budget friendly dinner ready in 20 minutes.</p>
+<div id="recipe"></div>
+<div id="wprm-recipe-container-3921" class="wprm-recipe-container" data-recipe-id="3921" data-servings="10">
+<div class="wprm-recipe wprm-recipe-template-custom-template">
+<h2 class="wprm-recipe-name wprm-block-text-bold">Dutch Oven 7 Can Soup</h2>
+<div id="recipe-3921-ingredients" class="wprm-recipe-ingredients-container wprm-recipe-ingredients-no-images wprm-recipe-3921-ingredients-container wprm-block-text-normal wprm-ingredient-style-regular wprm-recipe-images-before" data-recipe="3921" data-servings="10"><h3 class="wprm-recipe-header wprm-recipe-ingredients-header wprm-block-text-bold wprm-align-left wprm-header-decoration-none" style="">Ingredients</h3><div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name wprm-recipe-ingredient-group-name wprm-block-text-bold">no-bean chili</h4></div><div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name wprm-recipe-ingredient-group-name wprm-block-text-bold">pinto beans, undrained</h4></div><div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name wprm-recipe-ingredient-group-name wprm-block-text-bold">black beans, undrained</h4></div><div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name wprm-recipe-ingredient-group-name wprm-block-text-bold">petite diced tomatoes</h4></div><div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name wprm-recipe-ingredient-group-name wprm-block-text-bold">sweet corn</h4></div><div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name wprm-recipe-ingredient-group-name wprm-block-text-bold">Rotel diced tomatoes with green chilies</h4></div><div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name wprm-recipe-ingredient-group-name wprm-block-text-bold">fiesta nacho cheese sauce</h4></div><div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-group-name wprm-recipe-ingredient-group-name wprm-block-text-bold">taco seasoning</h4></div></div>
+<div class="wprm-spacer"></div>
+</div>
+</div>
+</div>
+</body>
+</html>
