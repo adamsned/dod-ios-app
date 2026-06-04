@@ -216,3 +216,120 @@ import Testing
         #expect(recipe.video?.duration == .seconds(150))
     }
 }
+
+@Suite("JSONLDRecipeParser WPRM card fallback (DUT-42)") struct WPRMFallbackTests {
+
+    private static let listItem = RecipeListItem(
+        id: 563,
+        title: "Dutch Oven 7 Can Soup",
+        excerpt: "Pantry soup.",
+        heroImage: nil,
+        publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        totalTimeDisplay: nil
+    )
+
+    private static let canonical =
+        URL(string: "https://www.dutchovendaddy.com/dutch-oven-7-can-soup/")
+        ?? URL(filePath: "/dev/null")
+
+    /// DUT-42 reproduction. The `seven-can-soup.html` fixture is a trimmed-but-
+    /// real capture whose JSON-LD `Recipe` node OMITS `recipeIngredient` /
+    /// `recipeInstructions`. Pre-fix this parsed to an EMPTY ingredient list;
+    /// the WPRM fallback recovers the ingredients from the card's
+    /// `wprm-recipe-ingredient-group-name` headers (this post's real shape).
+    @Test func recoversIngredientsFromWPRMCardWhenJSONLDOmitsThem() throws {
+        let html = try loadFixture("seven-can-soup")
+        let recipe = try JSONLDRecipeParser.parse(
+            html: html,
+            merging: Self.listItem,
+            canonicalURL: Self.canonical
+        )
+        #expect(!recipe.ingredients.isEmpty, "7 Can Soup should recover ingredients from the WPRM card")
+        let texts = recipe.ingredients.map(\.text)
+        #expect(texts.contains { $0.localizedCaseInsensitiveContains("black beans") })
+        #expect(texts.contains { $0.localizedCaseInsensitiveContains("corn") })
+        #expect(texts.contains { $0.localizedCaseInsensitiveContains("pinto beans") })
+        // The JSON-LD times/yield/nutrition still parse normally — the fallback
+        // is per-field and does not disturb the fields JSON-LD did provide.
+        #expect(recipe.totalTime == .seconds(20 * 60))
+        #expect(recipe.servings == 10)
+        #expect(recipe.nutrition?.calories == "291 kcal")
+    }
+
+    /// End-to-end proof that the fallback also recovers INSTRUCTIONS through
+    /// `parse(...)` when the JSON-LD omits them but the WPRM card carries the
+    /// standard `wprm-recipe-ingredient` line rows + `wprm-recipe-instruction`
+    /// rows (the common shape across the catalog — real markup from
+    /// `dutch-oven-awesome-chili`).
+    @Test func recoversBothListsFromStandardWPRMCard() throws {
+        let html = """
+            <html><head>
+            <script type="application/ld+json">
+            {"@context":"https://schema.org/","@type":"Recipe","name":"Standard Card","totalTime":"PT30M"}
+            </script>
+            </head><body>
+            <div class="entry-content">
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-checkbox-container"><label><span class="wprm-screen-reader-text">&#9634; </span></label></span><span class="wprm-recipe-ingredient-amount">3</span> <span class="wprm-recipe-ingredient-unit">lbs</span> <span class="wprm-recipe-ingredient-name">lean ground beef</span></li>
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">1</span> <span class="wprm-recipe-ingredient-name">onion</span> <span class="wprm-recipe-ingredient-notes">diced</span></li>
+            </ul>
+            <ul class="wprm-recipe-instructions">
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Heat the Dutch oven over medium-high heat</span></div></li>
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Crumble in the ground beef; stir.</span></div></li>
+            </ul>
+            </div>
+            </div>
+            </body></html>
+            """
+        let recipe = try JSONLDRecipeParser.parse(
+            html: html,
+            merging: Self.listItem,
+            canonicalURL: Self.canonical
+        )
+        #expect(recipe.ingredients.map(\.text) == ["3 lbs lean ground beef", "1 onion diced"])
+        #expect(
+            recipe.instructions.map(\.text) == [
+                "Heat the Dutch oven over medium-high heat", "Crumble in the ground beef; stir.",
+            ]
+        )
+        #expect(recipe.instructions.map(\.step) == [1, 2])
+    }
+
+    /// Regression guard: a recipe with COMPLETE JSON-LD ingredients +
+    /// instructions is unchanged — the WPRM card is not consulted (even if one
+    /// is present), so good JSON-LD always wins.
+    @Test func completeJSONLDIsUnchangedByFallback() throws {
+        let html = """
+            <html><head>
+            <script type="application/ld+json">
+            {"@context":"https://schema.org/","@type":"Recipe","name":"Good","totalTime":"PT15M",
+             "recipeIngredient":["2 cans corn","2 tbsp butter"],
+             "recipeInstructions":[{"@type":"HowToStep","text":"Melt butter."},{"@type":"HowToStep","text":"Add corn."}]}
+            </script>
+            </head><body>
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">SHOULD NOT APPEAR</span></li>
+            </ul>
+            </div>
+            </body></html>
+            """
+        let recipe = try JSONLDRecipeParser.parse(
+            html: html,
+            merging: Self.listItem,
+            canonicalURL: Self.canonical
+        )
+        #expect(recipe.ingredients.map(\.text) == ["2 cans corn", "2 tbsp butter"])
+        #expect(recipe.instructions.map(\.text) == ["Melt butter.", "Add corn."])
+        #expect(!recipe.ingredients.contains { $0.text.contains("SHOULD NOT APPEAR") })
+    }
+
+    private func loadFixture(_ name: String) throws -> String {
+        let url = try #require(
+            Bundle.module.url(forResource: name, withExtension: "html"),
+            "Fixture \(name).html not found in test bundle"
+        )
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+}
