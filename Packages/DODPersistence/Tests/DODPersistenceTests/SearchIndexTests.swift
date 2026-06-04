@@ -131,6 +131,44 @@ import Testing
         let hits = try await store.recipesUsingIngredient(matching: "ground beef")
         #expect(hits.isEmpty)
     }
+
+    // MARK: - DUT-10: fuzzy fallback (typo / plural tolerance)
+
+    @Test func fuzzyFallbackRecoversPluralTypo() async throws {
+        // "tomatos" is a misspelled plural — NOT a substring of "tomatoes" — so
+        // the substring predicate misses and the fuzzy fallback recovers it.
+        let store = try await makeStore()
+        try await store.mergeDetail(makeRecipe(id: 1, ingredients: ["3 ripe tomatoes", "basil"]))
+        let hits = try await store.searchIngredients(matching: "tomatos")
+        #expect(hits == [1])
+    }
+
+    @Test func fuzzyFallbackRecoversSingleCharacterTypo() async throws {
+        // "chiken" (a dropped 'c') is Levenshtein-1 from "chicken".
+        let store = try await makeStore()
+        try await store.mergeDetail(makeRecipe(id: 1, ingredients: ["2 chicken breasts"]))
+        let hits = try await store.searchIngredients(matching: "chiken")
+        #expect(hits == [1])
+    }
+
+    @Test func fuzzyFallbackDoesNotMatchUnrelatedTerms() async throws {
+        // A clearly different term (Levenshtein-2+) must NOT fuzzy-match — the
+        // fallback inherits TitleSearchMatcher's "two typos is too loose" rule.
+        let store = try await makeStore()
+        try await store.mergeDetail(makeRecipe(id: 1, ingredients: ["2 chicken breasts"]))
+        let hits = try await store.searchIngredients(matching: "salmon")
+        #expect(hits.isEmpty)
+    }
+
+    @Test func recipesUsingIngredientRecoversMultiTokenTypo() async throws {
+        // The fuzzy fallback flows through the value-type entry point too:
+        // every query token must clear the bar ("grond" ~ "ground", "beef" ==).
+        let store = try await makeStore()
+        try await store.mergeDetail(makeRecipe(id: 1, ingredients: ["1 lb ground beef", "1 onion"]))
+        try await store.mergeDetail(makeRecipe(id: 2, ingredients: ["2 chicken breasts"]))
+        let hits = try await store.recipesUsingIngredient(matching: "grond beef")
+        #expect(hits.map(\.id) == [1])
+    }
 }
 
 @Suite("RecipeStore search-filter inputs (US-12)") struct SearchFilterInputsTests {
