@@ -48,6 +48,9 @@ struct RootView: View {
     /// descendants — used to defer non-recipe article links to the browser
     /// (DOD-ART-2).
     @Environment(\.openURL) private var systemOpenURL
+    /// Foreground Spotlight refresh (DUT-12); see `reindexSpotlightOnForeground`.
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var didInitialSpotlightIndex = false
 
     init(dependencies: AppDependencies) {
         _dependencies = State(initialValue: dependencies)
@@ -79,10 +82,10 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.2), value: appearance)
         .task {
             await dependencies.bootstrap()
-            // Push current saved + recents into Spotlight on every cold launch
-            // so users can find DOD recipes from the home-screen search bar
-            // even if they've never invoked the app today (US-10 / AC-10.3).
+            // Cold-launch index so DOD recipes are findable in Spotlight right
+            // away; the foreground refresh below keeps it fresh (US-10 / DUT-12).
             await indexSpotlight()
+            didInitialSpotlightIndex = true  // arm the foreground re-index
         }
         .onOpenURL { url in
             // Widget deep links route through WidgetDeepLink; App-Intents URLs
@@ -105,6 +108,7 @@ struct RootView: View {
             else { return }
             handle(intent: .openRecipe(id: id))
         }
+        .onChange(of: scenePhase) { reindexSpotlightOnForeground($1) }
         .onChange(of: dispatcher.pending) { _, newValue in
             guard let newValue else { return }
             handle(intent: newValue)
@@ -365,6 +369,13 @@ struct RootView: View {
 // MARK: - DOD-ART-2 in-app article-link routing
 
 extension RootView {
+    /// Re-index Spotlight on each foreground return so later-session saves stay
+    /// searchable without a cold launch; the launch `.active` is gated (DUT-12).
+    func reindexSpotlightOnForeground(_ newPhase: ScenePhase) {
+        guard newPhase == .active, didInitialSpotlightIndex else { return }
+        Task { await indexSpotlight() }
+    }
+
     /// Custom `openURL` handler for in-app article recipe links. A
     /// `dutchovendaddy.com` link is resolved to its post and pushed into the
     /// Feed stack (the same surface Spotlight / Siri / notifications route to);
