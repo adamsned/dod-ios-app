@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 import SwiftData
 
@@ -10,21 +11,40 @@ import SwiftData
 /// AC-12.3 (filter composition), AC-12.5 (< 200ms local search).
 extension RecipeStore {
 
-    /// Substring-match the local ingredient index. Returns the recipe IDs
-    /// that contain at least one ingredient line where
-    /// ``CachedIngredient.normalizedText`` contains the (lowercased,
-    /// trimmed) query. Order is unspecified — callers should re-rank merged
-    /// results explicitly (see `SearchResultMerger`).
+    /// Match the local ingredient index. Returns the recipe IDs that contain at
+    /// least one ingredient line matching the (normalized) query: a SwiftData
+    /// substring predicate first, then — only when that misses — a fuzzy
+    /// fallback via ``TitleSearchMatcher`` (plural swap + Levenshtein-1) so a
+    /// typo'd or plural/singular query ("tomatos", "chiken") still finds its
+    /// recipes (DUT-10). Order is unspecified — callers re-rank merged results
+    /// explicitly (see `SearchResultMerger`).
     public func searchIngredients(matching query: String) throws -> [Int] {
         let normalized = CachedIngredient.normalize(query)
         guard normalized.count >= 2 else { return [] }
+        // Fast path: substring match via the SwiftData predicate (the common case).
         let descriptor = FetchDescriptor<CachedIngredient>(
             predicate: #Predicate { row in
                 row.normalizedText.contains(normalized)
             }
         )
-        let rows = try modelContext.fetch(descriptor)
-        // Stable dedupe in fetch order so behavior is deterministic for tests.
+        let substringIDs = orderedDistinctRecipeIDs(try modelContext.fetch(descriptor))
+        if !substringIDs.isEmpty {
+            return substringIDs
+        }
+        // Fuzzy fallback (DUT-10): a typo'd / plural query won't substring-match,
+        // so scan the index with `TitleSearchMatcher`'s plural + Levenshtein-1
+        // tolerance. Only runs on a substring miss, so the hot path stays a
+        // single indexed predicate and the < 200ms local-search budget
+        // (AC-12.5) holds — the index is the ~100-recipe local cache.
+        let allRows = try modelContext.fetch(FetchDescriptor<CachedIngredient>())
+        let fuzzyRows = allRows.filter {
+            TitleSearchMatcher.match(query: normalized, title: $0.normalizedText) != nil
+        }
+        return orderedDistinctRecipeIDs(fuzzyRows)
+    }
+
+    /// Distinct recipe IDs in fetch order — stable + deterministic for tests.
+    private func orderedDistinctRecipeIDs(_ rows: [CachedIngredient]) -> [Int] {
         var seen: Set<Int> = []
         var ordered: [Int] = []
         for row in rows where !seen.contains(row.recipeID) {

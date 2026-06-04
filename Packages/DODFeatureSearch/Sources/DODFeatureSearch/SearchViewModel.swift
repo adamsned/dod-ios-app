@@ -6,7 +6,7 @@ import Observation
 /// Debounced search view model. v2 adds a local ingredient-index pass, filter
 /// chips, and a recent-searches history (US-12).
 ///
-/// Spec trace: AC-3.1 (300ms debounce), AC-3.4 (empty state),
+/// Spec trace: AC-3.1 (150ms debounce, DUT-10; was 300ms), AC-3.4 (empty state),
 /// AC-3.6 (hashed query telemetry), AC-3.7 (offline),
 /// AC-12.1..AC-12.6 (ingredient index + filters + recents + suggestions).
 @Observable
@@ -135,8 +135,8 @@ public final class SearchViewModel {
 
     let dependencies: SearchDependencies
     private let recents: RecentSearches
-    /// Public for tests to control timing without sleeping for real.
-    public var debounceMilliseconds: Int = 300
+    /// Autocomplete debounce (DUT-10: tightened 300 -> 150ms). Public so tests control timing.
+    public var debounceMilliseconds: Int = 150
     private var debounceTask: Task<Void, Never>?
 
     public init(
