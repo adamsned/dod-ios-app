@@ -165,15 +165,73 @@ jobs:
           echo "Wrote AuthKey_${ASC_KEY_ID}.p8 to $API_PRIVATE_KEYS_DIR"
 
       # ---------------------------------------------------------------------
+      # Reuse a FIXED signing certificate instead of minting a new one per run.
+      #
+      # Each release runs on a fresh macOS runner with an EMPTY keychain, so
+      # `-allowProvisioningUpdates` automatic signing creates a brand-new Apple
+      # signing certificate (via the API key) every single time. Those pile up
+      # and hit Apple's per-account certificate cap (the "Created via API"
+      # accumulation), which then forces a manual cert revocation every few
+      # builds before a release can sign.
+      #
+      # Fix: import a maintainer-provided certificate (.p12, WITH its private
+      # key) into a throwaway keychain and put it on the search list. Automatic
+      # signing then FINDS a valid cert and reuses it - no new cert is created,
+      # so nothing accumulates. Pure `security` + xcodebuild (no fastlane, per
+      # the constitution's no-new-dependencies default).
+      #
+      # Backward-compatible: if the secret is absent the step warns and skips,
+      # leaving the previous automatic-creation behavior intact - so this is
+      # safe to merge before the secret exists.
+      #
+      # Secrets (see Marketing/CICD.md):
+      #   SIGNING_CERT_P12_BASE64    - base64 of the exported .p12
+      #   SIGNING_CERT_P12_PASSWORD  - the .p12 export password
+      # ---------------------------------------------------------------------
+      - name: Reuse a fixed signing certificate (stop per-build cert pile-up)
+        env:
+          SIGNING_CERT_P12_BASE64: ${{ secrets.SIGNING_CERT_P12_BASE64 }}
+          SIGNING_CERT_P12_PASSWORD: ${{ secrets.SIGNING_CERT_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SIGNING_CERT_P12_BASE64:-}" ]; then
+            echo "::warning::SIGNING_CERT_P12_BASE64 is not set - falling back to automatic certificate creation. Each run will mint a new certificate that counts toward Apple's per-account cap. Add the secret to enable certificate reuse (see Marketing/CICD.md)."
+            exit 0
+          fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/dod-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          CERT_P12="$RUNNER_TEMP/dod-signing.p12"
+          echo "$SIGNING_CERT_P12_BASE64" | base64 -d > "$CERT_P12"
+          # Throwaway keychain: unlocked for the job, never auto-locking.
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          # Import the cert + private key; allow codesign to use it non-interactively.
+          security import "$CERT_P12" -k "$KEYCHAIN_PATH" -P "${SIGNING_CERT_P12_PASSWORD:-}" -A
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          # Put our keychain first on the user search list so xcodebuild's
+          # automatic signing discovers this cert and reuses it.
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
+          rm -f "$CERT_P12"
+          echo "Signing identities now available to xcodebuild:"
+          security find-identity -v -p codesigning
+
+      # ---------------------------------------------------------------------
       # Archive with managed (automatic) cloud signing for distribution.
       #
+      # The signing CERTIFICATE is supplied by the "Reuse a fixed signing
+      # certificate" step above (imported into a throwaway keychain), so
+      # automatic signing reuses it rather than minting a new one. The API key
+      # below still creates/refreshes the App Store distribution PROFILES
+      # (profiles are not cap-limited the way certificates are).
+      #
       # -allowProvisioningUpdates + the three -authenticationKey* flags let
-      # Xcode talk to App Store Connect to create/refresh the App Store
-      # distribution cert + provisioning profiles for the app and BOTH
-      # extensions, including the iCloud/CloudKit + App Groups +
-      # remote-notification entitlements they carry. DEVELOPMENT_TEAM comes
-      # from the APPLE_TEAM_ID secret (the gitignored local xcconfig does not
-      # exist on the runner - that is fine, the optional #include? no-ops).
+      # Xcode talk to App Store Connect to refresh the App Store distribution
+      # profiles for the app and BOTH extensions, including the iCloud/CloudKit
+      # + App Groups + remote-notification entitlements they carry.
+      # DEVELOPMENT_TEAM comes from the APPLE_TEAM_ID secret (the gitignored
+      # local xcconfig does not exist on the runner - that is fine, the optional
+      # #include? no-ops).
       # ---------------------------------------------------------------------
       - name: Archive (Release, automatic distribution signing)
         env:

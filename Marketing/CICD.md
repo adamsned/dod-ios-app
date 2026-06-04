@@ -115,6 +115,21 @@ Required secrets:
   this public repo. The workflow injects it into signing and into a runtime copy
   of exportOptions.plist.
 
+Optional but recommended (stops the per-build certificate pile-up - see
+"Certificate reuse" below):
+
+- SIGNING_CERT_P12_BASE64
+  Base64 of a `.p12` export of your DOD signing certificate (with its private
+  key). When set, the release runner imports this certificate and reuses it
+  instead of letting automatic signing mint a brand-new certificate on every
+  run. Without it, each release creates a new "Created via API" certificate that
+  accumulates toward Apple's per-account cap, eventually forcing a manual
+  revocation before a release can sign. Absent = the old behavior (the workflow
+  warns and continues).
+
+- SIGNING_CERT_P12_PASSWORD
+  The password you set when exporting the `.p12`.
+
 This pipeline does not require any repository variables; everything sensitive is
 a secret. If you prefer, APPLE_TEAM_ID could be a repository variable instead of
 a secret (it is not strictly a credential), but keeping it a secret is simplest
@@ -140,6 +155,55 @@ You need an account with permission to create keys (Account Holder or Admin).
    once. Store it in a password manager or other secure vault.
 9. Base64-encode the .p8 and add it as ASC_KEY_P8_BASE64 (see the secrets list
    above for the exact command).
+
+
+## Certificate reuse (stop the per-build certificate pile-up)
+
+By default the workflow uses automatic ("managed") cloud signing. On a fresh CI
+runner the keychain is empty, so `-allowProvisioningUpdates` mints a NEW Apple
+signing certificate via the API key on every release. Apple caps the number of
+certificates per account, so after a handful of releases the cap is hit and the
+archive fails with "Your account has reached the maximum number of certificates.
+To create a new one, you must choose a certificate to revoke." - which forces a
+manual cert revocation before you can ship again.
+
+The fix is to provide ONE fixed certificate that the runner imports and reuses,
+so no new certificate is ever created. It is purely additive: the workflow's
+"Reuse a fixed signing certificate" step is a no-op (it warns and continues)
+until the secret is set, so nothing breaks before you do this.
+
+One-time setup:
+
+1. On your Mac, open Keychain Access (login keychain).
+2. Find your DOD signing certificate(s) that have a private key under them (the
+   row expands with a disclosure triangle to show a "private key" child). At
+   minimum this is your "Apple Development" certificate - the one that has been
+   piling up as "Created via API". If your "Apple Distribution" certificate also
+   shows a private key, select it too (both can go in one .p12).
+3. Select the certificate(s), right-click -> Export ... -> Personal Information
+   Exchange (.p12), save it (e.g. dod-signing.p12), and set an export password.
+   Remember that password.
+4. Base64-encode it:
+       base64 -i dod-signing.p12 | pbcopy
+5. Add two repository secrets (Settings -> Secrets and variables -> Actions):
+   - SIGNING_CERT_P12_BASE64    = the base64 from step 4
+   - SIGNING_CERT_P12_PASSWORD  = the export password from step 3
+6. Dry run (Actions -> Release (TestFlight) -> Run workflow, skip_upload = true).
+   In the "Reuse a fixed signing certificate" step log you should see your
+   identity under "Signing identities now available to xcodebuild", and the
+   archive should succeed WITHOUT a new "Created via API" certificate appearing
+   in the Developer portal.
+
+Notes:
+
+- The certificate must be valid (not expired or revoked) and belong to your
+  team. Update the secret if you ever rotate the certificate.
+- This stores a private key as a GitHub secret. That is standard for iOS CI
+  signing; keep the .p12 + password in your password manager as the source of
+  truth. The repo is public, so the cert + password must only ever live as
+  secrets, never in a tracked file.
+- Once this is working you can safely revoke the leftover "Created via API"
+  development certificates in the portal to reclaim the cap.
 
 
 ## How to trigger a release
@@ -191,6 +255,12 @@ This is the checklist to take the pipeline from "committed but inert" to "works"
 
 4. Add the four repository secrets (see "GitHub secrets and variables to add"):
    ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64, APPLE_TEAM_ID.
+
+4b. Recommended: add SIGNING_CERT_P12_BASE64 + SIGNING_CERT_P12_PASSWORD so the
+   runner reuses one fixed certificate instead of minting a new one every
+   release (see "Certificate reuse (stop the per-build certificate pile-up)"
+   above). Without this you will periodically hit Apple's certificate cap and
+   have to revoke an old cert before a release can sign.
 
 5. Do a dry run: Actions -> Release (TestFlight) -> Run workflow with
    skip_upload = true. Confirm it archives and exports an .ipa and attaches it
