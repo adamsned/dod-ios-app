@@ -1,3 +1,4 @@
+import DODSupport
 import SwiftUI
 
 /// Reusable list row for recipes. Generic over content — takes primitive
@@ -12,17 +13,23 @@ public struct RecipeCard: View {
     public let excerpt: String
     public let heroImageURL: URL?
     public let totalTimeDisplay: String?
+    /// Active search query (DUT-10). When non-nil/non-empty, its term matches in
+    /// `title` are tinted in the brand accent; nil (every non-search host) keeps
+    /// the plain `Text(title)` render byte-for-byte.
+    public let highlightQuery: String?
 
     public init(
         title: String,
         excerpt: String,
         heroImageURL: URL?,
-        totalTimeDisplay: String? = nil
+        totalTimeDisplay: String? = nil,
+        highlightQuery: String? = nil
     ) {
         self.title = title
         self.excerpt = excerpt
         self.heroImageURL = heroImageURL
         self.totalTimeDisplay = totalTimeDisplay
+        self.highlightQuery = highlightQuery
     }
 
     public var body: some View {
@@ -78,7 +85,7 @@ public struct RecipeCard: View {
 
     private var textSection: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text(title)
+            Self.titleText(title, highlightQuery: highlightQuery)
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
                 .lineLimit(2)
@@ -119,6 +126,30 @@ public struct RecipeCard: View {
         } else {
             "\(title). \(excerpt)."
         }
+    }
+
+    // MARK: - Title highlighting (DUT-10)
+
+    /// `Text` for a card title — plain when there's no active query (identical
+    /// to the pre-DUT-10 `Text(title)`, so existing hosts + snapshots are
+    /// untouched), or with `query` term matches tinted in the brand accent.
+    /// Shared by the gallery card and ``ListRow``.
+    static func titleText(_ title: String, highlightQuery: String?) -> Text {
+        guard let highlightQuery, !highlightQuery.isEmpty else { return Text(title) }
+        return Text(highlightedTitle(title, query: highlightQuery))
+    }
+
+    /// `title` as an `AttributedString` with every ``SearchTermHighlighter``
+    /// match of `query` tinted in `DODColor.accent` (DUT-10). Pure + host-free
+    /// so the highlight styling is unit-testable without a SwiftUI host.
+    static func highlightedTitle(_ title: String, query: String) -> AttributedString {
+        var attributed = AttributedString(title)
+        for range in SearchTermHighlighter.matchedRanges(in: title, query: query) {
+            let lower = attributed.index(attributed.startIndex, offsetByCharacters: range.lowerBound)
+            let upper = attributed.index(attributed.startIndex, offsetByCharacters: range.upperBound)
+            attributed[lower..<upper].foregroundColor = DODColor.accent
+        }
+        return attributed
     }
 }
 
@@ -229,24 +260,28 @@ extension RecipeCard {
         public let excerpt: String
         public let heroImageURL: URL?
         public let totalTimeDisplay: String?
+        /// Active search query (DUT-10) — see ``RecipeCard/highlightQuery``.
+        public let highlightQuery: String?
 
         public init(
             title: String,
             excerpt: String,
             heroImageURL: URL?,
-            totalTimeDisplay: String? = nil
+            totalTimeDisplay: String? = nil,
+            highlightQuery: String? = nil
         ) {
             self.title = title
             self.excerpt = excerpt
             self.heroImageURL = heroImageURL
             self.totalTimeDisplay = totalTimeDisplay
+            self.highlightQuery = highlightQuery
         }
 
         public var body: some View {
             HStack(alignment: .center, spacing: DODSpacing.sm) {
                 thumbnail
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                    Text(title)
+                    RecipeCard.titleText(title, highlightQuery: highlightQuery)
                         .dodFont(DODType.heading)
                         .foregroundStyle(DODColor.label)
                         .lineLimit(1)

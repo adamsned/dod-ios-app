@@ -245,7 +245,8 @@ public struct SearchView: View {
                     title: item.title,
                     excerpt: item.excerpt,
                     heroImageURL: item.heroImage,
-                    totalTimeDisplay: item.totalTimeDisplay
+                    totalTimeDisplay: item.totalTimeDisplay,
+                    highlightQuery: viewModel.query
                 )
                 .recipeCardTap { onSelect(item) }
                 // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO:
@@ -273,7 +274,8 @@ public struct SearchView: View {
                     title: item.title,
                     excerpt: item.excerpt,
                     heroImageURL: item.heroImage,
-                    totalTimeDisplay: item.totalTimeDisplay
+                    totalTimeDisplay: item.totalTimeDisplay,
+                    highlightQuery: viewModel.query
                 )
                 .recipeCardTap { onSelect(item) }
                 .recipeCardContextMenu(isSaved: false) { onSave?(item) }
