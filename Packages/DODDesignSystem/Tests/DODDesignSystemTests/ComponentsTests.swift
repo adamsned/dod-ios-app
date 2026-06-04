@@ -63,6 +63,46 @@ import Testing
         #expect(card.totalTimeDisplay == nil)
     }
 
+    // MARK: - DUT-10 — search-term highlighting
+
+    /// The substrings of `attributed` carried by runs with any per-run
+    /// foreground color (i.e. the highlighted spans).
+    private func highlightedSubstrings(_ attributed: AttributedString) -> [String] {
+        attributed.runs.compactMap { run in
+            run.foregroundColor == nil ? nil : String(attributed[run.range].characters)
+        }
+    }
+
+    @Test func highlightedTitleTintsMatchedTerm() {
+        let attributed = RecipeCard.highlightedTitle("Cast Iron Skillet Nachos", query: "nachos")
+        #expect(highlightedSubstrings(attributed) == ["Nachos"])
+        // Plain text is preserved verbatim.
+        #expect(String(attributed.characters) == "Cast Iron Skillet Nachos")
+    }
+
+    @Test func highlightedTitleTintsEachQueryToken() {
+        let attributed = RecipeCard.highlightedTitle("Garlic Butter Corn", query: "garlic corn")
+        #expect(highlightedSubstrings(attributed) == ["Garlic", "Corn"])
+    }
+
+    @Test func highlightedTitleUsesBrandAccent() {
+        let attributed = RecipeCard.highlightedTitle("Cast Iron Nachos", query: "nachos")
+        let accentRun = attributed.runs.first { $0.foregroundColor != nil }
+        #expect(accentRun?.foregroundColor == DODColor.accent)
+    }
+
+    @Test func highlightedTitleLeavesUnmatchedTitlePlain() {
+        let attributed = RecipeCard.highlightedTitle("Cast Iron Nachos", query: "pizza")
+        #expect(highlightedSubstrings(attributed).isEmpty)
+    }
+
+    @Test func recipeCardAndListRowStoreHighlightQuery() {
+        let card = RecipeCard(title: "Nachos", excerpt: "E", heroImageURL: nil, highlightQuery: "nacho")
+        #expect(card.highlightQuery == "nacho")
+        let row = RecipeCard.ListRow(title: "Nachos", excerpt: "E", heroImageURL: nil, highlightQuery: "nacho")
+        #expect(row.highlightQuery == "nacho")
+    }
+
     // MARK: - T-648 / CL-126 / REG-32 — DODSearchField
 
     /// `DODSearchField` constructs against a text binding and exposes the
