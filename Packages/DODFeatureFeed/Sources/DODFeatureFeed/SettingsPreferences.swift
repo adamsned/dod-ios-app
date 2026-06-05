@@ -1,12 +1,13 @@
+import DODSupport
 import Foundation
 
 // The Settings preference value types (`AppearancePreference`,
-// `ShareFormatPreference`) were extracted from `SettingsViewModel.swift`
-// to keep that file under the SwiftLint 400-line `file_length` cap after
-// T-721 added the Cook Mode voice-gender row. No behavior change — these
-// are the same public enums the view-model's `appearance` / `shareFormat`
-// accessors read + write, just hosted beside the view-model rather than
-// inside its file.
+// `ShareFormatPreference`, `TemperaturePreference`) were extracted from
+// `SettingsViewModel.swift` to keep that file under the SwiftLint 400-line
+// `file_length` cap after T-721 added the Cook Mode voice-gender row. No
+// behavior change — these are the same public enums the view-model's
+// `appearance` / `shareFormat` / `temperaturePreference` accessors read +
+// write, just hosted beside the view-model rather than inside its file.
 
 // MARK: - Appearance preference (AC-36.2)
 
@@ -80,6 +81,66 @@ public enum ShareFormatPreference: String, CaseIterable, Sendable, Hashable {
             let value = ShareFormatPreference(rawValue: raw)
         else {
             return .linkOnly
+        }
+        return value
+    }
+}
+
+// MARK: - Temperature preference (DUT-47, temperature half)
+
+/// User-selected display unit for temperatures inside recipe instruction
+/// text. Drives Recipe Detail's render-time call to
+/// ``DODSupport/TemperatureConverter/converting(_:to:)``:
+/// - ``recipeDefault`` — leave temperatures exactly as the recipe author
+///   wrote them (the converter is NOT applied). The first-launch default.
+/// - ``fahrenheit`` / ``celsius`` — rewrite explicit-unit temperatures in
+///   the step text to that scale at display time (stored data is never
+///   mutated, mirroring how servings scaling is a render-time transform).
+///
+/// Raw values are the on-disk wire format — never rename without a
+/// migration shim because the values land in `UserDefaults` on every
+/// device that has touched the Temperature picker (same caveat as
+/// ``AppearancePreference`` / ``ShareFormatPreference``).
+///
+/// Scope note: this is the temperature half of DUT-47. The ingredient
+/// metric/imperial conversion is deferred — it needs DUT-43's quantity
+/// parser — and is intentionally not modeled here.
+///
+/// Spec trace: DUT-47 (temperature half).
+public enum TemperaturePreference: String, CaseIterable, Sendable, Hashable {
+    case recipeDefault
+    case fahrenheit
+    case celsius
+
+    /// Human-readable label rendered in the picker row.
+    public var displayName: String {
+        switch self {
+        case .recipeDefault: "Recipe default"
+        case .fahrenheit: "Fahrenheit"
+        case .celsius: "Celsius"
+        }
+    }
+
+    /// The converter unit this preference drives, or `nil` for
+    /// ``recipeDefault`` (the signal to skip conversion entirely). Recipe
+    /// Detail reads this and only runs the converter when it is non-`nil`.
+    public var targetUnit: TemperatureUnit? {
+        switch self {
+        case .recipeDefault: nil
+        case .fahrenheit: .fahrenheit
+        case .celsius: .celsius
+        }
+    }
+
+    /// Default-aware read. An absent key OR an unknown raw value falls back
+    /// to ``recipeDefault`` so a malformed migration / forward-compat
+    /// situation never crashes — "show as written" is the safe default.
+    public static func fromDefaults(_ defaults: UserDefaults) -> TemperaturePreference {
+        guard
+            let raw = defaults.string(forKey: SettingsViewModel.temperaturePreferenceKey),
+            let value = TemperaturePreference(rawValue: raw)
+        else {
+            return .recipeDefault
         }
         return value
     }

@@ -33,6 +33,17 @@ public struct RecipeDetailView: View {
     /// state — collapsing does not persist across screen re-entries (matches
     /// the AC-4.2 ingredient check lifetime contract: view-lifetime state).
     @State var isBlurbExpanded: Bool = false
+    /// DUT-47 (temperature half) — the user's recipe-step temperature unit
+    /// preference, read from the same `UserDefaults` key Settings writes
+    /// (`TemperatureConverter.preferenceKey`) via `@AppStorage` so a change
+    /// in Settings re-renders the instructions in the same frame. The raw
+    /// string is resolved to an optional `TemperatureUnit` by
+    /// ``DODSupport/TemperatureConverter/resolvedUnit(fromRawValue:)``;
+    /// `nil` ("Recipe default" / absent / malformed) means the converter is
+    /// NOT applied and steps render exactly as the author wrote them. This
+    /// is a display-time transform only — stored recipe data is untouched.
+    @AppStorage(TemperatureConverter.preferenceKey)
+    private var temperatureUnitRaw: String = ""
     @Environment(\.dismiss) private var dismiss
     public let onSelectRelated: (RecipeListItem) -> Void
 
@@ -245,17 +256,33 @@ public struct RecipeDetailView: View {
     }
 
     private var instructionsSection: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.md) {
+        // DUT-47 (temperature half): resolve the unit once per render. `nil`
+        // ("Recipe default" / absent / malformed) leaves every step exactly
+        // as written; otherwise each step's text is mapped through the
+        // converter at display time (stored data untouched, AC-31.8-style).
+        let temperatureUnit = TemperatureConverter.resolvedUnit(fromRawValue: temperatureUnitRaw)
+        return VStack(alignment: .leading, spacing: DODSpacing.md) {
             Text("Instructions")
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
             if let instructions = viewModel.recipe?.instructions {
                 ForEach(instructions) { step in
-                    InstructionStepView(step: step)
+                    InstructionStepView(
+                        step: step,
+                        displayText: convertedStepText(step.text, to: temperatureUnit)
+                    )
                 }
             }
         }
         .padding(.horizontal, DODSpacing.md)
+    }
+
+    /// Apply the DUT-47 temperature conversion to one step's text, or return
+    /// it unchanged when no unit is selected. Extracted so the `ForEach`
+    /// body stays a single expression and the gating logic reads in one place.
+    private func convertedStepText(_ text: String, to unit: TemperatureUnit?) -> String {
+        guard let unit else { return text }
+        return TemperatureConverter.converting(text, to: unit)
     }
 
     // MARK: - Toolbars
