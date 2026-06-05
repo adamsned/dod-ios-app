@@ -167,6 +167,27 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
+            // MARK: DUT-47 (temperature half) — recipe-step temperature unit
+
+            Section {
+                Picker(selection: temperaturePreferenceBinding) {
+                    ForEach(TemperaturePreference.allCases, id: \.self) { value in
+                        Text(value.displayName)
+                            .tag(value)
+                    }
+                } label: {
+                    Text("Recipe step temperatures")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-picker-temperature")
+            } footer: {
+                Text("Converts temperatures shown in the steps. \"Recipe default\" shows them as written.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+            }
+            .listRowBackground(DODColor.surfaceElevated)
+
             Section {
                 Picker(selection: shareFormatBinding) {
                     ForEach(ShareFormatPreference.allCases, id: \.self) { value in
@@ -312,6 +333,13 @@ public struct SettingsView: View {
         Binding(
             get: { viewModel.appearance },
             set: { viewModel.appearance = $0 }
+        )
+    }
+
+    private var temperaturePreferenceBinding: Binding<TemperaturePreference> {
+        Binding(
+            get: { viewModel.temperaturePreference },
+            set: { viewModel.temperaturePreference = $0 }
         )
     }
 

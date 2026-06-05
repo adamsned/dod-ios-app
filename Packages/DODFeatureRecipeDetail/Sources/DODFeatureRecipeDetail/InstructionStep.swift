@@ -6,9 +6,16 @@ import SwiftUI
 public struct InstructionStepView: View {
 
     public let step: RecipeInstruction
+    /// The text actually shown (and read by VoiceOver). Defaults to
+    /// `step.text`; Recipe Detail passes a temperature-converted variant
+    /// when the DUT-47 unit preference is set (a render-time transform — the
+    /// stored `step.text` is never mutated, mirroring how `IngredientCheckRow`
+    /// takes a pre-scaled `displayText` separate from its model).
+    public let displayText: String
 
-    public init(step: RecipeInstruction) {
+    public init(step: RecipeInstruction, displayText: String? = nil) {
         self.step = step
+        self.displayText = displayText ?? step.text
     }
 
     public var body: some View {
@@ -19,7 +26,7 @@ public struct InstructionStepView: View {
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(DODColor.burntOrange))
                 .accessibilityHidden(true)
-            Text(step.text)
+            Text(displayText)
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
                 .lineSpacing(DODSpacing.xxs)
@@ -30,6 +37,6 @@ public struct InstructionStepView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(step.step). \(step.text)")
+        .accessibilityLabel("Step \(step.step). \(displayText)")
     }
 }
