@@ -248,6 +248,15 @@ public struct SettingsView: View {
             // must live with the Section it decorates.
             CloudSyncSection(viewModel: viewModel)
 
+            // MARK: DUT-48 Tools — Dutch Oven Heat Coach
+
+            // The "Tools" section view lives in `SettingsView+Tools.swift`
+            // so this file stays under the 400-line `file_length` cap. It
+            // pushes ``HeatCoachView`` via the same NavigationLink push
+            // pattern as the About row below — a v1 low-risk entry point;
+            // a dedicated "Tools" tab is the eventual home (DUT-48).
+            ToolsSection()
+
             // MARK: US-32 About + version
 
             Section {
