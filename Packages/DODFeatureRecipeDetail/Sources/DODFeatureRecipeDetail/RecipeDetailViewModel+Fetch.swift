@@ -115,6 +115,10 @@ extension RecipeDetailViewModel {
         let url = canonicalURL
         Task { [weak self] in
             await self?.refreshBlurbBlocks(forCanonicalURL: url)
+            // DUT-53: self-heal a cached recipe whose ingredients are empty
+            // — parsed before the DUT-42 WPRM fallback existed, or fixed on
+            // the site since it was cached. No-op when ingredients present.
+            await self?.backfillIngredientsIfEmpty()
         }
     }
 
@@ -169,6 +173,43 @@ extension RecipeDetailViewModel {
         let parsed = ArticleHTMLParser.parse(html: blurbHTML)
         guard !parsed.isEmpty else { return }
         blurbBlocks = parsed
+    }
+
+    /// DUT-53: cache-hit ingredient self-heal. A recipe cached with empty
+    /// `ingredients` but `hasDetail == true` (it has instructions) takes the
+    /// `onAppear()` cache-hit fast path (`hydrateCachedRecipe`) and never
+    /// re-parses — so a parser improvement (the DUT-42 WPRM-card fallback) or
+    /// a site-content fix never reaches that already-cached row. When the
+    /// displayed (cached) recipe has no ingredients, re-fetch + re-parse in
+    /// the background; if the re-parse now recovers ingredients, persist them
+    /// and swap them into the live recipe so they render in a later frame.
+    ///
+    /// Fire-and-forget, fail-silent, and non-downgrading — offline, fetch
+    /// error, parse failure, or a still-empty re-parse all leave the cached
+    /// view exactly as it was (never `.unavailable`). Same contract as
+    /// ``refreshBlurbBlocks(forCanonicalURL:)`` (T-736 / REG-37): the cached
+    /// view is already on screen, so a snackbar would misrepresent a working
+    /// state, and holding `onAppear()` open on the fetch would serialize
+    /// subsequent UI work behind a network call.
+    ///
+    /// Recipes whose cache has BOTH lists empty (`hasDetail == false`) never
+    /// reach here — `onAppear()` routes them straight to `fetchAndParse()`,
+    /// which already applies the DUT-42 fallback on every open. This closes
+    /// the remaining gap for the has-instructions-but-no-ingredients shape.
+    func backfillIngredientsIfEmpty() async {
+        guard recipe?.ingredients.isEmpty == true else { return }
+        guard await dependencies.isOnline() else { return }
+        guard let html = try? await dependencies.fetchHTML(for: canonicalURL) else { return }
+        guard
+            let reparsed = try? dependencies.parseJSONLD(
+                html: html,
+                merging: listItem,
+                canonicalURL: canonicalURL
+            ),
+            !reparsed.ingredients.isEmpty
+        else { return }
+        try? await dependencies.mergeDetail(reparsed)
+        recipe = reparsed
     }
 
     /// Load the related-recipes strip for the recipe path (AC-4.6).
