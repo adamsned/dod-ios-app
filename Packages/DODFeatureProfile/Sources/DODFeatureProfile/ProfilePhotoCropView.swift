@@ -21,14 +21,15 @@ import UIKit
 /// clamp) + `DragGesture` + a dimmed overlay outside the square crop
 /// frame — and fits the surface budget.
 ///
-/// **The crop math.** ``cropRect(for:offset:imageSize:cropSize:)`` is a
-/// pure helper exposed `static` so the L1 test suite can pin the
+/// **The crop math.** ``cropRect(for:offset:imageSize:cropDiameterInScreenPoints:displayedImageScaleFactor:)``
+/// is a pure helper exposed `static` so the L1 test suite can pin the
 /// transform without spinning up a view host. Returns the source-image
-/// `CGRect` (in image coordinates) the renderer should sample to produce
-/// the cropped output. The output is always square; the crop frame is a
-/// fixed 1:1 aspect (locked per CL-137).
+/// `CGRect` (in image pixels) the renderer should sample. T-748 / CL-145
+/// (DUT-54) amended the signature to take screen-pt diameter + the
+/// scaledToFit ratio so offset (also screen-pts) and diameter convert
+/// to source pixels correctly. See CL-145 for the pre-T-748 units bug.
 ///
-/// Spec trace: US-44 AC-44.3, AC-44.8; CL-137.
+/// Spec trace: US-44 AC-44.3, AC-44.8; CL-137; CL-145.
 public struct ProfilePhotoCropView: View {
 
     /// Picked image, presented inside the crop frame.
@@ -47,6 +48,13 @@ public struct ProfilePhotoCropView: View {
     @State private var committedScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var committedOffset: CGSize = .zero
+
+    /// T-748 / CL-145 — captured `GeometryReader` proxy size so the
+    /// toolbar Done button (outside the GeometryReader closure) can read
+    /// it at crop time. Drives the `cropDiameterInScreenPoints` +
+    /// `displayedImageScaleFactor` computations in ``renderCroppedImage()``.
+    /// `.zero` until the first layout pass resolves the proxy.
+    @State private var capturedProxySize: CGSize = .zero
 
     public init(
         sourceImage: UIImage,
@@ -106,6 +114,16 @@ public struct ProfilePhotoCropView: View {
                     // recognisers underneath.
                     cropOverlay(cropSize: cropSize, frameSize: proxy.size)
                         .allowsHitTesting(false)
+                }
+                // T-748 / CL-145 — capture the proxy size into @State so
+                // `renderCroppedImage()` (called from the toolbar Done
+                // button, which lives outside this `GeometryReader`
+                // closure) can read it to compute the displayed-image
+                // scale factor + the crop circle's screen-pt diameter
+                // and convert offset + diameter to source pixels.
+                .onAppear { capturedProxySize = proxy.size }
+                .onChange(of: proxy.size) { _, newValue in
+                    capturedProxySize = newValue
                 }
             }
             .navigationTitle("Crop Photo")
@@ -179,23 +197,36 @@ public struct ProfilePhotoCropView: View {
 
     // MARK: - Rendering
 
-    /// Renders the cropped image at the user's transform. Uses
-    /// ``cropRect(for:offset:imageSize:cropSize:)`` to compute the
-    /// source rect, then draws into a fresh ``UIGraphicsImageRenderer``
-    /// at the locked 512×512 output size (the ``ProfilePhotoStore`` will
-    /// re-encode to JPEG @ 0.85, so the renderer here just produces the
-    /// bitmap).
+    /// Renders the cropped image at the user's transform into a
+    /// 512×512 bitmap (the ``ProfilePhotoStore`` re-encodes to JPEG @
+    /// 0.85). Reads `capturedProxySize` (set by the GeometryReader's
+    /// `.onAppear` / `.onChange`) to compute the on-screen crop circle
+    /// diameter + the scaledToFit factor, which the cropRect helper
+    /// needs to convert offset + diameter to source pixels per
+    /// T-748 / CL-145.
     private func renderCroppedImage() -> UIImage {
         let imageSize = sourceImage.size
-        // Crop frame on screen is the visual `cropSize` but the math
-        // operates in source-image coordinates — the helper takes the
-        // user's scale + offset and produces a square sub-rect that the
-        // renderer will sample to fill the 512×512 output.
+        // Compute the visible crop circle diameter in screen pts — same
+        // formula as the GeometryReader closure's `cropSize` constant
+        // (locked per CL-137: 0.85 of the proxy's shorter side).
+        let cropDiameterInScreenPoints = min(
+            capturedProxySize.width,
+            capturedProxySize.height
+        ) * 0.85
+        // Compute the scaledToFit ratio: source-px → screen-pt.
+        // SwiftUI's `.scaledToFit()` fits the image entirely within the
+        // proxy preserving aspect; the limiting factor is the smaller
+        // of the two per-axis ratios.
+        let displayedImageScaleFactor = Self.displayedImageScaleFactor(
+            imageSize: imageSize,
+            proxySize: capturedProxySize
+        )
         let rect = Self.cropRect(
             for: scale,
             offset: offset,
             imageSize: imageSize,
-            cropSize: 1.0  // Normalized — see helper docs.
+            cropDiameterInScreenPoints: cropDiameterInScreenPoints,
+            displayedImageScaleFactor: displayedImageScaleFactor
         )
         let target = CGSize(width: 512, height: 512)
         let format = UIGraphicsImageRendererFormat()
@@ -230,48 +261,62 @@ public struct ProfilePhotoCropView: View {
         max(scaleMin, min(scaleMax, value))
     }
 
-    /// Computes the source-image rect (in image coordinates) the crop
-    /// should sample given the user's current transform. Returns a
+    /// Computes the source-image rect (in image pixel coordinates) the
+    /// crop should sample given the user's current transform. Returns a
     /// square rect centered on the user's pan + zoom after clamping
-    /// against the image bounds.
+    /// against the image bounds + the source's shorter side.
     ///
-    /// **Coordinate model.** The pan + zoom values are in the
-    /// crop-view's screen coordinate space, but the rect this helper
-    /// returns is in the source image's pixel coordinate space — so
-    /// the renderer can sample it. The `cropSize` parameter is
-    /// normalized (1.0 = "the crop is the full source image side at
-    /// scale 1.0"); the helper takes the inverse-scale to find how
-    /// much of the source the crop frame visually covers, then walks
-    /// the offset by the same factor to translate the rect.
-    ///
-    /// **Clamping.** If the user pans the image off the screen the
-    /// helper clamps the rect to the source-image bounds so the
-    /// renderer never samples outside the image (which would produce
-    /// the transparent renderer-background bleeding through).
+    /// **Coordinate model (T-748 / CL-145).** `offset` arrives in screen
+    /// points (`DragGesture.translation`); `cropDiameterInScreenPoints`
+    /// is the visible circle's screen-pt diameter; both convert to
+    /// source pixels via `displayedImageScaleFactor * scale`. The
+    /// `displayedImageScaleFactor` is SwiftUI's `.scaledToFit()` ratio
+    /// (source-px → screen-pt) — see
+    /// ``displayedImageScaleFactor(imageSize:proxySize:)``.
     public static func cropRect(
         for scale: CGFloat,
         offset: CGSize,
         imageSize: CGSize,
-        cropSize: CGFloat
+        cropDiameterInScreenPoints: CGFloat,
+        displayedImageScaleFactor: CGFloat
     ) -> CGRect {
-        // Defensive guards — a zero-side input image shouldn't crash
-        // (it would produce a degenerate rect, but it shouldn't trap).
-        guard scale > 0, imageSize.width > 0, imageSize.height > 0 else {
+        // Defensive guards — a zero-side input image, zero scale, or
+        // zero scale factor shouldn't crash (each would otherwise produce
+        // a divide-by-zero or a degenerate rect). Return the source
+        // bounds so the renderer noops gracefully.
+        guard scale > 0,
+              imageSize.width > 0,
+              imageSize.height > 0,
+              displayedImageScaleFactor > 0
+        else {
             return CGRect(origin: .zero, size: imageSize)
         }
-        // The visible source side at scale 1.0 is the shorter dimension
-        // of the image — that's the side the crop frame's 1:1 square
-        // can fit inside without overshoot. At scale > 1.0 the source
-        // side shrinks (more zoom = less source visible).
+        // Convert the crop circle's screen diameter to source pixels:
+        // 1 source pixel = `displayedImageScaleFactor` screen pts at
+        // user scale 1.0; at user scale K the image is rendered K× larger
+        // on screen so each source pixel covers K× more screen pts. So
+        // 1 screen pt = `1 / (displayedImageScaleFactor * scale)` source pixels.
+        let cropInSourcePixels = cropDiameterInScreenPoints /
+            (displayedImageScaleFactor * scale)
+        // Clamp the crop side to the shorter source dimension — a circle
+        // wider than the source can't honestly sample more than the
+        // source's bounds (the renderer would otherwise stamp the source's
+        // edges with the renderer-clear background).
         let shorterSide = min(imageSize.width, imageSize.height)
-        let visibleSide = (shorterSide * cropSize) / scale
-        // Centered rect at zero offset.
+        let visibleSide = min(cropInSourcePixels, shorterSide)
+        // Convert the user's drag offset from screen pts to source pixels
+        // via the same `displayedImageScaleFactor * scale` factor.
+        let offsetInSourcePixels = CGSize(
+            width: offset.width / (displayedImageScaleFactor * scale),
+            height: offset.height / (displayedImageScaleFactor * scale)
+        )
+        // Centered rect at zero offset; positive drag right = crop walks
+        // left in source coords (the image moved right under the fixed
+        // crop window).
         let centerX = imageSize.width / 2
         let centerY = imageSize.height / 2
-        // The user's offset (in screen pts) maps to source-image pts
-        // by dividing by the on-screen scale.
-        let translatedX = centerX - (offset.width / scale)
-        let translatedY = centerY - (offset.height / scale)
+        let translatedX = centerX - offsetInSourcePixels.width
+        let translatedY = centerY - offsetInSourcePixels.height
         // Clamp so the visible rect can't slide off the image bounds.
         let halfSide = visibleSide / 2
         let clampedX = max(halfSide, min(imageSize.width - halfSide, translatedX))
@@ -281,6 +326,33 @@ public struct ProfilePhotoCropView: View {
             y: clampedY - halfSide,
             width: visibleSide,
             height: visibleSide
+        )
+    }
+
+    /// T-748 / CL-145 — computes the SwiftUI `.scaledToFit()` ratio of
+    /// source pixels to screen points for an image of `imageSize`
+    /// rendered inside a frame of `proxySize`. The fit-to-frame ratio
+    /// is the **smaller** of the two per-axis ratios (so the image
+    /// fits entirely within the proxy on its limiting dimension).
+    /// Returns 0 if either input is degenerate so call sites can
+    /// guard before dividing.
+    ///
+    /// Exposed `static` so the L1 test suite can pin the conversion
+    /// without spinning up a view host.
+    public static func displayedImageScaleFactor(
+        imageSize: CGSize,
+        proxySize: CGSize
+    ) -> CGFloat {
+        guard imageSize.width > 0,
+              imageSize.height > 0,
+              proxySize.width > 0,
+              proxySize.height > 0
+        else {
+            return 0
+        }
+        return min(
+            proxySize.width / imageSize.width,
+            proxySize.height / imageSize.height
         )
     }
 }
