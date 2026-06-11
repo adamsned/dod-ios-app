@@ -209,10 +209,11 @@ public struct ProfilePhotoCropView: View {
         // Compute the visible crop circle diameter in screen pts — same
         // formula as the GeometryReader closure's `cropSize` constant
         // (locked per CL-137: 0.85 of the proxy's shorter side).
-        let cropDiameterInScreenPoints = min(
-            capturedProxySize.width,
-            capturedProxySize.height
-        ) * 0.85
+        let cropDiameterInScreenPoints =
+            min(
+                capturedProxySize.width,
+                capturedProxySize.height
+            ) * 0.85
         // Compute the scaledToFit ratio: source-px → screen-pt.
         // SwiftUI's `.scaledToFit()` fits the image entirely within the
         // proxy preserving aspect; the limiting factor is the smaller
@@ -285,9 +286,9 @@ public struct ProfilePhotoCropView: View {
         // a divide-by-zero or a degenerate rect). Return the source
         // bounds so the renderer noops gracefully.
         guard scale > 0,
-              imageSize.width > 0,
-              imageSize.height > 0,
-              displayedImageScaleFactor > 0
+            imageSize.width > 0,
+            imageSize.height > 0,
+            displayedImageScaleFactor > 0
         else {
             return CGRect(origin: .zero, size: imageSize)
         }
@@ -296,8 +297,7 @@ public struct ProfilePhotoCropView: View {
         // user scale 1.0; at user scale K the image is rendered K× larger
         // on screen so each source pixel covers K× more screen pts. So
         // 1 screen pt = `1 / (displayedImageScaleFactor * scale)` source pixels.
-        let cropInSourcePixels = cropDiameterInScreenPoints /
-            (displayedImageScaleFactor * scale)
+        let cropInSourcePixels = cropDiameterInScreenPoints / (displayedImageScaleFactor * scale)
         // Clamp the crop side to the shorter source dimension — a circle
         // wider than the source can't honestly sample more than the
         // source's bounds (the renderer would otherwise stamp the source's
@@ -344,9 +344,9 @@ public struct ProfilePhotoCropView: View {
         proxySize: CGSize
     ) -> CGFloat {
         guard imageSize.width > 0,
-              imageSize.height > 0,
-              proxySize.width > 0,
-              proxySize.height > 0
+            imageSize.height > 0,
+            proxySize.width > 0,
+            proxySize.height > 0
         else {
             return 0
         }

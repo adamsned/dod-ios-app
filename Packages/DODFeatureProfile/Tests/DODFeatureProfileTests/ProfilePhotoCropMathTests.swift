@@ -130,7 +130,7 @@ struct ProfilePhotoCropMathTests {
             imageSize: CGSize(width: 1_600, height: 800),
             cropDiameterInScreenPoints: 360,
             displayedImageScaleFactor: 0.4
-            // 360 / 0.4 = 900 > shorterSide 800 → clamped to 800.
+                // 360 / 0.4 = 900 > shorterSide 800 → clamped to 800.
         )
         #expect(rect.size.width == 800)
         #expect(rect.size.height == 800)
