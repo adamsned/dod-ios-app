@@ -48,10 +48,9 @@ public final class SettingsViewModel {
     public nonisolated static let notificationsEnabledKey = "dod.settings.notificationsEnabled"
 
     /// T-750 / CL-147 (DUT-56) — "When Someone Replies to My Comment"
-    /// toggle key. Defaults OFF. Stores the preference + (on enable)
-    /// secures notification permission like ``notificationsEnabledKey``;
-    /// actual reply-alert delivery awaits a server-side push trigger
-    /// (the DUT-15 backend gap). `V1` suffix for forward-compatible migration.
+    /// toggle key. Defaults OFF. Secures notification permission on enable
+    /// like ``notificationsEnabledKey``; reply-alert delivery awaits a
+    /// server-side push trigger (the DUT-15 backend gap). `V1` suffix.
     public nonisolated static let commentReplyNotificationsEnabledKey =
         "dod.settings.commentReplyNotificationsEnabledV1"
 
