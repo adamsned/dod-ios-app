@@ -288,16 +288,21 @@ public struct SettingsView: View {
 
     // MARK: - Section header
 
-    /// T-750 / CL-147 — brand-consistent grouped-section header. Uses
-    /// `DODType.caption` + `DODColor.labelSecondary` to match the
-    /// established `ToolsSection` header treatment (a custom `Text`
-    /// header rather than the `Section("…")` string form, so the brand
-    /// font + color apply instead of the system's uppercased grey).
+    /// Brand-consistent grouped-section header. A custom `Text` header
+    /// (not the `Section("…")` string form) so the brand font + color
+    /// apply instead of the system's uppercased grey.
+    ///
+    /// **T-751 / CL-148 (DUT-57) — header/description hierarchy.** Uses
+    /// `DODType.heading` (17pt semibold) + primary `DODColor.label` so
+    /// the subheader reads as distinctly larger + bolder than the section
+    /// footer descriptions (which stay `DODType.caption` 12pt medium +
+    /// `DODColor.labelSecondary`). Pre-T-751 the header matched the footer
+    /// (both `caption` + `labelSecondary`), leaving no visual distinction.
     @ViewBuilder
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .dodFont(DODType.caption)
-            .foregroundStyle(DODColor.labelSecondary)
+            .dodFont(DODType.heading)
+            .foregroundStyle(DODColor.label)
     }
 
     // MARK: - Bindings

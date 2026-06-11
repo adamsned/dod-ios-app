@@ -26,9 +26,12 @@ struct ToolsSection: View {
             }
             .accessibilityIdentifier("settings-link-heat-coach")
         } header: {
+            // T-751 / CL-148 (DUT-57) — `heading` + primary `label` so the
+            // subheader reads larger + bolder than the footer description
+            // (which stays `caption` + `labelSecondary`).
             Text("Tools")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.label)
         } footer: {
             Text("A starting point for coals — then cook by feel.")
                 .dodFont(DODType.caption)

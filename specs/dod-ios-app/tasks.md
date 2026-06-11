@@ -2160,6 +2160,18 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Deps:** main is at `463f2ab` (T-749 / CL-146 merged). Branch (`feat/T-750-settings-revamp`) is off `origin/main` and independent of every in-flight branch. Source-side touches 6 `DODFeatureFeed` source files (1 new) + 2 test files (1 new) + `UITests/SmokeTests.swift`.
 - **||:** P33-settings-revamp (DUT-56). `e2e` label is NOT applied — layout + a persisted-preference toggle with backend-gated delivery; L1 preference tests + the regenerating L4 Settings snapshots + the updated L3/L5 toggle-label smoke cover it.
 
+### T-751 — DUT-57 Settings section subheader hierarchy (US-32 amendment, CL-148)
+
+- **What:** Bump the Settings grouped-section subheaders ("Measurements & Units", "Notification Settings", "Tools") from `DODType.caption` + `DODColor.labelSecondary` (identical to the footers) to `DODType.heading` (17pt semibold) + primary `DODColor.label`, so they read as distinctly larger + bolder than the section footer descriptions. Footers unchanged. A direct follow-up to T-750 / CL-147 — Spencer flagged that headers + descriptions looked identical with no clean distinction. Closes Linear DUT-57.
+- **Files:**
+  - **Spec/clarifications/tasks (commit 1):** `specs/dod-ios-app/clarifications.md` (new CL-148 entry — the problem, the three-axis distinction, considered-and-rejected alternatives; the canonical record since no numbered AC governs the header font tokens). `specs/dod-ios-app/tasks.md` (this entry).
+  - **Source (commit 2):** `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (the `sectionHeader(_:)` helper → `heading` + `label`). `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView+Tools.swift` (the inline "Tools" header → `heading` + `label`; footer unchanged).
+  - **Out of bounds:** the headerless single-row sections (Profile / Appearance / iCloud Sync / Clear Cache / Telemetry / About — no header to restyle); all footers (stay `caption` + `labelSecondary`).
+- **AC:** US-32 Settings header treatment refined (CL-148 is the canonical record). Pins every other Settings AC unchanged.
+- **Est:** ~15 min total.
+- **Deps:** main is at `614d6a9` (T-750 / CL-147 merged). Branch (`feat/T-751-settings-header-hierarchy`) is off `origin/main`. Touches 2 `DODFeatureFeed` source files.
+- **||:** P34-settings-header-hierarchy (DUT-57). `e2e` label is NOT applied — a pure type-token swap on static headers; the regenerating L4 Settings snapshots cover it.
+
 ---
 
 ## Summary
