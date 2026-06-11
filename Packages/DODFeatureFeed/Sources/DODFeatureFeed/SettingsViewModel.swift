@@ -52,7 +52,8 @@ public final class SettingsViewModel {
     /// secures notification permission like ``notificationsEnabledKey``;
     /// actual reply-alert delivery awaits a server-side push trigger
     /// (the DUT-15 backend gap). `V1` suffix for forward-compatible migration.
-    public nonisolated static let commentReplyNotificationsEnabledKey = "dod.settings.commentReplyNotificationsEnabledV1"
+    public nonisolated static let commentReplyNotificationsEnabledKey =
+        "dod.settings.commentReplyNotificationsEnabledV1"
 
     /// AC-36.2 — Appearance preference key. Value is the raw value of
     /// ``AppearancePreference`` (`"system"` / `"light"` / `"dark"`).
