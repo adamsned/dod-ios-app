@@ -38,6 +38,33 @@ import UIKit
         #expect(AboutNedView.aboutNedCopy == Self.expectedDUT14Copy)
     }
 
+    // MARK: - T-749 / CL-146 (DUT-55) — story paragraph verbatim pin
+
+    /// The exact three story paragraphs from DUT-55, in order. Like the
+    /// intro pin above, stored as a separate constant in the test so a
+    /// copy-paste edit on the production `aboutNedStoryParagraphs`
+    /// constant can't accidentally pass — the test's copy is the source
+    /// of truth, so any drift forces a deliberate spec amendment + CL bump.
+    private static let expectedStoryParagraphs: [String] = [
+        "Dutch Oven Daddy is the happy result of a gifted cast iron skillet and meal prep for a family member recovering from surgery. The desire to keep track of the recipes created brought Dutch Oven Daddy into existence. As these things go, the randomness of the Internet allowed D.O.D. to flourish as did with my love and appreciation for cast iron.",
+        "Since that first skillet, my activity in the cast iron community has grown. I love to educate others on not only how to cook with it, but how to care for it along with the benefits of using cast iron.",
+        "Dutch Oven Daddy not only develops online content but also has had multiple television appearances and taught many cast iron focused classes. I love everything about the multi-generational durability of cast iron.",
+    ]
+
+    @Test func aboutNedView_storyParagraphs_matchVerbatim() {
+        #expect(AboutNedView.aboutNedStoryParagraphs == Self.expectedStoryParagraphs)
+    }
+
+    @Test func aboutNedView_storyParagraphs_hasThreeInOrder() {
+        // Guards the count + ordering contract independently of the
+        // verbatim text — a future edit that drops or reorders a
+        // paragraph trips here even if someone updates both verbatim
+        // constants in lockstep.
+        #expect(AboutNedView.aboutNedStoryParagraphs.count == 3)
+        #expect(AboutNedView.aboutNedStoryParagraphs.first?.hasPrefix("Dutch Oven Daddy is the happy result") == true)
+        #expect(AboutNedView.aboutNedStoryParagraphs.last?.hasPrefix("Dutch Oven Daddy not only develops") == true)
+    }
+
     // MARK: - Asset bundle sanity
 
     @Test func aboutNedImageAsset_existsInBundle() {
