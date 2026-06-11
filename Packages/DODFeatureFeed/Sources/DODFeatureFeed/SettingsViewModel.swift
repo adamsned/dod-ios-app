@@ -40,10 +40,19 @@ public final class SettingsViewModel {
     /// AC-32.4 — "Use metric units" toggle key.
     public nonisolated static let useMetricUnitsKey = "dod.settings.useMetricUnits"
 
-    /// AC-36.1 — "Notify me when new recipes drop" toggle key. Defaults
-    /// OFF on first launch; T-631 follow-up wires APNs authorization
-    /// when the user flips it ON.
+    /// AC-36.1 — "When New Recipes Drop" toggle key (the row was renamed
+    /// from "Notify me when new recipes drop" in T-750 / CL-147; the key
+    /// is unchanged so the persisted preference survives the rename).
+    /// Defaults OFF on first launch; T-631 follow-up wires APNs
+    /// authorization when the user flips it ON.
     public nonisolated static let notificationsEnabledKey = "dod.settings.notificationsEnabled"
+
+    /// T-750 / CL-147 (DUT-56) — "When Someone Replies to My Comment"
+    /// toggle key. Defaults OFF. Secures notification permission on enable
+    /// like ``notificationsEnabledKey``; reply-alert delivery awaits a
+    /// server-side push trigger (the DUT-15 backend gap). `V1` suffix.
+    public nonisolated static let commentReplyNotificationsEnabledKey =
+        "dod.settings.commentReplyNotificationsEnabledV1"
 
     /// AC-36.2 — Appearance preference key. Value is the raw value of
     /// ``AppearancePreference`` (`"system"` / `"light"` / `"dark"`).
@@ -135,7 +144,8 @@ public final class SettingsViewModel {
     /// reports "not granted" so previews / snapshot hosts / the L1 suite
     /// never touch `UserNotifications` — the view-model package builds on
     /// the macOS `swift test` slice where that framework is unavailable.
-    private let requestNotificationAuthorization: @MainActor () async -> Bool
+    /// `internal` so the `+Notifications.swift` setters reach it (T-750).
+    let requestNotificationAuthorization: @MainActor () async -> Bool
 
     // MARK: - Persisted state
 
@@ -152,6 +162,15 @@ public final class SettingsViewModel {
     public var notificationsEnabled: Bool {
         get { defaults.bool(forKey: Self.notificationsEnabledKey) }
         set { defaults.set(newValue, forKey: Self.notificationsEnabledKey) }
+    }
+
+    /// T-750 / CL-147 (DUT-56). The "When Someone Replies to My Comment"
+    /// preference. Defaults false (absent key → off). Written through the
+    /// async ``setCommentReplyNotificationsEnabled(_:)`` so an enable
+    /// requests system authorization, mirroring ``notificationsEnabled``.
+    public var commentReplyNotificationsEnabled: Bool {
+        get { defaults.bool(forKey: Self.commentReplyNotificationsEnabledKey) }
+        set { defaults.set(newValue, forKey: Self.commentReplyNotificationsEnabledKey) }
     }
 
     /// AC-36.2. Defaults to ``AppearancePreference/system`` when the key
@@ -254,10 +273,12 @@ public final class SettingsViewModel {
 
     // MARK: - Snackbar feedback (Clear Cache row)
 
-    /// AC-36.4. Latest snackbar message from the Clear Cache action.
-    /// The view binds a `Snackbar` to this when non-nil and dismisses
-    /// it via ``dismissSnackbar()``. `nil` means no snackbar is showing.
-    public private(set) var snackbarMessage: String?
+    /// AC-36.4. Latest snackbar message from the Clear Cache action + the
+    /// notification toggles' denied-authorization feedback. `nil` means no
+    /// snackbar is showing. `internal(set)` (not `private(set)`) so the
+    /// notification setters in `SettingsViewModel+Notifications.swift`
+    /// surface their deny copy across the file_length split (T-750 / CL-147).
+    public internal(set) var snackbarMessage: String?
 
     public init(
         defaults: UserDefaults = .standard,
@@ -294,30 +315,11 @@ public final class SettingsViewModel {
         }
     }
 
-    // MARK: - Notifications toggle (US-42 / AC-42.1)
-
-    /// Drives the notifications toggle's ON/OFF transition. Turning **ON**
-    /// requests system authorization (AC-42.1): on grant the flag persists
-    /// `true`; on deny the flag stays `false` (the toggle reverts) and a
-    /// snackbar points the user at iOS Settings. Turning **OFF** simply
-    /// persists `false` — no system call. Returns the resolved on/off
-    /// state so the view's binding can reflect a denied prompt without a
-    /// separate observation hop.
-    @discardableResult
-    public func setNotificationsEnabled(_ enabled: Bool) async -> Bool {
-        guard enabled else {
-            notificationsEnabled = false
-            return false
-        }
-        let granted = await requestNotificationAuthorization()
-        notificationsEnabled = granted
-        if !granted {
-            // Persisted intent stays OFF so the UI never claims notifications
-            // are on while the OS suppresses them (AC-42.1).
-            snackbarMessage = "Enable notifications in iOS Settings → DOD to get new-post alerts."
-        }
-        return granted
-    }
+    // US-42 / AC-42.1 + T-750 / CL-147 — the notification toggle setters
+    // (`setNotificationsEnabled` + `setCommentReplyNotificationsEnabled`)
+    // live in `SettingsViewModel+Notifications.swift` to keep this file
+    // inside the SwiftLint 400-line file_length cap (the same partitioning
+    // rule the iCloud Sync + Voice + Temperature splits follow).
 
     // US-41 / AC-41.3 — iCloud Sync toggle actions live in
     // `SettingsViewModel+CloudSync.swift` to keep this file inside the

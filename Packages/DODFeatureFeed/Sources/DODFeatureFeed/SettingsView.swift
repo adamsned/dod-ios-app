@@ -3,57 +3,30 @@ import DODFeatureProfile
 import DODSupport
 import SwiftUI
 
-/// Settings page (US-32 skeleton, US-36 expansion, US-41 iCloud Sync row).
+/// Settings page (US-32 skeleton, US-36 expansion, US-41 iCloud Sync,
+/// US-44 Profile, revamped + regrouped in T-750 / CL-147, DUT-56).
 ///
 /// Reached via the gear icon on the trailing edge of the Recipes (Feed)
 /// tab's nav bar (see ``FeedView``). The list uses `.insetGrouped` with
 /// `.scrollContentBackground(.hidden) + .background(DODColor.surface)`
 /// to match the Categories tab treatment (CL-54 / T-560).
 ///
-/// **US-32 (T-550 skeleton) rows:**
-///   1. Use metric units — `Toggle` bound to ``SettingsViewModel/useMetricUnits``
-///      (UserDefaults round-trip; T-551 follow-up wires consumption).
-///   2. About Dutch Oven Daddy — `NavigationLink` to ``AboutNedView``
-///      (the embedded DUT-14 copy + Ned's photo bundled as a local
-///      asset per T-738 / CL-134; supersedes the T-552 WP REST fetch
-///      plan since the copy is now embedded verbatim, not fetched).
-///   3. Version footer.
+/// **Section layout (T-750 / CL-147 — top → bottom).** Profile (US-44,
+/// no header); **Measurements & Units** (Use Metric Units toggle + Recipe
+/// Step Temperatures picker); **Notification Settings** (When New Recipes
+/// Drop + When Someone Replies to My Comment toggles); Appearance picker
+/// (single self-describing row, no header); Cook Mode Voice (``VoiceSection``);
+/// Clear Cached Recipe Images; Share Anonymous Usage Data; iCloud Sync
+/// (``CloudSyncSection`` — no header, description in footer); Tools
+/// (``ToolsSection`` — Heat Coach); About Dutch Oven Daddy; version footer.
 ///
-/// **US-36 (T-630 expansion) rows:**
-///   4. Notifications — `Toggle` bound to
-///      ``SettingsViewModel/notificationsEnabled`` (UI-only in v1;
-///      T-631 follow-up requests APNs authorization).
-///   5. Appearance — `Picker` bound to ``SettingsViewModel/appearance``.
-///      Selection persists and `RootView.preferredColorScheme(...)`
-///      consumes the persisted value at launch.
-///   6. Default Share Format — `Picker` bound to
-///      ``SettingsViewModel/shareFormat``. Persisted now; a future task
-///      wires the consumer at the `ShareLink` call site.
-///   7. Clear Cached Recipe Images — `Button` that invokes
-///      ``SettingsViewModel/clearImageCache(via:)`` and surfaces a
-///      `Snackbar` with the freed-MB count.
-///   8. Share Anonymous Usage Data — `Toggle` bound to
-///      ``SettingsViewModel/telemetryEnabled`` (default ON);
-///      `TelemetryDeckTransport` reads the same key at every `send(_:)`
-///      and short-circuits when false.
-///
-/// **US-41 (T-703) iCloud Sync section** (appended below the existing
-/// rows per the task scope — the original CL-89 spec called for the row
-/// to sit between Notifications and Appearance, but the codebase landed
-/// the Settings layout with one row per Section + a footer, so a single
-/// extra Section at the bottom matches the visual rhythm without
-/// disturbing the established ordering):
-///   9. iCloud Sync — `Toggle` bound to
-///      ``SettingsViewModel/isCloudSyncEnabled``. Subtext flips based on
-///      state (off: stays-on-device copy; on: across-devices copy).
-///      Toggling flips fire a confirmation alert per CL-89.
-///  10. Status — read-only row, only visible when the toggle is ON.
-///      Renders ``SettingsViewModel/cloudSyncStatusText`` which today
-///      returns "Idle"; T-705 wires the real `CloudKitSyncStatus`
-///      enum + "Last synced N ago" formatting.
+/// All row labels + section headers are Title Case (T-750); footers stay
+/// sentence case (they're prose descriptions). The "Default Share Format"
+/// UI row was removed in T-750 (the ``SettingsViewModel/shareFormat``
+/// preference + persistence are retained for the future link+text share).
 ///
 /// Spec trace: US-32 AC-32.1..AC-32.5; US-36 AC-36.1..AC-36.8;
-/// US-41 AC-41.3, AC-41.4; CL-89 (opt-in flow + confirmation alerts).
+/// US-41 AC-41.3, AC-41.4; US-44; CL-89; CL-147.
 public struct SettingsView: View {
 
     @State private var viewModel: SettingsViewModel
@@ -119,38 +92,76 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
-            // MARK: US-32 rows
-
             // T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`
             // so the Settings cells render in the brand brown (matches the
             // Recipe & Articles card surface) instead of the system default
             // near-black `secondarySystemGroupedBackground` in dark mode.
 
+            // MARK: T-750 / CL-147 — Measurements & Units group
+
+            // DUT-56 — the "Use Metric Units" toggle (US-32 AC-32.4) + the
+            // "Recipe Step Temperatures" picker (DUT-47) are grouped into
+            // one titled section so the two unit-related controls sit
+            // together instead of scattered across the page.
             Section {
                 Toggle(isOn: useMetricUnitsBinding) {
-                    Text("Use metric units")
+                    Text("Use Metric Units")
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-toggle-metric")
-            }
-            .listRowBackground(DODColor.surfaceElevated)
 
-            // MARK: US-36 rows
-
-            Section {
-                Toggle(isOn: notificationsEnabledBinding) {
-                    Text("Notify me when new recipes drop")
+                Picker(selection: temperaturePreferenceBinding) {
+                    ForEach(TemperaturePreference.allCases, id: \.self) { value in
+                        Text(value.displayName)
+                            .tag(value)
+                    }
+                } label: {
+                    Text("Recipe Step Temperatures")
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                 }
-                .accessibilityIdentifier("settings-toggle-notifications")
+                .accessibilityIdentifier("settings-picker-temperature")
+            } header: {
+                sectionHeader("Measurements & Units")
             } footer: {
-                Text("New-post alerts are delivered on this device only.")
+                Text("Converts temperatures shown in the steps. \"Recipe Default\" shows them as written.")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             }
             .listRowBackground(DODColor.surfaceElevated)
+
+            // MARK: T-750 / CL-147 — Notification Settings group
+
+            // DUT-56 — the renamed recipe-drop toggle (US-36 AC-36.1) +
+            // the new "When Someone Replies to My Comment" toggle grouped
+            // under one header. The reply toggle persists + secures
+            // notification permission now; delivery follows the server-side
+            // push trigger (the DUT-15 backend gap).
+            Section {
+                Toggle(isOn: notificationsEnabledBinding) {
+                    Text("When New Recipes Drop")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-toggle-notifications")
+
+                Toggle(isOn: commentReplyNotificationsBinding) {
+                    Text("When Someone Replies to My Comment")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-toggle-comment-reply-notifications")
+            } header: {
+                sectionHeader("Notification Settings")
+            } footer: {
+                Text("Alerts are delivered on this device only.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+            }
+            .listRowBackground(DODColor.surfaceElevated)
+
+            // MARK: Appearance (single self-describing row — no header)
 
             Section {
                 Picker(selection: appearanceBinding) {
@@ -164,42 +175,6 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-picker-appearance")
-            }
-            .listRowBackground(DODColor.surfaceElevated)
-
-            // MARK: DUT-47 (temperature half) — recipe-step temperature unit
-
-            Section {
-                Picker(selection: temperaturePreferenceBinding) {
-                    ForEach(TemperaturePreference.allCases, id: \.self) { value in
-                        Text(value.displayName)
-                            .tag(value)
-                    }
-                } label: {
-                    Text("Recipe step temperatures")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.label)
-                }
-                .accessibilityIdentifier("settings-picker-temperature")
-            } footer: {
-                Text("Converts temperatures shown in the steps. \"Recipe default\" shows them as written.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            .listRowBackground(DODColor.surfaceElevated)
-
-            Section {
-                Picker(selection: shareFormatBinding) {
-                    ForEach(ShareFormatPreference.allCases, id: \.self) { value in
-                        Text(value.displayName)
-                            .tag(value)
-                    }
-                } label: {
-                    Text("Default share format")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.label)
-                }
-                .accessibilityIdentifier("settings-picker-share-format")
             }
             .listRowBackground(DODColor.surfaceElevated)
 
@@ -227,7 +202,7 @@ public struct SettingsView: View {
 
             Section {
                 Toggle(isOn: telemetryEnabledBinding) {
-                    Text("Share anonymous usage data")
+                    Text("Share Anonymous Usage Data")
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                 }
@@ -311,6 +286,20 @@ public struct SettingsView: View {
         }
     }
 
+    // MARK: - Section header
+
+    /// T-750 / CL-147 — brand-consistent grouped-section header. Uses
+    /// `DODType.caption` + `DODColor.labelSecondary` to match the
+    /// established `ToolsSection` header treatment (a custom `Text`
+    /// header rather than the `Section("…")` string form, so the brand
+    /// font + color apply instead of the system's uppercased grey).
+    @ViewBuilder
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .dodFont(DODType.caption)
+            .foregroundStyle(DODColor.labelSecondary)
+    }
+
     // MARK: - Bindings
 
     /// Wraps each view-model property in a SwiftUI Binding so the
@@ -338,6 +327,18 @@ public struct SettingsView: View {
         )
     }
 
+    private var commentReplyNotificationsBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.commentReplyNotificationsEnabled },
+            // Mirrors `notificationsEnabledBinding` — turning ON requests
+            // system authorization (T-750 / CL-147); a denied prompt leaves
+            // the persisted flag OFF so the toggle springs back.
+            set: { newValue in
+                Task { await viewModel.setCommentReplyNotificationsEnabled(newValue) }
+            }
+        )
+    }
+
     private var appearanceBinding: Binding<AppearancePreference> {
         Binding(
             get: { viewModel.appearance },
@@ -349,13 +350,6 @@ public struct SettingsView: View {
         Binding(
             get: { viewModel.temperaturePreference },
             set: { viewModel.temperaturePreference = $0 }
-        )
-    }
-
-    private var shareFormatBinding: Binding<ShareFormatPreference> {
-        Binding(
-            get: { viewModel.shareFormat },
-            set: { viewModel.shareFormat = $0 }
         )
     }
 
