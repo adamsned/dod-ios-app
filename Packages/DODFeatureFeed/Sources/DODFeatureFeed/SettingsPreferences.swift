@@ -115,7 +115,7 @@ public enum TemperaturePreference: String, CaseIterable, Sendable, Hashable {
     /// Human-readable label rendered in the picker row.
     public var displayName: String {
         switch self {
-        case .recipeDefault: "Recipe default"
+        case .recipeDefault: "Recipe Default"
         case .fahrenheit: "Fahrenheit"
         case .celsius: "Celsius"
         }

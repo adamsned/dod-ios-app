@@ -287,9 +287,10 @@ final class SmokeTests: XCTestCase {
         settingsButton.tap()
 
         // Positive signal: the notifications toggle from US-36 / AC-36.1.
-        // The `Toggle`'s label text "Notify me when new recipes drop"
-        // surfaces as the switch's accessibility label per `SettingsView`.
-        let notificationsToggle = app.switches["Notify me when new recipes drop"]
+        // The `Toggle`'s label text "When New Recipes Drop" surfaces as the
+        // switch's accessibility label per `SettingsView` (renamed from
+        // "Notify me when new recipes drop" in T-750 / CL-147, DUT-56).
+        let notificationsToggle = app.switches["When New Recipes Drop"]
         XCTAssertTrue(
             notificationsToggle.waitForExistence(timeout: 5),
             "Settings page should expose the notifications toggle (US-36 / AC-36.1)"

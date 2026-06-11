@@ -18,27 +18,30 @@ import SwiftUI
 
 // MARK: - Section view
 
-/// Renders the "iCloud Sync" section the host appends below the
-/// telemetry row in `SettingsView`. Two rows max: a toggle (always) +
-/// a Status row (only when sync is ON — T-705 wires its real copy).
-/// Pulled out as its own `View` so the host's body stays compact and
-/// the L4 snapshot baselines can target this surface specifically.
+/// Renders the iCloud Sync section the host appends below the telemetry
+/// row in `SettingsView`. Two rows max: a toggle (always) + a Status row
+/// (only when sync is ON — T-705 wires its real copy). The state
+/// description renders as the section footer (T-750 / CL-147 moved it out
+/// of the toggle row), and the section carries no header (the toggle row
+/// is self-labeling). Pulled out as its own `View` so the host's body
+/// stays compact and the L4 snapshot baselines can target this surface.
 struct CloudSyncSection: View {
 
     @Bindable var viewModel: SettingsViewModel
 
     var body: some View {
-        Section("iCloud Sync") {
+        // T-750 / CL-147 (DUT-56) — no section header: the toggle row
+        // already labels itself "iCloud Sync", so a `Section("iCloud
+        // Sync")` header was redundant (headers are reserved for
+        // multi-row groups). The state description that used to sit
+        // inside the toggle row now renders as the section footer
+        // (`subtext`) — below the section, the standard place for a
+        // descriptive caption.
+        Section {
             Toggle(isOn: toggleBinding) {
-                VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                    Text("iCloud Sync")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.label)
-                    Text(subtext)
-                        .dodFont(DODType.caption)
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text("iCloud Sync")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
             }
             .accessibilityIdentifier("settings-toggle-icloud-sync")
             .accessibilityLabel("iCloud Sync")
@@ -47,6 +50,11 @@ struct CloudSyncSection: View {
             if viewModel.isCloudSyncEnabled {
                 statusRow
             }
+        } footer: {
+            Text(subtext)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         // T-647 / CL-125 — match the brand brown surface used by every
         // other Settings section + the Recipe & Articles cards.

@@ -68,7 +68,7 @@ struct VoiceSection: View {
                     .tag(value)
             }
         } label: {
-            Text("Cook Mode voice")
+            Text("Cook Mode Voice")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
         }
@@ -81,7 +81,7 @@ struct VoiceSection: View {
     /// guessing a tier.
     private var qualityReadoutRow: some View {
         HStack {
-            Text("Voice quality")
+            Text("Voice Quality")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
             Spacer()
@@ -100,7 +100,7 @@ struct VoiceSection: View {
         Button {
             viewModel.previewVoice()
         } label: {
-            Label("Preview voice", systemImage: "speaker.wave.2.fill")
+            Label("Preview Voice", systemImage: "speaker.wave.2.fill")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.accent)
         }
@@ -188,7 +188,7 @@ extension VoiceGender {
         switch self {
         case .female: return "Female"
         case .male: return "Male"
-        case .unspecified: return "No preference"
+        case .unspecified: return "No Preference"
         }
     }
 }
