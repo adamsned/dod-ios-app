@@ -12,8 +12,10 @@ import UIKit
 //
 // Extracted from `SettingsView.swift` so that file stays under the SwiftLint
 // 400-line file_length cap — the same split `SettingsView+CloudSync.swift`
-// uses. `VoiceSection` takes the view-model as a constructor parameter (rather
-// than reaching for the host's `private @State`) exactly like `CloudSyncSection`.
+// uses. `VoiceRows` takes the view-model as a constructor parameter (rather
+// than reaching for the host's `private @State`) exactly like `CloudSyncRows`.
+// T-752 / CL-149 renamed `VoiceSection` → `VoiceRows` (rows, not a Section)
+// so the parent "Customization" section composes it with the Appearance picker.
 //
 // Why a nudge instead of an in-app download: Apple ships only the compact
 // ("robotic") voice tier preinstalled, and there is NO public API to bundle or
@@ -24,11 +26,18 @@ import UIKit
 
 // MARK: - Voice section
 
-/// Renders the "Cook Mode Voice" section: the gender `Picker`, the resolved
+/// Renders the Cook Mode Voice ROWS: the gender `Picker`, the resolved
 /// quality readout, the Preview-voice button, and — when only the compact
 /// (robotic) voice is installed for the device language — the dismissible
 /// download nudge.
-struct VoiceSection: View {
+///
+/// **T-752 / CL-149 (DUT-58) — rows, not a Section.** Pre-T-752 this
+/// rendered its own `Section` + footer. It now provides loose rows (a
+/// `Group`) so the parent "Customization" section in `SettingsView` can
+/// compose them alongside the Appearance picker under one header (SwiftUI
+/// `Section`s can't share a header). The footer + `.listRowBackground`
+/// live on the parent Customization section now.
+struct VoiceRows: View {
 
     @Bindable var viewModel: SettingsViewModel
 
@@ -39,19 +48,14 @@ struct VoiceSection: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        Section {
+        Group {
             picker
             qualityReadoutRow
             previewButton
             if viewModel.shouldShowDownloadVoiceTip {
                 downloadVoiceTip
             }
-        } footer: {
-            Text("Used when reading recipe steps aloud in Cook Mode.")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
         }
-        .listRowBackground(DODColor.surfaceElevated)
         // Stop any in-flight preview when the user leaves Settings so a
         // sample never trails off-screen.
         .onDisappear { viewModel.stopVoicePreview() }

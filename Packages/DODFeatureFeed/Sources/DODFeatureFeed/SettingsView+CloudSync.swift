@@ -7,37 +7,37 @@ import SwiftUI
 // SwiftLint 400-line file_length + 250-line type_body_length caps.
 // The split is mechanical — all helpers here read the same
 // `SettingsViewModel` instance the host view holds via `@State`, so a
-// sub-view (`CloudSyncSection`) takes the view-model as a constructor
+// sub-view (`CloudSyncRows`) takes the view-model as a constructor
 // parameter rather than reaching for the host's `@State` (which is
 // `private` and not accessible from a sibling file). The
 // `cloudSyncConfirmationAlert(viewModel:)` modifier exposes the
 // `.alert(...)` chain so the host's `body` stays one short call.
+// T-752 / CL-149 renamed `CloudSyncSection` → `CloudSyncRows` (rows, not
+// a Section) so the parent "Data & Privacy" section composes it.
 //
 // Spec trace: US-41 AC-41.3 + AC-41.4 + AC-41.10; CL-89 (opt-in flow +
 // confirmation alerts).
 
-// MARK: - Section view
+// MARK: - Section rows
 
-/// Renders the iCloud Sync section the host appends below the telemetry
-/// row in `SettingsView`. Two rows max: a toggle (always) + a Status row
-/// (only when sync is ON — T-705 wires its real copy). The state
-/// description renders as the section footer (T-750 / CL-147 moved it out
-/// of the toggle row), and the section carries no header (the toggle row
-/// is self-labeling). Pulled out as its own `View` so the host's body
-/// stays compact and the L4 snapshot baselines can target this surface.
-struct CloudSyncSection: View {
+/// Renders the iCloud Sync ROWS the parent "Data & Privacy" section
+/// composes in `SettingsView`. Two rows max: a toggle (always) + a Status
+/// row (only when sync is ON — T-705 wires its real copy).
+///
+/// **T-752 / CL-149 (DUT-58) — rows, not a Section.** Pre-T-752 this
+/// rendered its own headerless `Section` + a state-description footer
+/// (T-750 / CL-147). It now provides loose rows so the parent "Data &
+/// Privacy" section can compose the iCloud toggle alongside Clear Cache +
+/// telemetry under one header (SwiftUI `Section`s can't share a header).
+/// The state description folds into that section's footer; the
+/// state-dependent `accessibilityHint` is retained on the toggle for
+/// VoiceOver. The `.listRowBackground` lives on the parent section now.
+struct CloudSyncRows: View {
 
     @Bindable var viewModel: SettingsViewModel
 
     var body: some View {
-        // T-750 / CL-147 (DUT-56) — no section header: the toggle row
-        // already labels itself "iCloud Sync", so a `Section("iCloud
-        // Sync")` header was redundant (headers are reserved for
-        // multi-row groups). The state description that used to sit
-        // inside the toggle row now renders as the section footer
-        // (`subtext`) — below the section, the standard place for a
-        // descriptive caption.
-        Section {
+        Group {
             Toggle(isOn: toggleBinding) {
                 Text("iCloud Sync")
                     .dodFont(DODType.body)
@@ -50,15 +50,7 @@ struct CloudSyncSection: View {
             if viewModel.isCloudSyncEnabled {
                 statusRow
             }
-        } footer: {
-            Text(subtext)
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        // T-647 / CL-125 — match the brand brown surface used by every
-        // other Settings section + the Recipe & Articles cards.
-        .listRowBackground(DODColor.surfaceElevated)
     }
 
     /// AC-41.7 status row reservation. Read-only today; renders
@@ -77,17 +69,6 @@ struct CloudSyncSection: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("settings-icloud-sync-status")
-    }
-
-    /// Off → "Saved recipes stay on this device." / On → the
-    /// across-devices copy. Both strings are pinned in the T-703 brief
-    /// so the snapshot baselines and VoiceOver paths can rely on a
-    /// stable wording.
-    private var subtext: String {
-        if viewModel.isCloudSyncEnabled {
-            return "Saved recipes sync across your devices via your iCloud account."
-        }
-        return "Saved recipes stay on this device."
     }
 
     /// AC-41.10 — VoiceOver hint flips with state.

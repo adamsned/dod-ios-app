@@ -4,29 +4,31 @@ import DODSupport
 import SwiftUI
 
 /// Settings page (US-32 skeleton, US-36 expansion, US-41 iCloud Sync,
-/// US-44 Profile, revamped + regrouped in T-750 / CL-147, DUT-56).
+/// US-44 Profile, revamped in T-750 / CL-147 + T-752 / CL-149).
 ///
 /// Reached via the gear icon on the trailing edge of the Recipes (Feed)
 /// tab's nav bar (see ``FeedView``). The list uses `.insetGrouped` with
 /// `.scrollContentBackground(.hidden) + .background(DODColor.surface)`
 /// to match the Categories tab treatment (CL-54 / T-560).
 ///
-/// **Section layout (T-750 / CL-147 — top → bottom).** Profile (US-44,
+/// **Section layout (T-752 / CL-149 — top → bottom).** Profile (US-44,
 /// no header); **Measurements & Units** (Use Metric Units toggle + Recipe
 /// Step Temperatures picker); **Notification Settings** (When New Recipes
-/// Drop + When Someone Replies to My Comment toggles); Appearance picker
-/// (single self-describing row, no header); Cook Mode Voice (``VoiceSection``);
-/// Clear Cached Recipe Images; Share Anonymous Usage Data; iCloud Sync
-/// (``CloudSyncSection`` — no header, description in footer); Tools
-/// (``ToolsSection`` — Heat Coach); About Dutch Oven Daddy; version footer.
+/// Drop + When Someone Replies to My Comment toggles); **Customization**
+/// (Appearance picker + Cook Mode Voice rows via ``VoiceRows``); **Tools**
+/// (``ToolsSection`` — Heat Coach); **Data & Privacy** (iCloud Sync via
+/// ``CloudSyncRows`` + Clear Cached Recipe Images + Share Anonymous Usage
+/// Data); About Dutch Oven Daddy; version footer.
 ///
-/// All row labels + section headers are Title Case (T-750); footers stay
-/// sentence case (they're prose descriptions). The "Default Share Format"
-/// UI row was removed in T-750 (the ``SettingsViewModel/shareFormat``
-/// preference + persistence are retained for the future link+text share).
+/// Section subheaders use `DODType.heading` + primary `DODColor.label`
+/// (T-751 / CL-148) so they read distinctly above the `caption` +
+/// `labelSecondary` footers. All row labels + headers are Title Case
+/// (T-750); footers stay sentence case. The "Default Share Format" UI row
+/// was removed in T-750 (the ``SettingsViewModel/shareFormat`` preference
+/// is retained for the future link+text share).
 ///
 /// Spec trace: US-32 AC-32.1..AC-32.5; US-36 AC-36.1..AC-36.8;
-/// US-41 AC-41.3, AC-41.4; US-44; CL-89; CL-147.
+/// US-41 AC-41.3, AC-41.4; US-44; CL-89; CL-147; CL-148; CL-149.
 public struct SettingsView: View {
 
     @State private var viewModel: SettingsViewModel
@@ -161,8 +163,11 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
-            // MARK: Appearance (single self-describing row — no header)
+            // MARK: T-752 / CL-149 — Customization group
 
+            // DUT-58 — Appearance picker + the Cook Mode Voice rows
+            // (`VoiceRows`, `SettingsView+Voice.swift`) grouped under one
+            // "Customization" header.
             Section {
                 Picker(selection: appearanceBinding) {
                     ForEach(AppearancePreference.allCases, id: \.self) { value in
@@ -175,16 +180,30 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-picker-appearance")
+
+                VoiceRows(viewModel: viewModel)
+            } header: {
+                sectionHeader("Customization")
+            } footer: {
+                Text("The Cook Mode voice reads recipe steps aloud.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
             }
             .listRowBackground(DODColor.surfaceElevated)
 
-            // MARK: US-40 / AC-40.10 + AC-40.12 + AC-40.13 — Cook Mode voice
-            // section (gender picker + quality readout + Preview + download
-            // nudge). The section view lives in `SettingsView+Voice.swift` so
-            // this file stays under the file_length cap (T-721 / T-722).
-            VoiceSection(viewModel: viewModel)
+            // MARK: DUT-48 Tools — Dutch Oven Heat Coach
+            // (`ToolsSection`, `SettingsView+Tools.swift`).
+            ToolsSection()
 
+            // MARK: T-752 / CL-149 — Data & Privacy group
+
+            // DUT-58 — iCloud Sync (`CloudSyncRows`) + Clear Cached Recipe
+            // Images + Share Anonymous Usage Data grouped under one "Data &
+            // Privacy" header, between Tools and About. The iCloud
+            // confirmation alert + status refresh stay on the host body.
             Section {
+                CloudSyncRows(viewModel: viewModel)
+
                 Button {
                     Task { await clearImageCacheIfAvailable() }
                 } label: {
@@ -193,44 +212,25 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.accent)
                 }
                 .accessibilityIdentifier("settings-button-clear-cache")
-            } footer: {
-                Text("Saved recipe images stay on your device.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            .listRowBackground(DODColor.surfaceElevated)
 
-            Section {
                 Toggle(isOn: telemetryEnabledBinding) {
                     Text("Share Anonymous Usage Data")
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-toggle-telemetry")
+            } header: {
+                sectionHeader("Data & Privacy")
             } footer: {
-                Text("Helps us improve the app. No personal information leaves your device.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                Text(
+                    "Saved recipes sync across your devices when iCloud Sync is on. "
+                        + "Cached images stay on this device. "
+                        + "Anonymous usage data never includes personal information."
+                )
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
             }
             .listRowBackground(DODColor.surfaceElevated)
-
-            // MARK: US-41 / AC-41.3 / AC-41.4 — iCloud Sync section
-
-            // The section view + the confirmation alert modifier live
-            // in `SettingsView+CloudSync.swift` so this file stays under
-            // the file_length cap. T-647 — the brand row background is
-            // applied inside `CloudSyncSection` since the modifier scope
-            // must live with the Section it decorates.
-            CloudSyncSection(viewModel: viewModel)
-
-            // MARK: DUT-48 Tools — Dutch Oven Heat Coach
-
-            // The "Tools" section view lives in `SettingsView+Tools.swift`
-            // so this file stays under the 400-line `file_length` cap. It
-            // pushes ``HeatCoachView`` via the same NavigationLink push
-            // pattern as the About row below — a v1 low-risk entry point;
-            // a dedicated "Tools" tab is the eventual home (DUT-48).
-            ToolsSection()
 
             // MARK: US-32 About + version
 
@@ -383,6 +383,6 @@ public struct SettingsView: View {
 // under the 400-line `file_length` cap (T-738 / CL-134, DUT-14).
 //
 // `VoiceGender.displayName` (the Cook Mode voice-picker label) lives in
-// `SettingsView+Voice.swift` alongside the `VoiceSection` that renders it
-// (T-721) — the same file_length split — so it is intentionally not
-// redeclared here.
+// `SettingsView+Voice.swift` alongside the `VoiceRows` that renders it
+// (T-721; renamed from `VoiceSection` in T-752 / CL-149) — the same
+// file_length split — so it is intentionally not redeclared here.
