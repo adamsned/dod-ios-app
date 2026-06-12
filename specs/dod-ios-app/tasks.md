@@ -2196,6 +2196,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Deps:** main is at `0235c54` (T-752 / CL-149 merged). Branch (`feat/T-753-profile-photo-header`) is off `origin/main`. Touches 2 `DODFeatureProfile` source files.
 - **||:** P36-profile-photo-header (DUT-59). `e2e` label is NOT applied — a presentation-only restructure with no behavior change; the regenerating L4 profile snapshots + the existing UIKit-gated `ProfileEditView` logic tests cover it.
 
+### T-754 — DUT-60 Enlarge profile photo header 88 → 120 (US-44 amendment, CL-151)
+
+- **What:** One-constant follow-up to T-753 — Spencer reported the 88pt centered photo header still left dead space at the top of the edit form, so bump `ProfileEditView.headerAvatarDiameter` 88 → 120 (Apple-ID-scale; quality-safe at 120@3x=360px < 512). Closes Linear DUT-60.
+- **Files:** `specs/dod-ios-app/clarifications.md` (CL-151). `specs/dod-ios-app/tasks.md` (this entry). `Packages/DODFeatureProfile/Sources/DODFeatureProfile/ProfileEditView+Photo.swift` (the constant + doc note).
+- **AC:** US-44 — refines CL-150 header sizing. **Deps:** main at `c457dc0` (T-753 merged). Branch `feat/T-754-profile-photo-larger`. **||:** P37-profile-photo-larger (DUT-60). No `e2e` label — single presentation constant.
+
 ---
 
 ## Summary
