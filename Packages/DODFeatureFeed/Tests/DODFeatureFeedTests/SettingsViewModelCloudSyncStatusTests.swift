@@ -44,8 +44,7 @@ struct SettingsViewModelCloudSyncStatusTests {
         viewModel.updateCloudSyncStatus(.syncing)
         #expect(viewModel.cloudSyncStatusText == "Syncing…")
 
-        viewModel.requestCloudSyncOptIn(true)
-        await viewModel.confirmCloudSyncFlip()
+        await viewModel.setCloudSyncEnabled(true)?.value
 
         #expect(viewModel.cloudSyncPendingRelaunch == true)
         #expect(viewModel.cloudSyncStatusText == "Relaunch DOD to apply")
@@ -68,8 +67,7 @@ struct SettingsViewModelCloudSyncStatusTests {
         let stub = StubStatusDependencies(status: .idle)
         let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults(), dependencies: stub)
 
-        viewModel.requestCloudSyncOptIn(true)
-        await viewModel.confirmCloudSyncFlip()
+        await viewModel.setCloudSyncEnabled(true)?.value
         #expect(viewModel.cloudSyncStatusText == "Relaunch DOD to apply")
 
         viewModel.refreshCloudSyncStatus()

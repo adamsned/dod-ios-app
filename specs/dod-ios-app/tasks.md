@@ -2237,6 +2237,19 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **What:** Two small `SettingsView.swift` tweaks: (1) move "Clear Cached Recipe Images" below "Share Anonymous Usage Data" in the Data & Privacy section (new order: iCloud Sync → telemetry → clear cache); (2) add a `\n` to the "Recipe Step Temperatures" picker label ("Recipe Step\nTemperatures") so the value sits to the right instead of wrapping below (the long label overflowed the row at `.menu` style). Closes Linear DUT-64.
 - **Files:** `specs/dod-ios-app/clarifications.md` (CL-155). `specs/dod-ios-app/tasks.md` (this entry). `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (the reorder + label break). **Deps:** main at `65eeade` (T-757 merged). Branch `fix/T-758-settings-layout-tweaks`. No `e2e` label — pure layout; 81 feed tests pass unchanged.
 
+### T-759 — DUT-65 Remove iCloud Sync per-toggle confirmation popup (US-41 amendment, CL-156)
+
+- **What:** Remove the per-toggle iCloud Sync confirmation popup — the toggle now flips directly via `SettingsViewModel.setCloudSyncEnabled(_:)` (no-op on unchanged; synchronous flag flip + relaunch-pending + dependency persist, returning the Task for tests). Safe: toggling is non-destructive (disabling keeps saves local) + deferred to next launch, and the first-launch opt-in sheet remains the consent moment. Supersedes CL-89 (confirm-every-flip) + CL-154 (the custom dialog). Closes Linear DUT-65.
+- **Files:**
+  - **Spec/clarifications/tasks (commit 1):** `specs/dod-ios-app/spec.md` (AC-41.3 amended — direct flip, no per-toggle confirmation). `specs/dod-ios-app/clarifications.md` (new CL-156 — the request, the non-destructive-disable verification, the removal, considered-and-rejected alternatives). `specs/dod-ios-app/tasks.md` (this entry).
+  - **Source (commit 2):** `SettingsViewModel+CloudSync.swift` (replace the 3 confirmation methods with `setCloudSyncEnabled`; remove `CloudSyncConfirmationRequest`). `SettingsViewModel.swift` (remove the `cloudSyncConfirmationRequest` property + doc refs). `SettingsView+CloudSync.swift` (toggle binding → `setCloudSyncEnabled`; remove the dialog + modifier). `SettingsView.swift` (remove the `.cloudSyncConfirmationAlert` call).
+  - **Tests (commit 2 same):** `SettingsViewModelTests.swift` (retarget the 2 toggle tests + the relaunch test to `setCloudSyncEnabled`; replace `confirmationFlowCanBeCancelled` with `settingSyncToTheCurrentValueIsANoOp`). `SettingsViewModelCloudSyncStatusTests.swift` (2 cases retargeted). `SettingsViewSnapshotTests.swift` (remove the alert-visible test + `makeHostedView`'s `pendingFlip` param).
+  - **Out of bounds:** the AC-41.2 first-launch opt-in sheet (`CloudKitOptInSheet` — separate path, unchanged); the dependency `setCloudSyncOptIn` + T-702 container-rebuild seam; the toggle row + Status row + identifiers.
+- **AC:** US-41 AC-41.3 amended (direct flip, no per-toggle confirmation). Pins every other AC-41 contract unchanged.
+- **Est:** ~50 min total.
+- **Deps:** main at `aaafc41` (T-758 merged). Branch (`fix/T-759-remove-icloud-sync-confirmation`) is off `origin/main`. Touches 4 `DODFeatureFeed` source files + 3 test files.
+- **||:** P40-remove-icloud-confirm (DUT-65). `e2e` label is NOT applied — the direct flip is unit-pinned (81 feed tests) + manually verified on device.
+
 ---
 
 ## Summary

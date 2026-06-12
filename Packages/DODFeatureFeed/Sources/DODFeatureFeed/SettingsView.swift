@@ -72,13 +72,10 @@ public struct SettingsView: View {
             .overlay(alignment: .bottom) {
                 snackbarOverlay
             }
-            // US-41 AC-41.3 — toggle-flip confirmation alert. The
-            // modifier lives in `SettingsView+CloudSync.swift` so this
-            // file stays under the file_length cap; the copy + button
-            // styles flip with the request direction per CL-89.
-            .cloudSyncConfirmationAlert(viewModel: viewModel)
             // DUT-6 cause B — pull the latest CloudKit mirror status into the
             // iCloud Sync row's status sublabel when the screen appears.
+            // (T-759 / CL-156 removed the per-toggle confirmation dialog; the
+            // toggle in `CloudSyncRows` now flips directly.)
             .task {
                 viewModel.refreshCloudSyncStatus()
             }
