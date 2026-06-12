@@ -161,8 +161,12 @@ public struct ProfileEditView: View {
 
     public var body: some View {
         Form {
-            identitySection
+            // T-753 / CL-150 (DUT-59) — the photo header is the FIRST
+            // section now: a large, centered, circular avatar + caption
+            // above the display-name + email fields (was a 44pt trailing
+            // avatar in a labeled row below the identity fields).
             profileEditPhotoSection
+            identitySection
             signOutSection
             if let saveError {
                 Section {
