@@ -25,10 +25,12 @@ extension ProfileEditView {
 
     // MARK: - Photo header
 
-    /// Diameter of the centered profile-photo header avatar (T-753 / CL-150
-    /// — bumped from the prior 44pt trailing-row avatar to a prominent
-    /// header size).
-    static let headerAvatarDiameter: CGFloat = 88
+    /// Diameter of the centered profile-photo header avatar. T-753 / CL-150
+    /// lifted it from the prior 44pt trailing-row avatar to a prominent
+    /// header size; T-754 / CL-151 (DUT-60) bumped it 88 → 120 to fill the
+    /// dead space at the top of the form (Apple-ID-scale). Quality-safe:
+    /// 120pt @3x = 360px, within the 512×512 saved JPG (no upscaling).
+    static let headerAvatarDiameter: CGFloat = 120
 
     /// **T-753 / CL-150 (DUT-59) — centered photo header.** Renders the
     /// profile photo as a large, centered, circular, tappable avatar at
