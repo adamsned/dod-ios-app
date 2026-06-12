@@ -6,10 +6,12 @@ import Foundation
 
 /// Outcome of an explicit-download tap (US-35 / AC-35.3 / AC-35.4).
 /// `firstTime` triggers the "Recipe downloaded for offline use" snackbar;
-/// `alreadyDownloaded` triggers the "Already downloaded" snackbar copy
-/// when the recipe has either previously been explicitly downloaded
-/// (`downloadedAt != nil`) or is currently saved (so AC-5.2's
-/// auto-download already pinned the bytes on save).
+/// `alreadyDownloaded` triggers the "Already downloaded" snackbar copy when
+/// the recipe has previously been explicitly downloaded (`downloadedAt !=
+/// nil`). T-761 / CL-158 (DUT-67) — a merely-*saved* recipe is NO LONGER
+/// treated as already-downloaded (save and download are decoupled); a
+/// re-download still returns `.alreadyDownloaded` only on the real
+/// `downloadedAt` pin.
 public enum DownloadOutcome: Sendable, Equatable {
     case firstTime
     case alreadyDownloaded
@@ -38,31 +40,28 @@ extension LiveRecipeDetailDependencies {
     }
 
     /// Explicitly download a recipe for offline use. Marks the row's
-    /// `downloadedAt` and routes the hero image bytes through
+    /// `downloadedAt`, routes the hero image bytes through
     /// `RecipeStore.cacheImage(...)` with the pin field set so the image
-    /// survives `evictImagesIfNeeded`. Image-fetch failures are
-    /// swallowed (logged) — the metadata pin still lands, and the user
-    /// can retry by re-tapping if the snackbar shows on a flaky
-    /// connection. Idempotent: a re-tap on an already-downloaded recipe
-    /// returns `.alreadyDownloaded` without re-fetching the image
-    /// (AC-35.4). When the recipe is currently saved (`isSaved == true`),
-    /// the AC-5.2 auto-download has already pinned the image bytes —
-    /// returning `.alreadyDownloaded` surfaces the right snackbar copy
-    /// per AC-35.3 without redundant work.
+    /// survives `evictImagesIfNeeded`, AND marks the recipe saved (T-761 /
+    /// CL-158 — downloading also saves). Image-fetch failures are swallowed
+    /// (logged) — the metadata pin still lands. Idempotent: a re-tap on an
+    /// already-downloaded recipe returns `.alreadyDownloaded` without
+    /// re-fetching the image (AC-35.4).
+    ///
+    /// **T-761 / CL-158 (DUT-67).** Save and download are decoupled: a
+    /// merely-*saved* recipe (`isSaved == true`, `downloadedAt == nil`) is
+    /// NOT treated as already-downloaded anymore — only the explicit
+    /// `downloadedAt` pin counts. Conversely, downloading always ensures
+    /// the recipe is saved via ``RecipeStore/markSaved(id:)``.
     public func downloadForOffline(recipe: Recipe) async throws -> DownloadOutcome {
-        // AC-35.3 / AC-35.4: idempotent on either pin path.
-        let alreadyExplicitlyDownloaded = try await store.isDownloaded(id: recipe.id)
-        let alreadySaved = try await store.isSaved(id: recipe.id)
-        if alreadyExplicitlyDownloaded || alreadySaved {
-            // Make sure the metadata pin lands even if a saved recipe
-            // happened to never carry the explicit-download flag — this
-            // ensures `isDownloaded(id:)` flips true so the
-            // accessibility-label branch + the local cache stay
-            // consistent on the next re-tap and across launches.
-            _ = try await store.markDownloaded(id: recipe.id)
+        let transitioned = try await store.markDownloaded(id: recipe.id)
+        // Download also saves (T-761) — idempotent, so a re-download of an
+        // already-saved recipe is a no-op on the save side.
+        _ = try await store.markSaved(id: recipe.id)
+        guard transitioned else {
+            // Already explicitly downloaded — no image re-fetch (AC-35.4).
             return .alreadyDownloaded
         }
-        let transitioned = try await store.markDownloaded(id: recipe.id)
         // Hero image (US-35 / AC-35.2). Prefer the large URL, fall back
         // to the small. Failure is logged + swallowed — the metadata
         // pin already landed, so the recipe text is still on-device for
@@ -81,6 +80,6 @@ extension LiveRecipeDetailDependencies {
                 )
             }
         }
-        return transitioned ? .firstTime : .alreadyDownloaded
+        return .firstTime
     }
 }

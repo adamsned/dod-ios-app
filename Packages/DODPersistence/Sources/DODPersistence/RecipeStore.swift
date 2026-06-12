@@ -161,18 +161,29 @@ public actor RecipeStore {
     public func toggleSaved(id: Int) throws -> Bool {
         guard let row = try fetchRecipe(id: id) else { return false }
         row.isSaved.toggle()
-        // DUT-35: mirror the local pin into the synced source of truth. Only
-        // `SyncedSavedRecipe` leaves the device, so the saved SET follows the
-        // user across devices while the full recipe cache stays local.
+        // DUT-35: mirror the local pin into the synced source of truth (only
+        // `SyncedSavedRecipe` leaves the device; the recipe cache stays local).
         if row.isSaved {
             try upsertSyncedSaved(from: row)
         } else {
             try removeSyncedSaved(id: id)
         }
         try modelContext.save()
-        // Eviction only meaningful when transitioning saved -> unsaved.
         try evictIfNeeded()
         return row.isSaved
+    }
+
+    /// T-761 / CL-158 (DUT-67) — idempotently pin a recipe SAVED without
+    /// toggling, mirroring the synced row like ``toggleSaved(id:)`` (download =
+    /// save + pin). Returns `true` on unsaved → saved, `false` if already saved.
+    @discardableResult
+    public func markSaved(id: Int) throws -> Bool {
+        guard let row = try fetchRecipe(id: id) else { return false }
+        if row.isSaved { return false }
+        row.isSaved = true
+        try upsertSyncedSaved(from: row)
+        try modelContext.save()
+        return true
     }
 
     public func savedRecipes() throws -> [Recipe] {
@@ -187,14 +198,10 @@ public actor RecipeStore {
 
     // MARK: - Explicit download (US-35 / AC-35.2 / AC-35.5)
 
-    /// Mark the recipe as explicitly downloaded for offline use. Sets
-    /// ``CachedRecipe/downloadedAt`` to `.now` on the first call;
-    /// subsequent calls on an already-downloaded row are a no-op (the
-    /// existing timestamp is preserved per AC-35.4). Returns `true` if
-    /// the row was just transitioned to downloaded, `false` if it was
-    /// already downloaded (lets the caller branch the snackbar copy
-    /// between "Recipe downloaded for offline use" and "Already
-    /// downloaded" per AC-35.3).
+    /// Mark the recipe explicitly downloaded for offline use. Sets
+    /// ``CachedRecipe/downloadedAt`` on the first call; a re-tap preserves the
+    /// timestamp and is a no-op (AC-35.4). Returns `true` on the transition,
+    /// `false` if already downloaded (caller branches the snackbar copy).
     @discardableResult
     public func markDownloaded(id: Int) throws -> Bool {
         guard let row = try fetchRecipe(id: id) else { return false }
@@ -206,10 +213,9 @@ public actor RecipeStore {
         return true
     }
 
-    /// True when the recipe has been explicitly downloaded (US-35).
-    /// Distinct from ``isSaved(id:)`` — a saved recipe is auto-downloaded
-    /// per AC-5.2 but its `downloadedAt` field stays nil unless the user
-    /// also taps the explicit Download button.
+    /// True when the recipe was explicitly downloaded (US-35). T-761 / CL-158
+    /// decoupled this from ``isSaved(id:)`` — only a Download tap (its
+    /// ``markDownloaded(id:)``) sets `downloadedAt`; saving alone does not.
     public func isDownloaded(id: Int) throws -> Bool {
         try fetchRecipe(id: id)?.downloadedAt != nil
     }
@@ -257,14 +263,10 @@ public actor RecipeStore {
         try modelContext.save()
     }
 
-    /// Every cached recipe's title. Used by Search's "did you mean?"
-    /// suggestion engine (T-649 / CL-127) — the cached titles are the
-    /// source pool the engine tokenizes to find the closest-Levenshtein
-    /// neighbor for a sparse-result query. Reads the same `CachedRecipe`
-    /// rows the cook-time hydration path already touches; no new schema.
-    /// Returns an empty array on a fresh install (cold cache) — the
-    /// caller short-circuits to `nil` suggestion when the source pool
-    /// is empty.
+    /// Every cached recipe's title — the source pool for Search's "did you
+    /// mean?" suggestion engine (T-649 / CL-127), which tokenizes them to find
+    /// the closest-Levenshtein neighbor for a sparse query. Empty on a cold
+    /// cache (caller short-circuits to a `nil` suggestion).
     public func cachedRecipeTitles() throws -> [String] {
         let descriptor = FetchDescriptor<CachedRecipe>()
         return try modelContext.fetch(descriptor).map(\.title)
