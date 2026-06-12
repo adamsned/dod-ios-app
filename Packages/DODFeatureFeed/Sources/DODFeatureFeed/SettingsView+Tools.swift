@@ -33,7 +33,8 @@ struct ToolsSection: View {
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
         } footer: {
-            Text("A starting point for coals — then cook by feel.")
+            // T-752 / CL-149 (DUT-58) — reworded, em-dash-free caption.
+            Text("Estimate how many coals you need for your target temperature, then cook by feel.")
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
         }

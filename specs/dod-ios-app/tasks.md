@@ -2172,6 +2172,18 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Deps:** main is at `614d6a9` (T-750 / CL-147 merged). Branch (`feat/T-751-settings-header-hierarchy`) is off `origin/main`. Touches 2 `DODFeatureFeed` source files.
 - **||:** P34-settings-header-hierarchy (DUT-57). `e2e` label is NOT applied — a pure type-token swap on static headers; the regenerating L4 Settings snapshots cover it.
 
+### T-752 — DUT-58 Settings Customization + Data & Privacy groups + Heat Coach caption (US-32/40/41 amendment, CL-149)
+
+- **What:** Continue the Settings layout work: **(1)** combine the Appearance picker + Cook Mode Voice rows into a "Customization" section; **(2)** combine iCloud Sync + Clear Cached Recipe Images + Share Anonymous Usage Data into a "Data & Privacy" section (in that order, between Tools and About); **(3)** reword the Heat Coach caption to be em-dash-free ("A starting point for coals — then cook by feel." → "Estimate how many coals you need for your target temperature, then cook by feel."). SwiftUI Sections can't share a header, so `VoiceSection` → `VoiceRows` + `CloudSyncSection` → `CloudSyncRows` are refactored to provide loose rows the parent sections compose. Closes Linear DUT-58.
+- **Files:**
+  - **Spec/clarifications/tasks (commit 1):** `specs/dod-ios-app/spec.md` (AC-41.3 amended — iCloud rows now in the shared Data & Privacy section). `specs/dod-ios-app/clarifications.md` (new CL-149 — the two new groups, the Section→rows mechanism, the iCloud footer-fold, the "Data & Privacy" header rationale, considered-and-rejected alternatives). `specs/dod-ios-app/tasks.md` (this entry).
+  - **Source (commit 2):** `SettingsView.swift` (new Customization + Data & Privacy sections; remove the old standalone Appearance / Clear Cache / Telemetry sections + the `VoiceSection`/`CloudSyncSection` calls; update the layout doc header). `SettingsView+Voice.swift` (`VoiceSection` → `VoiceRows`: `Section` → `Group`; footer/listRowBackground drop to parent; `.onDisappear` retained). `SettingsView+CloudSync.swift` (`CloudSyncSection` → `CloudSyncRows`: `Section` → `Group`; footer folds to parent; `accessibilityHint` retained; `subtext` removed). `SettingsView+Tools.swift` (Heat Coach caption reword).
+  - **Out of bounds:** the `.cloudSyncConfirmationAlert` + `.task { refreshCloudSyncStatus() }` host-body modifiers (unchanged); the voice picker/quality/preview/nudge behavior + all row identifiers (unchanged); the Measurements & Units + Notification Settings groups (T-750); the `sectionHeader` styling (T-751). L4 `SettingsViewSnapshotTests` baselines are `record: .missing` + uncommitted (the host builds the full `SettingsView`), so they regenerate on next pass.
+- **AC:** US-41 AC-41.3 amended (iCloud rows in the shared Data & Privacy section, no own footer). Pins every other Settings AC unchanged.
+- **Est:** ~70 min total.
+- **Deps:** main is at `25aa4fd` (T-751 / CL-148 merged). Branch (`feat/T-752-settings-groups-customization-data-privacy`) is off `origin/main`. Touches 4 `DODFeatureFeed` source files.
+- **||:** P35-settings-customization-dataprivacy (DUT-58). `e2e` label is NOT applied — a layout regroup of existing rows with no new behavior; the regenerating L4 Settings snapshots + the full-`SettingsView` L1 voice/iCloud tests cover it.
+
 ---
 
 ## Summary
