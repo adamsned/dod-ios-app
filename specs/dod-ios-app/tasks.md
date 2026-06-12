@@ -2202,6 +2202,11 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `specs/dod-ios-app/clarifications.md` (CL-151). `specs/dod-ios-app/tasks.md` (this entry). `Packages/DODFeatureProfile/Sources/DODFeatureProfile/ProfileEditView+Photo.swift` (the constant + doc note).
 - **AC:** US-44 — refines CL-150 header sizing. **Deps:** main at `c457dc0` (T-753 merged). Branch `feat/T-754-profile-photo-larger`. **||:** P37-profile-photo-larger (DUT-60). No `e2e` label — single presentation constant.
 
+### T-755 — DUT-61 Rename "Appearance" → "App Appearance" (US-36 amendment, CL-152)
+
+- **What:** Rename the Settings → Customization "Appearance" picker row label to "App Appearance" for clarity. One-string change in `SettingsView.swift`; the `settings-picker-appearance` identifier + the option values + persistence unchanged. Closes Linear DUT-61.
+- **Files:** `specs/dod-ios-app/clarifications.md` (CL-152). `specs/dod-ios-app/tasks.md` (this entry). `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (the label). **Deps:** main at `adcc2eb` (T-754 merged). Branch `feat/T-755-app-appearance-label`. No `e2e` label — single label string.
+
 ---
 
 ## Summary

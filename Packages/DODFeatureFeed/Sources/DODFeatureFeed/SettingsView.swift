@@ -175,7 +175,7 @@ public struct SettingsView: View {
                             .tag(value)
                     }
                 } label: {
-                    Text("Appearance")
+                    Text("App Appearance")
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                 }
