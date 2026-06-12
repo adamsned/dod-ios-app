@@ -49,8 +49,8 @@ public final class RecipeDetailViewModel {
     public internal(set) var recipe: Recipe?
     public internal(set) var related: [RecipeListItem] = []
     public internal(set) var loadState: LoadState = .loadingDetail
-    public private(set) var isSaved: Bool = false
-    /// US-35 / AC-35.1 — `internal(set)` for the `+Download` extension.
+    // T-761 / CL-158: `isSaved` is `internal(set)` too so `+Download` can flip it (download also saves).
+    public internal(set) var isSaved: Bool = false
     public internal(set) var isDownloaded: Bool = false
     public private(set) var checkedIngredientIDs: Set<UUID> = []
     public internal(set) var snackbarMessage: String?
@@ -304,7 +304,7 @@ public final class RecipeDetailViewModel {
             isSaved = nowSaved
             if nowSaved {
                 await dependencies.sendTelemetry(.recipeSaved(recipeID: listItem.id))
-                snackbarMessage = "Saved for offline."
+                snackbarMessage = "Saved."  // T-761 / CL-158 — lightweight favorite.
             } else {
                 await dependencies.sendTelemetry(.recipeUnsaved(recipeID: listItem.id))
                 snackbarMessage = "Removed from saved."

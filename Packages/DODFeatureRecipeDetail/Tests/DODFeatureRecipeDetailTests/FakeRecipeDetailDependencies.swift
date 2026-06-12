@@ -172,10 +172,12 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     func downloadForOffline(recipe: Recipe) async throws -> DownloadOutcome {
         if downloadShouldFail { throw URLError(.notConnectedToInternet) }
         downloadCallCount[recipe.id, default: 0] += 1
-        // Idempotent in either pin direction (explicit download OR
-        // saved-via-AC-5.2). Mirrors `LiveRecipeDetailDependencies`.
-        if downloadedIDs.contains(recipe.id) || savedIDs.contains(recipe.id) {
-            downloadedIDs.insert(recipe.id)
+        // T-761 / CL-158 (DUT-67) — downloading also SAVES (idempotent on
+        // the save side). Mirrors `LiveRecipeDetailDependencies`.
+        savedIDs.insert(recipe.id)
+        // Only a real prior download counts as already-downloaded now; a
+        // merely-*saved* recipe downloads fresh (save/download decoupled).
+        if downloadedIDs.contains(recipe.id) {
             return .alreadyDownloaded
         }
         downloadedIDs.insert(recipe.id)

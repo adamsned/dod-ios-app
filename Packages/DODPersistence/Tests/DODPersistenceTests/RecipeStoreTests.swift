@@ -94,6 +94,24 @@ import Testing
         let savedAfter = try await store.savedRecipes()
         #expect(savedAfter.isEmpty)
     }
+
+    /// T-761 / CL-158 (DUT-67) — `markSaved` idempotently pins a recipe saved
+    /// (the download-also-saves path), reporting the transition; no-op if saved.
+    @Test func markSavedIsIdempotentAndPinsTheRow() async throws {
+        let store = try await makeStore()
+        try await store.cache(listItem: makeListItem(id: 8, title: "Chili"))
+        #expect(try await store.isSaved(id: 8) == false)
+
+        let transitioned = try await store.markSaved(id: 8)
+        #expect(transitioned == true)
+        #expect(try await store.isSaved(id: 8))
+        #expect(try await store.savedRecipes().contains { $0.id == 8 })
+
+        // Second call is a no-op — already saved.
+        let idempotent = try await store.markSaved(id: 8)
+        #expect(idempotent == false)
+        #expect(try await store.isSaved(id: 8))
+    }
 }
 
 @Suite("RecipeStore recently-viewed + entity lookup (US-10)")
