@@ -219,8 +219,8 @@ public final class SettingsViewModel {
 
     /// Cached snapshot of the iCloud sync opt-in flag so `@Observable`
     /// emits a change when the view-model flips it. Public write path is
-    /// ``requestCloudSyncOptIn(_:)`` (AC-41.3 + CL-89 — confirmation
-    /// alert is mandatory). Seeded from the dependency at init.
+    /// ``setCloudSyncEnabled(_:)`` (T-759 / CL-156 — the toggle flips
+    /// directly, no confirmation popup). Seeded from the dependency at init.
     public internal(set) var isCloudSyncEnabled: Bool
 
     /// Set when the user flips iCloud Sync *this session*. SwiftData
@@ -257,14 +257,6 @@ public final class SettingsViewModel {
     public func updateCloudSyncStatus(_ status: CloudKitSyncStatus) {
         cloudSyncStatus = status
     }
-
-    /// State for the confirmation alert that fronts every toggle flip per
-    /// AC-41.3 / CL-89. `nil` when no alert is showing; otherwise describes the
-    /// direction (on → off vs off → on) so the view renders the right copy +
-    /// button labels via ``cloudSyncConfirmationIsPresented``. Setter is
-    /// `internal` so the action methods in `SettingsViewModel+CloudSync.swift`
-    /// can mutate it while external callers stay locked out.
-    public internal(set) var cloudSyncConfirmationRequest: CloudSyncConfirmationRequest?
 
     // MARK: - Snackbar feedback (Clear Cache row)
 
@@ -394,7 +386,7 @@ public final class SettingsViewModel {
     }
 }
 
-// `CloudSyncConfirmationRequest` lives in `SettingsViewModel+CloudSync.swift`
-// alongside the iCloud Sync action methods (file_length split). The
+// The iCloud Sync toggle action (`setCloudSyncEnabled`) lives in
+// `SettingsViewModel+CloudSync.swift` (file_length split). The
 // `AppearancePreference` + `ShareFormatPreference` value types live in
 // `SettingsPreferences.swift` (same split, extended by T-721).

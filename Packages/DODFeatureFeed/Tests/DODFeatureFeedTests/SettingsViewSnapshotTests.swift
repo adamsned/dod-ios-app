@@ -87,28 +87,9 @@ final class SettingsViewSnapshotTests: XCTestCase {
         )
     }
 
-    @MainActor
-    func test_settings_iCloudSyncSection_alertVisible_light() async {
-        // Confirmation alert visible. Starts with the toggle OFF and
-        // fires an off → on request so the view-model holds a
-        // pending `CloudSyncConfirmationRequest(targetEnabled: true)`.
-        // Note: SwiftUI's `.alert(...)` modifier is presented by the
-        // host UIViewController, not as part of the SwiftUI view tree,
-        // so the visible pixels in this snapshot are the underlying
-        // Settings list (NOT the alert chrome) — the test still locks
-        // the underlying surface rendering during an in-flight alert
-        // request, so a future code path that crashes the view when a
-        // request is pending shows up as a snapshot failure rather
-        // than only firing in a UI test. The actual alert copy is
-        // pinned by the `cloudSyncAlertMessage(for:)` static + the
-        // L1 confirmation flow tests in SettingsViewModelTests.
-        let view = Self.makeHostedView(cloudSyncEnabled: false, pendingFlip: true)
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
-            record: .missing
-        )
-    }
+    // (T-759 / CL-156 removed the per-toggle confirmation dialog, so the
+    // former `test_settings_iCloudSyncSection_alertVisible_light` baseline
+    // — which captured the pending-confirmation surface — no longer applies.)
 
     // MARK: - T-721 / T-722 (US-40 AC-40.12 + AC-40.13) — voice section baselines
 
@@ -172,15 +153,13 @@ final class SettingsViewSnapshotTests: XCTestCase {
     ///
     /// `cloudSyncEnabled` seeds the canonical `RecipeStore.cloudKitSyncOptInKey`
     /// flag before view-model construction so the view-model's cached
-    /// `isCloudSyncEnabled` mirrors the requested state. `pendingFlip`
-    /// fires an off → on toggle request so the confirmation alert
-    /// renders in the snapshot. `voiceCatalog`, when non-nil, wires a
-    /// recording previewer over an en-US locale so the voice section's quality
-    /// readout + download nudge render against a known catalog (T-721 / T-722).
+    /// `isCloudSyncEnabled` mirrors the requested state. `voiceCatalog`, when
+    /// non-nil, wires a recording previewer over an en-US locale so the voice
+    /// section's quality readout + download nudge render against a known
+    /// catalog (T-721 / T-722).
     @MainActor
     static func makeHostedView(
         cloudSyncEnabled: Bool = false,
-        pendingFlip: Bool = false,
         voiceCatalog: [VoiceDescriptor]? = nil
     ) -> some View {
         let suite = "SettingsViewSnapshotTests-\(UUID().uuidString)"
@@ -192,11 +171,6 @@ final class SettingsViewSnapshotTests: XCTestCase {
             voicePreviewer: voiceCatalog.map { RecordingVoicePreviewer(catalog: $0) },
             voiceLocale: Locale(identifier: "en-US")
         )
-        if pendingFlip {
-            // Drive an off → on flip so the confirmation alert is in
-            // its pending state when SwiftUI snapshots the view.
-            viewModel.requestCloudSyncOptIn(!cloudSyncEnabled)
-        }
         return SettingsViewSnapshotHost(viewModel: viewModel)
     }
 

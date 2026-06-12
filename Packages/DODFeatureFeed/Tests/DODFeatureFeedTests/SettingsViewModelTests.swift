@@ -223,15 +223,11 @@ import os
         let recorder = RecordingSettingsDependencies(defaults: defaults)
         let viewModel = SettingsViewModel(defaults: defaults, dependencies: recorder)
 
-        // Toggle starts in the OFF state per the canonical default. The
-        // user flips the toggle ON via the view's Binding setter, which
-        // routes through `requestCloudSyncOptIn(true)` — the alert
-        // surfaces, the user confirms, and only then does the
-        // dependency get called.
+        // Toggle starts OFF per the canonical default. T-759 / CL-156 —
+        // the toggle flips DIRECTLY via `setCloudSyncEnabled` (no
+        // confirmation popup); `?.value` awaits the dependency write Task.
         #expect(viewModel.isCloudSyncEnabled == false)
-        viewModel.requestCloudSyncOptIn(true)
-        #expect(viewModel.cloudSyncConfirmationRequest?.targetEnabled == true)
-        await viewModel.confirmCloudSyncFlip()
+        await viewModel.setCloudSyncEnabled(true)?.value
 
         // Dependency saw the flag-write call (and the flag landed in
         // UserDefaults before the container rebuild fired — order
@@ -240,7 +236,6 @@ import os
         #expect(recorder.invocations == [true])
         #expect(recorder.flagWasWrittenBeforeRebuild == true)
         #expect(viewModel.isCloudSyncEnabled == true)
-        #expect(viewModel.cloudSyncConfirmationRequest == nil)
     }
 
     @Test func togglingOffCallsRecreateContainerAfterFlagWrite() async throws {
@@ -251,14 +246,11 @@ import os
         let viewModel = SettingsViewModel(defaults: defaults, dependencies: recorder)
 
         #expect(viewModel.isCloudSyncEnabled == true)
-        viewModel.requestCloudSyncOptIn(false)
-        #expect(viewModel.cloudSyncConfirmationRequest?.targetEnabled == false)
-        await viewModel.confirmCloudSyncFlip()
+        await viewModel.setCloudSyncEnabled(false)?.value
 
         #expect(recorder.invocations == [false])
         #expect(recorder.flagWasWrittenBeforeRebuild == true)
         #expect(viewModel.isCloudSyncEnabled == false)
-        #expect(viewModel.cloudSyncConfirmationRequest == nil)
     }
 
     @Test func cloudSyncStatusTextDefaultsToIdle() async throws {
@@ -271,16 +263,15 @@ import os
         #expect(viewModel.cloudSyncStatusText == "Idle")
     }
 
-    @Test func confirmingSyncFlipMarksRelaunchPendingInSublabel() async throws {
+    @Test func flippingSyncMarksRelaunchPendingInSublabel() async throws {
         // Round-12 backlog bug: SwiftData builds the container once per
-        // process, so a confirmed toggle only engages on the next cold
+        // process, so a flipped toggle only engages on the next cold
         // launch. The sublabel must say so instead of silently staying "Idle".
         let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
         #expect(viewModel.cloudSyncPendingRelaunch == false)
         #expect(viewModel.cloudSyncStatusText == "Idle")
 
-        viewModel.requestCloudSyncOptIn(true)
-        await viewModel.confirmCloudSyncFlip()
+        await viewModel.setCloudSyncEnabled(true)?.value
 
         #expect(viewModel.cloudSyncPendingRelaunch == true)
         #expect(viewModel.cloudSyncStatusText == "Relaunch DOD to apply")
@@ -305,26 +296,20 @@ import os
         #expect(next.isCloudSyncEnabled == false)
     }
 
-    @Test func confirmationFlowCanBeCancelled() async throws {
+    @Test func settingSyncToTheCurrentValueIsANoOp() async throws {
+        // T-759 / CL-156 — `setCloudSyncEnabled` no-ops on an unchanged
+        // value (returns nil, never touches the dependency or persistence),
+        // so a spurious binding fire can't double-write or relaunch-flag.
         let defaults = Self.isolatedDefaults()
         let recorder = RecordingSettingsDependencies(defaults: defaults)
         let viewModel = SettingsViewModel(defaults: defaults, dependencies: recorder)
 
-        // User flips the toggle ON optimistically (the SwiftUI Binding
-        // mirrors `targetEnabled` to the view-model immediately so the
-        // toggle visually moves), then taps "Cancel" on the alert.
-        viewModel.requestCloudSyncOptIn(true)
-        #expect(viewModel.cloudSyncConfirmationRequest?.targetEnabled == true)
-
-        viewModel.cancelCloudSyncFlip()
-
-        // Cached state snaps back to the pre-request value, the alert
-        // request clears, and the dependency NEVER gets called.
         #expect(viewModel.isCloudSyncEnabled == false)
-        #expect(viewModel.cloudSyncConfirmationRequest == nil)
+        let task = viewModel.setCloudSyncEnabled(false)  // already OFF
+        #expect(task == nil)
+        #expect(viewModel.isCloudSyncEnabled == false)
+        #expect(viewModel.cloudSyncPendingRelaunch == false)
         #expect(recorder.invocations.isEmpty)
-        // The canonical UserDefaults flag is untouched — the cancel
-        // path must leave persistence in its pre-tap state.
         #expect(defaults.bool(forKey: RecipeStore.cloudKitSyncOptInKey) == false)
     }
 
