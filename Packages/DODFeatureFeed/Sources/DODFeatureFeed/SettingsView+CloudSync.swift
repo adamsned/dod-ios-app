@@ -98,93 +98,130 @@ struct CloudSyncRows: View {
     }
 }
 
-// MARK: - Confirmation alert modifier
+// MARK: - Confirmation dialog (T-757 / CL-154, DUT-63)
 
 extension View {
-    /// Attaches the `.alert(...)` modifier that fronts every iCloud
-    /// Sync toggle flip per CL-89. Title + button labels + body copy
-    /// flip on the direction of the pending request — off → on shows
-    /// the friendly "Turn on iCloud Sync?" alert with a default "Turn
-    /// On" primary, on → off shows the lighter-but-still-confirmed
-    /// "Turn off iCloud Sync?" alert with a destructive "Turn Off"
-    /// primary.
+    /// Fronts every iCloud Sync toggle flip per CL-89 with a custom
+    /// branded confirmation dialog (replaces the pre-T-757 system
+    /// `.alert`). **Why custom, not `.alert`:** (1) system alert buttons
+    /// inherit the app's `.tint(DODColor.accent)` (orange) and Apple
+    /// gives no per-button foreground override, so white button text was
+    /// impossible; (2) the system `.alert`'s `isPresented` binding fired
+    /// `cancelCloudSyncFlip()` on dismiss, which raced + reverted the
+    /// async `confirmCloudSyncFlip()` so the toggle never flipped. The
+    /// custom dialog is driven purely by `cloudSyncConfirmationRequest`
+    /// (no `isPresented` binding → no cancel-on-dismiss race) and styles
+    /// its own buttons. The view-model flow is unchanged.
     func cloudSyncConfirmationAlert(viewModel: SettingsViewModel) -> some View {
-        modifier(CloudSyncConfirmationAlertModifier(viewModel: viewModel))
+        modifier(CloudSyncConfirmationDialogModifier(viewModel: viewModel))
     }
 }
 
-/// AC-41.3 / CL-89 confirmation alert payload. Reads
-/// `viewModel.cloudSyncConfirmationRequest`; renders different copy +
-/// button styles per flip direction.
-struct CloudSyncConfirmationAlertModifier: ViewModifier {
+/// Presents ``CloudSyncConfirmationDialog`` as a centered overlay when the
+/// view-model holds a pending ``CloudSyncConfirmationRequest``.
+struct CloudSyncConfirmationDialogModifier: ViewModifier {
     @Bindable var viewModel: SettingsViewModel
 
     func body(content: Content) -> some View {
         content
-            .alert(
-                title,
-                isPresented: isPresented,
-                presenting: viewModel.cloudSyncConfirmationRequest
-            ) { request in
-                buttons(for: request)
-            } message: { request in
-                Text(Self.message(for: request))
-            }
-    }
-
-    /// Title for the confirmation alert. Reads the pending request's
-    /// direction; when no request is pending the alert isn't shown so
-    /// the empty-string fallback is unreachable in production.
-    private var title: String {
-        guard let request = viewModel.cloudSyncConfirmationRequest else { return "" }
-        return request.targetEnabled ? "Turn on iCloud Sync?" : "Turn off iCloud Sync?"
-    }
-
-    /// Static so it composes inside the `.alert(message:)` closure
-    /// without capturing `self`. Picks copy by direction per CL-89.
-    static func message(for request: CloudSyncConfirmationRequest) -> String {
-        if request.targetEnabled {
-            return
-                "Your saved recipes will sync across the Apple devices signed into the same iCloud account. "
-                + "You can turn this off any time."
-        }
-        return
-            "Saved recipes already on iCloud stay there. New saves will live only on this device until you turn sync back on."
-    }
-
-    /// Alert buttons for both flip directions.
-    @ViewBuilder
-    private func buttons(for request: CloudSyncConfirmationRequest) -> some View {
-        if request.targetEnabled {
-            Button("Turn On") {
-                Task { await viewModel.confirmCloudSyncFlip() }
-            }
-            .accessibilityIdentifier("settings-icloud-sync-alert-confirm")
-        } else {
-            Button("Turn Off", role: .destructive) {
-                Task { await viewModel.confirmCloudSyncFlip() }
-            }
-            .accessibilityIdentifier("settings-icloud-sync-alert-confirm")
-        }
-        Button("Cancel", role: .cancel) {
-            viewModel.cancelCloudSyncFlip()
-        }
-        .accessibilityIdentifier("settings-icloud-sync-alert-cancel")
-    }
-
-    /// `isPresented` adapter for the `.alert(...)` modifier. Tracks
-    /// whether the view-model has a pending confirmation request and
-    /// clears it via ``SettingsViewModel/cancelCloudSyncFlip()`` when
-    /// the alert dismisses without an explicit button tap (e.g. the
-    /// user backgrounds the app).
-    private var isPresented: Binding<Bool> {
-        Binding(
-            get: { viewModel.cloudSyncConfirmationRequest != nil },
-            set: { newValue in
-                if !newValue && viewModel.cloudSyncConfirmationRequest != nil {
-                    viewModel.cancelCloudSyncFlip()
+            .overlay {
+                if let request = viewModel.cloudSyncConfirmationRequest {
+                    CloudSyncConfirmationDialog(
+                        request: request,
+                        // confirm/cancel route through the unchanged VM
+                        // methods. No `isPresented` binding exists, so the
+                        // dismiss-cancel race that swallowed the flip is gone.
+                        onConfirm: { Task { await viewModel.confirmCloudSyncFlip() } },
+                        onCancel: { viewModel.cancelCloudSyncFlip() }
+                    )
+                    .transition(.opacity)
                 }
             }
-        )
+            .animation(.easeInOut(duration: 0.15), value: viewModel.cloudSyncConfirmationRequest)
+    }
+}
+
+/// AC-41.3 / CL-89 branded confirmation dialog (T-757 / CL-154). A dimmed
+/// backdrop + a centered ``DODColor/surface`` card with the direction-aware
+/// title + body copy + a filled brand primary button (cream text on
+/// `DODColor.castIronBrown` — the fix for the orange-button complaint) and
+/// a plain Cancel. Tapping the backdrop cancels.
+struct CloudSyncConfirmationDialog: View {
+    let request: CloudSyncConfirmationRequest
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture { onCancel() }
+                .accessibilityHidden(true)
+
+            VStack(spacing: DODSpacing.md) {
+                Text(title)
+                    .dodFont(DODType.heading)
+                    .foregroundStyle(DODColor.label)
+                    .multilineTextAlignment(.center)
+
+                Text(message)
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(spacing: DODSpacing.sm) {
+                    Button(action: onConfirm) {
+                        Text(confirmLabel)
+                            .dodFont(DODType.bodyEmphasized)
+                            .foregroundStyle(DODColor.cream)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, DODSpacing.sm)
+                            .background(
+                                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                                    .fill(DODColor.castIronBrown)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings-icloud-sync-alert-confirm")
+
+                    Button(action: onCancel) {
+                        Text("Cancel")
+                            .dodFont(DODType.body)
+                            .foregroundStyle(DODColor.label)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, DODSpacing.xs)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings-icloud-sync-alert-cancel")
+                }
+            }
+            .padding(DODSpacing.lg)
+            .frame(maxWidth: 320)
+            .background(
+                RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+                    .fill(DODColor.surface)
+            )
+            .shadow(color: .black.opacity(0.2), radius: 16, y: 6)
+            .padding(DODSpacing.lg)
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    private var title: String {
+        request.targetEnabled ? "Turn on iCloud Sync?" : "Turn off iCloud Sync?"
+    }
+
+    private var confirmLabel: String {
+        request.targetEnabled ? "Turn On" : "Turn Off"
+    }
+
+    private var message: String {
+        if request.targetEnabled {
+            return "Your saved recipes will sync across the Apple devices signed into the same "
+                + "iCloud account. You can turn this off any time."
+        }
+        return "Saved recipes already on iCloud stay there. New saves will live only on this "
+            + "device until you turn sync back on."
     }
 }
