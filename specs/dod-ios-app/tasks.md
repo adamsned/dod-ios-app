@@ -2250,6 +2250,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Deps:** main at `aaafc41` (T-758 merged). Branch (`fix/T-759-remove-icloud-sync-confirmation`) is off `origin/main`. Touches 4 `DODFeatureFeed` source files + 3 test files.
 - **||:** P40-remove-icloud-confirm (DUT-65). `e2e` label is NOT applied — the direct flip is unit-pinned (81 feed tests) + manually verified on device.
 
+### T-760 — DUT-66 Fold Voice quality+preview + iCloud status into their parent cells (US-40/41 amendment, CL-157)
+
+- **What:** Consolidate two Settings controls into single richer cells. (1) Cook Mode Voice: the gender picker + the voice-quality readout + a speaker-icon-only preview (title dropped) become one `voiceCell` VStack, with the quality + preview at a new smaller `DODType.detail` (~15pt) size. (2) iCloud Sync: the toggle + the (when-on) Status fold into one cell, Status at `DODType.detail`. Closes Linear DUT-66.
+- **Files:** `specs/dod-ios-app/clarifications.md` (CL-157). `specs/dod-ios-app/tasks.md` (this entry). `Packages/DODDesignSystem/Sources/DODDesignSystem/Typography.swift` (new `DODType.detail`). `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView+Voice.swift` + `SettingsView+CloudSync.swift` (the cell restructures). Identifiers + VM values unchanged (all L1 tests pass untouched); the download-voice nudge stays a separate row.
+- **AC:** US-40 AC-40.12 + US-41 AC-41.7 cell layout refined (CL-157 canonical). **Est:** ~40 min. **Deps:** main at `11af9cb` (T-759 merged). Branch `feat/T-760-settings-cell-consolidation`. **||:** P41-settings-cell-consolidation (DUT-66). No `e2e` label — presentation-only; regenerating L4 snapshots + unchanged L1 VM tests cover it.
+
 ---
 
 ## Summary

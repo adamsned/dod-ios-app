@@ -49,9 +49,7 @@ struct VoiceRows: View {
 
     var body: some View {
         Group {
-            picker
-            qualityReadoutRow
-            previewButton
+            voiceCell
             if viewModel.shouldShowDownloadVoiceTip {
                 downloadVoiceTip
             }
@@ -62,6 +60,20 @@ struct VoiceRows: View {
     }
 
     // MARK: Rows
+
+    /// T-760 / CL-157 (DUT-66) — ONE cell: the gender picker on top, then a
+    /// smaller (``DODType/detail``) line folding the voice-quality readout +
+    /// a speaker-icon-only preview button (was three separate cells).
+    private var voiceCell: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            picker
+            HStack(spacing: DODSpacing.sm) {
+                qualityReadout
+                Spacer(minLength: 0)
+                previewButton
+            }
+        }
+    }
 
     /// AC-40.10 — the Female / Male / No-preference gender picker. Identifier
     /// unchanged from T-721 so existing UI coverage keeps resolving it.
@@ -79,36 +91,31 @@ struct VoiceRows: View {
         .accessibilityIdentifier("settings-picker-voice-gender")
     }
 
-    /// AC-40.12 — read-only "Voice quality → Default/Enhanced/Premium" row so
-    /// the user can SEE whether they're on a robotic (Default) voice. Renders
-    /// "Unknown" when no catalog is available (no previewer wired) rather than
-    /// guessing a tier.
-    private var qualityReadoutRow: some View {
-        HStack {
-            Text("Voice Quality")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-            Spacer()
-            Text(viewModel.resolvedVoiceQuality?.displayName ?? "Unknown")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.labelSecondary)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("settings-voice-quality")
+    /// AC-40.12 — read-only "Voice Quality → Default/Enhanced/Premium" readout
+    /// so the user can SEE whether they're on a robotic (Default) voice.
+    /// Renders "Unknown" when no catalog is available. T-760 / CL-157 — now
+    /// inline in the voice cell at the smaller ``DODType/detail`` size.
+    private var qualityReadout: some View {
+        Text("Voice Quality: \(viewModel.resolvedVoiceQuality?.displayName ?? "Unknown")")
+            .dodFont(DODType.detail)
+            .foregroundStyle(DODColor.labelSecondary)
+            .accessibilityIdentifier("settings-voice-quality")
     }
 
-    /// AC-40.12 — speaks the fixed sample line with the current pick so the
-    /// user hears the difference before committing. Inert (no-op) when no
-    /// previewer is wired.
+    /// AC-40.12 — speaks the fixed sample line with the current pick. T-760 /
+    /// CL-157 — title removed; just the speaker icon now (accent), with the
+    /// label moved to VoiceOver. Inert (no-op) when no previewer is wired.
     private var previewButton: some View {
         Button {
             viewModel.previewVoice()
         } label: {
-            Label("Preview Voice", systemImage: "speaker.wave.2.fill")
-                .dodFont(DODType.body)
+            Image(systemName: "speaker.wave.2.fill")
+                .dodFont(DODType.detail)
                 .foregroundStyle(DODColor.accent)
         }
+        .buttonStyle(.plain)
         .accessibilityIdentifier("settings-button-voice-preview")
+        .accessibilityLabel("Preview Voice")
         .accessibilityHint("Plays a sample recipe step in the selected voice.")
     }
 
