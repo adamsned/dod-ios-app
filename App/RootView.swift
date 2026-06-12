@@ -17,18 +17,13 @@ struct RootView: View {
     /// Spec trace: US-8 (post-launch amendment to CL-7).
     static let onboardingCompletedKey = "dod.onboardingCompletedV1"
 
-    /// The sequential first-launch sheets, driven by a single `.sheet(item:)`
-    /// so onboarding hands off to the iCloud-Sync opt-in without the
-    /// two-`.sheet` dismiss/present race (US-8 + US-41 / AC-41.2, T-704).
-    private enum FirstLaunchSheet: String, Identifiable {
-        case onboarding
-        case cloudKitOptIn
-        var id: String { rawValue }
-    }
-
     @State private var dependencies: AppDependencies
     @State private var selectedTab: AppTab = .feed
-    @State private var activeFirstLaunchSheet: FirstLaunchSheet?
+    /// T-762 / CL-159 (DUT-68) — drives the single first-launch welcome sheet
+    /// (US-8). The former second sheet (the iCloud-Sync opt-in, AC-41.2) is
+    /// removed; sync is opt-in only from Settings (AC-41.3) now, and the
+    /// welcome sheet mentions it as a capability instead.
+    @State private var showOnboarding: Bool
     /// US-36 AC-36.2 — user-selected appearance preference. Backed by
     /// `UserDefaults` (key `dod.settings.appearance`) via `@AppStorage`
     /// so a write from `SettingsViewModel.appearance` (the Picker's
@@ -54,20 +49,11 @@ struct RootView: View {
 
     init(dependencies: AppDependencies) {
         _dependencies = State(initialValue: dependencies)
-        // Pick the first sheet to show on cold launch: onboarding for brand-new
-        // installs, else the AC-41.2 iCloud-Sync opt-in for upgraders who
-        // haven't seen it, else nothing. New installs chain onboarding →
-        // opt-in from the onboarding CTA (see `firstLaunchSheet(for:)`).
+        // T-762 / CL-159 — show the single welcome sheet on brand-new installs
+        // only (US-8). The former second sheet (iCloud-Sync opt-in) is gone;
+        // sync opt-in lives in Settings (AC-41.3).
         let onboardingDone = UserDefaults.standard.bool(forKey: Self.onboardingCompletedKey)
-        let initialSheet: FirstLaunchSheet?
-        if !onboardingDone {
-            initialSheet = .onboarding
-        } else if CloudKitOptInPromptGate().shouldShow {
-            initialSheet = .cloudKitOptIn
-        } else {
-            initialSheet = nil
-        }
-        _activeFirstLaunchSheet = State(initialValue: initialSheet)
+        _showOnboarding = State(initialValue: !onboardingDone)
     }
 
     var body: some View {
@@ -114,9 +100,17 @@ struct RootView: View {
             handle(intent: newValue)
             dispatcher.consume()
         }
-        .sheet(item: $activeFirstLaunchSheet) { sheet in
-            firstLaunchSheet(for: sheet)
-                .presentationDetents([.large])
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingSheet(
+                title: "Welcome to Dutch Oven Daddy",
+                bullets: Self.welcomeBullets,
+                ctaTitle: "Get cooking",
+                onContinue: {
+                    UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
+                    showOnboarding = false
+                }
+            )
+            .presentationDetents([.large])
         }
         // Intercept in-app link taps (DOD-ART-2): a dutchovendaddy.com recipe
         // link inside a rendered article opens the recipe in-app instead of
@@ -126,9 +120,13 @@ struct RootView: View {
         .environment(\.openURL, OpenURLAction { url in handleArticleLinkTap(url) })
     }
 
-    /// The three highlight rows shown on first launch. Declared as a static so
-    /// the array is not rebuilt every render and so tests/previews can reuse
-    /// the exact same content the app ships.
+    /// The highlight rows shown on the single first-launch welcome sheet.
+    /// Declared as a static so the array is not rebuilt every render and so
+    /// tests/previews can reuse the exact content the app ships. T-762 / CL-159
+    /// (DUT-68) — reworded the Save row to the save-a-favorite-for-findability
+    /// framing (T-761 decoupled Save from the offline download) and added the
+    /// iCloud-Sync capability row (informational; the opt-in lives in Settings,
+    /// not here — no toggle on the splash).
     static let welcomeBullets: [OnboardingSheet.Bullet] = [
         .init(
             systemImage: "house.fill",
@@ -142,55 +140,15 @@ struct RootView: View {
         ),
         .init(
             systemImage: "bookmark.fill",
-            title: "Save for offline",
-            caption: "Tap the bookmark on any recipe to cook it without Wi-Fi."
+            title: "Save your favorites",
+            caption: "Tap the bookmark on any recipe to find it again later."
+        ),
+        .init(
+            systemImage: "icloud.fill",
+            title: "Sync across devices",
+            caption: "Turn on iCloud Sync in Settings to keep your saved recipes on every device."
         ),
     ]
-
-    /// Builds the active first-launch sheet. Onboarding's CTA hands off to the
-    /// iCloud-Sync opt-in for first-time users (AC-41.2); upgraders reached the
-    /// opt-in directly from `init`.
-    @ViewBuilder
-    private func firstLaunchSheet(for sheet: FirstLaunchSheet) -> some View {
-        switch sheet {
-        case .onboarding:
-            OnboardingSheet(
-                title: "Welcome to Dutch Oven Daddy",
-                bullets: Self.welcomeBullets,
-                ctaTitle: "Get cooking",
-                onContinue: {
-                    UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
-                    activeFirstLaunchSheet =
-                        CloudKitOptInPromptGate().shouldShow ? .cloudKitOptIn : nil
-                }
-            )
-        case .cloudKitOptIn:
-            cloudKitOptInSheet
-        }
-    }
-
-    /// US-41 / AC-41.2 (T-704). The first-launch iCloud-Sync opt-in. Primary
-    /// flips the canonical opt-in flag + rebuilds the container through the
-    /// same `SettingsDependencies` seam the Settings toggle uses (AC-41.3);
-    /// both buttons mark the prompt shown so it never returns.
-    private var cloudKitOptInSheet: some View {
-        CloudKitOptInSheet(
-            title: "Sync your saved recipes across devices",
-            message: "Turn on iCloud Sync to see your saved recipes on every Apple "
-                + "device signed into the same iCloud account.",
-            primaryTitle: "Turn on iCloud Sync",
-            secondaryTitle: "Not now",
-            onPrimary: {
-                CloudKitOptInPromptGate().markShown()
-                activeFirstLaunchSheet = nil
-                Task { await dependencies.settingsDependencies().setCloudSyncOptIn(true) }
-            },
-            onSecondary: {
-                CloudKitOptInPromptGate().markShown()
-                activeFirstLaunchSheet = nil
-            }
-        )
-    }
 
     private var phoneTabs: some View {
         TabView(selection: $selectedTab) {

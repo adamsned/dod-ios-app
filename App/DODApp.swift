@@ -54,24 +54,10 @@ struct DODApp: App {
         if args.contains("-DODForceFreshOnboarding") {
             UserDefaults.standard.removeObject(forKey: RootView.onboardingCompletedKey)
         }
-        // T-704 (US-41 / AC-41.2): keep the first-launch iCloud-Sync opt-in
-        // sheet out of the UI-test golden paths so it never blocks the feed.
-        // Both onboarding signals imply "a UI test that should land on the
-        // feed, not the opt-in sheet": the default smoke/E2E rig
-        // (`DOD_SUPPRESS_ONBOARDING=1`) and the dedicated onboarding test
-        // (`-DODForceFreshOnboarding`, which asserts onboarding → feed). Mark
-        // the prompt shown under either — unless a test explicitly opts back
-        // in with `-DODForceCloudKitOptInPrompt` (the T-704 prompt test).
-        let forceOptInPrompt = args.contains("-DODForceCloudKitOptInPrompt")
-        let suppressOptInPrompt =
-            (env["DOD_SUPPRESS_ONBOARDING"] == "1" || args.contains("-DODForceFreshOnboarding"))
-            && !forceOptInPrompt
-        if suppressOptInPrompt {
-            UserDefaults.standard.set(true, forKey: CloudKitOptInPromptGate.promptShownKey)
-        }
-        if forceOptInPrompt {
-            UserDefaults.standard.removeObject(forKey: CloudKitOptInPromptGate.promptShownKey)
-        }
+        // T-762 / CL-159 (DUT-68): the first-launch iCloud-Sync opt-in sheet was
+        // removed (sync opt-in now lives only in Settings), so the
+        // `-DODForceCloudKitOptInPrompt` / prompt-shown launch overrides that
+        // kept it out of the UI-test golden paths are gone too.
         // L5 E2E mode flag — recorded process-wide so T-610's future
         // FakeAppDependencies switch can read it without re-parsing args.
         // Today (Phase 1) the boolean is read by zero consumers; the journeys
