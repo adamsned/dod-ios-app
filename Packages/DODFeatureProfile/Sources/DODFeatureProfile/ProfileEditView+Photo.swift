@@ -23,68 +23,87 @@ import UIKit
 
 extension ProfileEditView {
 
-    // MARK: - Photo section
+    // MARK: - Photo header
 
-    /// Phase b — Profile Picture row. Renders an avatar (initial-letter
-    /// fallback in Phase a; freshly-cropped photo when one is in-flight)
-    /// + a tap target that branches based on whether a photo already
-    /// exists: nil → straight to the picker; populated → confirmation
-    /// dialog with Replace + Edit + Remove + Cancel (per CL-137 /
-    /// AC-44.8 + T-745 / CL-142). The row is rendered as a `Button`
-    /// (not a `NavigationLink` — the photo flow is sheet-presented,
-    /// not pushed) so the tap region matches the visible row + the
-    /// trailing chevron is omitted.
+    /// Diameter of the centered profile-photo header avatar (T-753 / CL-150
+    /// — bumped from the prior 44pt trailing-row avatar to a prominent
+    /// header size).
+    static let headerAvatarDiameter: CGFloat = 88
+
+    /// **T-753 / CL-150 (DUT-59) — centered photo header.** Renders the
+    /// profile photo as a large, centered, circular, tappable avatar at
+    /// the TOP of the edit form (above the display-name + email fields),
+    /// with the tap-action caption directly below it. Pre-T-753 the photo
+    /// was a 44pt trailing avatar inside a labeled "Profile Picture" row;
+    /// this lifts it OUT of the elevated cell box (`.listRowBackground(.clear)`
+    /// + hidden separator) so it floats on the page surface like the
+    /// Contacts / Apple ID avatar header. The circle shape is intrinsic to
+    /// ``ProfilePhotoView`` (it clips both the loaded photo + the
+    /// initial-letter fallback to `Circle()`).
     ///
-    /// **T-745 / CL-142 / DUT-39 — load-bearing direct-picker gate.**
-    /// The `inFlightPhotoFilename != nil` check below is the
-    /// AC-44.8-mandated entry gate: a tap with no photo set goes
-    /// straight to the picker (no action sheet); a tap with a photo
-    /// set surfaces the action sheet for Replace / Edit / Remove /
-    /// Cancel. Pinned as the canonical entry shape — DUT-39 confirmed
-    /// the gate already exists in the production code; the spec entry
-    /// (CL-142) documents the verification and the intent.
+    /// **T-745 / CL-142 / DUT-39 — load-bearing direct-picker gate
+    /// (preserved).** Tapping the avatar runs ``handleProfilePictureRowTap()``:
+    /// no photo → straight to the picker; a photo set → the Replace /
+    /// Edit / Remove action sheet. The `profile-edit-photo` identifier is
+    /// preserved on the avatar Button for existing coverage.
     @ViewBuilder
     var profileEditPhotoSection: some View {
         Section {
-            Button(action: handleProfilePictureRowTap) {
-                HStack(spacing: DODSpacing.md) {
-                    Text("Profile Picture")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.label)
-                    Spacer(minLength: 0)
-                    #if canImport(UIKit)
-                    ProfilePhotoView(
-                        profile: previewProfile,
-                        diameter: 44,
-                        photoStore: photoStore
-                    )
-                    #else
-                    ProfilePhotoView(
-                        profile: previewProfile,
-                        diameter: 44
-                    )
-                    #endif
+            VStack(spacing: DODSpacing.sm) {
+                Button(action: handleProfilePictureRowTap) {
+                    photoHeaderAvatar
                 }
-            }
-            .accessibilityIdentifier("profile-edit-photo")
-        } footer: {
-            #if canImport(UIKit)
-            if inFlightPhotoFilename != nil {
-                Text("Tap the photo to replace or remove it.")
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("profile-edit-photo")
+                .accessibilityLabel("Profile Picture")
+                .accessibilityHint(photoHeaderCaption)
+
+                Text(photoHeaderCaption)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
-            } else {
-                Text("Tap to add a profile picture.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            #else
-            Text("Photo upload requires UIKit.")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-            #endif
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, DODSpacing.sm)
         }
-        .listRowBackground(DODColor.surfaceElevated)
+        // T-753 / CL-150 — float on the page surface (no elevated cell box).
+        .listRowBackground(Color.clear)
+        #if os(iOS)
+        .listRowSeparator(.hidden)
+        #endif
+    }
+
+    /// The header avatar itself — UIKit passes the photo store so a saved
+    /// JPG renders; the macOS slice falls through to the initial-letter
+    /// circle. Both clip to `Circle()` inside ``ProfilePhotoView``.
+    @ViewBuilder
+    private var photoHeaderAvatar: some View {
+        #if canImport(UIKit)
+        ProfilePhotoView(
+            profile: previewProfile,
+            diameter: Self.headerAvatarDiameter,
+            photoStore: photoStore
+        )
+        #else
+        ProfilePhotoView(
+            profile: previewProfile,
+            diameter: Self.headerAvatarDiameter
+        )
+        #endif
+    }
+
+    /// State-dependent caption below the header avatar. Mentions Edit
+    /// (T-745's Edit Photo action) alongside Replace + Remove when a photo
+    /// exists; invites a first upload when none does.
+    private var photoHeaderCaption: String {
+        #if canImport(UIKit)
+        return inFlightPhotoFilename != nil
+            ? "Tap the photo to replace, edit, or remove it."
+            : "Tap to add a profile picture."
+        #else
+        return "Photo upload requires UIKit."
+        #endif
     }
 
     /// T-745 / CL-142 / DUT-39 — Profile Picture row tap handler.
