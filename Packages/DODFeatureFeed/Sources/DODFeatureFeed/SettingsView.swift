@@ -57,6 +57,14 @@ public struct SettingsView: View {
 
     public var body: some View {
         content
+            // T-756 / CL-153 (DUT-62 bug 2) — give the Settings sheet its
+            // OWN live color scheme. Settings is presented as a `.sheet`,
+            // and `preferredColorScheme` applied on `RootView` does NOT
+            // propagate into an already-presented sheet (it only re-captures
+            // on re-present — hence the "only updates on reopen" bug). Driving
+            // it from the now-observable `viewModel.appearance` re-themes the
+            // sheet the instant the App Appearance picker changes.
+            .preferredColorScheme(viewModel.appearance.colorScheme)
             .navigationTitle("Settings")
             #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

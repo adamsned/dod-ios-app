@@ -4,28 +4,19 @@ import DODSupport
 import Foundation
 import Observation
 
-/// State + persistence for the Settings page (US-32 skeleton, US-36 expansion,
-/// US-41 iCloud Sync row, US-44 Profile section).
-///
-/// Persisted keys (`dod.settings.*` + `dod.cloudkit.*`):
-/// - ``useMetricUnitsKey`` — Bool, AC-32.4.
-/// - ``notificationsEnabledKey`` — Bool, AC-36.1 (US-42 / T-631 wires APNs).
-/// - ``appearancePreferenceKey`` — String, AC-36.2 (RootView consumes).
-/// - ``shareFormatPreferenceKey`` — String, AC-36.3.
-/// - ``telemetryEnabledKey`` — Bool, AC-36.5 (TelemetryDeckTransport reads).
-/// - `RecipeStore.cloudKitSyncOptInKey` — Bool, AC-41.3 (launch-time SoT
-///   per DUT-6; routed through ``SettingsDependencies``).
-///
-/// US-44 (T-739) Profile section: the on-device ``profile`` and its
-/// Keychain-backed ``profileStore`` are constructor-injected by the
-/// composition root; ``refreshProfile()`` reloads after edit-view
-/// dismiss.
+/// State + persistence for the Settings page (US-32 skeleton, US-36
+/// expansion, US-41 iCloud Sync row, US-44 Profile section). Persisted
+/// keys live under `dod.settings.*` + `dod.cloudkit.*`; the picker
+/// preferences (`appearance` / `temperaturePreference` / `voiceGender`)
+/// are `@Observable` stored properties as of T-756 / CL-153 so the picker
+/// labels + the sheet theme update live (DUT-62).
 ///
 /// `UserDefaults` is constructor-injected so the L1 unit suite can pass an
-/// isolated `UserDefaults(suiteName:)` — pattern mirrors `RecentSearches`.
+/// isolated `UserDefaults(suiteName:)`. The Profile section's ``profile``
+/// + ``profileStore`` are constructor-injected by the composition root.
 ///
 /// Spec trace: US-32 AC-32.4; US-36 AC-36.1..AC-36.8; US-41 AC-41.3, AC-41.4;
-/// US-44 AC-44.1, AC-44.4.
+/// US-44 AC-44.1, AC-44.4; CL-153.
 @Observable
 @MainActor
 public final class SettingsViewModel {
@@ -173,32 +164,36 @@ public final class SettingsViewModel {
         set { defaults.set(newValue, forKey: Self.commentReplyNotificationsEnabledKey) }
     }
 
-    /// AC-36.2. Defaults to ``AppearancePreference/system`` when the key
-    /// is absent or carries a value that doesn't decode to a known case
-    /// (defensive — preserves Match-System behavior under any future
-    /// rename or migration).
+    /// AC-36.2. **T-756 / CL-153 — observable stored property** (was
+    /// computed-over-`defaults`, which `@Observable` can't track → the App
+    /// Appearance picker label + sheet theme never updated live). Seeded
+    /// from `defaults` in `init`, persisted via `didSet`.
     public var appearance: AppearancePreference {
-        get { AppearancePreference.fromDefaults(defaults) }
-        set { defaults.set(newValue.rawValue, forKey: Self.appearancePreferenceKey) }
+        didSet { defaults.set(appearance.rawValue, forKey: Self.appearancePreferenceKey) }
     }
 
-    /// AC-36.3. Defaults to ``ShareFormatPreference/linkOnly`` when the
-    /// key is absent or carries an unknown value — same defensive
-    /// fallback as ``appearance``.
+    /// DUT-47. **T-756 / CL-153 — observable stored property** (moved here
+    /// from the `+Temperature` extension — stored props can't live in
+    /// extensions; the key stays there). Seeded in `init`, `didSet`-persisted.
+    /// Recipe Detail still reads the persisted value via `@AppStorage`.
+    public var temperaturePreference: TemperaturePreference {
+        didSet { defaults.set(temperaturePreference.rawValue, forKey: Self.temperaturePreferenceKey) }
+    }
+
+    /// AC-36.3. Defaults to ``ShareFormatPreference/linkOnly``. Stays
+    /// computed-over-defaults — no UI picker reads it (T-750 removed the
+    /// row), so it doesn't need the T-756 observable treatment.
     public var shareFormat: ShareFormatPreference {
         get { ShareFormatPreference.fromDefaults(defaults) }
         set { defaults.set(newValue.rawValue, forKey: Self.shareFormatPreferenceKey) }
     }
 
-    /// US-40 / AC-40.10..AC-40.11 (T-721). The user's Cook Mode voice-gender
-    /// preference. Reads + writes via ``VoicePreferenceStore`` (canonical key
-    /// `dod.voice.preferredGenderV1`); defaults to ``VoiceGender/female`` when
-    /// unset. `SystemSpeechSynthesizer` (recipe-detail read-aloud) reads the
-    /// same store, so a change here is honored the next time Cook Mode
-    /// resolves a voice.
+    /// US-40 / AC-40.10..AC-40.11 (T-721). Cook Mode voice-gender preference.
+    /// **T-756 / CL-153 — observable stored property** (was computed-over-
+    /// ``VoicePreferenceStore`` → the voice picker label never updated).
+    /// Seeded in `init`, persisted via the store on `didSet`.
     public var voiceGender: VoiceGender {
-        get { voicePreferenceStore.preference().gender }
-        set { voicePreferenceStore.setGender(newValue) }
+        didSet { voicePreferenceStore.setGender(voiceGender) }
     }
 
     /// AC-36.5. Defaults ON (true). The read uses
@@ -291,6 +286,11 @@ public final class SettingsViewModel {
     ) {
         self.defaults = defaults
         self.voicePreferenceStore = VoicePreferenceStore(defaults: defaults)
+        // T-756 / CL-153 — seed the observable picker preferences (didSet
+        // doesn't fire for these initial-in-init assignments).
+        self.appearance = AppearancePreference.fromDefaults(defaults)
+        self.temperaturePreference = TemperaturePreference.fromDefaults(defaults)
+        self.voiceGender = voicePreferenceStore.preference().gender
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies

@@ -355,14 +355,11 @@ struct RootView: View {
     /// Map the user-selected preference onto SwiftUI's `ColorScheme?`.
     /// `.system` returns `nil` so `.preferredColorScheme(...)` becomes a
     /// no-op and the OS-level setting drives every screen — matches the
-    /// "Match System" default. `.light` / `.dark` force the SwiftUI
-    /// environment value regardless of OS preference.
+    /// "Match System" default. T-756 / CL-153 — delegates to the shared
+    /// ``AppearancePreference/colorScheme`` so RootView (main window) and
+    /// SettingsView (the sheet's own live theme) map identically.
     private func preferredColorScheme(for value: AppearancePreference) -> ColorScheme? {
-        switch value {
-        case .system: nil
-        case .light: .light
-        case .dark: .dark
-        }
+        value.colorScheme
     }
 }
 
