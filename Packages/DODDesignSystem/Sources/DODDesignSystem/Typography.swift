@@ -47,6 +47,12 @@ public enum DODType {
     /// CL-128 / T-731, 2026-05-31 — uniform System font; `.medium` weight stands.)
     public static let caption: Font = .system(.caption, weight: .medium)
 
+    /// ~15pt. Inline secondary detail that sits BETWEEN ``body`` (17) and
+    /// ``caption`` (12) — e.g. the Settings Cook Mode Voice cell's quality
+    /// readout + the iCloud Sync cell's status line, folded under their
+    /// primary control rather than living in their own rows (T-760 / CL-157).
+    public static let detail: Font = .system(.subheadline)
+
     /// 22pt, bold. Reserved for "DUTCH OVEN DADDY" wordmark
     /// moments — splash, About, share-sheet preview cards. Reserved-but-unused
     /// in Phase a; Phase c (T-712) is the first consumer when the nav-bar

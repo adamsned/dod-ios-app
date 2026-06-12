@@ -32,7 +32,10 @@ struct CloudSyncRows: View {
     @Bindable var viewModel: SettingsViewModel
 
     var body: some View {
-        Group {
+        // T-760 / CL-157 (DUT-66) — ONE cell: the toggle on top, then (when
+        // sync is ON) a smaller (``DODType/detail``) inline Status line,
+        // folded in rather than living in its own row.
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Toggle(isOn: toggleBinding) {
                 Text("iCloud Sync")
                     .dodFont(DODType.body)
@@ -43,24 +46,25 @@ struct CloudSyncRows: View {
             .accessibilityHint(accessibilityHint)
 
             if viewModel.isCloudSyncEnabled {
-                statusRow
+                statusLine
             }
         }
     }
 
-    /// AC-41.7 status row reservation. Read-only today; renders
-    /// ``SettingsViewModel/cloudSyncStatusText`` which returns "Idle"
-    /// until T-705 wires the real `CloudKitSyncStatus`-driven copy.
+    /// AC-41.7 status reservation. Read-only today; renders
+    /// ``SettingsViewModel/cloudSyncStatusText`` which returns "Idle" until
+    /// T-705 wires the real `CloudKitSyncStatus`-driven copy. T-760 / CL-157 —
+    /// inline in the iCloud cell at the smaller ``DODType/detail`` size.
     @ViewBuilder
-    private var statusRow: some View {
-        HStack {
-            Text("Status")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-            Spacer()
-            Text(viewModel.cloudSyncStatusText)
-                .dodFont(DODType.body)
+    private var statusLine: some View {
+        HStack(spacing: DODSpacing.xs) {
+            Text("Status:")
+                .dodFont(DODType.detail)
                 .foregroundStyle(DODColor.labelSecondary)
+            Text(viewModel.cloudSyncStatusText)
+                .dodFont(DODType.detail)
+                .foregroundStyle(DODColor.labelSecondary)
+            Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("settings-icloud-sync-status")
