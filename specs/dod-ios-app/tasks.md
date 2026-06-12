@@ -2220,6 +2220,18 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Deps:** main at `c65da90` (T-755 / CL-152 merged). Branch (`fix/T-756-appearance-observable-live-theme`) is off `origin/main`. Touches 5 source files (1 App, 4 DODFeatureFeed) + 1 new test file.
 - **||:** P38-appearance-observable (DUT-62). `e2e` label is NOT applied — unit-pinned by the observation tests + manually verified on device; no new end-to-end journey.
 
+### T-757 — DUT-63 iCloud Sync confirmation dialog (US-41 amendment, CL-154)
+
+- **What:** Fix two iCloud Sync confirmation bugs: (1) the dialog's buttons were orange (need white), and (2) the toggle never flipped ON. Both stem from it being a system `.alert` — alert buttons inherit the app's orange `.tint` (no per-button override), and the alert's `isPresented`-binding cancel-on-dismiss synchronously reverted the async `confirmCloudSyncFlip()` so the flip was swallowed. Fix: replace the system `.alert` with a custom branded `CloudSyncConfirmationDialog` (dimmed backdrop + centered `DODColor.surface` card, filled `castIronBrown` primary button with `cream` white text, plain Cancel) presented via an `.overlay` driven purely by `cloudSyncConfirmationRequest` — no `isPresented` binding, so no cancel-on-dismiss race. The view-model flow is unchanged. Closes Linear DUT-63.
+- **Files:**
+  - **Spec/clarifications/tasks (commit 1):** `specs/dod-ios-app/spec.md` (AC-41.3 amended — custom branded confirmation dialog). `specs/dod-ios-app/clarifications.md` (new CL-154 — the two bugs, the system-alert root causes, the custom-dialog fix, considered-and-rejected alternatives). `specs/dod-ios-app/tasks.md` (this entry).
+  - **Source (commit 2):** `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView+CloudSync.swift` (replace `CloudSyncConfirmationAlertModifier` (system `.alert`) with `CloudSyncConfirmationDialog` + `CloudSyncConfirmationDialogModifier` overlay; the `cloudSyncConfirmationAlert(viewModel:)` entry name is kept).
+  - **Out of bounds:** `SettingsViewModel+CloudSync.swift` (the VM confirm/cancel/request flow — unchanged; all its L1 tests pass untouched); `CloudSyncRows` (the toggle + status row — unchanged); the CL-89 confirm-every-flip contract (honored).
+- **AC:** US-41 AC-41.3 amended (custom branded confirmation dialog driven by `cloudSyncConfirmationRequest`). Pins every other AC-41 contract unchanged.
+- **Est:** ~60 min total.
+- **Deps:** main at `29bc4cb` (T-756 / CL-153 merged). Branch (`fix/T-757-icloud-sync-confirm-dialog`) is off `origin/main`. Touches 1 `DODFeatureFeed` source file.
+- **||:** P39-icloud-confirm-dialog (DUT-63). `e2e` label is NOT applied — the toggle flip is unit-pinned by the existing VM cloud-sync tests + manually verified on device; the L4 alert-visible snapshot regenerates with the custom dialog.
+
 ---
 
 ## Summary
