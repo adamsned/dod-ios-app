@@ -2232,6 +2232,11 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Deps:** main at `29bc4cb` (T-756 / CL-153 merged). Branch (`fix/T-757-icloud-sync-confirm-dialog`) is off `origin/main`. Touches 1 `DODFeatureFeed` source file.
 - **||:** P39-icloud-confirm-dialog (DUT-63). `e2e` label is NOT applied — the toggle flip is unit-pinned by the existing VM cloud-sync tests + manually verified on device; the L4 alert-visible snapshot regenerates with the custom dialog.
 
+### T-758 — DUT-64 Settings layout tweaks (US-36 amendment, CL-155)
+
+- **What:** Two small `SettingsView.swift` tweaks: (1) move "Clear Cached Recipe Images" below "Share Anonymous Usage Data" in the Data & Privacy section (new order: iCloud Sync → telemetry → clear cache); (2) add a `\n` to the "Recipe Step Temperatures" picker label ("Recipe Step\nTemperatures") so the value sits to the right instead of wrapping below (the long label overflowed the row at `.menu` style). Closes Linear DUT-64.
+- **Files:** `specs/dod-ios-app/clarifications.md` (CL-155). `specs/dod-ios-app/tasks.md` (this entry). `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (the reorder + label break). **Deps:** main at `65eeade` (T-757 merged). Branch `fix/T-758-settings-layout-tweaks`. No `e2e` label — pure layout; 81 feed tests pass unchanged.
+
 ---
 
 ## Summary

@@ -127,7 +127,9 @@ public struct SettingsView: View {
                             .tag(value)
                     }
                 } label: {
-                    Text("Recipe Step Temperatures")
+                    // T-758 / CL-155 (DUT-64) — explicit `\n` so the label is
+                    // narrow enough for the value to sit to its RIGHT (not below).
+                    Text("Recipe Step\nTemperatures")
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                 }
@@ -205,12 +207,21 @@ public struct SettingsView: View {
 
             // MARK: T-752 / CL-149 — Data & Privacy group
 
-            // DUT-58 — iCloud Sync (`CloudSyncRows`) + Clear Cached Recipe
-            // Images + Share Anonymous Usage Data grouped under one "Data &
+            // DUT-58 — iCloud Sync (`CloudSyncRows`) + Share Anonymous Usage
+            // Data + Clear Cached Recipe Images grouped under one "Data &
             // Privacy" header, between Tools and About. The iCloud
             // confirmation alert + status refresh stay on the host body.
+            // T-758 / CL-155 (DUT-64) — Clear Cache moved BELOW the telemetry
+            // toggle (was above).
             Section {
                 CloudSyncRows(viewModel: viewModel)
+
+                Toggle(isOn: telemetryEnabledBinding) {
+                    Text("Share Anonymous Usage Data")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-toggle-telemetry")
 
                 Button {
                     Task { await clearImageCacheIfAvailable() }
@@ -220,13 +231,6 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.accent)
                 }
                 .accessibilityIdentifier("settings-button-clear-cache")
-
-                Toggle(isOn: telemetryEnabledBinding) {
-                    Text("Share Anonymous Usage Data")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.label)
-                }
-                .accessibilityIdentifier("settings-toggle-telemetry")
             } header: {
                 sectionHeader("Data & Privacy")
             } footer: {
