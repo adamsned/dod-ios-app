@@ -2184,6 +2184,18 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Deps:** main is at `25aa4fd` (T-751 / CL-148 merged). Branch (`feat/T-752-settings-groups-customization-data-privacy`) is off `origin/main`. Touches 4 `DODFeatureFeed` source files.
 - **||:** P35-settings-customization-dataprivacy (DUT-58). `e2e` label is NOT applied — a layout regroup of existing rows with no new behavior; the regenerating L4 Settings snapshots + the full-`SettingsView` L1 voice/iCloud tests cover it.
 
+### T-753 — DUT-59 Profile edit photo header (US-44 amendment, CL-150)
+
+- **What:** Move the Profile edit photo out of its boxed "Profile Picture" row into a large (88pt, was 44pt), centered, circular, tappable header at the top of the form (above the display-name + email fields), with the tap-action caption directly below it. Update the populated caption "Tap the photo to replace or remove it." → "Tap the photo to replace, edit, or remove it." (names the T-745 Edit Photo action). Keep the circle shape (intrinsic to ``ProfilePhotoView``). Closes Linear DUT-59.
+- **Files:**
+  - **Spec/clarifications/tasks (commit 1):** `specs/dod-ios-app/clarifications.md` (new CL-150 — the header restructure, the clear-background float-out-of-box, the edit-aware caption, considered-and-rejected alternatives). `specs/dod-ios-app/tasks.md` (this entry). (No spec.md AC text edit — AC-44.3's photo layout is documented in CL-150; the AC's substance, the PhotosPicker + crop + Documents path, is unchanged.)
+  - **Source (commit 2):** `Packages/DODFeatureProfile/Sources/DODFeatureProfile/ProfileEditView+Photo.swift` (rewrite `profileEditPhotoSection` as a centered `VStack` header: 88pt tappable circular avatar + caption below, `.listRowBackground(Color.clear)` + `.listRowSeparator(.hidden)`; add `headerAvatarDiameter` static + `photoHeaderAvatar` / `photoHeaderCaption` helpers; identifier `profile-edit-photo` + VoiceOver label/hint preserved). `ProfileEditView.swift` (reorder the `Form` so `profileEditPhotoSection` is FIRST, above `identitySection`).
+  - **Out of bounds:** `handleProfilePictureRowTap` (the T-745 / DUT-39 direct-picker gate — unchanged); the picker / crop / Edit / Remove flows; the photo store; the dirty-state machinery; Save / Sign Out / Delete sections.
+- **AC:** US-44 AC-44.3 photo-row layout (centered 88pt circular header above the identity fields, caption below mentioning replace / edit / remove). Pins every other AC-44 contract unchanged.
+- **Est:** ~25 min total.
+- **Deps:** main is at `0235c54` (T-752 / CL-149 merged). Branch (`feat/T-753-profile-photo-header`) is off `origin/main`. Touches 2 `DODFeatureProfile` source files.
+- **||:** P36-profile-photo-header (DUT-59). `e2e` label is NOT applied — a presentation-only restructure with no behavior change; the regenerating L4 profile snapshots + the existing UIKit-gated `ProfileEditView` logic tests cover it.
+
 ---
 
 ## Summary
