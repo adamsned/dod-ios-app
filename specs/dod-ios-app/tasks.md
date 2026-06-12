@@ -2207,6 +2207,19 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **What:** Rename the Settings → Customization "Appearance" picker row label to "App Appearance" for clarity. One-string change in `SettingsView.swift`; the `settings-picker-appearance` identifier + the option values + persistence unchanged. Closes Linear DUT-61.
 - **Files:** `specs/dod-ios-app/clarifications.md` (CL-152). `specs/dod-ios-app/tasks.md` (this entry). `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsView.swift` (the label). **Deps:** main at `adcc2eb` (T-754 merged). Branch `feat/T-755-app-appearance-label`. No `e2e` label — single label string.
 
+### T-756 — DUT-62 App Appearance observability + live sheet theme (US-36 amendment, CL-153)
+
+- **What:** Fix two App Appearance bugs: (1) the picker's selected-value label didn't update on change, and (2) the Settings sheet didn't re-theme live (only on close + reopen). Root cause: `SettingsViewModel.appearance` (+ `temperaturePreference` + `voiceGender`) were computed-over-store, which `@Observable` can't track (so mutations never re-rendered the picker); and the Settings `.sheet` doesn't inherit `RootView`'s `preferredColorScheme`. Fix: convert the three picker preferences to `@Observable` stored properties (didSet-persist, init-seed) + apply `.preferredColorScheme(viewModel.appearance.colorScheme)` to `SettingsView` so the sheet re-themes live. Closes Linear DUT-62.
+- **Files:**
+  - **Spec/clarifications/tasks (commit 1):** `specs/dod-ios-app/spec.md` (AC-36.2 amended — observable preference + sheet's own preferredColorScheme). `specs/dod-ios-app/clarifications.md` (new CL-153 — the two bugs, the observation + sheet root causes, the fix, considered-and-rejected alternatives). `specs/dod-ios-app/tasks.md` (this entry).
+  - **Source (commit 2):** `SettingsViewModel.swift` (convert `appearance` + `voiceGender` to stored+didSet; add `temperaturePreference` stored+didSet moved from the extension; seed all three in init; trim docs to stay ≤400). `SettingsViewModel+Temperature.swift` (drop the computed property, keep the key). `SettingsPreferences.swift` (`AppearancePreference.colorScheme: ColorScheme?` helper + `import SwiftUI`). `SettingsView.swift` (`.preferredColorScheme(viewModel.appearance.colorScheme)` on the body). `App/RootView.swift` (`preferredColorScheme(for:)` delegates to `appearance.colorScheme`).
+  - **Tests (commit 2 same):** `Packages/DODFeatureFeed/Tests/DODFeatureFeedTests/SettingsViewModelObservationTests.swift` (NEW — `withObservationTracking` proves each picker preference mutation emits an observation change; would fail on the old computed code + a persistence-preservation test).
+  - **Out of bounds:** `shareFormat` (stays computed — no reactive UI reads it post-T-750); the toggles (`useMetricUnits` / `notificationsEnabled` / `telemetryEnabled` — interactive state masks the issue, deferred); the persisted keys + wire format; Recipe Detail's `@AppStorage` temperature read; the voice store read by `SystemSpeechSynthesizer`.
+- **AC:** US-36 AC-36.2 amended (observable appearance + sheet preferredColorScheme). Pins every other Settings AC unchanged.
+- **Est:** ~65 min total.
+- **Deps:** main at `c65da90` (T-755 / CL-152 merged). Branch (`fix/T-756-appearance-observable-live-theme`) is off `origin/main`. Touches 5 source files (1 App, 4 DODFeatureFeed) + 1 new test file.
+- **||:** P38-appearance-observable (DUT-62). `e2e` label is NOT applied — unit-pinned by the observation tests + manually verified on device; no new end-to-end journey.
+
 ---
 
 ## Summary

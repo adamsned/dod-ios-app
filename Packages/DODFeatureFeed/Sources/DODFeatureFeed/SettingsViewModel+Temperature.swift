@@ -26,14 +26,8 @@ extension SettingsViewModel {
     /// with `appearancePreferenceKey` / `shareFormatPreferenceKey`.
     public nonisolated static let temperaturePreferenceKey = TemperatureConverter.preferenceKey
 
-    /// DUT-47. Defaults to ``TemperaturePreference/recipeDefault`` when the
-    /// key is absent or carries a value that doesn't decode to a known case
-    /// (defensive — preserves "show as written" under any future rename or
-    /// migration). Recipe Detail consumes the persisted value at render time
-    /// through the same key via `@AppStorage`; a change here is honored the
-    /// next time the instructions section re-renders.
-    public var temperaturePreference: TemperaturePreference {
-        get { TemperaturePreference.fromDefaults(defaults) }
-        set { defaults.set(newValue.rawValue, forKey: Self.temperaturePreferenceKey) }
-    }
+    // T-756 / CL-153 — the `temperaturePreference` property itself moved to
+    // the primary `SettingsViewModel` declaration: it's now an `@Observable`
+    // STORED property (was computed-over-defaults here), and stored
+    // properties can't live in an extension. Only the key alias stays here.
 }

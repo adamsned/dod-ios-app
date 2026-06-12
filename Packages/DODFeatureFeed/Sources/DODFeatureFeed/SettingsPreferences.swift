@@ -1,5 +1,6 @@
 import DODSupport
 import Foundation
+import SwiftUI
 
 // The Settings preference value types (`AppearancePreference`,
 // `ShareFormatPreference`, `TemperaturePreference`) were extracted from
@@ -32,6 +33,19 @@ public enum AppearancePreference: String, CaseIterable, Sendable, Hashable {
         case .system: "Match System"
         case .light: "Light"
         case .dark: "Dark"
+        }
+    }
+
+    /// T-756 / CL-153 — the `ColorScheme?` this preference maps to for
+    /// `.preferredColorScheme(...)`: `.system` → `nil` (inherit the OS
+    /// setting), `.light` / `.dark` → the forced scheme. Single source of
+    /// truth reused by both `RootView` (main window) and `SettingsView`
+    /// (the Settings sheet's own live theme — fixes DUT-62 bug 2).
+    public var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
         }
     }
 
