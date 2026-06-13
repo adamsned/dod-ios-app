@@ -54,11 +54,13 @@ jobs:
               - '.swiftlint.yml'
               - 'bin/**'
               - '.github/workflows/ci.yml'
+              - '.github/actions/**'
             ios_sim:
               - 'App/**'
               - 'Packages/**'
               - 'project.yml'
               - '.github/workflows/ci.yml'
+              - '.github/actions/**'
 
   lint:
     name: Lint
@@ -188,13 +190,22 @@ jobs:
           key: ${{ runner.os }}-xcode26-srcpkgs-designsystem-${{ hashFiles('Packages/*/Package.swift') }}
           restore-keys: |
             ${{ runner.os }}-xcode26-srcpkgs-designsystem-
+      # Guarantee the iPhone 17 device exists + is booted (the runner image
+      # intermittently ships without it). Snapshot baselines are geometry-
+      # locked to iPhone 17, so this must be that exact device, not a
+      # substitute — the action creates it if missing rather than falling back.
+      - name: Ensure iPhone 17 simulator
+        id: sim
+        uses: ./.github/actions/ensure-ios-simulator
       - name: Test on iOS simulator
         working-directory: Packages/DODDesignSystem
+        env:
+          DESTINATION: ${{ steps.sim.outputs.destination }}
         run: |
           set -o pipefail
           xcodebuild \
             -scheme DODDesignSystem \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination "$DESTINATION" \
             -derivedDataPath ~/Library/Developer/Xcode/DerivedData/DODDesignSystem-cache \
             test | xcpretty
       - name: Upload snapshot diffs on failure
@@ -256,10 +267,15 @@ jobs:
       - name: Build for iOS Simulator
         run: |
           set -o pipefail
+          # Build-only: no booted device required, so use the device-agnostic
+          # generic simulator destination. This sidesteps the "Unable to find
+          # a device ... name:iPhone 17" flake entirely — there is no device
+          # name to match. (Test jobs that DO need a booted sim use the
+          # ensure-ios-simulator action instead.)
           xcodebuild \
             -project DODApp.xcodeproj \
             -scheme DODApp \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             -derivedDataPath DerivedData \
             build | xcpretty
@@ -295,13 +311,18 @@ jobs:
         run: brew install xcodegen
       - name: Generate project
         run: xcodegen generate
+      - name: Ensure iPhone 17 simulator
+        id: sim
+        uses: ./.github/actions/ensure-ios-simulator
       - name: Run unit tests
+        env:
+          DESTINATION: ${{ steps.sim.outputs.destination }}
         run: |
           set -o pipefail
           xcodebuild \
             -project DODApp.xcodeproj \
             -scheme DODApp \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination "$DESTINATION" \
             -derivedDataPath DerivedData \
             -only-testing:DODAppUnitTests \
             test | xcpretty
@@ -333,26 +354,19 @@ jobs:
         run: brew install xcodegen
       - name: Generate project
         run: xcodegen generate
+      # Guarantee a booted iPhone 17 (create-if-missing) and pin the
+      # destination by UDID — replaces the previous inline "prefer iPhone 17,
+      # else any iPhone, else bare name" resolver. Shared with L1/L4/L5 via
+      # the ensure-ios-simulator action so there is one source of truth.
+      - name: Ensure iPhone 17 simulator
+        id: sim
+        uses: ./.github/actions/ensure-ios-simulator
       - name: Run UI tests (resilient to simulator/runner flake)
+        env:
+          DESTINATION: ${{ steps.sim.outputs.destination }}
         run: |
           set -o pipefail
-          # Resolve an actually-available iPhone simulator instead of
-          # hardcoding a device name a given runner image may lack. Observed
-          # flake: "Unable to find a device ... name:iPhone 17" on an
-          # otherwise-healthy runner. Prefer iPhone 17; else the first
-          # available iPhone; else fall back to the pinned name.
-          device_id=$(xcrun simctl list devices available --json | jq -r '
-            ([.devices[][] | select(.name == "iPhone 17")] | first)
-            // ([.devices[][] | select(.name | startswith("iPhone"))] | first)
-            | .udid // empty')
-          if [ -n "$device_id" ]; then
-            destination="platform=iOS Simulator,id=$device_id"
-            # Warm-boot so the test runner doesn't race a cold simulator.
-            xcrun simctl boot "$device_id" 2>/dev/null || true
-          else
-            destination="platform=iOS Simulator,name=iPhone 17"
-          fi
-          echo "L3 destination -> $destination"
+          echo "L3 destination -> $DESTINATION"
           # XCUITests flake at the infra layer on GitHub macOS runners:
           # cold-sim races + test-runner SIGKILL before bootstrap. Retry the
           # whole invocation up to 3x; within each run, retry individual
@@ -373,7 +387,7 @@ jobs:
             if xcodebuild \
               -project DODApp.xcodeproj \
               -scheme DODApp \
-              -destination "$destination" \
+              -destination "$DESTINATION" \
               -derivedDataPath DerivedData \
               -only-testing:DODAppUITests \
               -skip-testing:DODAppUITests/ScreenshotTests \
@@ -438,13 +452,18 @@ jobs:
         run: brew install xcodegen
       - name: Generate project
         run: xcodegen generate
+      - name: Ensure iPhone 17 simulator
+        id: sim
+        uses: ./.github/actions/ensure-ios-simulator
       - name: Run E2E user journeys
+        env:
+          DESTINATION: ${{ steps.sim.outputs.destination }}
         run: |
           set -o pipefail
           xcodebuild \
             -project DODApp.xcodeproj \
             -scheme DODApp \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination "$DESTINATION" \
             -derivedDataPath DerivedData \
             -only-testing:DODAppE2ETests \
             test | xcpretty

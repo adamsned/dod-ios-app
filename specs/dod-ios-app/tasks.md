@@ -2286,6 +2286,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `specs/dod-ios-app/{clarifications.md (CL-162), spec.md (AC-34.6 amended), tasks.md}`. `Packages/DODPersistence/Sources/DODPersistence/RecipeStore+SavedWidget.swift` (store accessor — placed in the extension to keep `RecipeStore.swift` ≤400). `…/DODFeature{Feed,Search,Categories}/…` dependencies + view models + views; new `SearchViewModel+SavedState.swift` (file-length cap). Tests: `SyncedSavedRecipeTests` (+store projection), `FeedViewModelTests` (+hydrate/optimistic).
 - **AC:** US-34 AC-34.6 amended (state-aware label on all card surfaces; the Feed/Categories/Search TODO resolved) (CL-162 canonical). **Est:** ~75 min. **Deps:** main at `31f4317` (T-764 merged). Branch `feat/T-765-context-menu-saved-state`. **||:** P46-card-saved-state (DUT-71). No `e2e` label — L1-pinned (Feed 6 + persistence 28 + Search 76 + Categories 10); the existing Saved-tab L5 journey is unaffected.
 
+### T-766 — DUT-72 Saved widget: populate `heroImageFilename` so hero photos show (US-17 amendment, CL-163)
+
+- **What:** Fix the Saved Recipes widget rendering the gradient placeholder instead of recipe photos. `SavedRecipesWidgetPublisher.toSnapshotEntry` hardcoded `heroImageFilename: nil` (a T-322 deferral); now emits `row.heroImageCached ? WidgetImageBridge.filename(for: row.heroImageURL) : nil` — the bytes are already mirrored to the App Group by `RecipeStore.cacheImage` (AC-21.2), so the widget reads the local file + renders the full-color photo (same path as the Featured widget). PR1 of the 3-PR widget overhaul. Closes Linear DUT-72.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-163), spec.md (AC-17.3 amended), tasks.md}`. `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/SavedRecipesWidgetPublisher.swift`. Test: `SavedRecipesWidgetPublisherTests` (+`heroImageFilenameIsSetWhenBytesAreCached`, comment refresh on the nil case).
+- **AC:** US-17 AC-17.3 amended (saved snapshot carries the bridged hero filename) (CL-163 canonical). **Est:** ~30 min. **Deps:** main at `14e2856` (T-765 merged). Branch `feat/T-766-saved-widget-images`. **||:** P47-widget-overhaul (DUT-72). No `e2e` label — 9 publisher L1 tests pass + manual on-device verify. **PR1 of 3:** → PR2 Tinted/Clear styling → PR3 Large sizes.
+
 ---
 
 ## Summary
