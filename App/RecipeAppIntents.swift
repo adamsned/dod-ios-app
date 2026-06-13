@@ -68,7 +68,7 @@ struct OpenSavedRecipesIntent: AppIntent {
 
     static let title: LocalizedStringResource = "Show Saved Recipes"
     static let description = IntentDescription(
-        "Opens the list of recipes you've saved for offline cooking."
+        "Opens the list of recipes you've saved."
     )
 
     static let openAppWhenRun: Bool = true

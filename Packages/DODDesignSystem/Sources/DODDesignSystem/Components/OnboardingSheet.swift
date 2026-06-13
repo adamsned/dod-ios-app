@@ -132,8 +132,8 @@ public struct OnboardingSheet: View {
             ),
             .init(
                 systemImage: "bookmark.fill",
-                title: "Save for offline",
-                caption: "Tap the bookmark on any recipe to cook it without Wi-Fi."
+                title: "Save your favorites",
+                caption: "Tap the bookmark on any recipe to find it again later."
             ),
         ],
         ctaTitle: "Get cooking",
