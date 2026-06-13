@@ -27,12 +27,16 @@ public enum AppearancePreference: String, CaseIterable, Sendable, Hashable {
     case light
     case dark
 
-    /// Human-readable label rendered in the picker row.
+    /// Human-readable label rendered in the picker row. T-763 / CL-160
+    /// (DUT-69) — the two explicit-scheme labels carry brand personality:
+    /// `.light` → "Flour", `.dark` → "Cocoa" (the `rawValue`s + the
+    /// `colorScheme` mapping are unchanged, so a saved preference is
+    /// preserved). "Match System" stays plain.
     public var displayName: String {
         switch self {
         case .system: "Match System"
-        case .light: "Light"
-        case .dark: "Dark"
+        case .light: "Flour"
+        case .dark: "Cocoa"
         }
     }
 
