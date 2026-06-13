@@ -73,7 +73,7 @@ public struct EmptyState: View {
     EmptyState(
         systemImage: "bookmark",
         title: "No saved recipes yet",
-        message: "Tap the bookmark on any recipe to save it for offline."
+        message: "Tap the bookmark on any recipe to find it again later."
     )
 }
 

@@ -2274,6 +2274,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `specs/dod-ios-app/{clarifications.md (CL-160), spec.md (AC-36.2 amended), tasks.md (this entry)}`. `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsPreferences.swift` (the two `displayName` strings).
 - **AC:** US-36 AC-36.2 amended (picker reads "Match System" / "Flour" / "Cocoa") (CL-160 canonical). **Est:** ~15 min. **Deps:** main at `bacd2eb` (T-762 merged). Branch `feat/T-763-appearance-flour-cocoa-labels`. **||:** P44-appearance-labels (DUT-69). No `e2e` label — a label-only change; the `.menu` picker shows only the selected value so L4 Settings snapshots are unaffected, and the 50 `SettingsViewModel*` L1 tests pass unchanged.
 
+### T-764 — DUT-70 Reword stale "save for offline" Save copy → favorite/find-later (US-5/US-10 amendment, CL-161)
+
+- **What:** Follow-up cleanup to T-761 / T-762 (Save decoupled from the offline download). Four sites still framed Save as "for offline": (1) the Saved-tab empty-state message → "Tap the bookmark on any recipe to find it again later." (matches the splash caption); (2) the Siri/Shortcuts `OpenSavedRecipesIntent` description → "Opens the list of recipes you've saved."; (3) the `EmptyState` `#Preview` default + (4) the `OnboardingSheet` `#Preview` bullet → both matched. Copy-only, no behavior change. Closes Linear DUT-70.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-161), spec.md (AC-5.8 amended), tasks.md (this entry)}`. `Packages/DODFeatureSaved/Sources/DODFeatureSaved/SavedView.swift`, `App/RecipeAppIntents.swift`, `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/{EmptyState,OnboardingSheet}.swift` (the two `#Preview`s). The empty-state **title** ("No saved recipes yet") is untouched so the L3/L5 assertions hold; the DS snapshot fixtures' sample "Save for offline" bullet is intentionally left (render fixture, not shipped copy).
+- **AC:** US-5 AC-5.8 amended (Saved empty-state message) + US-10 `OpenSavedRecipesIntent` description reworded (CL-161 canonical). **Est:** ~15 min. **Deps:** main at `1277a74` (T-763 merged). Branch `feat/T-764-reword-save-favorite-copy`. **||:** P45-save-copy-reword (DUT-70). No `e2e` label — copy-only; DODFeatureSaved (29) + DODDesignSystem (19) L1 suites pass, no L4 regen (Saved snapshots render the loaded state only).
+
 ---
 
 ## Summary
