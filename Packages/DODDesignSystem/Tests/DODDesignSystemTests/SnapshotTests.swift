@@ -46,10 +46,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             action: .init(title: "Retry") {}
         )
         .frame(width: 390, height: 600)
-        assertSnapshot(
-            of: view,
-            as: Self.tolerantImage(layout: .fixed(width: 390, height: 600))
-        )
+        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 390, height: 600)))
     }
 
     func test_offlineBanner_offline() {
@@ -173,6 +170,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             )
         )
         .frame(width: 158, height: 158)
+        .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 158, height: 158)), record: .missing)
     }
 
@@ -188,6 +186,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
             )
         )
         .frame(width: 338, height: 158)
+        .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 338, height: 158)), record: .missing)
     }
 
@@ -196,6 +195,7 @@ final class DesignSystemSnapshotTests: XCTestCase {
     func test_widgetCard_placeholder() {
         let view = WidgetCard.Placeholder()
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 158, height: 158)), record: .missing)
     }
 

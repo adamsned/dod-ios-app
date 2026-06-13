@@ -127,7 +127,10 @@ public enum WidgetCard {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(DODSpacing.md)
                 .frame(maxWidth: .infinity)
-                .background(DODColor.surfaceElevated)
+                // T-767 / CL-164 (DUT-73) — no inner background: the widget's
+                // `containerBackground(for: .widget)` owns it, so Tinted/Clear
+                // mode tints it (Apple News pattern) instead of the system
+                // flattening a solid inner fill into a tint silhouette.
             }
         }
     }
@@ -155,7 +158,7 @@ public enum WidgetCard {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(DODSpacing.md)
-            .background(DODColor.surfaceElevated)
+            // T-767 / CL-164 — background owned by `containerBackground` (Tinted-safe).
         }
     }
 

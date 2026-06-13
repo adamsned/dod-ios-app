@@ -62,7 +62,7 @@ extension WidgetCard {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(DODSpacing.sm)
-            .background(DODColor.surfaceElevated)
+            // T-767 / CL-164 — background owned by `containerBackground` (Tinted-safe).
         }
     }
 
@@ -100,7 +100,7 @@ extension WidgetCard {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(DODSpacing.sm)
-            .background(DODColor.surfaceElevated)
+            // T-767 / CL-164 — background owned by `containerBackground` (Tinted-safe).
         }
     }
 
@@ -127,7 +127,7 @@ extension WidgetCard {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(DODSpacing.md)
-            .background(DODColor.surfaceElevated)
+            // T-767 / CL-164 — background owned by `containerBackground` (Tinted-safe).
         }
     }
 
