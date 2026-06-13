@@ -57,6 +57,24 @@ import Testing
         #expect(viewModel.items.map(\.id) == [1, 3])
     }
 
+    @Test func onAppearHydratesSavedIDsAndOptimisticToggleFlips() async throws {
+        // T-765 / CL-162 (DUT-71) — the card long-press menu reads
+        // `savedRecipeIDs`. It hydrates from the store on appear, and an
+        // optimistic toggle flips membership immediately (so the menu label is
+        // correct on re-open) ahead of the async store round-trip.
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = (1...3).map(Self.makeItem)
+        dependencies.savedIDs = [2]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.savedRecipeIDs == [2])
+
+        // Save an unsaved card + unsave the saved card — both flip locally.
+        viewModel.applyOptimisticSaveToggle(id: 1)
+        viewModel.applyOptimisticSaveToggle(id: 2)
+        #expect(viewModel.savedRecipeIDs == [1])
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
@@ -77,6 +95,7 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     var shouldFail: Bool = false
     var online: Bool = true
     var clearBlocklistCalls: Int = 0
+    var savedIDs: Set<Int> = []
 
     func fetchPosts(page: Int) async throws -> [RecipeListItem] {
         if shouldFail {
@@ -104,4 +123,5 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     func connectivityChanges() async -> AsyncStream<Bool> {
         AsyncStream { _ in }
     }
+    func savedRecipeIDs() async throws -> Set<Int> { savedIDs }
 }

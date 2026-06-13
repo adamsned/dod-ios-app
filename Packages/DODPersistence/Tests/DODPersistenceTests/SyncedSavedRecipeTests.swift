@@ -78,6 +78,24 @@ struct SyncedSavedRecipeTests {
         #expect(try await store.savedRecipes().isEmpty)
     }
 
+    @Test("savedRecipeIDs returns the saved id set; unsaving removes from it")
+    func savedRecipeIDsReflectsTheSavedSet() async throws {
+        // T-765 / CL-162 (DUT-71) — the lightweight id projection the card
+        // long-press menu reads to render the correct Save/Unsave label.
+        let store = RecipeStore(modelContainer: try RecipeStore.inMemoryContainer())
+        try await store.cache(listItem: sampleListItem(id: 10, title: "Chili"))
+        try await store.cache(listItem: sampleListItem(id: 11, title: "Bread"))
+        try await store.cache(listItem: sampleListItem(id: 12, title: "Stew"))
+        #expect(try await store.savedRecipeIDs().isEmpty)
+
+        _ = try await store.toggleSaved(id: 10)
+        _ = try await store.toggleSaved(id: 12)
+        #expect(try await store.savedRecipeIDs() == [10, 12])
+
+        _ = try await store.toggleSaved(id: 10)
+        #expect(try await store.savedRecipeIDs() == [12])
+    }
+
     @Test("savedRecipes is ordered newest-saved first")
     func savedRecipesNewestFirst() async throws {
         let store = RecipeStore(modelContainer: try RecipeStore.inMemoryContainer())

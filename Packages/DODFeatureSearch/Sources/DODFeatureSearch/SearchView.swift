@@ -92,7 +92,10 @@ public struct SearchView: View {
             }
             #endif
         }
-        .task { await viewModel.loadCategoriesIfNeeded() }
+        .task {
+            await viewModel.loadCategoriesIfNeeded()
+            await viewModel.refreshSavedRecipeIDs()  // T-765: state-aware menu on appear
+        }
     }
 
     /// CL-127 (T-649): gate the banner on a settled state so it never
@@ -249,15 +252,11 @@ public struct SearchView: View {
                     highlightQuery: viewModel.query
                 )
                 .recipeCardTap { onSelect(item) }
-                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO:
-                // thread per-card `isSaved` state once a Search
-                // viewmodel-owned `Set<Int>` of saved IDs (CL-60 path-(c))
-                // is wired. Until then `false` keeps the pre-T-634 "Save"
-                // + `bookmark.fill` copy at this surface; the high-value
-                // Saved-tab fix is the priority for T-634.
-                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
-                // T-737 / L5: stable handle mirroring `dod.feed.card` so
-                // XCUITest avoids toolbar / chip / "Try" button sweep.
+                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
+                    viewModel.applyOptimisticSaveToggle(id: item.id)
+                    onSave?(item)
+                }
+                // T-737 / L5: stable handle mirroring `dod.feed.card`.
                 .accessibilityIdentifier("dod.search.card")
             }
         }
@@ -278,7 +277,10 @@ public struct SearchView: View {
                     highlightQuery: viewModel.query
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
+                    viewModel.applyOptimisticSaveToggle(id: item.id)
+                    onSave?(item)
+                }
                 .accessibilityIdentifier("dod.search.card")
             }
         }

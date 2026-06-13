@@ -153,16 +153,12 @@ public struct FeedView: View {
             ForEach(viewModel.items) { item in
                 FeedRow(item: item)
                     .recipeCardTap { onSelect(item) }
-                    // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO:
-                    // thread per-card `isSaved` state once a Feed
-                    // viewmodel-owned `Set<Int>` of saved IDs (CL-60
-                    // path-(c)) is wired. Until then `false` keeps the
-                    // pre-T-634 "Save" + `bookmark.fill` copy at this
-                    // surface; the high-value Saved-tab fix is the
-                    // priority for T-634. RecipeListItem has no `isSaved`
-                    // field, so the cheapest follow-up is the viewmodel-
-                    // owned set hydrated alongside the result set.
-                    .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                    // T-765 / CL-162 (DUT-71) — state-aware Save/Unsave from the
+                    // viewmodel-owned saved-id set; optimistic flip on toggle.
+                    .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item)
+                    }
                     // Stable L3 handle: `app.buttons.matching(identifier:)`
                     // targets feed recipe cards directly, so XCUITest can't
                     // accidentally tap a nav-bar toolbar button (the layout
@@ -191,9 +187,10 @@ public struct FeedView: View {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) — TODO as
-                // above (CL-60 path-(c) viewmodel-owned saved-IDs set).
-                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
+                    viewModel.applyOptimisticSaveToggle(id: item.id)
+                    onSave?(item)
+                }
                 .accessibilityIdentifier("dod.feed.card")
                 .task {
                     await viewModel.loadMoreIfNeeded(currentItem: item)

@@ -90,10 +90,10 @@ public final class SearchViewModel {
     /// what tells the user why a title-less recipe matched. Filter chips do
     /// NOT narrow this discovery tier in v1.
     public internal(set) var ingredientItems: [RecipeListItem] = []
-    /// Last user-typed query that produced `items`. Used so filter changes
-    /// can re-merge without re-running the network call. CL-106 (T-637)
-    /// promotes the setter to `internal` for the same Latest-Recipes
-    /// extension-write reason as `items` above.
+    /// T-765 / CL-162 — saved recipe ids for the card menu (see `SearchViewModel+SavedState`).
+    public internal(set) var savedRecipeIDs: Set<Int> = []
+    /// Last user-typed query that produced `items` (so filter changes re-merge
+    /// without a network call). `internal(set)` for the T-637 extension write.
     public internal(set) var lastQuery: String = ""
     /// Categories list for the category chip menu. Loaded lazily.
     public private(set) var availableCategories: [DODDomain.Category] = []
