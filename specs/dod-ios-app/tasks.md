@@ -2268,6 +2268,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `specs/dod-ios-app/{clarifications.md (CL-159), spec.md (AC-8.1 + AC-41.2 amended), tasks.md (this entry)}`. `App/RootView.swift` + `App/DODApp.swift`. Deletes `App/CloudKitOptInPromptGate.swift`, `AppTests/CloudKitOptInPromptGateTests.swift`, `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/CloudKitOptInSheet.swift`.
 - **AC:** US-8 AC-8.1 amended (four bullets) + US-41 AC-41.2 amended (opt-in sheet removed; Settings-only opt-in) (CL-159 canonical). **Est:** ~35 min. **Deps:** main at `0645518` (T-761 merged). Branch `feat/T-762-single-splash-screen`. **||:** P43-single-splash (DUT-68). No `e2e` label — presentation + dead-code removal; the existing onboarding L3 smoke + the compile gates (`build` + `build-for-testing`) cover it. Final PR of the 3-PR cleanup batch (T-760 → T-761 → T-762).
 
+### T-763 — DUT-69 App Appearance labels: "Light" → "Flour", "Dark" → "Cocoa" (US-36 amendment, CL-160)
+
+- **What:** Give the Settings → Customization → App Appearance options brand personality. `AppearancePreference.displayName` maps `.light` → "Flour" and `.dark` → "Cocoa"; "Match System" is unchanged (explicitly out of scope). Labels only — cases, `rawValue`s, `colorScheme` mapping, default, and `settings-picker-appearance` identifier untouched (saved preferences preserved, no migration). Closes Linear DUT-69.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-160), spec.md (AC-36.2 amended), tasks.md (this entry)}`. `Packages/DODFeatureFeed/Sources/DODFeatureFeed/SettingsPreferences.swift` (the two `displayName` strings).
+- **AC:** US-36 AC-36.2 amended (picker reads "Match System" / "Flour" / "Cocoa") (CL-160 canonical). **Est:** ~15 min. **Deps:** main at `bacd2eb` (T-762 merged). Branch `feat/T-763-appearance-flour-cocoa-labels`. **||:** P44-appearance-labels (DUT-69). No `e2e` label — a label-only change; the `.menu` picker shows only the selected value so L4 Settings snapshots are unaffected, and the 50 `SettingsViewModel*` L1 tests pass unchanged.
+
 ---
 
 ## Summary
