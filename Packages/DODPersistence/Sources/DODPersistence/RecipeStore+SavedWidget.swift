@@ -52,6 +52,15 @@ public struct SavedRecipeWidgetRow: Sendable, Equatable {
 
 extension RecipeStore {
 
+    /// T-765 / CL-162 (DUT-71) — the id set of every saved recipe, read from
+    /// the synced source of truth (same rows ``isSaved(id:)`` / ``savedRecipes()``
+    /// use). Lightweight projection (no `toDomain` stitch) for the card
+    /// long-press menu to render the correct Save/Unsave label on every surface.
+    public func savedRecipeIDs() throws -> Set<Int> {
+        let descriptor = FetchDescriptor<SyncedSavedRecipe>()
+        return Set(try modelContext.fetch(descriptor).map(\.id))
+    }
+
     /// Fetch the most-recently-saved recipes, projected into the narrow
     /// shape the saved-recipes widget snapshot needs (spec.md US-17 /
     /// AC-17.3). Sorted by `lastViewedAt` descending, capped at `limit`.

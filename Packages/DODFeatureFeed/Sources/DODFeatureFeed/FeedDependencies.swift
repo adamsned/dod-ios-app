@@ -21,10 +21,16 @@ public protocol FeedDependencies: Sendable {
     /// implementation is a no-op so existing fake conformers in unit tests
     /// keep compiling — only the live wiring needs to do anything.
     func publishWidgetSnapshot(items: [RecipeListItem]) async
+    /// T-765 / CL-162 (DUT-71) — the id set of saved recipes, used by the
+    /// card long-press menu to render the correct Save/Unsave label. Default
+    /// `[]` so existing fake conformers keep compiling; the live wiring routes
+    /// to ``RecipeStore/savedRecipeIDs()``.
+    func savedRecipeIDs() async throws -> Set<Int>
 }
 
 extension FeedDependencies {
     public func publishWidgetSnapshot(items: [RecipeListItem]) async {}
+    public func savedRecipeIDs() async throws -> Set<Int> { [] }
 }
 
 /// Production wiring. Constructed by the app composition root (T-140).
@@ -104,6 +110,10 @@ public struct LiveFeedDependencies: FeedDependencies {
 
     public func connectivityChanges() async -> AsyncStream<Bool> {
         await monitor.changes()
+    }
+
+    public func savedRecipeIDs() async throws -> Set<Int> {
+        try await store.savedRecipeIDs()
     }
 
     public func publishWidgetSnapshot(items: [RecipeListItem]) async {

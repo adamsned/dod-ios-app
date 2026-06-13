@@ -93,6 +93,13 @@ public protocol SearchDependencies: Sendable {
     // MARK: - Telemetry + connectivity
     func sendSearchTelemetry(queryHash: String) async
     func isOnline() async -> Bool
+    /// T-765 / CL-162 (DUT-71) — saved recipe id set for the card long-press
+    /// Save/Unsave label. Default `[]` keeps existing fake conformers compiling.
+    func savedRecipeIDs() async throws -> Set<Int>
+}
+
+extension SearchDependencies {
+    public func savedRecipeIDs() async throws -> Set<Int> { [] }
 }
 
 public struct LiveSearchDependencies: SearchDependencies {
@@ -140,6 +147,10 @@ public struct LiveSearchDependencies: SearchDependencies {
 
     public func cache(listItems: [RecipeListItem]) async throws {
         try await store.cache(listItems: listItems)
+    }
+
+    public func savedRecipeIDs() async throws -> Set<Int> {
+        try await store.savedRecipeIDs()
     }
 
     public func categoryIDs(forRecipeIDs ids: [Int]) async throws -> [Int: [Int]] {

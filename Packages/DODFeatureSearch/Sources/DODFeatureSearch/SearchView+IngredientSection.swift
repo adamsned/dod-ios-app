@@ -88,7 +88,10 @@ extension SearchView {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
+                    viewModel.applyOptimisticSaveToggle(id: item.id)
+                    onSave?(item)
+                }
                 .accessibilityIdentifier("dod.search.ingredientCard")
             }
         }
@@ -105,7 +108,10 @@ extension SearchView {
                     totalTimeDisplay: item.totalTimeDisplay
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(isSaved: false) { onSave?(item) }
+                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
+                    viewModel.applyOptimisticSaveToggle(id: item.id)
+                    onSave?(item)
+                }
                 .accessibilityIdentifier("dod.search.ingredientCard")
             }
         }
