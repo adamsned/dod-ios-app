@@ -82,16 +82,30 @@ import Testing
     }
 
     @Test func heroImageFilenameIsNilWhenBytesAreNotCached() async throws {
-        // T-321 (widget extension) will own the bridge between
-        // CachedImage bytes and an App-Group filename. T-322's contract
-        // is: leave the filename nil whenever the cache hasn't been
-        // populated yet (the brief calls this out explicitly). The widget
-        // extension renders a placeholder for nil filenames per AC-17.5.
+        // T-766 / CL-163 (DUT-72): the filename stays nil when the recipe's
+        // hero bytes aren't cached (no bridged file to point at) — the widget
+        // renders its gradient placeholder per AC-17.5 / AC-21.3.
         let harness = try await Harness.make()
         try await harness.saveRecipe(id: 1, title: "NoImage")
         await harness.publisher.publish()
         let snapshot = try #require(harness.widgetStore.readSavedRecipes())
         #expect(snapshot.entries.first?.heroImageFilename == nil)
+    }
+
+    @Test func heroImageFilenameIsSetWhenBytesAreCached() async throws {
+        // T-766 / CL-163 (DUT-72): once the hero bytes are cached
+        // (`RecipeStore.cacheImage`, which also mirrors them to the App Group
+        // bridge per AC-21.2), the saved snapshot carries the deterministic
+        // bridged filename so the widget renders the full-color photo — the
+        // same path the Featured widget already uses.
+        let harness = try await Harness.make()
+        let heroURL = try #require(URL(string: "https://www.dutchovendaddy.com/img/1.jpg"))
+        try await harness.saveRecipeWithCachedImage(id: 1, title: "Chili", heroURL: heroURL)
+        await harness.publisher.publish()
+        let snapshot = try #require(harness.widgetStore.readSavedRecipes())
+        #expect(
+            snapshot.entries.first?.heroImageFilename == WidgetImageBridge.filename(for: heroURL)
+        )
     }
 
     @Test func emptyStoreStillProducesAReloadAndAnEmptyPayload() async throws {
@@ -179,6 +193,25 @@ import Testing
                 canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
             )
             try await store.cache(listItem: listItem)
+            _ = try await store.toggleSaved(id: id)
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+
+        /// Like `saveRecipe` but with a hero image URL whose bytes are cached
+        /// via `RecipeStore.cacheImage` — so `heroImageCached` is true and the
+        /// publisher emits the bridged filename. T-766 / CL-163.
+        func saveRecipeWithCachedImage(id: Int, title: String, heroURL: URL) async throws {
+            let listItem = RecipeListItem(
+                id: id,
+                title: title,
+                excerpt: "Excerpt.",
+                heroImage: heroURL,
+                publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                totalTimeDisplay: nil,
+                canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
+            )
+            try await store.cache(listItem: listItem)
+            try await store.cacheImage(url: heroURL, bytes: Data([0xFF, 0xD8, 0xFF]))
             _ = try await store.toggleSaved(id: id)
             try await Task.sleep(nanoseconds: 1_000_000)
         }

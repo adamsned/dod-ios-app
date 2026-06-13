@@ -1,0 +1,76 @@
+name: "Ensure iOS Simulator"
+description: >
+  Guarantees an "iPhone 17" simulator is present + booted on the runner and
+  emits an xcodebuild `-destination` string pinned to its UDID. Fixes the
+  intermittent "Unable to find a device matching ... name:iPhone 17" flake:
+  the GitHub macos-15 image does not always pre-create the iPhone 17 device,
+  so a bare `name:iPhone 17` destination fails on an otherwise-healthy runner.
+  This action resolves the device if it already exists, and CREATES it on the
+  newest installed iOS runtime if it does not — so callers always get a real
+  device. Pinning by UDID (vs the bare name) also sidesteps name-match races.
+
+  Requires: the desired Xcode is already selected (callers run
+  `sudo xcode-select -s ...` first) so `xcrun simctl` + the iPhone 17 device
+  type resolve against the iOS 26 SDK, and the repo is checked out.
+
+# The booted device's geometry must match the recorded snapshot baselines
+# (L4 records on iPhone 17 — logical 402×874pt), so this action deliberately
+# guarantees iPhone 17 specifically rather than falling back to "any iPhone".
+outputs:
+  destination:
+    description: "xcodebuild -destination value, pinned to the booted device UDID"
+    value: ${{ steps.resolve.outputs.destination }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+        NAME="iPhone 17"
+
+        # Fast path (the common case): the runner image already created the
+        # device. Resolve its UDID and reuse it.
+        udid=$(xcrun simctl list devices available --json \
+          | jq -r --arg n "$NAME" \
+              '[.devices[][] | select(.name == $n)] | first | .udid // empty')
+
+        if [ -z "$udid" ]; then
+          echo "::notice::'$NAME' simulator not present on this runner image; creating it."
+
+          # Newest available iOS runtime (Xcode 26 ships iOS 26.x). Sort by a
+          # numeric (major, minor, ...) tuple so 26.0 outranks 9.0, then take
+          # the last. Only iOS identifiers contain "iOS" (watchOS/tvOS/xrOS do
+          # not), so the filter is unambiguous.
+          runtime=$(xcrun simctl list runtimes --json \
+            | jq -r '[.runtimes[]
+                      | select(.isAvailable == true and (.identifier | contains("iOS")))]
+                     | sort_by(.version | split(".") | map(tonumber))
+                     | last | .identifier // empty')
+          if [ -z "$runtime" ]; then
+            echo "::error::No available iOS simulator runtime found on this runner."
+            exit 1
+          fi
+
+          # Resolve the canonical device-type id; fall back to the display
+          # name if the lookup misses (simctl create accepts either).
+          devicetype=$(xcrun simctl list devicetypes --json \
+            | jq -r --arg n "$NAME" \
+                '[.devicetypes[] | select(.name == $n)] | first | .identifier // empty')
+          if [ -z "$devicetype" ]; then
+            devicetype="$NAME"
+          fi
+
+          udid=$(xcrun simctl create "$NAME" "$devicetype" "$runtime")
+          echo "Created $NAME -> $udid (runtime: $runtime)"
+        else
+          echo "Found existing $NAME -> $udid"
+        fi
+
+        # Warm-boot so the test runner doesn't race a cold simulator
+        # (xcodebuild would otherwise boot it lazily on first use). The
+        # already-booted pre-created case exits non-zero -> tolerated.
+        xcrun simctl boot "$udid" 2>/dev/null || true
+
+        echo "destination=platform=iOS Simulator,id=$udid" >> "$GITHUB_OUTPUT"

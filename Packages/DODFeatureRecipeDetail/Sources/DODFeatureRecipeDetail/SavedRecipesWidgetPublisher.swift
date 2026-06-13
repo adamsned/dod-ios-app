@@ -87,29 +87,23 @@ public struct SavedRecipesWidgetPublisher: Sendable {
     }
 
     /// Convert a `SavedRecipeWidgetRow` (DODPersistence projection) into a
-    /// `SavedRecipesWidgetSnapshot.Entry` (DODSupport wire format).
-    /// `heroImageFilename` stays `nil` until the host learns to surface
-    /// cached image bytes via the App Group container — see the note
-    /// below; AC-5.2 stores image bytes in SwiftData (`CachedImage`), not
-    /// as files. The widget extension renders a placeholder for `nil`
-    /// per AC-17.5, so leaving this nil is the honest representation
-    /// today rather than fabricating a filename that doesn't exist.
+    /// `SavedRecipesWidgetSnapshot.Entry` (DODSupport wire format). T-766 /
+    /// CL-163 (DUT-72): the hero photo is surfaced via the App Group bridge,
+    /// the same path the Featured widget uses — see `heroImageFilename` below.
     static func toSnapshotEntry(_ row: SavedRecipeWidgetRow) -> SavedRecipesWidgetSnapshot.Entry {
         SavedRecipesWidgetSnapshot.Entry(
             recipeID: row.recipeID,
             title: row.title,
             canonicalURL: row.canonicalURL,
-            // `heroImageCached` is plumbed through SavedRecipeWidgetRow
-            // but we still pass nil here for v1 — even when bytes are
-            // present in `CachedImage`, the widget can't read them
-            // without a separate App-Group-file bridge that lives outside
-            // T-322's scope. Future work: write image files to the App
-            // Group container on `preDownloadImages` and use that
-            // filename here. T-321 (widget extension) will need to read
-            // the file once it exists. For now, the boolean is preserved
-            // on the projection type so future commits don't have to
-            // re-plumb it.
-            heroImageFilename: nil,
+            // T-766 / CL-163 (DUT-72) — surface the bridged hero photo. When the
+            // bytes are cached (`heroImageCached`), `RecipeStore.cacheImage` has
+            // already mirrored them into the App Group container under
+            // `WidgetImageBridge.filename(for:)` (AC-21.2), so the widget reads
+            // the local file and renders the full-color photo (mirrors
+            // `LiveFeedDependencies.publishWidgetSnapshot`). Not cached → nil →
+            // `WidgetCard.Hero` renders its gradient fallback (AC-17.5 / AC-21.3).
+            heroImageFilename: row.heroImageCached
+                ? row.heroImageURL.map(WidgetImageBridge.filename(for:)) : nil,
             savedAt: row.savedAt
         )
     }
