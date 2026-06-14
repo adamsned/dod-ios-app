@@ -101,18 +101,21 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
     func test_widgetCard_small_populated_dark() {
         let view = WidgetCard.Small(content: Self.widgetContent())
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(of: view, as: Self.darkImage(width: 158, height: 158), record: .missing)
     }
 
     func test_widgetCard_medium_populated_dark() {
         let view = WidgetCard.Medium(content: Self.widgetContent())
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(of: view, as: Self.darkImage(width: 338, height: 158), record: .missing)
     }
 
     func test_widgetCard_placeholder_dark() {
         let view = WidgetCard.Placeholder()
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(of: view, as: Self.darkImage(width: 158, height: 158), record: .missing)
     }
 

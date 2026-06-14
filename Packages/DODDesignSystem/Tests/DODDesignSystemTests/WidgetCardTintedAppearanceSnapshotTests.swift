@@ -58,6 +58,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.Small(content: Self.widgetContent())
             .environment(\.widgetRenderingMode, .accented)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
@@ -69,6 +70,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.Small(content: Self.widgetContent())
             .environment(\.widgetRenderingMode, .vibrant)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
@@ -80,6 +82,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.Medium(content: Self.widgetContent())
             .environment(\.widgetRenderingMode, .accented)
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 338, height: 158)),
@@ -91,6 +94,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.Medium(content: Self.widgetContent())
             .environment(\.widgetRenderingMode, .vibrant)
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 338, height: 158)),
@@ -102,6 +106,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.Placeholder()
             .environment(\.widgetRenderingMode, .accented)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
@@ -113,6 +118,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.Placeholder()
             .environment(\.widgetRenderingMode, .vibrant)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
@@ -126,6 +132,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.SavedSmall(row: Self.savedSampleRow)
             .environment(\.widgetRenderingMode, .accented)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
@@ -137,6 +144,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.SavedSmall(row: Self.savedSampleRow)
             .environment(\.widgetRenderingMode, .vibrant)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
@@ -148,6 +156,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.SavedMedium(rows: Self.savedSampleRows)
             .environment(\.widgetRenderingMode, .accented)
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 338, height: 158)),
@@ -159,6 +168,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.SavedMedium(rows: Self.savedSampleRows)
             .environment(\.widgetRenderingMode, .vibrant)
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 338, height: 158)),
@@ -170,6 +180,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.SavedEmpty()
             .environment(\.widgetRenderingMode, .accented)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),
@@ -181,6 +192,7 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         let view = WidgetCard.SavedEmpty()
             .environment(\.widgetRenderingMode, .vibrant)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
         assertSnapshot(
             of: view,
             as: .image(precision: 0.98, perceptualPrecision: 0.97, layout: .fixed(width: 158, height: 158)),

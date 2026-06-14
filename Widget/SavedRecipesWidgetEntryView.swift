@@ -95,7 +95,8 @@ struct SavedRecipesWidgetEntryView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(DODSpacing.sm)
-        .background(DODColor.surfaceElevated)
+        // T-767 / CL-164 (DUT-73) — no inner background: the widget's
+        // `containerBackground(for: .widget)` owns it so Tinted/Clear tints it.
     }
 
     /// Fallback used when URL construction somehow fails — a `dod://`
@@ -166,4 +167,3 @@ struct SavedRecipesWidgetEntryView: View {
         "Saved recipe: \(entry.title)."
     }
 }
-

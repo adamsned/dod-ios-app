@@ -2292,6 +2292,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `specs/dod-ios-app/{clarifications.md (CL-163), spec.md (AC-17.3 amended), tasks.md}`. `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/SavedRecipesWidgetPublisher.swift`. Test: `SavedRecipesWidgetPublisherTests` (+`heroImageFilenameIsSetWhenBytesAreCached`, comment refresh on the nil case).
 - **AC:** US-17 AC-17.3 amended (saved snapshot carries the bridged hero filename) (CL-163 canonical). **Est:** ~30 min. **Deps:** main at `14e2856` (T-765 merged). Branch `feat/T-766-saved-widget-images`. **||:** P47-widget-overhaul (DUT-72). No `e2e` label — 9 publisher L1 tests pass + manual on-device verify. **PR1 of 3:** → PR2 Tinted/Clear styling → PR3 Large sizes.
 
+### T-767 — DUT-73 Tinted/Clear widget styling: background owned by containerBackground (US-23 amendment, CL-164)
+
+- **What:** Fix Tinted/Clear (`.accented`/`.vibrant`) widget rendering so it follows the Apple News pattern (tinted background + white text + full-color images). Remove the inner `.background(DODColor.surfaceElevated)` from `WidgetCard.Medium`/`Placeholder`/`SavedSmall`/`SavedMedium`/`SavedEmpty` + `SavedRecipesWidgetEntryView.mediumBody` (6 sites) — it flattened into a tint silhouette that hid the tinted `containerBackground`. Standard mode unchanged (container is the same color); small Featured stays full-bleed. PR2 of 3. Closes Linear DUT-73.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-164), spec.md (AC-23.2 amended), tasks.md}`. `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/{WidgetCard,WidgetCard+Saved}.swift`; `Widget/SavedRecipesWidgetEntryView.swift`. L4 harness: the 4 `*SnapshotTests` files wrap each render site in `.background(surfaceElevated)` to simulate the container (Standard/dark baselines byte-stable; `SnapshotTests` kept under `type_body_length` by collapsing one verbose `assertSnapshot`).
+- **AC:** US-23 AC-23.2 amended (background owned by `containerBackground`; Tinted/Clear fix for all home-screen widgets) (CL-164 canonical). **Est:** ~90 min. **Deps:** main at `804bb74` (T-766 merged). Branch `feat/T-767-widget-tinted-styling`. **||:** P47-widget-overhaul (DUT-73). No `e2e` label — presentation; L4 Standard/dark baselines unchanged by construction, Tinted/Clear is the on-device human checkpoint (AC-23.7 — system accent pass isn't snapshot-reproducible).
+
 ---
 
 ## Summary

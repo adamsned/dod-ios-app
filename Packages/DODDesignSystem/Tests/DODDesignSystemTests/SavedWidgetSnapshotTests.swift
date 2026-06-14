@@ -50,6 +50,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_small_oneEntry_light() {
         let view = WidgetCard.SavedSmall(row: Self.savedSampleRow)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -65,6 +66,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_small_oneEntry_dark() {
         let view = WidgetCard.SavedSmall(row: Self.savedSampleRow)
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -84,6 +86,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_small_threeEntries_takesFirstOnly_light() {
         let view = WidgetCard.SavedSmall(row: Self.savedSampleRows[0])
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -99,6 +102,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_small_threeEntries_takesFirstOnly_dark() {
         let view = WidgetCard.SavedSmall(row: Self.savedSampleRows[0])
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -116,6 +120,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_medium_oneEntry_light() {
         let view = WidgetCard.SavedMedium(rows: Array(Self.savedSampleRows.prefix(1)))
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -131,6 +136,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_medium_oneEntry_dark() {
         let view = WidgetCard.SavedMedium(rows: Array(Self.savedSampleRows.prefix(1)))
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -146,6 +152,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_medium_threeEntries_light() {
         let view = WidgetCard.SavedMedium(rows: Self.savedSampleRows)
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -161,6 +168,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_medium_threeEntries_dark() {
         let view = WidgetCard.SavedMedium(rows: Self.savedSampleRows)
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -178,6 +186,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_empty_small_light() {
         let view = WidgetCard.SavedEmpty()
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -193,6 +202,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_empty_small_dark() {
         let view = WidgetCard.SavedEmpty()
             .frame(width: 158, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -208,6 +218,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_empty_medium_light() {
         let view = WidgetCard.SavedEmpty()
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
@@ -223,6 +234,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     func test_savedWidget_empty_medium_dark() {
         let view = WidgetCard.SavedEmpty()
             .frame(width: 338, height: 158)
+            .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
             of: view,
             as: .image(
