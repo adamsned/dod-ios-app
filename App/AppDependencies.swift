@@ -252,22 +252,13 @@ final class AppDependencies {
     }
 
     func recipeDetailDependencies() -> some RecipeDetailDependencies {
-        // After a save / unsave the recipe-detail view model asks the
-        // dependency to refresh the saved-recipes widget snapshot. The
-        // publisher writes to the App Group container and then calls this
-        // hook, which is what actually pokes WidgetKit. The kind string
-        // is pinned in spec.md AC-17.6 — must match the widget's
-        // `kind` (T-321 will register it).
-        let savedWidgetReload: SavedRecipesWidgetPublisher.ReloadHook = {
-            WidgetCenter.shared.reloadTimelines(ofKind: "SavedRecipesWidget")
-        }
         // US-44 / CL-138 / T-741 — thread the Phase a profile store
         // and the Phase b photo store into recipe-detail so the
         // Ratings & Reviews gate can (a) read `hasProfile` via
         // `loadUserProfile()`, and (b) present `ProfileEditView` as a
         // modal sheet over the recipe with the same photo flow the
         // Settings entry path uses.
-        return LiveRecipeDetailDependencies(
+        LiveRecipeDetailDependencies(
             client: restClient,
             fetcher: pageFetcher,
             store: store,
@@ -278,11 +269,33 @@ final class AppDependencies {
             profileStore: profileStore,
             profilePhotoStore: profilePhotoStore,
             imageLoader: imageLoader,
-            savedWidgetPublisher: SavedRecipesWidgetPublisher(
-                store: store,
-                reload: savedWidgetReload
-            )
+            savedWidgetPublisher: savedWidgetPublisher()
         )
+    }
+
+    /// Build a fully-wired saved-recipes widget publisher: the store, the
+    /// WidgetKit reload hook (the `kind` is pinned by spec.md AC-17.6 — it must
+    /// match the widget's `kind`), and the hero-image prefetcher that bridges
+    /// saved-recipe photos into the App Group container so the widget renders
+    /// them (T-770 / CL-167 / DUT-76). Both the recipe-detail save path
+    /// (above) and the card long-press save path (`TabStack.saveFromCard`) use
+    /// this, so the prefetch runs regardless of where the save originates. The
+    /// prefetch closure mirrors the feed's (`feedDependencies()` above): route
+    /// hero URLs through `ImageLoader` + `RecipeStore.cacheImage`, which writes
+    /// the bridge file via `WidgetImageBridge`.
+    func savedWidgetPublisher() -> SavedRecipesWidgetPublisher {
+        let reload: SavedRecipesWidgetPublisher.ReloadHook = {
+            WidgetCenter.shared.reloadTimelines(ofKind: "SavedRecipesWidget")
+        }
+        let loader = imageLoader
+        let cacheStore = store
+        let prefetch: SavedRecipesWidgetPublisher.ImagePrefetcher = { urls in
+            for url in urls {
+                guard let bytes = try? await loader.data(for: url) else { continue }
+                try? await cacheStore.cacheImage(url: url, bytes: bytes)
+            }
+        }
+        return SavedRecipesWidgetPublisher(store: store, reload: reload, imagePrefetcher: prefetch)
     }
 
     func savedDependencies() -> some SavedDependencies {

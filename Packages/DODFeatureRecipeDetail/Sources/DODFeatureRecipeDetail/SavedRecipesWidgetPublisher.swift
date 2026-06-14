@@ -24,18 +24,31 @@ public struct SavedRecipesWidgetPublisher: Sendable {
     /// supplies the closure that does.
     public typealias ReloadHook = @Sendable () -> Void
 
+    /// Sendable hook the app supplies to download hero-image bytes for the
+    /// saved recipes and route them through `RecipeStore.cacheImage`, which
+    /// mirrors files into the App Group container via ``WidgetImageBridge``
+    /// so the widget can render the photo without a widget-side network
+    /// fetch (AC-17.6). Mirrors `LiveFeedDependencies.ImagePrefetcher`. Fired
+    /// detached AFTER the snapshot write, only for saved recipes whose bytes
+    /// aren't cached yet (e.g. saved from the feed without ever opening
+    /// detail). T-770 / CL-167 (DUT-76).
+    public typealias ImagePrefetcher = @Sendable ([URL]) async -> Void
+
     private let store: RecipeStore
     private let widgetStore: WidgetSnapshotStore?
     private let reload: ReloadHook?
+    private let imagePrefetcher: ImagePrefetcher?
 
     public init(
         store: RecipeStore,
         widgetStore: WidgetSnapshotStore? = WidgetSnapshotStore(),
-        reload: ReloadHook? = nil
+        reload: ReloadHook? = nil,
+        imagePrefetcher: ImagePrefetcher? = nil
     ) {
         self.store = store
         self.widgetStore = widgetStore
         self.reload = reload
+        self.imagePrefetcher = imagePrefetcher
     }
 
     /// Re-read the current saved set, write a fresh snapshot to the App
@@ -84,6 +97,25 @@ public struct SavedRecipesWidgetPublisher: Sendable {
         }
 
         reload?()
+
+        // T-770 / CL-167 (DUT-76) — bridge hero bytes for saved recipes whose
+        // photos aren't cached yet (e.g. saved from the feed without ever
+        // opening detail, so `RecipeStore.cacheImage` never ran for them).
+        // `toSnapshotEntry` now emits the deterministic bridged filename for
+        // every row with a hero URL; without this prefetch that filename would
+        // point at a file that doesn't exist and `WidgetCard.Hero` would render
+        // its gradient fallback. Mirrors the feed's
+        // `LiveFeedDependencies.publishWidgetSnapshot` prefetch: detached so the
+        // save round-trip isn't blocked on the network, gated on
+        // `!heroImageCached` so only the missing photos are fetched, and
+        // followed by a second `reload()` so the freshly-bridged photos appear.
+        guard let imagePrefetcher else { return }
+        let missing = rows.filter { !$0.heroImageCached }.compactMap(\.heroImageURL)
+        guard !missing.isEmpty else { return }
+        Task.detached { [imagePrefetcher, reload, missing] in
+            await imagePrefetcher(missing)
+            reload?()
+        }
     }
 
     /// Convert a `SavedRecipeWidgetRow` (DODPersistence projection) into a
@@ -95,15 +127,18 @@ public struct SavedRecipesWidgetPublisher: Sendable {
             recipeID: row.recipeID,
             title: row.title,
             canonicalURL: row.canonicalURL,
-            // T-766 / CL-163 (DUT-72) — surface the bridged hero photo. When the
-            // bytes are cached (`heroImageCached`), `RecipeStore.cacheImage` has
-            // already mirrored them into the App Group container under
-            // `WidgetImageBridge.filename(for:)` (AC-21.2), so the widget reads
-            // the local file and renders the full-color photo (mirrors
-            // `LiveFeedDependencies.publishWidgetSnapshot`). Not cached → nil →
-            // `WidgetCard.Hero` renders its gradient fallback (AC-17.5 / AC-21.3).
-            heroImageFilename: row.heroImageCached
-                ? row.heroImageURL.map(WidgetImageBridge.filename(for:)) : nil,
+            // T-770 / CL-167 (DUT-76) — emit the deterministic bridged filename
+            // for every row that has a hero URL, regardless of whether the bytes
+            // are cached yet (mirrors `LiveFeedDependencies.publishWidgetSnapshot`).
+            // `RecipeStore.cacheImage` mirrors bytes into the App Group container
+            // under `WidgetImageBridge.filename(for:)` (AC-21.2); for saves whose
+            // bytes aren't cached yet, `publish()`'s detached prefetch fetches +
+            // bridges them and reloads. The widget reads the local file (no
+            // widget-side network — AC-17.6) and renders the full-color photo, or
+            // falls back to `WidgetCard.Hero`'s gradient until the file lands
+            // (AC-17.5 / AC-21.3). Supersedes the T-766 / CL-163 `heroImageCached`
+            // gate (which left feed-saved recipes permanently photoless).
+            heroImageFilename: row.heroImageURL.map(WidgetImageBridge.filename(for:)),
             savedAt: row.savedAt
         )
     }
