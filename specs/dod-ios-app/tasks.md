@@ -2314,6 +2314,14 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 
 ---
 
+### T-770 — DUT-76 Saved widget images: emit filename unconditionally + actively prefetch/bridge hero bytes (US-17 amendment, CL-167)
+
+- **What:** The Saved widget still showed gradients because a pure Save (post-T-761) never caches the hero bytes, so CL-163's `heroImageCached` gate left feed-saved recipes photoless. Fix (mirror the feed): emit `heroImageFilename` unconditionally from the URL + add an injected `ImagePrefetcher` to `SavedRecipesWidgetPublisher` that downloads+bridges the uncached photos (detached, gated `!heroImageCached`) then reloads. New `AppDependencies.savedWidgetPublisher()` factory wires the prefetcher into both save paths (recipe-detail + `TabStack.saveFromCard`). Closes Linear DUT-76. PR2 of 3.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-167), spec.md (AC-17.3 amended), tasks.md}`. `Packages/DODFeatureRecipeDetail/Sources/DODFeatureRecipeDetail/SavedRecipesWidgetPublisher.swift`. `App/{AppDependencies,TabStack}.swift`. `Packages/DODFeatureRecipeDetail/Tests/DODFeatureRecipeDetailTests/SavedRecipesWidgetPublisherTests.swift` (12 tests).
+- **AC:** US-17 AC-17.3 amended (unconditional bridged filename + active hero-byte prefetch) (CL-167 canonical). **Est:** ~60 min. **Deps:** main at `d03c1b3` (T-769 merged). Branch `feat/T-770-saved-widget-image-prefetch`. **||:** P47-widget-overhaul (DUT-76). No `e2e` label — L1-pinned (12 publisher tests) + on-device verify (save a never-opened feed recipe, confirm its photo appears in the Saved widget). **PR2 of 3 (widget follow-up): PR1 (T-769) → this → PR3 circular lock-screen.**
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) + 1 (Phase 19 CloudKit sync fix: T-736) = 132 (Phase 16–18 follow-up tasks T-730..T-735 are tracked in-line within their phases)

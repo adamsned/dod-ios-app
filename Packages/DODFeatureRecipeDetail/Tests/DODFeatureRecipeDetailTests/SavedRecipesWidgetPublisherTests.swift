@@ -82,15 +82,33 @@ import Testing
         #expect(harness.reloadCount.value == 1)
     }
 
-    @Test func heroImageFilenameIsNilWhenBytesAreNotCached() async throws {
-        // T-766 / CL-163 (DUT-72): the filename stays nil when the recipe's
-        // hero bytes aren't cached (no bridged file to point at) — the widget
-        // renders its gradient placeholder per AC-17.5 / AC-21.3.
+    @Test func heroImageFilenameIsNilWhenThereIsNoHeroURL() async throws {
+        // A saved recipe with no hero image at all carries a nil filename —
+        // there's nothing to bridge, so the widget renders its gradient
+        // placeholder (AC-17.5 / AC-21.3).
         let harness = try await Harness.make()
         try await harness.saveRecipe(id: 1, title: "NoImage")
         await harness.publisher.publish()
         let snapshot = try #require(harness.widgetStore.readSavedRecipes())
         #expect(snapshot.entries.first?.heroImageFilename == nil)
+    }
+
+    @Test func heroImageFilenameIsSetFromURLEvenWhenBytesNotCached() async throws {
+        // T-770 / CL-167 (DUT-76): the filename is now emitted from the hero
+        // URL even when the bytes aren't cached yet (e.g. a recipe saved from
+        // the feed without ever opening detail). `publish()`'s detached
+        // prefetch bridges the bytes; the snapshot already points at the
+        // deterministic filename so the photo appears as soon as the file
+        // lands. Supersedes the T-766 / CL-163 `heroImageCached` gate, which
+        // left feed-saved recipes permanently photoless.
+        let harness = try await Harness.make()
+        let heroURL = try #require(URL(string: "https://www.dutchovendaddy.com/img/uncached.jpg"))
+        try await harness.saveRecipeWithHeroURL(id: 1, title: "FeedSave", heroURL: heroURL)
+        await harness.publisher.publish()
+        let snapshot = try #require(harness.widgetStore.readSavedRecipes())
+        #expect(
+            snapshot.entries.first?.heroImageFilename == WidgetImageBridge.filename(for: heroURL)
+        )
     }
 
     @Test func heroImageFilenameIsSetWhenBytesAreCached() async throws {
@@ -107,6 +125,61 @@ import Testing
         #expect(
             snapshot.entries.first?.heroImageFilename == WidgetImageBridge.filename(for: heroURL)
         )
+    }
+
+    @Test func prefetcherIsInvokedForUncachedSavedHeroImages() async throws {
+        // T-770 / CL-167 (DUT-76): a recipe saved from the feed (hero URL
+        // present, bytes NOT cached) must have its photo actively fetched +
+        // bridged so the widget can render it. The prefetch fires in a detached
+        // Task, so poll until it lands.
+        let container = try RecipeStore.inMemoryContainer()
+        let store = RecipeStore(modelContainer: container)
+        let suiteName = "test.savedWidgetPublisher.prefetch.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        let widgetStore = WidgetSnapshotStore(defaults: defaults)
+        let recorder = PrefetchRecorder()
+        let heroURL = try #require(URL(string: "https://www.dutchovendaddy.com/img/uncached.jpg"))
+        let listItem = RecipeListItem(
+            id: 1,
+            title: "Feed Save",
+            excerpt: "Excerpt.",
+            heroImage: heroURL,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            totalTimeDisplay: nil,
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/1/")
+        )
+        try await store.cache(listItem: listItem)
+        _ = try await store.toggleSaved(id: 1)
+        let publisher = SavedRecipesWidgetPublisher(
+            store: store,
+            widgetStore: widgetStore,
+            reload: nil,
+            imagePrefetcher: { urls in recorder.record(urls) }
+        )
+        await publisher.publish()
+        await Self.waitUntil { recorder.urls.count == 1 }
+        #expect(recorder.urls == [heroURL], "Uncached saved hero URL must be prefetched + bridged")
+    }
+
+    @Test func prefetcherIsNotInvokedWhenHeroBytesAreCached() async throws {
+        // The gate: when the bytes are already cached (and thus already bridged
+        // via cacheImage's AC-21.2 mirror) there's nothing to fetch — the
+        // detached prefetch is skipped. Deterministic: `publish()` hits the
+        // `guard !missing.isEmpty` synchronously and returns without spawning a
+        // Task, so the recorder is observably empty the instant publish returns.
+        let harness = try await Harness.make()
+        let recorder = PrefetchRecorder()
+        let heroURL = try #require(URL(string: "https://www.dutchovendaddy.com/img/cached.jpg"))
+        try await harness.saveRecipeWithCachedImage(id: 1, title: "Chili", heroURL: heroURL)
+        let publisher = SavedRecipesWidgetPublisher(
+            store: harness.store,
+            widgetStore: harness.widgetStore,
+            reload: nil,
+            imagePrefetcher: { urls in recorder.record(urls) }
+        )
+        await publisher.publish()
+        #expect(recorder.urls.isEmpty, "Cached hero bytes must not trigger a prefetch")
     }
 
     @Test func emptyStoreStillProducesAReloadAndAnEmptyPayload() async throws {
@@ -215,6 +288,54 @@ import Testing
             try await store.cacheImage(url: heroURL, bytes: Data([0xFF, 0xD8, 0xFF]))
             _ = try await store.toggleSaved(id: id)
             try await Task.sleep(nanoseconds: 1_000_000)
+        }
+
+        /// Like `saveRecipeWithCachedImage` but WITHOUT caching the bytes — the
+        /// feed-save case (hero URL present, no cached photo) the T-770 prefetch
+        /// exists to fix. `heroImageCached` is false, so the publisher emits the
+        /// filename AND queues the URL for the detached prefetch.
+        func saveRecipeWithHeroURL(id: Int, title: String, heroURL: URL) async throws {
+            let listItem = RecipeListItem(
+                id: id,
+                title: title,
+                excerpt: "Excerpt.",
+                heroImage: heroURL,
+                publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                totalTimeDisplay: nil,
+                canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
+            )
+            try await store.cache(listItem: listItem)
+            _ = try await store.toggleSaved(id: id)
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+    }
+
+    /// Poll until `condition` holds or a short deadline passes — used to
+    /// observe the detached prefetch Task that `publish()` spawns (the prefetch
+    /// is fire-and-forget so `await publish()` returns before it runs).
+    static func waitUntil(_ condition: @Sendable () -> Bool, timeout: TimeInterval = 2.0) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition(), Date() < deadline {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
+
+    /// Thread-safe recorder of the URLs handed to the injected image
+    /// prefetcher, so tests can observe the detached prefetch without racing.
+    final class PrefetchRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var captured: [URL] = []
+
+        var urls: [URL] {
+            lock.lock()
+            defer { lock.unlock() }
+            return captured
+        }
+
+        func record(_ newURLs: [URL]) {
+            lock.lock()
+            defer { lock.unlock() }
+            captured.append(contentsOf: newURLs)
         }
     }
 

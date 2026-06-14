@@ -67,7 +67,13 @@ struct TabStack: View {
                 viewModel: FeedViewModel(dependencies: dependencies.feedDependencies()),
                 onSelect: { item in path.append(.recipe(item: item)) },
                 onSave: { item in
-                    Task { await Self.saveFromCard(item: item, store: dependencies.store) }
+                    Task {
+                        await Self.saveFromCard(
+                            item: item,
+                            store: dependencies.store,
+                            publisher: dependencies.savedWidgetPublisher()
+                        )
+                    }
                 }
             )
             .modifier(settingsToolbar(identifierStem: "feed"))
@@ -82,7 +88,13 @@ struct TabStack: View {
                 viewModel: SearchViewModel(dependencies: dependencies.searchDependencies()),
                 onSelect: { item in path.append(.recipe(item: item)) },
                 onSave: { item in
-                    Task { await Self.saveFromCard(item: item, store: dependencies.store) }
+                    Task {
+                        await Self.saveFromCard(
+                            item: item,
+                            store: dependencies.store,
+                            publisher: dependencies.savedWidgetPublisher()
+                        )
+                    }
                 }
             )
             .modifier(settingsToolbar(identifierStem: "search"))
@@ -94,7 +106,8 @@ struct TabStack: View {
                     Task {
                         await Self.saveFromCard(
                             item: Self.listItem(from: recipe),
-                            store: dependencies.store
+                            store: dependencies.store,
+                            publisher: dependencies.savedWidgetPublisher()
                         )
                     }
                 }
@@ -176,7 +189,13 @@ struct TabStack: View {
                 ),
                 onSelect: { item in path.append(.recipe(item: item)) },
                 onSave: { item in
-                    Task { await Self.saveFromCard(item: item, store: dependencies.store) }
+                    Task {
+                        await Self.saveFromCard(
+                            item: item,
+                            store: dependencies.store,
+                            publisher: dependencies.savedWidgetPublisher()
+                        )
+                    }
                 }
             )
             .onAppear {
@@ -196,7 +215,11 @@ struct TabStack: View {
     /// sense — a follow-up long-press just toggles state again with no
     /// user-visible error path. Errors are logged + swallowed so the menu
     /// never surfaces a crash to the user.
-    private static func saveFromCard(item: RecipeListItem, store: RecipeStore) async {
+    private static func saveFromCard(
+        item: RecipeListItem,
+        store: RecipeStore,
+        publisher: SavedRecipesWidgetPublisher
+    ) async {
         do {
             try await store.cache(listItem: item)
             _ = try await store.toggleSaved(id: item.id)
@@ -204,10 +227,11 @@ struct TabStack: View {
             DODLog.persistence.error("save-from-card failed: \(String(describing: error))")
             return
         }
-        await SavedRecipesWidgetPublisher(
-            store: store,
-            reload: { WidgetCenter.shared.reloadTimelines(ofKind: "SavedRecipesWidget") }
-        ).publish()
+        // T-770 / CL-167 (DUT-76) — `publisher` is built by
+        // `AppDependencies.savedWidgetPublisher()` with the hero-image
+        // prefetcher, so saving from a card (where the recipe's hero bytes are
+        // usually not cached yet) still bridges the photo into the widget.
+        await publisher.publish()
     }
 
     private static func listItem(from recipe: Recipe) -> RecipeListItem {
