@@ -13,8 +13,14 @@ let package = Package(
     products: [
         .library(name: "DODFeatureCastIron", targets: ["DODFeatureCastIron"])
     ],
+    dependencies: [
+        .package(path: "../DODDesignSystem")
+    ],
     targets: [
-        .target(name: "DODFeatureCastIron"),
+        .target(
+            name: "DODFeatureCastIron",
+            dependencies: ["DODDesignSystem"]
+        ),
         .testTarget(
             name: "DODFeatureCastIronTests",
             dependencies: ["DODFeatureCastIron"]
