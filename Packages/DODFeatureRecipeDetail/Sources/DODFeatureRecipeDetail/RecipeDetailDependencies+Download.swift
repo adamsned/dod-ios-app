@@ -31,6 +31,10 @@ extension RecipeDetailDependencies {
     public func downloadForOffline(recipe: Recipe) async throws -> DownloadOutcome {
         .firstTime
     }
+
+    /// Default no-op so fakes that don't model `downloadedAt` keep compiling
+    /// (T-775 / DUT-81). Production routes to `RecipeStore.removeDownload(id:)`.
+    public func removeDownload(id: Int) async throws {}
 }
 
 extension LiveRecipeDetailDependencies {
@@ -81,5 +85,12 @@ extension LiveRecipeDetailDependencies {
             }
         }
         return .firstTime
+    }
+
+    /// Clear the download pin (T-775 / DUT-81). Inverse of
+    /// ``downloadForOffline(recipe:)`` — leaves the recipe saved + its hero
+    /// image pinned (AC-4.9), so there's no image or widget-snapshot work.
+    public func removeDownload(id: Int) async throws {
+        _ = try await store.removeDownload(id: id)
     }
 }

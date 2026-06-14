@@ -301,24 +301,23 @@ public struct RecipeDetailView: View {
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
 
-                // US-35 / AC-35.1 — explicit download for offline use.
-                // Sits between Save (AC-4.7) and Share (AC-4.8); the
-                // glyph stays at the outline `square.and.arrow.down`
-                // regardless of state per CL-61's discoverability
-                // rationale (re-tapping a downloaded recipe surfaces the
-                // "Already downloaded" snackbar; a disabled button would
-                // hide that state from VoiceOver users).
+                // US-35 / AC-35.1 — explicit download for offline use, now a
+                // toggle (T-775 / DUT-81, supersedes CL-61's always-outline +
+                // "Already downloaded" re-tap snackbar). Downloaded → filled
+                // burnt-orange glyph; tapping removes the download. Not
+                // downloaded → outline glyph; tapping downloads. Sits between
+                // Save (AC-4.7) and Share (AC-4.8).
                 Button {
-                    Task { await viewModel.downloadForOffline() }
+                    Task { await viewModel.toggleDownload() }
                 } label: {
-                    Image(systemName: "square.and.arrow.down")
-                        .foregroundStyle(DODColor.label)
+                    Image(
+                        systemName: viewModel.isDownloaded
+                            ? "square.and.arrow.down.fill"
+                            : "square.and.arrow.down"
+                    )
+                    .foregroundStyle(viewModel.isDownloaded ? DODColor.burntOrange : DODColor.label)
                 }
-                .accessibilityLabel(
-                    viewModel.isDownloaded
-                        ? "Downloaded for offline use"
-                        : "Download for offline use"
-                )
+                .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
 
                 ShareLink(item: viewModel.canonicalURL) {
                     Image(systemName: "square.and.arrow.up")

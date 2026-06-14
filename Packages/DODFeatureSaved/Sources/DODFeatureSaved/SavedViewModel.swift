@@ -107,4 +107,18 @@ public final class SavedViewModel {
         recipes.removeAll { $0.id == id }
         loadState = recipes.isEmpty ? .empty : .loaded
     }
+
+    /// T-775 / DUT-81 — un-download from the Saved-tab context menu. Clears the
+    /// "Downloaded" badge optimistically (mirrors ``optimisticallyRemove(id:)``)
+    /// so the capsule disappears instantly, then routes the store write through
+    /// the dependency. The recipe stays saved, so the card remains in the grid;
+    /// a failed write reconciles on the next ``refresh()``.
+    public func removeDownload(id: Int) async {
+        downloadedIDs.remove(id)
+        do {
+            try await dependencies.removeDownload(id: id)
+        } catch {
+            DODLog.persistence.error("remove download failed: \(String(describing: error))")
+        }
+    }
 }

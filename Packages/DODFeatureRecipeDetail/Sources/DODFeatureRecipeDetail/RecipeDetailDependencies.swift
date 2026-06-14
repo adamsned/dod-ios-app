@@ -47,11 +47,13 @@ public protocol RecipeDetailDependencies: Sendable {
     // The protocol methods + the ``DownloadOutcome`` enum + the live
     // implementation live in `RecipeDetailDependencies+Download.swift`
     // (extension on this protocol + on `LiveRecipeDetailDependencies`).
-    // Required surface: `isDownloaded(id:) async throws -> Bool` +
-    // `downloadForOffline(recipe:) async throws -> DownloadOutcome`.
+    // Required surface: `isDownloaded(id:) async throws -> Bool`,
+    // `downloadForOffline(recipe:) async throws -> DownloadOutcome`, +
+    // `removeDownload(id:) async throws` (T-775 / DUT-81 — the inverse).
 
     func isDownloaded(id: Int) async throws -> Bool
     func downloadForOffline(recipe: Recipe) async throws -> DownloadOutcome
+    func removeDownload(id: Int) async throws
 
     // MARK: - Comments + ratings (US-13/14/15)
 

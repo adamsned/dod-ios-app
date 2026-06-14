@@ -32,4 +32,32 @@ extension RecipeDetailViewModel {
             snackbarMessage = "Couldn't download — try again."
         }
     }
+
+    /// AC-35.x (T-775 / DUT-81) — inverse of ``downloadForOffline()``. Clears
+    /// the explicit-download pin (the recipe stays saved, so the bookmark +
+    /// saved-widget snapshot are untouched) and flips the toolbar button back
+    /// to its outline state. Errors are logged + surfaced as a retry snackbar.
+    public func removeDownload() async {
+        guard let recipe else { return }
+        do {
+            try await dependencies.removeDownload(id: recipe.id)
+            isDownloaded = false
+            snackbarMessage = "Download removed"
+        } catch {
+            DODLog.persistence.error("remove download failed: \(String(describing: error))")
+            snackbarMessage = "Couldn't remove download — try again."
+        }
+    }
+
+    /// T-775 / DUT-81 — the toolbar download button's single entry point:
+    /// removes the download when the recipe is already downloaded, otherwise
+    /// downloads. Keeps the toolbar closure declarative (no branching in the
+    /// view).
+    public func toggleDownload() async {
+        if isDownloaded {
+            await removeDownload()
+        } else {
+            await downloadForOffline()
+        }
+    }
 }

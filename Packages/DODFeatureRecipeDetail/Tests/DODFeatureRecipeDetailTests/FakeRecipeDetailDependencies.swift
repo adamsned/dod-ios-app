@@ -184,6 +184,10 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
         return .firstTime
     }
 
+    func removeDownload(id: Int) async throws {
+        downloadedIDs.remove(id)
+    }
+
     func fetchRatingSummary(recipeID: Int) async -> RecipeRating {
         fetchRatingSummaryCallCount += 1
         if let gate = fetchRatingSummaryGate {

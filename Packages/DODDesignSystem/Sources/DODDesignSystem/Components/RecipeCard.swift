@@ -211,38 +211,32 @@ extension View {
             .accessibilityAddTraits(.isButton)
     }
 
-    /// Attach the state-aware long-press Save/Unsave context menu to a
-    /// recipe card (US-34 / AC-34.1 / AC-34.6 / CL-103).
+    /// Attach the state-aware long-press Save/Unsave (+ Remove Download)
+    /// context menu to a recipe card (US-34 / AC-34.1 / AC-34.6 / CL-103;
+    /// the download branch is T-775 / DUT-81).
     ///
-    /// The menu hosts a single `Button` whose `Label` branches on the
-    /// supplied `isSaved` flag: a saved card surfaces "Unsave" with the
-    /// outline `bookmark` glyph; an unsaved card surfaces "Save" with
-    /// `bookmark.fill`. Tapping invokes `onToggle`, which the caller wires
-    /// through `RecipeStore.toggleSaved(id:)` (the same seam used by the
-    /// detail-screen nav-bar bookmark per AC-4.7 / AC-5.1; the store-side
-    /// `toggleSaved` already flips in both directions, so tapping "Unsave"
-    /// on a saved card correctly transitions the row to `isSaved == false`).
+    /// The first `Button` branches on `isSaved`: a saved card surfaces
+    /// "Unsave" + outline `bookmark`, an unsaved card "Save" + `bookmark.fill`.
+    /// `onToggle` routes through `RecipeStore.toggleSaved(id:)`, which flips
+    /// both directions, so "Unsave" on a saved card transitions to
+    /// `isSaved == false`. When `isDownloaded` is true AND `onRemoveDownload`
+    /// is supplied, a second "Remove Download" item (orange
+    /// `square.and.arrow.down.badge.xmark`) appears beneath it —
+    /// un-downloading the recipe without unsaving it.
     ///
-    /// **History.** CL-60 (T-590) originally shipped this helper as
-    /// `recipeCardContextMenu(onSave:)` with always-"Save" + `bookmark.fill`
-    /// regardless of state — the "no Unsave branch in v1" decision deferred
-    /// the per-row `isSaved` plumbing on the basis that Feed/Categories/
-    /// Search viewmodels don't carry a saved-IDs observation surface. CL-103
-    /// (T-634) reverses that decision because the Saved tab is the high-
-    /// value surface where `isSaved` is trivially `true` for every card
-    /// (every card in `SavedView`'s grid is by definition saved), and
-    /// long-pressing a saved card to see "Save" reads as broken even
-    /// though the underlying toggle works. Feed/Categories/Search still
-    /// pass `isSaved: false` with a TODO marker pending the CL-60
-    /// path-(c) follow-up (viewmodel-owned saved-IDs sets hydrated on
-    /// appear).
+    /// **History.** CL-60 (T-590) shipped always-"Save"; CL-103 (T-634) added
+    /// the `isSaved` branch for the Saved tab (where every card is saved).
+    /// Feed/Categories/Search still pass `isSaved: false` (and omit the
+    /// download branch) pending the CL-60 path-(c) per-row state follow-up —
+    /// so today only the Saved tab passes `isDownloaded`.
     ///
-    /// The menu composes alongside `recipeCardTap` without eating the tap
-    /// gesture (SwiftUI's `.contextMenu` is gesture-distinct from
-    /// `.onTapGesture` — REG-DOD-LIST-SCROLL is unaffected).
+    /// Composes alongside `recipeCardTap` without eating the tap gesture
+    /// (`.contextMenu` is gesture-distinct from `.onTapGesture`).
     public func recipeCardContextMenu(
         isSaved: Bool,
-        onToggle: @escaping () -> Void
+        isDownloaded: Bool = false,
+        onToggle: @escaping () -> Void,
+        onRemoveDownload: (() -> Void)? = nil
     ) -> some View {
         self.contextMenu {
             Button(action: onToggle) {
@@ -250,6 +244,12 @@ extension View {
                     isSaved ? "Unsave" : "Save",
                     systemImage: isSaved ? "bookmark" : "bookmark.fill"
                 )
+            }
+            if isDownloaded, let onRemoveDownload {
+                Button(action: onRemoveDownload) {
+                    Label("Remove Download", systemImage: "square.and.arrow.down.badge.xmark")
+                }
+                .tint(DODColor.burntOrange)
             }
         }
     }
