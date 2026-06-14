@@ -41,6 +41,11 @@ final class LockScreenWidgetSnapshotTests: XCTestCase {
     /// system chrome around it.
     private static let lockScreenSize = CGSize(width: 172, height: 76)
 
+    /// Apple-documented `.accessoryCircular` system widget size on iPhone is
+    /// ~76×76pt. Fixed layout keeps the test hermetic — we render the glyph
+    /// primitive, not WidgetKit's circular chrome around it.
+    private static let circularSize = CGSize(width: 76, height: 76)
+
     private static let sampleContent = WidgetCard.LockScreenContent(
         title: "Garlic Butter Skillet Corn",
         excerpt: "An easy 15-minute side dish that pairs with everything."
@@ -109,6 +114,27 @@ final class LockScreenWidgetSnapshotTests: XCTestCase {
                 precision: 0.98,
                 perceptualPrecision: 0.97,
                 layout: .fixed(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
+            ),
+            record: .missing
+        )
+    }
+
+    // MARK: - Circular Saved shortcut (CL-168 / AC-22.7)
+
+    /// AC-22.7: the `.accessoryCircular` Saved shortcut renders the
+    /// `bookmark.fill` glyph. The tap target (`dod://saved`) is wired by the
+    /// `SavedLockScreenWidget` entry view's `widgetURL(_:)`; this pins the
+    /// glyph visual only (the `AccessoryWidgetBackground` disc + the system
+    /// monochrome tint are present-time chrome, not part of this primitive).
+    func test_lockScreenWidget_circularBookmark() {
+        let view = WidgetCard.LockScreenCircularBookmark()
+            .frame(width: Self.circularSize.width, height: Self.circularSize.height)
+        assertSnapshot(
+            of: view,
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: Self.circularSize.width, height: Self.circularSize.height)
             ),
             record: .missing
         )

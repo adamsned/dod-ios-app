@@ -101,6 +101,26 @@ extension WidgetCard {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
+
+    /// `.accessoryCircular` "Saved" shortcut: a single `bookmark.fill` glyph
+    /// (T-771 / CL-168 / DUT-77). Unlike the rectangular latest-recipe face
+    /// this carries no per-recipe data — it's a static shortcut whose tap
+    /// opens the Saved tab (`dod://saved`, wired by the entry view's
+    /// `widgetURL`). CL-37 deferred `.accessoryCircular` for the *recipe*
+    /// because there was no good single-glyph recipe payload; a bookmark
+    /// shortcut IS that good payload. The glyph stays WidgetKit-free here so
+    /// it remains L4-snapshot-testable (constitution §6); the entry view adds
+    /// the `AccessoryWidgetBackground` disc + `.widgetAccentable()` tint pass.
+    public struct LockScreenCircularBookmark: View {
+
+        public init() {}
+
+        public var body: some View {
+            Image(systemName: "bookmark.fill")
+                .font(.system(size: 24, weight: .semibold))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
 }
 
 #Preview("Lock Screen Rectangular — populated") {
@@ -126,4 +146,9 @@ extension WidgetCard {
 #Preview("Lock Screen Rectangular — empty") {
     WidgetCard.LockScreenEmpty()
         .frame(width: 172, height: 76)
+}
+
+#Preview("Lock Screen Circular — Saved bookmark") {
+    WidgetCard.LockScreenCircularBookmark()
+        .frame(width: 76, height: 76)
 }

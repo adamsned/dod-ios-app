@@ -2322,6 +2322,14 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 
 ---
 
+### T-771 — DUT-77 Circular Lock Screen "Saved" shortcut widget (bookmark.fill → dod://saved) (US-22 amendment, CL-168)
+
+- **What:** New static `.accessoryCircular` `SavedLockScreenWidget` — a `bookmark.fill` glyph that opens the Saved tab (`dod://saved`). CL-37 deferred circular for the *recipe* (no single-glyph payload); a bookmark shortcut is exactly that payload, so it ships as a separate widget. New `WidgetCard.LockScreenCircularBookmark` (glyph only, WidgetKit-free for L4); the widget + trivial `.never`-policy provider + entry view (AccessoryWidgetBackground + widgetAccentable + widgetURL) in one file; registered 4th in `DODAppWidgetBundle`. Closes Linear DUT-77. PR3 of 3 — completes the batch.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-168), spec.md (AC-22.1 amended + new AC-22.7), tasks.md}`. `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/WidgetCard+LockScreen.swift`. `Widget/{SavedLockScreenWidget.swift (new), DODAppWidgetBundle.swift}`. `Packages/DODDesignSystem/Tests/DODDesignSystemTests/LockScreenWidgetSnapshotTests.swift` + 1 recorded baseline.
+- **AC:** US-22 AC-22.7 added (`.accessoryCircular` Saved shortcut); AC-22.1 amended (CL-168 canonical). **Est:** ~45 min. **Deps:** main at `3929e48` (T-770 merged). Branch `feat/T-771-saved-lockscreen-circular`. **||:** P47-widget-overhaul (DUT-77). No `e2e` label — L4-pinned (1 glyph baseline, re-run green) + on-device tap verification (`dod://saved` → Saved tab). **PR3 of 3 (widget follow-up) — completes the batch (T-769 → T-770 → T-771).**
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) + 1 (Phase 19 CloudKit sync fix: T-736) = 132 (Phase 16–18 follow-up tasks T-730..T-735 are tracked in-line within their phases)
