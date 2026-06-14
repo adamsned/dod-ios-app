@@ -36,7 +36,8 @@ struct FeaturedRecipeWidget: Widget {
         }
         .configurationDisplayName("Latest Recipe")
         .description("See the latest Dutch Oven Daddy recipe right on your home screen.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        // T-768 / CL-165 (DUT-74) — large added alongside small + medium.
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         // The widget itself contains no content the user can edit, so we
         // don't need a configuration intent.
         .contentMarginsDisabled()
