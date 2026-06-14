@@ -61,6 +61,20 @@ extension RecipeStore {
         return Set(try modelContext.fetch(descriptor).map(\.id))
     }
 
+    /// T-774 / CL-171 (DUT-80) — the id set of every recipe explicitly
+    /// downloaded for offline use (``CachedRecipe/downloadedAt`` `!= nil`, set
+    /// by ``markDownloaded(id:)``). The Saved tab intersects this with its
+    /// displayed (saved) recipes to render a "Downloaded" badge on the cards
+    /// that are saved AND downloaded (vs. saved-only). Download state lives on
+    /// the local ``CachedRecipe`` (it is NOT CloudKit-synced, per DUT-35), so
+    /// this reads the cache table rather than ``SyncedSavedRecipe``.
+    public func downloadedRecipeIDs() throws -> Set<Int> {
+        let descriptor = FetchDescriptor<CachedRecipe>(
+            predicate: #Predicate { $0.downloadedAt != nil }
+        )
+        return Set(try modelContext.fetch(descriptor).map(\.id))
+    }
+
     /// Fetch the most-recently-saved recipes, projected into the narrow
     /// shape the saved-recipes widget snapshot needs (spec.md US-17 /
     /// AC-17.3). Sorted by `lastViewedAt` descending, capped at `limit`.

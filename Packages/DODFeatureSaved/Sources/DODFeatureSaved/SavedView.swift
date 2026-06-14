@@ -113,7 +113,10 @@ public struct SavedView: View {
                             title: recipe.title,
                             excerpt: recipe.excerpt,
                             heroImageURL: recipe.heroImage,
-                            totalTimeDisplay: totalTimeDisplay(recipe)
+                            totalTimeDisplay: totalTimeDisplay(recipe),
+                            // T-774 / DUT-80 — badge the cards that are saved
+                            // AND downloaded for offline use.
+                            isDownloaded: viewModel.downloadedIDs.contains(recipe.id)
                         )
                         .recipeCardTap { onSelect(recipe) }
                         // T-638 / CL-107 — stable test handle for the L5 E2E

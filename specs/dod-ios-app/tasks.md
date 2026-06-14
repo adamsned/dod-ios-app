@@ -2345,6 +2345,14 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 
 ---
 
+### T-774 — DUT-80 Saved tab "Downloaded" badge on downloaded recipe cards (US-5 amendment, CL-171)
+
+- **What:** Show a "Downloaded" badge on the Saved-tab cards for recipes that are saved AND explicitly downloaded for offline use (`CachedRecipe.downloadedAt != nil`), so the user can tell saved-only from saved + downloaded at a glance. New `RecipeStore.downloadedRecipeIDs() -> Set<Int>` + `SavedDependencies.downloadedRecipeIDs()` (default `[]`) → `SavedViewModel.downloadedIDs` (hydrated in `refresh()`) → `RecipeCard(isDownloaded:)` (defaulted; burnt-orange capsule badge, bottom-leading on the hero so it clears the top-trailing time chip) → `SavedView` passes `isDownloaded: downloadedIDs.contains(recipe.id)`. Closes Linear DUT-80.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-171), spec.md (AC-5.3 amended), tasks.md}`. `Packages/DODPersistence/Sources/DODPersistence/RecipeStore+SavedWidget.swift`. `Packages/DODFeatureSaved/Sources/DODFeatureSaved/{SavedDependencies,SavedViewModel,SavedView}.swift`. `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/RecipeCard.swift` (+ comment trim to stay ≤ 400). Tests: `RecipeStoreTests`, `SavedViewModelTests`, new `RecipeCardDownloadedBadgeSnapshotTests` (+ 1 baseline).
+- **AC:** US-5 AC-5.3 amended (Saved-list cards show a Downloaded badge) (CL-171 canonical). **Est:** ~45 min. **Deps:** main at `551c66e` (T-772 merged). Branch `feat/T-774-saved-downloaded-badge`. **||:** P48-saved-polish (DUT-80). No `e2e` label — presentation; L1 (store + viewmodel) + L4 (badge snapshot recorded on the iPhone-17 sim) pinned + on-device verification (download a saved recipe → its Saved-tab card gets the badge).
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) + 1 (Phase 19 CloudKit sync fix: T-736) = 132 (Phase 16–18 follow-up tasks T-730..T-735 are tracked in-line within their phases)

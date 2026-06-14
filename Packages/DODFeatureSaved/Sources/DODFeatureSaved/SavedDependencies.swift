@@ -5,6 +5,12 @@ import Foundation
 
 public protocol SavedDependencies: Sendable {
     func savedRecipes() async throws -> [Recipe]
+    /// T-774 / DUT-80 — the id set of recipes explicitly downloaded for offline
+    /// use (`CachedRecipe.downloadedAt != nil`), so the Saved tab can render a
+    /// "Downloaded" badge on the saved cards that are also downloaded. Default
+    /// `[]` (no badges) so existing fake conformers keep compiling; the live
+    /// wiring routes to ``RecipeStore/downloadedRecipeIDs()``.
+    func downloadedRecipeIDs() async throws -> Set<Int>
     /// Pre-download hero images for newly-saved recipe (AC-5.2).
     func preDownloadImages(forRecipeID: Int, urls: [URL]) async
     /// Emit a signal every time the on-disk store changes underneath us
@@ -29,6 +35,11 @@ extension SavedDependencies {
     public func remoteChanges() -> AsyncStream<Void> {
         AsyncStream { $0.finish() }
     }
+
+    /// Default: no downloaded recipes, so no "Downloaded" badges. The live
+    /// wiring overrides this; fake conformers that don't care about download
+    /// state inherit the empty set. T-774 / DUT-80.
+    public func downloadedRecipeIDs() async throws -> Set<Int> { [] }
 }
 
 public struct LiveSavedDependencies: SavedDependencies {
@@ -61,6 +72,10 @@ public struct LiveSavedDependencies: SavedDependencies {
 
     public func savedRecipes() async throws -> [Recipe] {
         try await store.savedRecipes()
+    }
+
+    public func downloadedRecipeIDs() async throws -> Set<Int> {
+        try await store.downloadedRecipeIDs()
     }
 
     public func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {
