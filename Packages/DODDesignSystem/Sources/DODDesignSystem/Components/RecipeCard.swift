@@ -153,9 +153,9 @@ public struct RecipeCard: View {
     }
 
     private var accessibilityLabel: String {
-        let base = totalTimeDisplay.map { "\(title). \(excerpt). \($0)." }
-            ?? "\(title). \(excerpt)."
-        return isDownloaded ? base + " Downloaded." : base
+        let time = totalTimeDisplay.map { " \($0)." } ?? ""
+        let downloaded = isDownloaded ? " Downloaded." : ""
+        return "\(title). \(excerpt).\(time)\(downloaded)"
     }
 
     // MARK: - Title highlighting (DUT-10)

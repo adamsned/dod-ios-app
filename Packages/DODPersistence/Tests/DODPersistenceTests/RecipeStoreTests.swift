@@ -226,21 +226,6 @@ struct RecentlyViewedTests {
             "Explicitly-downloaded recipe must survive LRU eviction"
         )
     }
-
-    /// T-774 / DUT-80 — the Saved tab's "Downloaded" badge reads this set.
-    /// Returns the ids of rows with `downloadedAt != nil` and excludes
-    /// cached-but-never-downloaded rows.
-    @Test func downloadedRecipeIDsReturnsOnlyDownloadedRows() async throws {
-        let store = try await makeStore()
-        for id in [101, 102, 103] {
-            try await store.cache(listItem: makeListItem(id: id, title: "R\(id)"))
-        }
-        _ = try await store.markDownloaded(id: 101)
-        _ = try await store.markDownloaded(id: 103)
-        #expect(try await store.downloadedRecipeIDs() == [101, 103])
-        // 102 was cached but never downloaded → excluded.
-        #expect(try await store.downloadedRecipeIDs().contains(102) == false)
-    }
 }
 
 @Suite("RecipeStore image cache (T-075)") struct ImageCacheTests {

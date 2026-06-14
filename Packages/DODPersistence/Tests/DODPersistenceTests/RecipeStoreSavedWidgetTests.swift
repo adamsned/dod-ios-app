@@ -99,6 +99,22 @@ import Testing
         #expect(rows.isEmpty, "Row with empty canonicalURL must be skipped")
     }
 
+    /// T-774 / DUT-80 — the Saved tab's "Downloaded" badge reads this set
+    /// (`downloadedRecipeIDs()`, defined alongside the widget projection in
+    /// `RecipeStore+SavedWidget.swift`). Returns ids of rows with
+    /// `downloadedAt != nil`; cached-but-never-downloaded rows are excluded.
+    @Test func downloadedRecipeIDsReturnsOnlyDownloadedRows() async throws {
+        let store = try await makeStore()
+        for id in [101, 102, 103] {
+            try await store.cache(listItem: makeListItem(id: id, title: "R\(id)"))
+        }
+        _ = try await store.markDownloaded(id: 101)
+        _ = try await store.markDownloaded(id: 103)
+        #expect(try await store.downloadedRecipeIDs() == [101, 103])
+        // 102 was cached but never downloaded → excluded.
+        #expect(try await store.downloadedRecipeIDs().contains(102) == false)
+    }
+
     // MARK: - Helpers
 
     /// Local helper that mirrors `makeListItem(id:title:)` but populates
