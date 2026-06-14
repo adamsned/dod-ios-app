@@ -2306,6 +2306,14 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 
 ---
 
+### T-769 — DUT-75 Latest Recipe widget: fix Large text clipping + eyebrow "Today on DOD" → "New on DOD" (US-9 amendment, CL-166)
+
+- **What:** Two Featured (Latest Recipe) widget tweaks. (1) `WidgetCard.FeaturedLarge` title/excerpt clipped on `.systemLarge` with long titles — the greedy hero squeezed the text block; fix by pinning the content stack to natural height (`.fixedSize(horizontal: false, vertical: true)`) + dropping the title `.title3`→`.headline`. (2) Rename the eyebrow "Today on DOD" → "New on DOD" on the medium + large faces (`WidgetCard.Medium` + `FeaturedLarge`). Closes Linear DUT-75. PR1 of a 3-PR widget follow-up batch.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-166), spec.md (AC-9.1 amended), tasks.md}`. `Packages/DODDesignSystem/Sources/DODDesignSystem/Components/{WidgetCard,WidgetCard+Large}.swift`. `Packages/DODDesignSystem/Tests/DODDesignSystemTests/WidgetLargeSnapshotTests.swift` (long-title fixture) + 6 re-recorded baselines (FeaturedLarge ×2, Medium ×4).
+- **AC:** US-9 AC-9.1 amended (eyebrow copy "New on DOD"; large text-fit) (CL-166 canonical). **Est:** ~45 min. **Deps:** main at `0bd2d5a` (T-768 merged). Branch `feat/T-769-featured-large-fit`. **||:** P47-widget-overhaul (DUT-75). No `e2e` label — presentation; L4-pinned (6 baselines re-recorded on the iPhone-17 sim, re-run green) + on-device verification. **PR1 of 3 (widget follow-up): → PR2 Saved images, PR3 circular lock-screen Saved widget.**
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) + 1 (Phase 19 CloudKit sync fix: T-736) = 132 (Phase 16–18 follow-up tasks T-730..T-735 are tracked in-line within their phases)
