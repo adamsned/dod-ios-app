@@ -55,17 +55,18 @@ import Testing
         #expect(snapshot.entries.map(\.recipeID) == [3, 2, 1])
     }
 
-    @Test func capsAtMaxEntriesEvenWhenFiveAreSaved() async throws {
+    @Test func capsAtMaxEntriesWhenMoreAreSaved() async throws {
         let harness = try await Harness.make()
-        for index in 1...5 {
+        // Save more than the cap so the trim is observable. T-768 / CL-165:
+        // the cap is `SavedRecipesWidgetSnapshotConfig.maxEntries` (5 — the
+        // large-widget size; small/medium take `prefix(1)`/`prefix(3)`).
+        for index in 1...7 {
             try await harness.saveRecipe(id: index, title: "R\(index)")
         }
         await harness.publisher.publish()
         let snapshot = try #require(harness.widgetStore.readSavedRecipes())
-        // Medium-size widget cap = 3 (see
-        // SavedRecipesWidgetSnapshotConfig.maxEntries).
         #expect(snapshot.entries.count == SavedRecipesWidgetSnapshotConfig.maxEntries)
-        #expect(snapshot.entries.map(\.recipeID) == [5, 4, 3], "Top-N by savedAt desc")
+        #expect(snapshot.entries.map(\.recipeID) == [7, 6, 5, 4, 3], "Top-N by savedAt desc")
     }
 
     @Test func emptyPayloadOnFullClear() async throws {
