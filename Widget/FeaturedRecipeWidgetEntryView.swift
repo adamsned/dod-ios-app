@@ -16,6 +16,11 @@ struct FeaturedRecipeWidgetEntryView: View {
         Group {
             if let recipe = entry.recipe {
                 switch family {
+                case .systemLarge:
+                    // T-768 / CL-165 (DUT-74) — large = hero-forward layout.
+                    WidgetCard.FeaturedLarge(content: Self.content(from: recipe))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(Self.mediumAccessibilityLabel(for: recipe))
                 case .systemMedium:
                     WidgetCard.Medium(content: Self.content(from: recipe))
                         .accessibilityElement(children: .combine)

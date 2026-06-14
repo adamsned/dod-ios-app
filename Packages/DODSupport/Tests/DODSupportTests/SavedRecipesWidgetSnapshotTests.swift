@@ -40,11 +40,14 @@ import Testing
 
         let roundTripped = try #require(store.readSavedRecipes())
         #expect(roundTripped.entries.count == SavedRecipesWidgetSnapshotConfig.maxEntries)
-        // Per AC-17.3 the snapshot carries the N most-recently-saved
-        // recipes. Sample entries have savedAt = base + index, so the
-        // three most-recently-saved are the last three (indices 10, 9, 8)
-        // in descending savedAt order.
-        let expectedIDs = [10, 9, 8]
+        // Per AC-17.3 the snapshot carries the N (= maxEntries) most-recently-
+        // saved recipes. Sample entries have savedAt = base + index, so the
+        // most-recently-saved are the highest indices in descending order.
+        // Derived from `maxEntries` so the T-768 cap bump (3 → 5) didn't
+        // require a hand-edit here.
+        let expectedIDs = Array(
+            (1...10).reversed().prefix(SavedRecipesWidgetSnapshotConfig.maxEntries)
+        )
         #expect(roundTripped.entries.map(\.recipeID) == expectedIDs)
     }
 

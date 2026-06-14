@@ -85,12 +85,11 @@ public enum SavedRecipesWidgetSnapshotConfig {
     /// stomping each other.
     public static let userDefaultsKey = "dod.widget.savedRecipes.v1"
 
-    /// Cap on how many entries the snapshot stores. Per CL-26 the widget
-    /// ships in two sizes: small (1 entry) and medium (3 entries). Both
-    /// sizes read from the same payload — the widget takes
-    /// `prefix(N)` client-side based on its `widgetFamily`. Writing more
-    /// than 3 is wasted I/O (see T-322 scope note).
-    public static let maxEntries = 3
+    /// Cap on how many entries the snapshot stores. T-768 / CL-165 (DUT-74):
+    /// the widget ships in three sizes — small (1), medium (3), large (up to
+    /// 5). All sizes read the same payload and take `prefix(N)` client-side
+    /// based on `widgetFamily`, so the cap is the largest size's need (5).
+    public static let maxEntries = 5
 }
 
 extension WidgetSnapshotStore {

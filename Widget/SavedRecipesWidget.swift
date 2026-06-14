@@ -32,9 +32,9 @@ struct SavedRecipesWidget: Widget {
         }
         .configurationDisplayName("Saved Recipes")
         .description("Quick access to your saved recipes.")
-        // CL-26: small + medium only. `.systemLarge` is deferred to v1.1
-        // pending user-testing demand.
-        .supportedFamilies([.systemSmall, .systemMedium])
+        // T-768 / CL-165 (DUT-74) — large added (supersedes CL-26's
+        // small+medium-only deferral); the large face shows up to 5 rows.
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         // The widget extension has no configurable parameters — no intent
         // needed, same as the featured widget.
         .contentMarginsDisabled()

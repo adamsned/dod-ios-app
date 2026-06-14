@@ -26,6 +26,8 @@ struct SavedRecipesWidgetEntryView: View {
                     )
             } else {
                 switch family {
+                case .systemLarge:
+                    largeBody
                 case .systemMedium:
                     mediumBody
                 default:
@@ -71,7 +73,18 @@ struct SavedRecipesWidgetEntryView: View {
     /// only — taps in the gaps between rows fall through to the chrome's
     /// `dod://saved` (CL-29). The row primitive itself comes from the
     /// design system so the layout stays in one place.
-    private var mediumBody: some View {
+    private var mediumBody: some View { savedListBody(maxRows: 3) }
+
+    // MARK: - Large (up to 5 entries) — T-768 / CL-165 (DUT-74)
+
+    private var largeBody: some View {
+        savedListBody(maxRows: WidgetCard.SavedLarge.maxRows)
+    }
+
+    /// Shared saved-list layout for the medium (3) and large (5) sizes: the
+    /// "Saved" eyebrow + up to `maxRows` per-row `Link`s (each deep-links to
+    /// its recipe; gaps fall through to the chrome's `dod://saved`).
+    private func savedListBody(maxRows: Int) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Text("Saved")
                 .font(.system(.caption2, design: .default, weight: .semibold))
@@ -80,7 +93,7 @@ struct SavedRecipesWidgetEntryView: View {
                 .tracking(0.5)
 
             VStack(spacing: DODSpacing.xs) {
-                ForEach(Array(entry.entries.prefix(3))) { snapshotEntry in
+                ForEach(Array(entry.entries.prefix(maxRows))) { snapshotEntry in
                     let url = Self.deepLink(for: snapshotEntry) ?? Self.savedFallbackURL
                     Link(destination: url) {
                         WidgetCard.SavedListRow(row: Self.row(from: snapshotEntry))
@@ -88,7 +101,7 @@ struct SavedRecipesWidgetEntryView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(Self.rowAccessibilityLabel(for: snapshotEntry))
                 }
-                if entry.entries.count < 3 {
+                if entry.entries.count < maxRows {
                     Spacer(minLength: 0)
                 }
             }
