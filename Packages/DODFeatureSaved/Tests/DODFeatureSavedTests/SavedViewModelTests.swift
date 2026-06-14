@@ -26,6 +26,18 @@ import Testing
         #expect(viewModel.recipes.map(\.id) == [2, 1])
     }
 
+    @Test func refreshHydratesDownloadedIDsForBadging() async {
+        // T-774 / DUT-80 — the Saved tab badges cards that are saved AND
+        // downloaded; the view model hydrates the downloaded-id set alongside
+        // the recipes so `SavedView` can check membership per card.
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2), Self.makeRecipe(id: 3)]
+        dependencies.downloadedIDs = [1, 3]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+        #expect(viewModel.downloadedIDs == [1, 3])
+    }
+
     @Test func errorStatePresentsRetry() async {
         let dependencies = FakeSavedDependencies()
         dependencies.shouldFail = true
@@ -183,6 +195,9 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     var recipes: [Recipe] = []
     var shouldFail = false
     var preDownloadedRecipeIDs: [Int] = []
+    /// T-774 / DUT-80 — the set ``downloadedRecipeIDs()`` returns, so a test can
+    /// assert the view model hydrates `downloadedIDs` for the Saved-tab badge.
+    var downloadedIDs: Set<Int> = []
     /// Number of times ``savedRecipes()`` has been called — lets a test assert
     /// the view model coalesces a remote-change burst into a single re-fetch.
     private(set) var savedRecipesCallCount = 0
@@ -202,6 +217,8 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
         if shouldFail { throw URLError(.unknown) }
         return recipes
     }
+
+    func downloadedRecipeIDs() async throws -> Set<Int> { downloadedIDs }
 
     func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {
         preDownloadedRecipeIDs.append(recipeID)

@@ -13,6 +13,10 @@ public struct RecipeCard: View {
     public let excerpt: String
     public let heroImageURL: URL?
     public let totalTimeDisplay: String?
+    /// T-774 / DUT-80 — when true, a "Downloaded" badge overlays the hero.
+    /// Default false (Feed/Categories/Search unchanged); only the Saved tab
+    /// passes `true`, for recipes that are saved AND downloaded.
+    public let isDownloaded: Bool
     /// Active search query (DUT-10). When non-nil/non-empty, its term matches in
     /// `title` are tinted in the brand accent; nil (every non-search host) keeps
     /// the plain `Text(title)` render byte-for-byte.
@@ -23,13 +27,15 @@ public struct RecipeCard: View {
         excerpt: String,
         heroImageURL: URL?,
         totalTimeDisplay: String? = nil,
-        highlightQuery: String? = nil
+        highlightQuery: String? = nil,
+        isDownloaded: Bool = false
     ) {
         self.title = title
         self.excerpt = excerpt
         self.heroImageURL = heroImageURL
         self.totalTimeDisplay = totalTimeDisplay
         self.highlightQuery = highlightQuery
+        self.isDownloaded = isDownloaded
     }
 
     public var body: some View {
@@ -80,6 +86,15 @@ public struct RecipeCard: View {
                 timeChip(totalTimeDisplay)
                     .padding(DODSpacing.xs)
             }
+
+            // T-774 / DUT-80 — "Downloaded" badge, bottom-leading so it never
+            // collides with the top-trailing time chip at the Saved tab's
+            // narrow half-width.
+            if isDownloaded {
+                Self.downloadedBadge
+                    .padding(DODSpacing.xs)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            }
         }
     }
 
@@ -120,12 +135,27 @@ public struct RecipeCard: View {
         )
     }
 
-    private var accessibilityLabel: String {
-        if let totalTimeDisplay {
-            "\(title). \(excerpt). \(totalTimeDisplay)."
-        } else {
-            "\(title). \(excerpt)."
+    /// T-774 / CL-171 (DUT-80) — the "Downloaded" status badge for the Saved
+    /// tab. Mirrors ``timeChip(_:)``'s capsule but in the burnt-orange accent
+    /// with a download glyph, so the two statuses read as distinct.
+    static var downloadedBadge: some View {
+        HStack(spacing: DODSpacing.xxs) {
+            Image(systemName: "arrow.down.circle.fill")
+            Text("Downloaded")
         }
+        .dodFont(DODType.caption)
+        .foregroundStyle(DODColor.cream)
+        .padding(.horizontal, DODSpacing.xs)
+        .padding(.vertical, DODSpacing.xxs)
+        .background(
+            Capsule().fill(DODColor.burntOrange.opacity(0.9))
+        )
+    }
+
+    private var accessibilityLabel: String {
+        let base = totalTimeDisplay.map { "\(title). \(excerpt). \($0)." }
+            ?? "\(title). \(excerpt)."
+        return isDownloaded ? base + " Downloaded." : base
     }
 
     // MARK: - Title highlighting (DUT-10)

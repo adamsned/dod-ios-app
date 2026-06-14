@@ -14,6 +14,10 @@ public final class SavedViewModel {
     }
 
     public private(set) var recipes: [Recipe] = []
+    /// T-774 / DUT-80 — ids of recipes explicitly downloaded for offline use,
+    /// hydrated alongside `recipes` in ``refresh()``. ``SavedView`` checks
+    /// membership to render the "Downloaded" badge on saved + downloaded cards.
+    public private(set) var downloadedIDs: Set<Int> = []
     public private(set) var loadState: LoadState = .idle
 
     private let dependencies: SavedDependencies
@@ -51,6 +55,9 @@ public final class SavedViewModel {
         loadState = .loading
         do {
             recipes = try await dependencies.savedRecipes()
+            // Best-effort: a download-state read failure just means no badges,
+            // never a failed Saved-tab load (T-774 / DUT-80).
+            downloadedIDs = (try? await dependencies.downloadedRecipeIDs()) ?? []
             loadState = recipes.isEmpty ? .empty : .loaded
         } catch {
             DODLog.persistence.error("saved load failed: \(String(describing: error))")
