@@ -99,7 +99,7 @@ public enum WidgetCard {
                     .frame(maxWidth: .infinity)
 
                 VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                    Text("Today on DOD")
+                    Text("New on DOD")
                         .font(.system(.caption2, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.burntOrange)
                         .textCase(.uppercase)

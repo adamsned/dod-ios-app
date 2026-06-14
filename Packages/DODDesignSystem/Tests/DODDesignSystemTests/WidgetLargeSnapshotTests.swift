@@ -67,11 +67,15 @@ final class WidgetLargeSnapshotTests: XCTestCase {
     }
 
     private static func widgetContent() -> WidgetCard.Content {
+        // Deliberately long title + excerpt: this is the real-world case
+        // that clipped before T-769 / CL-166 (DUT-75). The `.fixedSize`
+        // on the content stack must give both the 2-line title and the
+        // 2-line excerpt their full height without the hero squeezing them.
         WidgetCard.Content(
-            title: "Garlic Butter Skillet Corn",
-            excerpt: "An easy 15-minute side dish that pairs with everything.",
+            title: "Dutch Oven Garlic Herb Butter Roasted Chicken",
+            excerpt: "A one-pot weeknight dinner with crispy skin and tender, juicy meat the whole family loves.",
             heroImageURL: nil,
-            totalTimeDisplay: "15 min"
+            totalTimeDisplay: "1 hr 15 min"
         )
     }
 

@@ -33,14 +33,14 @@ extension WidgetCard {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                    Text("Today on DOD")
+                    Text("New on DOD")
                         .font(.system(.caption2, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.burntOrange)
                         .textCase(.uppercase)
                         .tracking(0.5)
 
                     Text(content.title)
-                        .font(.system(.title3, design: .default, weight: .bold))
+                        .font(.system(.headline, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.label)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -58,6 +58,11 @@ extension WidgetCard {
                             .padding(.top, DODSpacing.xxs)
                     }
                 }
+                // T-769 / CL-166 (DUT-75) — `.fixedSize` so the content takes its
+                // full natural height and the greedy hero takes the remainder;
+                // this is what keeps the title/excerpt from being squeezed +
+                // clipped on `.systemLarge`.
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(DODSpacing.md)
             }
