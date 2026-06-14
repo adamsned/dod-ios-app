@@ -2361,6 +2361,14 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 
 ---
 
+### T-776 — DUT-82 Saved tab "Saved" header vanishes after a context-menu action — iOS 26 NavigationStack workaround (US-5 amendment, CL-173)
+
+- **What:** The Saved tab's large `.navigationTitle("Saved")` disappears after any card context-menu action (Unsave, or Remove Download from T-775) and only returns on relaunch — a confirmed iOS 26 NavigationStack bug (`.navigationTitle` + `.toolbar` + list + a state transition; [Apple forums/thread/789557](https://developer.apple.com/forums/thread/789557)). PRE-EXISTING: Unsave (CL-103) triggers it on `main`, so T-775's Remove Download merely added a second action that hits the same OS bug. Two in-app fixes failed (sync optimistic mutation; stable `ToolbarItem` + pinned `displayMode`). Fix: render "Saved" as a manual large header in the view content (`Text("Saved").font(.largeTitle).fontWeight(.bold)` in a `VStack` above `content`) + drop `.navigationTitle`; keep the `.toolbar` cart; `.isHeader` trait preserves VoiceOver. Closes Linear DUT-82.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-173), spec.md (AC-5.3 amended), tasks.md}`. `Packages/DODFeatureSaved/Sources/DODFeatureSaved/SavedView.swift` (manual header; drop nav title).
+- **AC:** US-5 AC-5.3 amended (Saved title is an in-content header) (CL-173 canonical). **Est:** ~45 min (incl. iOS-26 bug diagnosis). **Deps:** main at `e5a898f` (T-775 merged). Branch `fix/T-776-saved-header-ios26`. **||:** P48-saved-polish (DUT-82). No `e2e` label — presentation workaround; on-device verified (the "Saved" header survives Unsave + Remove Download); lint/format clean; 31 DODFeatureSaved tests pass.
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) + 1 (Phase 19 CloudKit sync fix: T-736) = 132 (Phase 16–18 follow-up tasks T-730..T-735 are tracked in-line within their phases)
