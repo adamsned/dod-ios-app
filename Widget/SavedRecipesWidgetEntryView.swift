@@ -156,17 +156,24 @@ struct SavedRecipesWidgetEntryView: View {
         )
     }
 
-    /// Map a cached hero filename onto a `file://` URL inside the shared
-    /// App Group container. Returns nil if the container can't be
-    /// located (no entitlement / wrong simulator slice) so the row
-    /// renders its gradient fallback instead of crashing.
+    /// Map a bridged hero filename onto a `file://` URL inside the shared
+    /// App Group container. Delegates to ``WidgetImageBridge/fileURL(forFilename:)``
+    /// — the SAME resolver the Featured widget uses — so the saved widget
+    /// reads from the `widget-images/` subdirectory the bridge actually
+    /// writes to.
+    ///
+    /// T-772 / CL-169 (DUT-79) — the previous hand-rolled implementation
+    /// appended the filename to the container ROOT, missing
+    /// ``WidgetImageBridge/imageSubdirectory`` (`widget-images/`). So even
+    /// though the bytes were bridged (`…/widget-images/<sha>.img`) and the
+    /// snapshot carried the filename, the saved widget looked one directory
+    /// too high (`…/<sha>.img`), never found the file, and every saved row
+    /// fell back to the gradient placeholder — while the Featured widget,
+    /// which uses `WidgetImageBridge.fileURL`, rendered its photos correctly.
+    /// Returns nil if the container can't be located, so the row renders its
+    /// gradient fallback instead of crashing.
     static func heroImageURL(forFilename filename: String) -> URL? {
-        guard
-            let container = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: WidgetSnapshotConfig.appGroupIdentifier
-            )
-        else { return nil }
-        return container.appendingPathComponent(filename, isDirectory: false)
+        WidgetImageBridge.fileURL(forFilename: filename)
     }
 
     static func smallAccessibilityLabel(for entry: SavedRecipesWidgetSnapshot.Entry?) -> String {
