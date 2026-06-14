@@ -49,6 +49,13 @@ jobs:
             code:
               - 'App/**'
               - 'Packages/**'
+              # Embedded app-extension sources are now linted + swift-format
+              # checked (.swiftlint.yml `included` + the format job below), so an
+              # extension-only change must run lint + format. This also triggers
+              # L1-packages — a minor, accepted cost on the rare extension-only
+              # PR (the extensions link against those packages anyway).
+              - 'Widget/**'
+              - 'LiveActivity/**'
               - 'project.yml'
               - '.swift-format'
               - '.swiftlint.yml'
@@ -108,7 +115,7 @@ jobs:
       - name: Install swift-format
         run: brew install swift-format
       - name: Check formatting
-        run: swift-format lint --recursive --strict --configuration .swift-format App AppTests Packages
+        run: swift-format lint --recursive --strict --configuration .swift-format App AppTests Packages Widget LiveActivity
 
   # L1: all package unit tests in ONE macOS job. We previously ran
   # this as a 10-job matrix; each parallel job has a ~60s billed

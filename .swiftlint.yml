@@ -5,6 +5,8 @@ included:
   - App
   - AppTests
   - Packages
+  - Widget
+  - LiveActivity
 
 excluded:
   - .build
