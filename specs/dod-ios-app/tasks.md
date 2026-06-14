@@ -2330,6 +2330,14 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 
 ---
 
+### T-772 — DUT-79 Saved widget images: fix filename→URL resolver pointing at the wrong directory (US-17 amendment, CL-169)
+
+- **What:** The Saved widget never rendered hero photos. `SavedRecipesWidgetEntryView.heroImageURL(forFilename:)` appended the filename to the App Group container **root** (`<container>/<sha>.img`), missing the `widget-images/` subdir the bridge writes to (`WidgetImageBridge.imageSubdirectory`) — so it looked one directory too high and fell back to the gradient for every saved row, even though CL-163 set the filename and CL-167 bridged the bytes. The Latest widget worked because it used `WidgetImageBridge.fileURL`. **Fix:** delegate `heroImageURL(forFilename:)` to `WidgetImageBridge.fileURL(forFilename:)` — the single canonical resolver both widgets share. Closes Linear DUT-79. The real completion of the DUT-76 saved-images work.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-169), spec.md (AC-17.3 amended), tasks.md}`. `Widget/SavedRecipesWidgetEntryView.swift` (1-line behavior change + doc comment).
+- **AC:** US-17 AC-17.3 amended (saved widget shares the canonical `WidgetImageBridge.fileURL`); US-21 AC-21.3 (resolver contract) (CL-169 canonical). **Est:** ~30 min. **Deps:** main at `0282bb0` (T-771 merged). Branch `fix/T-772-saved-widget-image-path`. **||:** P47-widget-overhaul (DUT-79). No `e2e` label — Widget extension target isn't unit-testable; the fix routes through `WidgetImageBridge.fileURL`, whose `widget-images/` inclusion is locked by `WidgetImageBridgeTests.fileURLReturnsContainerPlusSubdirectoryPlusFilename`; on-device confirmed (filename + bridged file both present, only the resolution path was wrong).
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) + 1 (Phase 19 CloudKit sync fix: T-736) = 132 (Phase 16–18 follow-up tasks T-730..T-735 are tracked in-line within their phases)
