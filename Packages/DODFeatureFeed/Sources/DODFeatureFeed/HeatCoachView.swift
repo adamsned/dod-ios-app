@@ -82,12 +82,11 @@ public struct HeatCoachView: View {
             }
 
             labeledRow("Cooking style") {
-                Picker("Cooking style", selection: $style) {
-                    Text("Even").tag(CookingStyle.even)
-                    Text("Baking").tag(CookingStyle.baking)
-                }
-                .pickerStyle(.segmented)
-                .accessibilityIdentifier("heat-coach-style")
+                accentSelector(
+                    selection: $style,
+                    options: [(.even, "Even"), (.baking, "Baking")],
+                    accessibilityID: "heat-coach-style"
+                )
             }
 
             Divider().overlay(DODColor.surfaceDivider)
@@ -113,13 +112,11 @@ public struct HeatCoachView: View {
 
     private var ambientRow: some View {
         labeledRow("Air temperature") {
-            Picker("Air temperature", selection: $ambient) {
-                Text("Hot").tag(AmbientCondition.hot)
-                Text("Mild").tag(AmbientCondition.mild)
-                Text("Cold").tag(AmbientCondition.cold)
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("heat-coach-ambient")
+            accentSelector(
+                selection: $ambient,
+                options: [(.hot, "Hot"), (.mild, "Mild"), (.cold, "Cold")],
+                accessibilityID: "heat-coach-ambient"
+            )
         }
     }
 
@@ -133,11 +130,11 @@ public struct HeatCoachView: View {
         .accessibilityIdentifier("heat-coach-wind")
     }
 
-    // MARK: - Result card ("a starting point — then cook by feel")
+    // MARK: - Result card (the starting estimate, then cook by feel)
 
     private var resultCard: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text("A starting point — then cook by feel")
+            Text("A starting point. Then cook by feel.")
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelOnAccent.opacity(0.9))
                 .textCase(.uppercase)
@@ -185,6 +182,50 @@ public struct HeatCoachView: View {
                 .foregroundStyle(DODColor.labelSecondary)
             control()
         }
+    }
+
+    /// Brand-accent segmented selector (DUT-83). Replaces `.pickerStyle(.segmented)`
+    /// so the chosen option reads in the app's orange accent instead of iOS's
+    /// neutral grey, in both light and dark. Scoped to this screen (no global
+    /// `UISegmentedControl` appearance hack): selected = accent fill +
+    /// `labelOnAccent`; unselected = clear over a recessed `surface` track.
+    @ViewBuilder
+    private func accentSelector<Value: Hashable>(
+        selection: Binding<Value>,
+        options: [(Value, String)],
+        accessibilityID: String
+    ) -> some View {
+        HStack(spacing: DODSpacing.xxs) {
+            ForEach(options.indices, id: \.self) { index in
+                let (value, label) = options[index]
+                let isSelected = selection.wrappedValue == value
+                Text(label)
+                    .dodFont(DODType.body)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, DODSpacing.xs)
+                    .foregroundStyle(isSelected ? DODColor.labelOnAccent : DODColor.label)
+                    .background(
+                        RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous)
+                            .fill(isSelected ? DODColor.accent : Color.clear)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture { selection.wrappedValue = value }
+                    .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .padding(DODSpacing.xxs)
+        .background(
+            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                .fill(DODColor.surface)
+        )
+        // Hairline so the track reads as a grouped control in BOTH modes —
+        // in light, `surface` matches the card and the fill alone is invisible
+        // (DUT-83).
+        .overlay(
+            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                .strokeBorder(DODColor.surfaceDivider, lineWidth: 1)
+        )
+        .accessibilityIdentifier(accessibilityID)
     }
 }
 

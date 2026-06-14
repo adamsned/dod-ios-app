@@ -43,9 +43,11 @@ struct HeatCoachModel {
     var styleNote: String {
         switch style {
         case .even:
-            return "Even heat (top and bottom equal) — for roasts, stews, and one-pot meals."
+            return "Even heat, top and bottom. Great for roasts, stews, and one-pot meals."
         case .baking:
-            return "Lid-heavy 3:1 — for breads, cobblers, and cakes, so the top browns without scorching the bottom."
+            return
+                "Lid-heavy, about 3:1 (3 coals on top for every 1 underneath). "
+                + "Great for breads, cobblers, and cakes, so the top browns without burning the bottom."
         }
     }
 
@@ -59,9 +61,13 @@ struct HeatCoachModel {
         case .mild:
             return nil
         case .hot:
-            return "Hot air (about 90-100°F): pull \(magnitudePhrase(delta)) coals — the oven holds heat."
+            return
+                "Hot out (about 90-100°F): pull \(magnitudePhrase(delta)) coals, "
+                + "since the oven already holds plenty of heat."
         case .cold:
-            return "Cold air (about 20-30°F): add \(magnitudePhrase(delta)) coals — the cold steals heat."
+            return
+                "Cold out (about 20-30°F): add \(magnitudePhrase(delta)) coals, "
+                + "since the cold air steals heat."
         }
     }
 
@@ -77,7 +83,7 @@ struct HeatCoachModel {
     /// Replenish-cadence line, always shown.
     var replenishNote: String {
         let minutes = DutchOvenHeatCoach.replenishMinutes(ambient: ambient, windy: windy)
-        let why = minutes == 20 ? " (sooner — coals burn down faster in the cold or wind)" : ""
+        let why = minutes == 20 ? " (sooner, since coals burn down faster in the cold or wind)" : ""
         return "Replenish from the chimney every \(minutes) minutes\(why)."
     }
 
@@ -85,7 +91,8 @@ struct HeatCoachModel {
     var windNote: String? {
         guard windy else { return nil }
         return
-            "Windy: fix the environment first — turn the oven back-to-wind and build a windbreak before adding coals."
+            "Windy: fix the environment first by turning the oven so its back faces the wind, "
+            + "then build a windbreak before adding coals."
     }
 
     // MARK: - Helpers
