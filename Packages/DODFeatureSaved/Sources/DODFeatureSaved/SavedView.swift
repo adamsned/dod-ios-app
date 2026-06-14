@@ -141,17 +141,30 @@ public struct SavedView: View {
                         // `onSave?(recipe)` path; `RecipeStore.toggleSaved`
                         // flips in both directions, so tapping "Unsave"
                         // correctly transitions the row to `isSaved == false`.
-                        .recipeCardContextMenu(isSaved: true) {
-                            // T-635 / CL-104 — optimistic local removal so
-                            // the card disappears instantly; the store toggle
-                            // bubbles through `TabStack.saveFromCard(...)`
-                            // without a completion callback, so without this
-                            // the row lingers until the next `.task` cycle
-                            // (tab switch). Order matters: UI first, then
-                            // persistence fires asynchronously.
-                            viewModel.optimisticallyRemove(id: recipe.id)
-                            onSave?(recipe)
-                        }
+                        .recipeCardContextMenu(
+                            isSaved: true,
+                            // T-775 / DUT-81 — surfaces "Remove Download" only
+                            // for the saved cards that are also downloaded.
+                            isDownloaded: viewModel.downloadedIDs.contains(recipe.id),
+                            onToggle: {
+                                // T-635 / CL-104 — optimistic local removal so
+                                // the card disappears instantly; the store toggle
+                                // bubbles through `TabStack.saveFromCard(...)`
+                                // without a completion callback, so without this
+                                // the row lingers until the next `.task` cycle
+                                // (tab switch). Order matters: UI first, then
+                                // persistence fires asynchronously.
+                                viewModel.optimisticallyRemove(id: recipe.id)
+                                onSave?(recipe)
+                            },
+                            onRemoveDownload: {
+                                // T-775 / DUT-81 — un-download clears the badge
+                                // optimistically (the card stays — un-download ≠
+                                // unsave), then routes the store write through
+                                // the view model's dependency.
+                                Task { await viewModel.removeDownload(id: recipe.id) }
+                            }
+                        )
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)

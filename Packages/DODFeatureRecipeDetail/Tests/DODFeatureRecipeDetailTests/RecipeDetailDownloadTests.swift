@@ -121,6 +121,46 @@ import Testing
         #expect(viewModel.snackbarMessage == "Saved.")
     }
 
+    @Test func removeDownloadClearsStateButKeepsSaved() async throws {
+        // T-775 / DUT-81 — the toolbar download button is a toggle: removing
+        // a download flips `isDownloaded` back to false and surfaces "Download
+        // removed", but must NOT unsave the recipe (save/download decoupled,
+        // T-761) — so the card stays in the Saved tab, just without the badge.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 624, withDetail: true)
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 624)
+        await viewModel.onAppear()
+        await viewModel.downloadForOffline()
+        #expect(viewModel.isDownloaded == true)
+        #expect(viewModel.isSaved == true)
+
+        await viewModel.removeDownload()
+
+        #expect(viewModel.isDownloaded == false)
+        #expect(viewModel.snackbarMessage == "Download removed")
+        #expect(dependencies.downloadedIDs.contains(624) == false)
+        // Un-download ≠ unsave.
+        #expect(viewModel.isSaved == true)
+        #expect(dependencies.savedIDs.contains(624))
+    }
+
+    @Test func toggleDownloadDispatchesBothDirections() async throws {
+        // T-775 / DUT-81 — the toolbar button calls `toggleDownload()`; it must
+        // download when not downloaded and remove when already downloaded.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 625, withDetail: true)
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 625)
+        await viewModel.onAppear()
+        #expect(viewModel.isDownloaded == false)
+
+        await viewModel.toggleDownload()
+        #expect(viewModel.isDownloaded == true)
+
+        await viewModel.toggleDownload()
+        #expect(viewModel.isDownloaded == false)
+        #expect(viewModel.snackbarMessage == "Download removed")
+    }
+
     private func makeViewModel(
         dependencies: RecipeDetailDependencies,
         listItemID: Int

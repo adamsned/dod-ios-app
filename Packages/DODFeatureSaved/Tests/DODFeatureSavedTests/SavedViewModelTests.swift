@@ -38,6 +38,26 @@ import Testing
         #expect(viewModel.downloadedIDs == [1, 3])
     }
 
+    @Test func removeDownloadClearsBadgeOptimisticallyAndRoutesStoreWrite() async {
+        // T-775 / DUT-81 — the Saved-tab "Remove Download" action clears the
+        // card's "Downloaded" badge instantly (optimistic `downloadedIDs`
+        // update) and routes the un-download through the dependency. The
+        // recipe stays in `recipes` (un-download ≠ unsave).
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        dependencies.downloadedIDs = [1, 2]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+        #expect(viewModel.downloadedIDs == [1, 2])
+
+        await viewModel.removeDownload(id: 1)
+
+        #expect(viewModel.downloadedIDs == [2])
+        #expect(dependencies.removedDownloadIDs == [1])
+        // The card itself stays — only the badge cleared (un-download ≠ unsave).
+        #expect(viewModel.recipes.map(\.id) == [1, 2])
+    }
+
     @Test func errorStatePresentsRetry() async {
         let dependencies = FakeSavedDependencies()
         dependencies.shouldFail = true
@@ -198,6 +218,9 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     /// T-774 / DUT-80 — the set ``downloadedRecipeIDs()`` returns, so a test can
     /// assert the view model hydrates `downloadedIDs` for the Saved-tab badge.
     var downloadedIDs: Set<Int> = []
+    /// T-775 / DUT-81 — recipe ids the view model asked to un-download, so a
+    /// test can assert the store write routed through the dependency.
+    var removedDownloadIDs: [Int] = []
     /// Number of times ``savedRecipes()`` has been called — lets a test assert
     /// the view model coalesces a remote-change burst into a single re-fetch.
     private(set) var savedRecipesCallCount = 0
@@ -219,6 +242,11 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     }
 
     func downloadedRecipeIDs() async throws -> Set<Int> { downloadedIDs }
+
+    func removeDownload(id: Int) async throws {
+        removedDownloadIDs.append(id)
+        downloadedIDs.remove(id)
+    }
 
     func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {
         preDownloadedRecipeIDs.append(recipeID)

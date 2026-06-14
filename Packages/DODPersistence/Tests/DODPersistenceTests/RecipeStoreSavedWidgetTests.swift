@@ -115,6 +115,28 @@ import Testing
         #expect(try await store.downloadedRecipeIDs().contains(102) == false)
     }
 
+    /// T-775 / DUT-81 — ``RecipeStore/removeDownload(id:)`` clears the download
+    /// pin so a downloaded recipe reverts to saved-only, is an idempotent no-op
+    /// on a not-downloaded row, and the recipe can be re-downloaded afterward.
+    @Test func removeDownloadClearsThePinAndIsIdempotent() async throws {
+        let store = try await makeStore()
+        try await store.cache(listItem: makeListItem(id: 201, title: "Pinned"))
+        _ = try await store.markDownloaded(id: 201)
+        #expect(try await store.isDownloaded(id: 201) == true)
+
+        // Removal transitions (true) and clears the flag.
+        #expect(try await store.removeDownload(id: 201) == true)
+        #expect(try await store.isDownloaded(id: 201) == false)
+        #expect(try await store.downloadedRecipeIDs().contains(201) == false)
+
+        // Idempotent: a second removal on a not-downloaded row is a no-op.
+        #expect(try await store.removeDownload(id: 201) == false)
+
+        // The recipe can be re-downloaded after removal (full toggle cycle).
+        #expect(try await store.markDownloaded(id: 201) == true)
+        #expect(try await store.isDownloaded(id: 201) == true)
+    }
+
     // MARK: - Helpers
 
     /// Local helper that mirrors `makeListItem(id:title:)` but populates

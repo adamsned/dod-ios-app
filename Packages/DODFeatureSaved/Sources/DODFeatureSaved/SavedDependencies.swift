@@ -11,6 +11,10 @@ public protocol SavedDependencies: Sendable {
     /// `[]` (no badges) so existing fake conformers keep compiling; the live
     /// wiring routes to ``RecipeStore/downloadedRecipeIDs()``.
     func downloadedRecipeIDs() async throws -> Set<Int>
+    /// T-775 / DUT-81 — clear a recipe's explicit-download pin (un-download)
+    /// so its "Downloaded" badge clears. Default no-op; the live wiring routes
+    /// to ``RecipeStore/removeDownload(id:)``. The recipe stays saved.
+    func removeDownload(id: Int) async throws
     /// Pre-download hero images for newly-saved recipe (AC-5.2).
     func preDownloadImages(forRecipeID: Int, urls: [URL]) async
     /// Emit a signal every time the on-disk store changes underneath us
@@ -40,6 +44,10 @@ extension SavedDependencies {
     /// wiring overrides this; fake conformers that don't care about download
     /// state inherit the empty set. T-774 / DUT-80.
     public func downloadedRecipeIDs() async throws -> Set<Int> { [] }
+
+    /// Default no-op so fakes that don't model download state keep compiling
+    /// (T-775 / DUT-81). Live routes to ``RecipeStore/removeDownload(id:)``.
+    public func removeDownload(id: Int) async throws {}
 }
 
 public struct LiveSavedDependencies: SavedDependencies {
@@ -76,6 +84,10 @@ public struct LiveSavedDependencies: SavedDependencies {
 
     public func downloadedRecipeIDs() async throws -> Set<Int> {
         try await store.downloadedRecipeIDs()
+    }
+
+    public func removeDownload(id: Int) async throws {
+        _ = try await store.removeDownload(id: id)
     }
 
     public func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {
