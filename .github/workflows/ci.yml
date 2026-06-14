@@ -290,7 +290,14 @@ jobs:
     needs: [changes, build-app]
     if: needs.changes.outputs.ios_sim == 'true'
     runs-on: macos-15
-    timeout-minutes: 20
+    # Bumped 20 -> 30. This job was CANCELLED twice at the 20-min cap on PR #197
+    # (run 27486743128): the "Run unit tests" step ran ~19.8 min — a genuine
+    # timeout sitting on the cold-compile boundary, not a test failure (the 11
+    # DODAppUnitTests pass locally). The DerivedData restore added below makes
+    # the build incremental in the normal case; this bump is the safety net for
+    # the cold-build fallback (cache miss/eviction) so the symptom can't recur.
+    # 30 also matches L5 (test-e2e), the other full-scheme `xcodebuild test` job.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
@@ -314,6 +321,30 @@ jobs:
       - name: Ensure iPhone 17 simulator
         id: sim
         uses: ./.github/actions/ensure-ios-simulator
+      # Restore the compiled DODApp scheme (app + widget + Live Activity + all
+      # local packages) that the `build-app` job already built + cached, so the
+      # `xcodebuild ... test` below runs an INCREMENTAL build — compiling only
+      # the DODAppUnitTests bundle — instead of recompiling the whole scheme
+      # cold. That cold compile is the root cause of the 20-min timeout this job
+      # was hitting; build-app's products are reusable here because both build
+      # the same Debug-iphonesimulator slice (build-app uses the generic sim
+      # destination, this job a concrete iPhone 17 of the same iOS 26 SDK).
+      #
+      # Restore-only (not actions/cache): `build-app` is the sole producer and
+      # `needs`-runs first, saving this EXACT key in-run, so this restore is a
+      # guaranteed hit. We never save here — that keeps the parallel L1/L3/L5
+      # test jobs from racing to re-upload a test-polluted DerivedData under
+      # build-app's key. The key MUST stay byte-identical to build-app's "Cache
+      # DerivedData (incremental app build)" step for the hit to land; restore-
+      # keys warms a near-miss; a full miss falls back to a cold compile (still
+      # safe under the bumped timeout) — never wrong, only slower.
+      - name: Restore DerivedData (incremental build from build-app)
+        uses: actions/cache/restore@v4
+        with:
+          path: DerivedData/Build
+          key: ${{ runner.os }}-xcode26-derived-app-${{ hashFiles('project.yml', 'App/**', 'Packages/**/Sources/**', 'Packages/*/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode26-derived-app-
       - name: Run unit tests
         env:
           DESTINATION: ${{ steps.sim.outputs.destination }}
@@ -361,6 +392,20 @@ jobs:
       - name: Ensure iPhone 17 simulator
         id: sim
         uses: ./.github/actions/ensure-ios-simulator
+      # Same incremental-build restore as L1/L5 (see test-unit-app for the full
+      # rationale): pull build-app's compiled DODApp scheme so the FIRST
+      # xcodebuild `test` attempt below builds incrementally (UI-test bundle
+      # only) instead of cold — later retries in the loop already reuse attempt
+      # 1's products. Removing the cold compile per cold attempt is what keeps
+      # the retry loop inside the 25-min cap. Restore-only, byte-identical key
+      # to build-app's "Cache DerivedData (incremental app build)" step.
+      - name: Restore DerivedData (incremental build from build-app)
+        uses: actions/cache/restore@v4
+        with:
+          path: DerivedData/Build
+          key: ${{ runner.os }}-xcode26-derived-app-${{ hashFiles('project.yml', 'App/**', 'Packages/**/Sources/**', 'Packages/*/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode26-derived-app-
       - name: Run UI tests (resilient to simulator/runner flake)
         env:
           DESTINATION: ${{ steps.sim.outputs.destination }}
@@ -455,6 +500,18 @@ jobs:
       - name: Ensure iPhone 17 simulator
         id: sim
         uses: ./.github/actions/ensure-ios-simulator
+      # Same incremental-build restore as L1/L3 (see test-unit-app for the full
+      # rationale): pull build-app's compiled DODApp scheme so the `xcodebuild
+      # ... test` below compiles only the DODAppE2ETests bundle instead of
+      # recompiling the whole scheme cold. Restore-only, byte-identical key to
+      # build-app's "Cache DerivedData (incremental app build)" step.
+      - name: Restore DerivedData (incremental build from build-app)
+        uses: actions/cache/restore@v4
+        with:
+          path: DerivedData/Build
+          key: ${{ runner.os }}-xcode26-derived-app-${{ hashFiles('project.yml', 'App/**', 'Packages/**/Sources/**', 'Packages/*/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode26-derived-app-
       - name: Run E2E user journeys
         env:
           DESTINATION: ${{ steps.sim.outputs.destination }}
