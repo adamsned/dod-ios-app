@@ -33,6 +33,14 @@ public protocol SavedDependencies: Sendable {
     /// finished stream so existing fake conformers keep compiling and a
     /// build with no CloudKit container simply never refreshes out-of-band.
     func remoteChanges() -> AsyncStream<Void>
+
+    /// DUT-84 — is the device online right now? The Saved-tab "Remove Download"
+    /// action gates on this: offline, removing a download strands the recipe
+    /// (no network to re-fetch it), so the view confirms first; online it
+    /// removes immediately. Default `true` so fake conformers that don't model
+    /// connectivity read as "online" (no warning); the live wiring reads
+    /// ``NetworkMonitor``.
+    func isOnline() async -> Bool
 }
 
 extension SavedDependencies {
@@ -48,6 +56,10 @@ extension SavedDependencies {
     /// Default no-op so fakes that don't model download state keep compiling
     /// (T-775 / DUT-81). Live routes to ``RecipeStore/removeDownload(id:)``.
     public func removeDownload(id: Int) async throws {}
+
+    /// Default "online" (see ``isOnline()``) so fake conformers opt in only
+    /// when a test exercises the offline warning. T-778 / DUT-84.
+    public func isOnline() async -> Bool { true }
 }
 
 public struct LiveSavedDependencies: SavedDependencies {
@@ -67,15 +79,21 @@ public struct LiveSavedDependencies: SavedDependencies {
     let store: RecipeStore
     let imageLoader: ImageLoader
     private let remoteChangeStream: RemoteChangeStreamFactory?
+    /// DUT-84 — process-wide reachability for the offline remove-download
+    /// guard. Defaults to ``NetworkMonitor/shared`` (the instance the App
+    /// composition root starts), so existing call sites compile unchanged.
+    private let monitor: NetworkMonitor
 
     public init(
         store: RecipeStore,
         imageLoader: ImageLoader,
-        remoteChangeStream: RemoteChangeStreamFactory? = nil
+        remoteChangeStream: RemoteChangeStreamFactory? = nil,
+        monitor: NetworkMonitor = .shared
     ) {
         self.store = store
         self.imageLoader = imageLoader
         self.remoteChangeStream = remoteChangeStream
+        self.monitor = monitor
     }
 
     public func savedRecipes() async throws -> [Recipe] {
@@ -88,6 +106,10 @@ public struct LiveSavedDependencies: SavedDependencies {
 
     public func removeDownload(id: Int) async throws {
         _ = try await store.removeDownload(id: id)
+    }
+
+    public func isOnline() async -> Bool {
+        await monitor.isOnline
     }
 
     public func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {

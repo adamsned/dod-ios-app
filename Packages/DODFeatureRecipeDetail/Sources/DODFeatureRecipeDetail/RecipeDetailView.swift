@@ -89,6 +89,8 @@ public struct RecipeDetailView: View {
         .onChange(of: viewModel.loadState) { _, newValue in
             handleLoadStateChange(newValue)
         }
+        // DUT-84 — offline guard on the toolbar download toggle's remove path.
+        .modifier(OfflineRemoveDownloadWarningModifier(viewModel: viewModel))
     }
 
     @ViewBuilder

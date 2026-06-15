@@ -19,6 +19,13 @@ public final class SavedViewModel {
     /// membership to render the "Downloaded" badge on saved + downloaded cards.
     public private(set) var downloadedIDs: Set<Int> = []
     public private(set) var loadState: LoadState = .idle
+    /// DUT-84 — when the user taps "Remove Download" while **offline**, this
+    /// holds the recipe id awaiting confirmation (removing a download with no
+    /// network strands the recipe). Non-nil presents the offline warning in
+    /// ``SavedView``; ``confirmPendingRemoveDownload()`` /
+    /// ``cancelPendingRemoveDownload()`` resolve it. `nil` when online (removal
+    /// runs immediately) or nothing is pending.
+    public private(set) var pendingOfflineRemoveDownloadID: Int?
 
     private let dependencies: SavedDependencies
 
@@ -120,5 +127,32 @@ public final class SavedViewModel {
         } catch {
             DODLog.persistence.error("remove download failed: \(String(describing: error))")
         }
+    }
+
+    /// DUT-84 — the Saved-tab "Remove Download" entry point. Removing a
+    /// download while **offline** strands the recipe (no network to re-fetch),
+    /// so confirm first: offline, stash the id in
+    /// ``pendingOfflineRemoveDownloadID`` to present the warning; online, remove
+    /// immediately (re-downloading is a tap away).
+    public func requestRemoveDownload(id: Int) async {
+        if await dependencies.isOnline() {
+            await removeDownload(id: id)
+        } else {
+            pendingOfflineRemoveDownloadID = id
+        }
+    }
+
+    /// DUT-84 — the offline warning's "Remove Download" button: clear the
+    /// pending id and perform the removal the user confirmed.
+    public func confirmPendingRemoveDownload() async {
+        guard let id = pendingOfflineRemoveDownloadID else { return }
+        pendingOfflineRemoveDownloadID = nil
+        await removeDownload(id: id)
+    }
+
+    /// DUT-84 — the offline warning's "Keep Download" button: dismiss without
+    /// removing. The download and its badge stay put.
+    public func cancelPendingRemoveDownload() {
+        pendingOfflineRemoveDownloadID = nil
     }
 }
