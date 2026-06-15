@@ -24,7 +24,10 @@ extension View {
             Button("Remove Download", role: .destructive, action: onRemove)
             Button("Keep Download", role: .cancel) {}
         } message: {
-            Text("Removing this download means you won't be able to open this recipe until you're back online.")
+            Text(
+                "If you remove this download, you won't be able to open this recipe until you're "
+                    + "back online. You can always download it again once you're connected."
+            )
         }
     }
 }
