@@ -187,7 +187,7 @@ extension SearchViewModel {
             trimmed: trimmed
         )
 
-        await recordRecentAndTelemetry(trimmed: trimmed)
+        await sendSearchTelemetry(trimmed: trimmed)
         kickOffCookTimeHydrationIfNeeded(against: merged)
     }
 

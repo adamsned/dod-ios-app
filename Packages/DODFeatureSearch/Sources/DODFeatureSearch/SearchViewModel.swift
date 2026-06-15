@@ -43,7 +43,9 @@ public final class SearchViewModel {
     /// store — the user didn't intentionally search for it, they tapped a
     /// curated pill, and persisting it pollutes Recent with terms the user
     /// never typed (REG-19 / CL-66 / T-670).
-    private var queryFromCuratedTap: Bool = false
+    /// T-779 / DUT-85: `private(set)` (was `private`) so the `+Recents`
+    /// extension's `commitRecentSearch()` can read the curated-tap flag.
+    private(set) var queryFromCuratedTap: Bool = false
 
     /// US-29 / AC-29.1 amendment / CL-106 (T-637): tracks how the current
     /// `items` array was sourced so filter mutations re-apply against the
@@ -113,8 +115,9 @@ public final class SearchViewModel {
     /// stored properties can't live in extensions.
     var cachedTrySlate: [DODDomain.Category]?
 
-    /// Newest-first recent queries.
-    public private(set) var recentSearches: [String] = []
+    /// Newest-first recent queries. T-779 / DUT-85: `internal(set)` (was
+    /// `private(set)`) so the `+Recents` extension can refresh it on commit.
+    public internal(set) var recentSearches: [String] = []
 
     /// CL-127 (T-649): "did you mean?" suggestion populated by the
     /// `+T643` finalize hop when results settle < 3 items.
@@ -134,7 +137,8 @@ public final class SearchViewModel {
     var lastRecentlyViewedIDs: Set<Int> = []
 
     let dependencies: SearchDependencies
-    private let recents: RecentSearches
+    // T-779 / DUT-85: internal (was `private`) so `+Recents` can record into it.
+    let recents: RecentSearches
     /// Autocomplete debounce (DUT-10: tightened 300 -> 150ms). Public so tests control timing.
     public var debounceMilliseconds: Int = 150
     private var debounceTask: Task<Void, Never>?
@@ -300,17 +304,11 @@ public final class SearchViewModel {
     // / Path B / merge / finish / finalize) live in `SearchViewModel+T643.swift`
     // so this file stays under SwiftLint's `file_length` cap.
 
-    /// Record the recent on a successful query — even if zero results,
-    /// because "tried it, didn't work" is still useful history. Skip
-    /// when the query originated from a curated "Try" suggestion tap
-    /// (REG-19 / CL-66 / T-670). Also sends the AC-3.6 SHA-256-hashed
-    /// query to analytics. CL-121 (T-643) promoted this from `private`
-    /// to internal so the `+T643` extension's finalize helper can call it.
-    func recordRecentAndTelemetry(trimmed: String) async {
-        if !queryFromCuratedTap {
-            recents.record(trimmed)
-            recentSearches = recents.recent()
-        }
+    /// Send the AC-3.6 SHA-256-hashed query to analytics on each completed
+    /// search. T-779 / DUT-85 moved recent-recording out of this path into
+    /// ``commitRecentSearch()`` (Return / keyboard dismissal only), so this no
+    /// longer persists to the recents store. `+T643`'s finalize hop calls it.
+    func sendSearchTelemetry(trimmed: String) async {
         let hash = StringHasher.sha256Hex(trimmed)
         await dependencies.sendSearchTelemetry(queryHash: hash)
     }
