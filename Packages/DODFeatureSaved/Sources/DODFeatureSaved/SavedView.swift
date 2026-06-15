@@ -40,28 +40,12 @@ public struct SavedView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // DUT-82 — manual large header. On iOS 26 the NavigationStack large
-            // title vanishes after a card context-menu action re-renders the
-            // view (a `.navigationTitle` + `.toolbar` + list OS bug — Apple
-            // Developer Forums thread/789557; the Unsave menu hit it too, so it
-            // predates T-775's Remove Download). A header rendered as ordinary
-            // content can't vanish. The `.toolbar` cart stays; dropping
-            // `.navigationTitle` means a pushed shopping list shows a "Back"
-            // button instead of "Saved" — acceptable for the workaround. The
-            // `.isHeader` trait preserves the VoiceOver heading.
-            Text("Saved")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundStyle(DODColor.label)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.top, DODSpacing.sm)
-                .padding(.bottom, DODSpacing.xs)
-                .accessibilityAddTraits(.isHeader)
-            content
-        }
-        .background(DODColor.surface)
+        // T-781 / DUT-87 — the "Saved" title scrolls with the grid
+        // (`DODScreenHeader` inside the loaded ScrollView), matching every other
+        // tab; only the toolbar cart stays pinned. (T-776 had already dropped the
+        // native `.navigationTitle` to dodge the iOS 26 large-title vanish bug.)
+        content
+            .background(DODColor.surface)
         .toolbar { shoppingListToolbar }
         .sheet(isPresented: $isBuildingShoppingList) {
             ShoppingListBuilderSheet(recipes: viewModel.recipes) { selected in
@@ -133,6 +117,7 @@ public struct SavedView: View {
             )
         case .loaded:
             ScrollView {
+                DODScreenHeader("Saved")
                 LazyVGrid(
                     columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
                     spacing: DODSpacing.md

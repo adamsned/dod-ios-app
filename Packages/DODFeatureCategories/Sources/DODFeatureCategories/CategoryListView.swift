@@ -44,8 +44,10 @@ public struct CategoryListView: View {
     }
 
     public var body: some View {
+        // T-781 / DUT-87 — no `.navigationTitle`; the "Categories" title and the
+        // filter field scroll with the list (`DODScreenHeader` + `DODSearchField`
+        // are the first list rows in `loadedList`), consistent with every tab.
         content
-            .navigationTitle("Categories")
             .task { await viewModel.onAppear() }
     }
 
@@ -91,51 +93,63 @@ public struct CategoryListView: View {
             categories: viewModel.categories,
             matching: searchText
         )
-        let baseList = List {
+        // T-781 / DUT-87 — title + filter scroll above the category card. The
+        // `.insetGrouped` List was replaced with a ScrollView + a single brand
+        // rounded card (`categoryCard`) so the header can scroll with the list
+        // WITHOUT the List's section grouping squaring off the first cell's top
+        // corners or adding its top inset. The filter's border + shadow now come
+        // from `DODSearchField` itself, so it matches the Search tab's field.
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                DODScreenHeader("Categories")
+                DODSearchField(text: $searchText, placeholder: "Search")
+                    .padding(.horizontal, DODSpacing.md)
+                    .padding(.bottom, DODSpacing.sm)
+                    .accessibilityIdentifier("dod.search.field.categories")
+                categoryCard(filtered)
+                    .padding(.horizontal, DODSpacing.md)
+                    .padding(.bottom, DODSpacing.md)
+            }
+        }
+        .background(DODColor.surface)
+    }
+
+    /// The categories as one brand rounded card (`surfaceElevated`, rows split
+    /// by hairline dividers) — reproduces the prior `.insetGrouped` grouping in
+    /// a ScrollView so the title + filter can scroll above it (T-781 / DUT-87).
+    /// The card clip rounds the first/last rows, fixing the squared-off first
+    /// cell the List section grouping produced.
+    @ViewBuilder
+    private func categoryCard(_ filtered: [DODDomain.Category]) -> some View {
+        VStack(spacing: 0) {
             if filtered.isEmpty {
                 Text("No categories match '\(searchText)'")
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.labelSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(DODSpacing.md)
                     .accessibilityIdentifier("category-empty-search")
-                    // T-647 / CL-125 — brand brown surface (matches Recipes
-                    // & Articles cards + the post-T-647 Settings cells)
-                    // instead of the system default near-black row bg.
-                    .listRowBackground(DODColor.surfaceElevated)
             } else {
-                ForEach(filtered) { category in
+                ForEach(Array(filtered.enumerated()), id: \.element.id) { index, category in
                     categoryRow(category)
-                        .listRowBackground(DODColor.surfaceElevated)
+                        .padding(.horizontal, DODSpacing.md)
+                        .padding(.vertical, DODSpacing.sm)
+                    if index < filtered.count - 1 {
+                        Divider()
+                            .overlay(DODColor.surfaceDivider)
+                            .padding(.leading, DODSpacing.md)
+                    }
                 }
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(DODColor.surface)
-
-        return VStack(spacing: 0) {
-            DODSearchField(text: $searchText, placeholder: "Search")
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.bottom, DODSpacing.sm)
-                .accessibilityIdentifier("dod.search.field.categories")
-            applyListStyle(baseList)
-        }
-        .background(DODColor.surface)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                .fill(DODColor.surfaceElevated)
+        )
     }
 
-    /// Applies the iOS-only `.listStyle(.insetGrouped)` to the base list.
-    /// Split into a helper so the `loadedList` body stays an expression
-    /// the type-checker resolves quickly and the `#if os(iOS)` branch
-    /// doesn't fight `some View`'s opaque-type inference inside a
-    /// `VStack` builder.
-    @ViewBuilder
-    private func applyListStyle<L: View>(_ baseList: L) -> some View {
-        #if os(iOS)
-        baseList.listStyle(.insetGrouped)
-        #else
-        baseList
-        #endif
-    }
-
-    /// One row in the `.insetGrouped` list. Renders as an iOS-stock cell
+    /// One row in the category card. Renders as an iOS-stock cell
     /// shape — category name on the leading side, recipe count + system
     /// disclosure chevron on the trailing side. The chevron uses the
     /// system `chevron.forward` glyph at `.footnote` weight with the

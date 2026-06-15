@@ -40,13 +40,11 @@ public struct FeedView: View {
             OfflineBanner(isOffline: viewModel.isOffline)
         }
         .background(DODColor.surface)
-        // US-37 / AC-37.1 (T-640, 2026-05-27): "Recipes" → "Recipes & Articles".
-        // Communicates that the tab surfaces both recipes (the JSON-LD-parseable
-        // posts) and articles (the JSON-LD-less posts routed to ArticleDetailView
-        // per CL-63). Matches AppTab.title for the same case. The bottom-tab
-        // label is set independently in AppTab.title; this only drives the
-        // screen's nav-bar title.
-        .navigationTitle("Recipes & Articles")
+        // T-781 / DUT-87 — no `.navigationTitle`: the "Recipes & Articles" large
+        // title is rendered as scrolling content (`DODScreenHeader` in `list`)
+        // so it scrolls up and away instead of the native minimize, keeping every
+        // tab's header behavior consistent (and dodging the iOS 26 large-title
+        // bug). The `.toolbar` buttons below stay pinned in the nav bar.
         .toolbar {
             // US-38 / AC-38.1 / CL-64.5 (T-650): layout toggle on the
             // trailing edge. The Settings gear that used to sit to its
@@ -127,6 +125,10 @@ public struct FeedView: View {
         // `LazyVStack` of `RecipeCard.ListRow` rows for denser scanning.
         let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
         return ScrollView {
+            // T-781 / DUT-87 — the title scrolls with the content (no native
+            // minimize); offline shifts it below the OfflineBanner overlay.
+            DODScreenHeader("Recipes & Articles")
+                .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
             Group {
                 switch layout {
                 case .gallery:
@@ -136,7 +138,7 @@ public struct FeedView: View {
                 }
             }
             .padding(.horizontal, DODSpacing.md)
-            .padding(.top, viewModel.isOffline ? DODSpacing.xl : DODSpacing.md)
+            .padding(.top, DODSpacing.md)
 
             if viewModel.loadState == .loadingMore {
                 ProgressView()

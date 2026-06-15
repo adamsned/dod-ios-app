@@ -78,6 +78,15 @@ public struct DODSearchField: View {
             Capsule(style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
+        // DUT-25 + T-781 / DUT-87 — border + soft shadow built into the
+        // component (was the separate `dodSearchFieldAffordance` modifier in
+        // DODFeatureSearch) so every DODSearchField — Search and Categories —
+        // reads identically and isn't camouflaged on the light surface.
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(DODColor.surfaceDivider, lineWidth: 1.5)
+        )
+        .shadow(color: DODColor.charcoal.opacity(0.08), radius: 3, x: 0, y: 1)
         .onChange(of: isFocused) { _, focused in
             onFocusChange?(focused)
         }
