@@ -46,34 +46,34 @@ public struct SavedView: View {
         // native `.navigationTitle` to dodge the iOS 26 large-title vanish bug.)
         content
             .background(DODColor.surface)
-        .toolbar { shoppingListToolbar }
-        .sheet(isPresented: $isBuildingShoppingList) {
-            ShoppingListBuilderSheet(recipes: viewModel.recipes) { selected in
-                builtListRecipes = ShoppingListSelection(recipes: selected)
+            .toolbar { shoppingListToolbar }
+            .sheet(isPresented: $isBuildingShoppingList) {
+                ShoppingListBuilderSheet(recipes: viewModel.recipes) { selected in
+                    builtListRecipes = ShoppingListSelection(recipes: selected)
+                }
             }
-        }
-        .navigationDestination(item: $builtListRecipes) { selection in
-            ShoppingListView(viewModel: ShoppingListViewModel(recipes: selection.recipes))
-        }
-        .task {
-            // DUT-6: subscribe to CloudKit remote-import signals (no-op
-            // if already subscribed) so a recipe saved on another device
-            // surfaces here without a relaunch, then do the appear-time
-            // fetch. The subscription outlives this `.task`; the
-            // debounced re-fetch reconciles on each remote import.
-            viewModel.startObserving()
-            await viewModel.refresh()
-        }
-        // DUT-84 — confirm before removing a download while offline. The
-        // context-menu "Remove Download" routes through `requestRemoveDownload`,
-        // which sets `pendingOfflineRemoveDownloadID` when there's no network.
-        .offlineRemoveDownloadAlert(
-            isPresented: Binding(
-                get: { viewModel.pendingOfflineRemoveDownloadID != nil },
-                set: { if !$0 { viewModel.cancelPendingRemoveDownload() } }
-            ),
-            onRemove: { Task { await viewModel.confirmPendingRemoveDownload() } }
-        )
+            .navigationDestination(item: $builtListRecipes) { selection in
+                ShoppingListView(viewModel: ShoppingListViewModel(recipes: selection.recipes))
+            }
+            .task {
+                // DUT-6: subscribe to CloudKit remote-import signals (no-op
+                // if already subscribed) so a recipe saved on another device
+                // surfaces here without a relaunch, then do the appear-time
+                // fetch. The subscription outlives this `.task`; the
+                // debounced re-fetch reconciles on each remote import.
+                viewModel.startObserving()
+                await viewModel.refresh()
+            }
+            // DUT-84 — confirm before removing a download while offline. The
+            // context-menu "Remove Download" routes through `requestRemoveDownload`,
+            // which sets `pendingOfflineRemoveDownloadID` when there's no network.
+            .offlineRemoveDownloadAlert(
+                isPresented: Binding(
+                    get: { viewModel.pendingOfflineRemoveDownloadID != nil },
+                    set: { if !$0 { viewModel.cancelPendingRemoveDownload() } }
+                ),
+                onRemove: { Task { await viewModel.confirmPendingRemoveDownload() } }
+            )
     }
 
     /// AC-39.3 / CL-85 decision 1 — the Saved-tab entry into the shopping-list
