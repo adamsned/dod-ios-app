@@ -53,9 +53,6 @@ public struct SearchView: View {
             )
             // T-779 / DUT-85: ...and on Return.
             .onSubmit { viewModel.commitRecentSearch() }
-            // DUT-25: border + subtle fill + soft shadow so the field is no
-            // longer white-on-white (camouflaged) on the light background.
-            .dodSearchFieldAffordance()
             .padding(DODSpacing.md)
             .accessibilityIdentifier("dod.search.field.search")
             // US-12 / AC-12.2 amendment / CL-106 (T-637): hide the filter
