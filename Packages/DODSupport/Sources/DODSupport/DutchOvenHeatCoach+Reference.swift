@@ -39,53 +39,57 @@ extension DutchOvenHeatCoach {
     public static let feelCues: [FeelCue] = [
         FeelCue(
             title: "Coal color",
-            onTrack: "White-gray ash coating means steady, optimal heat.",
+            onTrack: "A white-gray ash coating means the heat is steady and right where you want it.",
             adjust:
-                "Bright orange glow = running hot; pull 1-2 coals from the bottom. "
-                + "Dark or dull = spent; replenish from the chimney."
+                "Glowing bright orange means it's running hot, so pull 1-2 coals off the bottom. "
+                + "Dark and dull means they're spent, so add fresh ones from your charcoal chimney."
         ),
         FeelCue(
             title: "Steam at the lid rim",
-            onTrack: "A light wisp escaping the lid is normal.",
-            adjust: "Heavy, continuous steam = too hot or too much liquid. Ease the bottom heat."
+            onTrack: "A light wisp of steam escaping the lid is normal.",
+            adjust: "Heavy, nonstop steam means it's too hot or there's too much liquid, so ease off the bottom heat."
         ),
         FeelCue(
             title: "Hand test",
-            onTrack: "Palm held over the coals: 4-5s = 325-350°F, 2-3s = 375-425°F.",
-            adjust: "Under 2 seconds is too hot for most recipes — pull coals before you load the oven."
+            onTrack: "Hold your palm over the coals: 4-5 seconds means 325-350°F, 2-3 seconds means 375-425°F.",
+            adjust: "Under 2 seconds is too hot for most recipes, so pull a few coals before you load the oven."
         ),
         FeelCue(
             title: "Sound",
-            onTrack: "A gentle, consistent sizzle is right.",
-            adjust: "Rapid popping or spattering = reduce heat; pull coals from the bottom first."
+            onTrack: "A gentle, steady sizzle is just right.",
+            adjust: "Rapid popping or spattering means it's too hot, so pull coals from the bottom first."
         ),
         FeelCue(
             title: "Smell",
             onTrack: "A light caramel smell means it's browning, not burning.",
-            adjust: "Scorching before the halfway mark = the bottom is burning; pull bottom coals now."
+            adjust:
+                "A scorched smell before the halfway point means the bottom is burning, "
+                + "so pull the bottom coals right away."
         ),
         FeelCue(
             title: "Lid condensation",
             onTrack: "Moisture beading on the underside of the lid means a healthy, moist cook.",
-            adjust: "Bone-dry at the 30-minute mark = running hot and dry; ease off and check the food."
+            adjust:
+                "Bone-dry under the lid at the 30-minute mark means it's running hot and dry, "
+                + "so ease off and check the food."
         ),
     ]
 
     /// The coal-management habits that keep heat steady across a long cook —
     /// the routine behind the feel cues.
     public static let coalManagementHabits: [String] = [
-        "Keep a charcoal chimney going so the next round of coals is always lighting.",
-        "Rotate the oven and the lid a quarter-turn (in opposite directions) every 15 minutes to even out hot spots.",
-        "Replenish when coals are 60-70% spent — glowing with thin ash, not gray and cold.",
-        "Replace coals from the bottom and top in pairs so the lid/bottom ratio holds.",
-        "In wind, reposition the oven or build a windbreak before you reach for more coals.",
+        "Keep a charcoal chimney going so your next round of coals is always lighting.",
+        "Every 15 minutes, rotate the oven and the lid a quarter-turn in opposite directions to even out hot spots.",
+        "Add fresh coals when the old ones are about 60-70% spent: still glowing under thin ash, not gray and cold.",
+        "Swap coals top and bottom in pairs so your lid-to-bottom ratio stays put.",
+        "In wind, move the oven or build a windbreak before you reach for more coals.",
     ]
 
     /// Wind-specific guidance — wind is the single biggest disruptor of a
     /// Dutch oven cook, so fix the environment before adding fuel.
     public static let windGuidance: [String] = [
-        "Orient the oven back-to-wind so the gusts don't blow heat off the windward coals.",
-        "Build a windbreak — rocks, a camp table, or a cooler on the upwind side.",
-        "On windy days, replenish every 20 min instead of 30; coals burn down faster in moving air.",
+        "Turn the oven back-to-wind (its back to the gusts) so the wind can't blow heat off the coals.",
+        "Build a windbreak on the upwind side: rocks, a camp table, or a cooler.",
+        "On windy days, add fresh coals every 20 min instead of 30, since they burn down faster in moving air.",
     ]
 }

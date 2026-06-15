@@ -19,10 +19,13 @@ extension HeatCoachView {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
             sectionHeader("Adjust for your conditions")
 
-            Text("These nudge the starting point. Watch the oven, not the clock — the cues below tell you the truth.")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                "These tweak your starting number. Watch the oven, not the clock. "
+                    + "The cues below tell you what's really happening."
+            )
+            .dodFont(DODType.body)
+            .foregroundStyle(DODColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             VStack(alignment: .leading, spacing: DODSpacing.xs) {
                 if let ambientNote = coachModel.ambientNote {
@@ -64,7 +67,8 @@ extension HeatCoachView {
             sectionHeader("Cook by feel")
 
             Text(
-                "The estimate gets you lit. From here, your senses run the cook — this is the Dutch Oven Daddy method."
+                "The estimate just gets your coals going. From there, your eyes, ears, and nose run the cook. "
+                    + "That's the Dutch Oven Daddy way."
             )
             .dodFont(DODType.body)
             .foregroundStyle(DODColor.labelSecondary)

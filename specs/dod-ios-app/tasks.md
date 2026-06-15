@@ -2369,6 +2369,14 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 
 ---
 
+### T-777 — DUT-83 Heat Coach polish: plain-language copy (no em dashes) + accent-tinted selectors + light/dark consistency (DUT-48 refinement, CL-174)
+
+- **What:** Reword the Dutch Oven Heat Coach copy (UI + `DutchOvenHeatCoach+Reference` cues/habits/wind + `HeatCoachModel` notes) in plain, warm language for any skill level: expand the `=` shorthand to full sentences, define jargon inline (chimney, the 3:1 lid ratio, back-to-wind), remove every em dash from user-facing strings. Replace the two `.pickerStyle(.segmented)` controls with a scoped `accentSelector` (selected segment fills `DODColor.accent`; `surfaceDivider` hairline track) so they match the app's accent in light + dark. Pinned test substrings preserved → no test changes. Closes Linear DUT-83.
+- **Files:** `specs/dod-ios-app/{clarifications.md (CL-174), tasks.md}`. `Packages/DODSupport/Sources/DODSupport/DutchOvenHeatCoach+Reference.swift`. `Packages/DODFeatureFeed/Sources/DODFeatureFeed/{HeatCoachModel,HeatCoachView,HeatCoachView+Sections}.swift`.
+- **AC:** DUT-48 refinement (no formal `spec.md` AC) (CL-174 canonical). **Est:** ~60 min. **Deps:** main at `9974672` (T-776 merged). Branch `feat/T-777-heat-coach-polish`. **||:** P49-heat-coach-polish (DUT-83). No `e2e` label — copy + presentation; `DutchOvenHeatCoachTests` (30) + `HeatCoachModelTests` (12) pass unchanged (substance pinned); on-device verified in light + dark.
+
+---
+
 ## Summary
 
 - **Total tasks:** 73 (Phase 1–5) + 6 (Phase 6 consultant pass) + 5 (Phase 7 comments + ratings) + 6 (Phase 8 polish: T-310, T-320, T-321, T-322, T-323, T-330) + 5 (Phase 8 follow-ups surfaced by T-330: T-331, T-332, T-333, T-334, T-335) + 1 (Phase 9 categories modernization: T-340) + 16 (Phase 10: T-350, T-360, T-361, T-370, T-380, T-390, T-391, T-392, T-393, T-580, T-610, T-590, T-620, T-630, T-631, T-640) + 10 (Phase 12 Shopping List: T-680, T-681, T-682, T-683, T-684, T-685, T-686, T-687, T-688, T-689) + 9 (Phase 15 CloudKit sync: T-700, T-701, T-702, T-703, T-704, T-705, T-706, T-707, T-708) + 1 (Phase 19 CloudKit sync fix: T-736) = 132 (Phase 16–18 follow-up tasks T-730..T-735 are tracked in-line within their phases)
