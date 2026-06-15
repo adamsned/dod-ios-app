@@ -14,11 +14,14 @@ import SwiftUI
 ///    modifier; the field now sits as a sticky element above the List,
 ///    which is the deliberate trade for matching Search's visual).
 ///
-/// Public API: `init(text: Binding<String>, placeholder: String, onClear: (() -> Void)? = nil)`.
+/// Public API: `init(text:placeholder:onClear:onFocusChange:)`.
 /// When `onClear` is `nil`, the clear button just empties the bound text;
 /// the Search tab supplies `{ viewModel.clear() }` so the clear button
 /// preserves the full view-model-side cleanup (state, items, lastQuery,
 /// debounce cancel) instead of only clearing the query string.
+/// `onFocusChange` (T-779 / DUT-85) reports keyboard focus gain/loss so a
+/// call site can react — the Search tab commits a recent search on dismissal;
+/// `nil` (Categories) is a no-op.
 ///
 /// Per-surface stable accessibility identifiers (e.g. `dod.search.field.search`,
 /// `dod.search.field.categories`) are added at the call site rather than on
@@ -29,15 +32,21 @@ public struct DODSearchField: View {
     @Binding public var text: String
     public let placeholder: String
     public let onClear: (() -> Void)?
+    /// T-779 / DUT-85 — keyboard-focus reporter (gain `true` / loss `false`).
+    /// `nil` is a no-op, so existing call sites (Categories) are unaffected.
+    public let onFocusChange: ((Bool) -> Void)?
+    @FocusState private var isFocused: Bool
 
     public init(
         text: Binding<String>,
         placeholder: String,
-        onClear: (() -> Void)? = nil
+        onClear: (() -> Void)? = nil,
+        onFocusChange: ((Bool) -> Void)? = nil
     ) {
         self._text = text
         self.placeholder = placeholder
         self.onClear = onClear
+        self.onFocusChange = onFocusChange
     }
 
     public var body: some View {
@@ -48,6 +57,7 @@ public struct DODSearchField: View {
                 .autocorrectionDisabled()
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
+                .focused($isFocused)
             if !text.isEmpty {
                 Button {
                     if let onClear {
@@ -68,6 +78,9 @@ public struct DODSearchField: View {
             Capsule(style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
+        .onChange(of: isFocused) { _, focused in
+            onFocusChange?(focused)
+        }
     }
 }
 

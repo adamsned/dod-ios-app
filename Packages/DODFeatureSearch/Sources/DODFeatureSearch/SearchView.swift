@@ -14,7 +14,7 @@ public struct SearchView: View {
     /// US-38 / AC-38.2 / CL-64 (T-650, 2026-05-27) — shared with `FeedView`
     /// via the same `@AppStorage` key. Default `.gallery` preserves the
     /// existing search-results 2-column grid byte-for-byte.
-    @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
+    @AppStorage(RecipeListLayout.storageKey) var layoutRaw: String =
         RecipeListLayout.gallery.rawValue
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
@@ -44,8 +44,15 @@ public struct SearchView: View {
             DODSearchField(
                 text: $viewModel.query,
                 placeholder: "Search recipes",
-                onClear: { viewModel.clear() }
+                onClear: { viewModel.clear() },
+                // T-779 / DUT-85: record a Recent on keyboard dismissal (focus
+                // loss), not on every live debounced search.
+                onFocusChange: { focused in
+                    if !focused { viewModel.commitRecentSearch() }
+                }
             )
+            // T-779 / DUT-85: ...and on Return.
+            .onSubmit { viewModel.commitRecentSearch() }
             // DUT-25: border + subtle fill + soft shadow so the field is no
             // longer white-on-white (camouflaged) on the light background.
             .dodSearchFieldAffordance()
@@ -129,23 +136,6 @@ public struct SearchView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Did you mean \(suggestion)? Tap to search.")
         .accessibilityIdentifier("dod.search.didYouMean")
-    }
-
-    /// US-38 / AC-38.1 / CL-64 (T-650): the layout-toggle button. Same
-    /// shape as `FeedView.layoutToggleToolbarButton` — current-state
-    /// icon convention (CL-64.1), destination-aware accessibility hint.
-    private var layoutToggleToolbarButton: some View {
-        let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
-        return Button {
-            var next = layout
-            next.toggle()
-            layoutRaw = next.rawValue
-        } label: {
-            Image(systemName: layout.toggleIconName)
-                .accessibilityLabel(layout.currentStateAccessibilityLabel)
-                .accessibilityHint(layout.destinationActionHint)
-        }
-        .accessibilityIdentifier("search-toolbar-layout-toggle")
     }
 
     @ViewBuilder

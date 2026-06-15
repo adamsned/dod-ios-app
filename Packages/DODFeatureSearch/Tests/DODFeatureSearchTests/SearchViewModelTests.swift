@@ -134,6 +134,8 @@ import Testing
         let firstVM = SearchViewModel(dependencies: dependencies, recentSearches: scratch)
         firstVM.query = "pizza"
         await firstVM.runImmediateSearch()
+        // T-779 / DUT-85: recents now record on commit (Return / dismissal), not the live search.
+        firstVM.commitRecentSearch()
         #expect(firstVM.recentSearches.first == "pizza")
 
         let secondVM = SearchViewModel(dependencies: dependencies, recentSearches: scratch)
@@ -150,6 +152,7 @@ import Testing
         let viewModel = SearchViewModel(dependencies: dependencies, recentSearches: scratch)
         viewModel.query = "pasta"
         await viewModel.runImmediateSearch()
+        viewModel.commitRecentSearch()  // T-779 / DUT-85: commit records the recent.
         #expect(viewModel.recentSearches.first == "pasta")
 
         viewModel.clearRecentSearches()
@@ -199,6 +202,7 @@ import Testing
         viewModel.query = "pasta"
         dependencies.results["pasta"] = [Self.makeItem(99)]
         await viewModel.runImmediateSearch()
+        viewModel.commitRecentSearch()  // T-779 / DUT-85: a real typed query records on commit.
         #expect(viewModel.recentSearches == ["pasta"])
 
         viewModel.clearRecentSearches()
