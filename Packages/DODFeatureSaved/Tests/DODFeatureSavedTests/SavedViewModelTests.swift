@@ -221,6 +221,9 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     /// T-775 / DUT-81 — recipe ids the view model asked to un-download, so a
     /// test can assert the store write routed through the dependency.
     var removedDownloadIDs: [Int] = []
+    /// T-778 / DUT-84 — drives ``isOnline()`` so a test can exercise the offline
+    /// remove-download warning. Defaults online (no warning).
+    var online = true
     /// Number of times ``savedRecipes()`` has been called — lets a test assert
     /// the view model coalesces a remote-change burst into a single re-fetch.
     private(set) var savedRecipesCallCount = 0
@@ -247,6 +250,8 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
         removedDownloadIDs.append(id)
         downloadedIDs.remove(id)
     }
+
+    func isOnline() async -> Bool { online }
 
     func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {
         preDownloadedRecipeIDs.append(recipeID)

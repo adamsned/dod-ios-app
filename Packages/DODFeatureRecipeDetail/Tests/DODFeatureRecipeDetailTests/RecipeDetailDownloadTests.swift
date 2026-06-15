@@ -161,6 +161,64 @@ import Testing
         #expect(viewModel.snackbarMessage == "Download removed")
     }
 
+    @Test func toggleDownloadOfflineWarnsInsteadOfRemoving() async throws {
+        // T-778 / DUT-84 — tapping the filled download button while OFFLINE must
+        // not remove immediately: it raises the confirmation flag and leaves the
+        // download intact (removing with no network would strand the recipe).
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 626, withDetail: true)
+        dependencies.online = false
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 626)
+        await viewModel.onAppear()
+        await viewModel.downloadForOffline()
+        #expect(viewModel.isDownloaded == true)
+
+        await viewModel.toggleDownload()
+
+        #expect(viewModel.showOfflineRemoveDownloadWarning == true)
+        // Nothing removed yet — the download (and pin) survive until confirmed.
+        #expect(viewModel.isDownloaded == true)
+        #expect(dependencies.downloadedIDs.contains(626))
+    }
+
+    @Test func toggleDownloadOnlineRemovesWithoutWarning() async throws {
+        // T-778 / DUT-84 — the online path is unchanged: removal is instant, no
+        // confirmation (re-downloading is a tap away).
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 627, withDetail: true)
+        dependencies.online = true
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 627)
+        await viewModel.onAppear()
+        await viewModel.downloadForOffline()
+
+        await viewModel.toggleDownload()
+
+        #expect(viewModel.showOfflineRemoveDownloadWarning == false)
+        #expect(viewModel.isDownloaded == false)
+        #expect(viewModel.snackbarMessage == "Download removed")
+    }
+
+    @Test func confirmRemoveDownloadRemovesAndClearsWarning() async throws {
+        // T-778 / DUT-84 — confirming the offline warning ("Remove Download")
+        // clears the flag and performs the removal; the recipe stays saved.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 628, withDetail: true)
+        dependencies.online = false
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 628)
+        await viewModel.onAppear()
+        await viewModel.downloadForOffline()
+        await viewModel.toggleDownload()
+        #expect(viewModel.showOfflineRemoveDownloadWarning == true)
+
+        await viewModel.confirmRemoveDownload()
+
+        #expect(viewModel.showOfflineRemoveDownloadWarning == false)
+        #expect(viewModel.isDownloaded == false)
+        #expect(viewModel.snackbarMessage == "Download removed")
+        #expect(dependencies.downloadedIDs.contains(628) == false)
+        #expect(viewModel.isSaved == true)
+    }
+
     private func makeViewModel(
         dependencies: RecipeDetailDependencies,
         listItemID: Int

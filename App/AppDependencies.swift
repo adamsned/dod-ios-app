@@ -308,7 +308,9 @@ final class AppDependencies {
         LiveSavedDependencies(
             store: store,
             imageLoader: imageLoader,
-            remoteChangeStream: { SavedRemoteChangeBridge.makeStream() }
+            remoteChangeStream: { SavedRemoteChangeBridge.makeStream() },
+            // DUT-84 — connectivity for the offline remove-download guard.
+            monitor: networkMonitor
         )
     }
 

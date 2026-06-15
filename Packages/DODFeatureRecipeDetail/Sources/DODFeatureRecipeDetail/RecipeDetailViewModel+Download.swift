@@ -53,11 +53,36 @@ extension RecipeDetailViewModel {
     /// removes the download when the recipe is already downloaded, otherwise
     /// downloads. Keeps the toolbar closure declarative (no branching in the
     /// view).
+    ///
+    /// DUT-84 — removing a download while **offline** would strand the recipe
+    /// (no network to re-fetch its text/image), so confirm first via
+    /// `showOfflineRemoveDownloadWarning` rather than removing immediately.
+    /// Online removal stays instant — re-downloading is a tap away.
     public func toggleDownload() async {
-        if isDownloaded {
+        guard isDownloaded else {
+            await downloadForOffline()
+            return
+        }
+        if await dependencies.isOnline() {
             await removeDownload()
         } else {
-            await downloadForOffline()
+            showOfflineRemoveDownloadWarning = true
         }
+    }
+
+    /// DUT-84 — the offline warning's "Remove Download" button: dismiss the
+    /// alert and perform the removal the user just confirmed. ("Keep Download"
+    /// needs no handler — dismissing the alert leaves the download intact.)
+    public func confirmRemoveDownload() async {
+        showOfflineRemoveDownloadWarning = false
+        await removeDownload()
+    }
+
+    /// Whether the device is currently offline. Drives the detail screen's
+    /// offline snapshot (`RecipeDetailView`); grouped here with the rest of the
+    /// connectivity-aware download logic (relocated from the main class body in
+    /// DUT-84 to keep `RecipeDetailViewModel.swift` under the file-length cap).
+    public var isOffline: Bool {
+        get async { await !dependencies.isOnline() }
     }
 }

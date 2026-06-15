@@ -54,6 +54,9 @@ public final class RecipeDetailViewModel {
     public internal(set) var isDownloaded: Bool = false
     public private(set) var checkedIngredientIDs: Set<UUID> = []
     public internal(set) var snackbarMessage: String?
+    /// DUT-84 — drives the offline remove-download confirmation: set by
+    /// ``toggleDownload()`` when offline, presented by ``RecipeDetailView``.
+    public internal(set) var showOfflineRemoveDownloadWarning: Bool = false
     /// T-732 / CL-129 / AC-4.12: rich blocks for the recipe's narrative
     /// blurb (the prose preceding the WPRM recipe card). Populated by the
     /// fetch path. T-733 / CL-130: capped to 1-2 paragraphs via the
@@ -142,10 +145,6 @@ public final class RecipeDetailViewModel {
         self.listItem = listItem
         self.canonicalURL = canonicalURL
         self.dependencies = dependencies
-    }
-
-    public var isOffline: Bool {
-        get async { await !dependencies.isOnline() }
     }
 
     public func onAppear() async {
