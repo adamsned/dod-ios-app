@@ -386,7 +386,7 @@ public struct ProfileEditView: View {
             await onProfileChanged()
             dismiss()
         } catch {
-            saveError = "Couldn't sign out — try again."
+            saveError = "Couldn't Sign Out. Try Again."
         }
     }
 

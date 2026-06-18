@@ -2,6 +2,7 @@ import CoreSpotlight
 import DODAnalytics
 import DODDesignSystem
 import DODFeatureFeed
+import DODFeatureProfile
 import DODSupport
 import SwiftUI
 
@@ -188,12 +189,23 @@ struct RootView: View {
         )
         return NavigationSplitView {
             List(selection: selectionBinding) {
-                ForEach(AppTab.allCases) { tab in
-                    Label(tab.title, systemImage: tab.systemImage)
-                        .tag(tab)
+                // T-783 / DUT-89 — Profile pinned at the top of the sidebar
+                // (moved from Settings on iPad). Untagged, so it's not a tab
+                // selection target — its Button opens the editor as a sheet.
+                Section {
+                    SidebarProfileRow(
+                        profileStore: dependencies.profileStore,
+                        profilePhotoStore: dependencies.profilePhotoStore
+                    )
+                }
+                Section {
+                    ForEach(AppTab.allCases) { tab in
+                        Label(tab.title, systemImage: tab.systemImage)
+                            .tag(tab)
+                    }
                 }
             }
-            .navigationTitle("DOD")
+            .navigationTitle("Dutch Oven Daddy")
             .listStyle(.sidebar)
         } detail: {
             // Re-instantiate per tab change so @State in TabStack resets cleanly.

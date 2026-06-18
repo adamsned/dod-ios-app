@@ -76,7 +76,7 @@ extension ProfileEditView {
                 emailValidationError = "Enter a valid email address."
             }
         } catch {
-            saveError = "Couldn't save your profile — try again."
+            saveError = "Couldn't Save Your Profile. Try Again."
         }
     }
 }
