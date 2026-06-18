@@ -94,10 +94,9 @@ public struct SettingsView: View {
             // profile" row when no profile exists; renders the avatar
             // + display name + email row when one does. Tap pushes
             // `ProfileEditView`.
-            Section {
-                ProfileSettingsRow(viewModel: viewModel)
-            }
-            .listRowBackground(DODColor.surfaceElevated)
+            // T-783 / DUT-89 — hidden on iPad (Profile lives in the
+            // sidebar via SidebarProfileRow); kept on iPhone.
+            ProfileSettingsSection(viewModel: viewModel)
 
             // T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`
             // so the Settings cells render in the brand brown (matches the

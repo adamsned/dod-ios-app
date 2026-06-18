@@ -2,6 +2,10 @@ import DODDesignSystem
 import DODFeatureProfile
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit  // T-783 / DUT-89 — UIDevice.userInterfaceIdiom (see ProfileSettingsSection)
+#endif
+
 // US-44 Phase b (T-740) — Profile row at the top of Settings.
 //
 // Extracted from `SettingsView.swift` so that file stays under the
@@ -66,6 +70,33 @@ struct ProfileSettingsRow: View {
                     .foregroundStyle(DODColor.labelSecondary)
             }
         }
+        #endif
+    }
+}
+
+/// T-783 / DUT-89 — wraps the Settings Profile section so it can be hidden on
+/// iPad, where the Profile lives in the sidebar (``SidebarProfileRow``). The
+/// device idiom — not `horizontalSizeClass` — is the signal: the Settings
+/// sheet is a form sheet on iPad, which reports a COMPACT size class, so only
+/// the idiom distinguishes iPad from iPhone. iPhone (no sidebar) keeps it.
+struct ProfileSettingsSection: View {
+
+    @Bindable var viewModel: SettingsViewModel
+
+    var body: some View {
+        if !hidesProfileSection {
+            Section {
+                ProfileSettingsRow(viewModel: viewModel)
+            }
+            .listRowBackground(DODColor.surfaceElevated)
+        }
+    }
+
+    private var hidesProfileSection: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
         #endif
     }
 }
