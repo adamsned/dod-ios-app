@@ -84,3 +84,39 @@ public func recipeGridColumns(horizontalSizeClass: UserInterfaceSizeClass?) -> [
         count: columns
     )
 }
+
+/// Columns for the dense LIST layout (`RecipeCard.ListRow` rows): a single
+/// column on iPhone (compact) and two columns on iPad (regular) so the rows
+/// tile across the wider canvas instead of stretching into one blown-up
+/// column (T-782 / DUT-88). List rows are wider than gallery cards, so the
+/// list uses two columns where the gallery (``recipeGridColumns``) uses three.
+public func recipeListColumns(horizontalSizeClass: UserInterfaceSizeClass?) -> [GridItem] {
+    let columns = horizontalSizeClass == .regular ? 2 : 1
+    return Array(
+        repeating: GridItem(.flexible(), spacing: DODSpacing.md, alignment: .top),
+        count: columns
+    )
+}
+
+/// Container for the dense LIST layout. Keeps iPhone (compact) on the exact
+/// single-column `LazyVStack` it always used — byte-identical, so the iPhone
+/// layout + snapshots stay untouched — while tiling the same rows into a
+/// multi-column `LazyVGrid` on iPad (regular) via ``recipeListColumns``.
+/// Callers supply the `ForEach` of `RecipeCard.ListRow` rows in `content`, so
+/// each host keeps its own identifiers / tap / context-menu wiring (T-782 /
+/// DUT-88). Shared by Feed + Search (title tier + ingredient tier).
+@ViewBuilder
+public func adaptiveListRows<Content: View>(
+    horizontalSizeClass: UserInterfaceSizeClass?,
+    @ViewBuilder content: () -> Content
+) -> some View {
+    if horizontalSizeClass == .regular {
+        LazyVGrid(
+            columns: recipeListColumns(horizontalSizeClass: horizontalSizeClass),
+            spacing: DODSpacing.xs,
+            content: content
+        )
+    } else {
+        LazyVStack(spacing: DODSpacing.xs, content: content)
+    }
+}

@@ -180,7 +180,9 @@ public struct FeedView: View {
     /// the gallery so tap-to-open + long-press-Save/Unsave (AC-34.1 /
     /// AC-34.6) work identically on both layouts.
     private var listContent: some View {
-        LazyVStack(spacing: DODSpacing.xs) {
+        // T-782 / DUT-88 — iPad tiles the dense rows into a multi-column grid;
+        // iPhone (compact) keeps the exact single-column LazyVStack.
+        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
             ForEach(viewModel.items) { item in
                 RecipeCard.ListRow(
                     title: item.title,

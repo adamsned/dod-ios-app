@@ -99,7 +99,8 @@ extension SearchView {
 
     /// Ingredient hits in the dense single-column list layout.
     private var ingredientList: some View {
-        LazyVStack(spacing: DODSpacing.xs) {
+        // T-782 / DUT-88 — same iPad multi-column tiling as the title tier.
+        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
             ForEach(viewModel.ingredientItems) { item in
                 RecipeCard.ListRow(
                     title: item.title,

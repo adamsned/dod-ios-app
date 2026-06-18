@@ -254,7 +254,9 @@ public struct SearchView: View {
     /// / AC-34.6 long-press-Save/Unsave works identically. DUT-11:
     /// `internal` so the `+IngredientSection` extension can compose it.
     var listResults: some View {
-        LazyVStack(spacing: DODSpacing.xs) {
+        // T-782 / DUT-88 — iPad tiles the rows into a multi-column grid; iPhone
+        // keeps the single-column LazyVStack.
+        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
             ForEach(viewModel.items) { item in
                 RecipeCard.ListRow(
                     title: item.title,
