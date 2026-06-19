@@ -205,7 +205,13 @@ struct RootView: View {
                     }
                 }
             }
-            .navigationTitle("Dutch Oven Daddy")
+            // T-784 / DUT-90 — no brand title in the sidebar. The Profile row
+            // (pinned above) reads as the header, so a separate "Dutch Oven
+            // Daddy" large title just crowds an already-busy sidebar. Empty +
+            // inline collapses the large-title band so the Profile row rises to
+            // the top.
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .listStyle(.sidebar)
         } detail: {
             // Re-instantiate per tab change so @State in TabStack resets cleanly.

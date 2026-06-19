@@ -2405,6 +2405,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `App/RootView.swift` (sidebar title + Profile Section), `App/SidebarProfileRow.swift` (new), `DODFeatureFeed/SettingsView.swift` (calls `ProfileSettingsSection`), `DODFeatureFeed/SettingsView+Profile.swift` (new `ProfileSettingsSection` wrapper, hides on iPad via device idiom), `DODFeatureProfile/ProfileEditView+Save.swift` + `ProfileEditView.swift` (copy).
 - **AC:** AC-44.1 amended (Profile section: Settings on iPhone, sidebar on iPad) (CL-179 canonical). **Est:** ~90 min. **Deps:** main at T-782 (`65546b9`). Branch `feat/T-783-sidebar-header-profile`. **||:** P-ipad (DUT-89). No `e2e` label - presentation + copy; iPad-Pro-11 sim verified (sidebar header + Profile row; Settings on iPad has no Profile). iPhone untouched (sidebar is `horizontalSizeClass == .regular`-only; Settings keeps Profile on iPhone). swift-format + SwiftLint clean; `SettingsView.swift` 396 / `SettingsView+Profile.swift` 102 lines; DODFeatureFeed (82) + DODFeatureProfile (44) tests green. **Known limitation (not a bug):** profile keychain save fails on unsigned CLI builds (`errSecMissingEntitlement`); works on a signed Xcode run.
 
+### T-784 — DUT-90 iPad sidebar: remove the brand title ("Dutch Oven Daddy") so the Profile row is the header (US-44 amendment, CL-180)
+
+- **What:** Remove the iPad sidebar's `.navigationTitle("Dutch Oven Daddy")` (added in T-783): set it to `.navigationTitle("")` + `.navigationBarTitleDisplayMode(.inline)` so the large-title band collapses and the pinned `SidebarProfileRow` reads as the sidebar header. Declutters an already-busy sidebar (Spencer: "the sidebar is getting quite busy, can you actually remove the word 'Dutch Oven Daddy'").
+- **Files:** `App/RootView.swift` (one site: `iPadSplit` sidebar `List` modifiers).
+- **AC:** AC-44.1 amended again (sidebar header title removed) (CL-180 canonical). **Est:** ~20 min. **Deps:** main at T-783 (`e172457`). Branch `feat/T-784-sidebar-remove-brand-title`. **||:** P-ipad (DUT-90). No `e2e` label - one-line presentation change; iPad-Pro-11 sim verified (Profile row at top, no brand title, no empty gap; 2-column list unaffected). iPhone untouched (sidebar is `horizontalSizeClass == .regular`-only; phone tabs have no such title). swift-format + SwiftLint clean.
+
 ---
 
 ## Summary
