@@ -2411,6 +2411,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `App/RootView.swift` (one site: `iPadSplit` sidebar `List` modifiers).
 - **AC:** AC-44.1 amended again (sidebar header title removed) (CL-180 canonical). **Est:** ~20 min. **Deps:** main at T-783 (`e172457`). Branch `feat/T-784-sidebar-remove-brand-title`. **||:** P-ipad (DUT-90). No `e2e` label - one-line presentation change; iPad-Pro-11 sim verified (Profile row at top, no brand title, no empty gap; 2-column list unaffected). iPhone untouched (sidebar is `horizontalSizeClass == .regular`-only; phone tabs have no such title). swift-format + SwiftLint clean.
 
+### T-785 — DUT-91 Download toast names the content type (article vs recipe) (US-35 amendment, CL-181)
+
+- **What:** The offline-download confirmation toast called everything a "recipe". Branch the first-time snackbar in `RecipeDetailViewModel.downloadForOffline()` on the existing `recipe.isArticle` so an **article** reads "Article downloaded for offline use" while a **recipe** stays byte-identical ("Recipe downloaded for offline use"). The "Already downloaded" / "Download removed" / error toasts do not name the type and are untouched.
+- **Files:** `DODFeatureRecipeDetail/RecipeDetailViewModel+Download.swift` (copy branch + doc); tests: `RecipeDetailDownloadTests.swift` (+1 L1 article-copy pin), `FakeRecipeDetailDependencies.swift` (`makeRecipe` gains an optional `kind:` param, default `.recipe`).
+- **AC:** AC-35.3 amended (first-time snackbar copy is content-type aware) (CL-181 canonical). **Est:** ~25 min. **Deps:** main at T-784 (`beaaa52`). Branch `feat/T-785-article-download-toast`. **||:** P-content. Cross-platform (shared view model -> iPhone + iPad). No `e2e` label - copy branch + L1 pin. `swift test --filter RecipeDetailDownloadTests` green (11/11); swift-format + SwiftLint clean.
+
 ---
 
 ## Summary

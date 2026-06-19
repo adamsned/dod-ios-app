@@ -334,7 +334,8 @@ enum RecipeDetailTestFixtures {
         withDetail: Bool,
         categoryID: Int = 0,
         servings: Int? = nil,
-        ingredients: [RecipeIngredient]? = nil
+        ingredients: [RecipeIngredient]? = nil,
+        kind: PostKind = .recipe
     ) -> Recipe {
         let resolvedIngredients: [RecipeIngredient] =
             ingredients ?? (withDetail ? [.init(text: "salt"), .init(text: "pepper")] : [])
@@ -349,7 +350,8 @@ enum RecipeDetailTestFixtures {
             ingredients: resolvedIngredients,
             instructions: withDetail ? [.init(step: 1, text: "Stir.")] : [],
             totalTime: .seconds(15 * 60),
-            servings: servings
+            servings: servings,
+            kind: kind
         )
     }
 }

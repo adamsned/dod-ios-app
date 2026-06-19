@@ -8,10 +8,11 @@ extension RecipeDetailViewModel {
     /// AC-35.2..AC-35.4. Routes through the dependency surface which marks
     /// the recipe row as offline-pinned, downloads the hero image at full
     /// resolution through `RecipeStore.cacheImage`, AND marks the recipe
-    /// saved (T-761 / CL-158 — downloading also saves). Snackbar copy
-    /// branches on the ``DownloadOutcome``: "Recipe downloaded for offline
-    /// use" on first-time, "Already downloaded" when previously downloaded.
-    /// Errors are logged and surfaced as "Couldn't download — try again."
+    /// saved (T-761 / CL-158 — downloading also saves). First-time snackbar
+    /// copy names the content kind (T-785 / CL-181): "Article downloaded for
+    /// offline use" for an article, else "Recipe downloaded for offline use";
+    /// "Already downloaded" when previously downloaded. Errors are logged and
+    /// surfaced as "Couldn't download — try again."
     public func downloadForOffline() async {
         guard let recipe else { return }
         do {
@@ -22,7 +23,10 @@ extension RecipeDetailViewModel {
             isSaved = true
             switch outcome {
             case .firstTime:
-                snackbarMessage = "Recipe downloaded for offline use"
+                // T-785 / CL-181 (DUT-91) — name the content type so an
+                // article isn't called a "recipe". Recipes stay unchanged.
+                let kindWord = recipe.isArticle ? "Article" : "Recipe"
+                snackbarMessage = "\(kindWord) downloaded for offline use"
             case .alreadyDownloaded:
                 snackbarMessage = "Already downloaded"
             }

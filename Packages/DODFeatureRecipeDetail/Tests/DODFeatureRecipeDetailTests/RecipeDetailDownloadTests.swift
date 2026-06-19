@@ -33,6 +33,28 @@ import Testing
         #expect(dependencies.downloadedIDs.contains(620))
     }
 
+    @Test func downloadForOfflineArticleNamesArticleInSnackbar() async throws {
+        // T-785 / CL-181 (DUT-91) — when the downloaded content is an ARTICLE
+        // (not a recipe) the first-time snackbar names it: "Article downloaded
+        // for offline use". Recipes keep "Recipe downloaded for offline use"
+        // (the test above). Cache-hit path so `viewModel.recipe` carries the
+        // `.article` kind the copy branches on.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.cachedRecipes[630] = RecipeDetailTestFixtures.makeRecipe(
+            id: 630,
+            withDetail: true,
+            kind: .article
+        )
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 630)
+        await viewModel.onAppear()
+        #expect(viewModel.recipe?.isArticle == true)
+
+        await viewModel.downloadForOffline()
+
+        #expect(viewModel.isDownloaded == true)
+        #expect(viewModel.snackbarMessage == "Article downloaded for offline use")
+    }
+
     @Test func downloadForOfflineAlsoSavesRecipe() async throws {
         // T-761 / CL-158 / AC-35.5 (DUT-67) — downloading a recipe also
         // SAVES it (download = save + offline pin): `isSaved` flips true
