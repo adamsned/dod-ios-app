@@ -24,11 +24,11 @@ struct SidebarProfileRow: View {
             HStack(spacing: DODSpacing.sm) {
                 ProfilePhotoView(profile: profile, diameter: 40, photoStore: profilePhotoStore)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(profile?.displayName ?? "Set up your profile")
+                    Text(profile?.displayName ?? "Set Up Your Profile")
                         .dodFont(DODType.heading)
                         .foregroundStyle(DODColor.label)
                         .lineLimit(1)
-                    Text(profile == nil ? "Add your name and photo" : "View profile")
+                    Text(profile == nil ? "Add Your Name and Photo" : "View profile")
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)
                         .lineLimit(1)
