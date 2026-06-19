@@ -70,7 +70,7 @@ public struct ProfileSection<Destination: View>: View {
 
     @ViewBuilder
     private var emptyRow: some View {
-        Text("Set up your profile")
+        Text("Set Up Your Profile")
             .dodFont(DODType.body)
             .foregroundStyle(DODColor.label)
     }

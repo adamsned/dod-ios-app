@@ -2417,6 +2417,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `DODFeatureRecipeDetail/RecipeDetailViewModel+Download.swift` (copy branch + doc); tests: `RecipeDetailDownloadTests.swift` (+1 L1 article-copy pin), `FakeRecipeDetailDependencies.swift` (`makeRecipe` gains an optional `kind:` param, default `.recipe`).
 - **AC:** AC-35.3 amended (first-time snackbar copy is content-type aware) (CL-181 canonical). **Est:** ~25 min. **Deps:** main at T-784 (`beaaa52`). Branch `feat/T-785-article-download-toast`. **||:** P-content. Cross-platform (shared view model -> iPhone + iPad). No `e2e` label - copy branch + L1 pin. `swift test --filter RecipeDetailDownloadTests` green (11/11); swift-format + SwiftLint clean.
 
+### T-786 — DUT-92 Title-case the profile-placeholder copy (US-44 amendment, CL-182)
+
+- **What:** Title Case the empty-profile placeholder strings: "Set up your profile" -> "Set Up Your Profile" and "Add your name and photo" -> "Add Your Name and Photo". Surfaces: iPad sidebar row (`SidebarProfileRow`, title + subtitle) + iPhone Settings row (`ProfileSection.emptyRow`, title) — same placeholder both platforms. Presentation-only; "and" stays lowercase (standard Title Case). Ratings-gate heading (same phrase) is out of scope (different surface + snapshot re-record), offered as a follow-up.
+- **Files:** `App/SidebarProfileRow.swift` (2 strings), `DODFeatureProfile/ProfileSection.swift` (1 string).
+- **AC:** AC-44.1 amended again (placeholder copy is Title Case) (CL-182 canonical). **Est:** ~15 min. **Deps:** main at T-785 (`73e6643`). Branch `feat/T-786-title-case-profile-placeholder`. **||:** P-content. Cross-platform (iPad sidebar + iPhone Settings). No `e2e` label - presentation-only copy; iPad-Pro-11 sim verified. No test asserts the old strings. swift-format + SwiftLint clean.
+
 ---
 
 ## Summary
