@@ -921,6 +921,20 @@ Added 2026-06-20 (DUT-94, authored by Ned). BuzzyWaxx is a sister brand under co
 
 ---
 
+### US-47 — Cooking timers (multi-timer, Live Activity, hands-free)
+
+As a cook following a Dutch-oven recipe, I want to start named countdown timers from the recipe's step times and see them on the Lock Screen / Dynamic Island, so I can walk away from my phone and still be alerted — without juggling the system Clock app or losing track when several things overlap.
+
+- **AC-47.1 (timer engine — T-804 / CL-198, IMPLEMENTED).** A pure, deterministically-testable engine owns the set of active countdowns. `CookTimer` (DODSupport) is a value type whose remaining-time math is a function of an injected "now" (`running(endDate:)` counts down, `paused(remaining:)` freezes, `finished`); `CookTimerEngine` (`@Observable @MainActor`, DODSupport) manages `[CookTimer]` with `start(label:duration:)` (rejects non-positive durations), `pause`/`resume`/`cancel`/`clearFinished`, a `soonestFinishing` accessor (for the Live Activity), and a `refresh()` that advances elapsed running timers to `.finished` and fires `onFinished` exactly once each (idempotent). All wall-clock reads go through an injected `clock`, so the L1 suite drives every transition with a controllable clock and no real waiting.
+- **AC-47.2 (Live Activity + Dynamic Island).** The soonest-finishing running timer surfaces on the Lock Screen + Dynamic Island via an ActivityKit Live Activity (reusing the existing `DODAppLiveActivity` target), updating as it counts down and reflecting pause/finish.
+- **AC-47.3 (completion alert).** When a timer finishes, the app fires a local notification + sound + haptic even when backgrounded/locked (notification permission is already requested for replies/new-recipe; denial degrades to an in-app alert).
+- **AC-47.4 (Cook Mode timer tray + start-from-step).** Tapping a detected duration in a recipe step starts a timer named after the step/recipe; a compact tray in Cook Mode + recipe detail shows all active timers with pause/resume/cancel; timers persist across relaunch.
+- **AC-47.5 (hands-free hook).** "Start a timer" via the Cook Mode voice commands (US — DUT-101) starts the current step's timer through the same engine, and the auto-advance behavior (DUT-173) keys off `onFinished`.
+
+This is the keystone of the "cooking session" epic (E1): AC-47.1 is the foundation the rest of US-47 — plus DUT-101 (voice), DUT-102 (Campfire), DUT-107 (Siri/StandBy), DUT-141 (HomeKit), and DUT-173 (auto-advance) — build on.
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
