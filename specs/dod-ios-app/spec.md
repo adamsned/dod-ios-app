@@ -915,7 +915,7 @@ These apply to every screen, not just one story.
 
 - **NFR-1 Offline-first cache:** the most recent 100 viewed recipes are cached automatically (LRU). Saved recipes are pinned and not evicted.
 - **NFR-2 Image cache budget:** disk image cache capped at 200 MB; oldest unsaved-recipe images evicted first.
-- **NFR-3 No surprise data use:** background refresh disabled by default; the app does not fetch when not in foreground in v1.
+- **NFR-3 No surprise data use:** background refresh is disabled by default. The ONE permitted background fetch is a single best-effort `BGAppRefreshTask` poll (DUT-15 / T-787, CL-183): it runs only after the user has enabled notifications, performs at most one lightweight "newest post" request per wake, never alerts on its first run (it records a baseline instead), fires only the existing US-42 local new-post notification when the newest post id is strictly newer than the last seen, and does no other background fetching. Outside this poll the app does not fetch when not in the foreground in v1.
 - **NFR-4 App Store readiness:** App Privacy questionnaire, screenshots for 6.5" and 6.7" iPhone + 12.9" iPad, and a marketing description are part of the release definition of done (Phase 5 task).
 
 ---

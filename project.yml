@@ -145,6 +145,9 @@ targets:
         # from this `properties:` block on every run.
         UIBackgroundModes:
           - remote-notification
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.dutchovendaddy.DODApp.newpost-refresh
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp

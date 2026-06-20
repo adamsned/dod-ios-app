@@ -13,6 +13,10 @@ struct DODApp: App {
     /// is delivered.
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    /// DUT-15 / T-787 — drives the background-poll re-arm: the next
+    /// `BGAppRefreshTask` request is submitted whenever the app backgrounds.
+    @Environment(\.scenePhase) private var scenePhase
+
     init() {
         applyTestLaunchOverrides()
     }
@@ -20,6 +24,13 @@ struct DODApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(dependencies: dependencies)
+                .onChange(of: scenePhase) { _, phase in
+                    // DUT-15 / T-787 — re-arm the next background poll whenever
+                    // the app backgrounds. Each task run also re-arms the next.
+                    if phase == .background {
+                        appDelegate.backgroundRefreshService.scheduleNext()
+                    }
+                }
         }
     }
 
@@ -100,12 +111,21 @@ enum DODEnvironment {
 final class AppDelegate: NSObject, UIApplicationDelegate {
 
     private let notificationCoordinator = NotificationCoordinator()
+    /// DUT-15 / T-787 — owns the best-effort new-post background poll for the
+    /// process lifetime. `register(...)` runs synchronously below (the
+    /// BGTaskScheduler contract); the SwiftUI scene re-arms the next request on
+    /// background, and each run re-arms the one after.
+    let backgroundRefreshService = BackgroundRefreshService(notificationService: NotificationService())
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = notificationCoordinator
+        // DUT-15 / T-787 — register the BGAppRefreshTask handler before launch
+        // finishes (required by BGTaskScheduler). The first request is armed
+        // when the scene first backgrounds.
+        backgroundRefreshService.register()
         return true
     }
 }

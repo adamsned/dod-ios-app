@@ -68,6 +68,28 @@ extension WPRestClient {
         return posts.first.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
     }
 
+    /// Fetch the single newest published post, projected to a
+    /// ``RecipeListItem``. Backs the DUT-15 / T-787 best-effort background-
+    /// refresh poll: the background task compares this post's `id` against the
+    /// last-seen id and fires the US-42 local new-post notification when it is
+    /// newer. Requests exactly one row with **explicit** newest-first ordering
+    /// (`orderby=date`, `order=desc`) rather than relying on WP's implicit
+    /// default order — mirrors the proven pattern in `WPCommentsClient`.
+    /// `_embed=wp:featuredmedia` inlines the hero URL, matching `posts()`.
+    /// Returns `nil` when the blog has no posts.
+    ///
+    /// Spec trace: DUT-15, T-787, NFR-3 (amended, CL-183).
+    public func newestPost() async throws -> RecipeListItem? {
+        let queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "per_page", value: "1"),
+            URLQueryItem(name: "orderby", value: "date"),
+            URLQueryItem(name: "order", value: "desc"),
+            URLQueryItem(name: "_embed", value: "wp:featuredmedia"),
+        ]
+        let posts: [WPDTO.Post] = try await get(path: "posts", queryItems: queryItems)
+        return posts.first.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
+    }
+
     /// Search posts by query string.
     ///
     /// `perPage` defaults to ``WPRestClient.searchPageSize`` (100, not the
