@@ -346,9 +346,10 @@ jobs:
     timeout-minutes: 30
     # Device matrix (DUT-16 follow-up): the smoke suite runs on iPhone 14/15/16/17
     # so a layout/regression that only shows on an older/smaller iPhone is caught.
-    # iPad runs the device-agnostic Account smoke only — the rest of SmokeTests
-    # still assumes the iPhone bottom-tab layout (iPad uses a sidebar, US-38 /
-    # DUT-89), so making the full suite iPad-safe is a tracked follow-up.
+    # iPad runs the full SmokeTests class too: the suite is device-agnostic
+    # (waits on the Settings gear, not a tab bar; a sidebar-aware nav helper
+    # handles tab navigation), and the two genuinely iPhone-bottom-tab tests
+    # self-skip on iPad (XCTSkipIf — iPad uses a sidebar, US-38 / DUT-89).
     # `fail-fast: false` so one device's flake doesn't sink the others.
     strategy:
       fail-fast: false
@@ -363,7 +364,7 @@ jobs:
           - device: "iPhone 17"
             only_testing: "-only-testing:DODAppUITests"
           - device: "iPad Pro 11-inch (M5)"
-            only_testing: "-only-testing:DODAppUITests/SmokeTests/test_settingsAccountSectionIsPresent"
+            only_testing: "-only-testing:DODAppUITests/SmokeTests"
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
