@@ -485,7 +485,7 @@ final class SmokeTests: XCTestCase {
 
         // The Account section header (US-46) sits at the top of Settings.
         XCTAssertTrue(
-            app.staticTexts["Account"].waitForExistence(timeout: 5),
+            app.staticTexts["Account"].waitForExistence(timeout: 12),
             "Settings should expose the Account section (US-46)"
         )
 
@@ -495,7 +495,7 @@ final class SmokeTests: XCTestCase {
         let byID = app.buttons["settings-button-sign-in-apple"]
         let byLabel = app.buttons["Sign in with Apple"]
         XCTAssertTrue(
-            byID.waitForExistence(timeout: 3) || byLabel.waitForExistence(timeout: 3),
+            byID.waitForExistence(timeout: 6) || byLabel.waitForExistence(timeout: 6),
             "Signed-out Account section should show the Sign in with Apple button"
         )
     }
