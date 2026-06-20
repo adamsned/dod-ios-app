@@ -150,10 +150,15 @@ public struct RecipeDetailView: View {
                         url: viewModel.recipe?.heroImageLargeURL ?? viewModel.listItem.heroImage,
                         title: viewModel.listItem.title
                     )
-                    RecipeDetailMetaPills(items: metaPillItems)
-                    // DUT-96 / T-789 — published date below the meta pills, the
-                    // same shared caption + long format the article header uses.
+                    // T-803 — published date as the inset caption directly below
+                    // the hero, the exact spot + treatment ArticleDetailView uses,
+                    // for parity + easy scanning across recipes + articles. CL-185
+                    // first placed it BELOW the meta pills with no horizontal inset,
+                    // which left it flush to the screen edge; `.padding(.horizontal,
+                    // .md)` mirrors the article's padded content block.
                     PublishedDateCaption(date: viewModel.listItem.publishedAt)
+                        .padding(.horizontal, DODSpacing.md)
+                    RecipeDetailMetaPills(items: metaPillItems)
                     servingsScaler
                     cookNowSection
                     excerptText
