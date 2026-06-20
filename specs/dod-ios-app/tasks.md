@@ -2470,6 +2470,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `DODFeatureFeed/SettingsViewModel+Voice.swift` (the `voicePreviewSampleLine` constant).
 - **AC:** Preview sample line (AC-40.12 / 40.13, code-level; no formal spec AC — the constant + `SettingsViewModelVoiceTests` are the pin) (CL-196 canonical). **Est:** ~5 min. **Deps:** main at T-801 (`c758d5d`). Branch `feat/T-802-voice-sample-line`. **||:** P-settings. No `e2e` label - one-line copy. swift-format + SwiftLint clean; the L1 voice test (sample == constant) stays green.
 
+### T-803 — DUT-179 Recipe detail: move the published-date caption to the article's spot (inset directly below the hero, not flush to the screen edge) (US-4 / AC-4.1 amendment, CL-197)
+
+- **What:** In `RecipeDetailView.readyBody`, move `PublishedDateCaption(date: viewModel.listItem.publishedAt)` from below `RecipeDetailMetaPills` (no horizontal inset → flush to the screen edge) to directly below `RecipeDetailHero` (above the meta pills) with `.padding(.horizontal, DODSpacing.md)` — the exact placement + treatment `ArticleDetailView` uses. Order: hero → published date (inset) → meta pills → servings → Cook Now → blurb.
+- **Files:** `DODFeatureRecipeDetail/RecipeDetailView.swift` (the `readyBody` ScrollView VStack). Shared `PublishedDateCaption` untouched.
+- **AC:** AC-4.1 (amended — published-date caption position; CL-197 canonical). **Est:** ~5 min. **Deps:** main at T-802 (`6611524`). Branch `feat/T-803-recipe-published-date-parity`. **||:** P-detail. No `e2e` label — a one-line layout move. Verified via an L4 snapshot parity render (recipe + article, iPhone 13, light); swift-format + SwiftLint + `xcodebuild build` clean. The off-CI `RecipeDetailViewSnapshotTests` baseline re-record is a fast-follow (UIKit-gated, never runs in CI).
+
 ---
 
 ## Summary
