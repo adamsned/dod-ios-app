@@ -2423,6 +2423,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `App/SidebarProfileRow.swift` (2 strings), `DODFeatureProfile/ProfileSection.swift` (1 string).
 - **AC:** AC-44.1 amended again (placeholder copy is Title Case) (CL-182 canonical). **Est:** ~15 min. **Deps:** main at T-785 (`73e6643`). Branch `feat/T-786-title-case-profile-placeholder`. **||:** P-content. Cross-platform (iPad sidebar + iPhone Settings). No `e2e` label - presentation-only copy; iPad-Pro-11 sim verified. No test asserts the old strings. swift-format + SwiftLint clean.
 
+### T-787 — DUT-93 Chef-hat avatar placeholder (Spencer's design) instead of "?" (US-44 amendment, CL-183)
+
+- **What:** Replace the profile-avatar "?" fallback with Spencer's hand-drawn chef-hat person silhouette (white on the orange circle). New `ChefHatAvatarGlyph` (DODFeatureProfile) translates his "Chef Profile" SVG (head + body + 3 toque puffs + band) into themeable SwiftUI `Circle`/`Rectangle` shapes, scaled ~94% + circle-clipped (head-and-shoulders cut). `InitialLetterAvatarView` renders the glyph for the no-letter case (guest / emoji-only name); named users keep their initial. Pure vector (no asset), crisp at every size; cross-platform via `ProfilePhotoView` (sidebar, Settings, edit header, ratings gate, comment composer).
+- **Files:** `DODFeatureProfile/ChefHatAvatarGlyph.swift` (new), `DODFeatureProfile/InitialLetterAvatarView.swift` (placeholder branch + `noLetterPlaceholder` sentinel).
+- **AC:** AC-44.5 amended (no-letter fallback renders ChefHatAvatarGlyph) (CL-183 canonical). **Est:** ~60 min (incl. a reverted from-primitives first attempt, replaced by Spencer's design). **Deps:** main at T-786 (`c90b6a9`). Branch `feat/T-787-chef-profile-avatar`. **||:** P-profile. No `e2e` label - presentation glyph; iPad-Pro-11 sim verified (white chef-hat silhouette on orange, margin from edge). swift-format + SwiftLint clean; 9 InitialLetterAvatarViewTests pass (letter contract intact).
+
 ---
 
 ## Summary
