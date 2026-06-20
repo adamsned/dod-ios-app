@@ -339,11 +339,31 @@ jobs:
 
   # L3: UI smoke tests against the built app on a live simulator.
   test-ui-smoke:
-    name: L3 UI Smoke
+    name: L3 UI Smoke (${{ matrix.device }})
     needs: [changes, build-app]
     if: needs.changes.outputs.ios_sim == 'true'
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 30
+    # Device matrix (DUT-16 follow-up): the smoke suite runs on iPhone 14/15/16/17
+    # so a layout/regression that only shows on an older/smaller iPhone is caught.
+    # iPad runs the device-agnostic Account smoke only — the rest of SmokeTests
+    # still assumes the iPhone bottom-tab layout (iPad uses a sidebar, US-38 /
+    # DUT-89), so making the full suite iPad-safe is a tracked follow-up.
+    # `fail-fast: false` so one device's flake doesn't sink the others.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - device: "iPhone 14"
+            only_testing: "-only-testing:DODAppUITests"
+          - device: "iPhone 15"
+            only_testing: "-only-testing:DODAppUITests"
+          - device: "iPhone 16"
+            only_testing: "-only-testing:DODAppUITests"
+          - device: "iPhone 17"
+            only_testing: "-only-testing:DODAppUITests"
+          - device: "iPad Pro 11-inch (M5)"
+            only_testing: "-only-testing:DODAppUITests/SmokeTests/test_settingsAccountSectionIsPresent"
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
@@ -368,9 +388,11 @@ jobs:
       # destination by UDID — replaces the previous inline "prefer iPhone 17,
       # else any iPhone, else bare name" resolver. Shared with L1/L4/L5 via
       # the ensure-ios-simulator action so there is one source of truth.
-      - name: Ensure iPhone 17 simulator
+      - name: Ensure ${{ matrix.device }} simulator
         id: sim
         uses: ./.github/actions/ensure-ios-simulator
+        with:
+          device: ${{ matrix.device }}
       - name: Run UI tests (resilient to simulator/runner flake)
         env:
           DESTINATION: ${{ steps.sim.outputs.destination }}
@@ -399,7 +421,7 @@ jobs:
               -scheme DODApp \
               -destination "$DESTINATION" \
               -derivedDataPath DerivedData \
-              -only-testing:DODAppUITests \
+              ${{ matrix.only_testing }} \
               -skip-testing:DODAppUITests/ScreenshotTests \
               -retry-tests-on-failure -test-iterations 2 \
               test | xcpretty; then
