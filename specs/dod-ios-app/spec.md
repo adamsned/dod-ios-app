@@ -895,6 +895,33 @@ Added 2026-06-02 (Linear DUT-36). Ships in four PRs: **Phase a (T-739, this PR)*
 
 ---
 
+### US-46 — Authentication: Sign in with Apple (Phase a)
+
+**As a** returning reader,
+**I want** to sign in with my Apple ID,
+**so that** my identity (for comments + ratings, and later cross-device state) is mine and survives reinstall, instead of an anonymous per-device guest UUID.
+
+Added 2026-06-20 (DUT-16, "Login via Google, Apple, and email", Spencer). DUT-16 is an **L feature split into four phases** — **(a) Sign in with Apple, (b) Sign in with Google, (c) email + magic link, (d) backend cross-device sync** of saves / comments / settings. This US covers **Phase a only**. Guest mode (US-15 / CL-15) **stays the default** — no sign-in is ever required to browse, save, read, comment, or rate (App Store Guideline 5.1.1(ii)). Sign in with Apple is **required by Guideline 4.8** the moment any third-party login (Google, Phase b) ships, and is the lowest-friction, SDK-free provider, so it lands first.
+
+**Phase a is backend-independent.** It captures the Apple credential and stores it **on-device** (Keychain), replacing the guest UUID as the comment/rating identity once signed in. Cross-device continuity needs a backend (Phase d) whose provider — **WordPress vs Firebase vs Supabase vs a small custom service** — is an **open decision deferred to Phase d** (CL-189); nothing in Phase a presupposes it.
+
+**Acceptance criteria (T-793 — CL-189):**
+
+- **AC-46.1 (On-device session store — this slice).** A new ``AppleAuthSession`` value type (DODSupport) holds the stable Apple `userIdentifier` (`ASAuthorizationAppleIDCredential.user` — the durable primary key, constant across devices + reinstalls for an Apple ID + app team) plus an **optional** `displayName` and `email`. Both are optional because **Apple releases name + email only on the very first authorization** for an Apple ID; every later sign-in returns them as `nil`. The `email` may be an Apple **private-relay** address (`…@privaterelay.appleid.com`) when the user chose "Hide My Email". An ``AppleAuthSessionStoring`` protocol (``load`` / ``save`` / ``clear``) is backed by ``KeychainAppleAuthSessionStore`` (production) + ``InMemoryAppleAuthSessionStore`` (tests / UI-test injection), exactly mirroring the US-15 ``GuestIdentityStoring`` family — `Security`-framework Keychain, no third-party dependency (constitution §3). The store is **device-local** (`kSecAttrSynchronizable: false` pinned on every `SecItem*` call) for the same DUT-30 reason the guest identity is: a session must never sync over iCloud Keychain onto a Family-Sharing / shared-Apple-ID device. The store is a **dumb, exact persist** — `save` writes the session verbatim (a `nil` name/email clears that field); the *merge* that carries the first-auth name/email forward across later `nil`-bearing re-auth credentials is the auth coordinator's job (AC-46.2), not the store's. `load` returns `nil` only when no `userIdentifier` is present. L1 coverage pins the in-memory contract, the optional-field / private-relay round-trips, and the device-local Keychain attribute builders (the live Keychain round-trip is an XCUITest L3 concern — `SecItem*` is unreliable under `swift test` in an unsigned bundle).
+- **AC-46.2 (Auth coordinator + Sign-in button — follow-up slice).** A `SignInWithAppleButton` (SwiftUI native) in the Settings → Account section drives an `ASAuthorizationController`; on success the coordinator formats `fullName: PersonNameComponents?` → `displayName`, **merges** name/email forward from any existing session (Apple omits them on re-auth), and persists via AC-46.1. Requires the `com.apple.developer.applesignin` **entitlement** (one capability toggle in the Apple Developer portal + `DODApp.entitlements` + `project.yml`). *Not in the AC-46.1 slice.*
+- **AC-46.3 (Settings Account section + Sign Out + in-app Delete Account — follow-up slice).** Settings grows an Account section: signed-out shows the Sign-in button; signed-in shows the name/email + **Sign Out** (clears the session, falls back to guest mode) and **Delete Account** (App Store Guideline **5.1.1(v)** — account deletion must be **in-app**, not a web link; in Phase a it clears the local session + revokes the Apple token via `ASAuthorizationAppleIDProvider`; once Phase d ships it also deletes the server record). *Not in the AC-46.1 slice.*
+- **AC-46.4 (Comment/rating identity — follow-up slice).** When a session exists, the US-13 / US-14 write paths use the session's name/email instead of firing the US-15 guest-identity sheet; signed-out users keep the guest path unchanged. *Not in the AC-46.1 slice.*
+- **AC-46.5 (Out of scope for US-46 / deferred).** **Google sign-in** (Phase b — adds the GoogleSignIn-iOS SDK, constitution §3 sign-off required), **email + magic link** (Phase c), and **backend cross-device sync + first-login data migration** (Phase d — gated on the backend-provider decision) are each their own future story. A **constitution §1 amendment** (acknowledging the v2 auth model, à la CL-86 for CloudKit) lands with the user-facing sign-in slice (AC-46.2/46.3), not the AC-46.1 store.
+
+**Constitution + spec notes:**
+
+- **No new third-party dependency** in Phase a — Sign in with Apple is a system framework (`AuthenticationServices`); the Keychain store uses `Security` directly (constitution §3 respected). Google's SDK (Phase b) is the only dep that needs §3 sign-off.
+- **App Store rule trace:** 5.1.1(ii) — guest browsing without login (preserved); 4.8 — Sign in with Apple offered alongside any other social login; 5.1.1(v) — in-app account deletion (AC-46.3).
+- **Privacy (constitution §9):** the session is Keychain-only and never sent to TelemetryDeck (parity with US-15). Anything a future backend phase transmits (saves / settings) must be reflected in the privacy policy + the Settings telemetry copy before it ships.
+- **CL-189** captures the locked Phase-a decisions (guest stays default; Apple first; on-device device-local Keychain session; dumb-persist store with coordinator-side merge; optional first-auth-only name/email; private-relay support) and the **deferred backend-provider decision** for Phase d, plus the rejected alternatives (iCloud-Keychain-synced session; storing the raw `ASAuthorizationAppleIDCredential`; baking the first-auth merge into the store).
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
