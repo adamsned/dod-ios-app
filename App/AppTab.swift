@@ -2,10 +2,11 @@
 ///
 /// Case order is the **single source of truth** for the bottom tab-bar
 /// order. Reordering here changes what the user sees; see AC-16.1 / CL-25.
-/// The visual order is **Recipes → Categories → Saved → Search** (post-US-16).
+/// The visual order is **Recipes → Saved → Search** — the Categories tab was
+/// folded into Search in T-800 (its browse list lives in the Search idle
+/// view now; CL-194 / DUT-113).
 enum AppTab: Hashable, CaseIterable, Identifiable {
     case feed
-    case categories
     case saved
     case search
 
@@ -35,7 +36,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         // (`telemetryName`, AC-16.4) is unchanged to preserve funnel
         // comparisons across both renames.
         case .feed: "Recipes & Articles"
-        case .categories: "Categories"
         case .search: "Search"
         case .saved: "Saved"
         }
@@ -58,7 +58,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         // the pre-T-640 wording; the full "Recipes & Articles" still
         // drives `FeedView.navigationTitle`.
         case .feed: "Recipes"
-        case .categories: "Categories"
         case .search: "Search"
         case .saved: "Saved"
         }
@@ -71,7 +70,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .feed: "house"
-        case .categories: "square.grid.2x2"
         case .search: "magnifyingglass"
         // `bookmark` (outline) when unselected, `bookmark.fill` when
         // selected — SwiftUI's tab styling handles the swap. AC-16.2.
@@ -88,7 +86,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
     var telemetryName: String {
         switch self {
         case .feed: "feed"
-        case .categories: "categories"
         case .search: "search"
         case .saved: "saved"
         }

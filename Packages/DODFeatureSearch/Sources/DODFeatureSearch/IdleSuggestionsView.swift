@@ -163,8 +163,8 @@ struct IdleSuggestionsView: View {
     }
 
     /// One browse row: category name + recipe count + disclosure chevron.
-    /// Mirrors `CategoryListView.categoryRow` (same stock-cell shape) so the
-    /// retired tab's muscle memory carries over. Host owns navigation via
+    /// Same stock-cell shape the retired Categories tab used (removed in
+    /// T-800), so the muscle memory carries over. Host owns navigation via
     /// `onCategorySelect`, so this is a plain `Button`, not a `NavigationLink`.
     private func categoryRow(_ category: DODDomain.Category) -> some View {
         Button {

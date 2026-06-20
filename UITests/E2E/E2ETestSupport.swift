@@ -36,7 +36,7 @@ enum E2ETestSupport {
     /// recipe-card `Button` natively). Order tracks `AppTab.allCases` per
     /// AC-16.6; if that order shifts, the L3 smoke `test_tabBarOrderMatchesSpec`
     /// blocks it before we get here.
-    static let tabLabels: Set<String> = ["Recipes", "Categories", "Saved", "Search"]
+    static let tabLabels: Set<String> = ["Recipes", "Saved", "Search"]
 }
 
 extension XCUIApplication {

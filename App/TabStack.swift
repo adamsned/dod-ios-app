@@ -77,12 +77,6 @@ struct TabStack: View {
                 }
             )
             .modifier(settingsToolbar(identifierStem: "feed"))
-        case .categories:
-            CategoryListView(
-                viewModel: CategoryListViewModel(dependencies: dependencies.categoriesDependencies()),
-                onSelect: { category in path.append(.category(category)) }
-            )
-            .modifier(settingsToolbar(identifierStem: "categories"))
         case .search:
             SearchView(
                 viewModel: SearchViewModel(dependencies: dependencies.searchDependencies()),
@@ -96,11 +90,12 @@ struct TabStack: View {
                         )
                     }
                 },
-                // T-799 / CL-193 (DUT-112): browse-category tap → push the
-                // category's recipes. `.category` resolves via the shared
+                // T-799 / CL-193: browse-category tap → push the category's
+                // recipes. `.category` resolves via the shared
                 // `navigationDestination(for: RecipeRoute.self)` →
-                // `CategoryRecipesView`, the same destination the Categories
-                // tab used (that tab retires in T-800 / Phase 2).
+                // `CategoryRecipesView`. Since T-800 (CL-194 / DUT-113)
+                // removed the Categories tab, this is now the only entry
+                // point into the category-browse → recipes flow.
                 onSelectCategory: { category in path.append(.category(category)) }
             )
             .modifier(settingsToolbar(identifierStem: "search"))

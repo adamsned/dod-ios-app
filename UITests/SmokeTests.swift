@@ -36,14 +36,14 @@ final class SmokeTests: XCTestCase {
         )
     }
 
-    func test_allFourTabsAreReachable() {
+    func test_allThreeTabsAreReachable() {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
-        // Tab order post-US-16 is Recipes → Categories → Saved → Search
-        // (Saved moved from position 4 to position 3). Iteration order here
-        // is purely "do all four open?"; the positional guard lives in
+        // Tab order post-T-800 is Recipes → Saved → Search (the Categories
+        // tab was folded into Search — CL-194). Iteration order here is
+        // purely "do all three open?"; the positional guard lives in
         // `test_tabBarOrderMatchesSpec` below. Spec trace: AC-16.1, AC-16.6.
-        for tabName in ["Recipes", "Categories", "Saved", "Search"] {
+        for tabName in ["Recipes", "Saved", "Search"] {
             let button = tabBar.buttons[tabName]
             XCTAssertTrue(button.exists, "Missing tab: \(tabName)")
             button.tap()
@@ -56,8 +56,8 @@ final class SmokeTests: XCTestCase {
     /// that reshuffles `AppTab.allCases` will fail this test loudly rather
     /// than silently changing the user-visible layout.
     ///
-    /// Asserts both directly (the button at index 2 is "Saved", the button
-    /// at index 3 is "Search") and behaviorally (tapping each lands on the
+    /// Asserts both directly (the button at index 1 is "Saved", the button
+    /// at index 2 is "Search") and behaviorally (tapping each lands on the
     /// expected screen — Saved shows the empty-state title from AC-5.8 on
     /// a fresh install; Search shows its search field placeholder).
     func test_tabBarOrderMatchesSpec() {
@@ -65,30 +65,29 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
         let tabButtons = tabBar.buttons.allElementsBoundByIndex
-        XCTAssertEqual(tabButtons.count, 4, "Expected exactly 4 top-level tabs")
+        XCTAssertEqual(tabButtons.count, 3, "Expected exactly 3 top-level tabs")
 
         // Position-by-position (left → right). The labels here are what
         // a real user sees on the tab bar, so they double as a readable
         // record of the spec'd order.
         XCTAssertEqual(tabButtons[0].label, "Recipes", "Tab 1 should be Recipes")
-        XCTAssertEqual(tabButtons[1].label, "Categories", "Tab 2 should be Categories")
-        XCTAssertEqual(tabButtons[2].label, "Saved", "Tab 3 should be Saved (was Search pre-US-16)")
-        XCTAssertEqual(tabButtons[3].label, "Search", "Tab 4 should be Search (was Saved pre-US-16)")
+        XCTAssertEqual(tabButtons[1].label, "Saved", "Tab 2 should be Saved")
+        XCTAssertEqual(tabButtons[2].label, "Search", "Tab 3 should be Search")
 
-        // Behavioral check: tapping the third tab actually lands on Saved,
+        // Behavioral check: tapping the second tab actually lands on Saved,
         // not on a mislabeled screen. AC-5.8 empty-state title is the
         // strongest "we're really on Saved" signal on fresh install.
-        tabButtons[2].tap()
+        tabButtons[1].tap()
         XCTAssertTrue(
             app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 6),
-            "Third tab should land on the Saved screen (empty state visible on fresh install)"
+            "Second tab should land on the Saved screen (empty state visible on fresh install)"
         )
 
-        // Behavioral check: fourth tab is Search. SearchView uses a
+        // Behavioral check: third tab is Search. SearchView uses a
         // plain `TextField` (not `.searchable`) with the placeholder
         // "Search recipes", so the search input shows up under
         // `app.textFields`, not `app.searchFields`.
-        tabButtons[3].tap()
+        tabButtons[2].tap()
         let searchField = app.textFields["Search recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 6),

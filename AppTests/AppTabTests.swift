@@ -7,17 +7,19 @@ import XCTest
 /// re-shuffle the bottom tab bar or break cross-version funnel analytics.
 ///
 /// Spec trace: US-16 / AC-16.1 (order), AC-16.2 (bookmark icon),
-/// AC-16.4 (telemetry names stable). CL-24, CL-25.
+/// AC-16.4 (telemetry names stable). CL-24, CL-25, CL-194 (the Categories
+/// tab was removed in T-800 — its browse list moved into Search, CL-193).
 final class AppTabTests: XCTestCase {
 
-    /// AC-16.1 / CL-25: bottom tab-bar order is **Recipes → Categories →
-    /// Saved → Search**. `AppTab.allCases` is the single source of truth
-    /// for that order (RootView's phoneTabs iterates it directly), so
-    /// asserting on the enum is the cheapest possible regression guard.
+    /// AC-16.1 / CL-25 / CL-194: bottom tab-bar order is **Recipes → Saved
+    /// → Search** (the Categories tab was folded into Search in T-800).
+    /// `AppTab.allCases` is the single source of truth for that order
+    /// (RootView's phoneTabs iterates it directly), so asserting on the
+    /// enum is the cheapest possible regression guard.
     func test_allCasesOrderMatchesSpec() {
         XCTAssertEqual(
             AppTab.allCases,
-            [.feed, .categories, .saved, .search],
+            [.feed, .saved, .search],
             "Bottom tab bar order is the single source of truth in AppTab.allCases. "
                 + "Changing the order here is a user-visible product change — update the "
                 + "spec (US-16 / AC-16.1) before touching this test."
@@ -36,11 +38,10 @@ final class AppTabTests: XCTestCase {
     }
 
     /// Sanity-check the other tab icons didn't get caught in a sloppy
-    /// rename. These haven't changed in US-16, but pinning them protects
-    /// against accidental drift in future passes.
+    /// rename. Pinning them protects against accidental drift in future
+    /// passes.
     func test_otherTabs_systemImagesUnchanged() {
         XCTAssertEqual(AppTab.feed.systemImage, "house")
-        XCTAssertEqual(AppTab.categories.systemImage, "square.grid.2x2")
         XCTAssertEqual(AppTab.search.systemImage, "magnifyingglass")
     }
 
@@ -51,7 +52,6 @@ final class AppTabTests: XCTestCase {
     /// constitution §9 event allowlist.
     func test_telemetryNames_areStable() {
         XCTAssertEqual(AppTab.feed.telemetryName, "feed")
-        XCTAssertEqual(AppTab.categories.telemetryName, "categories")
         XCTAssertEqual(AppTab.saved.telemetryName, "saved")
         XCTAssertEqual(AppTab.search.telemetryName, "search")
     }
@@ -65,19 +65,17 @@ final class AppTabTests: XCTestCase {
     /// both so a casual rename doesn't slip past code review.
     func test_titles_matchSpec() {
         XCTAssertEqual(AppTab.feed.title, "Recipes & Articles")
-        XCTAssertEqual(AppTab.categories.title, "Categories")
         XCTAssertEqual(AppTab.saved.title, "Saved")
         XCTAssertEqual(AppTab.search.title, "Search")
     }
 
     /// AC-16.1 / CL-65 (T-660): the feed tab's bottom-tab label is the short
     /// "Recipes" (the full "Recipes & Articles" lives in `title` for the
-    /// screen header). The other three tabs share one string across `title`
-    /// and `tabLabel`. Pinning `tabLabel` guards the fixed-width tab slot
+    /// screen header). The other tabs share one string across `title` and
+    /// `tabLabel`. Pinning `tabLabel` guards the fixed-width tab slot
     /// against a future rename that would re-introduce the truncation bug.
     func test_tabLabels_matchSpec() {
         XCTAssertEqual(AppTab.feed.tabLabel, "Recipes")
-        XCTAssertEqual(AppTab.categories.tabLabel, "Categories")
         XCTAssertEqual(AppTab.saved.tabLabel, "Saved")
         XCTAssertEqual(AppTab.search.tabLabel, "Search")
     }
