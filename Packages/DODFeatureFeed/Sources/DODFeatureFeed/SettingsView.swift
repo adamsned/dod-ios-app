@@ -254,6 +254,9 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
+            // US-45 (T-790, DUT-94) — Shop: BuzzyWaxx cross-promo (`SettingsView+Shop.swift`).
+            ShopSection()
+
             Section {
                 EmptyView()
             } footer: {

@@ -58,6 +58,28 @@ final class SettingsViewSnapshotTests: XCTestCase {
         )
     }
 
+    // MARK: - T-790 / US-45 AC-45.1 — Shop section (DUT-94)
+
+    @MainActor
+    func test_settingsView_shopSection_dark_AX5() async {
+        // Locks the Settings → Shop "Buy BuzzyWaxx Seasoning" row (AC-45.1 /
+        // AC-45.2) at the AX5 Dynamic Type ceiling in dark mode — the
+        // accessibility surface the DUT-94 spec calls out (the product name
+        // must not truncate, the row stays a 44pt tap target). `record:
+        // .missing` lays the fresh baseline down on the first iOS-sim run.
+        // (Adding the Shop section also shifts the two full-page
+        // `test_settingsView_light/dark_defaultDynamicType` baselines; that
+        // intentional visual change is a documented sim re-record fast-follow
+        // per T-790 / CL-186 — these feature snapshots are UIKit-gated and not
+        // in the CI L4 gate, so there is no CI impact.)
+        let view = Self.makeHostedView()
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 956), traits: Self.darkAX5Traits()),
+            record: .missing
+        )
+    }
+
     // MARK: - T-703 / US-41 AC-41.3 — iCloud Sync section baselines
 
     @MainActor
@@ -200,6 +222,17 @@ final class SettingsViewSnapshotTests: XCTestCase {
         UITraitCollection(traitsFrom: [
             UITraitCollection(userInterfaceStyle: .dark),
             UITraitCollection(displayScale: 3),
+        ])
+    }
+
+    /// Dark mode at the AX5 Dynamic Type ceiling (`.accessibilityExtraExtraExtraLarge`)
+    /// — the largest accessibility size, used to lock that the Shop row's
+    /// product name wraps rather than truncating (CC-1 / AC-45.2).
+    static func darkAX5Traits() -> UITraitCollection {
+        UITraitCollection(traitsFrom: [
+            UITraitCollection(userInterfaceStyle: .dark),
+            UITraitCollection(displayScale: 3),
+            UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraExtraLarge),
         ])
     }
 }
