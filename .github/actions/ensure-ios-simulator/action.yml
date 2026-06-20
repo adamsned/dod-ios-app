@@ -43,13 +43,30 @@ runs:
           # numeric (major, minor, ...) tuple so 26.0 outranks 9.0, then take
           # the last. Only iOS identifiers contain "iOS" (watchOS/tvOS/xrOS do
           # not), so the filter is unambiguous.
-          runtime=$(xcrun simctl list runtimes --json \
-            | jq -r '[.runtimes[]
-                      | select(.isAvailable == true and (.identifier | contains("iOS")))]
-                     | sort_by(.version | split(".") | map(tonumber))
-                     | last | .identifier // empty')
+          # Pick the newest installed iOS runtime. A function so we can
+          # re-query after downloading one below.
+          newest_ios_runtime() {
+            xcrun simctl list runtimes --json \
+              | jq -r '[.runtimes[]
+                        | select(.isAvailable == true and (.identifier | contains("iOS")))]
+                       | sort_by(.version | split(".") | map(tonumber))
+                       | last | .identifier // empty'
+          }
+          runtime=$(newest_ios_runtime)
           if [ -z "$runtime" ]; then
-            echo "::error::No available iOS simulator runtime found on this runner."
+            # The GitHub macos-15 image ships Xcode 26 WITHOUT the iOS 26
+            # simulator runtime — Xcode 26 unbundled the runtime, so a freshly
+            # `xcode-select`ed Xcode 26 has the iOS 26 SDK (builds work) but no
+            # bootable iOS runtime (test/snapshot jobs can't create a device).
+            # Download it for the selected Xcode, then re-query. This branch
+            # only runs when no iOS runtime is installed, so it adds zero cost
+            # on images that already ship one.
+            echo "::notice::No iOS simulator runtime installed; downloading it via 'xcodebuild -downloadPlatform iOS' (Xcode 26 on the macos-15 image does not bundle the iOS 26 runtime)."
+            xcodebuild -downloadPlatform iOS || sudo xcodebuild -downloadPlatform iOS || true
+            runtime=$(newest_ios_runtime)
+          fi
+          if [ -z "$runtime" ]; then
+            echo "::error::No available iOS simulator runtime found on this runner even after 'xcodebuild -downloadPlatform iOS'."
             exit 1
           fi
 
