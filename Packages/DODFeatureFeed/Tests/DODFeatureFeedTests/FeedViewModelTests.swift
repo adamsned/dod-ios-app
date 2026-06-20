@@ -27,6 +27,30 @@ import Testing
         #expect(viewModel.items.count == 40)
     }
 
+    @Test func loadMoreKeepsAlreadyLoadedRowsWhenCacheEvictsThem() async throws {
+        // DUT-99 — the old loadMore re-read the full id list from the cache and
+        // REPLACED `items`. Once the LRU cache evicted an earlier row, that
+        // re-query silently dropped it (compactMap), so the feed shrank/jumped
+        // mid-scroll. Append-only keeps already-loaded rows regardless of the
+        // cache's later state.
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = (1...20).map(Self.makeItem)
+        dependencies.pages[2] = (21...40).map(Self.makeItem)
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.items.count == 20)
+
+        // Simulate the cache evicting the top-of-feed row (id=1) before page 2.
+        dependencies.blocklistedIDs.insert(1)
+        let last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)
+
+        // id=1 is still shown (not dropped), the full page-2 appended, order kept.
+        #expect(viewModel.items.count == 40)
+        #expect(viewModel.items.first?.id == 1)
+        #expect(viewModel.items.map(\.id) == Array(1...40))
+    }
+
     @Test func firstLaunchOfflineShowsEmptyState() async throws {
         let dependencies = FakeFeedDependencies()
         dependencies.shouldFail = true

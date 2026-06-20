@@ -157,10 +157,17 @@ public final class FeedViewModel {
         do {
             let fetched = try await dependencies.fetchPosts(page: nextPage)
             try await dependencies.cache(listItems: fetched)
-            let ids = (items.map(\.id) + fetched.map(\.id)).reduce(into: [Int]()) { acc, id in
-                if !acc.contains(id) { acc.append(id) }
-            }
-            items = try await dependencies.cachedListItems(forIDs: ids)
+            // DUT-99 — APPEND only the new page's items. The old code re-read the
+            // full id list from the cache and REPLACED `items` wholesale, which
+            // (a) churned every existing cell — cancelling in-flight AsyncImage
+            // loads, so cards flipped to the broken-photo placeholder — and
+            // (b) once the cache LRU-evicted earlier rows, the re-query silently
+            // dropped them (`compactMap`), so the feed shrank/jumped mid-scroll.
+            // Appending leaves loaded cells (and their images) untouched.
+            let existingIDs = Set(items.map(\.id))
+            let newIDs = fetched.map(\.id).filter { !existingIDs.contains($0) }
+            let newItems = try await dependencies.cachedListItems(forIDs: newIDs)
+            items.append(contentsOf: newItems)
             currentPage = nextPage
             if fetched.count < 20 { reachedEnd = true }
             loadState = .loaded

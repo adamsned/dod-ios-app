@@ -89,23 +89,14 @@ extension RecipeCard {
         /// row's `recipeCardTap` modifier collapses children into the
         /// row's combined label.
         private var thumbnail: some View {
-            AsyncImage(url: heroImageURL) { phase in
-                switch phase {
-                case .empty:
-                    LoadingSkeleton(cornerRadius: DODSpacing.xs)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
-                    Image(systemName: "photo")
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(DODColor.surface)
-                @unknown default:
-                    EmptyView()
-                }
-            }
+            // DUT-99 — see RecipeCard.heroSection. Cached + retrying loader;
+            // `placeholderIconSize: nil` keeps the small default glyph that
+            // suits the 60×60 thumbnail (the gallery card uses 40pt).
+            CachedNetworkImage(
+                url: heroImageURL,
+                skeletonCornerRadius: DODSpacing.xs,
+                placeholderIconSize: nil
+            )
             .frame(width: 60, height: 60)
             .clipShape(RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous))
             .accessibilityHidden(true)

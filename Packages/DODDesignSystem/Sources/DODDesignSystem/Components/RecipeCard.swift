@@ -60,27 +60,15 @@ public struct RecipeCard: View {
 
     private var heroSection: some View {
         ZStack(alignment: .topTrailing) {
-            AsyncImage(url: heroImageURL) { phase in
-                switch phase {
-                case .empty:
-                    LoadingSkeleton(cornerRadius: 0)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
-                    Image(systemName: "photo")
-                        .font(.system(size: 40))
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(DODColor.surface)
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .frame(height: 140)
-            .clipped()
-            .accessibilityHidden(true)
+            // DUT-99 — was a raw `AsyncImage`, which flipped to the broken-photo
+            // placeholder whenever a load was cancelled by scroll/re-render churn
+            // and re-downloaded on every re-render. `CachedNetworkImage` caches +
+            // retries + ignores cancellation. Same visual phases (skeleton / fill
+            // / photo placeholder), so snapshots are unchanged.
+            CachedNetworkImage(url: heroImageURL, skeletonCornerRadius: 0)
+                .frame(height: 140)
+                .clipped()
+                .accessibilityHidden(true)
 
             if let totalTimeDisplay {
                 timeChip(totalTimeDisplay)
