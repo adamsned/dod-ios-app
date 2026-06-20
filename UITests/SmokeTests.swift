@@ -85,13 +85,13 @@ final class SmokeTests: XCTestCase {
 
         // Behavioral check: third tab is Search. SearchView uses a
         // plain `TextField` (not `.searchable`) with the placeholder
-        // "Search recipes", so the search input shows up under
+        // "Search Recipes", so the search input shows up under
         // `app.textFields`, not `app.searchFields`.
         tabButtons[2].tap()
-        let searchField = app.textFields["Search recipes"]
+        let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 6),
-            "Fourth tab should land on the Search screen (Search recipes field visible)"
+            "Fourth tab should land on the Search screen (Search Recipes field visible)"
         )
     }
 

@@ -2453,6 +2453,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `App/AppTab.swift` (drop `.categories`), `App/TabStack.swift` (drop case + reword comment), delete `CategoryListView.swift` + `CategoryListViewModel.swift` + `CategoryListViewSnapshotTests.swift`, trim `CategoriesTests.swift` (keep the CategoryRecipes suites), `TabBarSnapshotTests.swift` + re-record 6 baselines (delete 2 categories PNGs), `AppTabTests.swift` / `SmokeTests.swift` / `CoreUserJourneysE2ETests.swift` / `E2ETestSupport.swift` (3-tab order), doc-comment fixups in `IdleSuggestionsView.swift` + `DODSearchField.swift`.
 - **AC:** AC-16.1 amended (3 tabs), AC-16.5 amended (TabBar baselines → 3 tabs), AC-16.6 amended (smoke 3 tabs), US-19 retired (CL-194 canonical). **Est:** ~60 min. **Deps:** main at T-799 (`0f09007`). Branch `feat/T-800-remove-categories-tab`. **||:** P-search. No `e2e` label - presentation + nav; iPad-Pro-11 sim verified (3 tabs, browse flow intact). swift-format + SwiftLint clean; build SUCCEEDED; TabBar L4 baselines re-recorded + DODDesignSystem snapshots pass. **Snapshot:** `TabBarSnapshotTests` re-records 6 light baselines (3 tabs × 2 devices) + drops 2 categories PNGs — intentional visual change (AC-16.5).
 
+### T-801 — DUT-114 Search page polish: title-case placeholder + "Try Searching" header + platter corner radius (US-12 + US-3 amendment, CL-195)
+
+- **What:** 3 Search-page tweaks: placeholder "Search recipes" → "Search Recipes"; idle "Try" header → "Try Searching"; categories platter `cornerRadius` `DODSpacing.sm` (12) → `DODSpacing.md` (16, = the Try-pill capsule radius, picked over 24pt on the sim).
+- **Files:** `SearchView.swift` (placeholder), `IdleSuggestionsView.swift` (header + card radius), `SmokeTests.swift` / `CoreUserJourneysE2ETests.swift` / `ScreenshotTests.swift` (field lookups by "Search Recipes").
+- **AC:** AC-12.4 amended (idle header copy + platter radius); placeholder title case (CL-195 canonical). **Est:** ~15 min. **Deps:** main at T-800 (`2226093`). Branch `feat/T-801-search-page-polish`. **||:** P-search. No `e2e` label - presentation-only; iPad-Pro-11 sim verified (3 tweaks render; platter matches chip radius). swift-format + SwiftLint clean; build SUCCEEDED.
+
 ---
 
 ## Summary

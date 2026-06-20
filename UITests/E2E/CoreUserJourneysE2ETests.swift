@@ -98,7 +98,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         XCTAssertEqual(tabButtons.count, 3, "Expected exactly 3 top-level tabs")
         tabButtons[2].tap()
 
-        let searchField = app.textFields["Search recipes"]
+        let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 5),
             "Search text field should be visible after switching to the Search tab"
@@ -397,7 +397,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         // Switch to Search tab (index 3 per AC-16.6).
         tabBar.buttons.allElementsBoundByIndex[3].tap()
 
-        let searchField = app.textFields["Search recipes"]
+        let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 5),
             "Search field should be visible on the Search tab"
@@ -424,7 +424,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
 
         tabBar.buttons.allElementsBoundByIndex[3].tap()
 
-        let searchField = app.textFields["Search recipes"]
+        let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
         searchField.tap()
         searchField.typeText("chicken")
@@ -459,7 +459,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
 
         tabBar.buttons.allElementsBoundByIndex[3].tap()
 
-        let searchField = app.textFields["Search recipes"]
+        let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
         searchField.tap()
         // "chicken" reliably returns multiple results on the live blog and

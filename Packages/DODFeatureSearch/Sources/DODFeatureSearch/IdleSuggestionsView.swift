@@ -53,7 +53,7 @@ struct IdleSuggestionsView: View {
                         recentsSection
                     }
                     if !topCategories.isEmpty {
-                        section(title: "Try") {
+                        section(title: "Try Searching") {
                             FlowLayout(spacing: DODSpacing.xs) {
                                 ForEach(topCategories) { category in
                                     pill(text: category.name, systemImage: "magnifyingglass") {
@@ -156,7 +156,7 @@ struct IdleSuggestionsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
                     .fill(DODColor.surfaceElevated)
             )
         }
