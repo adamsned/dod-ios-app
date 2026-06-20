@@ -195,10 +195,9 @@ final class AppDependencies {
         // the device log (the opt-in flag was force-cleared in `init`).
         if didSelfHeal {
             cloudKitDiagnostics.markContainerOpenFailed()
+            // Single string literal: `os.Logger` needs an `OSLogMessage` (a `+`-concatenated `String` won't convert) and a static literal logs unredacted.
             DODLog.app.error(
-                "CloudKit sync self-healed (DUT-78): app had crash-looped, so sync "
-                    + "was force-disabled and a local-only store opened. Re-enable "
-                    + "from Settings once iCloud is signed in / the schema is deployed."
+                "CloudKit sync self-healed (DUT-78): app had crash-looped, so sync was force-disabled and a local-only store opened. Re-enable from Settings once iCloud is signed in / the schema is deployed."
             )
         }
         // The in-memory UI-test store never engages CloudKit — skip the block.
@@ -239,8 +238,7 @@ final class AppDependencies {
                 // clean store rebuild.
                 if RecipeStore.cloudKitStoreEverOpened(in: .standard) {
                     DODLog.app.error(
-                        "DUT-78: synced store likely tainted (was CloudKit-backed); "
-                            + "a `.none` reopen can still re-trigger mirroring."
+                        "DUT-78: synced store likely tainted (was CloudKit-backed); a `.none` reopen can still re-trigger mirroring."
                     )
                 }
             }

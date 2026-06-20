@@ -105,6 +105,11 @@ public enum CloudKitAvailability: Sendable {
         case .noAccount: return .noAccount
         case .restricted: return .restricted
         case .couldNotDetermine: return .couldNotDetermine
+        // iOS 15+ known case: the account exists but isn't usable right now
+        // (e.g. needs re-auth). Conservative "don't attempt CloudKit" — maps to
+        // `couldNotDetermine` so `shouldAttemptCloudKit` stays `false` and the
+        // launch path opens local, dodging the DUT-78 async-mirroring trap.
+        case .temporarilyUnavailable: return .couldNotDetermine
         @unknown default: return .unknown
         }
     }
