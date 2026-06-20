@@ -35,7 +35,13 @@ import Foundation
 /// (`recordLaunchStarted` first, `markLaunchHealthy` when on screen,
 /// `shouldSelfHeal` consulted at container-build time); this type owns only
 /// the counter arithmetic and the threshold decision.
-public struct LaunchHealthTracker: Sendable {
+///
+/// `@unchecked Sendable`: the only stored property is a `UserDefaults`, which
+/// Apple documents as thread-safe (its reads/writes are atomic) but which is
+/// not *typed* `Sendable` under Swift 6 strict concurrency. The tracker holds
+/// no other mutable state, so the conformance is sound — same posture the
+/// rest of the codebase takes for `UserDefaults`-backed helpers.
+public struct LaunchHealthTracker: @unchecked Sendable {
 
     /// `UserDefaults` key for the consecutive-unhealthy-launch counter
     /// (DUT-78). Versioned (`V1`) so a future schema change to the self-heal
