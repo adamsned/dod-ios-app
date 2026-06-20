@@ -24,6 +24,8 @@ the refresh token in its Keychain session.
 
 ## Deploy
 
+**One-liner:** `cd backend/siwa-revoke && ./deploy.sh` — it installs, prompts you to fill `wrangler.toml`, deploys, and sets the two secrets interactively. (`npx wrangler login` once first.) Or do it manually:
+
 ```bash
 cd backend/siwa-revoke
 npm install
