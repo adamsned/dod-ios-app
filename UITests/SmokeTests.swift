@@ -384,4 +384,48 @@ final class SmokeTests: XCTestCase {
             "Welcome sheet should be gone after Get cooking is tapped"
         )
     }
+
+    /// US-45 / AC-45.1..AC-45.3 (T-790, DUT-94): the Settings → Shop section's
+    /// "Buy BuzzyWaxx Seasoning" row exists and is tappable (it hands off to
+    /// the system browser via `openURL`).
+    ///
+    /// XCUITest can't read the URL the row opens — and asserting Safari reaches
+    /// the foreground is flaky on shared CI simulators — so the URL value
+    /// itself (`https://buzzywaxx.com/collections/frontpage`) is pinned
+    /// deterministically by the L1 test
+    /// `SettingsViewModelTests.buyBuzzyWaxxURLPointsAtTheShopifyStorefront`.
+    /// This smoke test guards the remaining contract: the row is present,
+    /// reachable by scrolling to the bottom of Settings, and activatable
+    /// without crashing.
+    func test_settingsShopRowIsPresentAndTappable() {
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 8), "Tab bar should appear")
+
+        // Open Settings via the gear icon (shared `SettingsToolbarModifier`).
+        let settingsButton = app.buttons["Settings"]
+        XCTAssertTrue(
+            settingsButton.waitForExistence(timeout: 5),
+            "Settings gear icon should be visible on the Feed nav bar"
+        )
+        settingsButton.tap()
+
+        // The Shop row sits near the bottom of the Settings list (between
+        // About and the version footer), so scroll it into view. Identified by
+        // its accessibility identifier (AC-45.2).
+        let shopRow = app.buttons["settings-button-shop-buzzywaxx"]
+        var swipes = 0
+        while !shopRow.exists && swipes < 8 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(
+            shopRow.waitForExistence(timeout: 3),
+            "Settings should expose the BuzzyWaxx Shop row (US-45 / AC-45.2)"
+        )
+        XCTAssertTrue(shopRow.isHittable, "The Shop row should be tappable")
+
+        // Activating it must not crash; the actual browser hand-off (openURL
+        // with the pinned URL) is covered at L1 per the doc comment above.
+        shopRow.tap()
+    }
 }

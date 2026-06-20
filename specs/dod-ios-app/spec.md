@@ -897,6 +897,30 @@ Added 2026-06-02 (Linear DUT-36). Ships in four PRs: **Phase a (T-739, this PR)*
 
 ---
 
+### US-45 — Settings "Shop" row linking out to the BuzzyWaxx storefront
+
+**As a** cast-iron cook who just fell in love with a DOD recipe,
+**I want** an in-app path to buy BuzzyWaxx cast iron seasoning wax,
+**so that** I can keep my skillet seasoned without hunting for where to buy it.
+
+Added 2026-06-20 (DUT-94, authored by Ned). BuzzyWaxx is a sister brand under common ownership; the app's "Cast Iron Living" brand voice already primes the reader as a warm buyer, but today there is no in-app path to the store. This is a **pure outbound-commerce external link** — no native cart, no in-app catalog, no in-app checkout, **no StoreKit / IAP**. It reuses the established external-link-to-system-browser path (the DOD-ART-2 precedent) and mirrors the `SettingsView+CloudSync` / `SettingsView+Voice` extension-section pattern, so the engineering footprint is tiny. v1 is the Settings surface only; co-located CTAs inside the planned cast-iron care features (DUT-13 / DUT-49) are a fast-follow reusing the same URL + routing.
+
+**Acceptance criteria (T-790 — CL-186):**
+
+- **AC-45.1** `SettingsView` renders a new `Shop` section (a `ShopSection` sub-view in `SettingsView+Shop.swift`) styled like the existing extension sections — `DODType.heading` + `DODColor.label` header reading `"Shop"`, `.listRowBackground(DODColor.surfaceElevated)`, and a `DODType.caption` + `DODColor.labelSecondary` footer clarifying it is a physical product that ships and that the link opens the web store. It is positioned between the `About Dutch Oven Daddy` section and the version footer (a low-key promotional placement at the bottom of the page).
+- **AC-45.2** The section contains a single `"Buy BuzzyWaxx Seasoning"` row: a `Button` whose primary label (Title Case per T-750) is `"Buy BuzzyWaxx Seasoning"`, a `DODType.detail` / `DODColor.labelSecondary` secondary line identifying the **physical** good (`"Cast iron seasoning wax · ships from buzzywaxx.com"`), a leading `shippingbox.fill` glyph (signals a physical good that ships) and a trailing `arrow.up.forward.app` external-link affordance, both in `DODColor.accent`. The row carries `accessibilityIdentifier("settings-button-shop-buzzywaxx")`, the `.isButton` trait (it is a `Button`), and `accessibilityLabel("Buy BuzzyWaxx cast iron seasoning, opens in browser")`; the two glyphs are decorative (`accessibilityHidden(true)`).
+- **AC-45.3** Activating the row opens `SettingsViewModel.buyBuzzyWaxxURLString` (`https://buzzywaxx.com/collections/frontpage` — the owned Shopify "Shop All" collection with on-site checkout) in the **system browser** via the SwiftUI `@Environment(\.openURL)` action, building the `URL` at the call site with `if let` (the URL is stored as a `String` constant so the repo's `force_unwrapping`-as-error lint stays clean and the L1 suite can pin the literal). No in-app cart, catalog, or checkout is built; no payment is collected in-app; **no StoreKit / IAP code is added**. The system browser (not an in-app `WKWebView`) is the strongest "you are leaving the app to a real store" reviewer signal.
+- **AC-45.4** The row is static content (a label + a URL constant) and always renders — it never shows a loading skeleton and does not depend on a network fetch. Tapping it offline simply opens the browser, which surfaces the system's own no-connection page; the row stays enabled (no `NetworkMonitor` gating in v1).
+- **AC-45.5** v1 ships **untracked** — no analytics event is added for the tap, so this surface needs neither a constitution §9 allowlist amendment nor an App Privacy review. A count-only `shopLinkTapped(channel:)` event is a documented fast-follow (CL-186) that would carry both of those gates. No Amazon secondary link in v1 (direct-Shopify only, to keep full margin + first-party data); it is a documented fast-follow.
+
+**Constitution + spec notes:**
+
+- **App Store compliance (Guideline 3.1.3(e) — Goods and Services Outside of the App).** BuzzyWaxx seasoning wax is a tangible jar that ships and is consumed outside the app, so external web payment is the compliant path and **IAP is prohibited** for it. 3.1.1 (IAP) does not apply (it governs digital content/subscriptions); the 3.1.1(a) External Purchase Link entitlement is NOT needed (it exists for apps selling *digital* content). Stay clean by: making it unmistakable this is a physical product (label, "cast iron seasoning wax," external-link affordance), sending the user to `buzzywaxx.com` to complete checkout, building no native storefront, and never gating any in-app feature on the purchase.
+- **No new third-party dependency.** Reuses the system browser via `@Environment(\.openURL)` exactly as `SettingsView+Voice` opens `openSettingsURLString` (constitution §3 default-no respected). No StoreKit.
+- **CL-186** captures the locked decisions (direct Shopify storefront URL not Amazon; Settings placement for v1; single "Shop All" link; untracked v1 with the analytics + Amazon-secondary as documented fast-follows) and the rejected alternatives (in-app cart/catalog/checkout, a new bottom-bar tab, hard-coded prices).
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.

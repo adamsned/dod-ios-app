@@ -15,6 +15,24 @@ import os
 @MainActor
 @Suite("SettingsViewModel (T-550 + T-630)") struct SettingsViewModelTests {
 
+    // MARK: - US-45 (T-790, DUT-94) — Shop link URL
+
+    /// AC-45.3 — the Buy row opens the owned BuzzyWaxx Shopify storefront.
+    /// Pinning the literal here (the view builds the `URL` from this `String`
+    /// with `if let`) guards against an accidental edit silently sending
+    /// buyers to the wrong store, and asserts the string parses into a valid
+    /// https URL — a malformed string would make the `if let URL(string:)`
+    /// hand-off a dead no-op.
+    @Test func buyBuzzyWaxxURLPointsAtTheShopifyStorefront() throws {
+        #expect(
+            SettingsViewModel.buyBuzzyWaxxURLString
+                == "https://buzzywaxx.com/collections/frontpage"
+        )
+        let url = try #require(URL(string: SettingsViewModel.buyBuzzyWaxxURLString))
+        #expect(url.scheme == "https")
+        #expect(url.host() == "buzzywaxx.com")
+    }
+
     // MARK: - US-32 (T-550) — metric units
 
     @Test func toggleMetricUnitsPersistsToInjectedDefaults() async throws {
