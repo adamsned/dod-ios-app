@@ -151,6 +151,9 @@ public struct RecipeDetailView: View {
                         title: viewModel.listItem.title
                     )
                     RecipeDetailMetaPills(items: metaPillItems)
+                    // DUT-96 / T-789 — published date below the meta pills, the
+                    // same shared caption + long format the article header uses.
+                    PublishedDateCaption(date: viewModel.listItem.publishedAt)
                     servingsScaler
                     cookNowSection
                     excerptText
