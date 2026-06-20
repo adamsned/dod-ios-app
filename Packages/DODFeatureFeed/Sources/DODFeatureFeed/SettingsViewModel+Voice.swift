@@ -26,7 +26,7 @@ extension SettingsViewModel {
     /// kind of text Cook Mode actually reads. Public so the L1 suite can pin
     /// the exact string the preview seam receives.
     public static let voicePreviewSampleLine =
-        "Preheat your Dutch oven to 350 degrees, then stir in the onions."
+        "Layer the noodles, then spread a third of the meat mixture evenly over the top."
 
     /// The synthesis-quality tier of the voice Cook Mode would resolve right
     /// now for this device's language + the user's gender pick — the load-

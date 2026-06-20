@@ -2459,6 +2459,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `SearchView.swift` (placeholder), `IdleSuggestionsView.swift` (header + card radius), `SmokeTests.swift` / `CoreUserJourneysE2ETests.swift` / `ScreenshotTests.swift` (field lookups by "Search Recipes").
 - **AC:** AC-12.4 amended (idle header copy + platter radius); placeholder title case (CL-195 canonical). **Est:** ~15 min. **Deps:** main at T-800 (`2226093`). Branch `feat/T-801-search-page-polish`. **||:** P-search. No `e2e` label - presentation-only; iPad-Pro-11 sim verified (3 tweaks render; platter matches chip radius). swift-format + SwiftLint clean; build SUCCEEDED.
 
+### T-802 — DUT-115 Cook Mode voice Preview: real recipe step instead of the "preheat a Dutch oven" sample (US-40 amendment, CL-196)
+
+- **What:** The Settings → Cook Mode Voice Preview sample line `SettingsViewModel.voicePreviewSampleLine` → "Layer the noodles, then spread a third of the meat mixture evenly over the top." (was the "preheat your Dutch oven" line, which is not a real Dutch-oven technique). One constant.
+- **Files:** `DODFeatureFeed/SettingsViewModel+Voice.swift` (the `voicePreviewSampleLine` constant).
+- **AC:** Preview sample line (AC-40.12 / 40.13, code-level; no formal spec AC — the constant + `SettingsViewModelVoiceTests` are the pin) (CL-196 canonical). **Est:** ~5 min. **Deps:** main at T-801 (`c758d5d`). Branch `feat/T-802-voice-sample-line`. **||:** P-settings. No `e2e` label - one-line copy. swift-format + SwiftLint clean; the L1 voice test (sample == constant) stays green.
+
 ---
 
 ## Summary
