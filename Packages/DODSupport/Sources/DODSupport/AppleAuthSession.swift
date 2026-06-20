@@ -34,10 +34,24 @@ public struct AppleAuthSession: Sendable, Hashable {
     /// `nil` on every sign-in after the first, or when withheld.
     public let email: String?
 
-    public init(userIdentifier: String, displayName: String? = nil, email: String? = nil) {
+    /// The long-lived Apple **refresh token**, obtained by exchanging the
+    /// one-time `authorizationCode` server-side at sign-in (the SiwA revoke
+    /// Worker, DUT-98). Stored so account deletion can later **revoke** it —
+    /// the App Store 5.1.1(v) requirement for Sign in with Apple. `nil` when
+    /// the exchange didn't run (no revoke Worker configured, or a re-auth that
+    /// reused the existing session). Device-local, like the rest of the session.
+    public let refreshToken: String?
+
+    public init(
+        userIdentifier: String,
+        displayName: String? = nil,
+        email: String? = nil,
+        refreshToken: String? = nil
+    ) {
         self.userIdentifier = userIdentifier
         self.displayName = displayName
         self.email = email
+        self.refreshToken = refreshToken
     }
 }
 
@@ -103,6 +117,7 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
     static let userIdentifierAccount = "user-identifier"
     static let displayNameAccount = "display-name"
     static let emailAccount = "email"
+    static let refreshTokenAccount = "refresh-token"
 
     private let service: String
     private let accessGroup: String?
@@ -124,7 +139,8 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
         return AppleAuthSession(
             userIdentifier: userIdentifier,
             displayName: try readString(account: Self.displayNameAccount),
-            email: try readString(account: Self.emailAccount)
+            email: try readString(account: Self.emailAccount),
+            refreshToken: try readString(account: Self.refreshTokenAccount)
         )
     }
 
@@ -132,12 +148,14 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
         try writeString(session.userIdentifier, account: Self.userIdentifierAccount)
         try writeOptional(session.displayName, account: Self.displayNameAccount)
         try writeOptional(session.email, account: Self.emailAccount)
+        try writeOptional(session.refreshToken, account: Self.refreshTokenAccount)
     }
 
     public func clear() throws {
         try delete(account: Self.userIdentifierAccount)
         try delete(account: Self.displayNameAccount)
         try delete(account: Self.emailAccount)
+        try delete(account: Self.refreshTokenAccount)
     }
 
     // MARK: - SecItem plumbing

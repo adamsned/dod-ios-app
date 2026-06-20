@@ -82,4 +82,76 @@ struct AccountViewModelTests {
         #expect(vm.isSignedIn == false)
         #expect((try? store.load()) == nil)
     }
+
+    // MARK: - AC-46.6 (DUT-98) — token exchange + revoke
+
+    @Test func deleteAccountRevokesTheRefreshTokenViaTheWorker() async {
+        let store = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "u1", refreshToken: "rt-1")
+        )
+        let spy = SpyRevoker()
+        let vm = AccountViewModel(store: store, revoker: spy)
+        await confirmation { confirmed in
+            spy.onRevoke = { _ in confirmed() }
+            vm.deleteAccount()
+            #expect(vm.session == nil)  // cleared immediately, revoke runs after
+            try? await Task.sleep(for: .milliseconds(300))
+        }
+        #expect(spy.revokedTokens == ["rt-1"])
+    }
+
+    @Test func signInExchangesTheCodeAndStoresTheRefreshToken() async {
+        let store = InMemoryAppleAuthSessionStore()
+        let spy = SpyRevoker()
+        spy.exchangeReturn = "rt-new"
+        let vm = AccountViewModel(store: store, revoker: spy)
+        await confirmation { confirmed in
+            spy.onExchange = { _ in confirmed() }
+            vm.applySignIn(
+                userIdentifier: "u1",
+                displayName: "Ned",
+                email: "n@x.com",
+                authorizationCode: "code-1"
+            )
+            #expect(vm.session?.refreshToken == nil)  // immediate session; token pending
+            try? await Task.sleep(for: .milliseconds(300))
+        }
+        #expect(spy.exchangedCodes == ["code-1"])
+        #expect(vm.session?.refreshToken == "rt-new")
+        #expect((try? store.load())?.refreshToken == "rt-new")
+    }
+
+    @Test func deleteWithoutRefreshTokenDoesNotCallRevoker() {
+        let store = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "u1")  // no refresh token
+        )
+        let spy = SpyRevoker()
+        let vm = AccountViewModel(store: store, revoker: spy)
+        vm.deleteAccount()
+        #expect(vm.session == nil)
+        #expect(spy.revokedTokens.isEmpty)
+    }
+}
+
+/// Records exchange/revoke calls for the AccountViewModel async-path tests.
+/// `@unchecked Sendable` is sound here: every call runs on the MainActor (the
+/// view-model + its Tasks are MainActor-isolated, as is this @MainActor suite).
+private final class SpyRevoker: SiwaRevoking, @unchecked Sendable {
+    var exchangeReturn: String? = "rt-exchanged"
+    private(set) var exchangedCodes: [String] = []
+    private(set) var revokedTokens: [String] = []
+    var onExchange: (@Sendable (String) -> Void)?
+    var onRevoke: (@Sendable (String) -> Void)?
+
+    func exchange(authorizationCode: String) async throws -> String {
+        exchangedCodes.append(authorizationCode)
+        onExchange?(authorizationCode)
+        guard let token = exchangeReturn else { throw SiwaRevokeError.missingRefreshToken }
+        return token
+    }
+
+    func revoke(refreshToken: String) async throws {
+        revokedTokens.append(refreshToken)
+        onRevoke?(refreshToken)
+    }
 }

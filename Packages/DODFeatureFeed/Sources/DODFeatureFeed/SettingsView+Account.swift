@@ -75,7 +75,12 @@ struct AccountSection: View {
             viewModel.applySignIn(
                 userIdentifier: credential.user,
                 displayName: AppleCredentialResolver.displayName(from: credential.fullName),
-                email: credential.email
+                email: credential.email,
+                // The one-time authorization code — exchanged server-side for a
+                // refresh token so Delete Account can revoke it (DUT-98).
+                authorizationCode: credential.authorizationCode.flatMap {
+                    String(data: $0, encoding: .utf8)
+                }
             )
         }
         .signInWithAppleButtonStyle(.black)

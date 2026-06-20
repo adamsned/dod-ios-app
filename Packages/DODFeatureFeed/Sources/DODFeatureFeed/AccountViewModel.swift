@@ -2,17 +2,16 @@ import DODSupport
 import Foundation
 import Observation
 
-/// State + actions for the Settings → Account section (US-46 / DUT-16 Phase a,
-/// AC-46.2..46.4). Owns the on-device ``AppleAuthSession`` via an injected
+/// State + actions for the Settings → Account section (US-46, AC-46.2..46.6).
+/// Owns the on-device ``AppleAuthSession`` via an injected
 /// ``AppleAuthSessionStoring`` and turns a Sign in with Apple credential into a
-/// persisted session through the pure ``AppleCredentialResolver`` (so the
-/// first-auth name/email merge is unit-tested without `AuthenticationServices`).
+/// persisted session through the pure ``AppleCredentialResolver``.
 ///
-/// Guest mode (US-15) stays the default: a `nil` ``session`` means signed-out,
-/// and every other surface keeps working unchanged. Signing in only adds a
-/// durable identity for comments/ratings (and, in a later phase, cross-device
-/// state). The store is injected so the L1 suite drives an
-/// ``InMemoryAppleAuthSessionStore``.
+/// Guest mode (US-15) stays the default: a `nil` ``session`` means signed-out.
+/// When a ``SiwaRevoking`` revoker is configured (the DUT-98 Worker), sign-in
+/// also exchanges the authorization code for a **refresh token** (stored so
+/// account deletion can revoke it — App Store 5.1.1(v)). Both the store and the
+/// revoker are injected so the L1 suite drives fakes.
 @Observable
 @MainActor
 public final class AccountViewModel {
@@ -21,9 +20,21 @@ public final class AccountViewModel {
     public private(set) var session: AppleAuthSession?
 
     private let store: any AppleAuthSessionStoring
+    private let revoker: (any SiwaRevoking)?
 
-    public init(store: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore()) {
+    /// The default `revoker` is the production SiwA-revoke client **when the
+    /// Worker is configured** (DUT-98), else `nil` — so the app degrades
+    /// gracefully (sign-in works, no exchange/revoke) until the owner fills
+    /// `SiwaRevokeConfig.production` after `wrangler deploy`. Tests inject a fake
+    /// (or `nil`). The default references only public symbols so it's valid on a
+    /// public initializer.
+    public init(
+        store: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
+        revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
+            ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil
+    ) {
         self.store = store
+        self.revoker = revoker
         // Seed from the store so a returning user lands signed-in. `try?` —
         // a Keychain read failure degrades to signed-out (guest), never a crash.
         self.session = try? store.load()
@@ -31,34 +42,73 @@ public final class AccountViewModel {
 
     public var isSignedIn: Bool { session != nil }
 
-    /// Apply a fresh Sign in with Apple credential: resolve it against any
-    /// existing session (carrying the first-auth name/email forward for the
-    /// SAME Apple user via ``AppleCredentialResolver``), persist, and publish.
-    /// The view extracts `(user, fullName, email)` from the
-    /// `ASAuthorizationAppleIDCredential` and passes them here, so this method
-    /// is `AuthenticationServices`-free and fully testable.
-    public func applySignIn(userIdentifier: String, displayName: String?, email: String?) {
+    /// Apply a fresh Sign in with Apple credential: resolve name/email (carrying
+    /// the first-auth values forward for the same user via
+    /// ``AppleCredentialResolver``), persist, and publish **immediately** so
+    /// sign-in feels instant. When `authorizationCode` is present and a revoke
+    /// Worker is configured, the code is exchanged for a refresh token in the
+    /// background and merged in (AC-46.6). The view extracts `(user, fullName,
+    /// email, authorizationCode)` from the `ASAuthorizationAppleIDCredential`.
+    public func applySignIn(
+        userIdentifier: String,
+        displayName: String?,
+        email: String?,
+        authorizationCode: String? = nil
+    ) {
+        let existing = try? store.load()
         let resolved = AppleCredentialResolver.resolve(
             userIdentifier: userIdentifier,
             credentialDisplayName: displayName,
             credentialEmail: email,
-            existing: try? store.load()
+            existing: existing
         )
-        try? store.save(resolved)
-        session = (try? store.load()) ?? resolved
+        // Carry an existing refresh token forward for the same user until the
+        // exchange below yields a fresh one (a re-auth without a new code keeps
+        // the prior token so deletion can still revoke).
+        let carried = existing?.userIdentifier == userIdentifier ? existing?.refreshToken : nil
+        let initial = AppleAuthSession(
+            userIdentifier: resolved.userIdentifier,
+            displayName: resolved.displayName,
+            email: resolved.email,
+            refreshToken: carried
+        )
+        try? store.save(initial)
+        session = initial
+
+        guard let authorizationCode, let revoker else { return }
+        Task {
+            guard let token = try? await revoker.exchange(authorizationCode: authorizationCode)
+            else { return }
+            let updated = AppleAuthSession(
+                userIdentifier: initial.userIdentifier,
+                displayName: initial.displayName,
+                email: initial.email,
+                refreshToken: token
+            )
+            try? store.save(updated)
+            session = updated
+        }
     }
 
     /// AC-46.3 — Sign Out: clear the local session and fall back to guest mode.
+    /// (Sign out does NOT revoke — the user may sign back in; revocation is for
+    /// account *deletion*.)
     public func signOut() {
         try? store.clear()
         session = nil
     }
 
-    /// AC-46.3 — in-app Delete Account (App Store Guideline 5.1.1(v)). In Phase a
-    /// this clears the local session; a later phase also revokes the Apple token
-    /// (`ASAuthorizationAppleIDProvider`) and deletes the server-side record.
+    /// AC-46.6 — in-app Delete Account (App Store Guideline 5.1.1(v)). Clears
+    /// the local session immediately, then **revokes the Apple refresh token**
+    /// via the DUT-98 Worker (best-effort, fire-and-forget with the captured
+    /// token — a transient network failure still deletes locally; the token
+    /// also expires). When no token was exchanged (no Worker configured), this
+    /// is just the local clear.
     public func deleteAccount() {
+        let token = session?.refreshToken
         try? store.clear()
         session = nil
+        guard let token, let revoker else { return }
+        Task { try? await revoker.revoke(refreshToken: token) }
     }
 }
