@@ -2429,6 +2429,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `DODFeatureProfile/ChefHatAvatarGlyph.swift` (new), `DODFeatureProfile/InitialLetterAvatarView.swift` (placeholder branch + `noLetterPlaceholder` sentinel).
 - **AC:** AC-44.5 amended (no-letter fallback renders ChefHatAvatarGlyph) (CL-183 canonical). **Est:** ~60 min (incl. a reverted from-primitives first attempt, replaced by Spencer's design). **Deps:** main at T-786 (`c90b6a9`). Branch `feat/T-787-chef-profile-avatar`. **||:** P-profile. No `e2e` label - presentation glyph; iPad-Pro-11 sim verified (white chef-hat silhouette on orange, margin from edge). swift-format + SwiftLint clean; 9 InitialLetterAvatarViewTests pass (letter contract intact).
 
+### T-788 — DUT-95 Article published date: absolute date ("Published Jun 1, 2026") instead of relative "X ago" (US-37 amendment, CL-184)
+
+- **What:** (Ned's bug, DUT-95.) The article detail header showed "Published 4 days, 8 hr ago" (`style: .relative`). Render an absolute medium date instead: `ArticleDetailView.publishedDateCaption` now uses the view's existing medium `DateFormatter` (renamed `accessibilityDateFormatter` -> `publishedDateFormatter`) for the visible Text -> "Published Jun 1, 2026" (Spencer's format; medium, locale-aware). Visible text == VoiceOver label by construction, so the redundant `.accessibilityLabel` is dropped. Article-only (recipe detail / cards show no date; comment timestamps stay relative -> out of scope).
+- **Files:** `DODFeatureRecipeDetail/ArticleDetailView.swift` (caption + formatter rename/comment).
+- **AC:** AC-37.3 amended (article published date is an absolute medium date) (CL-184 canonical). **Est:** ~20 min (XS). **Deps:** main at T-787 (`3db7408`). Branch `feat/T-788-article-published-date-absolute`. **||:** P-content. No `e2e` label - presentation-only. swift-format + SwiftLint clean; package compiles; no test asserts the old relative string. **Snapshot:** `ArticleDetailViewSnapshotTests` has no committed baseline (the old relative date drifted, precluding one; UIKit-gated + absent from CI) — the fix makes the caption stable so a golden baseline is now possible (fast-follow).
+
 ---
 
 ## Summary
