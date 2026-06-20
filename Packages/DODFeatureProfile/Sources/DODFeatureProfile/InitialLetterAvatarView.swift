@@ -36,12 +36,25 @@ public struct InitialLetterAvatarView: View {
         Circle()
             .fill(DODColor.accent)
             .frame(width: diameter, height: diameter)
-            .overlay(
-                Text(Self.initialLetter(from: displayName))
-                    .font(.system(size: diameter * 0.45, weight: .semibold))
-                    .foregroundStyle(DODColor.labelOnAccent)
-            )
+            .overlay(placeholder)
             .accessibilityHidden(true)
+    }
+
+    /// The avatar foreground: the person's uppercase initial, or — when the
+    /// display name yields no letter (empty / emoji-only: the guest "Set Up
+    /// Your Profile" state) — Spencer's chef-hat person silhouette instead of a
+    /// bare "?", so the empty avatar carries the app's personality.
+    /// T-787 / CL-183 (DUT-93).
+    @ViewBuilder
+    private var placeholder: some View {
+        let initial = Self.initialLetter(from: displayName)
+        if initial == Self.noLetterPlaceholder {
+            ChefHatAvatarGlyph(diameter: diameter)
+        } else {
+            Text(initial)
+                .font(.system(size: diameter * 0.45, weight: .semibold))
+                .foregroundStyle(DODColor.labelOnAccent)
+        }
     }
 
     /// Returns the single uppercase initial for the given display name,
@@ -49,13 +62,19 @@ public struct InitialLetterAvatarView: View {
     /// Exposed `static` so the L1 test suite can pin the extraction
     /// rules (empty, two-word, emoji-prefix, all-emoji) without spinning
     /// up a view host.
+    /// Sentinel returned by ``initialLetter(from:)`` when the display name has
+    /// no letter to show. The view renders ``ChefHatAvatarGlyph`` in its place
+    /// (T-787); the value stays "?" so the documented extraction contract —
+    /// pinned by the L1 suite — is unchanged.
+    public static let noLetterPlaceholder = "?"
+
     public static func initialLetter(from displayName: String) -> String {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "?" }
+        guard !trimmed.isEmpty else { return noLetterPlaceholder }
         // First *letter* — skips emoji / punctuation / digits so a
         // leading 🌟 in "🌟 Spencer" still surfaces "S" rather than the
         // emoji.
-        guard let letter = trimmed.first(where: \.isLetter) else { return "?" }
+        guard let letter = trimmed.first(where: \.isLetter) else { return noLetterPlaceholder }
         return String(letter).uppercased()
     }
 }
