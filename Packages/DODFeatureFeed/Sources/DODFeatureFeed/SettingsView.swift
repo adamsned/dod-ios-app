@@ -98,10 +98,10 @@ public struct SettingsView: View {
             // sidebar via SidebarProfileRow); kept on iPhone.
             ProfileSettingsSection(viewModel: viewModel)
 
-            // T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`
-            // so the Settings cells render in the brand brown (matches the
-            // Recipe & Articles card surface) instead of the system default
-            // near-black `secondarySystemGroupedBackground` in dark mode.
+            // US-46 (T-794, DUT-16) — Account: Sign in with Apple (`SettingsView+Account.swift`).
+            AccountSection()
+
+            // T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`.
 
             // MARK: T-750 / CL-147 — Measurements & Units group
 

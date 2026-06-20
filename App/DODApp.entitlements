@@ -39,5 +39,24 @@
 	<array>
 		<string>group.com.dutchovendaddy.DODApp</string>
 	</array>
+	<!--
+	  Sign in with Apple capability (US-46 / DUT-16 Phase a). Required by App
+	  Store Review Guideline 4.8 once any third-party login ships, and the
+	  provider the login feature lands first. "Default" is the standard value
+	  Xcode's "Sign in with Apple" capability writes (a single primary Apple ID
+	  relationship, no app-group sharing of the credential).
+
+	  HARD PREREQUISITE (same shape as aps-environment above): the App ID
+	  com.dutchovendaddy.DODApp must have the "Sign in with Apple" capability
+	  enabled in the Apple Developer portal and the provisioning profile
+	  regenerated BEFORE a signed/CD build can carry this entitlement — automatic
+	  signing cannot provision it for an App ID that lacks the capability.
+	  Simulator (Debug) builds are unsigned and run without the provisioned
+	  capability, so local sim testing of the button works regardless.
+	-->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

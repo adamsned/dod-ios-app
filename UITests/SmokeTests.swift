@@ -429,4 +429,42 @@ final class SmokeTests: XCTestCase {
         // with the pinned URL) is covered at L1 per the doc comment above.
         shopRow.tap()
     }
+
+    /// US-46 / AC-46.2 (T-794, DUT-16 Phase a): the Settings → Account section
+    /// renders, and signed-out (the default) shows the Sign in with Apple
+    /// button. Runs on both iPhone and iPad in CI (and locally) — the section
+    /// is at the top of Settings, so it's visible without scrolling on either.
+    ///
+    /// The credential→session merge is unit-tested (AccountViewModelTests /
+    /// AppleCredentialResolverTests); the interactive Apple sheet itself needs
+    /// a device signed into an Apple ID and is verified manually. This guards
+    /// the contract XCUITest can: the section + button are present.
+    func test_settingsAccountSectionIsPresent() {
+        // Device-agnostic: iPhone uses a bottom tab bar, iPad a sidebar
+        // (NavigationSplitView, US-38 / DUT-89) — both surface the Settings
+        // gear, so wait for the gear directly rather than a tab bar (which
+        // doesn't exist on iPad). This makes the test pass on iPhone + iPad.
+        let settingsButton = app.buttons["Settings"]
+        XCTAssertTrue(
+            settingsButton.waitForExistence(timeout: 12),
+            "Settings gear should be visible (iPhone tab nav or iPad sidebar)"
+        )
+        settingsButton.tap()
+
+        // The Account section header (US-46) sits at the top of Settings.
+        XCTAssertTrue(
+            app.staticTexts["Account"].waitForExistence(timeout: 5),
+            "Settings should expose the Account section (US-46)"
+        )
+
+        // Signed out by default → the Sign in with Apple button is present.
+        // `SignInWithAppleButton` may surface the system label instead of our
+        // accessibility identifier, so accept either as evidence it rendered.
+        let byID = app.buttons["settings-button-sign-in-apple"]
+        let byLabel = app.buttons["Sign in with Apple"]
+        XCTAssertTrue(
+            byID.waitForExistence(timeout: 3) || byLabel.waitForExistence(timeout: 3),
+            "Signed-out Account section should show the Sign in with Apple button"
+        )
+    }
 }
