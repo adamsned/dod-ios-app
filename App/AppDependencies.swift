@@ -36,7 +36,10 @@ final class AppDependencies {
     /// scheduling the (DEBUG) test affordance fires. No APNs / no server.
     let notificationService: NotificationService
 
-    private let restClient: WPRestClient
+    // Module-internal (was `private`) so the article/slug-resolution helpers
+    // extracted to `AppDependencies+RecipeResolution.swift` (T-791 file-length
+    // trim) can reach the REST client.
+    let restClient: WPRestClient
     private let pageFetcher: RecipePageFetcher
     private let imageLoader: ImageLoader
     private let networkMonitor: NetworkMonitor
@@ -64,8 +67,31 @@ final class AppDependencies {
     /// schema — is fixed and the app relaunches.
     private let usedCloudKitFallback: Bool
 
+    /// `true` when the DUT-78 self-heal escape hatch tripped this launch:
+    /// the app had crash-looped, so we force-opened a local container and
+    /// cleared the opt-in flag. Surfaced once in `bootstrap()` so a device
+    /// log shows the recovery happened.
+    private let didSelfHeal: Bool
+
+    /// The DUT-78 self-heal escape hatch. Records "a launch started but isn't
+    /// yet healthy" at the very start of `init()`; `bootstrap()` calls
+    /// ``LaunchHealthTracker/markLaunchHealthy()`` once the app is up. A launch
+    /// that crashes in between (e.g. the async CloudKit mirroring trap) leaves
+    /// the counter incremented, so after a few crash-looping launches the
+    /// container build force-opens local and we clear the opt-in flag.
+    private let launchHealth = LaunchHealthTracker()
+
+    private let usedInMemoryStore: Bool
+
     init() {
         var fellBackToLocal = false
+        var healed = false
+        var inMemory = false
+        // DUT-78 self-heal: stamp this launch as "started, not yet healthy"
+        // BEFORE building any SwiftData/CloudKit container, so a launch that
+        // traps in async CloudKit mirroring is counted. `bootstrap()` resets
+        // the counter once the app is on screen.
+        launchHealth.recordLaunchStarted()
         do {
             // L3 isolation hook: `-DODUseInMemoryStore` gives each UI-test
             // launch a clean, empty SwiftData store so saved recipes don't
@@ -74,20 +100,34 @@ final class AppDependencies {
             // in production — the app always uses the on-disk container.
             if ProcessInfo.processInfo.arguments.contains("-DODUseInMemoryStore") {
                 self.modelContainer = try RecipeStore.inMemoryContainer()
+                inMemory = true
             } else {
-                // DUT-6: build the container to match the persisted opt-in
-                // flag (the single source of truth, read at launch) WITH the
-                // DOD-CRASH-1 safety net. If sync is ON but the CloudKit
-                // `.private` open throws (e.g. the Production schema was never
-                // deployed), `productionContainer(defaults:)` falls back to a
-                // plain local container instead of throwing — so the app
-                // launches cleanly rather than crash-looping the way build 3
-                // did. A plain opt-out container that fails to open is still a
-                // real migration error and surfaces via the `fatalError`
-                // below (MIGRATION.md discipline rule 4).
-                let result = try RecipeStore.productionContainer(defaults: .standard)
+                // DUT-6 + DUT-78: build the container for the persisted opt-in
+                // flag with three layered safety nets: (1) DOD-CRASH-1 wraps
+                // the synchronous `.private` open in do/catch; (2) the DUT-78
+                // pre-open account-status guard passes the status the previous
+                // launch's `bootstrap()` probe cached (the build is sync, the
+                // probe async), so a non-`.available` account opens local
+                // instead of `.private(...)` — dodging the async
+                // `com.apple.coredata.cloudkit.queue` trap that fires AFTER the
+                // synchronous open returns and so escapes net #1; (3) the
+                // DUT-78 self-heal escape hatch (`launchHealth`) forces local +
+                // clears the opt-in flag below after repeated crash-loops.
+                let result = try RecipeStore.productionContainer(
+                    defaults: .standard,
+                    accountStatus: CloudKitAvailability.cachedAccountStatus(in: .standard),
+                    launchHealth: launchHealth
+                )
                 self.modelContainer = result.container
                 fellBackToLocal = result.usedCloudKitFallback
+                healed = result.didSelfHeal
+                if result.didSelfHeal {
+                    // DUT-78: crash-looped → force-opened local. Clear the
+                    // opt-in flag so the NEXT launch opens local cleanly (no
+                    // probe, no `.private`) without re-tripping the heal; the
+                    // user re-enables sync from Settings once iCloud is fixed.
+                    UserDefaults.standard.set(false, forKey: RecipeStore.cloudKitSyncOptInKey)
+                }
             }
         } catch {
             // Schema migration failure must surface to the user (MIGRATION.md
@@ -96,6 +136,8 @@ final class AppDependencies {
             fatalError("SwiftData migration failed: \(error)")
         }
         self.usedCloudKitFallback = fellBackToLocal
+        self.didSelfHeal = healed
+        self.usedInMemoryStore = inMemory
         self.store = RecipeStore(modelContainer: modelContainer)
         self.restClient = WPRestClient()
         self.pageFetcher = RecipePageFetcher()
@@ -125,6 +167,12 @@ final class AppDependencies {
 
     /// Called once from `@main` at app launch.
     func bootstrap() async {
+        // DUT-78 self-heal: reaching `bootstrap()` means the app survived the
+        // synchronous container build and the scene is up — well past the
+        // window in which the async CloudKit mirroring trap fires. Reset the
+        // consecutive-unhealthy-launch counter so a single later unrelated
+        // crash doesn't accumulate toward the self-heal threshold.
+        launchHealth.markLaunchHealthy()
         await networkMonitor.start()
         // TelemetryDeck app ID lives in DODApp.xcconfig (gitignored per
         // constitution §9). For v1 we read from Info.plist; if unset we
@@ -143,6 +191,17 @@ final class AppDependencies {
         // opt-in (so the synced store is already seeded if the user opts in
         // later) and exactly once (see `backfillSyncedSavedIfNeeded`).
         await backfillSyncedSavedIfNeeded()
+        // DUT-78: if the self-heal escape hatch tripped, surface it once for
+        // the device log (the opt-in flag was force-cleared in `init`).
+        if didSelfHeal {
+            cloudKitDiagnostics.markContainerOpenFailed()
+            // Single string literal: `os.Logger` needs an `OSLogMessage` (a `+`-concatenated `String` won't convert) and a static literal logs unredacted.
+            DODLog.app.error(
+                "CloudKit sync self-healed (DUT-78): app had crash-looped, so sync was force-disabled and a local-only store opened. Re-enable from Settings once iCloud is signed in / the schema is deployed."
+            )
+        }
+        // The in-memory UI-test store never engages CloudKit — skip the block.
+        guard !usedInMemoryStore else { return }
         // US-41 / AC-41.1 (T-702): conditional CloudKit availability
         // check. Only fires when the user has opted into iCloud sync via
         // T-703's Settings toggle or T-704's first-launch sheet —
@@ -173,37 +232,17 @@ final class AppDependencies {
                 // as a real error instead of letting the Settings row read a
                 // falsely-healthy "Idle".
                 cloudKitDiagnostics.markContainerOpenFailed()
+                // DUT-78: a previously-CloudKit store is now TAINTED — Core
+                // Data stamped it for mirroring, so even a `.none` reopen can
+                // re-trigger it. Log so a device follow-up can decide on a
+                // clean store rebuild.
+                if RecipeStore.cloudKitStoreEverOpened(in: .standard) {
+                    DODLog.app.error(
+                        "DUT-78: synced store likely tainted (was CloudKit-backed); a `.none` reopen can still re-trigger mirroring."
+                    )
+                }
             }
             await checkCloudKitAvailability()
-        }
-    }
-
-    /// US-41 / AC-41.1 + AC-41.7 / REG-25 + REG-26 (T-702). Probe the
-    /// user's iCloud account status so subsequent sync attempts know
-    /// whether to proceed (`.available`) or pause with a status sublabel
-    /// (`.noAccount` / `.restricted` / `.couldNotDetermine` — T-705 owns
-    /// the sublabel surface). Per AC-41.1 the app **must not crash** when
-    /// the account is unavailable — we log + continue, and the existing
-    /// SwiftData store keeps working unchanged on the AC-41.1 fallback
-    /// path.
-    ///
-    /// Surface trace (REG-25): the only `CKContainer` APIs this method
-    /// touches are the initializer + `accountStatus()`. No
-    /// `publicCloudDatabase` / `sharedCloudDatabase` / `discoverUserIdentity`
-    /// surface reference exists in the entire app per the REG-25 contract.
-    private func checkCloudKitAvailability() async {
-        let container = CKContainer(
-            identifier: RecipeStore.cloudKitContainerIdentifier
-        )
-        do {
-            let status = try await container.accountStatus()
-            DODLog.app.info(
-                "CloudKit account status: \(String(describing: status))"
-            )
-        } catch {
-            DODLog.app.notice(
-                "CloudKit availability check failed: \(error.localizedDescription)"
-            )
         }
     }
 
@@ -355,40 +394,5 @@ final class AppDependencies {
                 MainActor.assumeIsolated { diagnostics.latestStatus }
             }
         )
-    }
-
-    /// Fetch a single post (by WP id) from the live REST API and project it
-    /// to a ``RecipeListItem``. Backs the notification deep-link fetch-on-
-    /// cache-miss path (T-632 / REG-20 / CL-101): a notification targets a
-    /// brand-new post that is never cached, so `RootView.resolveRecipeRoute`
-    /// calls this when `store.recipeWithoutTouching(id:)` misses, then routes
-    /// to recipe-detail (which runs the JSON-LD parse / article
-    /// classification to resolve recipe-vs-article per AC-4.11 / AC-37.2).
-    func fetchListItem(forPostID id: Int) async throws -> RecipeListItem {
-        try await restClient.post(id: id)
-    }
-
-    /// Resolve a tapped article link (a `dutchovendaddy.com` canonical URL) to
-    /// a ``RecipeListItem`` by its slug — backs the in-app article recipe-link
-    /// deep-link (DOD-ART-2). Returns `nil` for an off-site URL, or a
-    /// `dutchovendaddy.com` URL whose slug matches no recipe/article post (a WP
-    /// *page* like `/about-me/`), so `RootView` falls back to the browser.
-    /// Best-effort: a network failure also yields `nil`.
-    func resolveRecipe(forArticleLink url: URL) async -> RecipeListItem? {
-        guard let slug = Self.recipeSlug(fromDODURL: url) else { return nil }
-        return try? await restClient.post(slug: slug)
-    }
-
-    /// Extract the post slug from a `https://(www.)dutchovendaddy.com/<slug>/`
-    /// permalink (DOD uses flat `/<slug>/` permalinks), or `nil` for any other
-    /// host. The slug is the first non-empty path component.
-    static func recipeSlug(fromDODURL url: URL) -> String? {
-        guard
-            let host = url.host()?.lowercased(),
-            host == "dutchovendaddy.com" || host == "www.dutchovendaddy.com"
-        else {
-            return nil
-        }
-        return url.pathComponents.first { $0 != "/" && !$0.isEmpty }
     }
 }
