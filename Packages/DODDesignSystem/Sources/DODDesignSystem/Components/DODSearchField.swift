@@ -4,15 +4,13 @@ import SwiftUI
 /// `Capsule(style: .continuous)` shape with a leading `magnifyingglass`
 /// glyph, a `TextField` body, and an optional trailing clear button.
 ///
-/// Two call sites — both adopted by T-648 / CL-126 / REG-32 so the Search
-/// tab and the Categories tab share a single search-bar visual language:
+/// Adopted by T-648 / CL-126 / REG-32 to unify the app's search-bar visual
+/// language. Originally two call sites (Search + the Categories tab); since
+/// T-800 (CL-194) folded the Categories tab into Search, the sole remaining
+/// call site is:
 ///
 /// 1. `Packages/DODFeatureSearch/Sources/DODFeatureSearch/SearchView.swift`
 ///    (replaces the inline `searchField` `HStack`-with-`RoundedRectangle`).
-/// 2. `Packages/DODFeatureCategories/Sources/DODFeatureCategories/CategoryListView.swift`
-///    (replaces the `.searchable(text:placement:.navigationBarDrawer(...))`
-///    modifier; the field now sits as a sticky element above the List,
-///    which is the deliberate trade for matching Search's visual).
 ///
 /// Public API: `init(text:placeholder:onClear:onFocusChange:)`.
 /// When `onClear` is `nil`, the clear button just empties the bound text;

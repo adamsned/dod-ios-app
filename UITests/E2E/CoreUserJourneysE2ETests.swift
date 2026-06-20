@@ -87,16 +87,16 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8), "Tab bar should appear")
 
-        // Switch to Search tab. Index 3 matches the AC-16.6 contract
-        // (Recipes / Categories / Saved / Search). `tabBar.buttons["Search"]`
-        // is the equivalent name-based lookup but the iOS 26 sim
-        // occasionally reports a `{-1, -1}` hit point for tab buttons
-        // queried by label when the simulator process is under load;
-        // index-based lookup avoids that quirk and matches the
+        // Switch to Search tab. Index 2 matches the AC-16.6 contract
+        // (Recipes / Saved / Search — the Categories tab was removed in
+        // T-800). `tabBar.buttons["Search"]` is the equivalent name-based
+        // lookup but the iOS 26 sim occasionally reports a `{-1, -1}` hit
+        // point for tab buttons queried by label when the simulator process
+        // is under load; index-based lookup avoids that quirk and matches the
         // `SmokeTests.test_tabBarOrderMatchesSpec` pattern.
         let tabButtons = tabBar.buttons.allElementsBoundByIndex
-        XCTAssertEqual(tabButtons.count, 4, "Expected exactly 4 top-level tabs")
-        tabButtons[3].tap()
+        XCTAssertEqual(tabButtons.count, 3, "Expected exactly 3 top-level tabs")
+        tabButtons[2].tap()
 
         let searchField = app.textFields["Search recipes"]
         XCTAssertTrue(

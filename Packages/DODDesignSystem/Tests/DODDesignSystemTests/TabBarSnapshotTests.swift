@@ -17,7 +17,7 @@ import XCTest
 ///
 /// The renderer is a local fixture (`TabBarFixture`) that mirrors the
 /// shipping `AppTab` order / labels / icons. The DesignSystem package
-/// can't `@testable import DODApp`, so the four tabs are re-declared
+/// can't `@testable import DODApp`, so the three tabs are re-declared
 /// here. Drift between the fixture and the real enum is guarded two
 /// ways:
 ///   1. `DODAppUnitTests/AppTabTests` pins the App-side data.
@@ -40,9 +40,6 @@ final class TabBarSnapshotTests: XCTestCase {
     func test_tabBar_feedSelected_light_iPhone13() {
         assertTabBarSnapshot(selected: .feed, device: .iPhone13)
     }
-    func test_tabBar_categoriesSelected_light_iPhone13() {
-        assertTabBarSnapshot(selected: .categories, device: .iPhone13)
-    }
     func test_tabBar_savedSelected_light_iPhone13() {
         assertTabBarSnapshot(selected: .saved, device: .iPhone13)
     }
@@ -54,9 +51,6 @@ final class TabBarSnapshotTests: XCTestCase {
 
     func test_tabBar_feedSelected_light_iPad129() {
         assertTabBarSnapshot(selected: .feed, device: .iPad129)
-    }
-    func test_tabBar_categoriesSelected_light_iPad129() {
-        assertTabBarSnapshot(selected: .categories, device: .iPad129)
     }
     func test_tabBar_savedSelected_light_iPad129() {
         assertTabBarSnapshot(selected: .saved, device: .iPad129)
@@ -118,12 +112,11 @@ final class TabBarSnapshotTests: XCTestCase {
 private struct TabBarFixture: View {
 
     enum Tab: Hashable, CaseIterable {
-        case feed, categories, saved, search
+        case feed, saved, search
 
         var title: String {
             switch self {
             case .feed: "Recipes"
-            case .categories: "Categories"
             case .saved: "Saved"
             case .search: "Search"
             }
@@ -132,7 +125,6 @@ private struct TabBarFixture: View {
         var systemImage: String {
             switch self {
             case .feed: "house"
-            case .categories: "square.grid.2x2"
             case .saved: "bookmark"
             case .search: "magnifyingglass"
             }
