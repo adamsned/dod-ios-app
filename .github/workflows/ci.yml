@@ -36,9 +36,9 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       ios_sim: ${{ steps.filter.outputs.ios_sim }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           # `code` triggers lint/format/L1. `ios_sim` triggers the
           # heavy iOS-Simulator jobs (snapshot, build, UI smoke).
@@ -76,7 +76,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # Warm Homebrew so `brew install` below skips the bottle download.
       # Cache ONLY Homebrew's download cache — NOT the tool keg
       # (/opt/homebrew/Cellar/...). Caching the keg made `brew install` see
@@ -86,7 +86,7 @@ jobs:
       # links the tool (fast, since the bottle is pre-downloaded). Keys are
       # at -v2 to bypass the poisoned -v1 caches that still hold a keg.
       - name: Cache Homebrew (swiftlint)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/Homebrew/downloads
           key: ${{ runner.os }}-brew-swiftlint-v2
@@ -102,13 +102,13 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # See the lint job for why we cache downloads only, not the keg.
       # swift-format ships no prebuilt macOS release artifact (Apple
       # publishes source-only tags), so caching the Homebrew bottle
       # download is the reliable way to make this install warm.
       - name: Cache Homebrew (swift-format)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/Homebrew/downloads
           key: ${{ runner.os }}-brew-swift-format-v2
@@ -130,7 +130,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
         # All packages declare swift-tools-version: 6.0. The macos-15
         # runner's default Xcode is 16.4; we pin the newest Xcode 26 so the
@@ -149,7 +149,7 @@ jobs:
       # restore-keys fallback warms most of the build on a near-miss (e.g.
       # one manifest changed). A miss still does a correct cold build.
       - name: Cache SPM build outputs
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             Packages/*/.build
@@ -179,7 +179,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       # Cache the SwiftPM packages xcodebuild resolves into DerivedData so
@@ -191,7 +191,7 @@ jobs:
       # Keyed on the manifest hash; restore-keys warms near-misses; a miss
       # cold-resolves exactly like today.
       - name: Cache SPM (DerivedData SourcePackages)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Developer/Xcode/DerivedData/DODDesignSystem-cache/SourcePackages
           key: ${{ runner.os }}-xcode26-srcpkgs-designsystem-${{ hashFiles('Packages/*/Package.swift') }}
@@ -217,7 +217,7 @@ jobs:
             test | xcpretty
       - name: Upload snapshot diffs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: snapshot-diffs
           path: Packages/DODDesignSystem/Tests/DODDesignSystemTests/__Snapshots__/
@@ -229,12 +229,12 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       # Warm Homebrew for xcodegen (HIT relinks in seconds, MISS cold-installs).
       - name: Cache Homebrew (xcodegen)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/Homebrew/downloads
           key: ${{ runner.os }}-brew-xcodegen-v2
@@ -244,7 +244,7 @@ jobs:
       # app's packages (TelemetryDeck SwiftSDK, swift-snapshot-testing, ...)
       # are not re-cloned + re-resolved every run. Keyed on the manifest hash.
       - name: Cache SPM (DerivedData SourcePackages)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: DerivedData/SourcePackages
           key: ${{ runner.os }}-xcode26-srcpkgs-app-${{ hashFiles('Packages/*/Package.swift') }}
@@ -263,7 +263,7 @@ jobs:
       # exactly like a local incremental build (which is how dev works). A
       # full miss is identical to today's cold build.
       - name: Cache DerivedData (incremental app build)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: DerivedData/Build
           key: ${{ runner.os }}-xcode26-derived-app-${{ hashFiles('project.yml', 'App/**', 'Packages/**/Sources/**', 'Packages/*/Package.swift') }}
@@ -299,16 +299,16 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Cache Homebrew (xcodegen)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/Homebrew/downloads
           key: ${{ runner.os }}-brew-xcodegen-v2
       - name: Cache SPM (DerivedData SourcePackages)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: DerivedData/SourcePackages
           key: ${{ runner.os }}-xcode26-srcpkgs-app-${{ hashFiles('Packages/*/Package.swift') }}
@@ -342,16 +342,16 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Cache Homebrew (xcodegen)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/Homebrew/downloads
           key: ${{ runner.os }}-brew-xcodegen-v2
       - name: Cache SPM (DerivedData SourcePackages)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: DerivedData/SourcePackages
           key: ${{ runner.os }}-xcode26-srcpkgs-app-${{ hashFiles('Packages/*/Package.swift') }}
@@ -412,7 +412,7 @@ jobs:
           exit 1
       - name: Upload UI test artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ui-test-results
           path: DerivedData/Logs/Test/*.xcresult
@@ -440,16 +440,16 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: Cache Homebrew (xcodegen)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/Homebrew/downloads
           key: ${{ runner.os }}-brew-xcodegen-v2
       - name: Cache SPM (DerivedData SourcePackages)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: DerivedData/SourcePackages
           key: ${{ runner.os }}-xcode26-srcpkgs-app-${{ hashFiles('Packages/*/Package.swift') }}
@@ -476,7 +476,7 @@ jobs:
             test | xcpretty
       - name: Upload E2E artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-test-results
           path: DerivedData/Logs/Test/*.xcresult
@@ -548,7 +548,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: File rollup bug in Linear
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}

@@ -60,7 +60,7 @@ jobs:
       API_PRIVATE_KEYS_DIR: ${{ github.workspace }}/private_keys
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Mirror ci.yml exactly: GitHub does not ship a bare Xcode_26.app
       # symlink, so glob the versioned 26.x apps and pick the newest.
@@ -308,7 +308,7 @@ jobs:
       # Always keep the build artifact even on a dry run / upload failure so a
       # human can upload it from Transporter as a fallback.
       - name: Upload .ipa as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: DODApp-ipa-${{ steps.buildnum.outputs.build_number }}
           path: ${{ steps.ipa.outputs.ipa_path }}
