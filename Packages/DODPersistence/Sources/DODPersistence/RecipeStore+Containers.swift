@@ -81,10 +81,33 @@ extension RecipeStore {
     /// crash.
     public struct ContainerBuildResult {
         public let container: ModelContainer
-        /// `true` when the opt-in flag was ON but the CloudKit-backed
-        /// `.private` open threw, so we fell back to a plain local
-        /// container. `false` on the normal opt-in or opt-out paths.
+        /// `true` when the opt-in flag was ON but we did **not** open
+        /// CloudKit-backed and instead opened a plain local container — either
+        /// because the synchronous `.private` open threw (the original
+        /// DOD-CRASH-1 catch), the pre-open account-status probe said the
+        /// account wasn't `.available` (DUT-78 async-trap avoidance), or the
+        /// self-heal escape hatch tripped after repeated crash-looping
+        /// launches (DUT-78). `false` on the normal opt-in success or any
+        /// opt-out path.
         public let usedCloudKitFallback: Bool
+
+        /// `true` when the self-heal escape hatch (``LaunchHealthTracker``)
+        /// force-opened local this launch after ``LaunchHealthTracker/
+        /// unhealthyLaunchLimit`` consecutive unhealthy launches, even though
+        /// the opt-in flag was ON (DUT-78). The host force-clears the opt-in
+        /// flag in this case so the app stays launchable on the *next* launch
+        /// without re-tripping the heal. Implies ``usedCloudKitFallback``.
+        public var didSelfHeal: Bool = false
+
+        public init(
+            container: ModelContainer,
+            usedCloudKitFallback: Bool,
+            didSelfHeal: Bool = false
+        ) {
+            self.container = container
+            self.usedCloudKitFallback = usedCloudKitFallback
+            self.didSelfHeal = didSelfHeal
+        }
     }
 
     /// Build the production container for the *current persisted opt-in
@@ -119,41 +142,18 @@ extension RecipeStore {
         defaults: UserDefaults,
         inMemory: Bool = false
     ) throws -> ContainerBuildResult {
-        let schema = Schema(SchemaV5.models)
-        // DUT-35: the six cache models are local-only; ONLY `SyncedSavedRecipe`
-        // is a CloudKit-mirror candidate. Both stores live in the same
-        // container, so the `@ModelActor`'s single `ModelContext` reaches both.
-        let local = localCacheConfiguration(inMemory: inMemory)
-        guard cloudKitSyncOptIn(in: defaults) else {
-            // Opt-out: both stores local. A failure here is a real
-            // migration error and must propagate.
-            let container = try ModelContainer(
-                for: schema,
-                migrationPlan: inMemory ? nil : MigrationPlan.self,
-                configurations: local,
-                syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)
-            )
-            return ContainerBuildResult(container: container, usedCloudKitFallback: false)
-        }
-        // Opt-in: mirror ONLY the synced store to the CloudKit private DB,
-        // falling back to an all-local layout if the `.private` open throws.
-        return try buildCloudKitWithFallback(
-            cloudKitBuild: {
-                try ModelContainer(
-                    for: schema,
-                    migrationPlan: inMemory ? nil : MigrationPlan.self,
-                    configurations: local,
-                    syncedSavedConfiguration(inMemory: inMemory, cloudKit: true)
-                )
-            },
-            localBuild: {
-                try ModelContainer(
-                    for: schema,
-                    migrationPlan: inMemory ? nil : MigrationPlan.self,
-                    configurations: local,
-                    syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)
-                )
-            }
+        // Back-compat seam: the original DUT-6 entry point with neither the
+        // pre-open account-status probe nor the self-heal escape hatch. The
+        // launch path now calls the richer `productionContainer(defaults:
+        // accountStatus:launchHealth:inMemory:)` overload below; this thin
+        // wrapper keeps existing callers + L1 tests building unchanged by
+        // passing decision inputs that match the pre-DUT-78 behavior (no
+        // probe ⇒ attempt CloudKit on opt-in; no tracker ⇒ never self-heal).
+        try productionContainer(
+            defaults: defaults,
+            accountStatus: nil,
+            launchHealth: nil,
+            inMemory: inMemory
         )
     }
 
@@ -188,7 +188,11 @@ extension RecipeStore {
     /// explicit (not cosmetic): SwiftData's default `.automatic` auto-enables
     /// CloudKit whenever the app's iCloud entitlement is present, so the
     /// explicit `.none` is what keeps these six models genuinely on-device.
-    private static func localCacheConfiguration(inMemory: Bool) -> ModelConfiguration {
+    ///
+    /// Relaxed from `private` to module-internal so the DUT-78 self-heal
+    /// extension (`RecipeStore+CloudKitSelfHeal.swift`) can build the same
+    /// two-store topology.
+    static func localCacheConfiguration(inMemory: Bool) -> ModelConfiguration {
         ModelConfiguration(
             schema: Schema(SchemaV5.localModels),
             isStoredInMemoryOnly: inMemory,
@@ -202,7 +206,10 @@ extension RecipeStore {
     /// is true (the opt-in path); `.none` otherwise — the opt-out path, the
     /// DOD-CRASH-1 fallback, and every in-memory test. This is the ONLY store
     /// that ever leaves the device (DUT-35 / DUT-6).
-    private static func syncedSavedConfiguration(
+    ///
+    /// Module-internal (was `private`) so the DUT-78 self-heal extension can
+    /// build the synced sub-store with the same `.private` / `.none` contract.
+    static func syncedSavedConfiguration(
         inMemory: Bool,
         cloudKit: Bool
     ) -> ModelConfiguration {
