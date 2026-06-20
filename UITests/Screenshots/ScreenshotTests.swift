@@ -375,7 +375,7 @@ final class ScreenshotTests: XCTestCase {
     /// multiple results.
     private func captureSearch() throws {
         switchToTab(short: "Search")
-        let searchField = app.textFields["Search recipes"]
+        let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 5),
             "Search field should appear after switching to Search tab"

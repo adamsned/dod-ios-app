@@ -48,7 +48,7 @@ public struct SearchView: View {
             // debounce-cancel cleanup, not just the query-string clear.
             DODSearchField(
                 text: $viewModel.query,
-                placeholder: "Search recipes",
+                placeholder: "Search Recipes",
                 onClear: { viewModel.clear() },
                 // T-779 / DUT-85: record a Recent on keyboard dismissal (focus
                 // loss), not on every live debounced search.
