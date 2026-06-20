@@ -20,15 +20,20 @@ public struct SearchView: View {
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
     /// `FeedView.onSave` for the contract; same shape applied to search hits.
     public let onSave: ((RecipeListItem) -> Void)?
+    /// T-799 / CL-193 — browse-category tap → host pushes the category's
+    /// recipes. Defaulted no-op; `TabStack` wires `path.append(.category)`.
+    public let onSelectCategory: (DODDomain.Category) -> Void
 
     public init(
         viewModel: SearchViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
-        onSave: ((RecipeListItem) -> Void)? = nil
+        onSave: ((RecipeListItem) -> Void)? = nil,
+        onSelectCategory: @escaping (DODDomain.Category) -> Void = { _ in }
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
+        self.onSelectCategory = onSelectCategory
     }
 
     public var body: some View {
@@ -188,7 +193,10 @@ public struct SearchView: View {
                 },
                 onClearRecents: { viewModel.clearRecentSearches() },
                 // US-33 / AC-33.3 / CL-57: per-term context-menu Clear.
-                onRemoveRecent: { viewModel.removeRecentSearch($0) }
+                onRemoveRecent: { viewModel.removeRecentSearch($0) },
+                // T-799 / CL-193: browse-categories list + tap handler.
+                categories: viewModel.browseCategories,
+                onCategorySelect: onSelectCategory
             )
         case .searching:
             ProgressView()

@@ -23,9 +23,18 @@ struct IdleSuggestionsView: View {
     let onClearRecents: () -> Void
     /// US-33 / AC-33.3 / CL-57: per-term context-menu removal.
     let onRemoveRecent: (String) -> Void
+    /// T-799 / CL-193 (DUT-112) — browse list for the new "Categories"
+    /// section below the "Try" chips. Different job from the chips, which
+    /// run an exact search: each row opens a broad topic's recipes. Empty
+    /// until `loadCategoriesIfNeeded()` resolves; the section hides while
+    /// empty so the idle view never shows a bare "Categories" header.
+    let categories: [DODDomain.Category]
+    /// Tap a category row → push that category's recipe list
+    /// (`CategoryRecipesView`); `TabStack` wires it to `path.append(.category)`.
+    let onCategorySelect: (DODDomain.Category) -> Void
 
     var body: some View {
-        if recents.isEmpty && topCategories.isEmpty {
+        if recents.isEmpty && topCategories.isEmpty && categories.isEmpty {
             EmptyState(
                 systemImage: "magnifyingglass",
                 title: "Find a recipe",
@@ -73,6 +82,12 @@ struct IdleSuggestionsView: View {
                             }
                         }
                     }
+                    if !categories.isEmpty {
+                        // T-799 / CL-193: browse list sits BELOW "Try". The
+                        // chips above suggest exact searches; these rows open
+                        // a broad topic (US-16 folded into Search, US-12).
+                        categoriesSection
+                    }
                 }
                 .padding(DODSpacing.md)
             }
@@ -116,6 +131,65 @@ struct IdleSuggestionsView: View {
                 }
             }
         }
+    }
+
+    /// US-16 / CL-193 (T-799) — "Categories" browse list merged into the
+    /// Search idle view below the "Try" chips. Tappable rows (name · recipe
+    /// count · chevron) in the brand `surfaceElevated` card. Treatment
+    /// mirrors the Categories-tab `categoryCard` (T-647 brand surface /
+    /// T-781 rounded card; that tab retires in T-800) so the merge reads as
+    /// a move, not a redesign. Distinct from "Try": chips fire an exact
+    /// search, a row browses a broad pocket of one topic.
+    private var categoriesSection: some View {
+        section(title: "Categories") {
+            VStack(spacing: 0) {
+                ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
+                    categoryRow(category)
+                        .padding(.horizontal, DODSpacing.md)
+                        .padding(.vertical, DODSpacing.sm)
+                    if index < categories.count - 1 {
+                        Divider()
+                            .overlay(DODColor.surfaceDivider)
+                            .padding(.leading, DODSpacing.md)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                    .fill(DODColor.surfaceElevated)
+            )
+        }
+    }
+
+    /// One browse row: category name + recipe count + disclosure chevron.
+    /// Mirrors `CategoryListView.categoryRow` (same stock-cell shape) so the
+    /// retired tab's muscle memory carries over. Host owns navigation via
+    /// `onCategorySelect`, so this is a plain `Button`, not a `NavigationLink`.
+    private func categoryRow(_ category: DODDomain.Category) -> some View {
+        Button {
+            onCategorySelect(category)
+        } label: {
+            HStack(spacing: DODSpacing.sm) {
+                Text(category.name)
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                Spacer(minLength: DODSpacing.xs)
+                Text("\(category.count)")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .monospacedDigit()
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(category.name), \(category.count) recipes")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("dod.search.categoryRow")
     }
 
     private func section<Content: View>(
