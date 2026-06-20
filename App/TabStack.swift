@@ -95,7 +95,13 @@ struct TabStack: View {
                             publisher: dependencies.savedWidgetPublisher()
                         )
                     }
-                }
+                },
+                // T-799 / CL-193 (DUT-112): browse-category tap → push the
+                // category's recipes. `.category` resolves via the shared
+                // `navigationDestination(for: RecipeRoute.self)` →
+                // `CategoryRecipesView`, the same destination the Categories
+                // tab used (that tab retires in T-800 / Phase 2).
+                onSelectCategory: { category in path.append(.category(category)) }
             )
             .modifier(settingsToolbar(identifierStem: "search"))
         case .saved:
