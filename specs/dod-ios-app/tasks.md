@@ -2435,6 +2435,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `DODFeatureRecipeDetail/ArticleDetailView.swift` (caption + formatter rename/comment).
 - **AC:** AC-37.3 amended (article published date is an absolute medium date) (CL-184 canonical). **Est:** ~20 min (XS). **Deps:** main at T-787 (`3db7408`). Branch `feat/T-788-article-published-date-absolute`. **||:** P-content. No `e2e` label - presentation-only. swift-format + SwiftLint clean; package compiles; no test asserts the old relative string. **Snapshot:** `ArticleDetailViewSnapshotTests` has no committed baseline (the old relative date drifted, precluding one; UIKit-gated + absent from CI) — the fix makes the caption stable so a golden baseline is now possible (fast-follow).
 
+### T-789 — DUT-96 Published date: wide month ("June 1, 2026") + add to recipe detail (US-37 + US-4 amendment, CL-185)
+
+- **What:** (Follow-up to Ned's DUT-95.) New shared `PublishedDateCaption` (long style, "Published June 1, 2026"). `ArticleDetailView` switches from its private medium formatter to it (medium -> long per Ned); `RecipeDetailView` adds it below the meta pills (`PublishedDateCaption(date: viewModel.listItem.publishedAt)`) — recipe detail previously showed no date. Cross-platform; presentation-only.
+- **Files:** `DODFeatureRecipeDetail/PublishedDateCaption.swift` (new), `ArticleDetailView.swift` (use shared, remove private formatter), `RecipeDetailView.swift` (add caption after meta pills).
+- **AC:** AC-37.3 re-amended (article date long-style); AC-4.1 amended (recipe detail shows published-date caption below meta row) (CL-185 canonical). **Est:** ~25 min. **Deps:** main at T-788 (`a5b6f7e`). Branch `feat/T-789-recipe-published-date`. **||:** P-content. No `e2e` label - presentation-only. swift-format + SwiftLint clean; package compiles. **Snapshot:** adding the caption shifts the off-CI `RecipeDetailViewSnapshotTests.longIngredientWraps` committed baseline (UIKit-gated, never run in CI) -> stale; sim re-record is the documented fast-follow for an intentional visual change.
+
 ---
 
 ## Summary

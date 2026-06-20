@@ -63,18 +63,14 @@ struct ArticleDetailView: View {
         .background(DODColor.surface)
     }
 
-    /// Small caption showing "Published <absolute-date>" (e.g. "Published Jun 1,
-    /// 2026") above the body. T-788 / CL-184 (DUT-95): replaced the former
-    /// `style: .relative` "Published X ago" — a content-published date should
-    /// read as an actual date, and the relative string was also a latent
-    /// snapshot flake (the fixed-date fixture rendered an ever-growing "X ago").
-    /// The medium formatter is the same one VoiceOver already used, so the
-    /// visible text and the accessibility label now match by construction (no
-    /// separate `.accessibilityLabel` needed).
+    /// "Published <absolute date>" caption above the body — the shared
+    /// ``PublishedDateCaption`` ("Published June 1, 2026", long style). DUT-95 /
+    /// T-788 first replaced the relative "Published X ago"; T-789 / CL-185
+    /// (DUT-96) moved it to the shared long-style component the recipe detail
+    /// also uses (medium → long per Ned). The visible text equals the VoiceOver
+    /// label by construction, so no separate `.accessibilityLabel` is needed.
     private var publishedDateCaption: some View {
-        Text("Published \(Self.publishedDateFormatter.string(from: recipe.publishedAt))")
-            .dodFont(DODType.caption)
-            .foregroundStyle(DODColor.labelSecondary)
+        PublishedDateCaption(date: recipe.publishedAt)
     }
 
     /// The rendered article body: native blocks when the HTML parsed, else a
@@ -110,15 +106,4 @@ struct ArticleDetailView: View {
                 .accessibilityLabel("Article body")
         }
     }
-
-    /// Absolute medium-style date ("Jun 1, 2026") for the published-date caption
-    /// — locale-aware, no hard-coded format string. T-788 / CL-184 (DUT-95):
-    /// promoted from a VoiceOver-only fallback to the visible caption text, so
-    /// the on-screen date matches what VoiceOver reads.
-    private static let publishedDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
 }
