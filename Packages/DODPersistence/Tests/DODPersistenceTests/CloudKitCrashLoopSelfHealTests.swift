@@ -125,9 +125,14 @@ struct CloudKitCrashLoopSelfHealTests {
         let defaults = Self.isolatedDefaults()
         defaults.set(true, forKey: RecipeStore.cloudKitSyncOptInKey)
         // Account available + opt-in ON: the guard does NOT short-circuit to
-        // local. (In-memory `.private` opens actually succeed in-process, so
-        // the synchronous DOD-CRASH-1 catch isn't exercised here — that branch
-        // is pinned separately in CloudKitContainerSelectionTests by injection.)
+        // local — control reaches the CloudKit-attempt branch (the decision
+        // under test). The container is built in-memory, which forces
+        // `cloudKitDatabase: .none` (an in-memory `.private` open spins up
+        // NSCloudKitMirroringDelegate → PushKit and aborts a test host with no
+        // CloudKit entitlement — SIGABRT), so this exercises the branch
+        // SELECTION without opening a real CloudKit container. The actual
+        // synchronous `.private` open + its DOD-CRASH-1 catch are
+        // device-verified, not unit-tested.
         let result = try RecipeStore.productionContainer(
             defaults: defaults,
             accountStatus: .available,

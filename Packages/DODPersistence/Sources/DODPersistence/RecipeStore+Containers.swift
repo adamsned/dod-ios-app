@@ -213,11 +213,22 @@ extension RecipeStore {
         inMemory: Bool,
         cloudKit: Bool
     ) -> ModelConfiguration {
-        ModelConfiguration(
+        // An in-memory store can't meaningfully mirror to CloudKit, and an
+        // in-memory `ModelConfiguration` carrying `.private(...)` STILL spins up
+        // an `NSCloudKitMirroringDelegate` → PushKit on a background queue,
+        // which aborts (SIGABRT) in any test host that has no CloudKit
+        // entitlement (the DUT-78 self-heal L1 suite hit exactly this). So
+        // `inMemory` forces `.none` regardless of `cloudKit`: the L1 tests can
+        // exercise the opt-in / account-status / self-heal *decision* branches
+        // (which container layout gets chosen) without opening a real CloudKit
+        // container. Production (`inMemory == false`) is unchanged — the opt-in
+        // path still uses `.private(cloudKitContainerIdentifier)`.
+        let useCloudKit = cloudKit && !inMemory
+        return ModelConfiguration(
             "SyncedSaved",
             schema: Schema(SchemaV5.syncedModels),
             isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: cloudKit ? .private(cloudKitContainerIdentifier) : .none
+            cloudKitDatabase: useCloudKit ? .private(cloudKitContainerIdentifier) : .none
         )
     }
 
