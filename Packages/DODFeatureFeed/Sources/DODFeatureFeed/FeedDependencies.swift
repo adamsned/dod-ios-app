@@ -165,11 +165,24 @@ public struct LiveFeedDependencies: FeedDependencies {
         // `ImageLoader` + `RecipeStore.cacheImage`; detaching keeps feed-load
         // latency unaffected, and per-URL failures are logged + swallowed
         // inside the prefetcher (graceful-fallback contract — AC-21.3).
+        //
+        // T-792 / DUT-8 (REG-T-362-v2) — the eager `widgetReload?()` above
+        // races ahead of these writes: WidgetKit re-snapshots immediately,
+        // `WidgetCard.Hero` resolves `heroImageFilename` to a bridged file
+        // that isn't on disk yet, and the widget renders its fork-and-knife
+        // gradient placeholder. A SECOND reload *after* the prefetch completes
+        // lets the timeline re-snapshot with the real photo. This mirrors the
+        // already-shipped Saved-widget path (`SavedRecipesWidgetPublisher`,
+        // T-770 / CL-167, DUT-76) — the feed path simply never got the same
+        // second-reload treatment. The first reload above is kept so the text
+        // content (title / total-time) updates promptly, and so the widget
+        // still reloads at least once when no prefetcher is wired.
         guard let imagePrefetcher else { return }
         let urls = entries.compactMap(\.heroImageURL)
         guard !urls.isEmpty else { return }
-        Task.detached { [imagePrefetcher, urls] in
+        Task.detached { [imagePrefetcher, urls, widgetReload, entries] in
             await imagePrefetcher(urls)
+            widgetReload?(Array(entries))
         }
     }
 }
