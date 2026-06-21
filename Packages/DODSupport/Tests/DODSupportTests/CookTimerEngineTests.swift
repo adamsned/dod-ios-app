@@ -49,10 +49,10 @@ struct CookTimerEngineTests {
         #expect(engine.timers[0].remaining(at: clock.now) == 0)  // clamped, not negative
     }
 
-    @Test func pauseFreezesRemainingAndResumeReAnchors() {
+    @Test func pauseFreezesRemainingAndResumeReAnchors() throws {
         let clock = TestClock()
         let engine = makeEngine(clock)
-        let timer = engine.start(label: "Proof", duration: 600)!
+        let timer = try #require(engine.start(label: "Proof", duration: 600))
         clock.advance(200)  // 400 left
         engine.pause(timer.id)
         #expect(engine.timers[0].isRunning == false)
@@ -101,12 +101,12 @@ struct CookTimerEngineTests {
         #expect(engine.soonestFinishing?.label == "Medium")
     }
 
-    @Test func cancelRemovesAndClearFinishedDropsDoneTimers() {
+    @Test func cancelRemovesAndClearFinishedDropsDoneTimers() throws {
         let clock = TestClock()
         let engine = makeEngine(clock)
-        let a = engine.start(label: "A", duration: 60)!
+        let timerA = try #require(engine.start(label: "A", duration: 60))
         engine.start(label: "B", duration: 600)
-        engine.cancel(a.id)
+        engine.cancel(timerA.id)
         #expect(engine.timers.map(\.label) == ["B"])
 
         engine.start(label: "C", duration: 10)
