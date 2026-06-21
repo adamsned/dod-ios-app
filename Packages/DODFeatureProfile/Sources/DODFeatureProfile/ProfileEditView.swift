@@ -166,6 +166,7 @@ public struct ProfileEditView: View {
             // above the display-name + email fields (was a 44pt trailing
             // avatar in a labeled row below the identity fields).
             profileEditPhotoSection
+            appleSignInSection
             identitySection
             signOutSection
             if let saveError {
@@ -280,38 +281,6 @@ public struct ProfileEditView: View {
     // `showLeaveConfirmation` `@State` vars above are non-`private`.
 
     // MARK: - Sections
-
-    @ViewBuilder
-    private var identitySection: some View {
-        Section {
-            TextField("Display name", text: $displayName)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .textContentType(.name)
-                .accessibilityIdentifier("profile-edit-displayname")
-                #if os(iOS)
-            .autocapitalization(.words)
-                #endif
-
-            TextField("Email", text: $email)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .textContentType(.emailAddress)
-                .accessibilityIdentifier("profile-edit-email")
-                #if os(iOS)
-            .keyboardType(.emailAddress)
-            .autocapitalization(.none)
-            .autocorrectionDisabled(true)
-                #endif
-        } footer: {
-            if let emailValidationError {
-                Text(emailValidationError)
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-        }
-        .listRowBackground(DODColor.surfaceElevated)
-    }
 
     @ViewBuilder
     private var signOutSection: some View {
