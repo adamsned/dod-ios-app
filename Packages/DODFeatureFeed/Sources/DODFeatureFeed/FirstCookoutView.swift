@@ -53,7 +53,33 @@ public struct FirstCookoutView: View {
     var lastIndex: Int { cookout.steps.count + 1 }
 
     var shareCaption: String {
-        "I made my first \(cookout.dishTitle) with @dutchovendaddy! 🔥 #DutchOvenDaddy"
+        cookout.isCampfire
+            ? "I cooked at the campfire with @dutchovendaddy! 🔥 #DutchOvenDaddy"
+            : "I made my first \(cookout.dishTitle) with @dutchovendaddy! 🔥 #DutchOvenDaddy"
+    }
+
+    // DUT-192 — the campfire capstone is dish-agnostic, so its body sentences use
+    // generic phrasing; "Take It to the Campfire" only reads well as a title.
+    var sharePreviewTitle: String {
+        cookout.isCampfire ? "My campfire cook" : "My \(cookout.dishTitle)"
+    }
+
+    var recipeLinkLabel: String {
+        cookout.isCampfire ? "Open the heat & coals guide" : "Open the \(cookout.dishTitle) recipe"
+    }
+
+    var bakeTimerLabel: String {
+        cookout.isCampfire ? "Campfire cook" : "\(cookout.dishTitle) bake"
+    }
+
+    var bakeStepAwayText: String {
+        cookout.isCampfire
+            ? "Your cook is going, you can step away"
+            : "\(cookout.dishTitle) bake, you can step away"
+    }
+
+    var goCheckText: String {
+        cookout.isCampfire ? "Go check your Dutch oven." : "Go check your \(cookout.dishTitle)."
     }
 
     public var body: some View {

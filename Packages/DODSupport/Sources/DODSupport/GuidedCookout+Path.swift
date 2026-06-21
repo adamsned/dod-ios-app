@@ -85,9 +85,87 @@ extension GuidedCookout {
         ]
     )
 
-    /// The ordered ladder of curated cookouts. One guaranteed win at a time;
-    /// more rungs slot in here as Ned curates them.
-    public static let path: [GuidedCookout] = [firstCookout, italianChicken]
+    /// The capstone (DUT-192) — **Take It to the Campfire**. The path's peak: the
+    /// hero who built confidence at home now cooks outdoors, over a real fire,
+    /// for the people they love. Dish-agnostic (bring a dish you've already
+    /// nailed); the coaching is the outdoor layer plus the word-of-mouth moment.
+    /// Links the heat/coals-by-feel guide as the outdoor reference.
+    public static let campfire = GuidedCookout(
+        recipeSlug: "dutch-oven-temperature-chart",
+        recipeID: 22294,
+        dishTitle: "Take It to the Campfire",
+        whyThisDish:
+            "This is the one you've been building toward. Take a dish you've already nailed "
+            + "at home and cook it outdoors, over a real fire, for the people you love. The "
+            + "cooking is the same. What changes is the moment: everyone gathered around, "
+            + "watching you lift the lid. That's when you become the person they ask to cook.",
+        steps: [
+            Step(
+                id: "plan-and-pack",
+                stage: .gather,
+                title: "Pack the dish you've mastered",
+                coaching:
+                    "Pick the cook you already know, the lasagna or the chicken. Pack your "
+                    + "Dutch oven, coals, a chimney, gloves, and a flat rock or trivet. You "
+                    + "know this one. You're just bringing it outside."
+            ),
+            Step(
+                id: "outdoor-fire",
+                stage: .fire,
+                title: "Build your fire, beat the wind",
+                coaching:
+                    "Outdoors, wind and cold steal heat. Light your chimney and add three or "
+                    + "four coals to your usual count, then pick a spot out of the wind. I'll "
+                    + "give you the adjusted numbers."
+            ),
+            Step(
+                id: "cook-and-be-present",
+                stage: .cook,
+                title: "Set it, then be with your people",
+                coaching:
+                    "Level ground, coals top and bottom, lid on. Here's the best part: you "
+                    + "cook while you're with everyone, not stuck at a stove. Give it a "
+                    + "quarter turn now and then. Otherwise, sit by the fire."
+            ),
+            Step(
+                id: "the-moment",
+                stage: .celebrate,
+                title: "Lift the lid in front of everyone",
+                coaching:
+                    "This is the moment they remember. Serve it around the fire, snap the "
+                    + "photo, and when someone asks how you did it, tell them. Then send them "
+                    + "the app."
+            ),
+        ],
+        celebrationMessage:
+            "You just cooked for your people, outdoors, over fire. That is the whole thing. "
+            + "You're not learning anymore, you're the one they count on. This is what a "
+            + "Dutch Oven Daddy is.",
+        nextStepPrompt:
+            "Do it again, and bring someone new into it. The best cooks make more cooks. "
+            + "That's how this spreads.",
+        ovenTempF: 375,
+        ovenDiameterInches: 12,
+        bakeMinutes: 45,
+        gear: [
+            "12-inch Dutch oven with a lid",
+            "Lid lifter or a sturdy pair of pliers",
+            "Charcoal + a chimney starter (pack extra for the wind)",
+            "Heat-proof gloves",
+            "A flat rock, trivet, or fire ring",
+            "Something to block the wind",
+        ],
+        ingredients: [
+            "Everything for the dish you've already nailed at home",
+            "A few extra coals for the wind and cold",
+            "The people you want to feed, gathered around the fire",
+        ]
+    )
+
+    /// The ordered ladder of curated cookouts: the home rungs, then the campfire
+    /// capstone. One guaranteed win at a time, building toward cooking outdoors
+    /// for the people you love. More rungs slot in here as Ned curates them.
+    public static let path: [GuidedCookout] = [firstCookout, italianChicken, campfire]
 
     /// The next rung the cook hasn't done yet, given the recipe ids they've
     /// logged (the DUT-104 cook journal). Returns the first un-cooked rung in
@@ -100,5 +178,11 @@ extension GuidedCookout {
     /// "Your First Cookout" vs "Your Next Cookout" hero framing.
     public var isFirstRung: Bool {
         recipeID == Self.path.first?.recipeID
+    }
+
+    /// True when this cookout is the campfire capstone (the outdoor peak) —
+    /// drives the special "Take It to the Campfire" hero framing.
+    public var isCampfire: Bool {
+        recipeID == Self.campfire.recipeID
     }
 }

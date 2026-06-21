@@ -2675,6 +2675,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DumpCake.swift` + `DumpCakeTests.swift` (new, DODSupport), `DumpCakeFlow.swift` (new, DODFeatureFeed), `FirstCookoutHeroCard.swift` (+ secondary CTA), `FeedView.swift` (sheet wiring). Spec: `clarifications.md` (CL-221).
 - **AC:** US-53 / DUT-190 (CL-221 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-826. Branch `feat/T-827-dump-cakes`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 458 DODSupport (new DumpCake suite) + 93 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). **Follow-up:** dynamic dump-cake category fetch (vs the v1 curated list).
 
+### T-828 — The campfire capstone: "Take It to the Campfire" (US-53 / DUT-192, CL-222)
+
+- **What:** The path's outdoor peak. `GuidedCookout.campfire` (dish-agnostic coached outdoor cook), the path becomes 3 rungs (`[firstCookout, italianChicken, campfire]`), `isCampfire` + special hero framing, and campfire-aware flow copy helpers so templated strings don't read like a dish name. Surfaces once both home rungs are cooked.
+- **Files:** `GuidedCookout+Path.swift` (campfire + path + `isCampfire`), `GuidedCookoutPathTests.swift` (3-rung + campfire tests), `FirstCookoutHeroCard.swift` (campfire eyebrow/title/hook), `FirstCookoutView.swift` (copy helpers), `FirstCookoutView+Stages.swift` (use them). Spec: `clarifications.md` (CL-222).
+- **AC:** US-53 / DUT-192 (CL-222 canonical). **Est:** ~3 h. **Deps:** off main (post dump cakes T-827). Branch `feat/T-828-campfire`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 459 DODSupport + 93 DODFeatureFeed tests pass; iOS app build green. **Follow-ups:** surface the campfire after the first cook (vs both); a campfire-specific celebrate visual.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
