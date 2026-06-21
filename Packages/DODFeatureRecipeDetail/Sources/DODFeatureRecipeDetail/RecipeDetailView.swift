@@ -43,8 +43,12 @@ public struct RecipeDetailView: View {
     /// NOT applied and steps render exactly as the author wrote them. This
     /// is a display-time transform only — stored recipe data is untouched.
     @AppStorage(TemperatureConverter.preferenceKey)
-    private var temperatureUnitRaw: String = ""
+    var temperatureUnitRaw: String = ""
     @Environment(\.dismiss) private var dismiss
+    /// T-804 — drives the iPad reading-column cap in `readyBody`. `.regular`
+    /// (iPad) bounds the content below the hero to a centered column;
+    /// `.compact` (iPhone) leaves the layout byte-identical.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public let onSelectRelated: (RecipeListItem) -> Void
 
     public init(
@@ -130,56 +134,75 @@ public struct RecipeDetailView: View {
         }
     }
 
-    private var loadingSkeleton: some View {
-        ScrollView {
-            VStack(spacing: DODSpacing.md) {
-                LoadingSkeleton(cornerRadius: 0).frame(height: 280)
-                LoadingSkeleton().frame(height: 24).padding(.horizontal, DODSpacing.md)
-                LoadingSkeleton().frame(height: 16).padding(.horizontal, DODSpacing.lg)
-                LoadingSkeleton().frame(height: 16).padding(.horizontal, DODSpacing.lg)
+    private var readyBody: some View {
+        // T-804 — GeometryReader feeds the actual canvas width so the body can
+        // flip Ingredients|Instructions into a two-up band once it's wide
+        // enough (landscape iPad / large split). Size classes alone can't tell
+        // iPad portrait from landscape (both are `.regular`), so we read width.
+        GeometryReader { geo in
+            let twoUp = geo.size.width >= 1000
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                        RecipeDetailHero(
+                            url: viewModel.recipe?.heroImageLargeURL ?? viewModel.listItem.heroImage,
+                            title: viewModel.listItem.title
+                        )
+                        // Top block — capped to the reading column on iPad,
+                        // byte-identical on iPhone. T-803 keeps the published
+                        // date inset directly below the hero.
+                        VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                            PublishedDateCaption(date: viewModel.listItem.publishedAt)
+                                .padding(.horizontal, DODSpacing.md)
+                            RecipeDetailMetaPills(items: metaPillItems)
+                            servingsScaler
+                            cookNowSection
+                            excerptText
+                            RecipeDetailQuickJump(items: quickJumpItems(proxy: proxy))
+                            if let video = viewModel.recipe?.video {
+                                RecipeDetailVideoSection(video: video, isOfflineSnapshot: isOfflineSnapshot)
+                            }
+                        }
+                        .readableContentColumn(horizontalSizeClass)
+                        ingredientsInstructions(twoUp: twoUp)
+                        // Related + ratings — back in the reading column.
+                        VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                            RelatedRecipesStrip(
+                                items: isOfflineSnapshot ? [] : viewModel.related,
+                                onSelect: onSelectRelated
+                            )
+                            RecipeDetailRatingsSection(viewModel: viewModel)
+                        }
+                        .readableContentColumn(horizontalSizeClass)
+                    }
+                    .padding(.bottom, DODSpacing.xl)
+                }
             }
         }
-        .accessibilityLabel("Loading recipe")
     }
 
-    private var readyBody: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                    RecipeDetailHero(
-                        url: viewModel.recipe?.heroImageLargeURL ?? viewModel.listItem.heroImage,
-                        title: viewModel.listItem.title
-                    )
-                    // T-803 — published date as the inset caption directly below
-                    // the hero, the exact spot + treatment ArticleDetailView uses,
-                    // for parity + easy scanning across recipes + articles. CL-185
-                    // first placed it BELOW the meta pills with no horizontal inset,
-                    // which left it flush to the screen edge; `.padding(.horizontal,
-                    // .md)` mirrors the article's padded content block.
-                    PublishedDateCaption(date: viewModel.listItem.publishedAt)
-                        .padding(.horizontal, DODSpacing.md)
-                    RecipeDetailMetaPills(items: metaPillItems)
-                    servingsScaler
-                    cookNowSection
-                    excerptText
-                    RecipeDetailQuickJump(items: quickJumpItems(proxy: proxy))
-                    if let video = viewModel.recipe?.video {
-                        RecipeDetailVideoSection(video: video, isOfflineSnapshot: isOfflineSnapshot)
-                    }
-                    ingredientsSection.id(SectionAnchor.ingredients)
-                    instructionsSection.id(SectionAnchor.instructions)
-                    RelatedRecipesStrip(
-                        items: isOfflineSnapshot ? [] : viewModel.related,
-                        onSelect: onSelectRelated
-                    )
-                    // US-13/14/15 integration: ratings + reviews hangs off
-                    // the bottom of the scroll content. The section owns
-                    // its own guest-identity sheet so the host doesn't
-                    // need to coordinate presentation state.
-                    RecipeDetailRatingsSection(viewModel: viewModel)
-                }
-                .padding(.bottom, DODSpacing.xl)
+    /// Ingredients + Instructions. Side by side in a wider centered band on a
+    /// wide canvas (landscape iPad), stacked in the reading column otherwise.
+    /// iPhone (compact) always stacks — byte-identical. T-804.
+    @ViewBuilder
+    private func ingredientsInstructions(twoUp: Bool) -> some View {
+        if twoUp {
+            HStack(alignment: .top, spacing: DODSpacing.lg) {
+                ingredientsSection
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .id(SectionAnchor.ingredients)
+                instructionsSection
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .id(SectionAnchor.instructions)
             }
+            .frame(maxWidth: DODContentWidth.wide)
+            .frame(maxWidth: .infinity, alignment: .center)
+        } else {
+            VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                ingredientsSection.id(SectionAnchor.ingredients)
+                instructionsSection.id(SectionAnchor.instructions)
+            }
+            .readableContentColumn(horizontalSizeClass)
         }
     }
 
@@ -239,60 +262,6 @@ public struct RecipeDetailView: View {
                 withAnimation { proxy.scrollTo(SectionAnchor.instructions, anchor: .top) }
             },
         ]
-    }
-
-    // MARK: - Sections
-
-    private var ingredientsSection: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            Text("Ingredients")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-            if let ingredients = viewModel.recipe?.ingredients {
-                // US-31 / AC-31.4 + AC-31.5: scale at render time.
-                // Source recipe `ingredient.text` stays untouched (AC-31.8).
-                let factor = viewModel.servingsScaleFactor
-                ForEach(ingredients) { ingredient in
-                    IngredientCheckRow(
-                        ingredient: ingredient,
-                        displayText: FractionRenderer.scale(ingredient.text, by: factor),
-                        isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
-                        onToggle: { viewModel.toggleIngredient(ingredient.id) }
-                    )
-                }
-            }
-        }
-        .padding(.horizontal, DODSpacing.md)
-    }
-
-    private var instructionsSection: some View {
-        // DUT-47 (temperature half): resolve the unit once per render. `nil`
-        // ("Recipe default" / absent / malformed) leaves every step exactly
-        // as written; otherwise each step's text is mapped through the
-        // converter at display time (stored data untouched, AC-31.8-style).
-        let temperatureUnit = TemperatureConverter.resolvedUnit(fromRawValue: temperatureUnitRaw)
-        return VStack(alignment: .leading, spacing: DODSpacing.md) {
-            Text("Instructions")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-            if let instructions = viewModel.recipe?.instructions {
-                ForEach(instructions) { step in
-                    InstructionStepView(
-                        step: step,
-                        displayText: convertedStepText(step.text, to: temperatureUnit)
-                    )
-                }
-            }
-        }
-        .padding(.horizontal, DODSpacing.md)
-    }
-
-    /// Apply the DUT-47 temperature conversion to one step's text, or return
-    /// it unchanged when no unit is selected. Extracted so the `ForEach`
-    /// body stays a single expression and the gating logic reads in one place.
-    private func convertedStepText(_ text: String, to unit: TemperatureUnit?) -> String {
-        guard let unit else { return text }
-        return TemperatureConverter.converting(text, to: unit)
     }
 
     // MARK: - Toolbars
