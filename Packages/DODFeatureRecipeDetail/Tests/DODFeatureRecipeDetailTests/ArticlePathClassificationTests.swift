@@ -66,6 +66,25 @@ struct ArticlePathClassificationTests {
         #expect(dependencies.markedFailedIDs.isEmpty)
     }
 
+    @Test func parsedRecipeWithEmptyInstructionsFallsBackToArticleBody() async throws {
+        // DUT-185: WP Recipe Maker now renders steps client-side and redacts
+        // them from the recipe's structured data, so `parseJSONLD` SUCCEEDS but
+        // returns a recipe with EMPTY instructions (e.g. Dutch Oven 7 Can Soup).
+        // Rather than render a step-less recipe, the view model falls back to
+        // the article-body path — where the post's "How to Make" steps live.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 17, withDetail: false)
+        dependencies.articleBodyToExtract = "How to Make. Step 1: Open and dump."
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 17)
+        await viewModel.onAppear()
+        if case .article(let article) = viewModel.loadState {
+            #expect(article.kind == .article)
+            #expect(article.articleBodyHTML == "How to Make. Step 1: Open and dump.")
+        } else {
+            Issue.record("Step-less recipe should fall back to .article, got \(viewModel.loadState)")
+        }
+    }
+
     // MARK: - Helper
 
     private func makeViewModel(

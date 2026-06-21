@@ -167,7 +167,7 @@ public final class RecipeDetailViewModel {
             // T-736 / CL-133: cache-hit recipe path also fires a background
             // `refreshBlurbBlocks` — see helper for the contract.
             switch cached.kind {
-            case .recipe: await hydrateCachedRecipe(cached)
+            case .recipe: await hydrateRecipeOrReclassify(cached)
             case .article: loadState = .article(cached)
             }
         } else {
