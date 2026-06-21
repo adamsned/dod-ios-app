@@ -33,6 +33,11 @@ struct ArticleDetailView: View {
 
     let recipe: Recipe
 
+    /// T-806 — caps the article body to a centered reading column on iPad
+    /// (`.regular`); iPhone (`.compact`) is byte-identical (the modifier
+    /// returns the content unchanged), so the L4 article snapshots don't move.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     /// Parsed once per view identity (synchronously in `init`) so the first
     /// frame is already rich — no plain-text-then-rich flash — and snapshot
     /// rendering is deterministic. An 87 KB round-up parses in single-digit
@@ -58,6 +63,7 @@ struct ArticleDetailView: View {
                 }
                 .padding(.horizontal, DODSpacing.md)
                 .padding(.bottom, DODSpacing.xl)
+                .readableContentColumn(horizontalSizeClass)
             }
         }
         .background(DODColor.surface)
