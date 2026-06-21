@@ -921,6 +921,25 @@ Added 2026-06-20 (DUT-94, authored by Ned). BuzzyWaxx is a sister brand under co
 
 ---
 
+### US-51 — Recipe equipment & tools list
+
+**As a** first-time Dutch oven cook planning my first cookout,
+**I want** to see exactly which pots, lids, and tools a recipe calls for,
+**so that** I know what to grab before I start (the "here's what you need" step of the "Your First Cookout" keystone).
+
+Added 2026-06-20 (DUT-156, authored by Ned). WP Recipe Maker recipe cards already carry a structured `equipment` array (name + optional affiliate link + optional thumbnail), but the app drops it on the floor today. Surfacing it directly serves the north-star "Your First Cookout" keystone by answering "what gear do I need?" up front. This first slice is the **pure decode + domain-mapping core only** — no UI; the on-screen "Equipment & Tools" section is a later slice that consumes the parsed list.
+
+**Acceptance criteria (T-808 — CL-202):**
+
+- **AC-51.1 — WPRM equipment parse (IMPLEMENTED).** A `DODDomain.Equipment` value type (`id`, `name`, optional `imageURL`, optional `link`; `Sendable`/`Equatable`/`Hashable`/`Codable`) models one tool. A wire-format `WPDTO.Equipment` + `WPDTO.RecipeCard` decode the WPRM recipe-card `equipment` array, and a `RecipeCard.equipmentList` computed property maps it to `[DODDomain.Equipment]`. Mapping degrades gracefully per the established WP-DTO style: an absent array → `[]`; entries with a missing/blank name are skipped; `link` / `image_url` parse leniently (empty / whitespace / unparseable → `nil`) and **never** drop the surrounding entry or throw. The name is HTML-sanitized via the shared `HTMLSanitizer`. No networking call is added — this is a pure decode core landing in `DODDomain` (`RecipeEquipment.swift`) + `DODNetworking` (`WPDTOs.swift`), covered by `WPRMEquipmentParseTests` (present / absent / empty / malformed-partial / HTML-name cases). The UI "Equipment & Tools" section is a later slice.
+
+**Constitution + spec notes:**
+
+- **No new dependency** — reuses `JSONDecoder` + the existing `HTMLSanitizer`, matching the `WPDTO.Comment` / `WPRMRatingResponse` lenient-decode precedent (no force-unwraps; `URL(string:)` guarded). Constitution §3 default-no respected.
+- **CL-202** captures the locked decisions (model in `DODDomain` alongside the other recipe value types; DTO + mapping in `DODNetworking`; lenient per-field URL parsing; skip-bad-entry-not-throw) and the deferred UI slice.
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
