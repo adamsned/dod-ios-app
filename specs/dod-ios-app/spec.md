@@ -921,6 +921,89 @@ Added 2026-06-20 (DUT-94, authored by Ned). BuzzyWaxx is a sister brand under co
 
 ---
 
+### US-47 — Cooking timers (multi-timer, Live Activity, hands-free)
+
+As a cook following a Dutch-oven recipe, I want to start named countdown timers from the recipe's step times and see them on the Lock Screen / Dynamic Island, so I can walk away from my phone and still be alerted — without juggling the system Clock app or losing track when several things overlap.
+
+- **AC-47.1 (timer engine — T-804 / CL-198, IMPLEMENTED).** A pure, deterministically-testable engine owns the set of active countdowns. `CookTimer` (DODSupport) is a value type whose remaining-time math is a function of an injected "now" (`running(endDate:)` counts down, `paused(remaining:)` freezes, `finished`); `CookTimerEngine` (`@Observable @MainActor`, DODSupport) manages `[CookTimer]` with `start(label:duration:)` (rejects non-positive durations), `pause`/`resume`/`cancel`/`clearFinished`, a `soonestFinishing` accessor (for the Live Activity), and a `refresh()` that advances elapsed running timers to `.finished` and fires `onFinished` exactly once each (idempotent). All wall-clock reads go through an injected `clock`, so the L1 suite drives every transition with a controllable clock and no real waiting.
+- **AC-47.2 (Live Activity + Dynamic Island).** The soonest-finishing running timer surfaces on the Lock Screen + Dynamic Island via an ActivityKit Live Activity (reusing the existing `DODAppLiveActivity` target), updating as it counts down and reflecting pause/finish.
+- **AC-47.3 (completion alert).** When a timer finishes, the app fires a local notification + sound + haptic even when backgrounded/locked (notification permission is already requested for replies/new-recipe; denial degrades to an in-app alert).
+- **AC-47.4 (Cook Mode timer tray + start-from-step).** Tapping a detected duration in a recipe step starts a timer named after the step/recipe; a compact tray in Cook Mode + recipe detail shows all active timers with pause/resume/cancel; timers persist across relaunch.
+- **AC-47.5 (hands-free hook).** "Start a timer" via the Cook Mode voice commands (US — DUT-101) starts the current step's timer through the same engine, and the auto-advance behavior (DUT-173) keys off `onFinished`.
+
+This is the keystone of the "cooking session" epic (E1): AC-47.1 is the foundation the rest of US-47 — plus DUT-101 (voice), DUT-102 (Campfire), DUT-107 (Siri/StandBy), DUT-141 (HomeKit), and DUT-173 (auto-advance) — build on.
+### US-48 — Private cook journal ("I Made This")
+
+As a cook, I want to privately log when I make a recipe — with my own photo, a note, and a personal rating — and see my cooking history, so I build a personal record (distinct from the public comments/ratings) that the app can celebrate over time.
+
+- **AC-48.1 (data model + stats — T-805 / CL-199, IMPLEMENTED).** `CookLogEntry` (DODSupport) is a primitive-only value type (id, recipeID, recipeTitle snapshot, cookedAt, optional note / personal 1–5 rating clamped on init / photo local id) — decoupled from Domain + Persistence. `CookLogStats` (DODSupport) is a pure, `Calendar`-injected calculator over `[CookLogEntry]`: `totalCooks`, `timesCooked(recipeID:)`, `mostCooked` (ties → most recent, then lower id), `currentWeeklyStreak(asOf:calendar:)` (consecutive weeks with a cook, with a forgiving in-progress week — DUT-171's grace rule), and `busiestMonth` (ties → more recent). All deterministically L1-tested with fixed dates.
+- **AC-48.2 (persistence).** Entries persist via SwiftData on the CloudKit **private** DB (same pattern as saved recipes), mapping to/from `CookLogEntry`. Never sent to the blog or analytics.
+- **AC-48.3 (log a cook).** A "Made it" action on recipe detail creates an entry (auto date; optional photo via the existing photo/image-cache infra + note + personal rating).
+- **AC-48.4 (My Kitchen history + badge).** A chronological "My Kitchen" view (timeline of cooks) and a per-recipe "made N times" badge on recipe detail.
+- **AC-48.5 (habits build on the stats).** The cooking streak (DUT-171), achievement badges (DUT-175), and "Cooking Wrapped" (DUT-177) all read `CookLogStats` — so AC-48.1 is the shared foundation for the E7 habits sub-group.
+
+This is the keystone of epic E2 (Save, Organize & Plan): AC-48.1 unblocks the habit features without waiting on the persistence/UI slices.
+### US-49 — Hands-free Cook Mode voice commands
+
+As a cook with messy hands, I want to say "next", "repeat", or "start a timer" instead of touching a greasy screen, so I can drive Cook Mode without setting down what I'm doing. (Complements the existing read-aloud, which is voice-OUT; this is voice-IN.)
+
+- **AC-49.1 (command grammar — T-806 / CL-200, IMPLEMENTED).** `CookModeVoiceCommand` (DODSupport) is a pure transcript→command mapper: `parse(_:)` lowercases + trims a recognized transcript and resolves a small synonym set to `.next` / `.previous` / `.repeatStep` / `.startTimer` / `.pause` (most-specific phrases first so "start a timer" never reads as navigation), else `.unknown` (ignored). Pure → fully L1-tested without a microphone.
+- **AC-49.2 (on-device recognition).** A mic toggle in Cook Mode runs `SFSpeechRecognizer` with `requiresOnDeviceRecognition` (privacy + offline), feeding transcripts to `parse(_:)`; needs the Speech permission + `NSSpeechRecognitionUsageDescription`.
+- **AC-49.3 (Cook Mode integration).** Recognized commands drive Cook Mode navigation + TTS re-read; `.startTimer` starts the current step's timer via the `CookTimerEngine` (US-47). The spoken step pauses while listening (no feedback loop); permission denial degrades to touch.
+
+This is part of epic E1 (Cooking Session Core), built on the US-47 timer engine.
+### US-50 — Per-recipe charcoal coaching
+
+**As a** first-time Dutch oven cook following a recipe,
+**I want** the recipe's oven temperature turned into a concrete charcoal count, top/bottom split, and refresh cadence for my oven size,
+**so that** I can "manage the fire" without owning a coal chart or doing the math myself.
+
+Added 2026-06-20 (DUT-128, authored by Ned). This serves the **"Your First Cookout"** keystone — specifically the *manage the fire* step. A recipe gives a target temperature (e.g. 350°F) but never answers the cook's real question: "how many briquettes, where do they go, and when do I add more?" This story closes that gap with a pure, on-device calculator. It is the per-recipe complement to the standalone Dutch Oven Heat Coach screen (DUT-48): both share the brand's `diameter × 2` baseline, but this one takes the recipe's own temperature + task and returns one starting recommendation.
+
+This slice ships the **pure calculator core only**; the inline recipe-card UI that surfaces the recommendation is a later slice of DUT-128.
+
+**Acceptance criteria:**
+
+- **AC-50.1 (IMPLEMENTED — T-807)** `CharcoalRecipeConverter` (in `Packages/DODSupport`) is a pure, Foundation-only, value-type calculator: `CharcoalRecipeConverter.recommend(ovenTempF:ovenDiameterInches:task:) -> CharcoalRecommendation`, with `CookTask { bake, roast, simmer, fry }` and a `CharcoalRecommendation` struct (`totalBriquettes`, `bottom`, `top`, `refreshIntervalMinutes`; Equatable + Sendable — a named struct, not a 3-member tuple, so the `large_tuple` lint rule stays clean). **Total** ≈ `diameter × 2` at the ~350°F baseline, adjusted about ±2 briquettes per 25°F away from ~350°F (clamped at 0, never negative). **Split** by task: bake ≈ ⅓ bottom / ⅔ top, roast ≈ even (odd extra to the bottom), simmer ≈ ¾ bottom, fry = all bottom; `bottom + top == totalBriquettes` always. **Refresh** = 45 min (a starting cadence in the 45–60 band). Pure + deterministic, no UI / network / AVFoundation. Verified: `swift-format`, `swiftlint --strict` clean on the source, and a 10-test swift-testing L1 suite (`CharcoalRecipeConverterTests`) passing under `swift test`. (US-50 / CL-201 / T-807; pure core of DUT-128 — the inline UI card is a later slice.)
+
+**Constitution + spec notes:**
+
+- **Pure logic-core seam (constitution §6 L1).** Same pattern as `DutchOvenHeatCoach`, `IngredientAisleClassifier`, and `StepTimerParser` — a domain transform that ships in `DODSupport` with its own L1 tests ahead of any UI, so the math is pinned on the macOS test slice and any future surface (recipe card, Tools tab, App Intent) reuses one contract.
+- **CL-201** captures the locked decisions (pure calculator ships ahead of the inline UI card; named result struct over a tuple; `diameter × 2` + ±2 / 25°F baseline shared with DUT-48; per-task split ratios; 45-min refresh) and the deferred inline-card slice.
+### US-51 — Recipe equipment & tools list
+
+**As a** first-time Dutch oven cook planning my first cookout,
+**I want** to see exactly which pots, lids, and tools a recipe calls for,
+**so that** I know what to grab before I start (the "here's what you need" step of the "Your First Cookout" keystone).
+
+Added 2026-06-20 (DUT-156, authored by Ned). WP Recipe Maker recipe cards already carry a structured `equipment` array (name + optional affiliate link + optional thumbnail), but the app drops it on the floor today. Surfacing it directly serves the north-star "Your First Cookout" keystone by answering "what gear do I need?" up front. This first slice is the **pure decode + domain-mapping core only** — no UI; the on-screen "Equipment & Tools" section is a later slice that consumes the parsed list.
+
+**Acceptance criteria (T-808 — CL-202):**
+
+- **AC-51.1 — WPRM equipment parse (IMPLEMENTED).** A `DODDomain.Equipment` value type (`id`, `name`, optional `imageURL`, optional `link`; `Sendable`/`Equatable`/`Hashable`/`Codable`) models one tool. A wire-format `WPDTO.Equipment` + `WPDTO.RecipeCard` decode the WPRM recipe-card `equipment` array, and a `RecipeCard.equipmentList` computed property maps it to `[DODDomain.Equipment]`. Mapping degrades gracefully per the established WP-DTO style: an absent array → `[]`; entries with a missing/blank name are skipped; `link` / `image_url` parse leniently (empty / whitespace / unparseable → `nil`) and **never** drop the surrounding entry or throw. The name is HTML-sanitized via the shared `HTMLSanitizer`. No networking call is added — this is a pure decode core landing in `DODDomain` (`RecipeEquipment.swift`) + `DODNetworking` (`WPDTOs.swift`), covered by `WPRMEquipmentParseTests` (present / absent / empty / malformed-partial / HTML-name cases). The UI "Equipment & Tools" section is a later slice.
+
+**Constitution + spec notes:**
+
+- **No new dependency** — reuses `JSONDecoder` + the existing `HTMLSanitizer`, matching the `WPDTO.Comment` / `WPRMRatingResponse` lenient-decode precedent (no force-unwraps; `URL(string:)` guarded). Constitution §3 default-no respected.
+- **CL-202** captures the locked decisions (model in `DODDomain` alongside the other recipe value types; DTO + mapping in `DODNetworking`; lenient per-field URL parsing; skip-bad-entry-not-throw) and the deferred UI slice.
+### US-52 — Dutch Oven 101 technique guides
+
+**As a** nervous beginner who just got a Dutch oven,
+**I want** short, accurate technique lessons bundled in the app,
+**so that** I can learn the fundamentals before my first cookout instead of guessing.
+
+Added 2026-06-20 (DUT-140, authored by Ned). This serves the "Your First Cookout" keystone — the *teaching* that turns nervous beginners into capable cast-iron cooks. v1 is a **pure content model + library core** in `DODSupport`: a curated, bundled-in-code set of at least six beginner guides (Preheating, Lid On vs Lid Off, Brown Then Braise, Resting Meat & Why, Deglazing 101, Adapting Indoor Recipes for Outdoor Coals). Each guide carries a title, an honest read-time estimate, two to four ordered sections, and two to four key takeaways. The content is teacher-authored starter craft (Ned refines the voice later).
+
+**Acceptance criteria (T-809 — CL-203):**
+
+- **AC-52.1 (IMPLEMENTED)** `DODSupport` ships a pure `TechniqueGuide` value type (`Identifiable`, `Sendable`, `Equatable` — `slug`, `title`, `estimatedReadMinutes`, `sections: [Section]` where each `Section` has a `heading` + `body`, and `keyTakeaways: [String]`) plus an `enum DutchOven101Library` exposing `static let guides: [TechniqueGuide]` (≥6 curated, bundled-in-code beginner guides, each with a non-empty title, `estimatedReadMinutes > 0`, 2–4 ordered sections with non-empty heading + body, and 2–4 key takeaways; all slugs unique) and `static func guide(slug:) -> TechniqueGuide?`. House style follows `IngredientAisleClassifier` / `DutchOvenHeatCoach` (pure, no UI, no network, bundled-in-code data over a JSON resource). L1 unit tests pin the structural contract. The "Learn" library UI and per-guide read-state persistence are **later slices** (not this AC).
+
+**Constitution + spec notes:**
+
+- **Why bundled-in-code, not a JSON resource.** The v1 library is small, human-readable, teacher-authored, and version-controlled; a static array the compiler folds into a constant beats a runtime load + parse, and ships + tests on the macOS slice ahead of any UI — the same rationale as the `IngredientAisleClassifier` keyword map (CL-67) and `DutchOvenHeatCoach`'s structured reference content. **CL-203** captures the locked decisions and the deferred "Learn" UI + read-state-persistence scope.
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
