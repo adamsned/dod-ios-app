@@ -2669,6 +2669,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `GuidedCookout+Path.swift` (new — rung 2 + path), `GuidedCookoutPathTests.swift` (new), `FirstCookoutHeroCard.swift` (rung-aware title/eyebrow/hook), `FeedView.swift` (`currentRung` from `cookLogs`, refresh after `logCook`). Spec: `clarifications.md` (CL-220).
 - **AC:** US-53 / DUT-183 (CL-220 canonical). **Est:** ~3 h. **Deps:** stacked on T-825 (hero card). Branch `feat/T-825-second-rung`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 455 DODSupport (new path suite) + 93 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). **Next rungs** slot into `GuidedCookout.path` as Ned curates them.
 
+### T-827 — "Cook a dump cake" option: any blog dump cake as a coached dessert win (US-53 / DUT-190, CL-221)
+
+- **What:** Pick any of the blog's dump cakes and run the same coached flow. `DumpCake` model + curated `DumpCake.all`; `GuidedCookout.dumpCake(_:)` — one generic parameterized template (dump cakes are all one method); `DumpCakeFlow` (picker → chosen cake's `FirstCookoutView` in one sheet); a "Or cook a dump cake" link on the hero card. A flexible dessert branch, not a fixed path rung.
+- **Files:** `DumpCake.swift` + `DumpCakeTests.swift` (new, DODSupport), `DumpCakeFlow.swift` (new, DODFeatureFeed), `FirstCookoutHeroCard.swift` (+ secondary CTA), `FeedView.swift` (sheet wiring). Spec: `clarifications.md` (CL-221).
+- **AC:** US-53 / DUT-190 (CL-221 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-826. Branch `feat/T-827-dump-cakes`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 458 DODSupport (new DumpCake suite) + 93 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). **Follow-up:** dynamic dump-cake category fetch (vs the v1 curated list).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

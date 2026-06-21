@@ -21,6 +21,8 @@ public struct FeedView: View {
     @State private var showingFirstCookout = false
     /// DUT-104 — presents the "I Made This" cook journal as a sheet.
     @State private var showingJournal = false
+    /// DUT-190 — presents the "cook a dump cake" picker + coached flow as a sheet.
+    @State private var showingDumpCakeFlow = false
     /// DUT-183 — the "Start Here" First Cookout hero card; dismissible + persisted
     /// so a cook past their first win isn't nagged (the toolbar flame stays).
     @AppStorage("dod.firstCookoutHeroDismissed") private var firstCookoutHeroDismissed = false
@@ -95,6 +97,14 @@ public struct FeedView: View {
         }
         .sheet(isPresented: $showingJournal) {
             CookJournalView(load: { await viewModel.cookLogs() })
+        }
+        .sheet(isPresented: $showingDumpCakeFlow) {
+            DumpCakeFlow(onLogCook: { entry in
+                Task {
+                    await viewModel.logCook(entry)
+                    await refreshCurrentRung()
+                }
+            })
         }
         .task { await viewModel.onAppear() }
         .task { await refreshCurrentRung() }
@@ -182,7 +192,8 @@ public struct FeedView: View {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             firstCookoutHeroDismissed = true
                         }
-                    }
+                    },
+                    onCookDumpCake: { showingDumpCakeFlow = true }
                 )
                 .padding(.horizontal, DODSpacing.md)
                 .padding(.top, DODSpacing.sm)
