@@ -8,6 +8,10 @@
 enum AppTab: Hashable, CaseIterable, Identifiable {
     case feed
     case saved
+    // T-823 / DUT-187 — Settings promoted from the per-tab gear sheet to a
+    // first-class destination: a tab between Saved and Search on iPhone, a
+    // sidebar row on iPad.
+    case settings
     case search
 
     var id: Self { self }
@@ -38,6 +42,7 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         case .feed: "Recipes & Articles"
         case .search: "Search"
         case .saved: "Saved"
+        case .settings: "Settings"
         }
     }
 
@@ -60,6 +65,7 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         case .feed: "Recipes"
         case .search: "Search"
         case .saved: "Saved"
+        case .settings: "Settings"
         }
     }
 
@@ -70,6 +76,7 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .feed: "house"
+        case .settings: "gearshape"
         case .search: "magnifyingglass"
         // `bookmark` (outline) when unselected, `bookmark.fill` when
         // selected — SwiftUI's tab styling handles the swap. AC-16.2.
@@ -88,6 +95,7 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         case .feed: "feed"
         case .search: "search"
         case .saved: "saved"
+        case .settings: "settings"
         }
     }
 }

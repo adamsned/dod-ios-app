@@ -11,15 +11,16 @@ import XCTest
 /// tab was removed in T-800 — its browse list moved into Search, CL-193).
 final class AppTabTests: XCTestCase {
 
-    /// AC-16.1 / CL-25 / CL-194: bottom tab-bar order is **Recipes → Saved
-    /// → Search** (the Categories tab was folded into Search in T-800).
+    /// AC-16.1 / CL-25 / CL-194 / CL-217: bottom tab-bar order is **Recipes →
+    /// Saved → Settings → Search** (Categories folded into Search in T-800;
+    /// Settings promoted from the per-tab gear sheet to a tab in T-823).
     /// `AppTab.allCases` is the single source of truth for that order
     /// (RootView's phoneTabs iterates it directly), so asserting on the
     /// enum is the cheapest possible regression guard.
     func test_allCasesOrderMatchesSpec() {
         XCTAssertEqual(
             AppTab.allCases,
-            [.feed, .saved, .search],
+            [.feed, .saved, .settings, .search],
             "Bottom tab bar order is the single source of truth in AppTab.allCases. "
                 + "Changing the order here is a user-visible product change — update the "
                 + "spec (US-16 / AC-16.1) before touching this test."
@@ -43,6 +44,7 @@ final class AppTabTests: XCTestCase {
     func test_otherTabs_systemImagesUnchanged() {
         XCTAssertEqual(AppTab.feed.systemImage, "house")
         XCTAssertEqual(AppTab.search.systemImage, "magnifyingglass")
+        XCTAssertEqual(AppTab.settings.systemImage, "gearshape")
     }
 
     /// AC-16.4: telemetry names are **stable across the visual change**
@@ -54,6 +56,7 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.feed.telemetryName, "feed")
         XCTAssertEqual(AppTab.saved.telemetryName, "saved")
         XCTAssertEqual(AppTab.search.telemetryName, "search")
+        XCTAssertEqual(AppTab.settings.telemetryName, "settings")
     }
 
     /// `title` is the **screen-header** string. US-37 / AC-37.1 (T-640)
@@ -67,6 +70,7 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.feed.title, "Recipes & Articles")
         XCTAssertEqual(AppTab.saved.title, "Saved")
         XCTAssertEqual(AppTab.search.title, "Search")
+        XCTAssertEqual(AppTab.settings.title, "Settings")
     }
 
     /// AC-16.1 / CL-65 (T-660): the feed tab's bottom-tab label is the short
@@ -78,5 +82,6 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.feed.tabLabel, "Recipes")
         XCTAssertEqual(AppTab.saved.tabLabel, "Saved")
         XCTAssertEqual(AppTab.search.tabLabel, "Search")
+        XCTAssertEqual(AppTab.settings.tabLabel, "Settings")
     }
 }

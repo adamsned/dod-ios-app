@@ -51,11 +51,13 @@ public struct FeedView: View {
         // tab's header behavior consistent (and dodging the iOS 26 large-title
         // bug). The `.toolbar` buttons below stay pinned in the nav bar.
         .toolbar {
-            // DUT-183 — "Your First Cookout" entry on the leading edge (the
-            // strategy's "Start Here"). `.topBarLeading` is iOS-only; the macOS
-            // test slice falls back to `.automatic` so the package still builds.
+            // T-823 / DUT-187 — "Your First Cookout" + Cook Journal entries
+            // move to the TRAILING edge (the corner the Settings gear + layout
+            // toggle used to occupy), now that Settings is a tab and the layout
+            // switcher lives in Settings ▸ Customization. `.topBarTrailing` is
+            // iOS-only; the macOS test slice falls back to `.automatic`.
             #if os(iOS)
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .topBarTrailing) {
                 firstCookoutToolbarButton
             }
             #else
@@ -63,9 +65,8 @@ public struct FeedView: View {
                 firstCookoutToolbarButton
             }
             #endif
-            // DUT-104 — the Cook Journal entry, also on the leading edge.
             #if os(iOS)
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .topBarTrailing) {
                 journalToolbarButton
             }
             #else

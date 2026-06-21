@@ -33,13 +33,26 @@ final class SmokeTests: XCTestCase {
     /// instead of a bottom tab bar (US-38 / DUT-89).
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
-    /// Wait until the first screen is interactive on either layout. The
-    /// Settings gear is present on both the iPhone tab nav and the iPad
-    /// sidebar/detail nav bar, so it is the reliable cross-device "app ready"
-    /// signal (the iPhone-only tab bar is not).
+    /// Wait until the first screen is interactive on either layout. Settings
+    /// is a first-class destination on both — an iPhone tab-bar button + an
+    /// iPad sidebar row (T-823 / DUT-187, promoted from the old per-tab gear)
+    /// — and it renders immediately on launch, so it stays the reliable
+    /// cross-device "app ready" signal (the iPhone-only tab bar is not). The
+    /// iPad sidebar `List` row can surface as a button / cell / static text
+    /// (the same reason `goToTab` probes all three), so probe each type
+    /// rather than assuming `buttons`.
     @discardableResult
     private func waitForAppReady(timeout: TimeInterval = 12) -> Bool {
-        app.buttons["Settings"].waitForExistence(timeout: timeout)
+        func settingsVisible() -> Bool {
+            app.buttons["Settings"].exists
+                || app.cells["Settings"].exists
+                || app.staticTexts["Settings"].exists
+        }
+        let deadline = Date().addingTimeInterval(timeout)
+        while !settingsVisible() && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        return settingsVisible()
     }
 
     /// Navigate to a top-level destination on either layout. `phoneLabel` is
@@ -67,7 +80,7 @@ final class SmokeTests: XCTestCase {
     func test_appLaunchesWithoutTelemetryAppID() {
         XCTAssertTrue(
             waitForAppReady(),
-            "App should reach its first screen (Settings gear) — didn't crash on launch"
+            "App should reach its first screen (Settings tab/sidebar) — didn't crash on launch"
         )
     }
 
@@ -106,14 +119,16 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
         let tabButtons = tabBar.buttons.allElementsBoundByIndex
-        XCTAssertEqual(tabButtons.count, 3, "Expected exactly 3 top-level tabs")
+        XCTAssertEqual(tabButtons.count, 4, "Expected exactly 4 top-level tabs")
 
         // Position-by-position (left → right). The labels here are what
         // a real user sees on the tab bar, so they double as a readable
-        // record of the spec'd order.
+        // record of the spec'd order. T-823 / DUT-187 inserted Settings
+        // between Saved and Search (promoted from the per-tab gear sheet).
         XCTAssertEqual(tabButtons[0].label, "Recipes", "Tab 1 should be Recipes")
         XCTAssertEqual(tabButtons[1].label, "Saved", "Tab 2 should be Saved")
-        XCTAssertEqual(tabButtons[2].label, "Search", "Tab 3 should be Search")
+        XCTAssertEqual(tabButtons[2].label, "Settings", "Tab 3 should be Settings")
+        XCTAssertEqual(tabButtons[3].label, "Search", "Tab 4 should be Search")
 
         // Behavioral check: tapping the second tab actually lands on Saved,
         // not on a mislabeled screen. AC-5.8 empty-state title is the
@@ -124,11 +139,11 @@ final class SmokeTests: XCTestCase {
             "Second tab should land on the Saved screen (empty state visible on fresh install)"
         )
 
-        // Behavioral check: third tab is Search. SearchView uses a
+        // Behavioral check: fourth tab is Search. SearchView uses a
         // plain `TextField` (not `.searchable`) with the placeholder
         // "Search Recipes", so the search input shows up under
         // `app.textFields`, not `app.searchFields`.
-        tabButtons[2].tap()
+        tabButtons[3].tap()
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 6),
@@ -305,22 +320,12 @@ final class SmokeTests: XCTestCase {
     /// test wall-clock should stay under 5s — AC-T2 pyramid level for
     /// "screen-existence + button-existence" assertions.
     func test_settingsPageHasNoDebugTestButton() {
-        // The Settings gear is the default-screen entry on both layouts
-        // (iPhone tab nav + iPad sidebar/detail).
+        // Settings is a first-class destination on both layouts since
+        // T-823 / DUT-187 — an iPhone tab + an iPad sidebar row, promoted
+        // from the old per-tab gear sheet. Reach it the device-agnostic way
+        // (`goToTab` taps the tab bar on iPhone, the sidebar row on iPad).
         XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
-
-        // Tap the gear icon. Per the shared `SettingsToolbarModifier`
-        // (DUT-26 — applied to every tab by `TabStack`, replacing the
-        // pre-DUT-26 per-view `FeedView.settingsToolbarLink`), the
-        // accessibility label is "Settings" (on the `Image(systemName:
-        // "gearshape")`). The accessibility identifier
-        // `feed-toolbar-settings` is also available as a secondary handle.
-        let settingsButton = app.buttons["Settings"]
-        XCTAssertTrue(
-            settingsButton.waitForExistence(timeout: 5),
-            "Settings gear icon should be visible on the Feed nav bar"
-        )
-        settingsButton.tap()
+        goToTab(phoneLabel: "Settings", padTitle: "Settings")
 
         // Positive signal: the notifications toggle from US-36 / AC-36.1.
         // The `Toggle`'s label text "When New Recipes Drop" surfaces as the
@@ -437,13 +442,9 @@ final class SmokeTests: XCTestCase {
     func test_settingsShopRowIsPresentAndTappable() {
         XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
 
-        // Open Settings via the gear icon (shared `SettingsToolbarModifier`).
-        let settingsButton = app.buttons["Settings"]
-        XCTAssertTrue(
-            settingsButton.waitForExistence(timeout: 5),
-            "Settings gear icon should be visible on the Feed nav bar"
-        )
-        settingsButton.tap()
+        // Open Settings — a first-class tab (iPhone) / sidebar row (iPad)
+        // since T-823 / DUT-187 (promoted from the old per-tab gear).
+        goToTab(phoneLabel: "Settings", padTitle: "Settings")
 
         // The Shop row sits near the bottom of the Settings list (between
         // About and the version footer), so scroll it into view. Identified by
@@ -476,15 +477,11 @@ final class SmokeTests: XCTestCase {
     /// the contract XCUITest can: the section + button are present.
     func test_settingsAccountSectionIsPresent() {
         // Device-agnostic: iPhone uses a bottom tab bar, iPad a sidebar
-        // (NavigationSplitView, US-38 / DUT-89) — both surface the Settings
-        // gear, so wait for the gear directly rather than a tab bar (which
-        // doesn't exist on iPad). This makes the test pass on iPhone + iPad.
-        let settingsButton = app.buttons["Settings"]
-        XCTAssertTrue(
-            settingsButton.waitForExistence(timeout: 12),
-            "Settings gear should be visible (iPhone tab nav or iPad sidebar)"
-        )
-        settingsButton.tap()
+        // (NavigationSplitView, US-38 / DUT-89). Settings is a first-class
+        // destination on both since T-823 / DUT-187 (promoted from the old
+        // per-tab gear), so reach it via the shared tab/sidebar helper.
+        XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
+        goToTab(phoneLabel: "Settings", padTitle: "Settings")
 
         // The Account section header (US-46) sits at the top of Settings.
         XCTAssertTrue(

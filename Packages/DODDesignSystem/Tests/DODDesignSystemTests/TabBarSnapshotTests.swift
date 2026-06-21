@@ -46,6 +46,9 @@ final class TabBarSnapshotTests: XCTestCase {
     func test_tabBar_searchSelected_light_iPhone13() {
         assertTabBarSnapshot(selected: .search, device: .iPhone13)
     }
+    func test_tabBar_settingsSelected_light_iPhone13() {
+        assertTabBarSnapshot(selected: .settings, device: .iPhone13)
+    }
 
     // MARK: - iPad 12.9"
 
@@ -57,6 +60,9 @@ final class TabBarSnapshotTests: XCTestCase {
     }
     func test_tabBar_searchSelected_light_iPad129() {
         assertTabBarSnapshot(selected: .search, device: .iPad129)
+    }
+    func test_tabBar_settingsSelected_light_iPad129() {
+        assertTabBarSnapshot(selected: .settings, device: .iPad129)
     }
 
     /// Records on missing so the very first run lays down baselines
@@ -112,12 +118,13 @@ final class TabBarSnapshotTests: XCTestCase {
 private struct TabBarFixture: View {
 
     enum Tab: Hashable, CaseIterable {
-        case feed, saved, search
+        case feed, saved, settings, search
 
         var title: String {
             switch self {
             case .feed: "Recipes"
             case .saved: "Saved"
+            case .settings: "Settings"
             case .search: "Search"
             }
         }
@@ -126,6 +133,7 @@ private struct TabBarFixture: View {
             switch self {
             case .feed: "house"
             case .saved: "bookmark"
+            case .settings: "gearshape"
             case .search: "magnifyingglass"
             }
         }
