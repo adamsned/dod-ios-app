@@ -65,6 +65,22 @@ public struct FirstCookoutView: View {
             }
             controls
         }
+        // DUT-188 — explicit dismiss affordance: an X in the top-trailing
+        // corner (pinned outside the ScrollView so it never scrolls away).
+        // Swipe-down already works since this is a `.sheet` with no
+        // `.interactiveDismissDisabled`; the X is the discoverable companion.
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(DODColor.labelSecondary)
+            }
+            .accessibilityLabel("Close")
+            .accessibilityIdentifier("first-cookout-close")
+        }
         .padding(DODSpacing.lg)
         .background(DODColor.surface)
         .animation(.easeInOut(duration: 0.25), value: index)

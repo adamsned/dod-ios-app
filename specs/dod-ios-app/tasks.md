@@ -2649,19 +2649,25 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **What:** Promote Settings from the per-tab gear sheet to a first-class bottom-tab destination (iPhone, between Saved and Search) / sidebar row (iPad); delete the `SettingsToolbarModifier`; move the Feed "Your First Cookout" + Cook Journal toolbar buttons from the leading to the trailing edge (the corner the gear + layout toggle vacated).
 - **Files:** `App/AppTab.swift` (`.settings` case + `title` / `tabLabel` / `systemImage` / `telemetryName`); `App/TabStack.swift` (render `SettingsView` for `.settings`, drop the three `settingsToolbar` modifiers, add `settingsTabViewModel`); deleted `App/SettingsToolbar.swift`; `DODFeatureFeed/FeedView.swift` (First Cookout + Journal → `.topBarTrailing`); `AppTests/AppTabTests.swift` (4-tab order + `.settings` assertions); `UITests/SmokeTests.swift` (4-tab order; Settings-reachability tests + `waitForAppReady` via `goToTab` / button-cell-staticText probe); `DODDesignSystem/Tests/.../TabBarSnapshotTests.swift` (4-tab fixture + 2 `settingsSelected` baselines). `RootView` unchanged — `phoneTabs` + the iPad sidebar already iterate `AppTab.allCases`. Needs `xcodegen generate` for the `SettingsToolbar.swift` removal (App-target file delta).
 - **AC:** AC-16.1 + AC-16.5 + AC-32.1 (amended; CL-217 canonical). **Est:** ~45 min. **Deps:** main at T-822 (`08753c6`). Branch `feat/T-823-settings-tab-toolbar-reshuffle`. **||:** P-settings/nav. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean; L4 TabBar baselines auto-recorded on iPhone 17.
+
+### T-824 — DUT-188 First Cookout: explicit X dismiss + de-em-dash the flow copy (US-53 / AC-53.4 new, CL-218)
+
+- **What:** Add an X / Close button to `FirstCookoutView` (top-trailing `.overlay` placed outside the `ScrollView`, wired to the already-injected `@Environment(\.dismiss)`); swipe-down already works since it's a `.sheet` with no `.interactiveDismissDisabled`. Strip em dashes from all 10 user-facing strings in the flow (7 in `GuidedCookout`, 3 in `FirstCookoutView+Stages`) per the copy convention; comments / `// MARK:` lines untouched.
+- **Files:** `DODFeatureFeed/FirstCookoutView.swift` (X overlay); `DODSupport/GuidedCookout.swift` (7 coaching strings); `DODFeatureFeed/FirstCookoutView+Stages.swift` (3 captions/labels).
+- **AC:** AC-53.4 (new; CL-218 canonical). **Est:** ~25 min. **Deps:** main at T-823 (`801ca75`). Branch `feat/T-824-first-cookout-dismiss-de-emdash`. **||:** P-firstcookout. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean.
 ---
 
-### T-824 — First Cookout hero card: make the wedge discoverable (US-53 / DUT-183, CL-218)
+### T-825 — First Cookout hero card: make the wedge discoverable (US-53 / DUT-183, CL-219)
 
 - **What:** A prominent "START HERE" hero card at the top of the Feed promoting "Your First Cookout" (the keystone coached path), so beginners find it instead of relying on the small toolbar flame. Tapping opens the existing `FirstCookoutView`; dismissible + persisted (`@AppStorage`).
-- **Files:** `FirstCookoutHeroCard.swift` (new, DODFeatureFeed), `FeedView.swift` (render at top of the list + dismiss state). Spec: `clarifications.md` (CL-218).
-- **AC:** US-53 / DUT-183 (CL-218 canonical). **Est:** ~1.5 h. **Deps:** off main (post CL-217 toolbar reshuffle). Branch `feat/T-822-first-cookout-hero-card`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; macOS DODFeatureFeed build complete; iOS app build green (xcodebuild exit 0). Discoverability is device-observable — TestFlight walk.
+- **Files:** `FirstCookoutHeroCard.swift` (new, DODFeatureFeed), `FeedView.swift` (render at top of the list + dismiss state). Spec: `clarifications.md` (CL-219).
+- **AC:** US-53 / DUT-183 (CL-219 canonical). **Est:** ~1.5 h. **Deps:** off main (post CL-217 toolbar reshuffle). Branch `feat/T-822-first-cookout-hero-card`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; macOS DODFeatureFeed build complete; iOS app build green (xcodebuild exit 0). Discoverability is device-observable — TestFlight walk.
 
-### T-825 — The second rung: one win → a coached path (US-53 / DUT-183, CL-219)
+### T-826 — The second rung: one win → a coached path (US-53 / DUT-183, CL-220)
 
 - **What:** Rung 2 (`GuidedCookout.italianChicken` — Italian chicken in gravy, WP id 683) + the path model (`path`, `nextUncookedRung(cookedRecipeIDs:)`, `isFirstRung`) + a **progress-aware Feed hero** that shows the next un-cooked rung from the journal and hides once the path is complete. Cooking rung 1 advances the hero + flow to rung 2.
-- **Files:** `GuidedCookout+Path.swift` (new — rung 2 + path), `GuidedCookoutPathTests.swift` (new), `FirstCookoutHeroCard.swift` (rung-aware title/eyebrow/hook), `FeedView.swift` (`currentRung` from `cookLogs`, refresh after `logCook`). Spec: `clarifications.md` (CL-219).
-- **AC:** US-53 / DUT-183 (CL-219 canonical). **Est:** ~3 h. **Deps:** stacked on T-824 (hero card). Branch `feat/T-825-second-rung`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 455 DODSupport (new path suite) + 93 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). **Next rungs** slot into `GuidedCookout.path` as Ned curates them.
+- **Files:** `GuidedCookout+Path.swift` (new — rung 2 + path), `GuidedCookoutPathTests.swift` (new), `FirstCookoutHeroCard.swift` (rung-aware title/eyebrow/hook), `FeedView.swift` (`currentRung` from `cookLogs`, refresh after `logCook`). Spec: `clarifications.md` (CL-220).
+- **AC:** US-53 / DUT-183 (CL-220 canonical). **Est:** ~3 h. **Deps:** stacked on T-825 (hero card). Branch `feat/T-825-second-rung`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 455 DODSupport (new path suite) + 93 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). **Next rungs** slot into `GuidedCookout.path` as Ned curates them.
 
 ---
 

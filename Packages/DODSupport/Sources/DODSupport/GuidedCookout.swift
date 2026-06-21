@@ -115,7 +115,7 @@ extension GuidedCookout {
         recipeID: 1459,
         dishTitle: "Dutch Oven Lasagna",
         whyThisDish:
-            "Lasagna looks like a showpiece — but in a Dutch oven it's one of the most "
+            "Lasagna looks like a showpiece, but in a Dutch oven it's one of the most "
             + "forgiving meals there is. You layer it, put the lid on, and walk away. It "
             + "feeds a crowd, everyone's impressed, and it's almost impossible to ruin. "
             + "That's exactly why it's the right first cookout.",
@@ -125,7 +125,7 @@ extension GuidedCookout {
                 stage: .gather,
                 title: "Lay out your gear and ingredients",
                 coaching:
-                    "Get everything out before you start — it makes the whole thing feel "
+                    "Get everything out before you start. It makes the whole thing feel "
                     + "easy. Don't worry about being precise; lasagna forgives a lot."
             ),
             Step(
@@ -135,14 +135,14 @@ extension GuidedCookout {
                 coaching:
                     "This is the part that feels scary the first time. It isn't. Light a "
                     + "chimney of charcoal, and I'll tell you exactly how many coals and "
-                    + "where to put them — bottom and lid. You've got this."
+                    + "where to put them, bottom and lid. You've got this."
             ),
             Step(
                 id: "layer-and-lid",
                 stage: .cook,
                 title: "Layer it, lid it, let it cook",
                 coaching:
-                    "Sauce, noodles, cheese — layer it up, set the lid, and step away. The "
+                    "Sauce, noodles, cheese. Layer it up, set the lid, and step away. The "
                     + "Dutch oven does the work. I'll keep the timer with you so you can "
                     + "relax and be with your people."
             ),
@@ -152,15 +152,15 @@ extension GuidedCookout {
                 title: "Lift the lid",
                 coaching:
                     "Bubbling, golden, smells incredible. You did that. Snap a photo before "
-                    + "everyone digs in — you'll want to remember your first one."
+                    + "everyone digs in. You'll want to remember your first one."
             ),
         ],
         celebrationMessage:
-            "That's it — you just cooked a Dutch oven lasagna. The first one is the "
+            "That's it. You just cooked a Dutch oven lasagna. The first one is the "
             + "hardest, and you nailed it. (I burned plenty of mine learning.) "
             + "You're the cook now.",
         nextStepPrompt:
-            "Make it again this week at home to lock it in — then take it to the campfire "
+            "Make it again this week at home to lock it in, then take it to the campfire "
             + "and watch your family's faces.",
         ovenTempF: 375,
         ovenDiameterInches: 12,
