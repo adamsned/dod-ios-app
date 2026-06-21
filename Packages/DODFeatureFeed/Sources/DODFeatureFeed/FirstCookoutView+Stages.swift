@@ -71,7 +71,7 @@ extension FirstCookoutView {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
             Text(
-                "for a \(cookout.ovenDiameterInches)-inch oven at \(cookout.ovenTempF)°F — "
+                "for a \(cookout.ovenDiameterInches)-inch oven at \(cookout.ovenTempF)°F, "
                     + "add a few fresh ones after about \(coals.refreshIntervalMinutes) minutes"
             )
             .dodFont(DODType.caption)
@@ -132,7 +132,7 @@ extension FirstCookoutView {
                         .monospacedDigit()
                         .foregroundStyle(DODColor.burntOrange)
                 }
-                Text("\(cookout.dishTitle) bake — you can step away")
+                Text("\(cookout.dishTitle) bake, you can step away")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
                 Button("Cancel timer") { timerEngine.cancel(active.id) }
@@ -195,7 +195,7 @@ extension FirstCookoutView {
                     message: Text(shareCaption),
                     preview: SharePreview("My \(cookout.dishTitle)", image: photo)
                 ) {
-                    Label("Share / Post — tags Dutch Oven Daddy", systemImage: "square.and.arrow.up")
+                    Label("Share / Post, tags Dutch Oven Daddy", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(DODColor.burntOrange)
