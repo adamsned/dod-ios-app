@@ -20,7 +20,7 @@ struct FirstCookoutHeroCard: View {
             HStack(spacing: DODSpacing.xs) {
                 Image(systemName: "flame.fill")
                     .foregroundStyle(DODColor.burntOrange)
-                Text("START HERE")
+                Text(cookout.isFirstRung ? "START HERE" : "YOUR NEXT WIN")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.burntOrange)
                 Spacer(minLength: 0)
@@ -33,16 +33,13 @@ struct FirstCookoutHeroCard: View {
                 .accessibilityLabel("Dismiss")
                 .accessibilityIdentifier("feed-first-cookout-hero-dismiss")
             }
-            Text("Your First Cookout")
+            Text(cookout.isFirstRung ? "Your First Cookout" : "Your Next Cookout")
                 .dodFont(DODType.displayMedium)
                 .foregroundStyle(DODColor.label)
-            Text(
-                "One guaranteed win: \(cookout.dishTitle). I'll walk you through every "
-                    + "step. The coals, the timing, all of it. You've got this."
-            )
-            .dodFont(DODType.body)
-            .foregroundStyle(DODColor.labelSecondary)
-            .fixedSize(horizontal: false, vertical: true)
+            Text(heroHook)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             Button(action: onStart) {
                 Text("Let's cook")
                     .frame(maxWidth: .infinity)
@@ -63,6 +60,17 @@ struct FirstCookoutHeroCard: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("feed-first-cookout-hero")
+    }
+
+    private var heroHook: String {
+        if cookout.isFirstRung {
+            return
+                "One guaranteed win: \(cookout.dishTitle). I'll walk you through every step. "
+                + "The coals, the timing, all of it. You've got this."
+        }
+        return
+            "Ready for your next one? \(cookout.dishTitle). Even more forgiving than your "
+            + "first. Let's keep the streak going."
     }
 }
 

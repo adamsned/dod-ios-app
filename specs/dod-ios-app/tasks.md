@@ -2657,6 +2657,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `FirstCookoutHeroCard.swift` (new, DODFeatureFeed), `FeedView.swift` (render at top of the list + dismiss state). Spec: `clarifications.md` (CL-218).
 - **AC:** US-53 / DUT-183 (CL-218 canonical). **Est:** ~1.5 h. **Deps:** off main (post CL-217 toolbar reshuffle). Branch `feat/T-822-first-cookout-hero-card`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; macOS DODFeatureFeed build complete; iOS app build green (xcodebuild exit 0). Discoverability is device-observable — TestFlight walk.
 
+### T-825 — The second rung: one win → a coached path (US-53 / DUT-183, CL-219)
+
+- **What:** Rung 2 (`GuidedCookout.italianChicken` — Italian chicken in gravy, WP id 683) + the path model (`path`, `nextUncookedRung(cookedRecipeIDs:)`, `isFirstRung`) + a **progress-aware Feed hero** that shows the next un-cooked rung from the journal and hides once the path is complete. Cooking rung 1 advances the hero + flow to rung 2.
+- **Files:** `GuidedCookout+Path.swift` (new — rung 2 + path), `GuidedCookoutPathTests.swift` (new), `FirstCookoutHeroCard.swift` (rung-aware title/eyebrow/hook), `FeedView.swift` (`currentRung` from `cookLogs`, refresh after `logCook`). Spec: `clarifications.md` (CL-219).
+- **AC:** US-53 / DUT-183 (CL-219 canonical). **Est:** ~3 h. **Deps:** stacked on T-824 (hero card). Branch `feat/T-825-second-rung`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 455 DODSupport (new path suite) + 93 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). **Next rungs** slot into `GuidedCookout.path` as Ned curates them.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
