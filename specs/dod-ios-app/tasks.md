@@ -2602,4 +2602,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-821 — Cook journal made visible: photo persistence + Cook Journal screen (US-48 / DUT-104, CL-215)
+
+- **What:** Completes "I Made This". `CookPhotoStore` (file-backed, Application Support/CookPhotos) saves the celebrate photo → `CookLogEntry.photoLocalID`; `CookJournalView` shows a stats header (`CookLogStats`) + a newest-first list (title/date/photo) with an empty state; entry is a book button on the Feed toolbar. `FeedDependencies.cookLogs()` → `RecipeStore.allCookLogs`.
+- **Files:** `CookPhotoStore.swift` + `CookPhotoStoreTests.swift` (new, DODPersistence), `CookJournalView.swift` (new, DODFeatureFeed), `FirstCookoutView.swift` (save photo on Done), `FeedDependencies.swift` (cookLogs), `FeedViewModel.swift` (cookLogs), `FeedView.swift` (journal entry). Spec: `clarifications.md` (CL-215).
+- **AC:** US-48 / DUT-104 (CL-215 canonical). **Est:** ~3.5 h. **Deps:** stacked on T-820. Branch `feat/T-821-cook-journal-view`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 116 DODPersistence + 83 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). Live camera-photo-in-journal is device-only (TestFlight).
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

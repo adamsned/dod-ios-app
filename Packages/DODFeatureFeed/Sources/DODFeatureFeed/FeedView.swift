@@ -19,6 +19,8 @@ public struct FeedView: View {
         RecipeListLayout.gallery.rawValue
     /// DUT-183 — presents the guided "Your First Cookout" flow as a sheet.
     @State private var showingFirstCookout = false
+    /// DUT-104 — presents the "I Made This" cook journal as a sheet.
+    @State private var showingJournal = false
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
@@ -61,6 +63,16 @@ public struct FeedView: View {
                 firstCookoutToolbarButton
             }
             #endif
+            // DUT-104 — the Cook Journal entry, also on the leading edge.
+            #if os(iOS)
+            ToolbarItem(placement: .topBarLeading) {
+                journalToolbarButton
+            }
+            #else
+            ToolbarItem(placement: .automatic) {
+                journalToolbarButton
+            }
+            #endif
             // US-38 / AC-38.1 / CL-64.5 (T-650): layout toggle on the
             // trailing edge. The Settings gear that used to sit to its
             // trailing side (US-32 AC-32.1) moved to the shared
@@ -86,6 +98,9 @@ public struct FeedView: View {
             FirstCookoutView(onLogCook: { entry in
                 Task { await viewModel.logCook(entry) }
             })
+        }
+        .sheet(isPresented: $showingJournal) {
+            CookJournalView(load: { await viewModel.cookLogs() })
         }
         .task { await viewModel.onAppear() }
         .refreshable { await viewModel.refresh() }
@@ -124,6 +139,19 @@ public struct FeedView: View {
         }
         .tint(DODColor.burntOrange)
         .accessibilityIdentifier("feed-toolbar-first-cookout")
+    }
+
+    /// DUT-104 — the Cook Journal entry: a book on the leading edge that opens
+    /// the user's logged-cook history + streak stats.
+    private var journalToolbarButton: some View {
+        Button {
+            showingJournal = true
+        } label: {
+            Image(systemName: "book.closed.fill")
+                .accessibilityLabel("Cook Journal")
+        }
+        .tint(DODColor.burntOrange)
+        .accessibilityIdentifier("feed-toolbar-journal")
     }
 
     @ViewBuilder

@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODPersistence
 import DODSupport
 import PhotosUI
 import SwiftUI
@@ -33,6 +34,8 @@ public struct FirstCookoutView: View {
     @State var checkedItems: Set<String> = []
     @State var cookPhotoItem: PhotosPickerItem?
     @State var cookPhoto: Image?
+    /// Raw JPEG bytes of the captured photo — saved to the journal on "Done".
+    @State var cookPhotoData: Data?
     @State var showingCamera = false
     /// Guards against double-logging if the user taps Done more than once.
     @State private var hasLoggedCook = false
@@ -73,7 +76,10 @@ public struct FirstCookoutView: View {
             #if canImport(UIKit)
             CameraPicker { image in
                 showingCamera = false
-                if let image { cookPhoto = Image(uiImage: image) }
+                if let image {
+                    cookPhoto = Image(uiImage: image)
+                    cookPhotoData = image.jpegData(compressionQuality: 0.85)
+                }
             }
             .ignoresSafeArea()
             #else
@@ -96,6 +102,7 @@ public struct FirstCookoutView: View {
 
     private func loadPhoto(_ item: PhotosPickerItem?) async {
         guard let item, let data = try? await item.loadTransferable(type: Data.self) else { return }
+        cookPhotoData = data
         #if canImport(UIKit)
         if let uiImage = UIImage(data: data) {
             cookPhoto = Image(uiImage: uiImage)
@@ -233,12 +240,16 @@ public struct FirstCookoutView: View {
     private func logCookIfNeeded() {
         guard !hasLoggedCook else { return }
         hasLoggedCook = true
+        // Persist the celebrate photo to disk (DUT-104); the entry keeps only the
+        // lightweight filename, not the bytes.
+        let photoID = cookPhotoData.flatMap { try? CookPhotoStore().save($0) }
         onLogCook?(
             CookLogEntry(
                 id: UUID(),
                 recipeID: cookout.recipeID,
                 recipeTitle: cookout.dishTitle,
-                cookedAt: .now
+                cookedAt: .now,
+                photoLocalID: photoID
             )
         )
     }
