@@ -2570,4 +2570,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-817 — First Cookout polish round 1 (US-53 / AC-53.2/53.3, CL-211) — five fixes from Ned's live TestFlight walkthrough
+
+- **What:** (1) "Open the recipe" works (dismiss the sheet so the in-app recipe navigation is visible); (2) the *gather* stage shows a tappable gear + ingredients check-off list (new `GuidedCookout.gear` + `.ingredients`); (3) the *fire* stage adds an "Open the Heat Coach" button (presents `HeatCoachView`); (4) a lid-rotation reminder (90° every 15 min) at *cook*; (5) photo + share-to-social at *celebrate* (`PhotosPicker` + `ShareLink` tagging Dutch Oven Daddy).
+- **Files:** `GuidedCookout.swift` (gear/ingredients), `FirstCookoutView.swift` (trimmed) + `FirstCookoutView+Stages.swift` (new extension — stage views, to stay under the length caps), `GuidedCookoutTests.swift` (pins). Spec: `clarifications.md` (CL-211).
+- **AC:** US-53 / AC-53.2 + AC-53.3 (CL-211 canonical). **Est:** ~3 h. **Deps:** stacked on T-816. Branch `feat/T-817-first-cookout-gather-and-recipe-fix`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean (both files + test); 426 DODSupport tests pass; iOS app build green (xcodebuild exit 0). **Next:** voice-at-cook (DUT-101) + the "I Made This" persistence so the celebrate photo logs to the journal.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

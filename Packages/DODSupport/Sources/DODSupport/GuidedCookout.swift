@@ -61,6 +61,10 @@ public struct GuidedCookout: Sendable, Equatable {
     /// The dish's bake time in minutes — the duration of the live timer offered
     /// at the *cook* stage.
     public let bakeMinutes: Int
+    /// The gear to round up at the *gather* stage (a curated checklist).
+    public let gear: [String]
+    /// The ingredients to round up at the *gather* stage (a curated checklist).
+    public let ingredients: [String]
 
     public init(
         recipeSlug: String,
@@ -71,7 +75,9 @@ public struct GuidedCookout: Sendable, Equatable {
         nextStepPrompt: String,
         ovenTempF: Int = 350,
         ovenDiameterInches: Int = 12,
-        bakeMinutes: Int = 45
+        bakeMinutes: Int = 45,
+        gear: [String] = [],
+        ingredients: [String] = []
     ) {
         self.recipeSlug = recipeSlug
         self.dishTitle = dishTitle
@@ -82,6 +88,8 @@ public struct GuidedCookout: Sendable, Equatable {
         self.ovenTempF = ovenTempF
         self.ovenDiameterInches = ovenDiameterInches
         self.bakeMinutes = bakeMinutes
+        self.gear = gear
+        self.ingredients = ingredients
     }
 
     /// The steps belonging to a given stage, in order.
@@ -150,6 +158,23 @@ extension GuidedCookout {
             + "and watch your family's faces.",
         ovenTempF: 375,
         ovenDiameterInches: 12,
-        bakeMinutes: 45
+        bakeMinutes: 45,
+        gear: [
+            "12-inch Dutch oven with a lid",
+            "Lid lifter or a sturdy pair of pliers",
+            "Charcoal briquettes + a chimney starter",
+            "Heat-proof gloves",
+            "A trivet or flat spot to set the oven on",
+        ],
+        ingredients: [
+            "1 lb ground beef or Italian sausage",
+            "1 jar (24 oz) marinara sauce",
+            "9 no-boil lasagna noodles",
+            "15 oz ricotta cheese",
+            "2 cups shredded mozzarella",
+            "½ cup grated parmesan",
+            "1 egg",
+            "Italian seasoning, salt + pepper",
+        ]
     )
 }

@@ -1,29 +1,36 @@
 import DODDesignSystem
 import DODSupport
+import PhotosUI
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// The guided "Your First Cookout" flow (US-53 / AC-53.2 / DUT-183) — the
-/// keystone experience that walks a nervous beginner through one guaranteed
-/// win, coached by Ned, and lands on the *"I did it"* moment.
-///
-/// It renders the pure ``GuidedCookout`` content spine as a paged flow:
-/// **intro → the four stages (gather / fire / cook / celebrate) → celebration**.
-/// This first slice is self-contained — the *cook* stage links out to the
-/// lasagna recipe; later slices wire the live engines per stage (the charcoal
-/// card at *fire*, the timer + voice at *cook*, the "I Made This" capture at
-/// *celebrate*).
+/// keystone that walks a nervous beginner through one guaranteed win, coached by
+/// Ned, and lands on the *"I did it"* moment. Renders the pure ``GuidedCookout``
+/// spine as a paged flow (intro → gather → fire → cook → celebrate) and wires the
+/// built engines in per stage. The stage-specific views live in
+/// `FirstCookoutView+Stages.swift`.
 public struct FirstCookoutView: View {
 
-    private let cookout: GuidedCookout
-    /// Web home of the recipe, used to deep-link the *cook* stage to the dish.
-    private let recipeBaseURL: String
+    let cookout: GuidedCookout
+    /// Web home of the recipe; the *cook* stage opens `base/<slug>/` which the
+    /// app's `openURL` override resolves to the in-app recipe detail.
+    let recipeBaseURL: String
 
-    @Environment(\.openURL) private var openURL
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) var openURL
+    @Environment(\.dismiss) var dismiss
     /// 0 = intro; 1...steps.count = each coached step; steps.count + 1 = celebration.
     @State private var index = 0
     /// Drives the live bake timer offered at the *cook* stage (DUT-100).
-    @State private var timerEngine = CookTimerEngine()
+    @State var timerEngine = CookTimerEngine()
+    @State var showingHeatCoach = false
+    /// Items the cook has ticked off the *gather* checklist.
+    @State var checkedItems: Set<String> = []
+    @State var cookPhotoItem: PhotosPickerItem?
+    @State var cookPhoto: Image?
 
     public init(
         cookout: GuidedCookout = .firstCookout,
@@ -33,18 +40,31 @@ public struct FirstCookoutView: View {
         self.recipeBaseURL = recipeBaseURL
     }
 
-    private var lastIndex: Int { cookout.steps.count + 1 }
+    var lastIndex: Int { cookout.steps.count + 1 }
+
+    var shareCaption: String {
+        "I made my first \(cookout.dishTitle) with @dutchovendaddy! 🔥 #DutchOvenDaddy"
+    }
 
     public var body: some View {
         VStack(spacing: DODSpacing.lg) {
-            screen
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView {
+                screen
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, DODSpacing.md)
+            }
             controls
         }
         .padding(DODSpacing.lg)
         .background(DODColor.surface)
         .animation(.easeInOut(duration: 0.25), value: index)
         .task { await runTimerTick() }
+        .sheet(isPresented: $showingHeatCoach) {
+            NavigationStack { HeatCoachView() }
+        }
+        .onChange(of: cookPhotoItem) { _, newItem in
+            Task { await loadPhoto(newItem) }
+        }
     }
 
     /// Advances the timer engine ~1×/s while the flow is on screen so the bake
@@ -56,51 +76,13 @@ public struct FirstCookoutView: View {
         }
     }
 
-    /// DUT-100 / DUT-183 — the live bake timer at the *cook* stage: start it and
-    /// watch it count down right in the flow, so the cook can walk away and be
-    /// with their people. Three states: not started → counting down → done.
-    @ViewBuilder private var cookTimerCard: some View {
-        if let active = timerEngine.timers.first(where: { $0.isRunning }) {
-            VStack(spacing: DODSpacing.xxs) {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(formatRemaining(active.remaining(at: context.date)))
-                        .dodFont(DODType.displayMedium)
-                        .monospacedDigit()
-                        .foregroundStyle(DODColor.burntOrange)
-                }
-                Text("\(cookout.dishTitle) bake — you can step away")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                Button("Cancel timer") { timerEngine.cancel(active.id) }
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            .padding(.top, DODSpacing.xs)
-        } else if timerEngine.timers.contains(where: { $0.state == .finished }) {
-            VStack(spacing: DODSpacing.xxs) {
-                Text("Timer's up!")
-                    .dodFont(DODType.heading)
-                    .foregroundStyle(DODColor.burntOrange)
-                Text("Go check your \(cookout.dishTitle).")
-                    .dodFont(DODType.body)
-                    .foregroundStyle(DODColor.label)
-            }
-            .padding(.top, DODSpacing.xs)
-        } else {
-            Button("Start the \(cookout.bakeMinutes)-minute bake timer") {
-                timerEngine.start(
-                    label: "\(cookout.dishTitle) bake",
-                    duration: Double(cookout.bakeMinutes) * 60
-                )
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(DODColor.burntOrange)
-            .padding(.top, DODSpacing.xs)
+    private func loadPhoto(_ item: PhotosPickerItem?) async {
+        guard let item, let data = try? await item.loadTransferable(type: Data.self) else { return }
+        #if canImport(UIKit)
+        if let uiImage = UIImage(data: data) {
+            cookPhoto = Image(uiImage: uiImage)
         }
-    }
-
-    private func formatRemaining(_ seconds: TimeInterval) -> String {
-        let total = Int(seconds.rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
+        #endif
     }
 
     // MARK: - Screens
@@ -148,55 +130,21 @@ public struct FirstCookoutView: View {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
                 .multilineTextAlignment(.center)
-            if step.stage == .fire {
+            switch step.stage {
+            case .gather:
+                gatherChecklist
+            case .fire:
                 coalsCard
-            }
-            if step.stage == .cook {
+                heatCoachButton
+            case .cook:
+                rotationReminder
                 cookTimerCard
-                Button("Open the \(cookout.dishTitle) recipe") {
-                    if let url = URL(string: "\(recipeBaseURL)/\(cookout.recipeSlug)/") {
-                        openURL(url)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(DODColor.burntOrange)
-                .padding(.top, DODSpacing.xs)
+                recipeButton
+            case .celebrate:
+                EmptyView()
             }
         }
         .frame(maxWidth: 520)
-    }
-
-    /// DUT-128 / DUT-183 — the live coal recommendation for the dish at the
-    /// *fire* stage: total briquettes + bottom/lid split, so the scariest part
-    /// of a first cookout is a concrete number instead of a guess.
-    private var coalsCard: some View {
-        let coals = CharcoalRecipeConverter.recommend(
-            ovenTempF: cookout.ovenTempF,
-            ovenDiameterInches: cookout.ovenDiameterInches,
-            task: .bake
-        )
-        return VStack(spacing: DODSpacing.xxs) {
-            Text("\(coals.totalBriquettes) coals")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.burntOrange)
-            Text("\(coals.bottom) on the bottom · \(coals.top) on the lid")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-            Text(
-                "for a \(cookout.ovenDiameterInches)-inch oven at \(cookout.ovenTempF)°F — "
-                    + "add a few fresh ones after about \(coals.refreshIntervalMinutes) minutes"
-            )
-            .dodFont(DODType.caption)
-            .foregroundStyle(DODColor.labelSecondary)
-            .multilineTextAlignment(.center)
-        }
-        .padding(DODSpacing.md)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
-                .fill(DODColor.surfaceElevated)
-        )
-        .padding(.top, DODSpacing.xs)
     }
 
     private var celebrationScreen: some View {
@@ -211,6 +159,7 @@ public struct FirstCookoutView: View {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
                 .multilineTextAlignment(.center)
+            shareSection
             Text(cookout.nextStepPrompt)
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
@@ -260,7 +209,7 @@ public struct FirstCookoutView: View {
         return "Next"
     }
 
-    private func stageIcon(_ stage: GuidedCookout.Stage) -> String {
+    func stageIcon(_ stage: GuidedCookout.Stage) -> String {
         switch stage {
         case .gather: return "checklist"
         case .fire: return "flame.fill"

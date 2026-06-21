@@ -20,6 +20,9 @@ struct GuidedCookoutTests {
         #expect(cookout.ovenTempF == 375)
         #expect(cookout.ovenDiameterInches == 12)
         #expect(cookout.bakeMinutes == 45)
+        // The gather checklist needs real gear + ingredients to be useful.
+        #expect(cookout.gear.isEmpty == false)
+        #expect(cookout.ingredients.isEmpty == false)
     }
 
     @Test func coversAllFourStagesInOrder() {
