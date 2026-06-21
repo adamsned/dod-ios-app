@@ -2554,4 +2554,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-815 — First Cookout fire stage: live coal count (US-53 / AC-53.2, CL-209) — first engine wired into the keystone UI
+
+- **What:** The *fire* stage of `FirstCookoutView` now shows the real coal recommendation (`CharcoalRecipeConverter`, DUT-128): total briquettes + bottom/lid split + refresh interval, computed from the dish's bake params. `GuidedCookout` gains `ovenTempF` + `ovenDiameterInches` (lasagna = 375°F / 12"). The scariest part of a first cookout becomes a concrete number.
+- **Files:** `Packages/DODSupport/Sources/DODSupport/GuidedCookout.swift` (params), `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FirstCookoutView.swift` (coals card), `GuidedCookoutTests.swift` (param pins). Spec: `clarifications.md` (CL-209).
+- **AC:** US-53 / AC-53.2 (CL-209 canonical). **Est:** ~2 h. **Deps:** stacked on T-814; required merging `main` (foundations / `CharcoalRecipeConverter`) into the branch since the stack predated #244. Branch `feat/T-815-first-cookout-fire-coals`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 386 DODSupport tests pass; iOS app build green (xcodebuild exit 0). **Next deepenings:** live timer + voice at *cook*; the "I Made This" capture at *celebrate* (needs the cook-journal persistence).
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

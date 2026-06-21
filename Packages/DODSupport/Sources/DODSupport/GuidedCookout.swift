@@ -52,6 +52,12 @@ public struct GuidedCookout: Sendable, Equatable {
     public let celebrationMessage: String
     /// The invitation onward — home reps → the campfire.
     public let nextStepPrompt: String
+    /// The dish's Dutch-oven bake temperature (°F) — drives the live coal count
+    /// shown at the *fire* stage via ``CharcoalRecipeConverter``.
+    public let ovenTempF: Int
+    /// The Dutch-oven diameter (inches) the coal recommendation assumes — 12" is
+    /// the common camp size.
+    public let ovenDiameterInches: Int
 
     public init(
         recipeSlug: String,
@@ -59,7 +65,9 @@ public struct GuidedCookout: Sendable, Equatable {
         whyThisDish: String,
         steps: [Step],
         celebrationMessage: String,
-        nextStepPrompt: String
+        nextStepPrompt: String,
+        ovenTempF: Int = 350,
+        ovenDiameterInches: Int = 12
     ) {
         self.recipeSlug = recipeSlug
         self.dishTitle = dishTitle
@@ -67,6 +75,8 @@ public struct GuidedCookout: Sendable, Equatable {
         self.steps = steps
         self.celebrationMessage = celebrationMessage
         self.nextStepPrompt = nextStepPrompt
+        self.ovenTempF = ovenTempF
+        self.ovenDiameterInches = ovenDiameterInches
     }
 
     /// The steps belonging to a given stage, in order.
@@ -132,6 +142,8 @@ extension GuidedCookout {
             + "You're the cook now.",
         nextStepPrompt:
             "Make it again this week at home to lock it in — then take it to the campfire "
-            + "and watch your family's faces."
+            + "and watch your family's faces.",
+        ovenTempF: 375,
+        ovenDiameterInches: 12
     )
 }

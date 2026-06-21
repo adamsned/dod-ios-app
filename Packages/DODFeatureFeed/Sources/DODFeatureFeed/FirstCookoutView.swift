@@ -89,6 +89,9 @@ public struct FirstCookoutView: View {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
                 .multilineTextAlignment(.center)
+            if step.stage == .fire {
+                coalsCard
+            }
             if step.stage == .cook {
                 Button("Open the \(cookout.dishTitle) recipe") {
                     if let url = URL(string: "\(recipeBaseURL)/\(cookout.recipeSlug)/") {
@@ -101,6 +104,39 @@ public struct FirstCookoutView: View {
             }
         }
         .frame(maxWidth: 520)
+    }
+
+    /// DUT-128 / DUT-183 — the live coal recommendation for the dish at the
+    /// *fire* stage: total briquettes + bottom/lid split, so the scariest part
+    /// of a first cookout is a concrete number instead of a guess.
+    private var coalsCard: some View {
+        let coals = CharcoalRecipeConverter.recommend(
+            ovenTempF: cookout.ovenTempF,
+            ovenDiameterInches: cookout.ovenDiameterInches,
+            task: .bake
+        )
+        return VStack(spacing: DODSpacing.xxs) {
+            Text("\(coals.totalBriquettes) coals")
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.burntOrange)
+            Text("\(coals.bottom) on the bottom · \(coals.top) on the lid")
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+            Text(
+                "for a \(cookout.ovenDiameterInches)-inch oven at \(cookout.ovenTempF)°F — "
+                    + "add a few fresh ones after about \(coals.refreshIntervalMinutes) minutes"
+            )
+            .dodFont(DODType.caption)
+            .foregroundStyle(DODColor.labelSecondary)
+            .multilineTextAlignment(.center)
+        }
+        .padding(DODSpacing.md)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                .fill(DODColor.surfaceElevated)
+        )
+        .padding(.top, DODSpacing.xs)
     }
 
     private var celebrationScreen: some View {
