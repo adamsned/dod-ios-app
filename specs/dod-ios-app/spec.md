@@ -943,6 +943,15 @@ As a cook, I want to privately log when I make a recipe — with my own photo, a
 - **AC-48.5 (habits build on the stats).** The cooking streak (DUT-171), achievement badges (DUT-175), and "Cooking Wrapped" (DUT-177) all read `CookLogStats` — so AC-48.1 is the shared foundation for the E7 habits sub-group.
 
 This is the keystone of epic E2 (Save, Organize & Plan): AC-48.1 unblocks the habit features without waiting on the persistence/UI slices.
+### US-49 — Hands-free Cook Mode voice commands
+
+As a cook with messy hands, I want to say "next", "repeat", or "start a timer" instead of touching a greasy screen, so I can drive Cook Mode without setting down what I'm doing. (Complements the existing read-aloud, which is voice-OUT; this is voice-IN.)
+
+- **AC-49.1 (command grammar — T-806 / CL-200, IMPLEMENTED).** `CookModeVoiceCommand` (DODSupport) is a pure transcript→command mapper: `parse(_:)` lowercases + trims a recognized transcript and resolves a small synonym set to `.next` / `.previous` / `.repeatStep` / `.startTimer` / `.pause` (most-specific phrases first so "start a timer" never reads as navigation), else `.unknown` (ignored). Pure → fully L1-tested without a microphone.
+- **AC-49.2 (on-device recognition).** A mic toggle in Cook Mode runs `SFSpeechRecognizer` with `requiresOnDeviceRecognition` (privacy + offline), feeding transcripts to `parse(_:)`; needs the Speech permission + `NSSpeechRecognitionUsageDescription`.
+- **AC-49.3 (Cook Mode integration).** Recognized commands drive Cook Mode navigation + TTS re-read; `.startTimer` starts the current step's timer via the `CookTimerEngine` (US-47). The spoken step pauses while listening (no feedback loop); permission denial degrades to touch.
+
+This is part of epic E1 (Cooking Session Core), built on the US-47 timer engine.
 
 ---
 

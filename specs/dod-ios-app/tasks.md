@@ -2524,6 +2524,11 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **What:** The pure foundation of the private cook journal. `CookLogEntry` value type (primitives only; personal rating clamped 1–5) + `CookLogStats` pure `Calendar`-injected calculator (totalCooks, timesCooked, mostCooked, currentWeeklyStreak with grace, busiestMonth). No SwiftData/UI yet — that's AC-48.2–48.4 in follow-up slices. Unblocks the E7 habit features (DUT-171/175/177).
 - **Files:** `Packages/DODSupport/Sources/DODSupport/{CookLogEntry,CookLogStats}.swift` (new), `Packages/DODSupport/Tests/DODSupportTests/CookLogStatsTests.swift` (new). Spec: `spec.md` (US-48 AC-48.1), `clarifications.md` (CL-199).
 - **AC:** US-48 / AC-48.1 (CL-199 canonical). **Est:** ~2 h. **Deps:** none — off `main`. Branch `feat/T-805-cook-log-foundation`. No `e2e` label (pure L1). **Verification:** swift-format + SwiftLint `--strict` clean; 391 DODSupport tests pass incl. `CookLogStatsTests` (10 cases, fixed UTC/Monday calendar — deterministic). **Next slices:** AC-48.2 SwiftData persistence on the CloudKit private DB, AC-48.3 "Made it" logging UI, AC-48.4 "My Kitchen" history + "made N times" badge.
+### T-806 — Cook Mode voice-command grammar (US-49 / AC-49.1, CL-200) — first slice of DUT-101 (epic E1)
+
+- **What:** The pure transcript→command mapper for hands-free Cook Mode. `CookModeVoiceCommand.parse(_:)` resolves natural synonyms to `.next`/`.previous`/`.repeatStep`/`.startTimer`/`.pause`/`.unknown` (most-specific first). No `SFSpeechRecognizer`/UI yet — AC-49.2/49.3. `.startTimer` is the hook into the US-47 timer engine.
+- **Files:** `Packages/DODSupport/Sources/DODSupport/CookModeVoiceCommand.swift` (new), `Packages/DODSupport/Tests/DODSupportTests/CookModeVoiceCommandTests.swift` (new). Spec: `spec.md` (US-49 AC-49.1), `clarifications.md` (CL-200).
+- **AC:** US-49 / AC-49.1 (CL-200 canonical). **Est:** ~1.5 h. **Deps:** none — off `main`. Branch `feat/T-806-cook-voice-command-parser`. No `e2e` label (pure L1). **Verification:** swift-format + SwiftLint `--strict` clean; 390 DODSupport tests pass incl. `CookModeVoiceCommandTests` (8 cases). **Next slices:** AC-49.2 on-device `SFSpeechRecognizer` + mic toggle, AC-49.3 Cook Mode navigation + TTS re-read + `.startTimer`→`CookTimerEngine` wiring.
 
 ---
 
