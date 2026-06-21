@@ -36,6 +36,18 @@ extension RecipeDetailViewModel {
                 merging: listItem,
                 canonicalURL: canonicalURL
             )
+            // DUT-185: WP Recipe Maker now renders steps client-side and redacts
+            // them from every scrapable source (JSON-LD, server HTML, the WPRM
+            // REST API), so some recipes (e.g. Dutch Oven 7 Can Soup) parse with
+            // an EMPTY instruction list — the recipe layout would show a blank
+            // Instructions section. The steps still live in the post's
+            // "How to Make" body, so fall back to the article-body path (which
+            // renders the full post) rather than a step-less recipe. A recipe
+            // that DOES parse instructions is unchanged.
+            guard !parsed.instructions.isEmpty else {
+                await classifyAsArticleOrFail(html: html)
+                return
+            }
             try await dependencies.mergeDetail(parsed)
             recipe = parsed
             // T-732 / CL-129 / AC-4.12: extract the recipe blurb (the
@@ -93,6 +105,22 @@ extension RecipeDetailViewModel {
         try? await dependencies.mergeDetail(article)
         recipe = article
         loadState = .article(article)
+    }
+
+    /// DUT-185: cache-hit dispatch for `.recipe`-kind posts. A recipe cached
+    /// with NO instructions hit the WPRM-redaction gap — its steps render
+    /// client-side and are stripped from every scrapable source (see
+    /// ``fetchAndParse``), so it must re-fetch to re-classify onto the
+    /// article-body path where the "How to Make" steps live. **Guarded on
+    /// ``isOnline()``:** offline we keep serving the cached (step-less but
+    /// ingredient-bearing) view rather than downgrading to "Recipe unavailable"
+    /// — the re-fetch can only help when it can actually run.
+    func hydrateRecipeOrReclassify(_ cached: Recipe) async {
+        if cached.instructions.isEmpty, await dependencies.isOnline() {
+            await fetchAndParse()
+        } else {
+            await hydrateCachedRecipe(cached)
+        }
     }
 
     /// T-736 / CL-133: cache-hit hydration helper for the `.recipe` kind —
