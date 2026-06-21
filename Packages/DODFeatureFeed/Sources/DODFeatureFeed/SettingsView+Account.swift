@@ -1,4 +1,3 @@
-import AuthenticationServices
 import DODDesignSystem
 import DODSupport
 import SwiftUI
@@ -39,7 +38,7 @@ struct AccountSection: View {
             if viewModel.isSignedIn {
                 signedInRows
             } else {
-                signInButton
+                signedOutPointer
             }
         } header: {
             Text("Account")
@@ -56,36 +55,22 @@ struct AccountSection: View {
     private var footerText: String {
         viewModel.isSignedIn
             ? "Signing out returns you to guest mode. Your saved recipes stay on this device."
-            : "Optional — you can browse, save, and comment as a guest without signing in."
+            : "Optional. You can browse, save, and comment as a guest without signing in."
     }
 
     // MARK: Signed-out
 
-    /// AC-46.2 — the native Sign in with Apple button. On success we extract the
-    /// stable user id + (first-auth-only) name/email and hand them to the
-    /// view-model, which resolves + persists the session. Cancellation /
-    /// failure is a no-op (the user stays in guest mode).
-    private var signInButton: some View {
-        SignInWithAppleButton(.signIn) { request in
-            request.requestedScopes = [.fullName, .email]
-        } onCompletion: { result in
-            guard case .success(let authorization) = result,
-                let credential = authorization.credential as? ASAuthorizationAppleIDCredential
-            else { return }
-            viewModel.applySignIn(
-                userIdentifier: credential.user,
-                displayName: AppleCredentialResolver.displayName(from: credential.fullName),
-                email: credential.email,
-                // The one-time authorization code — exchanged server-side for a
-                // refresh token so Delete Account can revoke it (DUT-98).
-                authorizationCode: credential.authorizationCode.flatMap {
-                    String(data: $0, encoding: .utf8)
-                }
-            )
-        }
-        .signInWithAppleButtonStyle(.black)
-        .frame(height: 44)
-        .accessibilityIdentifier("settings-button-sign-in-apple")
+    /// DUT-189 — the Sign in with Apple button moved to the profile editor
+    /// (``AppleProfileSignInButton``, reached via Settings ▸ Profile / the iPad
+    /// sidebar Profile / the recipe ratings gate). When signed out, the Account
+    /// section points there rather than hosting the button; signing in there
+    /// persists the same ``AppleAuthSession`` this section reads for its
+    /// signed-in rows.
+    private var signedOutPointer: some View {
+        Text("Sign in with Apple from your Profile to comment and rate as yourself.")
+            .dodFont(DODType.body)
+            .foregroundStyle(DODColor.labelSecondary)
+            .accessibilityIdentifier("settings-account-signin-pointer")
     }
 
     // MARK: Signed-in

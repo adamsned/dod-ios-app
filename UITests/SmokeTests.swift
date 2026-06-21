@@ -466,15 +466,17 @@ final class SmokeTests: XCTestCase {
         shopRow.tap()
     }
 
-    /// US-46 / AC-46.2 (T-794, DUT-16 Phase a): the Settings → Account section
-    /// renders, and signed-out (the default) shows the Sign in with Apple
-    /// button. Runs on both iPhone and iPad in CI (and locally) — the section
-    /// is at the top of Settings, so it's visible without scrolling on either.
+    /// US-46 / AC-46.2; amended by DUT-189: the Settings → Account section
+    /// renders, and signed-out (the default) shows a pointer to the profile
+    /// editor — the Sign in with Apple button itself moved there. Runs on both
+    /// iPhone and iPad in CI (and locally) — the section is at the top of
+    /// Settings, so it's visible without scrolling on either.
     ///
-    /// The credential→session merge is unit-tested (AccountViewModelTests /
-    /// AppleCredentialResolverTests); the interactive Apple sheet itself needs
-    /// a device signed into an Apple ID and is verified manually. This guards
-    /// the contract XCUITest can: the section + button are present.
+    /// The credential→session+profile sign-in is unit-tested
+    /// (AppleProfileSignInTests / AccountViewModelTests / AppleCredentialResolverTests);
+    /// the interactive Apple sheet needs a device signed into an Apple ID and is
+    /// verified manually. This guards the contract XCUITest can: the section +
+    /// pointer are present.
     func test_settingsAccountSectionIsPresent() {
         // Device-agnostic: iPhone uses a bottom tab bar, iPad a sidebar
         // (NavigationSplitView, US-38 / DUT-89). Settings is a first-class
@@ -489,14 +491,11 @@ final class SmokeTests: XCTestCase {
             "Settings should expose the Account section (US-46)"
         )
 
-        // Signed out by default → the Sign in with Apple button is present.
-        // `SignInWithAppleButton` may surface the system label instead of our
-        // accessibility identifier, so accept either as evidence it rendered.
-        let byID = app.buttons["settings-button-sign-in-apple"]
-        let byLabel = app.buttons["Sign in with Apple"]
+        // DUT-189 — the Sign in with Apple button moved to the profile editor.
+        // Signed out, the Account section points there instead of hosting it.
         XCTAssertTrue(
-            byID.waitForExistence(timeout: 6) || byLabel.waitForExistence(timeout: 6),
-            "Signed-out Account section should show the Sign in with Apple button"
+            app.staticTexts["settings-account-signin-pointer"].waitForExistence(timeout: 6),
+            "Signed-out Account section should point to the Profile for Sign in with Apple"
         )
     }
 }
