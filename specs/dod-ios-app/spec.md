@@ -932,6 +932,17 @@ As a cook following a Dutch-oven recipe, I want to start named countdown timers 
 - **AC-47.5 (hands-free hook).** "Start a timer" via the Cook Mode voice commands (US — DUT-101) starts the current step's timer through the same engine, and the auto-advance behavior (DUT-173) keys off `onFinished`.
 
 This is the keystone of the "cooking session" epic (E1): AC-47.1 is the foundation the rest of US-47 — plus DUT-101 (voice), DUT-102 (Campfire), DUT-107 (Siri/StandBy), DUT-141 (HomeKit), and DUT-173 (auto-advance) — build on.
+### US-48 — Private cook journal ("I Made This")
+
+As a cook, I want to privately log when I make a recipe — with my own photo, a note, and a personal rating — and see my cooking history, so I build a personal record (distinct from the public comments/ratings) that the app can celebrate over time.
+
+- **AC-48.1 (data model + stats — T-805 / CL-199, IMPLEMENTED).** `CookLogEntry` (DODSupport) is a primitive-only value type (id, recipeID, recipeTitle snapshot, cookedAt, optional note / personal 1–5 rating clamped on init / photo local id) — decoupled from Domain + Persistence. `CookLogStats` (DODSupport) is a pure, `Calendar`-injected calculator over `[CookLogEntry]`: `totalCooks`, `timesCooked(recipeID:)`, `mostCooked` (ties → most recent, then lower id), `currentWeeklyStreak(asOf:calendar:)` (consecutive weeks with a cook, with a forgiving in-progress week — DUT-171's grace rule), and `busiestMonth` (ties → more recent). All deterministically L1-tested with fixed dates.
+- **AC-48.2 (persistence).** Entries persist via SwiftData on the CloudKit **private** DB (same pattern as saved recipes), mapping to/from `CookLogEntry`. Never sent to the blog or analytics.
+- **AC-48.3 (log a cook).** A "Made it" action on recipe detail creates an entry (auto date; optional photo via the existing photo/image-cache infra + note + personal rating).
+- **AC-48.4 (My Kitchen history + badge).** A chronological "My Kitchen" view (timeline of cooks) and a per-recipe "made N times" badge on recipe detail.
+- **AC-48.5 (habits build on the stats).** The cooking streak (DUT-171), achievement badges (DUT-175), and "Cooking Wrapped" (DUT-177) all read `CookLogStats` — so AC-48.1 is the shared foundation for the E7 habits sub-group.
+
+This is the keystone of epic E2 (Save, Organize & Plan): AC-48.1 unblocks the habit features without waiting on the persistence/UI slices.
 
 ---
 
