@@ -16,9 +16,10 @@ struct GuidedCookoutTests {
         #expect(cookout.whyThisDish.isEmpty == false)
         #expect(cookout.celebrationMessage.isEmpty == false)
         #expect(cookout.nextStepPrompt.isEmpty == false)
-        // Cooking params drive the live coal count at the fire stage (DUT-128).
+        // Cooking params drive the live coal count + bake timer (DUT-128/100).
         #expect(cookout.ovenTempF == 375)
         #expect(cookout.ovenDiameterInches == 12)
+        #expect(cookout.bakeMinutes == 45)
     }
 
     @Test func coversAllFourStagesInOrder() {

@@ -2562,4 +2562,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-816 — First Cookout cook stage: live bake timer (US-53 / AC-53.2, CL-210) — second engine in the keystone UI
+
+- **What:** The *cook* stage of `FirstCookoutView` offers a live bake timer driven by `CookTimerEngine` (DUT-100): start → live `MM:SS` countdown (`TimelineView`) → "Timer's up!". `GuidedCookout` gains `bakeMinutes` (lasagna = 45). A `.task` ticks `engine.refresh()` ~1×/s.
+- **Files:** `Packages/DODSupport/Sources/DODSupport/GuidedCookout.swift` (bakeMinutes), `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FirstCookoutView.swift` (timer card + tick), `GuidedCookoutTests.swift` (pin). Spec: `clarifications.md` (CL-210).
+- **AC:** US-53 / AC-53.2 (CL-210 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-815. Branch `feat/T-816-first-cookout-cook-timer`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 426 DODSupport tests pass; iOS app build green (xcodebuild exit 0). **Next deepenings:** voice-at-cook (DUT-101) + the "I Made This" capture at *celebrate* (needs the cook-journal persistence).
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

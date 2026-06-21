@@ -22,6 +22,8 @@ public struct FirstCookoutView: View {
     @Environment(\.dismiss) private var dismiss
     /// 0 = intro; 1...steps.count = each coached step; steps.count + 1 = celebration.
     @State private var index = 0
+    /// Drives the live bake timer offered at the *cook* stage (DUT-100).
+    @State private var timerEngine = CookTimerEngine()
 
     public init(
         cookout: GuidedCookout = .firstCookout,
@@ -42,6 +44,63 @@ public struct FirstCookoutView: View {
         .padding(DODSpacing.lg)
         .background(DODColor.surface)
         .animation(.easeInOut(duration: 0.25), value: index)
+        .task { await runTimerTick() }
+    }
+
+    /// Advances the timer engine ~1×/s while the flow is on screen so the bake
+    /// countdown ticks down and finishes. A cheap no-op when no timer runs.
+    private func runTimerTick() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1))
+            timerEngine.refresh()
+        }
+    }
+
+    /// DUT-100 / DUT-183 — the live bake timer at the *cook* stage: start it and
+    /// watch it count down right in the flow, so the cook can walk away and be
+    /// with their people. Three states: not started → counting down → done.
+    @ViewBuilder private var cookTimerCard: some View {
+        if let active = timerEngine.timers.first(where: { $0.isRunning }) {
+            VStack(spacing: DODSpacing.xxs) {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(formatRemaining(active.remaining(at: context.date)))
+                        .dodFont(DODType.displayMedium)
+                        .monospacedDigit()
+                        .foregroundStyle(DODColor.burntOrange)
+                }
+                Text("\(cookout.dishTitle) bake — you can step away")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                Button("Cancel timer") { timerEngine.cancel(active.id) }
+                    .foregroundStyle(DODColor.labelSecondary)
+            }
+            .padding(.top, DODSpacing.xs)
+        } else if timerEngine.timers.contains(where: { $0.state == .finished }) {
+            VStack(spacing: DODSpacing.xxs) {
+                Text("Timer's up!")
+                    .dodFont(DODType.heading)
+                    .foregroundStyle(DODColor.burntOrange)
+                Text("Go check your \(cookout.dishTitle).")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+            }
+            .padding(.top, DODSpacing.xs)
+        } else {
+            Button("Start the \(cookout.bakeMinutes)-minute bake timer") {
+                timerEngine.start(
+                    label: "\(cookout.dishTitle) bake",
+                    duration: Double(cookout.bakeMinutes) * 60
+                )
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(DODColor.burntOrange)
+            .padding(.top, DODSpacing.xs)
+        }
+    }
+
+    private func formatRemaining(_ seconds: TimeInterval) -> String {
+        let total = Int(seconds.rounded())
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 
     // MARK: - Screens
@@ -93,6 +152,7 @@ public struct FirstCookoutView: View {
                 coalsCard
             }
             if step.stage == .cook {
+                cookTimerCard
                 Button("Open the \(cookout.dishTitle) recipe") {
                     if let url = URL(string: "\(recipeBaseURL)/\(cookout.recipeSlug)/") {
                         openURL(url)

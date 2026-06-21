@@ -58,6 +58,9 @@ public struct GuidedCookout: Sendable, Equatable {
     /// The Dutch-oven diameter (inches) the coal recommendation assumes — 12" is
     /// the common camp size.
     public let ovenDiameterInches: Int
+    /// The dish's bake time in minutes — the duration of the live timer offered
+    /// at the *cook* stage.
+    public let bakeMinutes: Int
 
     public init(
         recipeSlug: String,
@@ -67,7 +70,8 @@ public struct GuidedCookout: Sendable, Equatable {
         celebrationMessage: String,
         nextStepPrompt: String,
         ovenTempF: Int = 350,
-        ovenDiameterInches: Int = 12
+        ovenDiameterInches: Int = 12,
+        bakeMinutes: Int = 45
     ) {
         self.recipeSlug = recipeSlug
         self.dishTitle = dishTitle
@@ -77,6 +81,7 @@ public struct GuidedCookout: Sendable, Equatable {
         self.nextStepPrompt = nextStepPrompt
         self.ovenTempF = ovenTempF
         self.ovenDiameterInches = ovenDiameterInches
+        self.bakeMinutes = bakeMinutes
     }
 
     /// The steps belonging to a given stage, in order.
@@ -144,6 +149,7 @@ extension GuidedCookout {
             "Make it again this week at home to lock it in — then take it to the campfire "
             + "and watch your family's faces.",
         ovenTempF: 375,
-        ovenDiameterInches: 12
+        ovenDiameterInches: 12,
+        bakeMinutes: 45
     )
 }
