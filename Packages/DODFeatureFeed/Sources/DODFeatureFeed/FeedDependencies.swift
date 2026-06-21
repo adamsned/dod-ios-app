@@ -30,12 +30,16 @@ public protocol FeedDependencies: Sendable {
     /// test conformers keep compiling; the live wiring routes to
     /// ``RecipeStore/logCook(_:)``.
     func logCook(_ entry: CookLogEntry) async throws
+    /// DUT-104 — every logged cook, newest first (for the Cook Journal view).
+    /// Default `[]` so existing test conformers keep compiling.
+    func cookLogs() async throws -> [CookLogEntry]
 }
 
 extension FeedDependencies {
     public func publishWidgetSnapshot(items: [RecipeListItem]) async {}
     public func savedRecipeIDs() async throws -> Set<Int> { [] }
     public func logCook(_ entry: CookLogEntry) async throws {}
+    public func cookLogs() async throws -> [CookLogEntry] { [] }
 }
 
 /// Production wiring. Constructed by the app composition root (T-140).
@@ -123,6 +127,10 @@ public struct LiveFeedDependencies: FeedDependencies {
 
     public func logCook(_ entry: CookLogEntry) async throws {
         try await store.logCook(entry)
+    }
+
+    public func cookLogs() async throws -> [CookLogEntry] {
+        try await store.allCookLogs()
     }
 
     public func publishWidgetSnapshot(items: [RecipeListItem]) async {

@@ -106,6 +106,11 @@ public final class FeedViewModel {
         }
     }
 
+    /// DUT-104 — the logged cooks (newest first) for the Cook Journal view.
+    public func cookLogs() async -> [CookLogEntry] {
+        (try? await dependencies.cookLogs()) ?? []
+    }
+
     /// Pull-to-refresh (AC-1.4 + clears blocklist per AC-1.7).
     public func refresh() async {
         try? await dependencies.clearBlocklist()
