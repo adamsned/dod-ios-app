@@ -236,6 +236,33 @@ enum WPDTO {
             return 0
         }
     }
+
+    // MARK: - Equipment (US-51 / AC-51.1)
+
+    /// A single entry from the WP Recipe Maker recipe-card `equipment` array.
+    ///
+    /// WPRM serializes each item as
+    /// `{ "name": "12\" Dutch Oven", "link": "https://…", "image_url": "https://…" }`.
+    /// Only `name` is reliably present; `link` and `image_url` are absent on
+    /// most cards and are decoded leniently so a missing/empty/malformed URL
+    /// never fails the surrounding recipe-card decode (AC-51.1).
+    struct Equipment: Decodable {
+        let name: String?
+        let link: String?
+        let imageURL: String?
+
+        enum CodingKeys: String, CodingKey {
+            case name, link
+            case imageURL = "image_url"
+        }
+    }
+
+    /// The slice of a WPRM recipe-card payload we read for equipment. The
+    /// card carries many more fields; we decode only `equipment` and ignore
+    /// the rest. An absent array decodes to `nil` (→ no equipment).
+    struct RecipeCard: Decodable {
+        let equipment: [Equipment]?
+    }
 }
 
 // MARK: - Domain mapping
@@ -271,6 +298,43 @@ extension WPDTO.Post {
 extension WPDTO.Category {
     func toDomain() -> DODDomain.Category {
         DODDomain.Category(id: id, name: name, slug: slug, count: count)
+    }
+}
+
+extension WPDTO.Equipment {
+    /// Map a wire-format equipment entry to the domain type, or `nil` when the
+    /// entry is unusable (missing / blank name). Strips HTML from the name and
+    /// parses `link` / `image_url` leniently — an empty or malformed URL just
+    /// becomes `nil` rather than dropping the whole entry (AC-51.1).
+    func toDomain() -> DODDomain.Equipment? {
+        let cleanName = HTMLSanitizer.plainText(from: name ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanName.isEmpty else { return nil }
+        return DODDomain.Equipment(
+            name: cleanName,
+            imageURL: WPDTO.parseOptionalURL(imageURL),
+            link: WPDTO.parseOptionalURL(link)
+        )
+    }
+}
+
+extension WPDTO.RecipeCard {
+    /// The recipe's equipment list, ready for the domain. Absent array → `[]`;
+    /// entries with no usable name are skipped (AC-51.1). UI surfacing of this
+    /// list ("Equipment & Tools" section) is a later slice.
+    var equipmentList: [DODDomain.Equipment] {
+        (equipment ?? []).compactMap { $0.toDomain() }
+    }
+}
+
+extension WPDTO {
+    /// Parse an optional URL string the lenient way: nil / empty / whitespace /
+    /// unparseable all collapse to `nil`. No force-unwrap.
+    static func parseOptionalURL(_ raw: String?) -> URL? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return URL(string: trimmed)
     }
 }
 
