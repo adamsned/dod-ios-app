@@ -16,6 +16,8 @@ public struct FeedView: View {
     /// 2-column grid byte-for-byte for users who never tap the toggle.
     @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
         RecipeListLayout.gallery.rawValue
+    /// DUT-183 — presents the guided "Your First Cookout" flow as a sheet.
+    @State private var showingFirstCookout = false
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
@@ -46,6 +48,18 @@ public struct FeedView: View {
         // tab's header behavior consistent (and dodging the iOS 26 large-title
         // bug). The `.toolbar` buttons below stay pinned in the nav bar.
         .toolbar {
+            // DUT-183 — "Your First Cookout" entry on the leading edge (the
+            // strategy's "Start Here"). `.topBarLeading` is iOS-only; the macOS
+            // test slice falls back to `.automatic` so the package still builds.
+            #if os(iOS)
+            ToolbarItem(placement: .topBarLeading) {
+                firstCookoutToolbarButton
+            }
+            #else
+            ToolbarItem(placement: .automatic) {
+                firstCookoutToolbarButton
+            }
+            #endif
             // US-38 / AC-38.1 / CL-64.5 (T-650): layout toggle on the
             // trailing edge. The Settings gear that used to sit to its
             // trailing side (US-32 AC-32.1) moved to the shared
@@ -66,6 +80,9 @@ public struct FeedView: View {
                 layoutToggleToolbarButton
             }
             #endif
+        }
+        .sheet(isPresented: $showingFirstCookout) {
+            FirstCookoutView()
         }
         .task { await viewModel.onAppear() }
         .refreshable { await viewModel.refresh() }
@@ -91,6 +108,19 @@ public struct FeedView: View {
                 .accessibilityHint(layout.destinationActionHint)
         }
         .accessibilityIdentifier("feed-toolbar-layout-toggle")
+    }
+
+    /// DUT-183 — the "Your First Cookout" entry: a flame on the leading edge
+    /// that opens the guided first-cookout flow (the strategy's "Start Here").
+    private var firstCookoutToolbarButton: some View {
+        Button {
+            showingFirstCookout = true
+        } label: {
+            Image(systemName: "flame.fill")
+                .accessibilityLabel("Your First Cookout")
+        }
+        .tint(DODColor.burntOrange)
+        .accessibilityIdentifier("feed-toolbar-first-cookout")
     }
 
     @ViewBuilder

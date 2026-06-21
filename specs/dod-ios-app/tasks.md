@@ -2522,4 +2522,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 
 ---
 
+### T-814 — "Your First Cookout" flow UI + Feed entry (US-53 / AC-53.2, CL-208) — the first user-visible keystone slice
+
+- **What:** `FirstCookoutView` (DODFeatureFeed) — a paged SwiftUI flow rendering the `GuidedCookout` spine (intro → gather/fire/cook/celebrate → celebration, with Back/Next + progress dots; the cook stage links to the lasagna recipe), plus a leading-edge flame "Your First Cookout" toolbar button on the Feed that presents it as a sheet ("Start Here"). The deep per-stage engine wiring (charcoal card, live timer/voice, journal capture) is deferred to follow-up slices.
+- **Files:** `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FirstCookoutView.swift` (new), `FeedView.swift` (toolbar entry + sheet). Spec: `spec.md` (US-53 AC-53.2), `clarifications.md` (CL-208).
+- **AC:** US-53 / AC-53.2 (CL-208 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-813 (`GuidedCookout`). Branch `feat/T-814-first-cookout-flow`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; DODFeatureFeed macOS build green; **iOS app build green (xcodebuild exit 0)** — first user-visible slice; makes a TestFlight build meaningful. **Next slices:** wire the live engines per stage (AC-53.2 deepening) + the captured-win/share (AC-53.3); promote the entry to a prominent Feed hero card.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
