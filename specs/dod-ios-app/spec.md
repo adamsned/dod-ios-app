@@ -921,6 +921,27 @@ Added 2026-06-20 (DUT-94, authored by Ned). BuzzyWaxx is a sister brand under co
 
 ---
 
+### US-50 — Per-recipe charcoal coaching
+
+**As a** first-time Dutch oven cook following a recipe,
+**I want** the recipe's oven temperature turned into a concrete charcoal count, top/bottom split, and refresh cadence for my oven size,
+**so that** I can "manage the fire" without owning a coal chart or doing the math myself.
+
+Added 2026-06-20 (DUT-128, authored by Ned). This serves the **"Your First Cookout"** keystone — specifically the *manage the fire* step. A recipe gives a target temperature (e.g. 350°F) but never answers the cook's real question: "how many briquettes, where do they go, and when do I add more?" This story closes that gap with a pure, on-device calculator. It is the per-recipe complement to the standalone Dutch Oven Heat Coach screen (DUT-48): both share the brand's `diameter × 2` baseline, but this one takes the recipe's own temperature + task and returns one starting recommendation.
+
+This slice ships the **pure calculator core only**; the inline recipe-card UI that surfaces the recommendation is a later slice of DUT-128.
+
+**Acceptance criteria:**
+
+- **AC-50.1 (IMPLEMENTED — T-807)** `CharcoalRecipeConverter` (in `Packages/DODSupport`) is a pure, Foundation-only, value-type calculator: `CharcoalRecipeConverter.recommend(ovenTempF:ovenDiameterInches:task:) -> CharcoalRecommendation`, with `CookTask { bake, roast, simmer, fry }` and a `CharcoalRecommendation` struct (`totalBriquettes`, `bottom`, `top`, `refreshIntervalMinutes`; Equatable + Sendable — a named struct, not a 3-member tuple, so the `large_tuple` lint rule stays clean). **Total** ≈ `diameter × 2` at the ~350°F baseline, adjusted about ±2 briquettes per 25°F away from ~350°F (clamped at 0, never negative). **Split** by task: bake ≈ ⅓ bottom / ⅔ top, roast ≈ even (odd extra to the bottom), simmer ≈ ¾ bottom, fry = all bottom; `bottom + top == totalBriquettes` always. **Refresh** = 45 min (a starting cadence in the 45–60 band). Pure + deterministic, no UI / network / AVFoundation. Verified: `swift-format`, `swiftlint --strict` clean on the source, and a 10-test swift-testing L1 suite (`CharcoalRecipeConverterTests`) passing under `swift test`. (US-50 / CL-201 / T-807; pure core of DUT-128 — the inline UI card is a later slice.)
+
+**Constitution + spec notes:**
+
+- **Pure logic-core seam (constitution §6 L1).** Same pattern as `DutchOvenHeatCoach`, `IngredientAisleClassifier`, and `StepTimerParser` — a domain transform that ships in `DODSupport` with its own L1 tests ahead of any UI, so the math is pinned on the macOS test slice and any future surface (recipe card, Tools tab, App Intent) reuses one contract.
+- **CL-201** captures the locked decisions (pure calculator ships ahead of the inline UI card; named result struct over a tuple; `diameter × 2` + ±2 / 25°F baseline shared with DUT-48; per-task split ratios; 45-min refresh) and the deferred inline-card slice.
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
