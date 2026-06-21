@@ -2476,6 +2476,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `DODFeatureRecipeDetail/RecipeDetailView.swift` (the `readyBody` ScrollView VStack). Shared `PublishedDateCaption` untouched.
 - **AC:** AC-4.1 (amended — published-date caption position; CL-197 canonical). **Est:** ~5 min. **Deps:** main at T-802 (`6611524`). Branch `feat/T-803-recipe-published-date-parity`. **||:** P-detail. No `e2e` label — a one-line layout move. Verified via an L4 snapshot parity render (recipe + article, iPhone 13, light); swift-format + SwiftLint + `xcodebuild build` clean. The off-CI `RecipeDetailViewSnapshotTests` baseline re-record is a fast-follow (UIKit-gated, never runs in CI).
 
+### T-804 — DUT-180 iPad recipe detail: centered reading column + landscape two-up Ingredients|Instructions (US-4 / AC-4.1 amendment, CL-198)
+
+- **What:** iPad-only adaptive layout for `RecipeDetailView` — a centered ~700pt reading column under the full-bleed hero (both orientations) and, in landscape (canvas ≥ 1000pt), a two-up Ingredients|Instructions band at ~1040pt. iPhone (compact) byte-identical.
+- **Files:** `DODDesignSystem/ContentColumn.swift` (new — `DODContentWidth` + `View.readableContentColumn`); `DODFeatureRecipeDetail/RecipeDetailView.swift` (3-band `readyBody` + `ingredientsInstructions(twoUp:)` + `GeometryReader` width breakpoint + `@Environment(\.horizontalSizeClass)`); `RecipeDetailView+Sections.swift` (new — ingredients/instructions sections moved out); `RecipeDetailView+Loading.swift` (new — loading skeleton moved out).
+- **AC:** AC-4.1 (amended — iPad adaptive layout; CL-198 canonical). **Est:** ~1.5 h. **Deps:** main at T-803 (`d551501`). Branch `feat/T-804-ipad-recipe-reading-column`. **||:** P-detail. No `e2e` label — iPad-gated layout. Verified via iPad portrait + landscape renders (834×1194 / 1194×834, `.regular`); swift-format + SwiftLint + `xcodebuild build` clean. iPhone byte-identical (column helper no-ops on compact).
+
 ---
 
 ## Summary
