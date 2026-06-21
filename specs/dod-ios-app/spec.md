@@ -946,6 +946,15 @@ Added 2026-06-20 (DUT-16, "Login via Google, Apple, and email", Spencer). DUT-16
 
 ---
 
+### US-53 — "Your First Cookout" guided first win (DUT-183, the keystone)
+
+As a nervous beginner, I want to be walked through one guaranteed first cookout by a master, so I succeed at an impressive dish, feel *"holy cow, I did that,"* and become the cook who feeds their people — at home and, eventually, at the campfire.
+
+- **AC-53.1 (content spine — T-813 / CL-207, IMPLEMENTED).** `GuidedCookout` (DODSupport) is a pure value model of the coached first-cookout: the curated gateway dish (the **Dutch oven lasagna** — max hero, min risk), a "why this dish" hook, and an ordered set of `Step`s across four `Stage`s — **gather → fire → cook → celebrate** — each carrying Ned's warm, beginner-first coaching copy, plus a celebration message + a next-step prompt (home reps → campfire). `GuidedCookout.firstCookout` is the curated content; `steps(in:)` returns a stage's steps. Pure + L1-tested (stage coverage + order, well-formed steps, unique ids).
+- **AC-53.2 (the flow UI).** A "Start Here" entry launches the guided flow that renders these stages, wiring the existing engines per stage: equipment (DUT-156) at *gather*; the Heat Coach + `CharcoalRecipeConverter` (DUT-128) at *fire*; Cook Mode + `CookTimerEngine` (DUT-100) + voice (DUT-101) at *cook*; the "I Made This" capture (DUT-104) at *celebrate*.
+- **AC-53.3 (the captured win).** It ends in a shareable "I did it" moment and points the user to their next rung and the outdoor peak. Success = a nervous beginner completes it and reports the confidence to do it again / for others.
+
+This is the **spine that orders the rungs** (US-47/48/49/50/51/52). AC-53.1 is the content backbone; the flow UI (AC-53.2/53.3) assembles it once the rung UIs land.
 ### US-47 — Cooking timers (multi-timer, Live Activity, hands-free)
 
 As a cook following a Dutch-oven recipe, I want to start named countdown timers from the recipe's step times and see them on the Lock Screen / Dynamic Island, so I can walk away from my phone and still be alerted — without juggling the system Clock app or losing track when several things overlap.

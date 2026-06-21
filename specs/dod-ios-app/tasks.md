@@ -2543,6 +2543,19 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Phase 17 parallelism:** P17-voice sequences internally — T-720 (engine, `DODFeatureRecipeDetail` → moved to `DODSupport` in T-721) → T-721 (Settings picker + quality readout + Preview, depends on the SettingsView-owning PRs #72 + #86 landing) → T-722 (download nudge + `VoiceSelector` quality helper, depends on T-721's voice section + `VoicePreviewing` catalog seam). T-721 + T-722 (DUT-5) own `Packages/DODSupport/Sources/DODSupport/VoiceSelection.swift` + the `DODFeatureFeed` Settings voice section (`VoicePreview.swift`, `SettingsView+Voice.swift`, `SettingsViewModel+Voice.swift`, + the existing `SettingsView`/`SettingsViewModel`/`FeedView` edits) + the single `App/TabStack.swift` previewer-wiring line — no source-side collisions with other phases. The voice fix is intentionally a picker + readout + guidance nudge, NOT an engine rewrite or cloud TTS: Apple ships only the compact ("robotic") voice tier preinstalled and exposes no public API to download the natural tiers from inside the app, so the app SHOWS the tier and guides the user to iOS Settings → Accessibility → Spoken Content → Voices (CL-123).
 - **Phase 19 parallelism:** P19-cloudkit-sync-fix is a single task (T-736) on `fix/dut-6-cloudkit-sync`. Source-localized to the CloudKit/sync code paths — `Packages/DODPersistence/Sources/DODPersistence/{RecipeStore+Containers,CloudKitSyncStatus}.swift` + the `App/{AppDependencies,CloudKitSyncDiagnostics}.swift` composition root + the `DODFeatureFeed` Settings cloud-sync seam — so it is conflict-free with prior phases. A trivial rebase against the concurrent DODFeatureFeed Voice-section branch is expected (it touches a different region of `SettingsView`/`SettingsViewModel`). The owner-side schema deploy (cause #1) and the optional `aps-environment` Push provisioning (cause #3) are documented in T-736, not graduated as code tasks — they happen on the owner's Apple ID outside any PR.
 
+### T-813 — "Your First Cookout" content spine (US-53 / AC-53.1, CL-207) — the DUT-183 keystone backbone
+
+- **What:** The pure content model of the guided first-cookout. `GuidedCookout` value type (curated gateway dish + `Stage` gather/fire/cook/celebrate + `Step`s with Ned's coaching copy + celebration/next-step) and `GuidedCookout.firstCookout` (the Dutch oven lasagna). No UI yet — that's AC-53.2/53.3, which wires the rung engines (DUT-156/128/100/101/104) per stage.
+- **Files:** `Packages/DODSupport/Sources/DODSupport/GuidedCookout.swift` (new), `Packages/DODSupport/Tests/DODSupportTests/GuidedCookoutTests.swift` (new). Spec: `spec.md` (US-53 AC-53.1), `clarifications.md` (CL-207).
+- **AC:** US-53 / AC-53.1 (CL-207 canonical). **Est:** ~2 h. **Deps:** none — off `main`. Branch `feat/T-813-first-cookout-content`. No `e2e` label (pure L1). **Verification:** swift-format + SwiftLint `--strict` clean (source **and test**); 386 DODSupport tests pass incl. `GuidedCookoutTests` (4 cases). **Numbering note:** US-53 / CL-207 / T-813 — chosen above all in-flight numbers (incl. the integration-PR #244 renumber range T-810-812 / CL-204-206).
+
+---
+
+### T-814 — "Your First Cookout" flow UI + Feed entry (US-53 / AC-53.2, CL-208) — the first user-visible keystone slice
+
+- **What:** `FirstCookoutView` (DODFeatureFeed) — a paged SwiftUI flow rendering the `GuidedCookout` spine (intro → gather/fire/cook/celebrate → celebration, with Back/Next + progress dots; the cook stage links to the lasagna recipe), plus a leading-edge flame "Your First Cookout" toolbar button on the Feed that presents it as a sheet ("Start Here"). The deep per-stage engine wiring (charcoal card, live timer/voice, journal capture) is deferred to follow-up slices.
+- **Files:** `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FirstCookoutView.swift` (new), `FeedView.swift` (toolbar entry + sheet). Spec: `spec.md` (US-53 AC-53.2), `clarifications.md` (CL-208).
+- **AC:** US-53 / AC-53.2 (CL-208 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-813 (`GuidedCookout`). Branch `feat/T-814-first-cookout-flow`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; DODFeatureFeed macOS build green; **iOS app build green (xcodebuild exit 0)** — first user-visible slice; makes a TestFlight build meaningful. **Next slices:** wire the live engines per stage (AC-53.2 deepening) + the captured-win/share (AC-53.3); promote the entry to a prominent Feed hero card.
 ### T-804 — Cooking-timer engine (US-47 / AC-47.1, CL-198) — first slice of DUT-100 (epic E1 keystone)
 
 - **What:** The pure, testable core of the multi-timer feature. `CookTimer` value type (running/paused/finished state machine, remaining-time math as a function of an injected "now") + `CookTimerEngine` (`@Observable @MainActor`: start/pause/resume/cancel/clearFinished, `soonestFinishing`, idempotent `refresh()` firing `onFinished` once per finished timer). No ActivityKit/UI yet — that's AC-47.2–47.5 in follow-up slices.
@@ -2567,6 +2580,54 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 **Implements:** US-52 / AC-52.1 (CL-203). **Branch:** `feat/T-809-dutch-oven-101-guides`.
 
 Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `DODSupport` (no UI, no network, bundled-in-code data per CL-203): the `TechniqueGuide` value type (`Identifiable` / `Sendable` / `Equatable` — `slug`, `title`, `estimatedReadMinutes`, `sections: [Section { heading; body }]`, `keyTakeaways: [String]`) and `enum DutchOven101Library` with `static let guides: [TechniqueGuide]` (≥6 curated beginner guides — Preheating, Lid On vs Lid Off, Brown Then Braise, Resting Meat & Why, Deglazing 101, Adapting Indoor Recipes for Outdoor Coals) + `guide(slug:) -> TechniqueGuide?`. Owns `Packages/DODSupport/Sources/DODSupport/{DutchOven101Library,DutchOven101Library+Content}.swift` (content split out so neither file crosses the 400-line cap) + `Packages/DODSupport/Tests/DODSupportTests/DutchOven101LibraryTests.swift`. House style follows `IngredientAisleClassifier` / `DutchOvenHeatCoach`. Independent of every other task source-wise. The **"Learn" library UI + per-guide read-state persistence are later slices** (not T-809). Estimate: ~20 min.
+
+---
+
+### T-815 — First Cookout fire stage: live coal count (US-53 / AC-53.2, CL-209) — first engine wired into the keystone UI
+
+- **What:** The *fire* stage of `FirstCookoutView` now shows the real coal recommendation (`CharcoalRecipeConverter`, DUT-128): total briquettes + bottom/lid split + refresh interval, computed from the dish's bake params. `GuidedCookout` gains `ovenTempF` + `ovenDiameterInches` (lasagna = 375°F / 12"). The scariest part of a first cookout becomes a concrete number.
+- **Files:** `Packages/DODSupport/Sources/DODSupport/GuidedCookout.swift` (params), `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FirstCookoutView.swift` (coals card), `GuidedCookoutTests.swift` (param pins). Spec: `clarifications.md` (CL-209).
+- **AC:** US-53 / AC-53.2 (CL-209 canonical). **Est:** ~2 h. **Deps:** stacked on T-814; required merging `main` (foundations / `CharcoalRecipeConverter`) into the branch since the stack predated #244. Branch `feat/T-815-first-cookout-fire-coals`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 386 DODSupport tests pass; iOS app build green (xcodebuild exit 0). **Next deepenings:** live timer + voice at *cook*; the "I Made This" capture at *celebrate* (needs the cook-journal persistence).
+
+---
+
+### T-816 — First Cookout cook stage: live bake timer (US-53 / AC-53.2, CL-210) — second engine in the keystone UI
+
+- **What:** The *cook* stage of `FirstCookoutView` offers a live bake timer driven by `CookTimerEngine` (DUT-100): start → live `MM:SS` countdown (`TimelineView`) → "Timer's up!". `GuidedCookout` gains `bakeMinutes` (lasagna = 45). A `.task` ticks `engine.refresh()` ~1×/s.
+- **Files:** `Packages/DODSupport/Sources/DODSupport/GuidedCookout.swift` (bakeMinutes), `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FirstCookoutView.swift` (timer card + tick), `GuidedCookoutTests.swift` (pin). Spec: `clarifications.md` (CL-210).
+- **AC:** US-53 / AC-53.2 (CL-210 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-815. Branch `feat/T-816-first-cookout-cook-timer`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 426 DODSupport tests pass; iOS app build green (xcodebuild exit 0). **Next deepenings:** voice-at-cook (DUT-101) + the "I Made This" capture at *celebrate* (needs the cook-journal persistence).
+
+---
+
+### T-817 — First Cookout polish round 1 (US-53 / AC-53.2/53.3, CL-211) — five fixes from Ned's live TestFlight walkthrough
+
+- **What:** (1) "Open the recipe" works (dismiss the sheet so the in-app recipe navigation is visible); (2) the *gather* stage shows a tappable gear + ingredients check-off list (new `GuidedCookout.gear` + `.ingredients`); (3) the *fire* stage adds an "Open the Heat Coach" button (presents `HeatCoachView`); (4) a lid-rotation reminder (90° every 15 min) at *cook*; (5) photo + share-to-social at *celebrate* (`PhotosPicker` + `ShareLink` tagging Dutch Oven Daddy).
+- **Files:** `GuidedCookout.swift` (gear/ingredients), `FirstCookoutView.swift` (trimmed) + `FirstCookoutView+Stages.swift` (new extension — stage views, to stay under the length caps), `GuidedCookoutTests.swift` (pins). Spec: `clarifications.md` (CL-211).
+- **AC:** US-53 / AC-53.2 + AC-53.3 (CL-211 canonical). **Est:** ~3 h. **Deps:** stacked on T-816. Branch `feat/T-817-first-cookout-gather-and-recipe-fix`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean (both files + test); 426 DODSupport tests pass; iOS app build green (xcodebuild exit 0). **Next:** voice-at-cook (DUT-101) + the "I Made This" persistence so the celebrate photo logs to the journal.
+
+---
+
+### T-818 — First Cookout celebrate: real camera capture + auto-tag social post (US-53 / AC-53.3, CL-212, DUT-184)
+
+- **What:** The celebrate-stage share becomes a real **camera + post** moment. New `CameraPicker` (`UIImagePickerController` `.camera`, fully `#if canImport(UIKit)`-guarded); `FirstCookoutView` presents it via a `showingCamera` sheet; `shareSection` offers "Take a photo" (camera, shown only where available) + "Choose from library", then "Share / Post — tags Dutch Oven Daddy" (`ShareLink` w/ auto-tag caption) + Retake. `NSCameraUsageDescription` added to `project.yml`.
+- **Files:** `CameraPicker.swift` (new), `FirstCookoutView.swift` (sheet + state), `FirstCookoutView+Stages.swift` (shareSection + photoSourceButtons), `project.yml` (camera usage string). Spec: `clarifications.md` (CL-212).
+- **AC:** US-53 / AC-53.3 (CL-212 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-817. Branch `feat/T-818-first-cookout-camera-share`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; macOS `DODFeatureFeed` build complete (camera #if-excluded); iOS app build green (xcodebuild exit 0); `NSCameraUsageDescription` in generated Info.plist. **Device-only** (live camera capture) deferred to Ned's TestFlight walk.
+
+---
+
+### T-819 — Cook journal persistence: SchemaV6 + RecipeStore CRUD (US-48 / DUT-104, CL-213)
+
+- **What:** The persistence layer for the "I Made This" journal. New local-only `CachedCookLogEntry` `@Model`; `SchemaV6` (= V5 + the new model) with a lightweight V5→V6 migration; `RecipeStore+CookLog` (`logCook` / `allCookLogs` newest-first / `deleteCookLog`). The pure `CookLogStats` runs over `allCookLogs()`.
+- **Files:** `CachedCookLogEntry.swift` (new @Model), `SchemaV6.swift` (new), `RecipeStore+CookLog.swift` (new), `SchemaV1.swift` (MigrationPlan +V6), `RecipeStore+Containers.swift` (Schema V5→V6 ×4), `MIGRATION.md` (history + design note), `SchemaV6Tests.swift` (new), `CommentsRatingsCacheTests.swift` (plan-count 5/4). Spec: `clarifications.md` (CL-213).
+- **AC:** US-48 / DUT-104 (CL-213 canonical). **Est:** ~3 h. **Deps:** stacked on T-818. Branch `feat/T-819-cook-journal-persistence`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 113 DODPersistence tests pass (V6 migration opens cleanly + cook-log CRUD round-trip); iOS app build green (xcodebuild exit 0). **Next (T-820):** wire the celebrate stage to call `logCook` (needs `GuidedCookout.recipeID` + the FeedViewModel seam).
+
+---
+
+### T-820 — Wire First Cookout celebrate → logCook (US-48 / US-53 / AC-53.3, CL-214, DUT-104)
+
+- **What:** Finishing "Your First Cookout" now logs a persisted cook. `GuidedCookout` gains `recipeID` (lasagna = WP 1459); `FirstCookoutView` gains an `onLogCook` closure fired once on "Done"; the seam runs `FeedView` → `FeedViewModel.logCook` → `FeedDependencies.logCook` (new, default no-op) → `LiveFeedDependencies` → `RecipeStore.logCook` (T-819).
+- **Files:** `GuidedCookout.swift` (recipeID) + `GuidedCookoutTests.swift` (pin), `FirstCookoutView.swift` (onLogCook + Done), `FeedView.swift` (closure), `FeedViewModel.swift` (logCook), `FeedDependencies.swift` (protocol + default + Live impl). Spec: `clarifications.md` (CL-214).
+- **AC:** US-48 / DUT-104 + US-53 / AC-53.3 (CL-214 canonical). **Est:** ~2 h. **Deps:** stacked on T-819. Branch `feat/T-820-cook-journal-wiring`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 426 DODSupport + 83 DODFeatureFeed tests pass; macOS DODFeatureFeed clean build + iOS app build green (xcodebuild exit 0). **Deferred:** persisting the captured photo to disk (`photoLocalID`); a Cook Journal *view* to browse history.
 
 ---
 
