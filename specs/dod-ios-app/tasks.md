@@ -2637,6 +2637,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookPhotoStore.swift` + `CookPhotoStoreTests.swift` (new, DODPersistence), `CookJournalView.swift` (new, DODFeatureFeed), `FirstCookoutView.swift` (save photo on Done), `FeedDependencies.swift` (cookLogs), `FeedViewModel.swift` (cookLogs), `FeedView.swift` (journal entry). Spec: `clarifications.md` (CL-215).
 - **AC:** US-48 / DUT-104 (CL-215 canonical). **Est:** ~3.5 h. **Deps:** stacked on T-820. Branch `feat/T-821-cook-journal-view`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 116 DODPersistence + 83 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). Live camera-photo-in-journal is device-only (TestFlight).
 
+
+### T-822 — DUT-186 Layout switcher → Settings ▸ Customization (US-38 / AC-38.1 amendment, CL-216)
+
+- **What:** Move the List/Grid layout switcher off the Feed + Search toolbars into a "Recipe Layout" picker in Settings ▸ Customization. New standalone `LayoutSettingPicker` view bound to the shared `RecipeListLayout` `@AppStorage` (drives both tabs). Remove the toolbar toggles + `SearchView+Toolbar.swift`; add `RecipeListLayout.displayName`.
+- **Files:** `DODFeatureFeed/LayoutSettingPicker.swift` (new); `DODFeatureFeed/SettingsView.swift` (picker in Customization); `DODFeatureFeed/FeedView.swift` + `DODFeatureSearch/SearchView.swift` (toggle removed); deleted `DODFeatureSearch/SearchView+Toolbar.swift`; `DODDesignSystem/RecipeListLayout.swift` (`displayName`).
+- **AC:** AC-38.1 (amended; CL-216 canonical). **Est:** ~30 min. **Deps:** main at T-821 (`04fb694`). Branch `feat/T-822-layout-in-settings`. **||:** P-settings. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean.
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

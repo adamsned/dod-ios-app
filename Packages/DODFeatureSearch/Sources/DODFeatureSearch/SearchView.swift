@@ -85,22 +85,6 @@ public struct SearchView: View {
         }
         .background(DODColor.surface)
         .navigationTitle("Search")
-        .toolbar {
-            // US-38 / AC-38.1 (T-650): layout toggle on the trailing
-            // edge of the Search-tab nav bar. Same `topBarTrailing`
-            // placement as `FeedView`'s toggle, so a user who learns
-            // the affordance on one tab finds it in the same spot on
-            // the other. `#if os(iOS)` mirror of the FeedView pattern.
-            #if os(iOS)
-            ToolbarItem(placement: .topBarTrailing) {
-                layoutToggleToolbarButton
-            }
-            #else
-            ToolbarItem(placement: .automatic) {
-                layoutToggleToolbarButton
-            }
-            #endif
-        }
         .task {
             await viewModel.loadCategoriesIfNeeded()
             await viewModel.refreshSavedRecipeIDs()  // T-765: state-aware menu on appear

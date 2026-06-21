@@ -50,6 +50,16 @@ public enum RecipeListLayout: String, CaseIterable, Sendable {
         }
     }
 
+    /// Human-readable name for the Settings ▸ Customization layout picker
+    /// (T-822 — moved here from the Feed/Search toolbar toggles). "Grid" /
+    /// "List", matching Spencer's "Grid View / List View" phrasing.
+    public var displayName: String {
+        switch self {
+        case .gallery: "Grid"
+        case .list: "List"
+        }
+    }
+
     /// AC-38.1 — the VoiceOver label spoken when the toggle button gains
     /// focus. Names the **current** state ("Layout, gallery" / "Layout,
     /// list") so VoiceOver users hear what's selected. The destination
