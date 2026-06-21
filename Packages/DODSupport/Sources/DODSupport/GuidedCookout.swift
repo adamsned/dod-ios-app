@@ -173,14 +173,18 @@ extension GuidedCookout {
             "A trivet or flat spot to set the oven on",
         ],
         ingredients: [
-            "1 lb ground beef or Italian sausage",
-            "1 jar (24 oz) marinara sauce",
-            "9 no-boil lasagna noodles",
-            "15 oz ricotta cheese",
-            "2 cups shredded mozzarella",
-            "½ cup grated parmesan",
-            "1 egg",
-            "Italian seasoning, salt + pepper",
+            "2 lbs lean ground beef",
+            "2 cups onion, finely diced",
+            "2½ tbsp Italian seasoning blend",
+            "1½ tsp garlic powder",
+            "½ tsp salt and ½ tsp black pepper",
+            "23 oz spaghetti sauce (2 jars)",
+            "12 oz shredded mozzarella",
+            "2¼ cups ricotta cheese",
+            "½ cup grated Parmesan",
+            "13 lasagna noodles, uncooked",
+            "1¼ cups hot water",
+            "1 tbsp fresh basil or parsley, chopped (optional)",
         ]
     )
 }
