@@ -11,13 +11,14 @@ struct CookLogStatsTests {
 
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
         calendar.firstWeekday = 2  // Monday
         return calendar
     }
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
-        calendar.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+        let components = DateComponents(year: year, month: month, day: day, hour: 12)
+        return calendar.date(from: components) ?? Date(timeIntervalSince1970: 0)
     }
 
     private func entry(_ recipeID: Int, _ title: String, at date: Date, rating: Int? = nil) -> CookLogEntry {
