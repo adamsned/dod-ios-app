@@ -23,10 +23,23 @@ inputs:
     description: "Simulator device name to ensure + boot (e.g. 'iPhone 16', 'iPad Pro 11-inch (M5)'). Defaults to iPhone 17."
     required: false
     default: "iPhone 17"
+  skip_if_unavailable:
+    description: >
+      When 'true', a runner that cannot provision this device (no iOS runtime
+      even after -downloadPlatform, or an unknown device type) is treated as a
+      SKIP (sets available=false, exits 0) instead of a hard failure. The L3
+      device matrix sets this so a runner that happens to lack a bleeding-edge
+      simulator runtime (e.g. the M5 iPad) does not red a non-required check.
+      Defaults to 'false' so L1/L4 stay strict.
+    required: false
+    default: "false"
 outputs:
   destination:
     description: "xcodebuild -destination value, pinned to the booted device UDID"
     value: ${{ steps.resolve.outputs.destination }}
+  available:
+    description: "'true' when the device was provisioned; 'false' when skip_if_unavailable is set and the runner could not provide it."
+    value: ${{ steps.resolve.outputs.available }}
 
 runs:
   using: composite
@@ -36,6 +49,19 @@ runs:
       run: |
         set -euo pipefail
         NAME="${{ inputs.device }}"
+        SKIP="${{ inputs.skip_if_unavailable }}"
+
+        # Either skip this device (best-effort, non-required matrix leg) or
+        # hard-fail, depending on `skip_if_unavailable`. $1 = reason.
+        unavailable() {
+          if [ "$SKIP" = "true" ]; then
+            echo "::warning::Could not provision '$NAME' on this runner ($1); skipping this device's job (non-required matrix leg)."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::Could not provision '$NAME' on this runner ($1)."
+          exit 1
+        }
 
         # Fast path (the common case): the runner image already created the
         # device. Resolve its UDID and reuse it.
@@ -73,8 +99,7 @@ runs:
             runtime=$(newest_ios_runtime)
           fi
           if [ -z "$runtime" ]; then
-            echo "::error::No available iOS simulator runtime found on this runner even after 'xcodebuild -downloadPlatform iOS'."
-            exit 1
+            unavailable "no iOS simulator runtime even after -downloadPlatform iOS"
           fi
 
           # Resolve the canonical device-type id; fall back to the display
@@ -86,7 +111,13 @@ runs:
             devicetype="$NAME"
           fi
 
-          udid=$(xcrun simctl create "$NAME" "$devicetype" "$runtime")
+          # `|| true` + the emptiness check so a create failure (e.g. an unknown
+          # device type for a too-new model like the M5 iPad) routes through
+          # `unavailable` instead of aborting under `set -e`.
+          udid=$(xcrun simctl create "$NAME" "$devicetype" "$runtime" 2>/dev/null || true)
+          if [ -z "$udid" ]; then
+            unavailable "simctl create failed (device type '$NAME' unknown on this runtime?)"
+          fi
           echo "Created $NAME -> $udid (runtime: $runtime)"
         else
           echo "Found existing $NAME -> $udid"
@@ -104,4 +135,5 @@ runs:
         # error; the job-level timeout backstops a genuinely stuck boot.
         xcrun simctl bootstatus "$udid" -b 2>/dev/null || true
 
+        echo "available=true" >> "$GITHUB_OUTPUT"
         echo "destination=platform=iOS Simulator,id=$udid" >> "$GITHUB_OUTPUT"

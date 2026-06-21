@@ -394,11 +394,24 @@ jobs:
         uses: ./.github/actions/ensure-ios-simulator
         with:
           device: ${{ matrix.device }}
+          # L3 is a non-required matrix leg: a runner that can't provision a
+          # bleeding-edge sim (e.g. the M5 iPad's runtime, which the macos
+          # image doesn't always ship + can't always download) SKIPS this
+          # device instead of reding the check. Real test failures (when the
+          # sim IS available) still fail the job. DUT — L3 device-matrix flake.
+          skip_if_unavailable: "true"
       - name: Run UI tests (resilient to simulator/runner flake)
         env:
           DESTINATION: ${{ steps.sim.outputs.destination }}
         run: |
           set -o pipefail
+          # The ensure-ios-simulator step sets available=false when this runner
+          # can't provision the device. Pass-through skip rather than running
+          # xcodebuild against a nonexistent destination.
+          if [ "${{ steps.sim.outputs.available }}" != "true" ]; then
+            echo "::warning::Skipping L3 on ${{ matrix.device }} — simulator could not be provisioned on this runner."
+            exit 0
+          fi
           echo "L3 destination -> $DESTINATION"
           # XCUITests flake at the infra layer on GitHub macOS runners:
           # cold-sim races + test-runner SIGKILL before bootstrap. Retry the
