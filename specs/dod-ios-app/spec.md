@@ -921,6 +921,24 @@ Added 2026-06-20 (DUT-94, authored by Ned). BuzzyWaxx is a sister brand under co
 
 ---
 
+### US-52 — Dutch Oven 101 technique guides
+
+**As a** nervous beginner who just got a Dutch oven,
+**I want** short, accurate technique lessons bundled in the app,
+**so that** I can learn the fundamentals before my first cookout instead of guessing.
+
+Added 2026-06-20 (DUT-140, authored by Ned). This serves the "Your First Cookout" keystone — the *teaching* that turns nervous beginners into capable cast-iron cooks. v1 is a **pure content model + library core** in `DODSupport`: a curated, bundled-in-code set of at least six beginner guides (Preheating, Lid On vs Lid Off, Brown Then Braise, Resting Meat & Why, Deglazing 101, Adapting Indoor Recipes for Outdoor Coals). Each guide carries a title, an honest read-time estimate, two to four ordered sections, and two to four key takeaways. The content is teacher-authored starter craft (Ned refines the voice later).
+
+**Acceptance criteria (T-809 — CL-203):**
+
+- **AC-52.1 (IMPLEMENTED)** `DODSupport` ships a pure `TechniqueGuide` value type (`Identifiable`, `Sendable`, `Equatable` — `slug`, `title`, `estimatedReadMinutes`, `sections: [Section]` where each `Section` has a `heading` + `body`, and `keyTakeaways: [String]`) plus an `enum DutchOven101Library` exposing `static let guides: [TechniqueGuide]` (≥6 curated, bundled-in-code beginner guides, each with a non-empty title, `estimatedReadMinutes > 0`, 2–4 ordered sections with non-empty heading + body, and 2–4 key takeaways; all slugs unique) and `static func guide(slug:) -> TechniqueGuide?`. House style follows `IngredientAisleClassifier` / `DutchOvenHeatCoach` (pure, no UI, no network, bundled-in-code data over a JSON resource). L1 unit tests pin the structural contract. The "Learn" library UI and per-guide read-state persistence are **later slices** (not this AC).
+
+**Constitution + spec notes:**
+
+- **Why bundled-in-code, not a JSON resource.** The v1 library is small, human-readable, teacher-authored, and version-controlled; a static array the compiler folds into a constant beats a runtime load + parse, and ships + tests on the macOS slice ahead of any UI — the same rationale as the `IngredientAisleClassifier` keyword map (CL-67) and `DutchOvenHeatCoach`'s structured reference content. **CL-203** captures the locked decisions and the deferred "Learn" UI + read-state-persistence scope.
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
