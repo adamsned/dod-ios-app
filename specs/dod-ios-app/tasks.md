@@ -2488,6 +2488,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `DODFeatureRecipeDetail/RecipeDetailVideoSection.swift` (the `RecipeVideoPlayer` `UIViewControllerRepresentable` + `loadAspectRatio(for:)` + aspect-sized `playerBox`; macOS `VideoPlayer` fallback under `#else`).
 - **AC:** AC-4.4 (amended — inline video player sizing + fullscreen; CL-199 canonical). **Est:** ~45 min. **Deps:** main at T-804 (`686f52f`). Branch `feat/T-805-video-aspect-fullscreen`. **||:** P-detail. No `e2e` label — single-component swap. Verified via injected-ratio renders (portrait/landscape) + live sim confirmation (playback, no black bars, fullscreen); swift-format + SwiftLint + `xcodebuild build` clean.
 
+### T-806 — DUT-182 iPad article detail: centered reading column (US-37 / AC-37.3 amendment, CL-200)
+
+- **What:** Wrap `ArticleDetailView`'s content block (published date + article body) in the shared `View.readableContentColumn(horizontalSizeClass)` (from T-804) so on iPad (`.regular`) the prose caps to a centered ~700pt reading column under the full-bleed hero. iPhone (`.compact`) byte-identical. No two-up (articles are pure prose).
+- **Files:** `DODFeatureRecipeDetail/ArticleDetailView.swift` (`@Environment(\.horizontalSizeClass)` + `.readableContentColumn` on the content VStack).
+- **AC:** AC-37.3 (amended — iPad article layout; CL-200 canonical). **Est:** ~15 min. **Deps:** main at T-805 (`69d9773`); reuses the `readableContentColumn` helper from T-804. Branch `feat/T-806-article-reading-column`. **||:** P-detail. No `e2e` label — one-modifier layout change. Verified via iPad portrait + landscape renders (834×1194 / 1194×834, `.regular`); swift-format + SwiftLint + `xcodebuild build` clean. iPhone byte-identical.
+
 ---
 
 ## Summary
