@@ -12,6 +12,10 @@ public struct FeedView: View {
 
     @State private var viewModel: FeedViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// System `openURL` (RootView's override). The Cooking Tools menu's "Buy
+    /// BuzzyWaxx Seasoning" item hands off to the browser — buzzywaxx.com isn't a
+    /// DOD recipe link, so RootView's override falls through to `.systemAction`.
+    @Environment(\.openURL) private var openURL
     /// US-38 / AC-38.2 / CL-64 (T-650, 2026-05-27) — shared with `SearchView`
     /// via the same `@AppStorage` key. Default `.gallery` preserves CC-9's
     /// 2-column grid byte-for-byte for users who never tap the toggle.
@@ -23,6 +27,10 @@ public struct FeedView: View {
     @State private var showingJournal = false
     /// DUT-190 — presents the "cook a dump cake" picker + coached flow as a sheet.
     @State private var showingDumpCakeFlow = false
+    /// DUT-196 — presents the Dutch Oven Heat Coach as a sheet. Moved here from
+    /// Settings ▸ Tools so all cooking-help + cast-iron-care tools live together
+    /// in the Feed's "Cooking Tools" menu.
+    @State private var showingHeatCoach = false
     /// DUT-183 — the "Start Here" First Cookout hero card; dismissible + persisted
     /// so a cook past their first win isn't nagged (the toolbar flame stays).
     @AppStorage("dod.firstCookoutHeroDismissed") private var firstCookoutHeroDismissed = false
@@ -60,27 +68,20 @@ public struct FeedView: View {
         // tab's header behavior consistent (and dodging the iOS 26 large-title
         // bug). The `.toolbar` buttons below stay pinned in the nav bar.
         .toolbar {
-            // T-823 / DUT-187 — "Your First Cookout" + Cook Journal entries
-            // move to the TRAILING edge (the corner the Settings gear + layout
-            // toggle used to occupy), now that Settings is a tab and the layout
-            // switcher lives in Settings ▸ Customization. `.topBarTrailing` is
-            // iOS-only; the macOS test slice falls back to `.automatic`.
+            // DUT-196 — a single "Cooking Tools" menu (`frying.pan.fill`) on the
+            // TRAILING edge consolidates every cooking-help + cast-iron-care
+            // entry point (Your First Cookout, Cook Journal, Heat Coach, Buy
+            // BuzzyWaxx) into one spot so the Feed chrome stays clean. Replaces
+            // the separate First Cookout + Journal buttons (T-823) and pulls Heat
+            // Coach + Shop off the Settings page. `.topBarTrailing` is iOS-only;
+            // the macOS test slice falls back to `.automatic`.
             #if os(iOS)
             ToolbarItem(placement: .topBarTrailing) {
-                firstCookoutToolbarButton
+                cookingToolsMenu
             }
             #else
             ToolbarItem(placement: .automatic) {
-                firstCookoutToolbarButton
-            }
-            #endif
-            #if os(iOS)
-            ToolbarItem(placement: .topBarTrailing) {
-                journalToolbarButton
-            }
-            #else
-            ToolbarItem(placement: .automatic) {
-                journalToolbarButton
+                cookingToolsMenu
             }
             #endif
         }
@@ -97,6 +98,9 @@ public struct FeedView: View {
         }
         .sheet(isPresented: $showingJournal) {
             CookJournalView(load: { await viewModel.cookLogs() })
+        }
+        .sheet(isPresented: $showingHeatCoach) {
+            NavigationStack { HeatCoachView() }
         }
         .sheet(isPresented: $showingDumpCakeFlow) {
             DumpCakeFlow(onLogCook: { entry in
@@ -120,30 +124,49 @@ public struct FeedView: View {
         currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cooked)
     }
 
-    /// DUT-183 — the "Your First Cookout" entry: a flame on the leading edge
-    /// that opens the guided first-cookout flow (the strategy's "Start Here").
-    private var firstCookoutToolbarButton: some View {
-        Button {
-            showingFirstCookout = true
+    /// DUT-196 — the "Cooking Tools" menu: one `frying.pan.fill` toolbar button
+    /// that gathers every cooking-help + cast-iron-care entry point in one place
+    /// (Your First Cookout + Cook Journal, folded in from their own buttons; Heat
+    /// Coach + Buy BuzzyWaxx, pulled off the Settings page). Each item triggers
+    /// its existing sheet / browser hand-off, keeping the Feed chrome to a single
+    /// button.
+    private var cookingToolsMenu: some View {
+        Menu {
+            Button {
+                showingFirstCookout = true
+            } label: {
+                Label("Your First Cookout", systemImage: "flame.fill")
+            }
+            Button {
+                showingJournal = true
+            } label: {
+                Label("Cook Journal", systemImage: "book.closed.fill")
+            }
+            Button {
+                showingHeatCoach = true
+            } label: {
+                Label("Dutch Oven Heat Coach", systemImage: "thermometer.medium")
+            }
+            Button {
+                openCookingToolURL(SettingsViewModel.buyBuzzyWaxxURLString)
+            } label: {
+                Label("Buy BuzzyWaxx Seasoning", systemImage: "bag.fill")
+            }
         } label: {
-            Image(systemName: "flame.fill")
-                .accessibilityLabel("Your First Cookout")
+            Image(systemName: "frying.pan.fill")
+                .accessibilityLabel("Cooking Tools")
         }
         .tint(DODColor.burntOrange)
-        .accessibilityIdentifier("feed-toolbar-first-cookout")
+        .accessibilityIdentifier("feed-toolbar-cooking-tools")
     }
 
-    /// DUT-104 — the Cook Journal entry: a book on the leading edge that opens
-    /// the user's logged-cook history + streak stats.
-    private var journalToolbarButton: some View {
-        Button {
-            showingJournal = true
-        } label: {
-            Image(systemName: "book.closed.fill")
-                .accessibilityLabel("Cook Journal")
+    /// Hand a Cooking Tools URL (the BuzzyWaxx storefront) to the browser. Built
+    /// with `if let` from the `String` constant so the repo's
+    /// `force_unwrapping`-as-error lint stays clean (mirrors the old `ShopSection`).
+    private func openCookingToolURL(_ string: String) {
+        if let url = URL(string: string) {
+            openURL(url)
         }
-        .tint(DODColor.burntOrange)
-        .accessibilityIdentifier("feed-toolbar-journal")
     }
 
     @ViewBuilder

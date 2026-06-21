@@ -427,43 +427,37 @@ final class SmokeTests: XCTestCase {
         )
     }
 
-    /// US-45 / AC-45.1..AC-45.3 (T-790, DUT-94): the Settings → Shop section's
-    /// "Buy BuzzyWaxx Seasoning" row exists and is tappable (it hands off to
-    /// the system browser via `openURL`).
-    ///
-    /// XCUITest can't read the URL the row opens — and asserting Safari reaches
-    /// the foreground is flaky on shared CI simulators — so the URL value
-    /// itself (`https://buzzywaxx.com/collections/frontpage`) is pinned
-    /// deterministically by the L1 test
-    /// `SettingsViewModelTests.buyBuzzyWaxxURLPointsAtTheShopifyStorefront`.
-    /// This smoke test guards the remaining contract: the row is present,
-    /// reachable by scrolling to the bottom of Settings, and activatable
-    /// without crashing.
-    func test_settingsShopRowIsPresentAndTappable() {
+    /// DUT-196: the cooking-help + cast-iron-care entry points are consolidated
+    /// into a single "Cooking Tools" menu (`frying.pan.fill`) on the Feed
+    /// toolbar — Your First Cookout + Cook Journal fold in from their own
+    /// buttons, and Heat Coach + the BuzzyWaxx shop row move OFF the Settings
+    /// page. The BuzzyWaxx URL itself stays pinned by the L1
+    /// `SettingsViewModelTests.buyBuzzyWaxxURLPointsAtTheShopifyStorefront`. This
+    /// smoke test guards the contract XCUITest can: the menu button is on the
+    /// Feed and opens a menu surfacing the tools that left Settings.
+    func test_feedCookingToolsMenuConsolidatesTools() {
         XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
 
-        // Open Settings — a first-class tab (iPhone) / sidebar row (iPad)
-        // since T-823 / DUT-187 (promoted from the old per-tab gear).
-        goToTab(phoneLabel: "Settings", padTitle: "Settings")
-
-        // The Shop row sits near the bottom of the Settings list (between
-        // About and the version footer), so scroll it into view. Identified by
-        // its accessibility identifier (AC-45.2).
-        let shopRow = app.buttons["settings-button-shop-buzzywaxx"]
-        var swipes = 0
-        while !shopRow.exists && swipes < 8 {
-            app.swipeUp()
-            swipes += 1
-        }
+        // The Feed is the default screen (iPhone tab / iPad detail); the Cooking
+        // Tools menu lives on its trailing toolbar edge.
+        let menuButton = app.buttons["feed-toolbar-cooking-tools"]
         XCTAssertTrue(
-            shopRow.waitForExistence(timeout: 6),
-            "Settings should expose the BuzzyWaxx Shop row (US-45 / AC-45.2)"
+            menuButton.waitForExistence(timeout: 8),
+            "Feed should expose the Cooking Tools menu button (DUT-196)"
         )
-        XCTAssertTrue(shopRow.isHittable, "The Shop row should be tappable")
+        menuButton.tap()
 
-        // Activating it must not crash; the actual browser hand-off (openURL
-        // with the pinned URL) is covered at L1 per the doc comment above.
-        shopRow.tap()
+        // The menu opens with the four consolidated tools (SwiftUI Menu items
+        // surface as buttons). Check the BuzzyWaxx entry (which moved off
+        // Settings) + the keystone First Cookout entry as evidence it rendered.
+        XCTAssertTrue(
+            app.buttons["Buy BuzzyWaxx Seasoning"].waitForExistence(timeout: 4),
+            "Cooking Tools menu should include the Buy BuzzyWaxx entry (moved off Settings)"
+        )
+        XCTAssertTrue(
+            app.buttons["Your First Cookout"].exists,
+            "Cooking Tools menu should include Your First Cookout"
+        )
     }
 
     /// US-46 / AC-46.2; amended by DUT-189: the Settings → Account section

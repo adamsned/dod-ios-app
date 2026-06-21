@@ -15,10 +15,12 @@ import SwiftUI
 /// no header); **Measurements & Units** (Use Metric Units toggle + Recipe
 /// Step Temperatures picker); **Notification Settings** (When New Recipes
 /// Drop + When Someone Replies to My Comment toggles); **Customization**
-/// (Appearance picker + Cook Mode Voice rows via ``VoiceRows``); **Tools**
-/// (``ToolsSection`` — Heat Coach); **Data & Privacy** (iCloud Sync via
-/// ``CloudSyncRows`` + Clear Cached Recipe Images + Share Anonymous Usage
-/// Data); About Dutch Oven Daddy; version footer.
+/// (Appearance picker + Cook Mode Voice rows via ``VoiceRows``); **Data &
+/// Privacy** (iCloud Sync via ``CloudSyncRows`` + Clear Cached Recipe Images
+/// + Share Anonymous Usage Data); About Dutch Oven Daddy; version footer.
+/// (DUT-196 moved the former **Tools** ▸ Heat Coach and **Shop** ▸ Buy
+/// BuzzyWaxx rows into the Feed's "Cooking Tools" menu, so neither lives in
+/// Settings anymore.)
 ///
 /// Section subheaders use `DODType.heading` + primary `DODColor.label`
 /// (T-751 / CL-148) so they read distinctly above the `caption` +
@@ -198,10 +200,6 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
-            // MARK: DUT-48 Tools — Dutch Oven Heat Coach
-            // (`ToolsSection`, `SettingsView+Tools.swift`).
-            ToolsSection()
-
             // MARK: T-752 / CL-149 — Data & Privacy group
 
             // DUT-58 — iCloud Sync (`CloudSyncRows`) + Share Anonymous Usage
@@ -254,9 +252,6 @@ public struct SettingsView: View {
                 .accessibilityIdentifier("settings-link-about")
             }
             .listRowBackground(DODColor.surfaceElevated)
-
-            // US-45 (T-790, DUT-94) — Shop: BuzzyWaxx cross-promo (`SettingsView+Shop.swift`).
-            ShopSection()
 
             Section {
                 EmptyView()
