@@ -73,26 +73,6 @@ public struct FeedView: View {
                 journalToolbarButton
             }
             #endif
-            // US-38 / AC-38.1 / CL-64.5 (T-650): layout toggle on the
-            // trailing edge. The Settings gear that used to sit to its
-            // trailing side (US-32 AC-32.1) moved to the shared
-            // `SettingsToolbarModifier` applied by `TabStack` (DUT-26) so
-            // every top-level tab carries the same gear at the absolute
-            // trailing edge. Because `TabStack` applies that modifier AFTER
-            // this view in the modifier chain, SwiftUI still orders the gear
-            // to the trailing side of this toggle — the user-visible layout
-            // (toggle then gear) is unchanged on Feed.
-            // `.topBarTrailing` is iOS-only; macOS test slice falls back to
-            // the default `.automatic` placement so the package still builds.
-            #if os(iOS)
-            ToolbarItem(placement: .topBarTrailing) {
-                layoutToggleToolbarButton
-            }
-            #else
-            ToolbarItem(placement: .automatic) {
-                layoutToggleToolbarButton
-            }
-            #endif
         }
         .sheet(isPresented: $showingFirstCookout) {
             FirstCookoutView(onLogCook: { entry in
@@ -106,26 +86,6 @@ public struct FeedView: View {
         .refreshable { await viewModel.refresh() }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isOffline)
         .sensoryFeedback(.success, trigger: viewModel.refreshCount)
-    }
-
-    /// US-38 / AC-38.1 / CL-64 (T-650): the layout-toggle button. Sits to
-    /// the leading side of the gear icon in the trailing-edge toolbar
-    /// group. Per CL-64.1 the icon shows the CURRENT layout (opposite
-    /// of the typical iOS destination convention) — VoiceOver users
-    /// hear the destination via the action hint so the affordance is
-    /// still discoverable.
-    private var layoutToggleToolbarButton: some View {
-        let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
-        return Button {
-            var next = layout
-            next.toggle()
-            layoutRaw = next.rawValue
-        } label: {
-            Image(systemName: layout.toggleIconName)
-                .accessibilityLabel(layout.currentStateAccessibilityLabel)
-                .accessibilityHint(layout.destinationActionHint)
-        }
-        .accessibilityIdentifier("feed-toolbar-layout-toggle")
     }
 
     /// DUT-183 — the "Your First Cookout" entry: a flame on the leading edge

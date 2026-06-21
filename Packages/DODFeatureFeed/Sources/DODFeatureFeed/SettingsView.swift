@@ -186,6 +186,7 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-picker-appearance")
+                LayoutSettingPicker()
 
                 VoiceRows(viewModel: viewModel)
             } header: {
