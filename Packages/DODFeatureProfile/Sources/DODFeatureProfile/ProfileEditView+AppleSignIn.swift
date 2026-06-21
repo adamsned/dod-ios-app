@@ -19,7 +19,7 @@ extension ProfileEditView {
                 .textContentType(.name)
                 .accessibilityIdentifier("profile-edit-displayname")
                 #if os(iOS)
-                .autocapitalization(.words)
+            .autocapitalization(.words)
                 #endif
 
             TextField("Email", text: $email)
@@ -28,9 +28,9 @@ extension ProfileEditView {
                 .textContentType(.emailAddress)
                 .accessibilityIdentifier("profile-edit-email")
                 #if os(iOS)
-                .keyboardType(.emailAddress)
-                .autocapitalization(.none)
-                .autocorrectionDisabled(true)
+            .keyboardType(.emailAddress)
+            .autocapitalization(.none)
+            .autocorrectionDisabled(true)
                 #endif
         } footer: {
             if let emailValidationError {
