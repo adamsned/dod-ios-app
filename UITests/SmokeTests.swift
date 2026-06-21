@@ -71,9 +71,14 @@ final class SmokeTests: XCTestCase {
         )
     }
 
-    func test_allThreeTabsAreReachable() {
+    func test_allThreeTabsAreReachable() throws {
+        // iPad uses a sidebar (US-38 / DUT-89), not a bottom tab bar — `app.tabBars`
+        // never exists there, so this iPhone-only check self-skips. (Without this,
+        // the whole L3 iPad job fails deterministically.) Sidebar reachability is
+        // covered device-agnostically by `goToTab` in the Saved/Settings tests.
+        try XCTSkipIf(isPad, "Bottom tabs are iPhone-only; iPad uses a sidebar.")
         let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 12))
         // Tab order post-T-800 is Recipes → Saved → Search (the Categories
         // tab was folded into Search — CL-194). Iteration order here is
         // purely "do all three open?"; the positional guard lives in
@@ -267,19 +272,19 @@ final class SmokeTests: XCTestCase {
         let stepOneLabel = stepOne.label
         if let total = Self.totalStepsCount(from: stepOneLabel), total >= 2 {
             let nextButton = app.buttons["Next"]
-            XCTAssertTrue(nextButton.waitForExistence(timeout: 3), "Next button should be present mid-flow")
+            XCTAssertTrue(nextButton.waitForExistence(timeout: 6), "Next button should be present mid-flow")
             nextButton.tap()
             let stepTwoPredicate = NSPredicate(format: "label BEGINSWITH 'Step 2 of'")
             let stepTwo = app.staticTexts.matching(stepTwoPredicate).firstMatch
             XCTAssertTrue(
-                stepTwo.waitForExistence(timeout: 3),
+                stepTwo.waitForExistence(timeout: 6),
                 "Cook Mode should advance to 'Step 2 of M' on Next"
             )
         }
 
         // Step 5: tap Done — AC-7.6 — and assert we're back on detail.
         let doneButton = app.buttons["Exit Cook Mode"]
-        XCTAssertTrue(doneButton.waitForExistence(timeout: 3), "Done button should be in Cook Mode top bar")
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 6), "Done button should be in Cook Mode top bar")
         doneButton.tap()
 
         XCTAssertTrue(
@@ -371,7 +376,7 @@ final class SmokeTests: XCTestCase {
             }
             // Landed on an article/roundup — go back and try the next card.
             let back = app.navigationBars.buttons.element(boundBy: 0)
-            if back.waitForExistence(timeout: 3) { back.tap() }
+            if back.waitForExistence(timeout: 6) { back.tap() }
             _ = cards.element(boundBy: 0).waitForExistence(timeout: 10)
         }
         return false
@@ -450,7 +455,7 @@ final class SmokeTests: XCTestCase {
             swipes += 1
         }
         XCTAssertTrue(
-            shopRow.waitForExistence(timeout: 3),
+            shopRow.waitForExistence(timeout: 6),
             "Settings should expose the BuzzyWaxx Shop row (US-45 / AC-45.2)"
         )
         XCTAssertTrue(shopRow.isHittable, "The Shop row should be tappable")

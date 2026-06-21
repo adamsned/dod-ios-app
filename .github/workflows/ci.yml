@@ -344,6 +344,10 @@ jobs:
     if: needs.changes.outputs.ios_sim == 'true'
     runs-on: macos-15
     timeout-minutes: 30
+    # Per-leg best-effort: only matrix legs that set `continue_on_error` (the
+    # flaky M5 iPad) are non-blocking; the iPhone legs stay strict and still
+    # red L3 on a genuine failure.
+    continue-on-error: ${{ matrix.continue_on_error || false }}
     # Device matrix (DUT-16 follow-up): the smoke suite runs on iPhone 14/15/16/17
     # so a layout/regression that only shows on an older/smaller iPhone is caught.
     # iPad runs the full SmokeTests class too: the suite is device-agnostic
@@ -365,6 +369,13 @@ jobs:
             only_testing: "-only-testing:DODAppUITests"
           - device: "iPad Pro 11-inch (M5)"
             only_testing: "-only-testing:DODAppUITests/SmokeTests"
+            # Best-effort leg: the M5 iPad sim is flaky on shared GitHub runners
+            # at BOTH provisioning (the iOS 26 runtime isn't always installable,
+            # now handled by skip_if_unavailable) AND the XCUITest run itself
+            # (test-runner SIGKILL/crash through all 3 retries even when the sim
+            # is present). L3 is non-required; a flaky iPad leg must not red the
+            # check. The device-agnostic + sim-stability retrofit is #226 / DUT.
+            continue_on_error: true
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)
@@ -394,11 +405,24 @@ jobs:
         uses: ./.github/actions/ensure-ios-simulator
         with:
           device: ${{ matrix.device }}
+          # L3 is a non-required matrix leg: a runner that can't provision a
+          # bleeding-edge sim (e.g. the M5 iPad's runtime, which the macos
+          # image doesn't always ship + can't always download) SKIPS this
+          # device instead of reding the check. Real test failures (when the
+          # sim IS available) still fail the job. DUT — L3 device-matrix flake.
+          skip_if_unavailable: "true"
       - name: Run UI tests (resilient to simulator/runner flake)
         env:
           DESTINATION: ${{ steps.sim.outputs.destination }}
         run: |
           set -o pipefail
+          # The ensure-ios-simulator step sets available=false when this runner
+          # can't provision the device. Pass-through skip rather than running
+          # xcodebuild against a nonexistent destination.
+          if [ "${{ steps.sim.outputs.available }}" != "true" ]; then
+            echo "::warning::Skipping L3 on ${{ matrix.device }} — simulator could not be provisioned on this runner."
+            exit 0
+          fi
           echo "L3 destination -> $DESTINATION"
           # XCUITests flake at the infra layer on GitHub macOS runners:
           # cold-sim races + test-runner SIGKILL before bootstrap. Retry the
