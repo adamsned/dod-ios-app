@@ -18,7 +18,10 @@ struct DumpCakeTests {
 
     @Test func templateUsesTheChosenRecipe() {
         let cake = DumpCake(
-            id: 16370, slug: "lemon-blueberry-dump-cake", title: "Lemon Blueberry Dump Cake")
+            id: 16370,
+            slug: "lemon-blueberry-dump-cake",
+            title: "Lemon Blueberry Dump Cake"
+        )
         let cookout = GuidedCookout.dumpCake(cake)
         #expect(cookout.recipeID == 16370)
         #expect(cookout.recipeSlug == "lemon-blueberry-dump-cake")
