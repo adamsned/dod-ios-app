@@ -14,6 +14,7 @@ struct FirstCookoutHeroCard: View {
     let cookout: GuidedCookout
     let onStart: () -> Void
     let onDismiss: () -> Void
+    let onCookDumpCake: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
@@ -47,6 +48,14 @@ struct FirstCookoutHeroCard: View {
             .buttonStyle(.borderedProminent)
             .tint(DODColor.burntOrange)
             .padding(.top, DODSpacing.xxs)
+            Button(action: onCookDumpCake) {
+                Text("Or cook a dump cake")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.burntOrange)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("feed-hero-dump-cake")
         }
         .padding(DODSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -75,6 +84,6 @@ struct FirstCookoutHeroCard: View {
 }
 
 #Preview {
-    FirstCookoutHeroCard(cookout: .firstCookout, onStart: {}, onDismiss: {})
+    FirstCookoutHeroCard(cookout: .firstCookout, onStart: {}, onDismiss: {}, onCookDumpCake: {})
         .padding()
 }
