@@ -2482,6 +2482,12 @@ Linear issue **DUT-36 "User profile + gated write surfaces"** (Phase d of 4 — 
 - **Files:** `DODDesignSystem/ContentColumn.swift` (new — `DODContentWidth` + `View.readableContentColumn`); `DODFeatureRecipeDetail/RecipeDetailView.swift` (3-band `readyBody` + `ingredientsInstructions(twoUp:)` + `GeometryReader` width breakpoint + `@Environment(\.horizontalSizeClass)`); `RecipeDetailView+Sections.swift` (new — ingredients/instructions sections moved out); `RecipeDetailView+Loading.swift` (new — loading skeleton moved out).
 - **AC:** AC-4.1 (amended — iPad adaptive layout; CL-198 canonical). **Est:** ~1.5 h. **Deps:** main at T-803 (`d551501`). Branch `feat/T-804-ipad-recipe-reading-column`. **||:** P-detail. No `e2e` label — iPad-gated layout. Verified via iPad portrait + landscape renders (834×1194 / 1194×834, `.regular`); swift-format + SwiftLint + `xcodebuild build` clean. iPhone byte-identical (column helper no-ops on compact).
 
+### T-805 — DUT-181 Recipe video: aspect-correct AVPlayerViewController (no black bars) + native fullscreen (US-4 / AC-4.4 amendment, CL-199)
+
+- **What:** Replace the recipe "Video" section's fixed 200pt full-width SwiftUI `VideoPlayer` with an `AVPlayerViewController` (fullscreen button + PiP) whose container is sized to the clip's real aspect ratio (read from the asset, capped 440pt tall, centered) — no more black bars on portrait clips. Applies everywhere (iPhone + iPad).
+- **Files:** `DODFeatureRecipeDetail/RecipeDetailVideoSection.swift` (the `RecipeVideoPlayer` `UIViewControllerRepresentable` + `loadAspectRatio(for:)` + aspect-sized `playerBox`; macOS `VideoPlayer` fallback under `#else`).
+- **AC:** AC-4.4 (amended — inline video player sizing + fullscreen; CL-199 canonical). **Est:** ~45 min. **Deps:** main at T-804 (`686f52f`). Branch `feat/T-805-video-aspect-fullscreen`. **||:** P-detail. No `e2e` label — single-component swap. Verified via injected-ratio renders (portrait/landscape) + live sim confirmation (playback, no black bars, fullscreen); swift-format + SwiftLint + `xcodebuild build` clean.
+
 ---
 
 ## Summary
