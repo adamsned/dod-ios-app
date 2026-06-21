@@ -2680,6 +2680,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DODFeatureProfile/AppleProfileSignIn.swift` (new — pure handler), `DODFeatureProfile/AppleProfileSignInButton.swift` (new — SiwA button), `DODFeatureProfile/ProfileEditView+AppleSignIn.swift` (new — moved `identitySection` + `appleSignInSection` + `handleAppleSignIn`), `DODFeatureProfile/ProfileEditView.swift` (body adds the section; `identitySection` removed for the cap), `DODFeatureFeed/SettingsView+Account.swift` (button → pointer; drop `AuthenticationServices` import); `DODFeatureProfile/Tests/.../AppleProfileSignInTests.swift` (new L1 ×4), `UITests/SmokeTests.swift` (Account test → pointer). `AccountViewModel` retained (session API + Sign Out/Delete). No `RootView` change (iPad sidebar Profile already opens `ProfileEditView`).
 - **AC:** AC-44.2 + AC-46.2 + AC-46.3 (amended; CL-222 canonical). **Est:** ~60 min. **Deps:** main at T-827 (`e6b50c2`, after merging Ned's parallel T-825/826/827). Branch `feat/T-825-siwa-profile-surfaces` (T-number bumped to T-828 to clear the collision with Ned's parallel T-825). **||:** P-auth/profile. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean; L1 `swift test` green.
 
+### T-832 — Reliable cached feed image loader (DUT-195, CL-226, BUGFIX)
+
+- **What:** Feed cards frequently showed the broken-image placeholder (AsyncImage: no retry, cancels on scroll, no decode cache). New `ReliableImage` (URLSession + URLCache + in-memory `NSCache` + 1 retry, cancellation-safe), `AsyncImage`-shaped so the swap is one line. `RecipeCard` + `RecipeCard+ListRow` use it.
+- **Files:** `ReliableImage.swift` (new, DODDesignSystem), `RecipeCard.swift`, `RecipeCard+ListRow.swift`. Spec: `clarifications.md` (CL-226).
+- **AC:** DUT-195 (CL-226 canonical). **Est:** ~2 h. **Deps:** off main; independent of the other in-flight PRs (DODDesignSystem only). Branch `fix/DUT-195-feed-image-loader`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 19 DODDesignSystem tests pass; iOS app build green. Visual reliability is TestFlight-verified (UIKit-bound loader, not unit-testable on the macOS slice). **Follow-up:** request sized WP thumbnails (`media_details.sizes`); share one loader across feed/list/widget.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
