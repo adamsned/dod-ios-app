@@ -21,6 +21,9 @@ public struct FeedView: View {
     @State private var showingFirstCookout = false
     /// DUT-104 — presents the "I Made This" cook journal as a sheet.
     @State private var showingJournal = false
+    /// DUT-183 — the "Start Here" First Cookout hero card; dismissible + persisted
+    /// so a cook past their first win isn't nagged (the toolbar flame stays).
+    @AppStorage("dod.firstCookoutHeroDismissed") private var firstCookoutHeroDismissed = false
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
@@ -151,6 +154,21 @@ public struct FeedView: View {
             // minimize); offline shifts it below the OfflineBanner overlay.
             DODScreenHeader("Recipes & Articles")
                 .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
+            // DUT-183 — the keystone "Your First Cookout" entry, surfaced as a
+            // prominent hero so beginners actually find the coached path.
+            if !firstCookoutHeroDismissed {
+                FirstCookoutHeroCard(
+                    cookout: .firstCookout,
+                    onStart: { showingFirstCookout = true },
+                    onDismiss: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            firstCookoutHeroDismissed = true
+                        }
+                    }
+                )
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.top, DODSpacing.sm)
+            }
             Group {
                 switch layout {
                 case .gallery:

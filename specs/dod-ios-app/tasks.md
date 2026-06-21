@@ -2651,4 +2651,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **AC:** AC-16.1 + AC-16.5 + AC-32.1 (amended; CL-217 canonical). **Est:** ~45 min. **Deps:** main at T-822 (`08753c6`). Branch `feat/T-823-settings-tab-toolbar-reshuffle`. **||:** P-settings/nav. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean; L4 TabBar baselines auto-recorded on iPhone 17.
 ---
 
+### T-824 — First Cookout hero card: make the wedge discoverable (US-53 / DUT-183, CL-218)
+
+- **What:** A prominent "START HERE" hero card at the top of the Feed promoting "Your First Cookout" (the keystone coached path), so beginners find it instead of relying on the small toolbar flame. Tapping opens the existing `FirstCookoutView`; dismissible + persisted (`@AppStorage`).
+- **Files:** `FirstCookoutHeroCard.swift` (new, DODFeatureFeed), `FeedView.swift` (render at top of the list + dismiss state). Spec: `clarifications.md` (CL-218).
+- **AC:** US-53 / DUT-183 (CL-218 canonical). **Est:** ~1.5 h. **Deps:** off main (post CL-217 toolbar reshuffle). Branch `feat/T-822-first-cookout-hero-card`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; macOS DODFeatureFeed build complete; iOS app build green (xcodebuild exit 0). Discoverability is device-observable — TestFlight walk.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
