@@ -921,6 +921,18 @@ Added 2026-06-20 (DUT-94, authored by Ned). BuzzyWaxx is a sister brand under co
 
 ---
 
+### US-49 — Hands-free Cook Mode voice commands
+
+As a cook with messy hands, I want to say "next", "repeat", or "start a timer" instead of touching a greasy screen, so I can drive Cook Mode without setting down what I'm doing. (Complements the existing read-aloud, which is voice-OUT; this is voice-IN.)
+
+- **AC-49.1 (command grammar — T-806 / CL-200, IMPLEMENTED).** `CookModeVoiceCommand` (DODSupport) is a pure transcript→command mapper: `parse(_:)` lowercases + trims a recognized transcript and resolves a small synonym set to `.next` / `.previous` / `.repeatStep` / `.startTimer` / `.pause` (most-specific phrases first so "start a timer" never reads as navigation), else `.unknown` (ignored). Pure → fully L1-tested without a microphone.
+- **AC-49.2 (on-device recognition).** A mic toggle in Cook Mode runs `SFSpeechRecognizer` with `requiresOnDeviceRecognition` (privacy + offline), feeding transcripts to `parse(_:)`; needs the Speech permission + `NSSpeechRecognitionUsageDescription`.
+- **AC-49.3 (Cook Mode integration).** Recognized commands drive Cook Mode navigation + TTS re-read; `.startTimer` starts the current step's timer via the `CookTimerEngine` (US-47). The spoken step pauses while listening (no feedback loop); permission denial degrades to touch.
+
+This is part of epic E1 (Cooking Session Core), built on the US-47 timer engine.
+
+---
+
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
