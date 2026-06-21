@@ -76,7 +76,6 @@ struct TabStack: View {
                     }
                 }
             )
-            .modifier(settingsToolbar(identifierStem: "feed"))
         case .search:
             SearchView(
                 viewModel: SearchViewModel(dependencies: dependencies.searchDependencies()),
@@ -98,7 +97,6 @@ struct TabStack: View {
                 // point into the category-browse → recipes flow.
                 onSelectCategory: { category in path.append(.category(category)) }
             )
-            .modifier(settingsToolbar(identifierStem: "search"))
         case .saved:
             SavedView(
                 viewModel: SavedViewModel(dependencies: dependencies.savedDependencies()),
@@ -113,52 +111,43 @@ struct TabStack: View {
                     }
                 }
             )
-            .modifier(settingsToolbar(identifierStem: "saved"))
+        case .settings:
+            // T-823 / DUT-187 — Settings is now a first-class destination
+            // (iPhone tab / iPad sidebar row) rendered inside the tab's own
+            // NavigationStack, replacing the per-tab gear sheet.
+            SettingsView(
+                viewModel: settingsTabViewModel,
+                onClearImageCache: { try await dependencies.store.clearImageCache() }
+            )
         }
     }
 
-    /// DUT-26 — the shared trailing Settings gear, wired with the
-    /// composition root's full Settings dependency surface and applied
-    /// identically to every top-level tab root above so the gear is present
-    /// and consistent on Recipes / Categories / Search / Saved. The deps
-    /// (the iCloud-Sync seam, Clear-Cache closure, notification-auth seam,
-    /// and the AVFoundation voice previewer) are the same ones `FeedView`
-    /// received pre-DUT-26 — only the wiring site moved up here so it is
-    /// declared once instead of per-tab. `identifierStem` gives each tab's
-    /// gear a unique accessibility identifier (`<stem>-toolbar-settings`)
-    /// while the visible label stays "Settings" everywhere.
-    private func settingsToolbar(identifierStem: String) -> SettingsToolbarModifier {
+    /// T-823 / DUT-187 — builds the `SettingsViewModel` for the Settings tab.
+    /// Settings is now a first-class destination (iPhone tab between Saved and
+    /// Search / iPad sidebar row) instead of the per-tab gear sheet, but the
+    /// dependency surface is exactly what the old `SettingsToolbarModifier`
+    /// (DUT-26) wired: the iCloud-Sync seam, Clear-Cache closure (passed at the
+    /// `SettingsView` call site), notification-auth seam, the AVFoundation
+    /// voice previewer, and the Keychain profile + photo stores.
+    private var settingsTabViewModel: SettingsViewModel {
         #if canImport(UIKit)
-        SettingsToolbarModifier(
-            identifierStem: identifierStem,
-            settingsDependencies: dependencies.settingsDependencies(),
-            onClearImageCache: { try await dependencies.store.clearImageCache() },
-            // US-42 / AC-42.1 — toggle ON requests local-notification
-            // authorization through the composition root's service.
-            onRequestNotificationAuthorization: {
-                await dependencies.notificationService.requestAuthorization()
-            },
-            // US-40 / AC-40.12 + AC-40.13 — the live AVFoundation-backed
-            // voice catalog + preview seam for the Settings Cook Mode Voice
-            // section (quality readout + Preview + download nudge).
+        SettingsViewModel(
+            dependencies: dependencies.settingsDependencies(),
             voicePreviewer: SystemVoicePreviewer(),
-            // US-44 (T-739) — the Keychain-backed profile store the
-            // Settings → Profile section + edit view read/write.
             profileStore: dependencies.profileStore,
-            // US-44 Phase b (T-740) — Documents-directory photo store
-            // routed through to the avatar render + picker flow.
-            profilePhotoStore: dependencies.profilePhotoStore
+            profilePhotoStore: dependencies.profilePhotoStore,
+            requestNotificationAuthorization: {
+                await dependencies.notificationService.requestAuthorization()
+            }
         )
         #else
-        SettingsToolbarModifier(
-            identifierStem: identifierStem,
-            settingsDependencies: dependencies.settingsDependencies(),
-            onClearImageCache: { try await dependencies.store.clearImageCache() },
-            onRequestNotificationAuthorization: {
-                await dependencies.notificationService.requestAuthorization()
-            },
+        SettingsViewModel(
+            dependencies: dependencies.settingsDependencies(),
             voicePreviewer: SystemVoicePreviewer(),
-            profileStore: dependencies.profileStore
+            profileStore: dependencies.profileStore,
+            requestNotificationAuthorization: {
+                await dependencies.notificationService.requestAuthorization()
+            }
         )
         #endif
     }
