@@ -13,9 +13,16 @@ description: >
   `sudo xcode-select -s ...` first) so `xcrun simctl` + the iPhone 17 device
   type resolve against the iOS 26 SDK, and the repo is checked out.
 
-# The booted device's geometry must match the recorded snapshot baselines
-# (L4 records on iPhone 17 — logical 402×874pt), so this action deliberately
-# guarantees iPhone 17 specifically rather than falling back to "any iPhone".
+# The device is parameterized (default "iPhone 17") so the L3 UI Smoke job can
+# fan out across a device matrix (iPhone 14/15/16/17 + iPad). L4 snapshots keep
+# the default — their baselines are locked to iPhone 17 geometry (402×874pt).
+# The action guarantees the requested device specifically (create-if-missing on
+# the newest installed iOS runtime) rather than falling back to "any device".
+inputs:
+  device:
+    description: "Simulator device name to ensure + boot (e.g. 'iPhone 16', 'iPad Pro 11-inch (M5)'). Defaults to iPhone 17."
+    required: false
+    default: "iPhone 17"
 outputs:
   destination:
     description: "xcodebuild -destination value, pinned to the booted device UDID"
@@ -28,7 +35,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        NAME="iPhone 17"
+        NAME="${{ inputs.device }}"
 
         # Fast path (the common case): the runner image already created the
         # device. Resolve its UDID and reuse it.
@@ -43,13 +50,30 @@ runs:
           # numeric (major, minor, ...) tuple so 26.0 outranks 9.0, then take
           # the last. Only iOS identifiers contain "iOS" (watchOS/tvOS/xrOS do
           # not), so the filter is unambiguous.
-          runtime=$(xcrun simctl list runtimes --json \
-            | jq -r '[.runtimes[]
-                      | select(.isAvailable == true and (.identifier | contains("iOS")))]
-                     | sort_by(.version | split(".") | map(tonumber))
-                     | last | .identifier // empty')
+          # Pick the newest installed iOS runtime. A function so we can
+          # re-query after downloading one below.
+          newest_ios_runtime() {
+            xcrun simctl list runtimes --json \
+              | jq -r '[.runtimes[]
+                        | select(.isAvailable == true and (.identifier | contains("iOS")))]
+                       | sort_by(.version | split(".") | map(tonumber))
+                       | last | .identifier // empty'
+          }
+          runtime=$(newest_ios_runtime)
           if [ -z "$runtime" ]; then
-            echo "::error::No available iOS simulator runtime found on this runner."
+            # The GitHub macos-15 image ships Xcode 26 WITHOUT the iOS 26
+            # simulator runtime — Xcode 26 unbundled the runtime, so a freshly
+            # `xcode-select`ed Xcode 26 has the iOS 26 SDK (builds work) but no
+            # bootable iOS runtime (test/snapshot jobs can't create a device).
+            # Download it for the selected Xcode, then re-query. This branch
+            # only runs when no iOS runtime is installed, so it adds zero cost
+            # on images that already ship one.
+            echo "::notice::No iOS simulator runtime installed; downloading it via 'xcodebuild -downloadPlatform iOS' (Xcode 26 on the macos-15 image does not bundle the iOS 26 runtime)."
+            xcodebuild -downloadPlatform iOS || sudo xcodebuild -downloadPlatform iOS || true
+            runtime=$(newest_ios_runtime)
+          fi
+          if [ -z "$runtime" ]; then
+            echo "::error::No available iOS simulator runtime found on this runner even after 'xcodebuild -downloadPlatform iOS'."
             exit 1
           fi
 

@@ -1,0 +1,15 @@
+name = "dod-siwa-revoke"
+main = "src/index.ts"
+compatibility_date = "2026-06-20"
+
+# Non-secret config. The secrets (APPLE_PRIVATE_KEY, APP_SHARED_SECRET) are NOT
+# here — set them with `wrangler secret put <NAME>` so they're encrypted and
+# never committed. The non-secret IDs can live here as plain vars.
+[vars]
+APPLE_KEY_ID = "REPLACE_WITH_YOUR_SIGN_IN_WITH_APPLE_KEY_ID"
+APPLE_TEAM_ID = "REPLACE_WITH_YOUR_APPLE_TEAM_ID"
+APPLE_CLIENT_ID = "com.dutchovendaddy.DODApp"
+
+# Secrets to set after first deploy (encrypted, prompt for the value):
+#   wrangler secret put APPLE_PRIVATE_KEY   # paste the full .p8 contents
+#   wrangler secret put APP_SHARED_SECRET   # a long random string; the iOS app sends it
