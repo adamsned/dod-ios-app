@@ -43,6 +43,8 @@ public enum SchemaV2: VersionedSchema {
 /// - V2 → V3: lightweight (V3 = V2 + `CachedComment` + `CachedRating`).
 /// - V3 → V5: lightweight (V5 = V4 + `SyncedSavedRecipe`); the phantom V4 is
 ///   skipped — see the SchemaV4 / SchemaV5 headers. DUT-35 / DUT-6.
+/// - V5 → V6: lightweight (V6 = V5 + `CachedCookLogEntry`, the local-only
+///   "I Made This" cook journal). DUT-104.
 ///
 /// **SchemaV4 note (US-41 / T-702).** `SchemaV4` exists as a real
 /// `VersionedSchema` in `SchemaV4.swift` and is the schema the
@@ -79,10 +81,12 @@ public enum SchemaV2: VersionedSchema {
 ///   posture).
 /// - `SchemaV5Tests.v3ToV5LightweightMigrationOpensCleanly` (additive
 ///   `SyncedSavedRecipe` entity, two-configuration split; DUT-35).
+/// - `SchemaV6Tests.v5ToV6LightweightMigrationOpensCleanly` (additive
+///   local-only `CachedCookLogEntry` cook journal; DUT-104).
 public enum MigrationPlan: SchemaMigrationPlan {
 
     public static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self, SchemaV3.self, SchemaV5.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self, SchemaV5.self, SchemaV6.self]
     }
 
     public static var stages: [MigrationStage] {
@@ -95,6 +99,10 @@ public enum MigrationPlan: SchemaMigrationPlan {
             // trap; existing stores carry the V3/V4 fingerprint and land on V5
             // with one new entity and no data transform.
             .lightweight(fromVersion: SchemaV3.self, toVersion: SchemaV5.self),
+            // V5 -> V6 (DUT-104): additive — adds the local-only
+            // `CachedCookLogEntry` cook-journal model. No existing field
+            // changes; the new table starts empty and never mirrors to CloudKit.
+            .lightweight(fromVersion: SchemaV5.self, toVersion: SchemaV6.self),
         ]
     }
 }

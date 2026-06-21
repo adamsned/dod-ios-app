@@ -2586,4 +2586,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-819 — Cook journal persistence: SchemaV6 + RecipeStore CRUD (US-48 / DUT-104, CL-213)
+
+- **What:** The persistence layer for the "I Made This" journal. New local-only `CachedCookLogEntry` `@Model`; `SchemaV6` (= V5 + the new model) with a lightweight V5→V6 migration; `RecipeStore+CookLog` (`logCook` / `allCookLogs` newest-first / `deleteCookLog`). The pure `CookLogStats` runs over `allCookLogs()`.
+- **Files:** `CachedCookLogEntry.swift` (new @Model), `SchemaV6.swift` (new), `RecipeStore+CookLog.swift` (new), `SchemaV1.swift` (MigrationPlan +V6), `RecipeStore+Containers.swift` (Schema V5→V6 ×4), `MIGRATION.md` (history + design note), `SchemaV6Tests.swift` (new), `CommentsRatingsCacheTests.swift` (plan-count 5/4). Spec: `clarifications.md` (CL-213).
+- **AC:** US-48 / DUT-104 (CL-213 canonical). **Est:** ~3 h. **Deps:** stacked on T-818. Branch `feat/T-819-cook-journal-persistence`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 113 DODPersistence tests pass (V6 migration opens cleanly + cook-log CRUD round-trip); iOS app build green (xcodebuild exit 0). **Next (T-820):** wire the celebrate stage to call `logCook` (needs `GuidedCookout.recipeID` + the FeedViewModel seam).
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
