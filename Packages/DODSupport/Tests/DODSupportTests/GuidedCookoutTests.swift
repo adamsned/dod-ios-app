@@ -12,6 +12,8 @@ struct GuidedCookoutTests {
 
     @Test func curatedFirstCookoutIsTheGatewayDish() {
         #expect(cookout.recipeSlug == "dutch-oven-lasagna")
+        // WP post id — the cook journal logs against this (DUT-104).
+        #expect(cookout.recipeID == 1459)
         #expect(cookout.dishTitle == "Dutch Oven Lasagna")
         #expect(cookout.whyThisDish.isEmpty == false)
         #expect(cookout.celebrationMessage.isEmpty == false)

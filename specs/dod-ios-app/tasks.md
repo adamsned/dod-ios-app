@@ -2594,4 +2594,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-820 — Wire First Cookout celebrate → logCook (US-48 / US-53 / AC-53.3, CL-214, DUT-104)
+
+- **What:** Finishing "Your First Cookout" now logs a persisted cook. `GuidedCookout` gains `recipeID` (lasagna = WP 1459); `FirstCookoutView` gains an `onLogCook` closure fired once on "Done"; the seam runs `FeedView` → `FeedViewModel.logCook` → `FeedDependencies.logCook` (new, default no-op) → `LiveFeedDependencies` → `RecipeStore.logCook` (T-819).
+- **Files:** `GuidedCookout.swift` (recipeID) + `GuidedCookoutTests.swift` (pin), `FirstCookoutView.swift` (onLogCook + Done), `FeedView.swift` (closure), `FeedViewModel.swift` (logCook), `FeedDependencies.swift` (protocol + default + Live impl). Spec: `clarifications.md` (CL-214).
+- **AC:** US-48 / DUT-104 + US-53 / AC-53.3 (CL-214 canonical). **Est:** ~2 h. **Deps:** stacked on T-819. Branch `feat/T-820-cook-journal-wiring`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 426 DODSupport + 83 DODFeatureFeed tests pass; macOS DODFeatureFeed clean build + iOS app build green (xcodebuild exit 0). **Deferred:** persisting the captured photo to disk (`photoLocalID`); a Cook Journal *view* to browse history.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

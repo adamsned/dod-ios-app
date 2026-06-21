@@ -43,6 +43,9 @@ public struct GuidedCookout: Sendable, Equatable {
 
     /// WP recipe slug of the curated gateway dish (max hero, min risk).
     public let recipeSlug: String
+    /// WP post id of the curated dish — the cook journal logs cooks against this
+    /// (DUT-104) so "times cooked" aligns with the recipe detail.
+    public let recipeID: Int
     public let dishTitle: String
     /// The "looks impressive, is actually forgiving" hook that earns the first try.
     public let whyThisDish: String
@@ -68,6 +71,7 @@ public struct GuidedCookout: Sendable, Equatable {
 
     public init(
         recipeSlug: String,
+        recipeID: Int = 0,
         dishTitle: String,
         whyThisDish: String,
         steps: [Step],
@@ -80,6 +84,7 @@ public struct GuidedCookout: Sendable, Equatable {
         ingredients: [String] = []
     ) {
         self.recipeSlug = recipeSlug
+        self.recipeID = recipeID
         self.dishTitle = dishTitle
         self.whyThisDish = whyThisDish
         self.steps = steps
@@ -107,6 +112,7 @@ extension GuidedCookout {
     /// Starter content — the voice gets refined with Ned, like the DO-101 guides.
     public static let firstCookout = GuidedCookout(
         recipeSlug: "dutch-oven-lasagna",
+        recipeID: 1459,
         dishTitle: "Dutch Oven Lasagna",
         whyThisDish:
             "Lasagna looks like a showpiece — but in a Dutch oven it's one of the most "

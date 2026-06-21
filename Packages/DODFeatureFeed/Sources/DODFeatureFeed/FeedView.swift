@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODDomain
+import DODSupport
 import SwiftUI
 
 /// Home feed screen. Pull-to-refresh + infinite scroll + offline banner +
@@ -82,7 +83,9 @@ public struct FeedView: View {
             #endif
         }
         .sheet(isPresented: $showingFirstCookout) {
-            FirstCookoutView()
+            FirstCookoutView(onLogCook: { entry in
+                Task { await viewModel.logCook(entry) }
+            })
         }
         .task { await viewModel.onAppear() }
         .refreshable { await viewModel.refresh() }

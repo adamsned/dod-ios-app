@@ -19,6 +19,8 @@ public struct FirstCookoutView: View {
     /// Web home of the recipe; the *cook* stage opens `base/<slug>/` which the
     /// app's `openURL` override resolves to the in-app recipe detail.
     let recipeBaseURL: String
+    /// DUT-104 — called once when the flow reaches "Done", with the cook to log.
+    let onLogCook: ((CookLogEntry) -> Void)?
 
     @Environment(\.openURL) var openURL
     @Environment(\.dismiss) var dismiss
@@ -32,13 +34,17 @@ public struct FirstCookoutView: View {
     @State var cookPhotoItem: PhotosPickerItem?
     @State var cookPhoto: Image?
     @State var showingCamera = false
+    /// Guards against double-logging if the user taps Done more than once.
+    @State private var hasLoggedCook = false
 
     public init(
         cookout: GuidedCookout = .firstCookout,
-        recipeBaseURL: String = "https://www.dutchovendaddy.com"
+        recipeBaseURL: String = "https://www.dutchovendaddy.com",
+        onLogCook: ((CookLogEntry) -> Void)? = nil
     ) {
         self.cookout = cookout
         self.recipeBaseURL = recipeBaseURL
+        self.onLogCook = onLogCook
     }
 
     var lastIndex: Int { cookout.steps.count + 1 }
@@ -194,6 +200,7 @@ public struct FirstCookoutView: View {
             Spacer()
             Button(primaryButtonTitle) {
                 if index >= lastIndex {
+                    logCookIfNeeded()
                     dismiss()
                 } else {
                     index += 1
@@ -219,6 +226,21 @@ public struct FirstCookoutView: View {
         if index == 0 { return "Let's cook" }
         if index >= lastIndex { return "Done" }
         return "Next"
+    }
+
+    /// Log the completed cook exactly once (DUT-104) — fired on "Done" so the
+    /// journal records "I made the lasagna today", feeding streaks/stats.
+    private func logCookIfNeeded() {
+        guard !hasLoggedCook else { return }
+        hasLoggedCook = true
+        onLogCook?(
+            CookLogEntry(
+                id: UUID(),
+                recipeID: cookout.recipeID,
+                recipeTitle: cookout.dishTitle,
+                cookedAt: .now
+            )
+        )
     }
 
     func stageIcon(_ stage: GuidedCookout.Stage) -> String {
