@@ -26,11 +26,16 @@ public protocol FeedDependencies: Sendable {
     /// `[]` so existing fake conformers keep compiling; the live wiring routes
     /// to ``RecipeStore/savedRecipeIDs()``.
     func savedRecipeIDs() async throws -> Set<Int>
+    /// DUT-104 — append a cook to the private journal. Default no-op so existing
+    /// test conformers keep compiling; the live wiring routes to
+    /// ``RecipeStore/logCook(_:)``.
+    func logCook(_ entry: CookLogEntry) async throws
 }
 
 extension FeedDependencies {
     public func publishWidgetSnapshot(items: [RecipeListItem]) async {}
     public func savedRecipeIDs() async throws -> Set<Int> { [] }
+    public func logCook(_ entry: CookLogEntry) async throws {}
 }
 
 /// Production wiring. Constructed by the app composition root (T-140).
@@ -114,6 +119,10 @@ public struct LiveFeedDependencies: FeedDependencies {
 
     public func savedRecipeIDs() async throws -> Set<Int> {
         try await store.savedRecipeIDs()
+    }
+
+    public func logCook(_ entry: CookLogEntry) async throws {
+        try await store.logCook(entry)
     }
 
     public func publishWidgetSnapshot(items: [RecipeListItem]) async {

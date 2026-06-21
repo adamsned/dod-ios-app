@@ -95,6 +95,17 @@ public final class FeedViewModel {
         }
     }
 
+    /// DUT-104 — record a completed cook in the private journal (called when the
+    /// "Your First Cookout" flow reaches "Done"). Best-effort: a journal write
+    /// failing must never block dismissing the celebration.
+    public func logCook(_ entry: CookLogEntry) async {
+        do {
+            try await dependencies.logCook(entry)
+        } catch {
+            // The journal is a nicety, not a blocker — swallow + move on.
+        }
+    }
+
     /// Pull-to-refresh (AC-1.4 + clears blocklist per AC-1.7).
     public func refresh() async {
         try? await dependencies.clearBlocklist()

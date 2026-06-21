@@ -119,7 +119,7 @@ extension RecipeStore {
         defaults: UserDefaults,
         inMemory: Bool = false
     ) throws -> ContainerBuildResult {
-        let schema = Schema(SchemaV5.models)
+        let schema = Schema(SchemaV6.models)
         // DUT-35: the six cache models are local-only; ONLY `SyncedSavedRecipe`
         // is a CloudKit-mirror candidate. Both stores live in the same
         // container, so the `@ModelActor`'s single `ModelContext` reaches both.
@@ -190,7 +190,7 @@ extension RecipeStore {
     /// explicit `.none` is what keeps these six models genuinely on-device.
     private static func localCacheConfiguration(inMemory: Bool) -> ModelConfiguration {
         ModelConfiguration(
-            schema: Schema(SchemaV5.localModels),
+            schema: Schema(SchemaV6.localModels),
             isStoredInMemoryOnly: inMemory,
             cloudKitDatabase: .none
         )
@@ -208,7 +208,7 @@ extension RecipeStore {
     ) -> ModelConfiguration {
         ModelConfiguration(
             "SyncedSaved",
-            schema: Schema(SchemaV5.syncedModels),
+            schema: Schema(SchemaV6.syncedModels),
             isStoredInMemoryOnly: inMemory,
             cloudKitDatabase: cloudKit ? .private(cloudKitContainerIdentifier) : .none
         )
@@ -291,7 +291,7 @@ extension RecipeStore {
         // reaches this via the `-DODUseInMemoryStore` UI-test hook in
         // `AppDependencies`; the L1 suite reaches it directly.
         try ModelContainer(
-            for: Schema(SchemaV5.models),
+            for: Schema(SchemaV6.models),
             configurations: localCacheConfiguration(inMemory: true),
             syncedSavedConfiguration(inMemory: true, cloudKit: false)
         )
