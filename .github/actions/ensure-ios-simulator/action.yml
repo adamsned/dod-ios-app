@@ -96,5 +96,12 @@ runs:
         # (xcodebuild would otherwise boot it lazily on first use). The
         # already-booted pre-created case exits non-zero -> tolerated.
         xcrun simctl boot "$udid" 2>/dev/null || true
+        # Block until the sim is FULLY booted before handing off to xcodebuild.
+        # `-b` boots if needed and waits for the device to finish booting. This
+        # removes the L3 device-matrix flake where newer/slower sims (iPhone
+        # 16/17) were still settling when the first UI test ran — the failures
+        # were intermittent across devices for identical code. Tolerated on
+        # error; the job-level timeout backstops a genuinely stuck boot.
+        xcrun simctl bootstatus "$udid" -b 2>/dev/null || true
 
         echo "destination=platform=iOS Simulator,id=$udid" >> "$GITHUB_OUTPUT"
