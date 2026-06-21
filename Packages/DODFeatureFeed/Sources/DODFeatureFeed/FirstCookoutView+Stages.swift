@@ -3,6 +3,10 @@ import DODSupport
 import PhotosUI
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// The per-stage views for ``FirstCookoutView`` (US-53 / AC-53.2 / DUT-183),
 /// extracted here so the main flow file stays under the SwiftLint length caps.
 extension FirstCookoutView {
@@ -179,28 +183,27 @@ extension FirstCookoutView {
     /// Dutch Oven Daddy. The word-of-mouth moment: the gathering, shared.
     @ViewBuilder var shareSection: some View {
         VStack(spacing: DODSpacing.sm) {
-            if let cookPhoto {
-                cookPhoto
+            if let photo = cookPhoto {
+                photo
                     .resizable()
                     .scaledToFit()
                     .frame(maxHeight: 220)
                     .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous))
                 ShareLink(
-                    item: cookPhoto,
+                    item: photo,
                     subject: Text("My first Dutch oven cook"),
                     message: Text(shareCaption),
-                    preview: SharePreview("My \(cookout.dishTitle)", image: cookPhoto)
+                    preview: SharePreview("My \(cookout.dishTitle)", image: photo)
                 ) {
-                    Label("Share with Dutch Oven Daddy", systemImage: "square.and.arrow.up")
+                    Label("Share / Post — tags Dutch Oven Daddy", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(DODColor.burntOrange)
+                Button("Retake or choose another") { cookPhoto = nil }
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
             } else {
-                PhotosPicker(selection: $cookPhotoItem, matching: .images) {
-                    Label("Add a photo of your cook", systemImage: "camera.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(DODColor.burntOrange)
+                photoSourceButtons
             }
             Text("Tag @dutchovendaddy + #DutchOvenDaddy so Ned can see it!")
                 .dodFont(DODType.caption)
@@ -208,6 +211,27 @@ extension FirstCookoutView {
                 .multilineTextAlignment(.center)
         }
         .padding(.top, DODSpacing.xs)
+    }
+
+    /// Primary "Take a photo" (camera, where available) + "Choose from library".
+    /// The camera affordance is hidden where there's no camera (Simulator / macOS).
+    @ViewBuilder private var photoSourceButtons: some View {
+        #if canImport(UIKit)
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            Button {
+                showingCamera = true
+            } label: {
+                Label("Take a photo", systemImage: "camera.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(DODColor.burntOrange)
+        }
+        #endif
+        PhotosPicker(selection: $cookPhotoItem, matching: .images) {
+            Label("Choose from library", systemImage: "photo.on.rectangle")
+        }
+        .buttonStyle(.bordered)
+        .tint(DODColor.burntOrange)
     }
 
     func formatRemaining(_ seconds: TimeInterval) -> String {

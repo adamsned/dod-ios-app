@@ -2578,4 +2578,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-818 — First Cookout celebrate: real camera capture + auto-tag social post (US-53 / AC-53.3, CL-212, DUT-184)
+
+- **What:** The celebrate-stage share becomes a real **camera + post** moment. New `CameraPicker` (`UIImagePickerController` `.camera`, fully `#if canImport(UIKit)`-guarded); `FirstCookoutView` presents it via a `showingCamera` sheet; `shareSection` offers "Take a photo" (camera, shown only where available) + "Choose from library", then "Share / Post — tags Dutch Oven Daddy" (`ShareLink` w/ auto-tag caption) + Retake. `NSCameraUsageDescription` added to `project.yml`.
+- **Files:** `CameraPicker.swift` (new), `FirstCookoutView.swift` (sheet + state), `FirstCookoutView+Stages.swift` (shareSection + photoSourceButtons), `project.yml` (camera usage string). Spec: `clarifications.md` (CL-212).
+- **AC:** US-53 / AC-53.3 (CL-212 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-817. Branch `feat/T-818-first-cookout-camera-share`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; macOS `DODFeatureFeed` build complete (camera #if-excluded); iOS app build green (xcodebuild exit 0); `NSCameraUsageDescription` in generated Info.plist. **Device-only** (live camera capture) deferred to Ned's TestFlight walk.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

@@ -31,6 +31,7 @@ public struct FirstCookoutView: View {
     @State var checkedItems: Set<String> = []
     @State var cookPhotoItem: PhotosPickerItem?
     @State var cookPhoto: Image?
+    @State var showingCamera = false
 
     public init(
         cookout: GuidedCookout = .firstCookout,
@@ -61,6 +62,17 @@ public struct FirstCookoutView: View {
         .task { await runTimerTick() }
         .sheet(isPresented: $showingHeatCoach) {
             NavigationStack { HeatCoachView() }
+        }
+        .sheet(isPresented: $showingCamera) {
+            #if canImport(UIKit)
+            CameraPicker { image in
+                showingCamera = false
+                if let image { cookPhoto = Image(uiImage: image) }
+            }
+            .ignoresSafeArea()
+            #else
+            EmptyView()
+            #endif
         }
         .onChange(of: cookPhotoItem) { _, newItem in
             Task { await loadPhoto(newItem) }

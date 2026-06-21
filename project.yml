@@ -75,6 +75,11 @@ targets:
         # on every app extension; we set it on the host app too for
         # consistency with what users see on the Home Screen.
         CFBundleDisplayName: Dutch Oven Daddy
+        # DUT-184: camera permission string. The "Your First Cookout" celebrate
+        # stage lets the cook snap a photo of their finished dish to share +
+        # tag Dutch Oven Daddy. iOS requires this key — without it the app
+        # crashes the instant the camera is accessed.
+        NSCameraUsageDescription: Take a photo of your finished cook to share it and tag Dutch Oven Daddy.
         # DUT-23: app-identity key for anonymous comment POSTs. The app sends it
         # as the `X-DOD-App-Key` header so WordPress's
         # `rest_allow_anonymous_comments` filter accepts comment creation from
