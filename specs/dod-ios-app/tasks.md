@@ -2680,6 +2680,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DODFeatureProfile/AppleProfileSignIn.swift` (new — pure handler), `DODFeatureProfile/AppleProfileSignInButton.swift` (new — SiwA button), `DODFeatureProfile/ProfileEditView+AppleSignIn.swift` (new — moved `identitySection` + `appleSignInSection` + `handleAppleSignIn`), `DODFeatureProfile/ProfileEditView.swift` (body adds the section; `identitySection` removed for the cap), `DODFeatureFeed/SettingsView+Account.swift` (button → pointer; drop `AuthenticationServices` import); `DODFeatureProfile/Tests/.../AppleProfileSignInTests.swift` (new L1 ×4), `UITests/SmokeTests.swift` (Account test → pointer). `AccountViewModel` retained (session API + Sign Out/Delete). No `RootView` change (iPad sidebar Profile already opens `ProfileEditView`).
 - **AC:** AC-44.2 + AC-46.2 + AC-46.3 (amended; CL-222 canonical). **Est:** ~60 min. **Deps:** main at T-827 (`e6b50c2`, after merging Ned's parallel T-825/826/827). Branch `feat/T-825-siwa-profile-surfaces` (T-number bumped to T-828 to clear the collision with Ned's parallel T-825). **||:** P-auth/profile. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean; L1 `swift test` green.
 
+### T-831 — First Cookout "What are we cooking?" chooser (US-53 / DUT-194, CL-225)
+
+- **What:** The First Cookout opens on a unified chooser (the recommended rung hoisted + badged, the other rungs, and the dump cakes), so picking your cook is easy. A true first-rung beginner still drops straight into coaching (one-tap preserved). Ultracode-designed (3 approaches, adversarially judged → the `DumpCakeFlow` picker-then-flow pattern).
+- **Files:** `CookChooserFlow.swift` (new, DODFeatureFeed), `FeedView.swift` (sheet body → `CookChooserFlow`; hero `onCookDumpCake` repoint), `CookChooserFlowTests.swift` (new). Spec: `clarifications.md` (CL-225).
+- **AC:** US-53 / DUT-194 (CL-225 canonical). **Est:** ~2 h. **Deps:** off main; conflict-free with the in-flight campfire (T-830) + recipe-fix (T-829). Branch `feat/DUT-194-cook-chooser`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 96 DODFeatureFeed tests pass; iOS app build green. **Follow-up:** delete the now-inert `DumpCakeFlow` sheet/state.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
