@@ -142,3 +142,37 @@ If you add push notifications for new recipes (still deferred to a future US —
 
 - Add **Identifiers — Device ID** (APNs token).
 - Update the purposes column to include "Notifications."
+
+## What changes for Sign in with Apple (US-46 / DUT-16, 2026-06-20)
+
+**Status:** Added for the build that ships **Sign in with Apple** (US-46 / AC-46.6, CL-191, T-797) — the **optional** login that sits alongside guest mode (guest stays the default per App Store 5.1.1(ii); no one is ever forced to sign in). This section is the App Privacy delta for that build. *It is irrelevant to the guest-only release, which ships unchanged.*
+
+### Question: "Did you make changes to your privacy practices?" (App Store Connect → App Privacy)
+
+**Answer for the data-categories table: No new categories.** Sign in with Apple is a **new way to obtain the same Contact Info** the app already declares (email + name), not a new data type:
+
+- **Contact Info — Email Address** (already in the v1.0 table). When a user signs in with Apple and shares their email, the app receives it — which may be an Apple **private-relay** address (`…@privaterelay.appleid.com`) if they chose "Hide My Email." A relay address is still an email → it stays in the existing **Contact Info — Email Address** row (**Linked to user = Yes, Used for tracking = No**). As before, the email travels only to dutchovendaddy.com when the user posts a comment/rating — **never to TelemetryDeck**.
+- **Contact Info — Name** (the display name). Confirm this row is present (it backs the comment/rating author name and the signed-in identity row). **Linked = Yes, Tracking = No.** Purpose: App Functionality.
+
+**No new category to add — and specifically NOT these:**
+
+- **Identifiers — User ID:** the Apple `userIdentifier` is stored **on-device only** (Keychain, device-local per DUT-30) — never transmitted to a third party, never used to track across apps/companies. On-device-only data is not "collected" per Apple's definition → do **not** declare it.
+- The **authorization code / refresh token** exchanged with the revoke Worker (below) are **authentication artifacts**, not a declarable user-data type. The only declarable data in the SiwA flow is the email/name, already covered.
+
+### The revoke Worker (Cloudflare) — a first-party auth processor
+
+To satisfy **5.1.1(v)** (account deletion must revoke the Apple token), the app talks to a small first-party Cloudflare Worker (`backend/siwa-revoke/`) that exchanges the sign-in authorization code for a refresh token and revokes it on deletion. It is **stateless** — it stores nothing; the app holds the refresh token in its Keychain. It processes **authentication tokens only — no user content, no analytics, no tracking**. It is **not** a third-party analytics/advertising SDK, so it adds **no** new App Privacy disclosure. (If you ever make it stateful — storing user records server-side — revisit this section.)
+
+### "Used for tracking" — still **No**
+
+No IDFA, no cross-app/cross-company tracking, no data broker. Sign in with Apple authenticates the user to *this* app only. **ATT prompt: still not used.**
+
+### Apple review template (if questioned about Sign in with Apple)
+
+> Sign in with Apple is optional — the app is fully usable as a guest (App Store Review Guideline 5.1.1(ii)). When a user signs in, the app receives the Apple user identifier (stored only on-device, in the Keychain) and, if the user shares them, their name and email (which may be an Apple private-relay address). The name/email are used only for the in-app identity and to attribute the user's own comments/ratings on dutchovendaddy.com; they are never sent to any analytics provider. **Account deletion (Settings → Account → Delete Account) revokes the Sign in with Apple token** via a first-party stateless Cloudflare Worker that calls Apple's `/auth/revoke`, so the app is removed from the user's Settings → Apple ID → Sign in with Apple list (5.1.1(v)). The Worker stores no user data. No IDFA, no device ID, no cross-app tracking.
+
+### Privacy-policy paragraph to add at `dutchovendaddy.com/app-privacy/`
+
+Paste alongside the comments/ratings + iCloud-Sync paragraphs (a one-time gate, like CL-95's):
+
+> **Optional Sign in with Apple.** You can use Dutch Oven Daddy without an account. If you choose to sign in with Apple, we receive your Apple user identifier (kept only on your device) and, if you choose to share them, your name and email — which may be an Apple private-relay address if you select "Hide My Email." We use these only to show who you're signed in as and to attribute comments or ratings you post; we never share them with advertisers or analytics. When you delete your account in the app, we revoke your Sign in with Apple token so the app is removed from your Apple ID's "Sign in with Apple" list. You can sign out at any time to return to browsing as a guest.

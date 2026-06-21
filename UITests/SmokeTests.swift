@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 /// L3 UI smoke tests. The two most recent bugs (TelemetryDeck pre-init crash,
@@ -26,13 +27,47 @@ final class SmokeTests: XCTestCase {
         app.launch()
     }
 
+    // MARK: - Device-agnostic navigation (iPad full-suite support)
+
+    /// True on iPad, where the app uses a `NavigationSplitView` sidebar
+    /// instead of a bottom tab bar (US-38 / DUT-89).
+    private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+
+    /// Wait until the first screen is interactive on either layout. The
+    /// Settings gear is present on both the iPhone tab nav and the iPad
+    /// sidebar/detail nav bar, so it is the reliable cross-device "app ready"
+    /// signal (the iPhone-only tab bar is not).
+    @discardableResult
+    private func waitForAppReady(timeout: TimeInterval = 12) -> Bool {
+        app.buttons["Settings"].waitForExistence(timeout: timeout)
+    }
+
+    /// Navigate to a top-level destination on either layout. `phoneLabel` is
+    /// the bottom-tab label (`AppTab.tabLabel`); `padTitle` is the sidebar row
+    /// title (`AppTab.title`) — they differ for Recipes ("Recipes" vs
+    /// "Recipes & Articles"). On iPad the sidebar `List` row can surface as a
+    /// button / cell / static text, so try each.
+    private func goToTab(phoneLabel: String, padTitle: String) {
+        guard isPad else {
+            app.tabBars.firstMatch.buttons[phoneLabel].tap()
+            return
+        }
+        for element in [app.buttons[padTitle], app.cells[padTitle], app.staticTexts[padTitle]] {
+            if element.firstMatch.waitForExistence(timeout: 6) {
+                element.firstMatch.tap()
+                return
+            }
+        }
+        XCTFail("Could not find sidebar row '\(padTitle)' on iPad")
+    }
+
     /// REG-1: app must launch without crashing even when no TelemetryDeck
     /// app ID is configured. Pre-fix this raised a SDK fatal error on the
     /// first .appOpen telemetry send.
     func test_appLaunchesWithoutTelemetryAppID() {
         XCTAssertTrue(
-            app.tabBars.firstMatch.waitForExistence(timeout: 8),
-            "Tab bar should appear within 8 seconds — app didn't crash on launch"
+            waitForAppReady(),
+            "App should reach its first screen (Settings gear) — didn't crash on launch"
         )
     }
 
@@ -60,7 +95,8 @@ final class SmokeTests: XCTestCase {
     /// at index 2 is "Search") and behaviorally (tapping each lands on the
     /// expected screen — Saved shows the empty-state title from AC-5.8 on
     /// a fresh install; Search shows its search field placeholder).
-    func test_tabBarOrderMatchesSpec() {
+    func test_tabBarOrderMatchesSpec() throws {
+        try XCTSkipIf(isPad, "Bottom-tab order is an iPhone-only contract; iPad uses a sidebar (US-38 / DUT-89).")
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
@@ -189,7 +225,7 @@ final class SmokeTests: XCTestCase {
     }
 
     func test_savedTabEmptyStateOnFreshInstall() {
-        app.tabBars.firstMatch.buttons["Saved"].tap()
+        goToTab(phoneLabel: "Saved", padTitle: "Saved")
         // Spec AC-5.8 verbatim.
         let emptyTitle = app.staticTexts["No saved recipes yet"]
         XCTAssertTrue(
@@ -264,13 +300,9 @@ final class SmokeTests: XCTestCase {
     /// test wall-clock should stay under 5s — AC-T2 pyramid level for
     /// "screen-existence + button-existence" assertions.
     func test_settingsPageHasNoDebugTestButton() {
-        // Wait for the tab bar to land. Feed (Recipes) is the default tab,
-        // so the gear icon is already in scope.
-        let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(
-            tabBar.waitForExistence(timeout: 8),
-            "Tab bar should appear within 8 seconds"
-        )
+        // The Settings gear is the default-screen entry on both layouts
+        // (iPhone tab nav + iPad sidebar/detail).
+        XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
 
         // Tap the gear icon. Per the shared `SettingsToolbarModifier`
         // (DUT-26 — applied to every tab by `TabStack`, replacing the
@@ -376,8 +408,8 @@ final class SmokeTests: XCTestCase {
         cta.tap()
 
         XCTAssertTrue(
-            app.tabBars.firstMatch.waitForExistence(timeout: 5),
-            "Tab bar should appear after the welcome sheet is dismissed"
+            waitForAppReady(timeout: 5),
+            "App should reach its first screen after the welcome sheet is dismissed"
         )
         XCTAssertFalse(
             welcome.exists,
@@ -398,8 +430,7 @@ final class SmokeTests: XCTestCase {
     /// reachable by scrolling to the bottom of Settings, and activatable
     /// without crashing.
     func test_settingsShopRowIsPresentAndTappable() {
-        let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 8), "Tab bar should appear")
+        XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
 
         // Open Settings via the gear icon (shared `SettingsToolbarModifier`).
         let settingsButton = app.buttons["Settings"]
@@ -427,5 +458,43 @@ final class SmokeTests: XCTestCase {
         // Activating it must not crash; the actual browser hand-off (openURL
         // with the pinned URL) is covered at L1 per the doc comment above.
         shopRow.tap()
+    }
+
+    /// US-46 / AC-46.2 (T-794, DUT-16 Phase a): the Settings → Account section
+    /// renders, and signed-out (the default) shows the Sign in with Apple
+    /// button. Runs on both iPhone and iPad in CI (and locally) — the section
+    /// is at the top of Settings, so it's visible without scrolling on either.
+    ///
+    /// The credential→session merge is unit-tested (AccountViewModelTests /
+    /// AppleCredentialResolverTests); the interactive Apple sheet itself needs
+    /// a device signed into an Apple ID and is verified manually. This guards
+    /// the contract XCUITest can: the section + button are present.
+    func test_settingsAccountSectionIsPresent() {
+        // Device-agnostic: iPhone uses a bottom tab bar, iPad a sidebar
+        // (NavigationSplitView, US-38 / DUT-89) — both surface the Settings
+        // gear, so wait for the gear directly rather than a tab bar (which
+        // doesn't exist on iPad). This makes the test pass on iPhone + iPad.
+        let settingsButton = app.buttons["Settings"]
+        XCTAssertTrue(
+            settingsButton.waitForExistence(timeout: 12),
+            "Settings gear should be visible (iPhone tab nav or iPad sidebar)"
+        )
+        settingsButton.tap()
+
+        // The Account section header (US-46) sits at the top of Settings.
+        XCTAssertTrue(
+            app.staticTexts["Account"].waitForExistence(timeout: 12),
+            "Settings should expose the Account section (US-46)"
+        )
+
+        // Signed out by default → the Sign in with Apple button is present.
+        // `SignInWithAppleButton` may surface the system label instead of our
+        // accessibility identifier, so accept either as evidence it rendered.
+        let byID = app.buttons["settings-button-sign-in-apple"]
+        let byLabel = app.buttons["Sign in with Apple"]
+        XCTAssertTrue(
+            byID.waitForExistence(timeout: 6) || byLabel.waitForExistence(timeout: 6),
+            "Signed-out Account section should show the Sign in with Apple button"
+        )
     }
 }

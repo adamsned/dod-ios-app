@@ -1,0 +1,9 @@
+# Copy to `.dev.vars` (gitignored) for local `wrangler dev` testing.
+# In production these are set via `wrangler secret put` (the two secret ones)
+# and wrangler.toml [vars] (the non-secret IDs) — NOT this file.
+APPLE_KEY_ID=YOUR_SIGN_IN_WITH_APPLE_KEY_ID
+APPLE_TEAM_ID=YOUR_APPLE_TEAM_ID
+APPLE_CLIENT_ID=com.dutchovendaddy.DODApp
+# Paste the full .p8 contents (BEGIN/END lines included); \n-escape the newlines on one line.
+APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIG...\n-----END PRIVATE KEY-----"
+APP_SHARED_SECRET=replace-with-a-long-random-string
