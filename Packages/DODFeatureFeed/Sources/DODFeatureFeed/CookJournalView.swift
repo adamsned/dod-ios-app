@@ -4,7 +4,7 @@ import DODSupport
 import SwiftUI
 
 #if canImport(UIKit)
-    import UIKit
+import UIKit
 #endif
 
 /// The "I Made This" cook journal (US-48 / DUT-104) — the user's history of
@@ -151,7 +151,7 @@ public struct CookJournalView: View {
 
     private func imageFromData(_ data: Data) -> Image? {
         #if canImport(UIKit)
-            if let uiImage = UIImage(data: data) { return Image(uiImage: uiImage) }
+        if let uiImage = UIImage(data: data) { return Image(uiImage: uiImage) }
         #endif
         return nil
     }
