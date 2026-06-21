@@ -2656,11 +2656,30 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DODFeatureFeed/FirstCookoutView.swift` (X overlay); `DODSupport/GuidedCookout.swift` (7 coaching strings); `DODFeatureFeed/FirstCookoutView+Stages.swift` (3 captions/labels).
 - **AC:** AC-53.4 (new; CL-218 canonical). **Est:** ~25 min. **Deps:** main at T-823 (`801ca75`). Branch `feat/T-824-first-cookout-dismiss-de-emdash`. **||:** P-firstcookout. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean.
 
-### T-825 — DUT-189 Sign in with Apple → profile-login surfaces (unified sign-in + profile fill), moved off Settings ▸ Account (US-46 / AC-44.2 + AC-46.2 + AC-46.3 amendments, CL-219)
+### T-825 — First Cookout hero card: make the wedge discoverable (US-53 / DUT-183, CL-219)
+
+- **What:** A prominent "START HERE" hero card at the top of the Feed promoting "Your First Cookout" (the keystone coached path), so beginners find it instead of relying on the small toolbar flame. Tapping opens the existing `FirstCookoutView`; dismissible + persisted (`@AppStorage`).
+- **Files:** `FirstCookoutHeroCard.swift` (new, DODFeatureFeed), `FeedView.swift` (render at top of the list + dismiss state). Spec: `clarifications.md` (CL-219).
+- **AC:** US-53 / DUT-183 (CL-219 canonical). **Est:** ~1.5 h. **Deps:** off main (post CL-217 toolbar reshuffle). Branch `feat/T-822-first-cookout-hero-card`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; macOS DODFeatureFeed build complete; iOS app build green (xcodebuild exit 0). Discoverability is device-observable — TestFlight walk.
+
+### T-826 — The second rung: one win → a coached path (US-53 / DUT-183, CL-220)
+
+- **What:** Rung 2 (`GuidedCookout.italianChicken` — Italian chicken in gravy, WP id 683) + the path model (`path`, `nextUncookedRung(cookedRecipeIDs:)`, `isFirstRung`) + a **progress-aware Feed hero** that shows the next un-cooked rung from the journal and hides once the path is complete. Cooking rung 1 advances the hero + flow to rung 2.
+- **Files:** `GuidedCookout+Path.swift` (new — rung 2 + path), `GuidedCookoutPathTests.swift` (new), `FirstCookoutHeroCard.swift` (rung-aware title/eyebrow/hook), `FeedView.swift` (`currentRung` from `cookLogs`, refresh after `logCook`). Spec: `clarifications.md` (CL-220).
+- **AC:** US-53 / DUT-183 (CL-220 canonical). **Est:** ~3 h. **Deps:** stacked on T-825 (hero card). Branch `feat/T-825-second-rung`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 455 DODSupport (new path suite) + 93 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). **Next rungs** slot into `GuidedCookout.path` as Ned curates them.
+
+### T-827 — "Cook a dump cake" option: any blog dump cake as a coached dessert win (US-53 / DUT-190, CL-221)
+
+- **What:** Pick any of the blog's dump cakes and run the same coached flow. `DumpCake` model + curated `DumpCake.all`; `GuidedCookout.dumpCake(_:)` — one generic parameterized template (dump cakes are all one method); `DumpCakeFlow` (picker → chosen cake's `FirstCookoutView` in one sheet); a "Or cook a dump cake" link on the hero card. A flexible dessert branch, not a fixed path rung.
+- **Files:** `DumpCake.swift` + `DumpCakeTests.swift` (new, DODSupport), `DumpCakeFlow.swift` (new, DODFeatureFeed), `FirstCookoutHeroCard.swift` (+ secondary CTA), `FeedView.swift` (sheet wiring). Spec: `clarifications.md` (CL-221).
+- **AC:** US-53 / DUT-190 (CL-221 canonical). **Est:** ~2.5 h. **Deps:** stacked on T-826. Branch `feat/T-827-dump-cakes`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 458 DODSupport (new DumpCake suite) + 93 DODFeatureFeed tests pass; iOS app build green (xcodebuild exit 0). **Follow-up:** dynamic dump-cake category fetch (vs the v1 curated list).
+
+### T-828 — DUT-189 Sign in with Apple → profile-login surfaces (unified sign-in + profile fill), moved off Settings ▸ Account (US-46 / AC-44.2 + AC-46.2 + AC-46.3 amendments, CL-222)
 
 - **What:** Move Sign in with Apple onto the profile editor as a shared one-tap control that BOTH signs in (persists `AppleAuthSession` + refresh-token exchange) AND fills the local `UserProfile` (name/email). Remove the sign-in button from Settings ▸ Account (signed-out shows a pointer to the Profile; signed-in unchanged). Covers all profile-login surfaces (Settings ▸ Profile, iPad sidebar Profile, recipe ratings gate) since all present `ProfileEditView`.
 - **Files:** `DODFeatureProfile/AppleProfileSignIn.swift` (new — pure handler), `DODFeatureProfile/AppleProfileSignInButton.swift` (new — SiwA button), `DODFeatureProfile/ProfileEditView+AppleSignIn.swift` (new — moved `identitySection` + `appleSignInSection` + `handleAppleSignIn`), `DODFeatureProfile/ProfileEditView.swift` (body adds the section; `identitySection` removed for the cap), `DODFeatureFeed/SettingsView+Account.swift` (button → pointer; drop `AuthenticationServices` import); `DODFeatureProfile/Tests/.../AppleProfileSignInTests.swift` (new L1 ×4), `UITests/SmokeTests.swift` (Account test → pointer). `AccountViewModel` retained (session API + Sign Out/Delete). No `RootView` change (iPad sidebar Profile already opens `ProfileEditView`).
-- **AC:** AC-44.2 + AC-46.2 + AC-46.3 (amended; CL-219 canonical). **Est:** ~60 min. **Deps:** main at T-824 (`55a458a`). Branch `feat/T-825-siwa-profile-surfaces`. **||:** P-auth/profile. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean; L1 `swift test` green.
+- **AC:** AC-44.2 + AC-46.2 + AC-46.3 (amended; CL-222 canonical). **Est:** ~60 min. **Deps:** main at T-827 (`e6b50c2`, after merging Ned's parallel T-825/826/827). Branch `feat/T-825-siwa-profile-surfaces` (T-number bumped to T-828 to clear the collision with Ned's parallel T-825). **||:** P-auth/profile. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean; L1 `swift test` green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

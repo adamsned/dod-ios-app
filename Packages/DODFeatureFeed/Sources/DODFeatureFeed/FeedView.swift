@@ -21,6 +21,15 @@ public struct FeedView: View {
     @State private var showingFirstCookout = false
     /// DUT-104 — presents the "I Made This" cook journal as a sheet.
     @State private var showingJournal = false
+    /// DUT-190 — presents the "cook a dump cake" picker + coached flow as a sheet.
+    @State private var showingDumpCakeFlow = false
+    /// DUT-183 — the "Start Here" First Cookout hero card; dismissible + persisted
+    /// so a cook past their first win isn't nagged (the toolbar flame stays).
+    @AppStorage("dod.firstCookoutHeroDismissed") private var firstCookoutHeroDismissed = false
+    /// DUT-183 — the cook's current rung on the path (the next dish they haven't
+    /// cooked yet). Defaults to rung 1; recomputed from the cook journal so the
+    /// hero + flow follow the user up the ladder. nil once every rung is cooked.
+    @State private var currentRung: GuidedCookout? = .firstCookout
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
@@ -76,17 +85,39 @@ public struct FeedView: View {
             #endif
         }
         .sheet(isPresented: $showingFirstCookout) {
-            FirstCookoutView(onLogCook: { entry in
-                Task { await viewModel.logCook(entry) }
-            })
+            FirstCookoutView(
+                cookout: currentRung ?? .firstCookout,
+                onLogCook: { entry in
+                    Task {
+                        await viewModel.logCook(entry)
+                        await refreshCurrentRung()
+                    }
+                }
+            )
         }
         .sheet(isPresented: $showingJournal) {
             CookJournalView(load: { await viewModel.cookLogs() })
         }
+        .sheet(isPresented: $showingDumpCakeFlow) {
+            DumpCakeFlow(onLogCook: { entry in
+                Task {
+                    await viewModel.logCook(entry)
+                    await refreshCurrentRung()
+                }
+            })
+        }
         .task { await viewModel.onAppear() }
+        .task { await refreshCurrentRung() }
         .refreshable { await viewModel.refresh() }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isOffline)
         .sensoryFeedback(.success, trigger: viewModel.refreshCount)
+    }
+
+    /// DUT-183 — recompute the cook's current rung from the journal so the hero
+    /// card + the flow advance to the next un-cooked dish as they climb the path.
+    private func refreshCurrentRung() async {
+        let cooked = Set((await viewModel.cookLogs()).map(\.recipeID))
+        currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cooked)
     }
 
     /// DUT-183 — the "Your First Cookout" entry: a flame on the leading edge
@@ -151,6 +182,22 @@ public struct FeedView: View {
             // minimize); offline shifts it below the OfflineBanner overlay.
             DODScreenHeader("Recipes & Articles")
                 .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
+            // DUT-183 — the keystone "Your First Cookout" entry, surfaced as a
+            // prominent hero so beginners actually find the coached path.
+            if let currentRung, !firstCookoutHeroDismissed {
+                FirstCookoutHeroCard(
+                    cookout: currentRung,
+                    onStart: { showingFirstCookout = true },
+                    onDismiss: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            firstCookoutHeroDismissed = true
+                        }
+                    },
+                    onCookDumpCake: { showingDumpCakeFlow = true }
+                )
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.top, DODSpacing.sm)
+            }
             Group {
                 switch layout {
                 case .gallery:
