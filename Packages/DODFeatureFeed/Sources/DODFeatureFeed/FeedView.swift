@@ -85,8 +85,11 @@ public struct FeedView: View {
             #endif
         }
         .sheet(isPresented: $showingFirstCookout) {
-            FirstCookoutView(
-                cookout: currentRung ?? .firstCookout,
+            // DUT-194 — start on the "pick what to cook" chooser (rungs + dump
+            // cakes), with the progress-aware rung recommended. A true beginner
+            // is dropped straight into coaching (CookChooserFlow.initialSelection).
+            CookChooserFlow(
+                recommended: currentRung,
                 onLogCook: { entry in
                     Task {
                         await viewModel.logCook(entry)
@@ -193,7 +196,9 @@ public struct FeedView: View {
                             firstCookoutHeroDismissed = true
                         }
                     },
-                    onCookDumpCake: { showingDumpCakeFlow = true }
+                    // DUT-194 — the dump-cake shortcut now lands in the unified
+                    // chooser (dump cakes are a section there).
+                    onCookDumpCake: { showingFirstCookout = true }
                 )
                 .padding(.horizontal, DODSpacing.md)
                 .padding(.top, DODSpacing.sm)

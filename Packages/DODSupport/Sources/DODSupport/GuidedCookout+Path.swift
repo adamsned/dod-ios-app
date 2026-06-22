@@ -19,9 +19,9 @@ extension GuidedCookout {
         dishTitle: "Italian Chicken in Gravy",
         whyThisDish:
             "You've got one win under your belt, so here's your next. This chicken is even "
-            + "more forgiving than the lasagna. You layer it, pour the gravy over, and let "
-            + "it braise low and slow until it falls apart. Rich, saucy, and the kind of "
-            + "meal people ask you to make again.",
+            + "more forgiving than the lasagna. You braise it with carrots and potatoes in "
+            + "Italian dressing until it falls apart, then turn the rich liquid into gravy. "
+            + "Saucy, hearty, and the kind of meal people ask you to make again.",
         steps: [
             Step(
                 id: "gather-gear",
@@ -43,19 +43,20 @@ extension GuidedCookout {
             Step(
                 id: "layer-and-braise",
                 stage: .cook,
-                title: "Layer it, pour the gravy, let it braise",
+                title: "Layer it, braise it, make the gravy",
                 coaching:
-                    "Nestle the chicken in, pour the gravy right over the top, set the lid, "
-                    + "and walk away. The longer it goes, the more tender it gets. I'll "
-                    + "keep the timer with you."
+                    "Nestle the chicken in with the carrots and potatoes, pour the dressing, "
+                    + "ginger ale, and soy over, set the lid, and walk away. At the end you'll "
+                    + "whisk the cooking liquid with cream into a rich gravy. I'll keep the "
+                    + "timer with you."
             ),
             Step(
                 id: "lift-the-lid",
                 stage: .celebrate,
                 title: "Lift the lid",
                 coaching:
-                    "Fall-apart chicken in a rich gravy. Spoon it over rice or bread, snap "
-                    + "a photo, and dig in. You're two for two now."
+                    "Fall-apart chicken in a rich gravy, with the potatoes and carrots right "
+                    + "there. Plate it up, snap a photo, and dig in. You're two for two now."
             ),
         ],
         celebrationMessage:
@@ -75,13 +76,16 @@ extension GuidedCookout {
             "A trivet or flat spot to set the oven on",
         ],
         ingredients: [
-            "6 bone-in chicken thighs (or a cut-up whole chicken)",
-            "1 bottle (16 oz) Italian dressing",
-            "2 cans (10.5 oz) cream of chicken soup",
-            "8 oz cream cheese, softened",
-            "1 tsp Italian seasoning",
-            "Salt + pepper",
-            "Cooked rice or crusty bread, to serve",
+            "3 lbs chicken breast, cut into tenders",
+            "16 oz Italian salad dressing",
+            "2 lbs baby carrots",
+            "1½ lbs Yukon gold potatoes, cubed",
+            "1½ lbs red potatoes, cubed",
+            "12 oz ginger ale",
+            "5 oz soy sauce",
+            "2 cups heavy cream",
+            "½ cup cornstarch",
+            "2 tbsp parsley, chopped (optional)",
         ]
     )
 
