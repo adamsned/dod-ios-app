@@ -60,7 +60,9 @@ public struct RecipeCard: View {
 
     private var heroSection: some View {
         ZStack(alignment: .topTrailing) {
-            AsyncImage(url: heroImageURL) { phase in
+            // DUT-195 — reliable cached loader instead of AsyncImage, which was
+            // dropping feed thumbnails to the broken-image placeholder on scroll.
+            ReliableImage(url: heroImageURL) { phase in
                 switch phase {
                 case .empty:
                     LoadingSkeleton(cornerRadius: 0)
@@ -74,8 +76,6 @@ public struct RecipeCard: View {
                         .foregroundStyle(DODColor.labelSecondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(DODColor.surface)
-                @unknown default:
-                    EmptyView()
                 }
             }
             .frame(height: 140)

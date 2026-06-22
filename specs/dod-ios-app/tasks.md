@@ -2685,6 +2685,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **What:** Replace the Feed's separate First Cookout + Journal toolbar buttons with one `frying.pan.fill` "Cooking Tools" `Menu` holding four items — Your First Cookout, Cook Journal, Dutch Oven Heat Coach, Buy BuzzyWaxx Seasoning. Heat Coach + the BuzzyWaxx shop row leave Settings (Tools + Shop sections deleted) and live in the menu, keeping the Feed chrome to one button.
 - **Files:** `DODFeatureFeed/FeedView.swift` (the Cooking Tools menu + the Heat Coach sheet + `openCookingToolURL`, replacing the two button helpers); `DODFeatureFeed/SettingsView.swift` (drop `ToolsSection()` + `ShopSection()` + the doc-comment layout note); deleted `DODFeatureFeed/SettingsView+Tools.swift` + `SettingsView+Shop.swift`; `DODFeatureFeed/SettingsViewModel+Shop.swift` (doc comment); `UITests/SmokeTests.swift` (Shop-row test → Cooking-Tools-menu test). `HeatCoachView` + `SettingsViewModel.buyBuzzyWaxxURLString` (+ its L1 pin) retained.
 - **AC:** AC-32.1 + AC-45.1 (amended; CL-224 canonical). **Est:** ~40 min. **Deps:** main at T-828 (`1d8ae9b`). Branch `feat/T-829-cooking-tools-menu`. **||:** P-feed/cleanup. No `e2e` label. swift-format + SwiftLint + `xcodebuild build` clean.
+### T-832 — Reliable cached feed image loader (DUT-195, CL-226, BUGFIX)
+
+- **What:** Feed cards frequently showed the broken-image placeholder (AsyncImage: no retry, cancels on scroll, no decode cache). New `ReliableImage` (URLSession + URLCache + in-memory `NSCache` + 1 retry, cancellation-safe), `AsyncImage`-shaped so the swap is one line. `RecipeCard` + `RecipeCard+ListRow` use it.
+- **Files:** `ReliableImage.swift` (new, DODDesignSystem), `RecipeCard.swift`, `RecipeCard+ListRow.swift`. Spec: `clarifications.md` (CL-226).
+- **AC:** DUT-195 (CL-226 canonical). **Est:** ~2 h. **Deps:** off main; independent of the other in-flight PRs (DODDesignSystem only). Branch `fix/DUT-195-feed-image-loader`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 19 DODDesignSystem tests pass; iOS app build green. Visual reliability is TestFlight-verified (UIKit-bound loader, not unit-testable on the macOS slice). **Follow-up:** request sized WP thumbnails (`media_details.sizes`); share one loader across feed/list/widget.
 
 ---
 
