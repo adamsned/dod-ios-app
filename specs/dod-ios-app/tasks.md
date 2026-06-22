@@ -2725,6 +2725,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookChooserFlow.swift` (drop auto-select + `initialSelection`), `CookChooserFlowTests.swift` (drop its test). Spec: `clarifications.md` (CL-230).
 - **AC:** US-53 / DUT-194 / DUT-235 (CL-230 canonical). **Est:** ~30 min. **Deps:** off main. Branch `fix/DUT-235-always-show-chooser`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 95 DODFeatureFeed tests pass; iOS app build green.
 
+### T-837 — Recipe display fixes: blank detail/article images + uneven grid cards (DUT-260, CL-231, BUGFIX)
+
+- **What:** Two tester-reported display bugs. (1) The recipe-detail hero, inline article images, related-recipe thumbnails, and the Cook Mode hero used `AsyncImage` (no retry/cache; drops to the placeholder on a transient/cancelled load) → swapped to DUT-195's `ReliableImage`. (2) Gallery grid cards rendered at different heights (a 1-line title made a shorter card than a 2-line one) → `.lineLimit(2, reservesSpace: true)` on the card title + excerpt so every card is a constant height. List view unchanged.
+- **Files:** `DODDesignSystem/Components/RecipeCard.swift` (reservesSpace); `DODFeatureRecipeDetail/{RecipeDetailHero,ArticleBlocksView,RelatedRecipesStrip,CookModeView}.swift` (AsyncImage → ReliableImage). Re-recorded 5 gallery `RecipeCard` L4 baselines (`SnapshotTests/{recipeCard_full,_halfWidth,_noTimeChip}` + RecipeCardDownloadedBadge + RecipeCardHighlight; list-row baseline untouched). Spec: `clarifications.md` (CL-231), `spec.md` (AC-1.3 amendment).
+- **AC:** AC-1.3 (amended) + AC-4.1 / AC-37.3 (image loading restored); CL-231 canonical. **Est:** ~1 h. **Deps:** off main (`9b52a6f`). Branch `fix/T-837-recipe-display-images-grid-cards`. **||:** P-feed/detail. No `e2e` label. **Verification:** SwiftLint + swift-format `--strict` clean; `xcodebuild build` clean; **verified on the iPhone 17 simulator** (uniform grid cards; recipe-detail hero loads); affected DODDesignSystem L4 snapshots re-recorded + green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

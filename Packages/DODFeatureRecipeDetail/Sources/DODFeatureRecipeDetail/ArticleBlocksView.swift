@@ -19,8 +19,8 @@ import SwiftUI
 /// - `.heading(level, text)` — `DODType.displayMedium` for `level ≤ 2`,
 ///   `DODType.heading` otherwise; `DODColor.label`; top padding `DODSpacing.sm`.
 /// - `.paragraph(text)` — `DODType.body`; `DODColor.label`; `.textSelection(.enabled)`.
-/// - `.image(url, caption)` — full-width `AsyncImage` (success/failure/empty
-///   phases all handled), capped at `imageMaxHeight`, optional caption below
+/// - `.image(url, caption)` — full-width `ReliableImage` (success → photo,
+///   else a neutral placeholder), capped at `imageMaxHeight`, optional caption below
 ///   in `DODType.caption` + `DODColor.labelSecondary`.
 /// - `.list(ordered, items)` — `VStack` of `HStack(.firstTextBaseline)` rows
 ///   with `•` (unordered) or `"\(index + 1)."` (ordered) leaders.
@@ -90,22 +90,22 @@ public struct ArticleBlocksView: View {
 
     /// A full-width article photo with an optional caption. Extracted verbatim
     /// from the pre-T-732 private `ArticleDetailView.articleImage(url:caption:)`
-    /// helper. Mirrors `RecipeDetailHero`'s `AsyncImage` phase handling; an
+    /// helper. Mirrors `RecipeDetailHero`'s `ReliableImage` phase handling; an
     /// unloaded/failed image shows a neutral placeholder rather than collapsing
     /// the layout.
     private func articleImage(url: URL, caption: String?) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            AsyncImage(url: url) { phase in
+            // T-837 — reliable cached loader (DUT-195's ReliableImage) instead of
+            // AsyncImage, which left inline article photos stuck on the neutral
+            // placeholder on a transient/cancelled load (tester-reported: the
+            // "Fall and Winter Dump Cakes" article images came up blank).
+            ReliableImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image
                         .resizable()
                         .scaledToFit()
-                case .failure:
-                    placeholder
-                case .empty:
-                    placeholder
-                @unknown default:
+                default:
                     placeholder
                 }
             }
