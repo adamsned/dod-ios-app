@@ -209,12 +209,12 @@ import Testing
         // and lid condensation. Pinned so a future trim can't silently
         // drop the point of the feature.
         let categories = DutchOvenHeatCoach.feelCues.map(\.title)
-        #expect(categories.contains("Coal color"))
-        #expect(categories.contains("Steam at the lid rim"))
-        #expect(categories.contains("Hand test"))
+        #expect(categories.contains("Coal Color"))
+        #expect(categories.contains("Steam at the Lid Rim"))
+        #expect(categories.contains("Hand Test"))
         #expect(categories.contains("Sound"))
         #expect(categories.contains("Smell"))
-        #expect(categories.contains("Lid condensation"))
+        #expect(categories.contains("Lid Condensation"))
     }
 
     @Test func reference_feelCuesEachHaveGoodAndAdjustSignals() {
@@ -253,8 +253,8 @@ import Testing
     @Test func reference_handTestCueMatchesTheCalculator() {
         // The hand-test row in the reference must quote the same three
         // temperature bands the calculator returns — one source of truth.
-        guard let handCue = DutchOvenHeatCoach.feelCues.first(where: { $0.title == "Hand test" }) else {
-            Issue.record("Hand test cue missing from feelCues")
+        guard let handCue = DutchOvenHeatCoach.feelCues.first(where: { $0.title == "Hand Test" }) else {
+            Issue.record("Hand Test cue missing from feelCues")
             return
         }
         #expect(handCue.onTrack.contains("325-350°F") || handCue.onTrack.contains("375-425°F"))

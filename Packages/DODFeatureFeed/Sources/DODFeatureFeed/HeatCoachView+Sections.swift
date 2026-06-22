@@ -17,7 +17,7 @@ extension HeatCoachView {
     @ViewBuilder
     func adjustmentsCard(_ coachModel: HeatCoachModel) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            sectionHeader("Adjust for your conditions")
+            sectionHeader("Adjust for Your Conditions")
 
             Text(
                 "These tweak your starting number. Watch the oven, not the clock. "
@@ -64,7 +64,7 @@ extension HeatCoachView {
     @ViewBuilder
     var feelReferenceSection: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            sectionHeader("Cook by feel")
+            sectionHeader("Cook by Feel")
 
             Text(
                 "The estimate just gets your coals going. From there, your eyes, ears, and nose run the cook. "
@@ -119,7 +119,7 @@ extension HeatCoachView {
     @ViewBuilder
     var coalManagementSection: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            sectionHeader("Coal management")
+            sectionHeader("Coal Management")
 
             VStack(alignment: .leading, spacing: DODSpacing.sm) {
                 ForEach(DutchOvenHeatCoach.coalManagementHabits, id: \.self) { habit in

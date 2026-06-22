@@ -73,7 +73,7 @@ struct CookChooserFlow: View {
     }
 
     @ViewBuilder private var pathSection: some View {
-        Section("Your path") {
+        Section("Your Path") {
             ForEach(orderedRungs, id: \.recipeID) { rung in
                 Button {
                     selected = rung
@@ -104,7 +104,7 @@ struct CookChooserFlow: View {
     }
 
     @ViewBuilder private var dumpCakeSection: some View {
-        Section("Dump cakes") {
+        Section("Dump Cakes") {
             ForEach(DumpCake.all) { cake in
                 Button {
                     selected = .dumpCake(cake)

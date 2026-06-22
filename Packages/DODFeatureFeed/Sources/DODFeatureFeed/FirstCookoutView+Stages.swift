@@ -11,6 +11,45 @@ import UIKit
 /// extracted here so the main flow file stays under the SwiftLint length caps.
 extension FirstCookoutView {
 
+    // MARK: Campfire-aware copy (DUT-192) — dish-agnostic phrasing for the
+    // capstone; "Take It to the Campfire" only reads well as a title.
+
+    var sharePreviewTitle: String {
+        cookout.isCampfire ? "My campfire cook" : "My \(cookout.dishTitle)"
+    }
+
+    var recipeLinkLabel: String {
+        cookout.isCampfire ? "Open the heat & coals guide" : "Open the \(cookout.dishTitle) recipe"
+    }
+
+    var bakeTimerLabel: String {
+        cookout.isCampfire ? "Campfire cook" : "\(cookout.dishTitle) bake"
+    }
+
+    var bakeStepAwayText: String {
+        cookout.isCampfire
+            ? "Your cook is going, you can step away"
+            : "\(cookout.dishTitle) bake, you can step away"
+    }
+
+    var goCheckText: String {
+        cookout.isCampfire ? "Go check your Dutch oven." : "Go check your \(cookout.dishTitle)."
+    }
+
+    // MARK: Swipe paging (DUT-197)
+
+    /// Advance/retreat the flow on a horizontally-dominant swipe past a ~50pt
+    /// threshold; vertical scrolls (handled by the ScrollView) are left alone.
+    func handleSwipe(_ translation: CGSize) {
+        let dx = translation.width
+        guard abs(dx) > abs(translation.height), abs(dx) > 50 else { return }
+        if dx < 0, index < lastIndex {
+            withAnimation(.easeInOut(duration: 0.25)) { index += 1 }
+        } else if dx > 0, index > 0 {
+            withAnimation(.easeInOut(duration: 0.25)) { index -= 1 }
+        }
+    }
+
     // MARK: Gather — gear + ingredients checklist
 
     /// A tappable gear + ingredients checklist so the cook can round everything
@@ -199,7 +238,13 @@ extension FirstCookoutView {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(DODColor.burntOrange)
-                Button("Retake or choose another") { cookPhoto = nil }
+                // DUT-203 — clear ALL photo state so a Retake-then-Done can't save
+                // the discarded photo, and re-picking the same asset re-fires onChange.
+                Button("Retake or choose another") {
+                    cookPhoto = nil
+                    cookPhotoData = nil
+                    cookPhotoItem = nil
+                }
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
             } else {

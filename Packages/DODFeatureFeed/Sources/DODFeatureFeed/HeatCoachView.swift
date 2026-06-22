@@ -68,7 +68,7 @@ public struct HeatCoachView: View {
 
     private var inputsCard: some View {
         VStack(alignment: .leading, spacing: DODSpacing.md) {
-            sectionHeader("Your setup")
+            sectionHeader("Your Setup")
 
             labeledRow("Oven size") {
                 Picker("Oven size", selection: $ovenDiameterInches) {

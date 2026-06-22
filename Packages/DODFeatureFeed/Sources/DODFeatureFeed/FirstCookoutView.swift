@@ -26,7 +26,8 @@ public struct FirstCookoutView: View {
     @Environment(\.openURL) var openURL
     @Environment(\.dismiss) var dismiss
     /// 0 = intro; 1...steps.count = each coached step; steps.count + 1 = celebration.
-    @State private var index = 0
+    /// Internal (not private) so the swipe handler in `+Stages.swift` can page it.
+    @State var index = 0
     /// Drives the live bake timer offered at the *cook* stage (DUT-100).
     @State var timerEngine = CookTimerEngine()
     @State var showingHeatCoach = false
@@ -58,29 +59,8 @@ public struct FirstCookoutView: View {
             : "I made my first \(cookout.dishTitle) with @dutchovendaddy! 🔥 #DutchOvenDaddy"
     }
 
-    // DUT-192 — the campfire capstone is dish-agnostic, so its body sentences use
-    // generic phrasing; "Take It to the Campfire" only reads well as a title.
-    var sharePreviewTitle: String {
-        cookout.isCampfire ? "My campfire cook" : "My \(cookout.dishTitle)"
-    }
-
-    var recipeLinkLabel: String {
-        cookout.isCampfire ? "Open the heat & coals guide" : "Open the \(cookout.dishTitle) recipe"
-    }
-
-    var bakeTimerLabel: String {
-        cookout.isCampfire ? "Campfire cook" : "\(cookout.dishTitle) bake"
-    }
-
-    var bakeStepAwayText: String {
-        cookout.isCampfire
-            ? "Your cook is going, you can step away"
-            : "\(cookout.dishTitle) bake, you can step away"
-    }
-
-    var goCheckText: String {
-        cookout.isCampfire ? "Go check your Dutch oven." : "Go check your \(cookout.dishTitle)."
-    }
+    // DUT-192 campfire-aware copy helpers + DUT-197 swipe handler live in
+    // FirstCookoutView+Stages.swift (keeps this struct body under the cap).
 
     public var body: some View {
         VStack(spacing: DODSpacing.lg) {
@@ -89,6 +69,17 @@ public struct FirstCookoutView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, DODSpacing.md)
             }
+            // DUT-197 — additive horizontal swipe paging. Attached as a
+            // `.simultaneousGesture` so it rides alongside (never replaces) the
+            // ScrollView's own vertical scroll. We only act on an *ended* drag
+            // that is horizontally dominant (`abs(width) > abs(height)`) and past
+            // a ~50pt threshold, so a normal vertical scroll is left untouched.
+            // Swipe left → forward, swipe right → back; the Next/Back buttons in
+            // `controls` keep working unchanged.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20)
+                    .onEnded { handleSwipe($0.translation) }
+            )
             controls
         }
         // DUT-188 — explicit dismiss affordance: an X in the top-trailing
