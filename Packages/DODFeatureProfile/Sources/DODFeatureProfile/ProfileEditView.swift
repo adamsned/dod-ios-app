@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODSupport
 import SwiftUI
 
 #if canImport(UIKit)
@@ -58,6 +59,13 @@ public struct ProfileEditView: View {
     /// store returns ``UIImage``.
     let photoStore: (any ProfilePhotoStoring)?
     #endif
+
+    /// DUT-217: the AppleAuthSession (session + Apple refresh token) written at
+    /// sign-in via ``AppleProfileSignIn``. "Sign Out" / "Delete Profile" must
+    /// clear this too — and **Delete must revoke** the token (App Store
+    /// 5.1.1(v)) — or the editor's teardown leaves a live, un-revoked token.
+    let sessionStore: any AppleAuthSessionStoring
+    let revoker: (any SiwaRevoking)?
 
     @State var displayName: String = ""
     @State var email: String = ""
@@ -130,22 +138,32 @@ public struct ProfileEditView: View {
         store: any ProfileStoring,
         existingProfile: UserProfile?,
         onProfileChanged: @MainActor @escaping () async -> Void,
-        photoStore: (any ProfilePhotoStoring)? = nil
+        photoStore: (any ProfilePhotoStoring)? = nil,
+        sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
+        revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
+            ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil
     ) {
         self.store = store
         self.existingProfile = existingProfile
         self.onProfileChanged = onProfileChanged
         self.photoStore = photoStore
+        self.sessionStore = sessionStore
+        self.revoker = revoker
     }
     #else
     public init(
         store: any ProfileStoring,
         existingProfile: UserProfile?,
-        onProfileChanged: @MainActor @escaping () async -> Void
+        onProfileChanged: @MainActor @escaping () async -> Void,
+        sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
+        revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
+            ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil
     ) {
         self.store = store
         self.existingProfile = existingProfile
         self.onProfileChanged = onProfileChanged
+        self.sessionStore = sessionStore
+        self.revoker = revoker
     }
     #endif
 
@@ -193,7 +211,7 @@ public struct ProfileEditView: View {
         .interactiveDismissDisabled(isDirty)
         .alert("Delete your profile?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
-                Task { await handleClear() }
+                Task { await handleDelete() }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -294,7 +312,7 @@ public struct ProfileEditView: View {
         if existingProfile != nil {
             Section {
                 Button {
-                    Task { await handleClear() }
+                    Task { await handleSignOut() }
                 } label: {
                     Text("Sign Out")
                         .dodFont(DODType.body)
@@ -342,22 +360,10 @@ public struct ProfileEditView: View {
     // additions (two-file storage + post-save cleanup for both cropped +
     // original).
 
-    @MainActor
-    private func handleClear() async {
-        guard !isSubmitting else { return }
-        isSubmitting = true
-        defer { isSubmitting = false }
-        do {
-            // The store's `clear()` is amended in Phase b (AC-44.9) to
-            // also delete the on-disk photo file, so we don't have to
-            // call `photoStore?.clear(filename:)` here separately.
-            try await store.clear()
-            await onProfileChanged()
-            dismiss()
-        } catch {
-            saveError = "Couldn't Sign Out. Try Again."
-        }
-    }
+    // DUT-217: `handleSignOut()` / `handleDelete()` + the shared
+    // `teardown(revoke:)` live in `ProfileEditView+Teardown.swift` (keeps this
+    // file under the SwiftLint `file_length` cap). They clear BOTH the profile
+    // AND the AppleAuthSession; Delete additionally revokes the refresh token.
 
     // MARK: - Phase b — Photo handlers
     //

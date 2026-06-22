@@ -2756,6 +2756,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **AC:** US-46 / AC-46.3 / AC-46.6 / DUT-217. CL-235 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/DUT-217-auth-teardown`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 97 DODFeatureFeed tests pass; iOS app build green.
 - **Part 2 (next PR):** `ProfileEditView` "Delete Profile" must clear the session + revoke the token (the primary surface since DUT-189).
 
+### T-842 — DUT-217 part 2: ProfileEditView Delete → revoke (CL-236)
+
+- **What:** Completes DUT-217 (App Store 5.1.1(v)). ProfileEditView's "Delete Profile" now clears the AppleAuthSession + revokes the Apple refresh token; "Sign Out" clears both rows without revoking. Was: both buttons only cleared the profile, leaving a live token on the primary sign-in surface (DUT-189). Injects `AppleAuthSessionStoring` + `SiwaRevoking` (defaults); `handleClear` split into `handleSignOut()`/`handleDelete()` over a pure `static performAccountTeardown(...)`.
+- **Files:** `ProfileEditView.swift` (props + dual inits + button repoints), `ProfileEditView+Teardown.swift` (new), `ProfileEditViewTeardownTests.swift` (new). Spec: `clarifications.md` (CL-236).
+- **AC:** US-46 / AC-46.3 / AC-46.6 / DUT-217. CL-236 canonical. **Est:** ~2 h. **Deps:** off main (post #278). Branch `fix/DUT-217-profile-revoke`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 50 DODFeatureProfile tests pass; iOS app build green. Closes DUT-217 with T-841 (part 1).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
