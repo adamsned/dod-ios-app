@@ -24,18 +24,12 @@ struct CookChooserFlow: View {
         if let selected {
             FirstCookoutView(cookout: selected, onLogCook: onLogCook)
         } else {
+            // DUT-235 — always show the chooser as the first screen so the cook
+            // picks their first cook (no auto-jump into the lasagna). The
+            // recommended rung is hoisted + badged at the top, so a beginner still
+            // has an obvious one-tap target — they just get to see the choice.
             picker
-                // Preserve today's literal one-tap-into-coaching for a true
-                // beginner; returning cooks (rung 2+) see the chooser.
-                .onAppear { selected = Self.initialSelection(recommended: recommended) }
         }
-    }
-
-    /// A true first-rung beginner jumps straight into coaching (zero added
-    /// friction); everyone past rung 1 gets the chooser. Pure for testability.
-    nonisolated static func initialSelection(recommended: GuidedCookout?) -> GuidedCookout? {
-        guard let recommended, recommended.isFirstRung else { return nil }
-        return recommended
     }
 
     /// The recommended rung hoisted to the front of ``GuidedCookout/path``,
