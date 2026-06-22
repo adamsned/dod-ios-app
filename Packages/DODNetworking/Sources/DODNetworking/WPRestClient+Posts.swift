@@ -12,6 +12,21 @@ extension WPRestClient {
         page: Int = 1,
         perPage: Int = WPRestClient.defaultPageSize
     ) async throws -> [RecipeListItem] {
+        try await postsPage(categoryID: categoryID, page: page, perPage: perPage).items
+    }
+
+    /// Like ``posts(categoryID:page:perPage:)`` but also returns WP's total
+    /// page count (`X-WP-TotalPages`), so paged callers (Feed, Categories) stop
+    /// at the real end instead of inferring it from a short page (DUT-237: a
+    /// page can return fewer than `perPage` items mid-list, which falsely
+    /// latched the feed's "reached end" gate).
+    ///
+    /// Spec trace: AC-1.1, AC-1.2, AC-2.3, DUT-237.
+    public func postsPage(
+        categoryID: Int? = nil,
+        page: Int = 1,
+        perPage: Int = WPRestClient.defaultPageSize
+    ) async throws -> (items: [RecipeListItem], totalPages: Int) {
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "per_page", value: String(perPage)),
@@ -22,8 +37,11 @@ extension WPRestClient {
         if let categoryID {
             queryItems.append(URLQueryItem(name: "categories", value: String(categoryID)))
         }
-        let posts: [WPDTO.Post] = try await get(path: "posts", queryItems: queryItems)
-        return posts.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
+        let (posts, totalPages): ([WPDTO.Post], Int) = try await getPaged(
+            path: "posts",
+            queryItems: queryItems
+        )
+        return (posts.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }, totalPages)
     }
 
     /// Fetch a single post by its WP id and project it to a
