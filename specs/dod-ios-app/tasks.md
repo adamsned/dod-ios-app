@@ -2762,11 +2762,16 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `ProfileEditView.swift` (props + dual inits + button repoints), `ProfileEditView+Teardown.swift` (new), `ProfileEditViewTeardownTests.swift` (new). Spec: `clarifications.md` (CL-236).
 - **AC:** US-46 / AC-46.3 / AC-46.6 / DUT-217. CL-236 canonical. **Est:** ~2 h. **Deps:** off main (post #278). Branch `fix/DUT-217-profile-revoke`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 50 DODFeatureProfile tests pass; iOS app build green. Closes DUT-217 with T-841 (part 1).
 
-### T-843 — DUT-215: unsaving a downloaded recipe tears down the download + image pin (CL-237)
+### T-843 — UI consistency: unify Search/Settings screen-header (DODScreenHeader) + remove the Search-bar orange border (DUT-261, CL-237, BUGFIX)
+
+- **What:** Tester-reported. (1) Search + Settings used native `.navigationTitle` (Search = large white; Settings = centered inline) while Recipes / Saved use `DODScreenHeader` (`DODColor.label`, large, left) → migrate both to `DODScreenHeader` (drop `navigationTitle`): `SearchView` pins it above the search field, `SettingsView` wraps its `List` in a `VStack` under it. (2) `DODSearchField` overlaid a `surfaceDivider` capsule stroke that reads as an orange border on the light surface → drop the overlay; fill + a stronger shadow keep the field defined.
+- **Files:** `DODDesignSystem/Components/DODSearchField.swift` (border removed); `DODFeatureSearch/SearchView.swift` (DODScreenHeader + drop navigationTitle); `DODFeatureFeed/SettingsView.swift` (VStack + DODScreenHeader + drop navigationTitle/inline). Spec: `clarifications.md` (CL-237).
+- **AC:** US-3 / US-32 / header consistency (CL-237 canonical). **Est:** ~45 min. **Deps:** off main (`f8485ac`), merged with Ned's #281. Branch `fix/header-consistency-search-border` (task renumbered T-842→T-843 to clear Ned's parallel DUT-217-part-2). **||:** P-ui/polish. No `e2e` label. **Verification:** SwiftLint + swift-format `--strict` clean; `xcodebuild build` clean; Search + Settings rendered via snapshot harness (light + dark) confirm the unified header + borderless field; full DODDesignSystem L4 suite green (only the `moderationBadge` local outlier).
+### T-844 — DUT-215: unsaving a downloaded recipe tears down the download + image pin (CL-238)
 
 - **What:** `toggleSaved`'s unsave branch only removed the synced row — it left `downloadedAt` set (so the orphaned `CachedRecipe` was never evicted) and the write-once `pinnedToSavedRecipeID` set (so the pinned hero bytes leaked, un-reclaimable by eviction OR Settings ▸ clear cache). Unsave now clears `downloadedAt` + calls a new `unpinImages(forRecipeID:)`.
-- **Files:** `RecipeStore+Saved.swift` (new — `toggleSaved`/`markSaved` moved here), `RecipeStore.swift` (`fetchRecipe` → internal), `RecipeStore+ImageCache.swift` (`unpinImages`), `RecipeStoreUnsaveTests.swift` (new), `RecipeStoreTests.swift`. Spec: `clarifications.md` (CL-237).
-- **AC:** US-5 / AC-5.2 / NFR-2 / DUT-215. CL-237 canonical. **Est:** ~1.5 h. **Deps:** off main (post #281). Branch `fix/DUT-215-unsave-orphan`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 117 DODPersistence tests pass; iOS app build green.
+- **Files:** `RecipeStore+Saved.swift` (new — `toggleSaved`/`markSaved` moved here), `RecipeStore.swift` (`fetchRecipe` → internal), `RecipeStore+ImageCache.swift` (`unpinImages`), `RecipeStoreUnsaveTests.swift` (new), `RecipeStoreTests.swift`. Spec: `clarifications.md` (CL-238).
+- **AC:** US-5 / AC-5.2 / NFR-2 / DUT-215. CL-238 canonical. **Est:** ~1.5 h. **Deps:** off main (post #281). Branch `fix/DUT-215-unsave-orphan`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 117 DODPersistence tests pass; iOS app build green.
 
 ---
 
