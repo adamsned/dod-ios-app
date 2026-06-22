@@ -449,7 +449,7 @@ final class SmokeTests: XCTestCase {
 
         // The menu opens with the four consolidated tools (SwiftUI Menu items
         // surface as buttons). Match by accessibilityIdentifier, not visible
-        // label: T-833 gave each item a description subtitle, so the a11y label
+        // label: T-834 gave each item a description subtitle, so the a11y label
         // is now "Title, subtitle…" — the stable id is the reliable hook. Check
         // the BuzzyWaxx entry (moved off Settings) + the keystone First Cookout.
         XCTAssertTrue(

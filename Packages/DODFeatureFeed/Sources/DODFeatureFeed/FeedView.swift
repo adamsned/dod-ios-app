@@ -127,7 +127,7 @@ public struct FeedView: View {
         currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cooked)
     }
 
-    /// DUT-196 (the menu) + DUT-200 / T-833 (this refinement): one
+    /// DUT-196 (the menu) + DUT-200 / T-834 (this refinement): one
     /// `frying.pan.fill` toolbar button that gathers every cooking-help +
     /// cast-iron-care entry
     /// point in one place. The button shows a **visible "Cooking Tools" title**
