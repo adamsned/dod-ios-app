@@ -91,7 +91,7 @@ struct AccountSection: View {
         .accessibilityIdentifier("settings-account-identity")
 
         Button {
-            viewModel.signOut()
+            Task { await viewModel.signOut() }
         } label: {
             Text("Sign Out")
                 .dodFont(DODType.body)
@@ -101,7 +101,7 @@ struct AccountSection: View {
 
         // AC-46.3 — in-app account deletion (App Store Guideline 5.1.1(v)).
         Button(role: .destructive) {
-            viewModel.deleteAccount()
+            Task { await viewModel.deleteAccount() }
         } label: {
             Text("Delete Account")
                 .dodFont(DODType.body)
