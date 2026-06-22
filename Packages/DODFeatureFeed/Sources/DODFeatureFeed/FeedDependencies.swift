@@ -30,7 +30,7 @@ public protocol FeedDependencies: Sendable {
     /// test conformers keep compiling; the live wiring routes to
     /// ``RecipeStore/logCook(_:)``.
     func logCook(_ entry: CookLogEntry) async throws
-    /// DUT-104 — every logged cook, newest first (for the Cook Journal view).
+    /// DUT-104 — every logged cook, newest first (for the Cooking Journal view).
     /// Default `[]` so existing test conformers keep compiling.
     func cookLogs() async throws -> [CookLogEntry]
 }

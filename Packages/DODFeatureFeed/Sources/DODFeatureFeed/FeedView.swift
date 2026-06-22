@@ -71,7 +71,7 @@ public struct FeedView: View {
         .toolbar {
             // DUT-196 — a single "Cooking Tools" menu (`frying.pan.fill`) on the
             // TRAILING edge consolidates every cooking-help + cast-iron-care
-            // entry point (Your First Cookout, Cook Journal, Heat Coach, Buy
+            // entry point (Your First Cookout, Cooking Journal, Heat Coach, Buy
             // BuzzyWaxx) into one spot so the Feed chrome stays clean. Replaces
             // the separate First Cookout + Journal buttons (T-823) and pulls Heat
             // Coach + Shop off the Settings page. `.topBarTrailing` is iOS-only;
@@ -150,7 +150,7 @@ public struct FeedView: View {
             Button {
                 showingJournal = true
             } label: {
-                Text("Cook Journal")
+                Text("Cooking Journal")
                 Text("Track every cook and build your streak.")
                 Image(systemName: "book.closed.fill")
             }

@@ -429,7 +429,7 @@ final class SmokeTests: XCTestCase {
 
     /// DUT-196: the cooking-help + cast-iron-care entry points are consolidated
     /// into a single "Cooking Tools" menu (`frying.pan.fill`) on the Feed
-    /// toolbar — Your First Cookout + Cook Journal fold in from their own
+    /// toolbar — Your First Cookout + Cooking Journal fold in from their own
     /// buttons, and Heat Coach + the BuzzyWaxx shop row move OFF the Settings
     /// page. The BuzzyWaxx URL itself stays pinned by the L1
     /// `SettingsViewModelTests.buyBuzzyWaxxURLPointsAtTheShopifyStorefront`. This

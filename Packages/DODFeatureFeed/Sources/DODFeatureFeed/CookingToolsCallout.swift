@@ -20,8 +20,9 @@ struct CookingToolsCallout: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             HStack(spacing: DODSpacing.xs) {
-                Image(systemName: "frying.pan.fill")
-                    .foregroundStyle(DODColor.burntOrange)
+                // No icon here: the toolbar button is already the `frying.pan.fill`,
+                // and the tail points right at it, so a second pan in the bubble
+                // would be redundant. The orange title carries the association.
                 Text("Cooking Tools")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.burntOrange)

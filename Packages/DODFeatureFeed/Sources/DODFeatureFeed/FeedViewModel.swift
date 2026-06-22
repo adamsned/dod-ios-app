@@ -106,7 +106,7 @@ public final class FeedViewModel {
         }
     }
 
-    /// DUT-104 — the logged cooks (newest first) for the Cook Journal view.
+    /// DUT-104 — the logged cooks (newest first) for the Cooking Journal view.
     public func cookLogs() async -> [CookLogEntry] {
         (try? await dependencies.cookLogs()) ?? []
     }
