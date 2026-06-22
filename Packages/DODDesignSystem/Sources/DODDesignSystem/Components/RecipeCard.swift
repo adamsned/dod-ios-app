@@ -99,15 +99,22 @@ public struct RecipeCard: View {
     }
 
     private var textSection: some View {
+        // T-839 — reserve space for the full 2 lines of BOTH title and excerpt so
+        // every gallery card is the same height regardless of how long its text
+        // runs. Without `reservesSpace`, a 1-line title produced a shorter card,
+        // so the `LazyVGrid` rows came out ragged and cards looked mismatched
+        // (tester-reported). The hero is already a fixed 140pt, so pinning the
+        // text block to 2 + 2 lines makes the whole card a constant height. The
+        // list row (`RecipeCard.ListRow`) renders its own text and is untouched.
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Self.titleText(title, highlightQuery: highlightQuery)
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
-                .lineLimit(2)
+                .lineLimit(2, reservesSpace: true)
             Text(excerpt)
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
-                .lineLimit(2)
+                .lineLimit(2, reservesSpace: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(DODSpacing.sm)

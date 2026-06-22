@@ -2738,6 +2738,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `WPRestClient.swift` (`getPaged` + `parseTotalPages`), `WPRestClient+Posts.swift` (`postsPage`), `FeedDependencies.swift` (tuple return), `FeedViewModel.swift`, `FeedViewModelTests.swift` (fake + 2 regression tests). Spec: `clarifications.md` (CL-232).
 - **AC:** US-1/US-2 (AC-1.1/1.2) / DUT-237 (+ DUT-223). CL-232 canonical. **Est:** ~2 h. **Deps:** off main (post #275). Branch `fix/DUT-237-feed-pagination`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 105 DODNetworking + 97 DODFeatureFeed tests pass; iOS app build green.
 
+### T-839 — Recipe display fixes: blank detail/article images + uneven grid cards (DUT-260, CL-233, BUGFIX)
+
+- **What:** Two tester-reported display bugs. (1) The recipe-detail hero, inline article images, related-recipe thumbnails, and the Cook Mode hero used `AsyncImage` (no retry/cache; drops to the placeholder on a transient/cancelled load) → swapped to DUT-195's `ReliableImage`. (2) Gallery grid cards rendered at different heights (a 1-line title made a shorter card than a 2-line one) → `.lineLimit(2, reservesSpace: true)` on the card title + excerpt so every card is a constant height. List view unchanged.
+- **Files:** `DODDesignSystem/Components/RecipeCard.swift` (reservesSpace); `DODFeatureRecipeDetail/{RecipeDetailHero,ArticleBlocksView,RelatedRecipesStrip,CookModeView}.swift` (AsyncImage → ReliableImage). Re-recorded 5 gallery `RecipeCard` L4 baselines (`SnapshotTests/{recipeCard_full,_halfWidth,_noTimeChip}` + RecipeCardDownloadedBadge + RecipeCardHighlight; list-row baseline untouched). Spec: `clarifications.md` (CL-233), `spec.md` (AC-1.3 amendment).
+- **AC:** AC-1.3 (amended) + AC-4.1 / AC-37.3 (image loading restored); CL-233 canonical. **Est:** ~1 h. **Deps:** off main (`9b52a6f`), merged with Ned's parallel #275/#276. Branch `fix/T-837-recipe-display-images-grid-cards` (kept its original T-837 name; task renumbered to T-839 to clear Ned's parallel CL-231/T-837 high-bug batch). **||:** P-feed/detail. No `e2e` label. **Verification:** SwiftLint + swift-format `--strict` clean; `xcodebuild build` clean; **verified on the iPhone 17 simulator** (uniform grid cards; recipe-detail hero loads); affected DODDesignSystem L4 snapshots re-recorded + green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
