@@ -2696,6 +2696,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookChooserFlow.swift` (new, DODFeatureFeed), `FeedView.swift` (sheet body → `CookChooserFlow`; hero `onCookDumpCake` repoint), `CookChooserFlowTests.swift` (new). Spec: `clarifications.md` (CL-225).
 - **AC:** US-53 / DUT-194 (CL-225 canonical). **Est:** ~2 h. **Deps:** off main; conflict-free with the in-flight campfire (T-830) + recipe-fix (T-829). Branch `feat/DUT-194-cook-chooser`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 96 DODFeatureFeed tests pass; iOS app build green. **Follow-up:** delete the now-inert `DumpCakeFlow` sheet/state.
 
+### T-833 — DUT-200 Cooking Tools menu refinement: visible "Cooking Tools" label + per-item descriptions (US-53 / US-45 / AC-32.1 amendment, CL-227)
+
+- **What:** Refine the DUT-196 menu per Spencer. Give the toolbar button a **visible "Cooking Tools" title** (an explicit icon + text `HStack`; a toolbar `Label` collapses to icon-only) and give each menu item a one-line **description** of what it is + why it matters on the learning journey (a second `Text` in the menu `Button` label renders as the iOS subtitle): First Cookout "Your guided first win, coached start to finish.", Cook Journal "Track every cook and build your streak.", Heat Coach "Get the coals right for any temperature.", Buy BuzzyWaxx "Season and protect your cast iron." (no em dashes).
+- **Files:** `DODFeatureFeed/FeedView.swift` (the `cookingToolsMenu` label + item description subtitles + per-item `accessibilityIdentifier`s); `UITests/SmokeTests.swift` (match menu items by the new ids — the subtitle merges into the a11y label). Spec: `clarifications.md` (CL-227), `spec.md` (AC-32.1 amendment).
+- **AC:** AC-32.1 (amended; CL-227 canonical). **Est:** ~30 min. **Deps:** main at T-829 / DUT-196 (`2a5a7d0`). Branch `feat/T-833-cooking-tools-descriptions`. **||:** P-feed/cleanup. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean (FeedView under the cap); `xcodebuild build -scheme DODApp` clean; verified on the iPhone 17 simulator (open-menu screenshot shows the labeled button + all four descriptions).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

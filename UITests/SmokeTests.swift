@@ -448,14 +448,16 @@ final class SmokeTests: XCTestCase {
         menuButton.tap()
 
         // The menu opens with the four consolidated tools (SwiftUI Menu items
-        // surface as buttons). Check the BuzzyWaxx entry (which moved off
-        // Settings) + the keystone First Cookout entry as evidence it rendered.
+        // surface as buttons). Match by accessibilityIdentifier, not visible
+        // label: T-833 gave each item a description subtitle, so the a11y label
+        // is now "Title, subtitle…" — the stable id is the reliable hook. Check
+        // the BuzzyWaxx entry (moved off Settings) + the keystone First Cookout.
         XCTAssertTrue(
-            app.buttons["Buy BuzzyWaxx Seasoning"].waitForExistence(timeout: 4),
+            app.buttons["cooking-tools-buy-buzzywaxx"].waitForExistence(timeout: 4),
             "Cooking Tools menu should include the Buy BuzzyWaxx entry (moved off Settings)"
         )
         XCTAssertTrue(
-            app.buttons["Your First Cookout"].exists,
+            app.buttons["cooking-tools-first-cookout"].exists,
             "Cooking Tools menu should include Your First Cookout"
         )
     }

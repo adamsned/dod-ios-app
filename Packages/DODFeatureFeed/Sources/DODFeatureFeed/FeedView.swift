@@ -127,37 +127,60 @@ public struct FeedView: View {
         currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cooked)
     }
 
-    /// DUT-196 — the "Cooking Tools" menu: one `frying.pan.fill` toolbar button
-    /// that gathers every cooking-help + cast-iron-care entry point in one place
-    /// (Your First Cookout + Cook Journal, folded in from their own buttons; Heat
-    /// Coach + Buy BuzzyWaxx, pulled off the Settings page). Each item triggers
-    /// its existing sheet / browser hand-off, keeping the Feed chrome to a single
-    /// button.
+    /// DUT-196 (the menu) + DUT-200 / T-833 (this refinement): one
+    /// `frying.pan.fill` toolbar button that gathers every cooking-help +
+    /// cast-iron-care entry
+    /// point in one place. The button shows a **visible "Cooking Tools" title**
+    /// (an explicit icon + text `HStack` — a toolbar `Label` collapses to
+    /// icon-only), and each item carries a one-line **description** of what it
+    /// is + why it matters on the Dutch-oven learning journey — a second `Text`
+    /// in a menu `Button`'s label renders as the item's subtitle. Each item
+    /// triggers its existing sheet / browser hand-off.
     private var cookingToolsMenu: some View {
         Menu {
             Button {
                 showingFirstCookout = true
             } label: {
-                Label("Your First Cookout", systemImage: "flame.fill")
+                Text("Your First Cookout")
+                Text("Your guided first win, coached start to finish.")
+                Image(systemName: "flame.fill")
             }
+            .accessibilityIdentifier("cooking-tools-first-cookout")
             Button {
                 showingJournal = true
             } label: {
-                Label("Cook Journal", systemImage: "book.closed.fill")
+                Text("Cook Journal")
+                Text("Track every cook and build your streak.")
+                Image(systemName: "book.closed.fill")
             }
+            .accessibilityIdentifier("cooking-tools-journal")
             Button {
                 showingHeatCoach = true
             } label: {
-                Label("Dutch Oven Heat Coach", systemImage: "thermometer.medium")
+                Text("Dutch Oven Heat Coach")
+                Text("Get the coals right for any temperature.")
+                Image(systemName: "thermometer.medium")
             }
+            .accessibilityIdentifier("cooking-tools-heat-coach")
             Button {
                 openCookingToolURL(SettingsViewModel.buyBuzzyWaxxURLString)
             } label: {
-                Label("Buy BuzzyWaxx Seasoning", systemImage: "bag.fill")
+                Text("Buy BuzzyWaxx Seasoning")
+                Text("Season and protect your cast iron.")
+                Image(systemName: "bag.fill")
             }
+            .accessibilityIdentifier("cooking-tools-buy-buzzywaxx")
         } label: {
-            Image(systemName: "frying.pan.fill")
-                .accessibilityLabel("Cooking Tools")
+            // Explicit HStack (not a `Label` + `.labelStyle`) so the nav bar
+            // actually renders the visible "Cooking Tools" title next to the
+            // pan — a toolbar `Label` collapses to icon-only.
+            HStack(spacing: DODSpacing.xxs) {
+                Image(systemName: "frying.pan.fill")
+                Text("Cooking Tools")
+                    .dodFont(DODType.body)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Cooking Tools")
         }
         .tint(DODColor.burntOrange)
         .accessibilityIdentifier("feed-toolbar-cooking-tools")
