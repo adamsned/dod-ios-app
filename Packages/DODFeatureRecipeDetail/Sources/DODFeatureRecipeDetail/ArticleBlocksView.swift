@@ -95,7 +95,7 @@ public struct ArticleBlocksView: View {
     /// the layout.
     private func articleImage(url: URL, caption: String?) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            // T-837 — reliable cached loader (DUT-195's ReliableImage) instead of
+            // T-839 — reliable cached loader (DUT-195's ReliableImage) instead of
             // AsyncImage, which left inline article photos stuck on the neutral
             // placeholder on a transient/cancelled load (tester-reported: the
             // "Fall and Winter Dump Cakes" article images came up blank).

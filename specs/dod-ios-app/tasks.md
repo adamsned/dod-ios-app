@@ -2725,11 +2725,24 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookChooserFlow.swift` (drop auto-select + `initialSelection`), `CookChooserFlowTests.swift` (drop its test). Spec: `clarifications.md` (CL-230).
 - **AC:** US-53 / DUT-194 / DUT-235 (CL-230 canonical). **Est:** ~30 min. **Deps:** off main. Branch `fix/DUT-235-always-show-chooser`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 95 DODFeatureFeed tests pass; iOS app build green.
 
-### T-837 — Recipe display fixes: blank detail/article images + uneven grid cards (DUT-260, CL-231, BUGFIX)
+### T-837 — High-bug batch 1: telemetry privacy + rating cache (DUT-241/216, CL-231)
+
+- **What:** First batch of bug-hunt High fixes (disjoint subsystems). DUT-241 — gate TelemetryDeck init behind the privacy opt-out (lazy init on first allowed event; `sendNewSessionBeganSignal=false`) so nothing is dispatched when off. DUT-216 — `applyRatingRefresh` carries the remembered userRating forward + never zeroes a cached aggregate on a transient failure.
+- **Files:** `TelemetryDeckTransport.swift` + `TelemetryTests.swift` (241); `RecipeDetailViewModel.swift`, `RecipeDetailViewModel+RatingSubmit.swift`, `RecipeDetailRatingsCacheTests.swift` (216). Spec: `clarifications.md` (CL-231).
+- **AC:** US-36 AC-36.5/36.6 (DUT-241); US-13/14/15 (DUT-216). CL-231 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/high-bugs-batch-1`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 33 DODAnalytics + 202 DODFeatureRecipeDetail tests pass; iOS app build green.
+- **Follow-ups (separate PRs):** DUT-237 (feed pagination via X-WP-TotalPages), DUT-215/217/218/240/242 (remaining Highs).
+
+### T-838 — Feed pages off X-WP-TotalPages (DUT-237, CL-232, HIGH BUGFIX)
+
+- **What:** The Recipes feed stopped loading more (deterministically at "Roasted Cauliflower Steaks") because `loadMore`/`loadInitial` inferred the end from `fetched.count < 20`. Now pages off WP's `X-WP-TotalPages` header (`reachedEnd = currentPage >= totalPages`), and a transient `loadMore` failure no longer latches `reachedEnd` (DUT-223).
+- **Files:** `WPRestClient.swift` (`getPaged` + `parseTotalPages`), `WPRestClient+Posts.swift` (`postsPage`), `FeedDependencies.swift` (tuple return), `FeedViewModel.swift`, `FeedViewModelTests.swift` (fake + 2 regression tests). Spec: `clarifications.md` (CL-232).
+- **AC:** US-1/US-2 (AC-1.1/1.2) / DUT-237 (+ DUT-223). CL-232 canonical. **Est:** ~2 h. **Deps:** off main (post #275). Branch `fix/DUT-237-feed-pagination`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 105 DODNetworking + 97 DODFeatureFeed tests pass; iOS app build green.
+
+### T-839 — Recipe display fixes: blank detail/article images + uneven grid cards (DUT-260, CL-233, BUGFIX)
 
 - **What:** Two tester-reported display bugs. (1) The recipe-detail hero, inline article images, related-recipe thumbnails, and the Cook Mode hero used `AsyncImage` (no retry/cache; drops to the placeholder on a transient/cancelled load) → swapped to DUT-195's `ReliableImage`. (2) Gallery grid cards rendered at different heights (a 1-line title made a shorter card than a 2-line one) → `.lineLimit(2, reservesSpace: true)` on the card title + excerpt so every card is a constant height. List view unchanged.
-- **Files:** `DODDesignSystem/Components/RecipeCard.swift` (reservesSpace); `DODFeatureRecipeDetail/{RecipeDetailHero,ArticleBlocksView,RelatedRecipesStrip,CookModeView}.swift` (AsyncImage → ReliableImage). Re-recorded 5 gallery `RecipeCard` L4 baselines (`SnapshotTests/{recipeCard_full,_halfWidth,_noTimeChip}` + RecipeCardDownloadedBadge + RecipeCardHighlight; list-row baseline untouched). Spec: `clarifications.md` (CL-231), `spec.md` (AC-1.3 amendment).
-- **AC:** AC-1.3 (amended) + AC-4.1 / AC-37.3 (image loading restored); CL-231 canonical. **Est:** ~1 h. **Deps:** off main (`9b52a6f`). Branch `fix/T-837-recipe-display-images-grid-cards`. **||:** P-feed/detail. No `e2e` label. **Verification:** SwiftLint + swift-format `--strict` clean; `xcodebuild build` clean; **verified on the iPhone 17 simulator** (uniform grid cards; recipe-detail hero loads); affected DODDesignSystem L4 snapshots re-recorded + green.
+- **Files:** `DODDesignSystem/Components/RecipeCard.swift` (reservesSpace); `DODFeatureRecipeDetail/{RecipeDetailHero,ArticleBlocksView,RelatedRecipesStrip,CookModeView}.swift` (AsyncImage → ReliableImage). Re-recorded 5 gallery `RecipeCard` L4 baselines (`SnapshotTests/{recipeCard_full,_halfWidth,_noTimeChip}` + RecipeCardDownloadedBadge + RecipeCardHighlight; list-row baseline untouched). Spec: `clarifications.md` (CL-233), `spec.md` (AC-1.3 amendment).
+- **AC:** AC-1.3 (amended) + AC-4.1 / AC-37.3 (image loading restored); CL-233 canonical. **Est:** ~1 h. **Deps:** off main (`9b52a6f`), merged with Ned's parallel #275/#276. Branch `fix/T-837-recipe-display-images-grid-cards` (kept its original T-837 name; task renumbered to T-839 to clear Ned's parallel CL-231/T-837 high-bug batch). **||:** P-feed/detail. No `e2e` label. **Verification:** SwiftLint + swift-format `--strict` clean; `xcodebuild build` clean; **verified on the iPhone 17 simulator** (uniform grid cards; recipe-detail hero loads); affected DODDesignSystem L4 snapshots re-recorded + green.
 
 ---
 

@@ -11,7 +11,7 @@ struct RecipeDetailHero: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // T-837 — reliable cached loader (DUT-195's ReliableImage) instead of
+            // T-839 — reliable cached loader (DUT-195's ReliableImage) instead of
             // AsyncImage, which left the detail hero stuck on the skeleton when a
             // load hit a transient error or was cancelled (tester-reported).
             ReliableImage(url: url) { phase in

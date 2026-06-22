@@ -99,7 +99,7 @@ public struct RecipeCard: View {
     }
 
     private var textSection: some View {
-        // T-837 — reserve space for the full 2 lines of BOTH title and excerpt so
+        // T-839 — reserve space for the full 2 lines of BOTH title and excerpt so
         // every gallery card is the same height regardless of how long its text
         // runs. Without `reservesSpace`, a 1-line title produced a shorter card,
         // so the `LazyVGrid` rows came out ragged and cards looked mismatched

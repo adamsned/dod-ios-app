@@ -113,7 +113,7 @@ public struct CookModeView: View {
     private var heroBlock: some View {
         if let url = viewModel.recipe.heroImageLargeURL ?? viewModel.recipe.heroImage {
             ZStack(alignment: .bottomLeading) {
-                // T-837 — reliable cached loader (ReliableImage), not AsyncImage,
+                // T-839 — reliable cached loader (ReliableImage), not AsyncImage,
                 // so the Cook Mode hero doesn't stick on the skeleton.
                 ReliableImage(url: url) { phase in
                     switch phase {

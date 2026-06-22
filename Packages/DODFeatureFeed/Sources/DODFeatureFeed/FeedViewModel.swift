@@ -141,12 +141,14 @@ public final class FeedViewModel {
         currentPage = 0
         reachedEnd = false
         do {
-            let fetched = try await dependencies.fetchPosts(page: 1)
-            try await dependencies.cache(listItems: fetched)
-            items = try await dependencies.cachedListItems(forIDs: fetched.map(\.id))
+            let page = try await dependencies.fetchPosts(page: 1)
+            try await dependencies.cache(listItems: page.items)
+            items = try await dependencies.cachedListItems(forIDs: page.items.map(\.id))
             currentPage = 1
             loadState = items.isEmpty ? .empty : .loaded
-            if fetched.count < 20 { reachedEnd = true }
+            // DUT-237: stop at the real last page (X-WP-TotalPages), not at the
+            // first page that returns fewer than a full batch.
+            reachedEnd = currentPage >= page.totalPages
             // Hand the freshly-loaded top-of-feed to the home-screen widget
             // (spec.md US-9, AC-9.3). Fire-and-forget; failures inside the
             // dependency are logged there, never thrown.
@@ -171,19 +173,23 @@ public final class FeedViewModel {
         loadState = .loadingMore
         let nextPage = currentPage + 1
         do {
-            let fetched = try await dependencies.fetchPosts(page: nextPage)
-            try await dependencies.cache(listItems: fetched)
-            let ids = (items.map(\.id) + fetched.map(\.id)).reduce(into: [Int]()) { acc, id in
+            let page = try await dependencies.fetchPosts(page: nextPage)
+            try await dependencies.cache(listItems: page.items)
+            let ids = (items.map(\.id) + page.items.map(\.id)).reduce(into: [Int]()) { acc, id in
                 if !acc.contains(id) { acc.append(id) }
             }
             items = try await dependencies.cachedListItems(forIDs: ids)
             currentPage = nextPage
-            if fetched.count < 20 { reachedEnd = true }
+            // DUT-237: stop at the real last page (X-WP-TotalPages).
+            reachedEnd = currentPage >= page.totalPages
             loadState = .loaded
         } catch {
             DODLog.network.error("feed loadMore failed: \(String(describing: error))")
-            loadState = .loaded  // Keep what we have; show no error toast for tail-pagination failures.
-            reachedEnd = true
+            // DUT-237 / DUT-223: a transient tail-pagination failure must NOT
+            // latch `reachedEnd` — that permanently kills infinite scroll for
+            // the session. Keep what we have; a later near-bottom appearance
+            // retries the same page.
+            loadState = .loaded
         }
     }
 

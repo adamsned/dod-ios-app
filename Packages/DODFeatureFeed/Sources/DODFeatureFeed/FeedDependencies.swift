@@ -8,7 +8,10 @@ import Foundation
 /// swap real `WPRestClient` for a fake in unit tests without touching the
 /// view-model API.
 public protocol FeedDependencies: Sendable {
-    func fetchPosts(page: Int) async throws -> [RecipeListItem]
+    /// DUT-237: returns the page's items plus WP's total page count
+    /// (`X-WP-TotalPages`), so the view model stops paging at the real last
+    /// page instead of guessing from a short page.
+    func fetchPosts(page: Int) async throws -> (items: [RecipeListItem], totalPages: Int)
     func cache(listItems: [RecipeListItem]) async throws
     func cachedListItems(forIDs ids: [Int]) async throws -> [RecipeListItem]
     func cachedListPage(key: String) async throws -> [Int]?
@@ -86,8 +89,8 @@ public struct LiveFeedDependencies: FeedDependencies {
         self.imagePrefetcher = imagePrefetcher
     }
 
-    public func fetchPosts(page: Int) async throws -> [RecipeListItem] {
-        try await client.posts(page: page)
+    public func fetchPosts(page: Int) async throws -> (items: [RecipeListItem], totalPages: Int) {
+        try await client.postsPage(page: page)
     }
 
     public func cache(listItems: [RecipeListItem]) async throws {

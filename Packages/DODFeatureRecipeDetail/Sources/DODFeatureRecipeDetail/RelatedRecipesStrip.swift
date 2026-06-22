@@ -39,7 +39,7 @@ public struct RelatedRecipesStrip: View {
 
     private func relatedCard(_ item: RecipeListItem) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            // T-837 — reliable cached loader (ReliableImage), not AsyncImage,
+            // T-839 — reliable cached loader (ReliableImage), not AsyncImage,
             // so related-recipe thumbnails don't stick on the skeleton.
             ReliableImage(url: item.heroImage) { phase in
                 switch phase {
