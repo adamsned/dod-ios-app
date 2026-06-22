@@ -38,6 +38,10 @@ public struct SearchView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
+            // T-843 / DUT-261 — shared `DODScreenHeader` (large, left-aligned,
+            // `DODColor.label`), pinned above the search field, so Search matches
+            // Recipes / Saved / Settings instead of a native white nav title.
+            DODScreenHeader("Search")
             // US-3 / AC-3.5 amendment / CL-126 / REG-32 (T-648, 2026-05-30):
             // the inline `searchField` `HStack`-with-`RoundedRectangle` is
             // replaced by the shared `DODSearchField` so this bar and the
@@ -84,7 +88,6 @@ public struct SearchView: View {
             content
         }
         .background(DODColor.surface)
-        .navigationTitle("Search")
         .task {
             await viewModel.loadCategoriesIfNeeded()
             await viewModel.refreshSavedRecipeIDs()  // T-765: state-aware menu on appear
