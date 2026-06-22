@@ -38,19 +38,19 @@ extension DutchOvenHeatCoach {
     /// the oven, not the chart.
     public static let feelCues: [FeelCue] = [
         FeelCue(
-            title: "Coal color",
+            title: "Coal Color",
             onTrack: "A white-gray ash coating means the heat is steady and right where you want it.",
             adjust:
                 "Glowing bright orange means it's running hot, so pull 1-2 coals off the bottom. "
                 + "Dark and dull means they're spent, so add fresh ones from your charcoal chimney."
         ),
         FeelCue(
-            title: "Steam at the lid rim",
+            title: "Steam at the Lid Rim",
             onTrack: "A light wisp of steam escaping the lid is normal.",
             adjust: "Heavy, nonstop steam means it's too hot or there's too much liquid, so ease off the bottom heat."
         ),
         FeelCue(
-            title: "Hand test",
+            title: "Hand Test",
             onTrack: "Hold your palm over the coals: 4-5 seconds means 325-350°F, 2-3 seconds means 375-425°F.",
             adjust: "Under 2 seconds is too hot for most recipes, so pull a few coals before you load the oven."
         ),
@@ -67,7 +67,7 @@ extension DutchOvenHeatCoach {
                 + "so pull the bottom coals right away."
         ),
         FeelCue(
-            title: "Lid condensation",
+            title: "Lid Condensation",
             onTrack: "Moisture beading on the underside of the lid means a healthy, moist cook.",
             adjust:
                 "Bone-dry under the lid at the 30-minute mark means it's running hot and dry, "

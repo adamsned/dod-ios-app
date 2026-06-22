@@ -84,28 +84,53 @@ final class ReliableImageLoader {
         // New/uncached URL: show the placeholder while (re)loading so a reused
         // cell never flashes the previous recipe's photo.
         phase = .empty
-        for attempt in 0..<2 {
-            do {
-                let (data, response) = try await URLSession.shared.data(from: url)
-                if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                    if attempt == 0 { continue }
-                    break
-                }
-                if let image = UIImage(data: data) {
-                    RecipeImageCache.shared.insert(image, for: url)
-                    phase = .success(Image(uiImage: image))
-                    return
-                }
-                break
-            } catch is CancellationError {
-                // Scrolled away mid-load. Leave the phase as-is; the next
-                // appearance reloads (from cache if a sibling cell finished it).
+        for _ in 0..<2 {
+            // Recycled cell (DUT-201): the .task(id:) was cancelled — don't touch phase.
+            if Task.isCancelled { return }
+            switch await Self.fetchOnce(url) {
+            case .image(let image):
+                RecipeImageCache.shared.insert(image, for: url)
+                phase = .success(Image(uiImage: image))
                 return
-            } catch {
-                if attempt == 0 { continue }
+            case .cancelled:
+                return
+            case .failed:
+                phase = .failure
+                return
+            case .retry:
+                continue
             }
         }
-        phase = .failure
+        if !Task.isCancelled { phase = .failure }
+    }
+
+    private enum FetchOutcome {
+        case image(UIImage)
+        case cancelled
+        case retry
+        case failed
+    }
+
+    /// One fetch + decode attempt. Reports cancellation distinctly (DUT-201:
+    /// URLSession surfaces Task cancellation as `URLError(.cancelled)`, NOT
+    /// `CancellationError`) so the caller never flips a recycled cell to failure,
+    /// and re-checks `Task.isCancelled` after the await so a resumed-stale task
+    /// can't overwrite the new URL's phase.
+    private static func fetchOnce(_ url: URL) async -> FetchOutcome {
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            if Task.isCancelled { return .cancelled }
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                return .retry
+            }
+            return UIImage(data: data).map(FetchOutcome.image) ?? .failed
+        } catch is CancellationError {
+            return .cancelled
+        } catch let error as URLError where error.code == .cancelled {
+            return .cancelled
+        } catch {
+            return .retry
+        }
     }
 }
 

@@ -25,8 +25,15 @@ extension RecipeDetailViewModel {
             // transient network failure rather than a missing-JSON-LD
             // post); the next pull-to-refresh's re-fetch decides.
             DODLog.network.error("recipe page fetch failed: \(String(describing: error))")
-            loadState = .unavailable
-            snackbarMessage = "Recipe unavailable."
+            // DUT-202: if a usable cached recipe is already on screen (the
+            // reclassify path set it), keep it rather than discarding a good view
+            // + auto-popping on a transient (non-offline) failure.
+            if let recipe, !recipe.ingredients.isEmpty {
+                loadState = .ready
+            } else {
+                loadState = .unavailable
+                snackbarMessage = "Recipe unavailable."
+            }
             return
         }
 
@@ -117,6 +124,12 @@ extension RecipeDetailViewModel {
     /// — the re-fetch can only help when it can actually run.
     func hydrateRecipeOrReclassify(_ cached: Recipe) async {
         if cached.instructions.isEmpty, await dependencies.isOnline() {
+            // DUT-202: show the usable cached recipe (ingredients + blurb) right
+            // away, then attempt the re-classify. A transient (non-offline) fetch
+            // failure must keep this view, not downgrade it to "Recipe unavailable"
+            // + auto-pop (see the fetch catch in fetchAndParse).
+            recipe = cached
+            loadState = .ready
             await fetchAndParse()
         } else {
             await hydrateCachedRecipe(cached)
