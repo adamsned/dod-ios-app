@@ -1,3 +1,4 @@
+import DODFeatureProfile
 import DODSupport
 import Foundation
 import Testing
@@ -62,25 +63,31 @@ struct AccountViewModelTests {
         #expect(vm.session?.email == nil)
     }
 
-    @Test func signOutClearsTheSession() {
+    @Test func signOutClearsBothSessionAndProfile() async {
         let store = InMemoryAppleAuthSessionStore(
             initial: AppleAuthSession(userIdentifier: "u1", displayName: "Ned")
         )
-        let vm = AccountViewModel(store: store)
-        vm.signOut()
+        let profileStore = SpyProfileStore()
+        let vm = AccountViewModel(store: store, profileStore: profileStore)
+        await vm.signOut()
         #expect(vm.isSignedIn == false)
         #expect(vm.session == nil)
         #expect((try? store.load()) == nil)
+        // DUT-217: the coupled UserProfile row is cleared too.
+        #expect(profileStore.clearCalls == 1)
     }
 
-    @Test func deleteAccountClearsTheSession() {
+    @Test func deleteAccountClearsBothSessionAndProfile() async {
         let store = InMemoryAppleAuthSessionStore(
             initial: AppleAuthSession(userIdentifier: "u1", displayName: "Ned")
         )
-        let vm = AccountViewModel(store: store)
-        vm.deleteAccount()
+        let profileStore = SpyProfileStore()
+        let vm = AccountViewModel(store: store, profileStore: profileStore)
+        await vm.deleteAccount()
         #expect(vm.isSignedIn == false)
         #expect((try? store.load()) == nil)
+        // DUT-217: an account deletion must not leave personal data on-device.
+        #expect(profileStore.clearCalls == 1)
     }
 
     // MARK: - AC-46.6 (DUT-98) — token exchange + revoke
@@ -90,13 +97,9 @@ struct AccountViewModelTests {
             initial: AppleAuthSession(userIdentifier: "u1", refreshToken: "rt-1")
         )
         let spy = SpyRevoker()
-        let vm = AccountViewModel(store: store, revoker: spy)
-        await confirmation { confirmed in
-            spy.onRevoke = { _ in confirmed() }
-            vm.deleteAccount()
-            #expect(vm.session == nil)  // cleared immediately, revoke runs after
-            try? await Task.sleep(for: .milliseconds(300))
-        }
+        let vm = AccountViewModel(store: store, profileStore: SpyProfileStore(), revoker: spy)
+        await vm.deleteAccount()
+        #expect(vm.session == nil)
         #expect(spy.revokedTokens == ["rt-1"])
     }
 
@@ -121,16 +124,26 @@ struct AccountViewModelTests {
         #expect((try? store.load())?.refreshToken == "rt-new")
     }
 
-    @Test func deleteWithoutRefreshTokenDoesNotCallRevoker() {
+    @Test func deleteWithoutRefreshTokenDoesNotCallRevoker() async {
         let store = InMemoryAppleAuthSessionStore(
             initial: AppleAuthSession(userIdentifier: "u1")  // no refresh token
         )
         let spy = SpyRevoker()
-        let vm = AccountViewModel(store: store, revoker: spy)
-        vm.deleteAccount()
+        let vm = AccountViewModel(store: store, profileStore: SpyProfileStore(), revoker: spy)
+        await vm.deleteAccount()
         #expect(vm.session == nil)
         #expect(spy.revokedTokens.isEmpty)
     }
+}
+
+/// Records `clear()` calls for the DUT-217 profile-teardown assertions.
+/// `@unchecked Sendable` is sound: access is MainActor-driven, like ``SpyRevoker``.
+private final class SpyProfileStore: ProfileStoring, @unchecked Sendable {
+    private(set) var clearCalls = 0
+    func load() async -> UserProfile? { nil }
+    func save(_ profile: UserProfile) async throws {}
+    func clear() async throws { clearCalls += 1 }
+    var hasProfile: Bool { get async { false } }
 }
 
 /// Records exchange/revoke calls for the AccountViewModel async-path tests.

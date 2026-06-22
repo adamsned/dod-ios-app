@@ -1,3 +1,4 @@
+import DODFeatureProfile
 import DODSupport
 import Foundation
 import Observation
@@ -20,6 +21,10 @@ public final class AccountViewModel {
     public private(set) var session: AppleAuthSession?
 
     private let store: any AppleAuthSessionStoring
+    /// DUT-217: the ``UserProfile`` row written alongside the session at sign-in.
+    /// Sign Out / Delete Account must clear it too, else the app keeps the user's
+    /// name + email and keeps attributing comments/ratings after they leave.
+    private let profileStore: any ProfileStoring
     private let revoker: (any SiwaRevoking)?
 
     /// The default `revoker` is the production SiwA-revoke client **when the
@@ -30,10 +35,12 @@ public final class AccountViewModel {
     /// public initializer.
     public init(
         store: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
+        profileStore: any ProfileStoring = KeychainProfileStore(),
         revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
             ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil
     ) {
         self.store = store
+        self.profileStore = profileStore
         self.revoker = revoker
         // Seed from the store so a returning user lands signed-in. `try?` —
         // a Keychain read failure degrades to signed-out (guest), never a crash.
@@ -93,9 +100,12 @@ public final class AccountViewModel {
     /// AC-46.3 — Sign Out: clear the local session and fall back to guest mode.
     /// (Sign out does NOT revoke — the user may sign back in; revocation is for
     /// account *deletion*.)
-    public func signOut() {
+    public func signOut() async {
         try? store.clear()
         session = nil
+        // DUT-217: clear the coupled UserProfile row too (no revoke — the user
+        // may sign back in; revocation is for account *deletion*).
+        try? await profileStore.clear()
     }
 
     /// AC-46.6 — in-app Delete Account (App Store Guideline 5.1.1(v)). Clears
@@ -104,11 +114,14 @@ public final class AccountViewModel {
     /// token — a transient network failure still deletes locally; the token
     /// also expires). When no token was exchanged (no Worker configured), this
     /// is just the local clear.
-    public func deleteAccount() {
+    public func deleteAccount() async {
         let token = session?.refreshToken
         try? store.clear()
         session = nil
+        // DUT-217: an explicit account deletion must not leave personal data on
+        // device — clear the coupled UserProfile row too.
+        try? await profileStore.clear()
         guard let token, let revoker else { return }
-        Task { try? await revoker.revoke(refreshToken: token) }
+        try? await revoker.revoke(refreshToken: token)
     }
 }
