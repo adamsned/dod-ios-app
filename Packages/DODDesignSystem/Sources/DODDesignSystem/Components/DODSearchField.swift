@@ -76,7 +76,7 @@ public struct DODSearchField: View {
             Capsule(style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
-        // T-842 / DUT-261 — the `surfaceDivider` stroke is dropped: it rendered
+        // T-843 / DUT-261 — the `surfaceDivider` stroke is dropped: it rendered
         // as an ugly orange outline on the light surface (tester-reported). The
         // fill + a slightly stronger soft shadow keep the field defined (Search
         // and Categories both) without the outline.

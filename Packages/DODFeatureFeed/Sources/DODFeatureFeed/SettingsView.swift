@@ -59,7 +59,7 @@ public struct SettingsView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // T-842 / DUT-261 — shared `DODScreenHeader` (large, left-aligned,
+            // T-843 / DUT-261 — shared `DODScreenHeader` (large, left-aligned,
             // `DODColor.label`) instead of a centered inline `.navigationTitle`,
             // so the Settings header matches Recipes / Saved / Search.
             DODScreenHeader("Settings")

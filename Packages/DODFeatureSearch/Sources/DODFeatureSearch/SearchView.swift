@@ -38,7 +38,7 @@ public struct SearchView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // T-842 / DUT-261 — shared `DODScreenHeader` (large, left-aligned,
+            // T-843 / DUT-261 — shared `DODScreenHeader` (large, left-aligned,
             // `DODColor.label`), pinned above the search field, so Search matches
             // Recipes / Saved / Settings instead of a native white nav title.
             DODScreenHeader("Search")
