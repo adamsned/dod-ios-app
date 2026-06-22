@@ -132,7 +132,7 @@ extension FirstCookoutView {
                         .monospacedDigit()
                         .foregroundStyle(DODColor.burntOrange)
                 }
-                Text("\(cookout.dishTitle) bake, you can step away")
+                Text(bakeStepAwayText)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
                 Button("Cancel timer") { timerEngine.cancel(active.id) }
@@ -144,7 +144,7 @@ extension FirstCookoutView {
                 Text("Timer's up!")
                     .dodFont(DODType.heading)
                     .foregroundStyle(DODColor.burntOrange)
-                Text("Go check your \(cookout.dishTitle).")
+                Text(goCheckText)
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.label)
             }
@@ -152,7 +152,7 @@ extension FirstCookoutView {
         } else {
             Button("Start the \(cookout.bakeMinutes)-minute bake timer") {
                 timerEngine.start(
-                    label: "\(cookout.dishTitle) bake",
+                    label: bakeTimerLabel,
                     duration: Double(cookout.bakeMinutes) * 60
                 )
             }
@@ -166,7 +166,7 @@ extension FirstCookoutView {
     /// to the in-app recipe detail; dismiss this sheet so that navigation is
     /// actually visible (it was opening behind the sheet).
     var recipeButton: some View {
-        Button("Open the \(cookout.dishTitle) recipe") {
+        Button(recipeLinkLabel) {
             if let url = URL(string: "\(recipeBaseURL)/\(cookout.recipeSlug)/") {
                 openURL(url)
                 dismiss()
@@ -193,7 +193,7 @@ extension FirstCookoutView {
                     item: photo,
                     subject: Text("My first Dutch oven cook"),
                     message: Text(shareCaption),
-                    preview: SharePreview("My \(cookout.dishTitle)", image: photo)
+                    preview: SharePreview(sharePreviewTitle, image: photo)
                 ) {
                     Label("Share / Post, tags Dutch Oven Daddy", systemImage: "square.and.arrow.up")
                 }
