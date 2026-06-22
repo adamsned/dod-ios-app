@@ -58,29 +58,30 @@ public struct SettingsView: View {
     }
 
     public var body: some View {
-        content
-            // T-756 / CL-153 (DUT-62 bug 2) — give the Settings sheet its
-            // OWN live color scheme. Settings is presented as a `.sheet`,
-            // and `preferredColorScheme` applied on `RootView` does NOT
-            // propagate into an already-presented sheet (it only re-captures
-            // on re-present — hence the "only updates on reopen" bug). Driving
-            // it from the now-observable `viewModel.appearance` re-themes the
-            // sheet the instant the App Appearance picker changes.
-            .preferredColorScheme(viewModel.appearance.colorScheme)
-            .navigationTitle("Settings")
-            #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .overlay(alignment: .bottom) {
-                snackbarOverlay
-            }
-            // DUT-6 cause B — pull the latest CloudKit mirror status into the
-            // iCloud Sync row's status sublabel when the screen appears.
-            // (T-759 / CL-156 removed the per-toggle confirmation dialog; the
-            // toggle in `CloudSyncRows` now flips directly.)
-            .task {
-                viewModel.refreshCloudSyncStatus()
-            }
+        VStack(spacing: 0) {
+            // T-842 / DUT-261 — shared `DODScreenHeader` (large, left-aligned,
+            // `DODColor.label`) instead of a centered inline `.navigationTitle`,
+            // so the Settings header matches Recipes / Saved / Search.
+            DODScreenHeader("Settings")
+            content
+        }
+        .background(DODColor.surface)
+        // T-756 / CL-153 (DUT-62 bug 2) — give the Settings surface its OWN live
+        // color scheme. `preferredColorScheme` applied on `RootView` does NOT
+        // propagate into an already-presented sheet (the "only updates on reopen"
+        // bug); driving it from the now-observable `viewModel.appearance`
+        // re-themes the instant the App Appearance picker changes.
+        .preferredColorScheme(viewModel.appearance.colorScheme)
+        .overlay(alignment: .bottom) {
+            snackbarOverlay
+        }
+        // DUT-6 cause B — pull the latest CloudKit mirror status into the iCloud
+        // Sync row's status sublabel when the screen appears. (T-759 / CL-156
+        // removed the per-toggle confirmation dialog; the toggle in
+        // `CloudSyncRows` now flips directly.)
+        .task {
+            viewModel.refreshCloudSyncStatus()
+        }
     }
 
     @ViewBuilder

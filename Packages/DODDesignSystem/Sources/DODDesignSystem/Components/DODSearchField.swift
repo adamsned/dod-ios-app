@@ -76,15 +76,11 @@ public struct DODSearchField: View {
             Capsule(style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
-        // DUT-25 + T-781 / DUT-87 — border + soft shadow built into the
-        // component (was the separate `dodSearchFieldAffordance` modifier in
-        // DODFeatureSearch) so every DODSearchField — Search and Categories —
-        // reads identically and isn't camouflaged on the light surface.
-        .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(DODColor.surfaceDivider, lineWidth: 1.5)
-        )
-        .shadow(color: DODColor.charcoal.opacity(0.08), radius: 3, x: 0, y: 1)
+        // T-842 / DUT-261 — the `surfaceDivider` stroke is dropped: it rendered
+        // as an ugly orange outline on the light surface (tester-reported). The
+        // fill + a slightly stronger soft shadow keep the field defined (Search
+        // and Categories both) without the outline.
+        .shadow(color: DODColor.charcoal.opacity(0.12), radius: 4, x: 0, y: 1)
         .onChange(of: isFocused) { _, focused in
             onFocusChange?(focused)
         }
