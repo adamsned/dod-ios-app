@@ -212,10 +212,11 @@ public final class RecipeDetailViewModel {
             commentsLoadState = .ready
         }
 
-        // Step 2: network refresh (best-effort).
+        // Step 2: network refresh (best-effort). DUT-216: don't blindly adopt
+        // `fresh` — carry the remembered userRating forward and never zero a
+        // good cached aggregate on a transient failure. See `applyRatingRefresh`.
         let fresh = await dependencies.fetchRatingSummary(recipeID: listItem.id)
-        ratingSummary = fresh
-        await dependencies.cacheRatingSummary(fresh)
+        await applyRatingRefresh(fresh)
 
         do {
             let page = try await dependencies.fetchComments(postID: listItem.id, page: 1)
