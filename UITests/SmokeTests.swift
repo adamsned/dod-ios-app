@@ -429,7 +429,7 @@ final class SmokeTests: XCTestCase {
 
     /// DUT-196: the cooking-help + cast-iron-care entry points are consolidated
     /// into a single "Cooking Tools" menu (`frying.pan.fill`) on the Feed
-    /// toolbar — Your First Cookout + Cook Journal fold in from their own
+    /// toolbar — Your First Cookout + Cooking Journal fold in from their own
     /// buttons, and Heat Coach + the BuzzyWaxx shop row move OFF the Settings
     /// page. The BuzzyWaxx URL itself stays pinned by the L1
     /// `SettingsViewModelTests.buyBuzzyWaxxURLPointsAtTheShopifyStorefront`. This
@@ -448,14 +448,16 @@ final class SmokeTests: XCTestCase {
         menuButton.tap()
 
         // The menu opens with the four consolidated tools (SwiftUI Menu items
-        // surface as buttons). Check the BuzzyWaxx entry (which moved off
-        // Settings) + the keystone First Cookout entry as evidence it rendered.
+        // surface as buttons). Match by accessibilityIdentifier, not visible
+        // label: T-834 gave each item a description subtitle, so the a11y label
+        // is now "Title, subtitle…" — the stable id is the reliable hook. Check
+        // the BuzzyWaxx entry (moved off Settings) + the keystone First Cookout.
         XCTAssertTrue(
-            app.buttons["Buy BuzzyWaxx Seasoning"].waitForExistence(timeout: 4),
+            app.buttons["cooking-tools-buy-buzzywaxx"].waitForExistence(timeout: 4),
             "Cooking Tools menu should include the Buy BuzzyWaxx entry (moved off Settings)"
         )
         XCTAssertTrue(
-            app.buttons["Your First Cookout"].exists,
+            app.buttons["cooking-tools-first-cookout"].exists,
             "Cooking Tools menu should include Your First Cookout"
         )
     }

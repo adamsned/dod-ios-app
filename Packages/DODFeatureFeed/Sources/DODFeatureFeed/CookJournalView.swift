@@ -34,7 +34,7 @@ public struct CookJournalView: View {
                 }
             }
             .background(DODColor.surface)
-            .navigationTitle("Cook Journal")
+            .navigationTitle("Cooking Journal")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
