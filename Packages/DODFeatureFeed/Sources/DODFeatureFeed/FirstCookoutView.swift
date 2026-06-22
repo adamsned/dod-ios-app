@@ -131,6 +131,13 @@ public struct FirstCookoutView: View {
         .onChange(of: cookPhotoItem) { _, newItem in
             Task { await loadPhoto(newItem) }
         }
+        // DUT-198 — safety net: if the cook reached the celebration (i.e. finished
+        // the cook) but left via the X / swipe-down instead of tapping "Done", log
+        // it anyway. `logCookIfNeeded()` is guarded by `hasLoggedCook`, so the
+        // explicit "Done" tap and this path never double-log.
+        .onDisappear {
+            if index >= lastIndex { logCookIfNeeded() }
+        }
     }
 
     /// Advances the timer engine ~1×/s while the flow is on screen so the bake

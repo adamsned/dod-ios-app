@@ -2701,6 +2701,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookChooserFlow.swift` (new, DODFeatureFeed), `FeedView.swift` (sheet body → `CookChooserFlow`; hero `onCookDumpCake` repoint), `CookChooserFlowTests.swift` (new). Spec: `clarifications.md` (CL-225).
 - **AC:** US-53 / DUT-194 (CL-225 canonical). **Est:** ~2 h. **Deps:** off main; conflict-free with the in-flight campfire (T-830) + recipe-fix (T-829). Branch `feat/DUT-194-cook-chooser`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 96 DODFeatureFeed tests pass; iOS app build green. **Follow-up:** delete the now-inert `DumpCakeFlow` sheet/state.
 
+### T-833 — Journal logs a completed cook however the user exits (DUT-198, CL-227, BUGFIX)
+
+- **What:** A finished cook only logged on the explicit "Done" tap; exiting the celebration via the X / swipe-down (added in DUT-188) dropped it. Added `.onDisappear { if index >= lastIndex { logCookIfNeeded() } }` to `FirstCookoutView` so any completed cook logs regardless of exit. Guarded by `hasLoggedCook` (no double-log); photo captured from `@State` at disappear.
+- **Files:** `FirstCookoutView.swift`. Spec: `clarifications.md` (CL-227).
+- **AC:** US-53 / DUT-104 / DUT-198 (CL-227 canonical). **Est:** ~1 h. **Deps:** off main (post chooser/campfire). Branch `fix/DUT-198-journal-logging`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 96 DODFeatureFeed tests pass; iOS app build green. Device-observable — TestFlight. **Note:** all entry points already wire `onLogCook` (not a nil-closure bug); the gap was the exit path.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
