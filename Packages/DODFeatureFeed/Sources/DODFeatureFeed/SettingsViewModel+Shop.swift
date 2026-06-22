@@ -21,9 +21,9 @@ extension SettingsViewModel {
     /// checkout is the compliant path — **no StoreKit / IAP** for this surface.
     /// Stored as a `String` (not a force-unwrapped `URL`) so it stays
     /// SwiftLint-clean (`force_unwrapping` is an error in this repo) and the L1
-    /// suite can pin the literal; `ShopSection` builds the `URL` at the call
-    /// site with `if let`, mirroring how `SettingsView+Voice` opens
-    /// `openSettingsURLString`.
+    /// suite can pin the literal; the Feed's Cooking Tools menu builds the `URL`
+    /// at the call site with `if let` (DUT-196 moved the Buy BuzzyWaxx entry off
+    /// the former Settings ▸ Shop section into the Feed menu).
     ///
     /// Spec trace: US-45 / AC-45.1..AC-45.3 (DUT-94 / CL-186).
     public nonisolated static let buyBuzzyWaxxURLString =
