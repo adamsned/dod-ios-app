@@ -2732,6 +2732,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **AC:** US-36 AC-36.5/36.6 (DUT-241); US-13/14/15 (DUT-216). CL-231 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/high-bugs-batch-1`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 33 DODAnalytics + 202 DODFeatureRecipeDetail tests pass; iOS app build green.
 - **Follow-ups (separate PRs):** DUT-237 (feed pagination via X-WP-TotalPages), DUT-215/217/218/240/242 (remaining Highs).
 
+### T-838 — Feed pages off X-WP-TotalPages (DUT-237, CL-232, HIGH BUGFIX)
+
+- **What:** The Recipes feed stopped loading more (deterministically at "Roasted Cauliflower Steaks") because `loadMore`/`loadInitial` inferred the end from `fetched.count < 20`. Now pages off WP's `X-WP-TotalPages` header (`reachedEnd = currentPage >= totalPages`), and a transient `loadMore` failure no longer latches `reachedEnd` (DUT-223).
+- **Files:** `WPRestClient.swift` (`getPaged` + `parseTotalPages`), `WPRestClient+Posts.swift` (`postsPage`), `FeedDependencies.swift` (tuple return), `FeedViewModel.swift`, `FeedViewModelTests.swift` (fake + 2 regression tests). Spec: `clarifications.md` (CL-232).
+- **AC:** US-1/US-2 (AC-1.1/1.2) / DUT-237 (+ DUT-223). CL-232 canonical. **Est:** ~2 h. **Deps:** off main (post #275). Branch `fix/DUT-237-feed-pagination`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 105 DODNetworking + 97 DODFeatureFeed tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

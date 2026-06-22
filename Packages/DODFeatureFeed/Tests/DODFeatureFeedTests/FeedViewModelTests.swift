@@ -27,6 +27,52 @@ import Testing
         #expect(viewModel.items.count == 40)
     }
 
+    @Test func shortMidListPageDoesNotStopPagination() async throws {
+        // DUT-237: page 2 returns fewer than a full batch, but X-WP-TotalPages
+        // says there are 3 pages — pagination must continue to page 3 instead
+        // of latching "reached end" on the short page (the bug that stopped the
+        // feed at "Roasted Cauliflower Steaks").
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = (1...20).map(Self.makeItem)
+        dependencies.pages[2] = (21...35).map(Self.makeItem)  // short page (15 items)
+        dependencies.pages[3] = (36...55).map(Self.makeItem)
+        dependencies.totalPagesOverride = 3
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+
+        var last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)  // -> page 2 (short)
+        #expect(viewModel.items.count == 35)
+
+        last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)  // -> page 3 (never ran pre-fix)
+        #expect(viewModel.items.count == 55)
+    }
+
+    @Test func transientLoadMoreFailureDoesNotLatchReachedEnd() async throws {
+        // DUT-237 / DUT-223: a transient tail-pagination failure must not
+        // permanently kill infinite scroll — a later near-bottom appearance
+        // resumes instead of being stuck for the whole session.
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = (1...20).map(Self.makeItem)
+        dependencies.pages[2] = (21...40).map(Self.makeItem)
+        dependencies.totalPagesOverride = 3  // more pages exist
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+
+        // Page-2 fetch blips.
+        dependencies.shouldFail = true
+        var last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)
+        #expect(viewModel.items.count == 20, "a failed page must keep what we have")
+
+        // Network recovers — the next attempt retries and loads.
+        dependencies.shouldFail = false
+        last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)
+        #expect(viewModel.items.count == 40, "pagination must resume after a transient failure")
+    }
+
     @Test func firstLaunchOfflineShowsEmptyState() async throws {
         let dependencies = FakeFeedDependencies()
         dependencies.shouldFail = true
@@ -96,12 +142,18 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     var online: Bool = true
     var clearBlocklistCalls: Int = 0
     var savedIDs: Set<Int> = []
+    /// DUT-237: override the reported `X-WP-TotalPages`. When nil, it derives
+    /// from the highest page index that has data, so a short final page still
+    /// ends pagination (matching the pre-DUT-237 `< 20` heuristic for tests
+    /// that predate this).
+    var totalPagesOverride: Int?
 
-    func fetchPosts(page: Int) async throws -> [RecipeListItem] {
+    func fetchPosts(page: Int) async throws -> (items: [RecipeListItem], totalPages: Int) {
         if shouldFail {
             throw URLError(.notConnectedToInternet)
         }
-        return pages[page] ?? []
+        let totalPages = totalPagesOverride ?? max(pages.keys.max() ?? 1, 1)
+        return (pages[page] ?? [], totalPages)
     }
 
     func cache(listItems: [RecipeListItem]) async throws {}

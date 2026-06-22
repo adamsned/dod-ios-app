@@ -40,6 +40,20 @@ public struct WPRestClient: Sendable {
         queryItems: [URLQueryItem] = [],
         decode: T.Type = T.self
     ) async throws -> T {
+        try await getPaged(path: path, queryItems: queryItems, decode: decode).value
+    }
+
+    /// Like ``get(path:queryItems:decode:)`` but also surfaces WP's
+    /// `X-WP-TotalPages` response header (DUT-237). Paging callers (Feed,
+    /// Categories) use it to stop at the *real* last page instead of guessing
+    /// from a short page — a page can return fewer than `per_page` items for
+    /// reasons other than the end, which falsely latched the feed's
+    /// "reached end" gate. Defaults to 1 page when the header is absent.
+    func getPaged<T: Decodable>(
+        path: String,
+        queryItems: [URLQueryItem] = [],
+        decode: T.Type = T.self
+    ) async throws -> (value: T, totalPages: Int) {
         let url = try buildURL(path: path, queryItems: queryItems)
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "GET"
@@ -62,11 +76,23 @@ public struct WPRestClient: Sendable {
         guard (200..<300).contains(response.statusCode) else {
             throw WPClientError.httpStatus(response.statusCode)
         }
+        let totalPages = Self.parseTotalPages(response)
         do {
-            return try decoder.decode(T.self, from: data)
+            return (try decoder.decode(T.self, from: data), totalPages)
         } catch {
             throw WPClientError.decoding(message: String(describing: error))
         }
+    }
+
+    /// Parse WP's `X-WP-TotalPages` header, defaulting to 1 when absent or
+    /// unparseable (DUT-237).
+    static func parseTotalPages(_ response: HTTPURLResponse) -> Int {
+        guard let raw = response.value(forHTTPHeaderField: "X-WP-TotalPages"),
+            let pages = Int(raw)
+        else {
+            return 1
+        }
+        return pages
     }
 
     func buildURL(path: String, queryItems: [URLQueryItem]) throws -> URL {
