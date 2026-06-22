@@ -46,4 +46,19 @@ struct GuidedCookoutPathTests {
         #expect(GuidedCookout.firstCookout.isFirstRung == true)
         #expect(GuidedCookout.italianChicken.isFirstRung == false)
     }
+
+    /// DUT-193 — guard against the gather checklist drifting back to fabricated
+    /// ingredients: pin a signature ingredient from each real published recipe
+    /// and assert the old made-up values are gone.
+    @Test func rungIngredientsMatchTheRealRecipes() {
+        let lasagna = GuidedCookout.firstCookout.ingredients.joined(separator: " | ")
+        #expect(lasagna.contains("hot water"))  // the real Dutch-oven trick
+        #expect(lasagna.contains("spaghetti sauce"))
+        #expect(!lasagna.contains("no-boil"))  // the old fabricated value
+
+        let chicken = GuidedCookout.italianChicken.ingredients.joined(separator: " | ")
+        #expect(chicken.contains("ginger ale"))  // signature of the real recipe
+        #expect(chicken.contains("Italian salad dressing"))
+        #expect(!chicken.contains("cream of chicken"))  // the old fabricated value
+    }
 }
