@@ -21,7 +21,7 @@ struct FirstCookoutHeroCard: View {
             HStack(spacing: DODSpacing.xs) {
                 Image(systemName: "flame.fill")
                     .foregroundStyle(DODColor.burntOrange)
-                Text(cookout.isFirstRung ? "START HERE" : "YOUR NEXT WIN")
+                Text(heroEyebrow)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.burntOrange)
                 Spacer(minLength: 0)
@@ -34,7 +34,7 @@ struct FirstCookoutHeroCard: View {
                 .accessibilityLabel("Dismiss")
                 .accessibilityIdentifier("feed-first-cookout-hero-dismiss")
             }
-            Text(cookout.isFirstRung ? "Your First Cookout" : "Your Next Cookout")
+            Text(heroTitle)
                 .dodFont(DODType.displayMedium)
                 .foregroundStyle(DODColor.label)
             Text(heroHook)
@@ -71,7 +71,23 @@ struct FirstCookoutHeroCard: View {
         .accessibilityIdentifier("feed-first-cookout-hero")
     }
 
+    private var heroEyebrow: String {
+        if cookout.isCampfire { return "YOU'RE READY" }
+        return cookout.isFirstRung ? "START HERE" : "YOUR NEXT WIN"
+    }
+
+    private var heroTitle: String {
+        if cookout.isCampfire { return cookout.dishTitle }
+        return cookout.isFirstRung ? "Your First Cookout" : "Your Next Cookout"
+    }
+
     private var heroHook: String {
+        if cookout.isCampfire {
+            return
+                "You've earned this one. Take a dish you've already nailed and cook it "
+                + "outdoors, over a real fire, for the people you love. This is the moment "
+                + "they remember."
+        }
         if cookout.isFirstRung {
             return
                 "One guaranteed win: \(cookout.dishTitle). I'll walk you through every step. "
