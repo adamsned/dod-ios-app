@@ -2685,6 +2685,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **What:** Feed cards frequently showed the broken-image placeholder (AsyncImage: no retry, cancels on scroll, no decode cache). New `ReliableImage` (URLSession + URLCache + in-memory `NSCache` + 1 retry, cancellation-safe), `AsyncImage`-shaped so the swap is one line. `RecipeCard` + `RecipeCard+ListRow` use it.
 - **Files:** `ReliableImage.swift` (new, DODDesignSystem), `RecipeCard.swift`, `RecipeCard+ListRow.swift`. Spec: `clarifications.md` (CL-226).
 - **AC:** DUT-195 (CL-226 canonical). **Est:** ~2 h. **Deps:** off main; independent of the other in-flight PRs (DODDesignSystem only). Branch `fix/DUT-195-feed-image-loader`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 19 DODDesignSystem tests pass; iOS app build green. Visual reliability is TestFlight-verified (UIKit-bound loader, not unit-testable on the macOS slice). **Follow-up:** request sized WP thumbnails (`media_details.sizes`); share one loader across feed/list/widget.
+### T-831 — First Cookout "What are we cooking?" chooser (US-53 / DUT-194, CL-225)
+
+- **What:** The First Cookout opens on a unified chooser (the recommended rung hoisted + badged, the other rungs, and the dump cakes), so picking your cook is easy. A true first-rung beginner still drops straight into coaching (one-tap preserved). Ultracode-designed (3 approaches, adversarially judged → the `DumpCakeFlow` picker-then-flow pattern).
+- **Files:** `CookChooserFlow.swift` (new, DODFeatureFeed), `FeedView.swift` (sheet body → `CookChooserFlow`; hero `onCookDumpCake` repoint), `CookChooserFlowTests.swift` (new). Spec: `clarifications.md` (CL-225).
+- **AC:** US-53 / DUT-194 (CL-225 canonical). **Est:** ~2 h. **Deps:** off main; conflict-free with the in-flight campfire (T-830) + recipe-fix (T-829). Branch `feat/DUT-194-cook-chooser`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 96 DODFeatureFeed tests pass; iOS app build green. **Follow-up:** delete the now-inert `DumpCakeFlow` sheet/state.
 
 ---
 
