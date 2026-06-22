@@ -2744,11 +2744,16 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DODDesignSystem/Components/RecipeCard.swift` (reservesSpace); `DODFeatureRecipeDetail/{RecipeDetailHero,ArticleBlocksView,RelatedRecipesStrip,CookModeView}.swift` (AsyncImage → ReliableImage). Re-recorded 5 gallery `RecipeCard` L4 baselines (`SnapshotTests/{recipeCard_full,_halfWidth,_noTimeChip}` + RecipeCardDownloadedBadge + RecipeCardHighlight; list-row baseline untouched). Spec: `clarifications.md` (CL-233), `spec.md` (AC-1.3 amendment).
 - **AC:** AC-1.3 (amended) + AC-4.1 / AC-37.3 (image loading restored); CL-233 canonical. **Est:** ~1 h. **Deps:** off main (`9b52a6f`), merged with Ned's parallel #275/#276. Branch `fix/T-837-recipe-display-images-grid-cards` (kept its original T-837 name; task renumbered to T-839 to clear Ned's parallel CL-231/T-837 high-bug batch). **||:** P-feed/detail. No `e2e` label. **Verification:** SwiftLint + swift-format `--strict` clean; `xcodebuild build` clean; **verified on the iPhone 17 simulator** (uniform grid cards; recipe-detail hero loads); affected DODDesignSystem L4 snapshots re-recorded + green.
 
-### T-840 — DUT-217 part 1: Account-side profile teardown (CL-234)
+### T-840 — Hotfix: re-record the AppearanceAudit RecipeCard L4 baselines missed in T-839 (DUT-260, CL-234, BUGFIX)
+
+- **What:** T-839's `reservesSpace` grew the gallery card; its re-record covered `DesignSystemSnapshotTests` + the dedicated RecipeCard suites but MISSED the sibling class `DesignSystemAppearanceSnapshotTests` (dark + AX5 variants), so CI L4 went red on main post-merge (T-839's own PR L4 was a tolerated `cancelled`, so it merged unverified). Re-record the 3 missed baselines.
+- **Files:** `__Snapshots__/SnapshotTests+AppearanceAudit/test_recipeCard_{full_dark,full_AX5,halfWidth_dark}.1.png` (re-recorded). Spec: `clarifications.md` (CL-234).
+- **AC:** AC-1.3 (CL-234 canonical; completes CL-233/DUT-260). **Est:** ~20 min. **Deps:** off main (`7a463e7`). Branch `fix/recipecard-appearance-baselines`. No `e2e` label. **Verification:** FULL DODDesignSystem snapshot suite run locally (no `-only-testing`) — only the 3 re-records + the `moderationBadge` cross-env outlier register; `xcodebuild build` clean. CI L4 is the real check.
+### T-841 — DUT-217 part 1: Account-side profile teardown (CL-235)
 
 - **What:** Settings ▸ Account Sign Out / Delete Account now clear the coupled `UserProfile` row, not just the session (App Store 5.1.1(v) — no personal data left on-device). `AccountViewModel` injects a `ProfileStoring` (default `KeychainProfileStore()`); `signOut()`/`deleteAccount()` are now `async` and `await profileStore.clear()` (Delete still revokes the token, awaited). Call sites wrap in `Task {}`.
-- **Files:** `AccountViewModel.swift`, `SettingsView+Account.swift`, `AccountViewModelTests.swift`. Spec: `clarifications.md` (CL-234).
-- **AC:** US-46 / AC-46.3 / AC-46.6 / DUT-217. CL-234 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/DUT-217-auth-teardown`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 97 DODFeatureFeed tests pass; iOS app build green.
+- **Files:** `AccountViewModel.swift`, `SettingsView+Account.swift`, `AccountViewModelTests.swift`. Spec: `clarifications.md` (CL-235).
+- **AC:** US-46 / AC-46.3 / AC-46.6 / DUT-217. CL-235 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/DUT-217-auth-teardown`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 97 DODFeatureFeed tests pass; iOS app build green.
 - **Part 2 (next PR):** `ProfileEditView` "Delete Profile" must clear the session + revoke the token (the primary surface since DUT-189).
 
 ---
