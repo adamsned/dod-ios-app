@@ -2762,6 +2762,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `ProfileEditView.swift` (props + dual inits + button repoints), `ProfileEditView+Teardown.swift` (new), `ProfileEditViewTeardownTests.swift` (new). Spec: `clarifications.md` (CL-236).
 - **AC:** US-46 / AC-46.3 / AC-46.6 / DUT-217. CL-236 canonical. **Est:** ~2 h. **Deps:** off main (post #278). Branch `fix/DUT-217-profile-revoke`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 50 DODFeatureProfile tests pass; iOS app build green. Closes DUT-217 with T-841 (part 1).
 
+### T-843 — DUT-215: unsaving a downloaded recipe tears down the download + image pin (CL-237)
+
+- **What:** `toggleSaved`'s unsave branch only removed the synced row — it left `downloadedAt` set (so the orphaned `CachedRecipe` was never evicted) and the write-once `pinnedToSavedRecipeID` set (so the pinned hero bytes leaked, un-reclaimable by eviction OR Settings ▸ clear cache). Unsave now clears `downloadedAt` + calls a new `unpinImages(forRecipeID:)`.
+- **Files:** `RecipeStore+Saved.swift` (new — `toggleSaved`/`markSaved` moved here), `RecipeStore.swift` (`fetchRecipe` → internal), `RecipeStore+ImageCache.swift` (`unpinImages`), `RecipeStoreUnsaveTests.swift` (new), `RecipeStoreTests.swift`. Spec: `clarifications.md` (CL-237).
+- **AC:** US-5 / AC-5.2 / NFR-2 / DUT-215. CL-237 canonical. **Est:** ~1.5 h. **Deps:** off main (post #281). Branch `fix/DUT-215-unsave-orphan`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 117 DODPersistence tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

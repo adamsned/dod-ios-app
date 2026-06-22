@@ -157,34 +157,8 @@ public actor RecipeStore {
         try fetchSyncedSaved(id: id) != nil
     }
 
-    @discardableResult
-    public func toggleSaved(id: Int) throws -> Bool {
-        guard let row = try fetchRecipe(id: id) else { return false }
-        row.isSaved.toggle()
-        // DUT-35: mirror the local pin into the synced source of truth (only
-        // `SyncedSavedRecipe` leaves the device; the recipe cache stays local).
-        if row.isSaved {
-            try upsertSyncedSaved(from: row)
-        } else {
-            try removeSyncedSaved(id: id)
-        }
-        try modelContext.save()
-        try evictIfNeeded()
-        return row.isSaved
-    }
-
-    /// T-761 / CL-158 (DUT-67) — idempotently pin a recipe SAVED without
-    /// toggling, mirroring the synced row like ``toggleSaved(id:)`` (download =
-    /// save + pin). Returns `true` on unsaved → saved, `false` if already saved.
-    @discardableResult
-    public func markSaved(id: Int) throws -> Bool {
-        guard let row = try fetchRecipe(id: id) else { return false }
-        if row.isSaved { return false }
-        row.isSaved = true
-        try upsertSyncedSaved(from: row)
-        try modelContext.save()
-        return true
-    }
+    // US-5 / DUT-35 — `toggleSaved(id:)` + `markSaved(id:)` (incl. the DUT-215
+    // unsave teardown) live in `RecipeStore+Saved.swift` (file_length cap).
 
     public func savedRecipes() throws -> [Recipe] {
         // DUT-35: read the synced source of truth, newest save first. Full
@@ -320,7 +294,9 @@ public actor RecipeStore {
 
     // MARK: - Helpers
 
-    private func fetchRecipe(id: Int) throws -> CachedRecipe? {
+    // Internal (not private) so the `+Saved`/`+Download`/… extensions in sibling
+    // files can fetch a row by id (the codebase splits RecipeStore aggressively).
+    func fetchRecipe(id: Int) throws -> CachedRecipe? {
         let descriptor = FetchDescriptor<CachedRecipe>(
             predicate: #Predicate { $0.id == id }
         )
