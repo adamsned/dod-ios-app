@@ -89,7 +89,9 @@ extension RecipeCard {
         /// row's `recipeCardTap` modifier collapses children into the
         /// row's combined label.
         private var thumbnail: some View {
-            AsyncImage(url: heroImageURL) { phase in
+            // DUT-195 — reliable cached loader (see ReliableImage); AsyncImage
+            // was failing these thumbnails to the broken-image placeholder.
+            ReliableImage(url: heroImageURL) { phase in
                 switch phase {
                 case .empty:
                     LoadingSkeleton(cornerRadius: DODSpacing.xs)
@@ -102,8 +104,6 @@ extension RecipeCard {
                         .foregroundStyle(DODColor.labelSecondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(DODColor.surface)
-                @unknown default:
-                    EmptyView()
                 }
             }
             .frame(width: 60, height: 60)
