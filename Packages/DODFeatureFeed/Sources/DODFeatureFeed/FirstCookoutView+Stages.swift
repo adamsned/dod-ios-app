@@ -245,8 +245,8 @@ extension FirstCookoutView {
                     cookPhotoData = nil
                     cookPhotoItem = nil
                 }
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
             } else {
                 photoSourceButtons
             }

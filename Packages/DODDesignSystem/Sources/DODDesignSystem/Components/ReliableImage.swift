@@ -104,7 +104,12 @@ final class ReliableImageLoader {
         if !Task.isCancelled { phase = .failure }
     }
 
-    private enum FetchOutcome { case image(UIImage), cancelled, retry, failed }
+    private enum FetchOutcome {
+        case image(UIImage)
+        case cancelled
+        case retry
+        case failed
+    }
 
     /// One fetch + decode attempt. Reports cancellation distinctly (DUT-201:
     /// URLSession surfaces Task cancellation as `URLError(.cancelled)`, NOT
