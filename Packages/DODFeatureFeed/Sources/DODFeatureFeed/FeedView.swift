@@ -31,9 +31,10 @@ public struct FeedView: View {
     /// Settings ▸ Tools so all cooking-help + cast-iron-care tools live together
     /// in the Feed's "Cooking Tools" menu.
     @State private var showingHeatCoach = false
-    /// DUT-183 — the "Start Here" First Cookout hero card; dismissible + persisted
-    /// so a cook past their first win isn't nagged (the toolbar flame stays).
-    @AppStorage("dod.firstCookoutHeroDismissed") private var firstCookoutHeroDismissed = false
+    /// DUT-200 — the Cooking Tools onboarding callout (the speech bubble under
+    /// the menu button); dismissible + persisted so it nudges once. Replaced the
+    /// First Cookout hero card (DUT-183) as the Feed's single onboarding nudge.
+    @AppStorage("dod.cookingToolsCalloutDismissed") private var cookingToolsCalloutDismissed = false
     /// DUT-183 — the cook's current rung on the path (the next dish they haven't
     /// cooked yet). Defaults to rung 1; recomputed from the cook journal so the
     /// hero + flow follow the user up the ladder. nil once every rung is cooked.
@@ -127,15 +128,15 @@ public struct FeedView: View {
         currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cooked)
     }
 
-    /// DUT-196 (the menu) + DUT-200 / T-834 (this refinement): one
+    /// DUT-196 (the menu) + DUT-200 / T-834 (this refinement): one icon-only
     /// `frying.pan.fill` toolbar button that gathers every cooking-help +
-    /// cast-iron-care entry
-    /// point in one place. The button shows a **visible "Cooking Tools" title**
-    /// (an explicit icon + text `HStack` — a toolbar `Label` collapses to
-    /// icon-only), and each item carries a one-line **description** of what it
-    /// is + why it matters on the Dutch-oven learning journey — a second `Text`
-    /// in a menu `Button`'s label renders as the item's subtitle. Each item
-    /// triggers its existing sheet / browser hand-off.
+    /// cast-iron-care entry point in one place. Each item carries a one-line
+    /// **description** of what it is + why it matters on the Dutch-oven learning
+    /// journey (a second `Text` in a menu `Button`'s label renders as the item's
+    /// subtitle). What the button *is* gets introduced by the dismissible
+    /// `CookingToolsCallout` speech bubble below it (which replaced the First
+    /// Cookout hero card). Each item triggers its existing sheet / browser
+    /// hand-off.
     private var cookingToolsMenu: some View {
         Menu {
             Button {
@@ -171,16 +172,11 @@ public struct FeedView: View {
             }
             .accessibilityIdentifier("cooking-tools-buy-buzzywaxx")
         } label: {
-            // Explicit HStack (not a `Label` + `.labelStyle`) so the nav bar
-            // actually renders the visible "Cooking Tools" title next to the
-            // pan — a toolbar `Label` collapses to icon-only.
-            HStack(spacing: DODSpacing.xxs) {
-                Image(systemName: "frying.pan.fill")
-                Text("Cooking Tools")
-                    .dodFont(DODType.body)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Cooking Tools")
+            // Icon-only (`frying.pan.fill`); the "Cooking Tools" wording lives in
+            // the onboarding `CookingToolsCallout` speech bubble below the button
+            // instead of a nav-bar label, keeping the chrome to one clean button.
+            Image(systemName: "frying.pan.fill")
+                .accessibilityLabel("Cooking Tools")
         }
         .tint(DODColor.burntOrange)
         .accessibilityIdentifier("feed-toolbar-cooking-tools")
@@ -227,28 +223,25 @@ public struct FeedView: View {
         // `LazyVStack` of `RecipeCard.ListRow` rows for denser scanning.
         let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
         return ScrollView {
+            // DUT-200 — the onboarding "Cooking Tools" speech bubble sits at the
+            // very top so its tail points up at the trailing menu button it
+            // describes. Replaced the First Cookout hero card as the Feed's
+            // single onboarding nudge; dismissible + persisted. (`currentRung`
+            // still feeds the chooser sheet's recommendation.)
+            if !cookingToolsCalloutDismissed {
+                CookingToolsCallout(onDismiss: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        cookingToolsCalloutDismissed = true
+                    }
+                })
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.top, DODSpacing.sm)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
             // T-781 / DUT-87 — the title scrolls with the content (no native
             // minimize); offline shifts it below the OfflineBanner overlay.
             DODScreenHeader("Recipes & Articles")
                 .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
-            // DUT-183 — the keystone "Your First Cookout" entry, surfaced as a
-            // prominent hero so beginners actually find the coached path.
-            if let currentRung, !firstCookoutHeroDismissed {
-                FirstCookoutHeroCard(
-                    cookout: currentRung,
-                    onStart: { showingFirstCookout = true },
-                    onDismiss: {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            firstCookoutHeroDismissed = true
-                        }
-                    },
-                    // DUT-194 — the dump-cake shortcut now lands in the unified
-                    // chooser (dump cakes are a section there).
-                    onCookDumpCake: { showingFirstCookout = true }
-                )
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.top, DODSpacing.sm)
-            }
             Group {
                 switch layout {
                 case .gallery:
