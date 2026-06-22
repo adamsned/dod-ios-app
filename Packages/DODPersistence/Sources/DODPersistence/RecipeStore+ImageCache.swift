@@ -127,4 +127,17 @@ extension RecipeStore {
         }
         try modelContext.save()
     }
+
+    /// DUT-215: clear the save-pin on every cached image belonging to
+    /// `recipeID`. `pinnedToSavedRecipeID` was write-once (set when a saved
+    /// recipe's hero is cached, never cleared), so unsaving a recipe left its
+    /// pinned bytes un-evictable — neither ``evictImagesIfNeeded()`` nor the
+    /// Settings ``clearImageCache()`` could reclaim a pinned row. Unsaving now
+    /// unpins so the bytes become reclaimable again. The caller persists.
+    func unpinImages(forRecipeID recipeID: Int) throws {
+        let all = try modelContext.fetch(FetchDescriptor<CachedImage>())
+        for row in all where row.pinnedToSavedRecipeID == recipeID {
+            row.pinnedToSavedRecipeID = nil
+        }
+    }
 }
