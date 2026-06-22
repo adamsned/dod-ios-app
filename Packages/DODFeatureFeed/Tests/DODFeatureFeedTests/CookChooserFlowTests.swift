@@ -8,17 +8,9 @@ import Testing
 @Suite("CookChooserFlow (DUT-194)")
 struct CookChooserFlowTests {
 
-    @Test func firstRungBeginnerJumpsStraightIntoCoaching() {
-        // A true beginner (recommended == the first rung) skips the chooser.
-        #expect(
-            CookChooserFlow.initialSelection(recommended: GuidedCookout.firstCookout)?.recipeID
-                == GuidedCookout.firstCookout.recipeID
-        )
-        // A returning cook (recommended == a later rung) sees the chooser.
-        #expect(CookChooserFlow.initialSelection(recommended: GuidedCookout.italianChicken) == nil)
-        // No recommendation -> the chooser.
-        #expect(CookChooserFlow.initialSelection(recommended: nil) == nil)
-    }
+    // DUT-235 — the chooser is now ALWAYS shown (no auto-jump into the first
+    // rung); the prior `initialSelection` bypass + its test were removed so a
+    // beginner sees the choice of first cook.
 
     @Test func recommendedRungIsHoistedAndDeduped() {
         let chicken = GuidedCookout.italianChicken

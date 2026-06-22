@@ -2719,6 +2719,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** HeatCoachView(+Sections).swift, CookChooserFlow.swift, DutchOvenHeatCoach+Reference.swift + tests (191); FirstCookoutView.swift + +Stages.swift (197/203); ReliableImage.swift (201); RecipeDetailViewModel+Fetch.swift (202). Spec: `clarifications.md` (CL-229).
 - **AC:** US-53 / DUT-191/197/201/202/203 (CL-229 canonical). **Est:** ~3 h. **Deps:** off main. Branch `fix/bughunt-highs-and-backlog`. No `e2e` label. **Verification:** swift-format + SwiftLint `--strict` clean; 460 DODSupport + 96 DODFeatureFeed + 200 DODFeatureRecipeDetail tests pass; iOS app build green. **Deferred:** DUT-199 clear journal (stale edits vs the Cooking-Tools merge; re-do against current main).
 
+### T-836 — First Cookout always shows the chooser (DUT-235, CL-230, BUGFIX)
+
+- **What:** Removed `CookChooserFlow`'s `onAppear` auto-select (`initialSelection`) so the "What are we cooking?" chooser is always the first screen — a beginner picks their first cook instead of being dropped into the lasagna. Recommended rung still hoisted + badged. Moots DUT-212.
+- **Files:** `CookChooserFlow.swift` (drop auto-select + `initialSelection`), `CookChooserFlowTests.swift` (drop its test). Spec: `clarifications.md` (CL-230).
+- **AC:** US-53 / DUT-194 / DUT-235 (CL-230 canonical). **Est:** ~30 min. **Deps:** off main. Branch `fix/DUT-235-always-show-chooser`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 95 DODFeatureFeed tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
