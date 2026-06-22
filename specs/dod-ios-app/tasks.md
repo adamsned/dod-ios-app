@@ -2725,6 +2725,13 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookChooserFlow.swift` (drop auto-select + `initialSelection`), `CookChooserFlowTests.swift` (drop its test). Spec: `clarifications.md` (CL-230).
 - **AC:** US-53 / DUT-194 / DUT-235 (CL-230 canonical). **Est:** ~30 min. **Deps:** off main. Branch `fix/DUT-235-always-show-chooser`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 95 DODFeatureFeed tests pass; iOS app build green.
 
+### T-837 — High-bug batch 1: telemetry privacy + rating cache (DUT-241/216, CL-231)
+
+- **What:** First batch of bug-hunt High fixes (disjoint subsystems). DUT-241 — gate TelemetryDeck init behind the privacy opt-out (lazy init on first allowed event; `sendNewSessionBeganSignal=false`) so nothing is dispatched when off. DUT-216 — `applyRatingRefresh` carries the remembered userRating forward + never zeroes a cached aggregate on a transient failure.
+- **Files:** `TelemetryDeckTransport.swift` + `TelemetryTests.swift` (241); `RecipeDetailViewModel.swift`, `RecipeDetailViewModel+RatingSubmit.swift`, `RecipeDetailRatingsCacheTests.swift` (216). Spec: `clarifications.md` (CL-231).
+- **AC:** US-36 AC-36.5/36.6 (DUT-241); US-13/14/15 (DUT-216). CL-231 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/high-bugs-batch-1`. No `e2e` label. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 33 DODAnalytics + 202 DODFeatureRecipeDetail tests pass; iOS app build green.
+- **Follow-ups (separate PRs):** DUT-237 (feed pagination via X-WP-TotalPages), DUT-215/217/218/240/242 (remaining Highs).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

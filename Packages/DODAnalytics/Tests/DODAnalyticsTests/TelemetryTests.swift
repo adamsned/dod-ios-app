@@ -132,3 +132,80 @@ import Testing
         return defaults
     }
 }
+
+/// DUT-241: the privacy gate must run BEFORE any TelemetryDeck initialization.
+/// When the user has opted out, the SDK is never initialized (no
+/// `Session.started`, no pseudonymous identifier) and nothing is emitted. These
+/// drive the real `send(_:)` path through an injected test seam, so they assert
+/// init + emission directly — not just the gate read.
+@Suite("TelemetryDeckTransport init gate (DUT-241)") struct TelemetryDeckTransportInitGateTests {
+
+    /// Reference holder so the injected escaping closures can record across
+    /// calls without capturing a mutable `var`.
+    final class Spy: @unchecked Sendable {
+        var initCount = 0
+        var initAppIDs: [String] = []
+        var signals: [String] = []
+    }
+
+    private func makeTransport(enabled: Bool, spy: Spy) -> (TelemetryDeckTransport, UserDefaults) {
+        let suiteName = "TelemetryDeckTransportInitGateTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(enabled, forKey: TelemetryDeckTransport.telemetryEnabledKey)
+        let transport = TelemetryDeckTransport(
+            defaults: defaults,
+            initializeSDK: {
+                spy.initCount += 1
+                spy.initAppIDs.append($0)
+            },
+            emitSignal: { name, _ in spy.signals.append(name) }
+        )
+        return (transport, defaults)
+    }
+
+    @Test func optedOutNeverInitializesOrEmits() {
+        let spy = Spy()
+        let (transport, _) = makeTransport(enabled: false, spy: spy)
+        transport.configure(appID: "app-id")
+        transport.send(.appOpen)
+        transport.send(.recipeView(recipeID: 7))
+        // DUT-241: opted out -> the SDK is never initialized and nothing is sent.
+        #expect(spy.initCount == 0)
+        #expect(spy.signals.isEmpty)
+    }
+
+    @Test func optedInLazilyInitializesOnceThenEmits() {
+        let spy = Spy()
+        let (transport, _) = makeTransport(enabled: true, spy: spy)
+        transport.configure(appID: "app-id")
+        transport.send(.appOpen)
+        transport.send(.appOpen)
+        // Initialized exactly once, lazily, on the first allowed event.
+        #expect(spy.initCount == 1)
+        #expect(spy.initAppIDs == ["app-id"])
+        #expect(spy.signals.count == 2)
+    }
+
+    @Test func enablingMidSessionInitializesWithoutRelaunch() {
+        let spy = Spy()
+        let (transport, defaults) = makeTransport(enabled: false, spy: spy)
+        transport.configure(appID: "app-id")
+        transport.send(.appOpen)
+        #expect(spy.initCount == 0)
+
+        // Flip ON mid-session -> the next event lazily initializes + emits.
+        defaults.set(true, forKey: TelemetryDeckTransport.telemetryEnabledKey)
+        transport.send(.appOpen)
+        #expect(spy.initCount == 1)
+        #expect(spy.signals.count == 1)
+    }
+
+    @Test func sendBeforeConfigureDoesNotInitialize() {
+        let spy = Spy()
+        let (transport, _) = makeTransport(enabled: true, spy: spy)
+        transport.send(.appOpen)  // no configure(appID:) yet -> no appID to init with
+        #expect(spy.initCount == 0)
+        #expect(spy.signals.isEmpty)
+    }
+}

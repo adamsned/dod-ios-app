@@ -1,3 +1,4 @@
+import DODDomain
 import DODSupport
 import Foundation
 
@@ -42,6 +43,37 @@ extension RecipeDetailViewModel {
         } catch {
             DODLog.network.error("post rating failed: \(String(describing: error))")
             snackbarMessage = "Couldn't save your rating — try again."
+        }
+    }
+
+    /// DUT-216: reconcile a freshly-fetched rating summary with what's already
+    /// on screen / in the cache. The public WPRM aggregate always returns
+    /// `userRating == nil`, and `fetchRatingSummary` degrades to a 0/0 summary
+    /// on any failure (REG-14) — indistinguishable from a genuinely empty
+    /// recipe. So:
+    ///   * a real refresh (has ratings) is adopted, but the device's remembered
+    ///     vote is carried forward (else "You rated this N stars" is erased on
+    ///     every open); and
+    ///   * an empty/failed refresh is ignored when a cached aggregate already
+    ///     exists (a transient blip must never blank the stars), and is shown
+    ///     only on a genuine first load with no cache.
+    ///
+    /// (`>= 1` rather than `> 0`: `RecipeRating.count` is a rating tally, not a
+    /// collection, so SwiftLint's `empty_count` rule doesn't apply here.)
+    func applyRatingRefresh(_ fresh: RecipeRating) async {
+        if fresh.count >= 1 {
+            let merged = RecipeRating(
+                recipeID: fresh.recipeID,
+                average: fresh.average,
+                count: fresh.count,
+                userRating: ratingSummary?.userRating ?? fresh.userRating
+            )
+            ratingSummary = merged
+            await dependencies.cacheRatingSummary(merged)
+        } else if ratingSummary == nil {
+            // First load, no cache, empty-or-failed refresh — show/cache 0/0.
+            ratingSummary = fresh
+            await dependencies.cacheRatingSummary(fresh)
         }
     }
 }
