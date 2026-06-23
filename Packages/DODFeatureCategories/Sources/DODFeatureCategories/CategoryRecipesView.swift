@@ -71,11 +71,12 @@ public struct CategoryRecipesView: View {
     }
 
     private func recipeRow(_ item: RecipeListItem) -> some View {
+        // CL-255 — cook-time chip omitted (browse declutter); time is on the
+        // recipe detail page + Search's time filter.
         RecipeCard(
             title: item.title,
             excerpt: item.excerpt,
-            heroImageURL: item.heroImage,
-            totalTimeDisplay: item.totalTimeDisplay
+            heroImageURL: item.heroImage
         )
         .recipeCardTap { onSelect(item) }
         // T-765 / CL-162 (DUT-71) — state-aware Save/Unsave from the

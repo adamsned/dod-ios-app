@@ -81,11 +81,11 @@ extension SearchView {
             spacing: DODSpacing.md
         ) {
             ForEach(viewModel.ingredientItems) { item in
+                // CL-255 — cook-time chip omitted (browse declutter).
                 RecipeCard(
                     title: item.title,
                     excerpt: item.excerpt,
-                    heroImageURL: item.heroImage,
-                    totalTimeDisplay: item.totalTimeDisplay
+                    heroImageURL: item.heroImage
                 )
                 .recipeCardTap { onSelect(item) }
                 .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
@@ -102,11 +102,11 @@ extension SearchView {
         // T-782 / DUT-88 — same iPad multi-column tiling as the title tier.
         adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
             ForEach(viewModel.ingredientItems) { item in
+                // CL-255 — cook-time chip omitted (browse declutter).
                 RecipeCard.ListRow(
                     title: item.title,
                     excerpt: item.excerpt,
-                    heroImageURL: item.heroImage,
-                    totalTimeDisplay: item.totalTimeDisplay
+                    heroImageURL: item.heroImage
                 )
                 .recipeCardTap { onSelect(item) }
                 .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
