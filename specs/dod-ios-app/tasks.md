@@ -2802,6 +2802,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **What:** The coal-delta model only adjusted coals for ambient temperature; wind only changed the replenish cadence + showed a tip. Added `windCoalDelta` (+3-4 when windy, additive with the ambient delta) + a `windCoalNote` line in the conditions section, so wind bumps the COAL COUNT (matching the campfire "+3-4 for wind" promise / DUT-247).
 - **Files:** `DutchOvenHeatCoach.swift`, `HeatCoachModel.swift`, `HeatCoachView+Sections.swift`, `DutchOvenHeatCoachTests.swift`, `HeatCoachModelTests.swift`. Spec: `clarifications.md` (CL-243).
 - **AC:** DUT-48 (Heat Coach) / DUT-264. CL-243 canonical. **Est:** ~1 h. **Deps:** off main. Branch `fix/DUT-264-heat-coach-wind-coals`. **Open for Ned:** confirm +3-4 magnitude + wind/cold stacking (ships additive). **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 462 DODSupport + 98 DODFeatureFeed tests pass; iOS app build green.
+### T-850 — DUT-265: Categories pages off X-WP-TotalPages (parity with DUT-237) (CL-244)
+
+- **What:** DUT-237's pagination fix never reached Categories — `CategoryRecipesViewModel` still used `if fetched.count < 20 { reachedEnd = true }`, so a short mid-list page latched pagination. Mirrored the Feed fix: `CategoriesDependencies.fetchPosts` returns `(items, totalPages)` via `client.postsPage`, and `load` sets `reachedEnd = currentPage >= totalPages`.
+- **Files:** `CategoriesDependencies.swift`, `CategoryRecipesViewModel.swift`, `CategoriesTests.swift` (fake + 1 regression test). Spec: `clarifications.md` (CL-244).
+- **AC:** US-2 / AC-2.3 / DUT-265. CL-244 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-265-categories-pagination`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 3 DODFeatureCategories tests pass; iOS app build green.
 
 ---
 
