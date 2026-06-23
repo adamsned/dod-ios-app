@@ -2792,6 +2792,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **AC:** US-21 / NFR-2 / DUT-242. CL-241 canonical. **Est:** ~2 h. **Deps:** off main (post #284). Branch `fix/DUT-242-image-bytecount`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 118 DODPersistence tests pass; iOS app build green.
 - **Follow-up (option B):** `@Attribute(.externalStorage)` on `bytes` + NSCache `totalCostLimit` (DUT-213/251) — heavier migration, separate PR.
 
+### T-848 — DUT-264: Heat Coach adjusts the coal count for wind, not just time (CL-242)
+
+- **What:** The coal-delta model only adjusted coals for ambient temperature; wind only changed the replenish cadence + showed a tip. Added `windCoalDelta` (+3-4 when windy, additive with the ambient delta) + a `windCoalNote` line in the conditions section, so wind bumps the COAL COUNT (matching the campfire "+3-4 for wind" promise / DUT-247).
+- **Files:** `DutchOvenHeatCoach.swift`, `HeatCoachModel.swift`, `HeatCoachView+Sections.swift`, `DutchOvenHeatCoachTests.swift`, `HeatCoachModelTests.swift`. Spec: `clarifications.md` (CL-242).
+- **AC:** DUT-48 (Heat Coach) / DUT-264. CL-242 canonical. **Est:** ~1 h. **Deps:** off main. Branch `fix/DUT-264-heat-coach-wind-coals`. **Open for Ned:** confirm +3-4 magnitude + wind/cold stacking (ships additive). **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 462 DODSupport + 98 DODFeatureFeed tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

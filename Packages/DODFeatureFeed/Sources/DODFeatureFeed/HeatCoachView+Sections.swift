@@ -35,6 +35,11 @@ extension HeatCoachView {
                     adjustmentLine(elevationNote)
                 }
                 adjustmentLine(coachModel.replenishNote)
+                // DUT-264 — wind adjusts the coal COUNT (the delta), then the
+                // environment tip.
+                if let windCoalNote = coachModel.windCoalNote {
+                    adjustmentLine(windCoalNote)
+                }
                 if let windNote = coachModel.windNote {
                     adjustmentLine(windNote)
                 }

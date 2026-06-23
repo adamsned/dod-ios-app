@@ -98,6 +98,15 @@ public enum DutchOvenHeatCoach {
         }
     }
 
+    /// How many coals to **add for wind** (DUT-264). Wind steals heat the same
+    /// way cold air does, so it bumps the *coal count* — not just the replenish
+    /// cadence. DOD's method: **+3-4 coals** when windy (a range, like the
+    /// ambient delta), `0...0` when calm. Stacks with ``ambientCoalDelta(_:)``
+    /// — a cold, windy cook adds both, since each heat loss is independent.
+    public static func windCoalDelta(_ windy: Bool) -> ClosedRange<Int> {
+        windy ? 3...4 : 0...0
+    }
+
     // MARK: - Elevation cook-time adjustment
 
     /// Extra cook time for elevation, as a **range** of minutes:
