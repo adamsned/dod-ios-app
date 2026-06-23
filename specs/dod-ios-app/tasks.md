@@ -2785,6 +2785,13 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookActivityAttributes.swift`, `CookLiveActivityViews.swift`, `LiveActivity/CookActivityWidget.swift`, `CookModeViewModel.swift`, `CookModeViewModelTests.swift`. Spec: `clarifications.md` (CL-240).
 - **AC:** US-11 / AC-11.2 / DUT-218. CL-240 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/DUT-218-liveactivity-countdown`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 203 DODFeatureRecipeDetail tests pass; iOS app build green.
 
+### T-847 — DUT-242: image-cache eviction sums a byteCount column, not faulted blobs (CL-241)
+
+- **What:** `evictImagesIfNeeded` summed `.bytes.count` over all rows (faulting every image's full payload into RAM on every cacheImage/scroll). Added defaulted `CachedImage.byteCount` (in-place migration; pure cache → no data risk), set on every write; eviction + clearImageCache now sum it via `propertiesToFetch` (no blob fault). One-time-per-launch backfill for pre-existing rows.
+- **Files:** `CachedImage.swift`, `RecipeStore.swift` (actor backfill flag), `RecipeStore+ImageCache.swift`, `RecipeStoreImageByteCountTests.swift` (new). Spec: `clarifications.md` (CL-241).
+- **AC:** US-21 / NFR-2 / DUT-242. CL-241 canonical. **Est:** ~2 h. **Deps:** off main (post #284). Branch `fix/DUT-242-image-bytecount`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 118 DODPersistence tests pass; iOS app build green.
+- **Follow-up (option B):** `@Attribute(.externalStorage)` on `bytes` + NSCache `totalCostLimit` (DUT-213/251) — heavier migration, separate PR.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
