@@ -46,9 +46,7 @@ public struct SavedView: View {
         content
             .background(DODColor.surface)
             // DUT-275 — nav bar hidden; the cart lives in the header row above.
-            #if os(iOS)
-            .toolbar(.hidden, for: .navigationBar)
-            #endif
+            .dodHidesNavBar()
             .sheet(isPresented: $isBuildingShoppingList) {
                 ShoppingListBuilderSheet(recipes: viewModel.recipes) { selected in
                     builtListRecipes = ShoppingListSelection(recipes: selected)

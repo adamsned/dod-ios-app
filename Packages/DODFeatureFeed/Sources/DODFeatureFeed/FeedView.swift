@@ -82,9 +82,7 @@ public struct FeedView: View {
         // in the pinned header row above (next to the title) instead of the nav
         // bar, so no nav-bar height is reserved and the title sits at the same top
         // Y as every other tab. Pushed detail screens keep their own nav bar.
-        #if os(iOS)
-        .toolbar(.hidden, for: .navigationBar)
-        #endif
+        .dodHidesNavBar()
         .sheet(isPresented: $showingFirstCookout) {
             // DUT-194 — start on the "pick what to cook" chooser (rungs + dump
             // cakes), with the progress-aware rung recommended. A true beginner

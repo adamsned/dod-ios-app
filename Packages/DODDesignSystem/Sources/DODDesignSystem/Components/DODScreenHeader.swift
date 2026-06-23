@@ -44,6 +44,21 @@ extension DODScreenHeader where Trailing == EmptyView {
     }
 }
 
+extension View {
+    /// DUT-275 — hides the navigation bar so the tab's pinned ``DODScreenHeader``
+    /// (with its inline action button) sits at the very top, at the same Y on
+    /// every tab. iOS-only: the `.navigationBar` toolbar placement doesn't exist
+    /// on macOS (where the feature packages' `swift test` compiles this), so this
+    /// is a macOS no-op. Wrapping the `#if` here keeps call-site chains clean.
+    public func dodHidesNavBar() -> some View {
+        #if os(iOS)
+        return toolbar(.hidden, for: .navigationBar)
+        #else
+        return self
+        #endif
+    }
+}
+
 #Preview("Header") {
     VStack(spacing: 0) {
         DODScreenHeader("Recipes & Articles") {

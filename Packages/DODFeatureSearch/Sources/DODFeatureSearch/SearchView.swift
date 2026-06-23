@@ -90,9 +90,7 @@ public struct SearchView: View {
         .background(DODColor.surface)
         // DUT-275 — nav bar hidden so the title pins at the very top, at the same
         // Y as every other tab (the title is the `DODScreenHeader` above).
-        #if os(iOS)
-        .toolbar(.hidden, for: .navigationBar)
-        #endif
+        .dodHidesNavBar()
         .task {
             await viewModel.loadCategoriesIfNeeded()
             await viewModel.refreshSavedRecipeIDs()  // T-765: state-aware menu on appear
