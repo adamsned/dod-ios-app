@@ -86,6 +86,11 @@ public final class AccountViewModel {
         Task {
             guard let token = try? await revoker.exchange(authorizationCode: authorizationCode)
             else { return }
+            // DUT-266: the exchange is async. If the user signed out / deleted /
+            // signed in as someone else while it was in flight, don't resurrect
+            // the torn-down session or persist a now-orphaned (never-revoked)
+            // refresh token — that would re-open the DUT-217 5.1.1(v) gap.
+            guard session?.userIdentifier == initial.userIdentifier else { return }
             let updated = AppleAuthSession(
                 userIdentifier: initial.userIdentifier,
                 displayName: initial.displayName,

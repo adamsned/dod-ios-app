@@ -2820,6 +2820,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DODDesignSystem/Components/DODScreenHeader.swift` (generic trailing slot; removed reservation helper); `DODFeatureFeed/FeedView.swift` (header row + callout overlay + hide bar); `DODFeatureSaved/SavedView.swift` (cart in header row + hide bar); `DODFeatureSearch/SearchView.swift` + `DODFeatureFeed/SettingsView.swift` (hide bar). Spec: `clarifications.md` (CL-246).
 - **AC:** US-1 / US-3 / US-32 / header consistency (supersedes CL-242's reservation). CL-246 canonical. **Est:** ~2 h. **Deps:** off main (post #289). Branch `fix/DUT-275-feed-title-top-callout-overlay`. **Verification:** built + ran the app on the iPhone 17 sim — every title at ~247px, Cooking Tools + cart inline beside titles, callout floats + points at the button, recipe-detail back button works; SwiftLint + swift-format `--strict` clean; feature packages compile on macOS.
 
+### T-853 — DUT-266: SiwA token exchange can't resurrect a torn-down session (CL-247)
+
+- **What:** The fire-and-forget auth-code→refresh-token exchange unconditionally re-saved the AppleAuthSession on completion at both surfaces (AccountViewModel.applySignIn + AppleProfileSignIn.apply). A sign-out/delete in flight let the late write resurrect the deleted session + persist a never-revoked token (re-opening the DUT-217 5.1.1(v) gap). Both sites now re-check the session is still the one being signed in before the post-exchange save.
+- **Files:** `AccountViewModel.swift`, `AppleProfileSignIn.swift` (exchange extracted to `scheduleRefreshTokenExchange`), `AccountViewModelTests.swift` (2 new race tests). Spec: `clarifications.md` (CL-247).
+- **AC:** US-46 / AC-46.6 / DUT-266. CL-247 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-266-siwa-exchange-race`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 100 DODFeatureFeed + 50 DODFeatureProfile tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

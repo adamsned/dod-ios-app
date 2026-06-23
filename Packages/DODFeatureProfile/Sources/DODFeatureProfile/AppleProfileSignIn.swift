@@ -99,22 +99,16 @@ public struct AppleProfileSignIn: Sendable {
         }
 
         // 3. Refresh-token exchange — fire-and-forget so sign-in feels instant
-        //    (the token only matters later, for deletion revocation). Re-saves
-        //    the session with the token merged in. Mirrors applySignIn.
+        //    (the token only matters later, for deletion revocation). See
+        //    `scheduleRefreshTokenExchange`.
         if let authorizationCode, let revoker {
-            let session = resolved
-            Task {
-                guard let token = try? await revoker.exchange(authorizationCode: authorizationCode)
-                else { return }
-                try? sessionStore.save(
-                    AppleAuthSession(
-                        userIdentifier: session.userIdentifier,
-                        displayName: session.displayName,
-                        email: session.email,
-                        refreshToken: token
-                    )
-                )
-            }
+            scheduleRefreshTokenExchange(
+                authorizationCode: authorizationCode,
+                revoker: revoker,
+                userIdentifier: resolved.userIdentifier,
+                displayName: resolved.displayName,
+                email: resolved.email
+            )
         }
 
         return Outcome(
@@ -122,5 +116,33 @@ public struct AppleProfileSignIn: Sendable {
             email: resolved.email,
             profileSaved: profileSaved
         )
+    }
+
+    /// DUT-266: the async auth-code → refresh-token exchange, fire-and-forget.
+    /// Re-saves the session with the token merged in — but ONLY if the session
+    /// is STILL the one being signed in. If the user signed out / deleted /
+    /// signed in as someone else while the exchange was in flight, the late
+    /// write-back is dropped, so it never resurrects a torn-down session or
+    /// persists an orphaned (never-revoked) token (the DUT-217 5.1.1(v) gap).
+    private func scheduleRefreshTokenExchange(
+        authorizationCode: String,
+        revoker: any SiwaRevoking,
+        userIdentifier: String,
+        displayName: String?,
+        email: String?
+    ) {
+        Task {
+            guard let token = try? await revoker.exchange(authorizationCode: authorizationCode)
+            else { return }
+            guard (try? sessionStore.load())?.userIdentifier == userIdentifier else { return }
+            try? sessionStore.save(
+                AppleAuthSession(
+                    userIdentifier: userIdentifier,
+                    displayName: displayName,
+                    email: email,
+                    refreshToken: token
+                )
+            )
+        }
     }
 }
