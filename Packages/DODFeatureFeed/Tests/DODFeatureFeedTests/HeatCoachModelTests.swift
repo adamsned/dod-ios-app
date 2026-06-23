@@ -88,11 +88,19 @@ import Testing
         #expect(copy.contains("burn down faster"))
     }
 
-    @Test func windNote_onlyWhenWindy_andLeadsWithEnvironment() {
+    @Test func windNote_onlyWhenWindy_isTheEnvironmentTip() {
         #expect(model(windy: false).windNote == nil)
         let copy = model(windy: true).windNote
-        #expect(copy?.contains("fix the environment first") == true)
+        #expect(copy?.contains("fix the environment") == true)
         #expect(copy?.lowercased().contains("windbreak") == true)
+    }
+
+    /// DUT-264 — wind adjusts the coal COUNT (add 3-4), not just the cadence.
+    @Test func windCoalNote_onlyWhenWindy_addsThreeToFour() {
+        #expect(model(windy: false).windCoalNote == nil)
+        let copy = model(windy: true).windCoalNote
+        #expect(copy?.contains("add 3-4 coals") == true)
+        #expect(copy?.lowercased().contains("steals heat") == true)
     }
 
     // MARK: - Static config
