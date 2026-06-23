@@ -2826,6 +2826,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `AccountViewModel.swift`, `AppleProfileSignIn.swift` (exchange extracted to `scheduleRefreshTokenExchange`), `AccountViewModelTests.swift` (2 new race tests). Spec: `clarifications.md` (CL-247).
 - **AC:** US-46 / AC-46.6 / DUT-266. CL-247 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-266-siwa-exchange-race`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 100 DODFeatureFeed + 50 DODFeatureProfile tests pass; iOS app build green.
 
+### T-854 — DUT-239: First Cookout fire step leads with the Heat Coach (CL-248)
+
+- **What:** The "Get Your Coals Going" fire step prescribed a hard "X coals" count then demoted the Heat Coach to a button. Now leads with a prominent "Open the Heat Coach" CTA + a read-by-feel line, and shows only a de-emphasized ±2 range framed as "a rough starting point — dial it in with the Heat Coach." No single prescriptive count up front. Ties to DUT-264 (the Heat Coach now adjusts coals for wind).
+- **Files:** `FirstCookoutView.swift` (`.fire` case), `FirstCookoutView+Stages.swift` (`heatCoachCallToAction` + `coalStartingPointNote` replace `coalsCard` + `heatCoachButton`). Spec: `clarifications.md` (CL-248).
+- **AC:** DUT-183 / DUT-239. CL-248 canonical. **Est:** ~45 min. **Deps:** off main. Branch `feat/DUT-239-fire-step-heat-coach-first`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 100 DODFeatureFeed tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

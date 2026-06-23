@@ -199,8 +199,8 @@ public struct FirstCookoutView: View {
             case .gather:
                 gatherChecklist
             case .fire:
-                coalsCard
-                heatCoachButton
+                heatCoachCallToAction
+                coalStartingPointNote
             case .cook:
                 rotationReminder
                 cookTimerCard

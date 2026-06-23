@@ -93,48 +93,54 @@ extension FirstCookoutView {
         .buttonStyle(.plain)
     }
 
-    // MARK: Fire — coal count + Heat Coach
+    // MARK: Fire — Heat Coach first, then a rough starting point (DUT-239)
 
-    /// The live coal recommendation for the dish (DUT-128).
-    var coalsCard: some View {
+    /// DUT-239: the fire step **leads with the Heat Coach**. Coals are read by
+    /// feel for the cook's own conditions (wind, weather, charcoal brand/size,
+    /// oven size) — a single prescribed number on the scariest step can sink a
+    /// beginner's first cook, the opposite of the guaranteed-win promise. So the
+    /// Heat Coach is the prominent CTA, not a button demoted below a hard count.
+    var heatCoachCallToAction: some View {
+        VStack(spacing: DODSpacing.xs) {
+            Text(
+                "Every fire is different — wind, weather, and your charcoal all change "
+                    + "the count. Read the coals by feel instead of trusting one number."
+            )
+            .dodFont(DODType.body)
+            .foregroundStyle(DODColor.labelSecondary)
+            .multilineTextAlignment(.center)
+            Button {
+                showingHeatCoach = true
+            } label: {
+                Label("Open the Heat Coach", systemImage: "thermometer.sun.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(DODColor.burntOrange)
+        }
+        .padding(.top, DODSpacing.xs)
+    }
+
+    /// DUT-239: a *rough* starting point only — a range, framed as "dial it in
+    /// with the Heat Coach," never a hard "X coals" answer. De-emphasized below
+    /// the Heat Coach CTA so the beginner reaches for the coach, not the number.
+    var coalStartingPointNote: some View {
         let coals = CharcoalRecipeConverter.recommend(
             ovenTempF: cookout.ovenTempF,
             ovenDiameterInches: cookout.ovenDiameterInches,
             task: .bake
         )
-        return VStack(spacing: DODSpacing.xxs) {
-            Text("\(coals.totalBriquettes) coals")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.burntOrange)
-            Text("\(coals.bottom) on the bottom · \(coals.top) on the lid")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-            Text(
-                "for a \(cookout.ovenDiameterInches)-inch oven at \(cookout.ovenTempF)°F, "
-                    + "add a few fresh ones after about \(coals.refreshIntervalMinutes) minutes"
-            )
-            .dodFont(DODType.caption)
-            .foregroundStyle(DODColor.labelSecondary)
-            .multilineTextAlignment(.center)
-        }
-        .padding(DODSpacing.md)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
-                .fill(DODColor.surfaceElevated)
+        // A loose ±2 range so it never reads as a precise rule.
+        let low = max(coals.totalBriquettes - 2, 0)
+        let high = coals.totalBriquettes + 2
+        return Text(
+            "Rough starting point: about \(low)-\(high) coals for a "
+                + "\(cookout.ovenDiameterInches)-inch oven — then dial it in for your "
+                + "conditions with the Heat Coach."
         )
-        .padding(.top, DODSpacing.xs)
-    }
-
-    /// Open the full Heat Coach to dial coals in by size / conditions.
-    var heatCoachButton: some View {
-        Button {
-            showingHeatCoach = true
-        } label: {
-            Label("Open the Heat Coach", systemImage: "thermometer.sun.fill")
-        }
-        .buttonStyle(.bordered)
-        .tint(DODColor.burntOrange)
+        .dodFont(DODType.caption)
+        .foregroundStyle(DODColor.labelSecondary)
+        .multilineTextAlignment(.center)
         .padding(.top, DODSpacing.xxs)
     }
 
