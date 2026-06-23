@@ -26,11 +26,24 @@ public struct CookActivityAttributes: Codable, Hashable, Sendable {
         public var remainingSeconds: Int
         public var stepText: String
         public var isPaused: Bool
+        /// DUT-218: wall-clock instant the timer finishes, set while running so
+        /// the Lock Screen / Dynamic Island render a self-updating
+        /// `Text(timerInterval:countsDown:)` that ticks WITHOUT per-second pushes
+        /// (those stop when the app is backgrounded, which froze the countdown).
+        /// `nil` while paused or for a non-live render (snapshots) → the views
+        /// fall back to the static `remainingSeconds` snapshot.
+        public var endDate: Date?
 
-        public init(remainingSeconds: Int, stepText: String, isPaused: Bool) {
+        public init(
+            remainingSeconds: Int,
+            stepText: String,
+            isPaused: Bool,
+            endDate: Date? = nil
+        ) {
             self.remainingSeconds = remainingSeconds
             self.stepText = stepText
             self.isPaused = isPaused
+            self.endDate = endDate
         }
     }
 

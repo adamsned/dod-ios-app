@@ -20,19 +20,25 @@ public struct CookActivityLockScreenView: View {
     public let remainingSeconds: Int
     public let totalSeconds: Int
     public let isPaused: Bool
+    /// DUT-218: when present + running, the countdown renders as a self-updating
+    /// `Text(timerInterval:)` (ticks on the Lock Screen even when the app is
+    /// backgrounded); `nil` (snapshots / paused) → the static `remainingSeconds`.
+    public let endDate: Date?
 
     public init(
         recipeTitle: String,
         stepText: String,
         remainingSeconds: Int,
         totalSeconds: Int,
-        isPaused: Bool
+        isPaused: Bool,
+        endDate: Date? = nil
     ) {
         self.recipeTitle = recipeTitle
         self.stepText = stepText
         self.remainingSeconds = remainingSeconds
         self.totalSeconds = totalSeconds
         self.isPaused = isPaused
+        self.endDate = endDate
     }
 
     public var body: some View {
@@ -56,7 +62,7 @@ public struct CookActivityLockScreenView: View {
                 CookActivityProgressArc(
                     progress: progress,
                     isPaused: isPaused,
-                    text: formattedCookActivityCountdown(remainingSeconds)
+                    countdown: countdownText
                 )
                 .frame(width: 88, height: 88)
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
@@ -75,6 +81,16 @@ public struct CookActivityLockScreenView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// DUT-218: self-updating `Text(timerInterval:)` while running (ticks even
+    /// when backgrounded), falling back to the static snapshot when paused or
+    /// when no `endDate` is supplied (snapshot tests).
+    private var countdownText: Text {
+        if let endDate, !isPaused, endDate > Date() {
+            return Text(timerInterval: Date()...endDate, countsDown: true)
+        }
+        return Text(formattedCookActivityCountdown(remainingSeconds))
+    }
+
     private var progress: Double {
         guard totalSeconds > 0 else { return 0 }
         let elapsed = Double(totalSeconds - remainingSeconds)
@@ -89,12 +105,14 @@ public struct CookActivityProgressArc: View {
 
     public let progress: Double
     public let isPaused: Bool
-    public let text: String
+    /// DUT-218: a `Text` (not a `String`) so callers can pass a self-updating
+    /// `Text(timerInterval:)` while running, or a static `Text` for snapshots.
+    public let countdown: Text
 
-    public init(progress: Double, isPaused: Bool, text: String) {
+    public init(progress: Double, isPaused: Bool, countdown: Text) {
         self.progress = progress
         self.isPaused = isPaused
-        self.text = text
+        self.countdown = countdown
     }
 
     public var body: some View {
@@ -105,7 +123,7 @@ public struct CookActivityProgressArc: View {
                 .trim(from: 0, to: progress)
                 .stroke(arcColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Text(text)
+            countdown
                 .dodFont(DODType.heading)
                 .monospacedDigit()
                 .foregroundStyle(DODColor.label)
@@ -121,16 +139,27 @@ public struct CookActivityProgressArc: View {
 public struct CookActivityCompactTrailingView: View {
 
     public let remainingSeconds: Int
+    public let endDate: Date?
 
-    public init(remainingSeconds: Int) {
+    public init(remainingSeconds: Int, endDate: Date? = nil) {
         self.remainingSeconds = remainingSeconds
+        self.endDate = endDate
     }
 
     public var body: some View {
-        Text(formattedCookActivityCountdown(remainingSeconds))
+        countdownText
             .dodFont(DODType.bodyEmphasized)
             .monospacedDigit()
             .foregroundStyle(DODColor.accent)
+    }
+
+    /// DUT-218: self-updating while running (survives backgrounding), static
+    /// snapshot when no `endDate` (snapshots) or already elapsed.
+    private var countdownText: Text {
+        if let endDate, endDate > Date() {
+            return Text(timerInterval: Date()...endDate, countsDown: true)
+        }
+        return Text(formattedCookActivityCountdown(remainingSeconds))
     }
 }
 

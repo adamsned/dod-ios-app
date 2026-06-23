@@ -2779,6 +2779,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DODDesignSystem/Components/RecipeCard.swift` (sizer + overlay + `ViewThatFits`); `RecipeCardExcerptSnapshotTests.swift` (new regression guard — short title at grid width); re-recorded only the 1-line-title L4 baselines that shifted (`SnapshotTests/test_recipeCard_full`, `SnapshotTests+AppearanceAudit/test_recipeCard_full_dark`, `RecipeCardHighlightSnapshotTests/test_recipeCard_highlightedTitle`). Spec: `clarifications.md` (CL-239).
 - **AC:** US-1 / AC-1.3 / DUT-262 (extends CL-233 / DUT-260). CL-239 canonical. **Est:** ~1 h. **Deps:** off main (post #282). Branch `fix/recipe-card-dynamic-excerpt`. **Verification:** SwiftLint + swift-format `--strict` clean; `xcodebuild build` clean; rendered both cases on the iPhone 17 sim — short title → 3 excerpt lines, 2-line title → 2 + "…", BOTH at the same 734px height; full DODDesignSystem L4 suite green (only the `moderationBadge` local outlier).
 
+### T-846 — DUT-218: Cook Mode Live Activity countdown survives backgrounding (CL-240)
+
+- **What:** The Lock Screen / Dynamic Island countdown was a static String pushed per-second from a foreground timer, so it froze when the app backgrounded. Added `endDate` to `ContentState` (set while running, nil while paused) and render the countdown as a self-updating `Text(timerInterval:countsDown:)` — iOS advances it with no pushes. Snapshots unaffected (views default `endDate` nil → static path).
+- **Files:** `CookActivityAttributes.swift`, `CookLiveActivityViews.swift`, `LiveActivity/CookActivityWidget.swift`, `CookModeViewModel.swift`, `CookModeViewModelTests.swift`. Spec: `clarifications.md` (CL-240).
+- **AC:** US-11 / AC-11.2 / DUT-218. CL-240 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/DUT-218-liveactivity-countdown`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 203 DODFeatureRecipeDetail tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

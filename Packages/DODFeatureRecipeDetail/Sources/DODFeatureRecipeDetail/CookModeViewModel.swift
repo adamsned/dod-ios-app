@@ -228,7 +228,10 @@ public final class CookModeViewModel {
         let initial = CookActivityAttributes.ContentState(
             remainingSeconds: totalSeconds,
             stepText: stepText,
-            isPaused: false
+            isPaused: false,
+            // DUT-218: the live deadline so the Lock Screen countdown self-ticks
+            // (via `Text(timerInterval:)`) even while the app is backgrounded.
+            endDate: Date(timeIntervalSinceNow: TimeInterval(totalSeconds))
         )
         liveActivity.start(attributes: attributes, initialState: initial)
     }
@@ -239,7 +242,11 @@ public final class CookModeViewModel {
         let state = CookActivityAttributes.ContentState(
             remainingSeconds: max(remainingSeconds, 0),
             stepText: stepText,
-            isPaused: isPaused
+            isPaused: isPaused,
+            // DUT-218: running → a live deadline (self-ticking countdown);
+            // paused → nil so the views show the frozen snapshot.
+            endDate: isPaused
+                ? nil : Date(timeIntervalSinceNow: TimeInterval(max(remainingSeconds, 0)))
         )
         liveActivity.update(state: state)
     }
