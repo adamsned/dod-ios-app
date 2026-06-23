@@ -35,6 +35,7 @@ extension RecipeStore {
         )
         if let existing = try modelContext.fetch(descriptor).first {
             existing.bytes = bytes
+            existing.byteCount = bytes.count  // DUT-242: keep the scalar in sync.
             existing.lastUsedAt = .now
             if let pin = pinnedToSavedRecipeID {
                 existing.pinnedToSavedRecipeID = pin
@@ -91,13 +92,16 @@ extension RecipeStore {
     /// Spec trace: US-36 AC-36.4.
     @discardableResult
     public func clearImageCache() throws -> Int {
-        let descriptor = FetchDescriptor<CachedImage>(
+        try backfillImageByteCountsIfNeeded()
+        var descriptor = FetchDescriptor<CachedImage>(
             predicate: #Predicate { $0.pinnedToSavedRecipeID == nil }
         )
+        // DUT-242: sum the scalar, don't fault every blob just to count its bytes.
+        descriptor.propertiesToFetch = [\.byteCount, \.urlString, \.pinnedToSavedRecipeID]
         let unpinned = try modelContext.fetch(descriptor)
         var freedBytes = 0
         for row in unpinned {
-            freedBytes += row.bytes.count
+            freedBytes += row.byteCount
             if let url = URL(string: row.urlString) { WidgetImageBridge.deleteImage(for: url) }
             modelContext.delete(row)
         }
@@ -112,14 +116,21 @@ extension RecipeStore {
     /// never drift. File deletion is best-effort — failures are logged
     /// and swallowed inside the bridge.
     public func evictImagesIfNeeded() throws {
-        let descriptor = FetchDescriptor<CachedImage>(
+        try backfillImageByteCountsIfNeeded()
+        var descriptor = FetchDescriptor<CachedImage>(
             sortBy: [SortDescriptor(\.lastUsedAt, order: .forward)]
         )
+        // DUT-242: prefetch only the scalar metadata, NOT `bytes`, so summing the
+        // 200 MB budget no longer faults every cached image's full payload into
+        // RAM on every `cacheImage` (every feed/search/saved scroll).
+        descriptor.propertiesToFetch = [
+            \.byteCount, \.lastUsedAt, \.urlString, \.pinnedToSavedRecipeID,
+        ]
         let all = try modelContext.fetch(descriptor)
-        var total = all.reduce(0) { $0 + $1.bytes.count }
+        var total = all.reduce(0) { $0 + $1.byteCount }
         guard total > Self.imageBudgetBytes else { return }
         for row in all where row.pinnedToSavedRecipeID == nil {
-            let size = row.bytes.count
+            let size = row.byteCount
             if let url = URL(string: row.urlString) { WidgetImageBridge.deleteImage(for: url) }
             modelContext.delete(row)
             total -= size
@@ -139,5 +150,22 @@ extension RecipeStore {
         for row in all where row.pinnedToSavedRecipeID == recipeID {
             row.pinnedToSavedRecipeID = nil
         }
+    }
+
+    /// DUT-242: one-time (per launch) backfill of `byteCount` for rows written
+    /// before the column existed (default 0). Faults each such row's bytes ONCE
+    /// to set the scalar; once `didBackfillImageByteCounts` flips, later calls
+    /// are a cheap fetch with nothing to do — so the eviction + clear-cache
+    /// budget sums stay accurate without re-reading blobs.
+    func backfillImageByteCountsIfNeeded() throws {
+        guard !didBackfillImageByteCounts else { return }
+        let all = try modelContext.fetch(FetchDescriptor<CachedImage>())
+        var changed = false
+        for row in all where row.byteCount == 0 && !row.bytes.isEmpty {
+            row.byteCount = row.bytes.count
+            changed = true
+        }
+        if changed { try modelContext.save() }
+        didBackfillImageByteCounts = true
     }
 }
