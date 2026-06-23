@@ -25,6 +25,13 @@ struct RootView: View {
     /// removed; sync is opt-in only from Settings (AC-41.3) now, and the
     /// welcome sheet mentions it as a capability instead.
     @State private var showOnboarding: Bool
+    /// First-run iCloud-Sync opt-in prompt, shown once right after the welcome
+    /// sheet on a brand-new install (paired with the notification permission
+    /// request). Re-introduces a launch-time *ask* for sync — DUT-68 removed the
+    /// old blocking opt-in sheet, but a new user was then never asked, so their
+    /// saved recipes never synced. "Turn On" sets the opt-in (effective next
+    /// launch); "Not Now" leaves it off (still changeable in Settings).
+    @State private var showCloudSyncPrompt = false
     /// US-36 AC-36.2 — user-selected appearance preference. Backed by
     /// `UserDefaults` (key `dod.settings.appearance`) via `@AppStorage`
     /// so a write from `SettingsViewModel.appearance` (the Picker's
@@ -109,9 +116,26 @@ struct RootView: View {
                 onContinue: {
                     UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
                     showOnboarding = false
+                    // First-run: ask for notifications + iCloud Sync (skipped
+                    // under the onboarding UI test, which can't dismiss the
+                    // system permission dialogs).
+                    if !DODEnvironment.suppressFirstRunPrompts {
+                        Task { await runFirstRunSetup() }
+                    }
                 }
             )
             .presentationDetents([.large])
+        }
+        .alert("Turn On iCloud Sync?", isPresented: $showCloudSyncPrompt) {
+            Button("Turn On Sync") {
+                Task { await dependencies.settingsDependencies().setCloudSyncOptIn(true) }
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text(
+                "Keep your saved recipes and cook journal on all your devices. "
+                    + "Takes effect next time you open the app — change it anytime in Settings."
+            )
         }
         // Intercept in-app link taps (DOD-ART-2): a dutchovendaddy.com recipe
         // link inside a rendered article opens the recipe in-app instead of
@@ -121,35 +145,25 @@ struct RootView: View {
         .environment(\.openURL, OpenURLAction { url in handleArticleLinkTap(url) })
     }
 
-    /// The highlight rows shown on the single first-launch welcome sheet.
-    /// Declared as a static so the array is not rebuilt every render and so
-    /// tests/previews can reuse the exact content the app ships. T-762 / CL-159
-    /// (DUT-68) — reworded the Save row to the save-a-favorite-for-findability
-    /// framing (T-761 decoupled Save from the offline download) and added the
-    /// iCloud-Sync capability row (informational; the opt-in lives in Settings,
-    /// not here — no toggle on the splash).
-    static let welcomeBullets: [OnboardingSheet.Bullet] = [
-        .init(
-            systemImage: "house.fill",
-            title: "Browse the latest",
-            caption: "New cast iron recipes appear at the top."
-        ),
-        .init(
-            systemImage: "magnifyingglass",
-            title: "Search what you've got",
-            caption: "Type any ingredient or technique to filter."
-        ),
-        .init(
-            systemImage: "bookmark.fill",
-            title: "Save your favorites",
-            caption: "Tap the bookmark on any recipe to find it again later."
-        ),
-        .init(
-            systemImage: "icloud.fill",
-            title: "Sync across devices",
-            caption: "Turn on iCloud Sync in Settings to keep your saved recipes on every device."
-        ),
-    ]
+    /// First-run setup, run once right after the welcome sheet is dismissed on a
+    /// brand-new install: ask for notification permission (the system prompt),
+    /// then ask to turn on iCloud Sync. New users were previously never prompted
+    /// for either — notifications were Settings-only and the sync opt-in sheet
+    /// was removed (DUT-68), so a new user got no alerts and no cross-device
+    /// sync until they happened to dig into Settings.
+    @MainActor
+    private func runFirstRunSetup() async {
+        // 1. Notifications — the system permission prompt. On grant, flip the
+        //    app-level toggle so cook-timer / new-recipe alerts actually fire
+        //    without a second trip to Settings (cohesive with the OS choice).
+        let granted = await dependencies.notificationService.requestAuthorization()
+        if granted {
+            UserDefaults.standard.set(true, forKey: SettingsViewModel.notificationsEnabledKey)
+        }
+        // 2. iCloud Sync — ask (never silently enable). The alert's "Turn On"
+        //    sets the launch-time opt-in.
+        showCloudSyncPrompt = true
+    }
 
     private var phoneTabs: some View {
         TabView(selection: $selectedTab) {
