@@ -2808,6 +2808,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CategoriesDependencies.swift`, `CategoryRecipesViewModel.swift`, `CategoriesTests.swift` (fake + 1 regression test). Spec: `clarifications.md` (CL-244).
 - **AC:** US-2 / AC-2.3 / DUT-265. CL-244 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-265-categories-pagination`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 3 DODFeatureCategories tests pass; iOS app build green.
 
+### T-851 — Feed "Cooking Tools" callout sits above the pinned title (DUT-274, CL-245, BUGFIX)
+
+- **What:** Regression from DUT-263. Pinning the Feed title moved it out of the `ScrollView`, leaving the onboarding "Cooking Tools" callout as the first scroll item — below the title — so its upward trailing tail (meant to point at the Cooking Tools nav-bar button, DUT-200) pointed at the title instead. Moved the callout ABOVE the pinned title in the `VStack` so it sits under the button with the tail aligned; when dismissed the title returns to the top (DUT-263 alignment preserved). Offline top-inset moved to the `VStack`.
+- **Files:** `DODFeatureFeed/FeedView.swift`. Spec: `clarifications.md` (CL-245).
+- **AC:** US-1 / DUT-200 amendment / DUT-274 (follows CL-242 / DUT-263). CL-245 canonical. **Est:** ~20 min. **Deps:** off main. Branch `fix/cooking-tools-callout-placement`. **Verification:** built + ran the app on the iPhone 17 sim — callout under the Cooking Tools button with the tail pointing at it, title directly below, title drops to top when dismissed; SwiftLint + swift-format `--strict` clean; feature package compiles on macOS.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
