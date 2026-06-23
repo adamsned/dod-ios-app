@@ -99,25 +99,66 @@ public struct RecipeCard: View {
     }
 
     private var textSection: some View {
-        // T-839 — reserve space for the full 2 lines of BOTH title and excerpt so
-        // every gallery card is the same height regardless of how long its text
-        // runs. Without `reservesSpace`, a 1-line title produced a shorter card,
-        // so the `LazyVGrid` rows came out ragged and cards looked mismatched
-        // (tester-reported). The hero is already a fixed 140pt, so pinning the
-        // text block to 2 + 2 lines makes the whole card a constant height. The
-        // list row (`RecipeCard.ListRow`) renders its own text and is untouched.
+        // T-839 (uniform card height) + T-845 (dynamic excerpt). A hidden sizer
+        // pins the text block to a CONSTANT height — 2 title lines + 2 excerpt
+        // lines at the current Dynamic Type — so every gallery card is the same
+        // size (the `LazyVGrid` rows don't go ragged). The real content is
+        // overlaid: the title takes its natural 1–2 lines (max 2 + "…"), and the
+        // excerpt FILLS whatever height the title leaves via `ViewThatFits`, so a
+        // short title shows more excerpt lines and a 2-line title shows 2 — with
+        // the title↔excerpt padding (`DODSpacing.xs`) held constant. The list row
+        // (`RecipeCard.ListRow`) renders its own text and is untouched.
+        textBlockSizer
+            .hidden()
+            .overlay(alignment: .topLeading) { textBlockContent }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(DODSpacing.sm)
+    }
+
+    /// Invisible spacer fixing the text block to "2-line title + 2-line excerpt"
+    /// (the maximum), so the card height is constant. `reservesSpace` keeps it
+    /// correct across Dynamic Type sizes with no hard-coded height.
+    private var textBlockSizer: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            Text(verbatim: " ")
+                .dodFont(DODType.heading)
+                .lineLimit(2, reservesSpace: true)
+            Text(verbatim: " ")
+                .dodFont(DODType.caption)
+                .lineLimit(2, reservesSpace: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
+    }
+
+    /// Title (natural, max 2 lines) + an excerpt that fills the freed height:
+    /// `ViewThatFits` picks the most lines (up to 4) that fit, so a 1-line title
+    /// yields ~3 excerpt lines and a 2-line title yields 2 — each tail-truncated.
+    private var textBlockContent: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Self.titleText(title, highlightQuery: highlightQuery)
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
-                .lineLimit(2, reservesSpace: true)
-            Text(excerpt)
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .lineLimit(2, reservesSpace: true)
+                .lineLimit(2)
+                // Title claims its full natural height (up to 2 lines) FIRST;
+                // without the priority the VStack compressed it to 1 line to give
+                // the excerpt room, so a real 2-line title truncated early.
+                .layoutPriority(1)
+            ViewThatFits(in: .vertical) {
+                excerptText.lineLimit(4)
+                excerptText.lineLimit(3)
+                excerptText.lineLimit(2)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DODSpacing.sm)
+    }
+
+    /// The excerpt run, shared across the `ViewThatFits` line-count variants.
+    private var excerptText: some View {
+        Text(excerpt)
+            .dodFont(DODType.caption)
+            .foregroundStyle(DODColor.labelSecondary)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private func timeChip(_ display: String) -> some View {
