@@ -13,11 +13,14 @@ public struct FeedRow: View {
     }
 
     public var body: some View {
+        // CL-254 (feed declutter) — no cook-time chip on the Recipes feed; it
+        // reads as noise there. `totalTimeDisplay` is intentionally omitted
+        // (defaults to nil → no chip). Time still shows on Search + the recipe
+        // detail page for anyone who wants it.
         RecipeCard(
             title: item.title,
             excerpt: item.excerpt,
-            heroImageURL: item.heroImage,
-            totalTimeDisplay: item.totalTimeDisplay
+            heroImageURL: item.heroImage
         )
     }
 }
