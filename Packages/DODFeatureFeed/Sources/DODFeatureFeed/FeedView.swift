@@ -223,25 +223,25 @@ public struct FeedView: View {
         // `LazyVStack` of `RecipeCard.ListRow` rows for denser scanning.
         let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
         return VStack(spacing: 0) {
+            // DUT-200 / DUT-263 — the onboarding "Cooking Tools" speech bubble sits
+            // ABOVE the pinned title (not below it) so its upward trailing tail
+            // still points at the Cooking Tools button in the nav bar. Dismissible
+            // + persisted; once dismissed the title sits at the very top, level
+            // with every other tab. (`currentRung` still feeds the chooser sheet.)
+            if !cookingToolsCalloutDismissed {
+                CookingToolsCallout(onDismiss: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        cookingToolsCalloutDismissed = true
+                    }
+                })
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.top, DODSpacing.sm)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
             // DUT-263 — the title is pinned at the top (not scrolling away) so it
-            // sits at the same Y as every other tab's title, with no nav-bar
-            // button needed to anchor it. Offline shifts it below the banner.
+            // sits at the same Y as every other tab's title.
             DODScreenHeader("Recipes & Articles")
-                .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
             ScrollView {
-                // DUT-200 — the onboarding "Cooking Tools" speech bubble; tail
-                // points up at the trailing menu button it describes. Dismissible
-                // + persisted. (`currentRung` still feeds the chooser sheet.)
-                if !cookingToolsCalloutDismissed {
-                    CookingToolsCallout(onDismiss: {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            cookingToolsCalloutDismissed = true
-                        }
-                    })
-                    .padding(.horizontal, DODSpacing.md)
-                    .padding(.top, DODSpacing.sm)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
                 Group {
                     switch layout {
                     case .gallery:
@@ -259,6 +259,8 @@ public struct FeedView: View {
                 }
             }
         }
+        // Offline shifts the whole stack below the OfflineBanner overlay.
+        .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
     }
 
     /// US-38 / AC-38.3 — the existing 2-col `LazyVGrid` rendering. Body
