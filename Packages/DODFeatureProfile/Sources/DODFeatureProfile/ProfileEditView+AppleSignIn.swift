@@ -26,8 +26,9 @@ extension ProfileEditView {
                 AppleProfileSignInButton(profileStore: store) { outcome in
                     handleAppleSignIn(outcome)
                 }
-                // Sign in with Google — scaffold, gated behind a real client ID
-                // (GoogleSignInConfig.isConfigured) so it stays hidden until wired.
+                // Sign in with Google (DUT-276) — shown once a real client ID is
+                // wired (GoogleSignInConfig.isConfigured); the GIDSignIn flow runs
+                // via GoogleProfileSignInButton's default GIDSignInProvider.
                 if GoogleSignInConfig.isConfigured {
                     GoogleProfileSignInButton { result in
                         handleGoogleSignIn(result)
@@ -94,17 +95,26 @@ extension ProfileEditView {
         }
     }
 
-    /// Reflect a completed Sign in with Google (SCAFFOLD — see
-    /// `GoogleProfileSignIn`). Gated behind `GoogleSignInConfig.isConfigured`, so
-    /// `.notConfigured` never reaches a production user. On `.success` it fills
-    /// the name/email fields like Apple does. TODO(2026-06-23, nadams): persist the identity
-    /// as a session + profile by generalizing `AppleProfileSignIn`'s persist path
-    /// to be provider-agnostic (Google has no Apple-style refresh-token exchange).
+    /// Reflect a completed Sign in with Google (DUT-276) — the Google mirror of
+    /// `handleAppleSignIn`. `.success` persists the session + profile via
+    /// `GoogleProfileSignIn`, fills the name/email fields, and (when a valid
+    /// profile was written in one tap) refreshes the parent + dismisses. A
+    /// cancel/failure (`.failed`) or the gated-off `.notConfigured` is a no-op.
     @MainActor
     func handleGoogleSignIn(_ result: GoogleSignInResult) {
-        guard case .success(_, let displayName, let email) = result else { return }
-        if let displayName { self.displayName = displayName }
-        if let email { self.email = email }
+        guard case .success(let userIdentifier, let displayName, let email) = result else { return }
+        Task {
+            let outcome = await GoogleProfileSignIn(profileStore: store).apply(
+                userIdentifier: userIdentifier,
+                displayName: displayName,
+                email: email
+            )
+            if let name = outcome.displayName { self.displayName = name }
+            if let mail = outcome.email { self.email = mail }
+            guard outcome.profileSaved else { return }
+            await onProfileChanged()
+            dismiss()
+        }
     }
     #endif
 }

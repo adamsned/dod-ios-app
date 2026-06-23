@@ -6,9 +6,9 @@ import Testing
 @Suite("Google sign-in scaffold")
 struct GoogleProfileSignInTests {
 
-    @Test func configIsNotConfiguredUntilAClientIDIsWired() {
-        #expect(GoogleSignInConfig.clientID.isEmpty)
-        #expect(GoogleSignInConfig.isConfigured == false)
+    @Test func configIsWiredWithARealClientID() {
+        #expect(GoogleSignInConfig.clientID.hasSuffix(".apps.googleusercontent.com"))
+        #expect(GoogleSignInConfig.isConfigured)
     }
 
     @Test func unconfiguredProviderReturnsNotConfigured() async {

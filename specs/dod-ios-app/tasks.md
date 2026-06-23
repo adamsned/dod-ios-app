@@ -2849,6 +2849,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `ProfileEditView+AppleSignIn.swift` (merge `appleSignInSection` + `identitySection` → `signInSection` + footer), `ProfileEditView.swift` (body calls `signInSection`), `SettingsView.swift` (drop `AccountSection()`), `AppleProfileSignIn.swift` + `AppleProfileSignInTests.swift` (doc-only: now the single sign-in path). Removed: `SettingsView+Account.swift`, `AccountViewModel.swift`, `AccountViewModelTests.swift`. Spec: `clarifications.md` (CL-251).
 - **AC:** US-46 / DUT-238 (unified login surface; Google stays gated per DUT-276 until its client ID is wired). CL-251 canonical. **Est:** ~1 h. **Deps:** off main (after DUT-276 #294). Branch `fix/unify-account-signin-profile`. **Verification:** swift-format (`--configuration .swift-format --recursive`) + SwiftLint `--strict` clean; DODFeatureProfile + DODFeatureFeed L1 compile on macOS; iOS app build green; unified section visually verified (Apple + name + email in one card, Google hidden since unconfigured).
 
+### T-858 — DUT-276: Sign in with Google wired live (GoogleSignIn SDK + client ID) (CL-252)
+
+- **What:** Flips the gated Google scaffold (CL-250) on now that Ned provisioned an OAuth client ID. Adds the GoogleSignIn-iOS SPM dep (iOS-only), a real `GIDSignInProvider` (presents `GIDSignIn.signIn(withPresenting:)`), a `GoogleProfileSignIn` persist struct (mirror of `AppleProfileSignIn`, no token), the client ID in `GoogleSignInConfig` + Info.plist (`GIDClientID` + reversed-client-ID URL scheme). Button renders in the unified `signInSection`.
+- **Files:** `DODFeatureProfile/Package.swift`, `GoogleProfileSignIn.swift`, `GIDSignInProvider.swift` (new), `GoogleProfileSignInButton.swift`, `ProfileEditView+AppleSignIn.swift`, `GoogleProfileSignInTests.swift`, `project.yml` (Info.plist). Spec: `clarifications.md` (CL-252).
+- **AC:** US-46 / DUT-276. CL-252 canonical. **Est:** ~2 h. **Deps:** off main. Branch `feat/DUT-276-google-signin-wireup`. **Device-verify:** the live OAuth round-trip needs a real device (CI verifies compile/wiring only). **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 52 DODFeatureProfile L1 tests pass; iOS app build green (GoogleSignIn 8.0 resolves, Swift 6).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

@@ -17,7 +17,7 @@ public struct GoogleProfileSignInButton: View {
     private let onComplete: @MainActor (GoogleSignInResult) -> Void
 
     public init(
-        provider: any GoogleSignInProviding = UnconfiguredGoogleSignInProvider(),
+        provider: any GoogleSignInProviding = GIDSignInProvider(),
         onComplete: @MainActor @escaping (GoogleSignInResult) -> Void
     ) {
         self.provider = provider

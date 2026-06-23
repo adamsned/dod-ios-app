@@ -28,11 +28,21 @@
 				<string>dod</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.dutchovendaddy.DODApp.googlesignin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.16278307823-o18m60h5rq1m76b9mqam4nhj8po9pipf</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>5</string>
 	<key>DODCommentAPIKey</key>
 	<string>$(DOD_COMMENT_API_KEY)</string>
+	<key>GIDClientID</key>
+	<string>16278307823-o18m60h5rq1m76b9mqam4nhj8po9pipf.apps.googleusercontent.com</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
