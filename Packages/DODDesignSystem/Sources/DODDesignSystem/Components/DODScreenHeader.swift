@@ -42,13 +42,21 @@ extension View {
     /// Saved (whose real toolbar buttons keep the bar present). A single hidden
     /// 1x1 item makes the bar non-empty so every tab's title lands at the same Y.
     public func dodReservesNavBarHeight() -> some View {
-        toolbar {
+        // `.topBarTrailing` is iOS-only; on macOS (where the feature packages'
+        // `swift test` compiles this) it doesn't exist, so guard it. The whole
+        // concept — reserving a UINavigationBar's height — is iOS-only anyway, so
+        // macOS is a no-op.
+        #if os(iOS)
+        return toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Color.clear
                     .frame(width: 1, height: 1)
                     .accessibilityHidden(true)
             }
         }
+        #else
+        return self
+        #endif
     }
 }
 
