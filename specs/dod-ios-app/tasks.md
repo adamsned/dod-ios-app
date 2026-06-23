@@ -2792,6 +2792,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **AC:** US-21 / NFR-2 / DUT-242. CL-241 canonical. **Est:** ~2 h. **Deps:** off main (post #284). Branch `fix/DUT-242-image-bytecount`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 118 DODPersistence tests pass; iOS app build green.
 - **Follow-up (option B):** `@Attribute(.externalStorage)` on `bytes` + NSCache `totalCostLimit` (DUT-213/251) — heavier migration, separate PR.
 
+### T-848 — Tab headers: uniform position + true black/white color + always-visible Saved title (DUT-263, CL-242, BUGFIX)
+
+- **What:** Tester follow-up to DUT-261. (1) Pin EVERY tab's `DODScreenHeader` at the top so titles line up + stay put (Recipes & Saved titles moved out of their `ScrollView` → no longer scroll away). Button-less tabs (Search/Settings/Saved) reserve the same bar height via `View.dodReservesNavBarHeight()` — an empty inline nav title (no pill). A first cut used a hidden 1x1 toolbar item, but iOS 26 draws even a clear item as an empty Liquid-Glass capsule (tester: "iconless buttons / visual noise") → swapped to the empty-title approach. All titles land at the same Y (~295px on iPhone 17); real Cooking Tools + cart buttons stay. (2) `DODScreenHeader` moved from the warm `DODColor.label` (grey/cream) to a new `DODColor.labelStrong` (`#000000`/`#FFFFFF`). (3) The "Saved" title renders above every state (was `.loaded`-only), state body centered beneath.
+- **Files:** `DODDesignSystem/Colors.swift` (+`labelStrong`); `Colors.xcassets/LabelStrong.colorset` (new); `DODDesignSystem/Components/DODScreenHeader.swift` (color + `dodReservesNavBarHeight`); `DODFeatureFeed/FeedView.swift` (pin header); `DODFeatureSaved/SavedView.swift` (pin header all states); `DODFeatureSearch/SearchView.swift`; `DODFeatureFeed/SettingsView.swift`. Spec: `clarifications.md` (CL-242).
+- **AC:** US-3 / US-32 / header consistency (extends CL-237 / DUT-261). CL-242 canonical. **Est:** ~1.5 h. **Deps:** off main (post Ned's #285). Branch `fix/header-consistency-dut263` (CL-242 / T-848 renumbered above Ned's parallel CL-241 / T-847). **Verification:** `xcodebuild` build + SwiftLint + swift-format `--strict` clean; built + ran the app on the iPhone 17 sim, confirmed all tab titles aligned at the top, true black/white, no empty capsules, Cooking Tools + cart intact.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

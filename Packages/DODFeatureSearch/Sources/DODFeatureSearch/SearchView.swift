@@ -88,6 +88,9 @@ public struct SearchView: View {
             content
         }
         .background(DODColor.surface)
+        // DUT-263 — Search has no toolbar button of its own; reserve the nav bar
+        // so its title sits at the same height as Recipes / Saved.
+        .dodReservesNavBarHeight()
         .task {
             await viewModel.loadCategoriesIfNeeded()
             await viewModel.refreshSavedRecipeIDs()  // T-765: state-aware menu on appear
