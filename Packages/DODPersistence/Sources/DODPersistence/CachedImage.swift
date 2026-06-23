@@ -15,6 +15,12 @@ public final class CachedImage {
     public var fetchedAt = Date.distantPast
     public var lastUsedAt = Date.distantPast
     public var pinnedToSavedRecipeID: Int?
+    /// DUT-242: a cheap, denormalized copy of `bytes.count`. Eviction +
+    /// clear-cache sum this scalar (via `propertiesToFetch`) instead of reading
+    /// `bytes.count` over every row, which faulted every image's full payload
+    /// into RAM on every scroll. Defaulted (in-place migration); set on every
+    /// write; pre-existing rows are backfilled once (see `RecipeStore`).
+    public var byteCount: Int = 0
 
     public init(
         urlString: String,
@@ -25,6 +31,7 @@ public final class CachedImage {
     ) {
         self.urlString = urlString
         self.bytes = bytes
+        self.byteCount = bytes.count
         self.fetchedAt = fetchedAt
         self.lastUsedAt = lastUsedAt
         self.pinnedToSavedRecipeID = pinnedToSavedRecipeID

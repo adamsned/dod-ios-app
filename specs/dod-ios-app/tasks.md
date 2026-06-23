@@ -2785,11 +2785,18 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookActivityAttributes.swift`, `CookLiveActivityViews.swift`, `LiveActivity/CookActivityWidget.swift`, `CookModeViewModel.swift`, `CookModeViewModelTests.swift`. Spec: `clarifications.md` (CL-240).
 - **AC:** US-11 / AC-11.2 / DUT-218. CL-240 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/DUT-218-liveactivity-countdown`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 203 DODFeatureRecipeDetail tests pass; iOS app build green.
 
-### T-847 — Tab headers: uniform position + true black/white color + always-visible Saved title (DUT-263, CL-241, BUGFIX)
+### T-847 — DUT-242: image-cache eviction sums a byteCount column, not faulted blobs (CL-241)
+
+- **What:** `evictImagesIfNeeded` summed `.bytes.count` over all rows (faulting every image's full payload into RAM on every cacheImage/scroll). Added defaulted `CachedImage.byteCount` (in-place migration; pure cache → no data risk), set on every write; eviction + clearImageCache now sum it via `propertiesToFetch` (no blob fault). One-time-per-launch backfill for pre-existing rows.
+- **Files:** `CachedImage.swift`, `RecipeStore.swift` (actor backfill flag), `RecipeStore+ImageCache.swift`, `RecipeStoreImageByteCountTests.swift` (new). Spec: `clarifications.md` (CL-241).
+- **AC:** US-21 / NFR-2 / DUT-242. CL-241 canonical. **Est:** ~2 h. **Deps:** off main (post #284). Branch `fix/DUT-242-image-bytecount`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 118 DODPersistence tests pass; iOS app build green.
+- **Follow-up (option B):** `@Attribute(.externalStorage)` on `bytes` + NSCache `totalCostLimit` (DUT-213/251) — heavier migration, separate PR.
+
+### T-848 — Tab headers: uniform position + true black/white color + always-visible Saved title (DUT-263, CL-242, BUGFIX)
 
 - **What:** Tester follow-up to DUT-261. (1) Search / Settings / empty-Saved titles sat ~64pt higher than Recipes / Saved because those tabs have no toolbar button, so their NavigationStack nav bar collapsed (no content inset). New `View.dodReservesNavBarHeight()` adds a hidden 1x1 toolbar item so the bar is reserved and every title lands at the same Y (~392px on iPhone 17). (2) `DODScreenHeader` moved from the warm `DODColor.label` (grey/cream) to a new `DODColor.labelStrong` (`#000000`/`#FFFFFF`). (3) The "Saved" title now renders in the empty / loading / error states (was `.loaded`-only), pinned via `safeAreaInset`. Recipes / Saved scroll-away behavior unchanged.
-- **Files:** `DODDesignSystem/Colors.swift` (+`labelStrong`); `Colors.xcassets/LabelStrong.colorset` (new); `DODDesignSystem/Components/DODScreenHeader.swift` (color + `dodReservesNavBarHeight`); `DODFeatureSearch/SearchView.swift`; `DODFeatureFeed/SettingsView.swift`; `DODFeatureSaved/SavedView.swift`. Spec: `clarifications.md` (CL-241).
-- **AC:** US-3 / US-32 / header consistency (extends CL-237 / DUT-261). CL-241 canonical. **Est:** ~1.5 h. **Deps:** off main (post Ned's #284/#285). Branch `fix/header-consistency-dut263`. **Verification:** `xcodebuild` build + SwiftLint + swift-format `--strict` clean; ran the app on the iPhone 17 sim and pixel-measured each tab title at ~392px (was 247 Search / 351 Settings); header renders true white in dark mode.
+- **Files:** `DODDesignSystem/Colors.swift` (+`labelStrong`); `Colors.xcassets/LabelStrong.colorset` (new); `DODDesignSystem/Components/DODScreenHeader.swift` (color + `dodReservesNavBarHeight`); `DODFeatureSearch/SearchView.swift`; `DODFeatureFeed/SettingsView.swift`; `DODFeatureSaved/SavedView.swift`. Spec: `clarifications.md` (CL-242).
+- **AC:** US-3 / US-32 / header consistency (extends CL-237 / DUT-261). CL-242 canonical. **Est:** ~1.5 h. **Deps:** off main (post Ned's #285). Branch `fix/header-consistency-dut263` (CL-242 / T-848 renumbered above Ned's parallel CL-241 / T-847). **Verification:** `xcodebuild` build + SwiftLint + swift-format `--strict` clean; ran the app on the iPhone 17 sim and pixel-measured each tab title at ~392px (was 247 Search / 351 Settings); header renders true white in dark mode.
 
 ---
 

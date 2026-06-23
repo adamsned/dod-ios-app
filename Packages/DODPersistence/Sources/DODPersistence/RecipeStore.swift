@@ -16,6 +16,11 @@ public actor RecipeStore {
     public static let unsavedLRUCap = 100
     public static let imageBudgetBytes: Int = 200 * 1_024 * 1_024
 
+    /// DUT-242: flips true after the first ``backfillImageByteCountsIfNeeded()``
+    /// of the process, so the one-time `byteCount` backfill faults pre-existing
+    /// image blobs at most once per launch.
+    var didBackfillImageByteCounts = false
+
     // MARK: - List item cache
 
     /// Insert-or-update a list item. Sets `lastViewedAt` so LRU sees it as fresh.
