@@ -124,6 +124,44 @@ struct AccountViewModelTests {
         #expect((try? store.load())?.refreshToken == "rt-new")
     }
 
+    @Test func exchangeAfterSignOutDoesNotResurrectTheSession() async {
+        // DUT-266: the auth-code exchange is async. Signing out before it
+        // resolves must NOT let the late write-back resurrect the session.
+        let store = InMemoryAppleAuthSessionStore()
+        let spy = SpyRevoker()
+        spy.exchangeReturn = "rt-new"
+        let vm = AccountViewModel(store: store, profileStore: SpyProfileStore(), revoker: spy)
+        vm.applySignIn(
+            userIdentifier: "u1",
+            displayName: "Ned",
+            email: "n@x.com",
+            authorizationCode: "code-1"
+        )
+        await vm.signOut()  // sign out before the background exchange resolves
+        try? await Task.sleep(for: .milliseconds(200))  // let the exchange Task run
+        #expect(vm.session == nil, "a late exchange must not resurrect a signed-out session")
+        #expect((try? store.load()) == nil, "no orphaned session persisted")
+    }
+
+    @Test func exchangeAfterDeleteDoesNotOrphanALiveToken() async {
+        // DUT-266 (the 5.1.1(v) case): deleting before the exchange resolves
+        // must NOT persist a fresh, never-revoked refresh token.
+        let store = InMemoryAppleAuthSessionStore()
+        let spy = SpyRevoker()
+        spy.exchangeReturn = "rt-new"
+        let vm = AccountViewModel(store: store, profileStore: SpyProfileStore(), revoker: spy)
+        vm.applySignIn(
+            userIdentifier: "u1",
+            displayName: "Ned",
+            email: "n@x.com",
+            authorizationCode: "code-1"
+        )
+        await vm.deleteAccount()  // delete before the background exchange resolves
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(vm.session == nil)
+        #expect((try? store.load()) == nil, "the late exchange must not persist an orphaned token")
+    }
+
     @Test func deleteWithoutRefreshTokenDoesNotCallRevoker() async {
         let store = InMemoryAppleAuthSessionStore(
             initial: AppleAuthSession(userIdentifier: "u1")  // no refresh token
