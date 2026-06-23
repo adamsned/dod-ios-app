@@ -53,6 +53,9 @@ struct DODApp: App {
         }
         if args.contains("-DODForceFreshOnboarding") {
             UserDefaults.standard.removeObject(forKey: RootView.onboardingCompletedKey)
+            // The onboarding UI test dismisses the welcome sheet; suppress the
+            // first-run permission prompts so the system dialogs don't block it.
+            DODEnvironment.suppressFirstRunPrompts = true
         }
         // T-762 / CL-159 (DUT-68): the first-launch iCloud-Sync opt-in sheet was
         // removed (sync opt-in now lives only in Settings), so the
@@ -85,6 +88,13 @@ enum DODEnvironment {
     /// `FakeAppDependencies` to decide whether to swap fixtures into the
     /// composition root.
     nonisolated(unsafe) static var isE2EMode: Bool = false
+
+    /// True when the first-run permission prompts (notifications + iCloud Sync,
+    /// shown after the welcome sheet) must be suppressed — set when the host is
+    /// the onboarding UI test (`-DODForceFreshOnboarding`), which dismisses the
+    /// welcome sheet but must not trip the system permission dialogs. Production
+    /// launches (no flag) leave this false, so real new installs get the prompts.
+    nonisolated(unsafe) static var suppressFirstRunPrompts: Bool = false
 }
 
 /// UIKit application delegate bridged into the SwiftUI lifecycle via
