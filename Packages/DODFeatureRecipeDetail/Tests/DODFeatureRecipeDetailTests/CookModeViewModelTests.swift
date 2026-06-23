@@ -189,6 +189,21 @@ import Testing
         #expect(activity.lastUpdateState?.isPaused == false)
     }
 
+    @Test func runningUpdateSetsALiveDeadlineAndPausedClearsIt() {
+        // DUT-218: a running tick carries an `endDate` so the Lock Screen
+        // countdown self-ticks (`Text(timerInterval:)`) even while backgrounded;
+        // pausing clears it so the views show the frozen snapshot instead.
+        let activity = FakeLiveActivityController()
+        let viewModel = Self.makeViewModel(stepCount: 1, liveActivity: activity)
+        viewModel.startTimerLiveActivity(stepText: "Step", totalSeconds: 60)
+
+        viewModel.updateTimerLiveActivity(remainingSeconds: 42, stepText: "Step", isPaused: false)
+        #expect(activity.lastUpdateState?.endDate != nil, "running → a live deadline")
+
+        viewModel.updateTimerLiveActivity(remainingSeconds: 42, stepText: "Step", isPaused: true)
+        #expect(activity.lastUpdateState?.endDate == nil, "paused → no deadline (frozen snapshot)")
+    }
+
     @Test func updatingWithoutAnActiveActivityIsANoOp() {
         // Tick events fire from the SwiftUI Timer publisher every second
         // even when no activity is in flight — the VM must filter so we
