@@ -40,17 +40,13 @@ public struct SavedView: View {
     }
 
     public var body: some View {
-        // T-781 / DUT-87 — the "Saved" title scrolls with the grid
-        // (`DODScreenHeader` inside the loaded ScrollView), matching every other
-        // tab; only the toolbar cart stays pinned. (T-776 had already dropped the
-        // native `.navigationTitle` to dodge the iOS 26 large-title vanish bug.)
+        // DUT-275 — the "Saved" title + cart are a pinned header row (nav bar
+        // hidden), so the title sits at the same Y as every other tab in every
+        // state. (No native `.navigationTitle` — dodges the iOS 26 large-title bug.)
         content
             .background(DODColor.surface)
-            .toolbar { shoppingListToolbar }
-            // DUT-263 — the cart button only exists in `.loaded`; reserve the nav
-            // bar in every state so the "Saved" title sits at the same height
-            // across empty / loading / loaded (and matches Recipes).
-            .dodReservesNavBarHeight()
+            // DUT-275 — nav bar hidden; the cart lives in the header row above.
+            .dodHidesNavBar()
             .sheet(isPresented: $isBuildingShoppingList) {
                 ShoppingListBuilderSheet(recipes: viewModel.recipes) { selected in
                     builtListRecipes = ShoppingListSelection(recipes: selected)
@@ -80,31 +76,27 @@ public struct SavedView: View {
             )
     }
 
-    /// AC-39.3 / CL-85 decision 1 — the Saved-tab entry into the shopping-list
-    /// flow. Rendered only in the `.loaded` state (there are no saved recipes
-    /// to pick from otherwise, mirroring the AC-39.1 hide-when-empty posture).
-    @ToolbarContentBuilder
-    private var shoppingListToolbar: some ToolbarContent {
-        if viewModel.loadState == .loaded {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isBuildingShoppingList = true
-                } label: {
-                    Label("Make Shopping List", systemImage: "cart")
-                }
-                .accessibilityIdentifier("saved-make-shopping-list")
-                .accessibilityLabel("Make Shopping List")
-            }
-        }
-    }
-
     @ViewBuilder
     private var content: some View {
-        // DUT-263 — the "Saved" title is pinned at the top above every state
-        // (loaded grid, empty, loading, error) so it always shows and sits at the
-        // same Y as the other tabs. The grid scrolls beneath the pinned title.
+        // DUT-275 — the "Saved" title + its cart button share one header row at
+        // the very top (nav bar hidden), so the title sits at the same Y as every
+        // other tab in every state. The grid scrolls beneath the pinned title.
         VStack(spacing: 0) {
-            DODScreenHeader("Saved")
+            DODScreenHeader("Saved") {
+                // AC-39.3 / CL-85 — the "Make Shopping List" cart, in the header
+                // row (was a nav-bar toolbar item). Only in `.loaded` (nothing to
+                // build a list from otherwise), mirroring the hide-when-empty rule.
+                if viewModel.loadState == .loaded {
+                    Button {
+                        isBuildingShoppingList = true
+                    } label: {
+                        Image(systemName: "cart")
+                            .accessibilityLabel("Make Shopping List")
+                    }
+                    .tint(DODColor.burntOrange)
+                    .accessibilityIdentifier("saved-make-shopping-list")
+                }
+            }
             loadStateBody
         }
     }
