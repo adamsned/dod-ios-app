@@ -2832,6 +2832,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `FirstCookoutView.swift` (`.fire` case), `FirstCookoutView+Stages.swift` (`heatCoachCallToAction` + `coalStartingPointNote` replace `coalsCard` + `heatCoachButton`). Spec: `clarifications.md` (CL-248).
 - **AC:** DUT-183 / DUT-239. CL-248 canonical. **Est:** ~45 min. **Deps:** off main. Branch `feat/DUT-239-fire-step-heat-coach-first`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 100 DODFeatureFeed tests pass; iOS app build green.
 
+### T-855 — First-run setup: prompt for notifications + iCloud Sync on new install (CL-249)
+
+- **What:** New installs asked for neither notifications nor iCloud Sync at first launch. `RootView.runFirstRunSetup()` (run once from the onboarding `onContinue`) now requests notification authorization (system prompt; sets the app toggle on grant) then shows a "Turn On iCloud Sync?" alert that sets the cloud-sync opt-in. Re-introduces a launch-time sync *ask* (DUT-68 removed the old blocking sheet) as a non-blocking prompt. Gated out of the onboarding UI test via `DODEnvironment.suppressFirstRunPrompts`.
+- **Files:** `App/RootView.swift` (state + alert + `runFirstRunSetup`), `App/RootView+Onboarding.swift` (new — `welcomeBullets`, keeps RootView under the 400-line cap), `App/DODApp.swift` (`suppressFirstRunPrompts` flag). Spec: `clarifications.md` (CL-249).
+- **AC:** US-8 / US-41 / US-42. CL-249 canonical. **Linear ticket pending (workspace at free issue limit).** **Est:** ~1.5 h. **Deps:** off main. Branch `feat/first-run-notifications-icloud-prompt`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; iOS app build green (XcodeGen regenerated for the new file).
 ### T-856 — DUT-276: Sign in with Google scaffold (gated, ships dark) (CL-250)
 
 - **What:** Lands the Google sign-in architecture now, gated behind `GoogleSignInConfig.isConfigured` (false until a real client ID is wired) so it ships dark and CI passes without the GoogleSignIn SDK. Button + provider seam + unconfigured stub + gated render in the profile editor. Wire-up (SDK + OAuth client ID + real provider + provider-agnostic session persist) is the follow-up step on the same ticket.
