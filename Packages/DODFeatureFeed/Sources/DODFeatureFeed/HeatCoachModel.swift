@@ -87,12 +87,22 @@ struct HeatCoachModel {
         return "Replenish from the chimney every \(minutes) minutes\(why)."
     }
 
-    /// Wind tip — only when windy. Leads with "fix the environment first."
+    /// Wind coal-delta line, e.g. "Windy: add 3-4 coals, since the wind steals
+    /// heat." (DUT-264 — wind adjusts the coal COUNT, not just the replenish
+    /// cadence; parallel to ``ambientNote`` and additive with it.) `nil` when calm.
+    var windCoalNote: String? {
+        guard windy else { return nil }
+        let delta = DutchOvenHeatCoach.windCoalDelta(windy)
+        return "Windy: add \(magnitudePhrase(delta)) coals, since the wind steals heat."
+    }
+
+    /// Wind environment tip — only when windy. Pairs with ``windCoalNote``:
+    /// add the coals, but fix the environment first.
     var windNote: String? {
         guard windy else { return nil }
         return
-            "Windy: fix the environment first by turning the oven so its back faces the wind, "
-            + "then build a windbreak before adding coals."
+            "Then fix the environment: turn the oven so its back faces the wind, "
+            + "and build a windbreak so those coals aren't wasted."
     }
 
     // MARK: - Helpers

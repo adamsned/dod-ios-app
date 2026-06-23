@@ -41,6 +41,14 @@ public enum DODColor {
     public static let surfaceDivider = bundleColor("SurfaceDivider")
     /// Primary body text color.
     public static let label = bundleColor("Label")
+    /// Maximum-contrast label for large screen titles (``DODScreenHeader``).
+    ///
+    /// DUT-263 — pure `#000000` light / `#FFFFFF` dark, where ``label`` is the
+    /// warmer brand `#2C2C2C` / `#E6DECF`. Tester feedback was that the
+    /// brand-grey/cream large titles read as washed out; the screen header
+    /// wants true black/white so every tab's title pops identically. Scoped to
+    /// the header — body copy stays on ``label``.
+    public static let labelStrong = bundleColor("LabelStrong")
     /// Secondary / supporting text color.
     public static let labelSecondary = bundleColor("LabelSecondary")
     /// Text rendered on top of an ``accent``-filled surface (the burnt-orange

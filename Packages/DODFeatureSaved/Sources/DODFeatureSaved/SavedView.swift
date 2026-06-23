@@ -47,6 +47,10 @@ public struct SavedView: View {
         content
             .background(DODColor.surface)
             .toolbar { shoppingListToolbar }
+            // DUT-263 — the cart button only exists in `.loaded`; reserve the nav
+            // bar in every state so the "Saved" title sits at the same height
+            // across empty / loading / loaded (and matches Recipes).
+            .dodReservesNavBarHeight()
             .sheet(isPresented: $isBuildingShoppingList) {
                 ShoppingListBuilderSheet(recipes: viewModel.recipes) { selected in
                     builtListRecipes = ShoppingListSelection(recipes: selected)
@@ -96,6 +100,17 @@ public struct SavedView: View {
 
     @ViewBuilder
     private var content: some View {
+        // DUT-263 — the "Saved" title is pinned at the top above every state
+        // (loaded grid, empty, loading, error) so it always shows and sits at the
+        // same Y as the other tabs. The grid scrolls beneath the pinned title.
+        VStack(spacing: 0) {
+            DODScreenHeader("Saved")
+            loadStateBody
+        }
+    }
+
+    @ViewBuilder
+    private var loadStateBody: some View {
         switch viewModel.loadState {
         case .idle, .loading:
             ProgressView()
@@ -106,6 +121,7 @@ public struct SavedView: View {
                 title: "No saved recipes yet",
                 message: "Tap the bookmark on any recipe to find it again later."
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .error:
             EmptyState(
                 systemImage: "exclamationmark.triangle",
@@ -115,9 +131,9 @@ public struct SavedView: View {
                     Task { await viewModel.refresh() }
                 }
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded:
             ScrollView {
-                DODScreenHeader("Saved")
                 LazyVGrid(
                     columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
                     spacing: DODSpacing.md
