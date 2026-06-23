@@ -66,9 +66,10 @@ public struct SettingsView: View {
             content
         }
         .background(DODColor.surface)
-        // DUT-263 — Settings has no toolbar button; reserve the nav bar so the
-        // title lands at the same height as Recipes / Saved (not ~64pt higher).
-        .dodReservesNavBarHeight()
+        // DUT-275 — nav bar hidden; the title pins at the top (header above).
+        #if os(iOS)
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
         // T-756 / CL-153 (DUT-62 bug 2) — give the Settings surface its OWN live
         // color scheme. `preferredColorScheme` applied on `RootView` does NOT
         // propagate into an already-presented sheet (the "only updates on reopen"

@@ -59,33 +59,32 @@ public struct FeedView: View {
 
     public var body: some View {
         ZStack(alignment: .top) {
-            content
+            VStack(spacing: 0) {
+                // DUT-275 — the "Recipes & Articles" title + the Cooking Tools
+                // button share one header row at the very top (the nav bar is
+                // hidden). With the button in the content row instead of the nav
+                // bar, NO nav-bar height is reserved, so this title sits at the
+                // exact same Y as every other tab's title (Search/Settings/Saved).
+                DODScreenHeader("Recipes & Articles") { cookingToolsMenu }
+                // DUT-275 — the onboarding callout floats ON TOP of the content
+                // (below the header row) as a dismissible popup, so it never
+                // pushes the pinned title/content down; its tail points up at the
+                // Cooking Tools button in the header row.
+                content
+                    .overlay(alignment: .top) { cookingToolsCalloutOverlay }
+            }
+            // Offline shifts the whole stack below the OfflineBanner overlay.
+            .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
             OfflineBanner(isOffline: viewModel.isOffline)
         }
         .background(DODColor.surface)
-        // T-781 / DUT-87 — no `.navigationTitle`: the "Recipes & Articles" large
-        // title is rendered as scrolling content (`DODScreenHeader` in `list`)
-        // so it scrolls up and away instead of the native minimize, keeping every
-        // tab's header behavior consistent (and dodging the iOS 26 large-title
-        // bug). The `.toolbar` buttons below stay pinned in the nav bar.
-        .toolbar {
-            // DUT-196 — a single "Cooking Tools" menu (`frying.pan.fill`) on the
-            // TRAILING edge consolidates every cooking-help + cast-iron-care
-            // entry point (Your First Cookout, Cooking Journal, Heat Coach, Buy
-            // BuzzyWaxx) into one spot so the Feed chrome stays clean. Replaces
-            // the separate First Cookout + Journal buttons (T-823) and pulls Heat
-            // Coach + Shop off the Settings page. `.topBarTrailing` is iOS-only;
-            // the macOS test slice falls back to `.automatic`.
-            #if os(iOS)
-            ToolbarItem(placement: .topBarTrailing) {
-                cookingToolsMenu
-            }
-            #else
-            ToolbarItem(placement: .automatic) {
-                cookingToolsMenu
-            }
-            #endif
-        }
+        // DUT-275 — nav bar hidden: the "Cooking Tools" menu (DUT-196) now lives
+        // in the pinned header row above (next to the title) instead of the nav
+        // bar, so no nav-bar height is reserved and the title sits at the same top
+        // Y as every other tab. Pushed detail screens keep their own nav bar.
+        #if os(iOS)
+        .toolbar(.hidden, for: .navigationBar)
+        #endif
         .sheet(isPresented: $showingFirstCookout) {
             // DUT-194 — start on the "pick what to cook" chooser (rungs + dump
             // cakes), with the progress-aware rung recommended. A true beginner
@@ -221,46 +220,45 @@ public struct FeedView: View {
         // layout. `.gallery` keeps the existing 2-col `LazyVGrid` body
         // byte-identical (CC-9 contract preserved); `.list` renders a
         // `LazyVStack` of `RecipeCard.ListRow` rows for denser scanning.
+        // DUT-275 — the title is now pinned above `content` in `body`, and the
+        // Cooking Tools callout floats as an overlay; `list` is just the grid.
         let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
-        return VStack(spacing: 0) {
-            // DUT-200 / DUT-263 — the onboarding "Cooking Tools" speech bubble sits
-            // ABOVE the pinned title (not below it) so its upward trailing tail
-            // still points at the Cooking Tools button in the nav bar. Dismissible
-            // + persisted; once dismissed the title sits at the very top, level
-            // with every other tab. (`currentRung` still feeds the chooser sheet.)
-            if !cookingToolsCalloutDismissed {
-                CookingToolsCallout(onDismiss: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        cookingToolsCalloutDismissed = true
-                    }
-                })
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.top, DODSpacing.sm)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+        return ScrollView {
+            Group {
+                switch layout {
+                case .gallery:
+                    galleryContent
+                case .list:
+                    listContent
+                }
             }
-            // DUT-263 — the title is pinned at the top (not scrolling away) so it
-            // sits at the same Y as every other tab's title.
-            DODScreenHeader("Recipes & Articles")
-            ScrollView {
-                Group {
-                    switch layout {
-                    case .gallery:
-                        galleryContent
-                    case .list:
-                        listContent
-                    }
-                }
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.top, DODSpacing.md)
+            .padding(.horizontal, DODSpacing.md)
+            .padding(.top, DODSpacing.md)
 
-                if viewModel.loadState == .loadingMore {
-                    ProgressView()
-                        .padding(.vertical, DODSpacing.lg)
-                }
+            if viewModel.loadState == .loadingMore {
+                ProgressView()
+                    .padding(.vertical, DODSpacing.lg)
             }
         }
-        // Offline shifts the whole stack below the OfflineBanner overlay.
-        .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
+    }
+
+    /// DUT-275 — the onboarding "Cooking Tools" speech bubble, rendered as a
+    /// floating overlay (a dismissible popup ON TOP of the content) so it never
+    /// shifts the pinned title or the grid down. Its upward trailing tail points
+    /// at the Cooking Tools button in the nav bar (DUT-200). Dismissible +
+    /// persisted; once dismissed the Feed is the clean pinned title + grid.
+    @ViewBuilder
+    private var cookingToolsCalloutOverlay: some View {
+        if !cookingToolsCalloutDismissed {
+            CookingToolsCallout(onDismiss: {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    cookingToolsCalloutDismissed = true
+                }
+            })
+            .padding(.horizontal, DODSpacing.md)
+            .padding(.top, DODSpacing.sm)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
     }
 
     /// US-38 / AC-38.3 — the existing 2-col `LazyVGrid` rendering. Body
