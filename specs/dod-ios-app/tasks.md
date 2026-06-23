@@ -2785,6 +2785,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookActivityAttributes.swift`, `CookLiveActivityViews.swift`, `LiveActivity/CookActivityWidget.swift`, `CookModeViewModel.swift`, `CookModeViewModelTests.swift`. Spec: `clarifications.md` (CL-240).
 - **AC:** US-11 / AC-11.2 / DUT-218. CL-240 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/DUT-218-liveactivity-countdown`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 203 DODFeatureRecipeDetail tests pass; iOS app build green.
 
+### T-847 — Tab headers: uniform position + true black/white color + always-visible Saved title (DUT-263, CL-241, BUGFIX)
+
+- **What:** Tester follow-up to DUT-261. (1) Search / Settings / empty-Saved titles sat ~64pt higher than Recipes / Saved because those tabs have no toolbar button, so their NavigationStack nav bar collapsed (no content inset). New `View.dodReservesNavBarHeight()` adds a hidden 1x1 toolbar item so the bar is reserved and every title lands at the same Y (~392px on iPhone 17). (2) `DODScreenHeader` moved from the warm `DODColor.label` (grey/cream) to a new `DODColor.labelStrong` (`#000000`/`#FFFFFF`). (3) The "Saved" title now renders in the empty / loading / error states (was `.loaded`-only), pinned via `safeAreaInset`. Recipes / Saved scroll-away behavior unchanged.
+- **Files:** `DODDesignSystem/Colors.swift` (+`labelStrong`); `Colors.xcassets/LabelStrong.colorset` (new); `DODDesignSystem/Components/DODScreenHeader.swift` (color + `dodReservesNavBarHeight`); `DODFeatureSearch/SearchView.swift`; `DODFeatureFeed/SettingsView.swift`; `DODFeatureSaved/SavedView.swift`. Spec: `clarifications.md` (CL-241).
+- **AC:** US-3 / US-32 / header consistency (extends CL-237 / DUT-261). CL-241 canonical. **Est:** ~1.5 h. **Deps:** off main (post Ned's #284/#285). Branch `fix/header-consistency-dut263`. **Verification:** `xcodebuild` build + SwiftLint + swift-format `--strict` clean; ran the app on the iPhone 17 sim and pixel-measured each tab title at ~392px (was 247 Search / 351 Settings); header renders true white in dark mode.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
