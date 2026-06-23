@@ -2792,6 +2792,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **AC:** US-21 / NFR-2 / DUT-242. CL-241 canonical. **Est:** ~2 h. **Deps:** off main (post #284). Branch `fix/DUT-242-image-bytecount`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 118 DODPersistence tests pass; iOS app build green.
 - **Follow-up (option B):** `@Attribute(.externalStorage)` on `bytes` + NSCache `totalCostLimit` (DUT-213/251) — heavier migration, separate PR.
 
+### T-849 — DUT-265: Categories pages off X-WP-TotalPages (parity with DUT-237) (CL-243)
+
+- **What:** DUT-237's pagination fix never reached Categories — `CategoryRecipesViewModel` still used `if fetched.count < 20 { reachedEnd = true }`, so a short mid-list page latched pagination. Mirrored the Feed fix: `CategoriesDependencies.fetchPosts` returns `(items, totalPages)` via `client.postsPage`, and `load` sets `reachedEnd = currentPage >= totalPages`.
+- **Files:** `CategoriesDependencies.swift`, `CategoryRecipesViewModel.swift`, `CategoriesTests.swift` (fake + 1 regression test). Spec: `clarifications.md` (CL-243).
+- **AC:** US-2 / AC-2.3 / DUT-265. CL-243 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-265-categories-pagination`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 3 DODFeatureCategories tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
