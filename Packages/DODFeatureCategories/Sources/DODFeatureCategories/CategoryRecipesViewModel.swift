@@ -71,18 +71,21 @@ public final class CategoryRecipesViewModel {
     private func load(page: Int, append: Bool = false) async {
         loadState = append ? .loadingMore : .loadingInitial
         do {
-            let fetched = try await dependencies.fetchPosts(categoryID: category.id, page: page)
-            try await dependencies.cache(listItems: fetched)
+            let result = try await dependencies.fetchPosts(categoryID: category.id, page: page)
+            try await dependencies.cache(listItems: result.items)
             if append {
-                let combinedIDs = (items.map(\.id) + fetched.map(\.id)).reduce(into: [Int]()) { acc, id in
-                    if !acc.contains(id) { acc.append(id) }
-                }
+                let combinedIDs = (items.map(\.id) + result.items.map(\.id))
+                    .reduce(into: [Int]()) { acc, id in
+                        if !acc.contains(id) { acc.append(id) }
+                    }
                 items = try await dependencies.cachedListItems(forIDs: combinedIDs)
             } else {
-                items = try await dependencies.cachedListItems(forIDs: fetched.map(\.id))
+                items = try await dependencies.cachedListItems(forIDs: result.items.map(\.id))
             }
             currentPage = page
-            if fetched.count < 20 { reachedEnd = true }
+            // DUT-265: stop at the real last page (X-WP-TotalPages), not at a
+            // short page — mirrors the DUT-237 feed fix.
+            reachedEnd = currentPage >= result.totalPages
             loadState = items.isEmpty ? .empty : .loaded
         } catch {
             DODLog.network.error("category load failed: \(String(describing: error))")

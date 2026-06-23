@@ -125,6 +125,16 @@ import Testing
         #expect(DutchOvenHeatCoach.ambientCoalDelta(.mild) == 0...0)
     }
 
+    // MARK: - windCoalDelta: wind adds coals, not just time (DUT-264)
+
+    @Test func windDelta_windy_isPlusThreeToPlusFour() {
+        #expect(DutchOvenHeatCoach.windCoalDelta(true) == 3...4)
+    }
+
+    @Test func windDelta_calm_isZeroToZero() {
+        #expect(DutchOvenHeatCoach.windCoalDelta(false) == 0...0)
+    }
+
     // MARK: - cookTimeExtraMinutes: +15..+20 min per 1,000 ft above baseline
 
     @Test func elevation_atBaseline_isZero() {

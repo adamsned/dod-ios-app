@@ -5,7 +5,13 @@ import Foundation
 
 public protocol CategoriesDependencies: Sendable {
     func fetchCategories() async throws -> [DODDomain.Category]
-    func fetchPosts(categoryID: Int, page: Int) async throws -> [RecipeListItem]
+    /// DUT-265: returns the page's items + WP's total page count
+    /// (`X-WP-TotalPages`) so the view model stops at the real last page instead
+    /// of guessing from a short page (mirrors the DUT-237 feed fix).
+    func fetchPosts(
+        categoryID: Int,
+        page: Int
+    ) async throws -> (items: [RecipeListItem], totalPages: Int)
     func cache(listItems: [RecipeListItem]) async throws
     func cachedListItems(forIDs ids: [Int]) async throws -> [RecipeListItem]
     /// T-765 / CL-162 (DUT-71) — saved recipe id set for the card long-press
@@ -30,8 +36,11 @@ public struct LiveCategoriesDependencies: CategoriesDependencies {
         try await client.categories()
     }
 
-    public func fetchPosts(categoryID: Int, page: Int) async throws -> [RecipeListItem] {
-        try await client.posts(categoryID: categoryID, page: page)
+    public func fetchPosts(
+        categoryID: Int,
+        page: Int
+    ) async throws -> (items: [RecipeListItem], totalPages: Int) {
+        try await client.postsPage(categoryID: categoryID, page: page)
     }
 
     public func cache(listItems: [RecipeListItem]) async throws {
