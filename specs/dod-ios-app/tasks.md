@@ -2832,6 +2832,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `FirstCookoutView.swift` (`.fire` case), `FirstCookoutView+Stages.swift` (`heatCoachCallToAction` + `coalStartingPointNote` replace `coalsCard` + `heatCoachButton`). Spec: `clarifications.md` (CL-248).
 - **AC:** DUT-183 / DUT-239. CL-248 canonical. **Est:** ~45 min. **Deps:** off main. Branch `feat/DUT-239-fire-step-heat-coach-first`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 100 DODFeatureFeed tests pass; iOS app build green.
 
+### T-856 — DUT-276: Sign in with Google scaffold (gated, ships dark) (CL-250)
+
+- **What:** Lands the Google sign-in architecture now, gated behind `GoogleSignInConfig.isConfigured` (false until a real client ID is wired) so it ships dark and CI passes without the GoogleSignIn SDK. Button + provider seam + unconfigured stub + gated render in the profile editor. Wire-up (SDK + OAuth client ID + real provider + provider-agnostic session persist) is the follow-up step on the same ticket.
+- **Files:** `GoogleProfileSignIn.swift` (new — config + seam + result + unconfigured provider), `GoogleProfileSignInButton.swift` (new), `ProfileEditView+AppleSignIn.swift` (gated render + `handleGoogleSignIn`), `GoogleProfileSignInTests.swift` (new). Spec: `clarifications.md` (CL-250).
+- **AC:** US-46 / DUT-276 (relates DUT-238). CL-250 canonical. **Est:** ~1 h (scaffold). **Deps:** off main. Branch `feat/DUT-276-google-signin-scaffold`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 52 DODFeatureProfile tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

@@ -56,6 +56,13 @@ extension ProfileEditView {
                 AppleProfileSignInButton(profileStore: store) { outcome in
                     handleAppleSignIn(outcome)
                 }
+                // Sign in with Google — scaffold, gated behind a real client ID
+                // (GoogleSignInConfig.isConfigured) so it stays hidden until wired.
+                if GoogleSignInConfig.isConfigured {
+                    GoogleProfileSignInButton { result in
+                        handleGoogleSignIn(result)
+                    }
+                }
             } footer: {
                 Text("Sign in to fill your name and email automatically, or just enter them below.")
                     .dodFont(DODType.caption)
@@ -81,6 +88,19 @@ extension ProfileEditView {
             await onProfileChanged()
             dismiss()
         }
+    }
+
+    /// Reflect a completed Sign in with Google (SCAFFOLD — see
+    /// `GoogleProfileSignIn`). Gated behind `GoogleSignInConfig.isConfigured`, so
+    /// `.notConfigured` never reaches a production user. On `.success` it fills
+    /// the name/email fields like Apple does. TODO(2026-06-23, nadams): persist the identity
+    /// as a session + profile by generalizing `AppleProfileSignIn`'s persist path
+    /// to be provider-agnostic (Google has no Apple-style refresh-token exchange).
+    @MainActor
+    func handleGoogleSignIn(_ result: GoogleSignInResult) {
+        guard case .success(_, let displayName, let email) = result else { return }
+        if let displayName { self.displayName = displayName }
+        if let email { self.email = email }
     }
     #endif
 }
