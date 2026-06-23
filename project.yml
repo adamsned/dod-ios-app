@@ -129,12 +129,18 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        # Deep-link scheme `dod://` for App Intents + Siri Shortcuts (US-10).
-        # Routed by `RootView.handle(intent:)` into the right tab + path.
+        # DUT-276 — Sign in with Google. The SDK reads `GIDClientID` at runtime;
+        # the OAuth redirect comes back on the reversed-client-ID URL scheme.
+        GIDClientID: 16278307823-o18m60h5rq1m76b9mqam4nhj8po9pipf.apps.googleusercontent.com
+        # Deep-link scheme `dod://` for App Intents + Siri Shortcuts (US-10),
+        # plus the Google reversed-client-ID scheme (DUT-276).
         CFBundleURLTypes:
           - CFBundleURLName: com.dutchovendaddy.DODApp.deeplink
             CFBundleURLSchemes:
               - dod
+          - CFBundleURLName: com.dutchovendaddy.DODApp.googlesignin
+            CFBundleURLSchemes:
+              - com.googleusercontent.apps.16278307823-o18m60h5rq1m76b9mqam4nhj8po9pipf
         # US-41 / AC-41.6 / CL-99 (T-702): silent-push wake-up for the
         # SwiftData → CloudKit private-DB sync adapter. SwiftData's
         # default `CKDatabaseSubscription` registers the app for silent

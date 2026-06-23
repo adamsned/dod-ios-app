@@ -1,35 +1,25 @@
+import DODSupport
 import Foundation
 
-// Sign in with Google — SCAFFOLD (Linear ticket pending; "add Google alongside
-// Sign in with Apple"). The button + provider seam ship now but stay HIDDEN
-// behind `GoogleSignInConfig.isConfigured` until a real Google OAuth client ID
-// is provisioned — exactly how `SiwaRevokeConfig.isConfigured` gates the Apple
-// revoke. Nothing here imports the GoogleSignIn SDK, so the app compiles +
-// CI passes without it; the real provider is added at wire-up time.
+// Sign in with Google (DUT-276). The OAuth flow is the GoogleSignIn SDK,
+// wrapped behind the `GoogleSignInProviding` seam so this file stays UI/SDK-free
+// and L1-testable; the real `GIDSignIn`-backed provider is `GIDSignInProvider`
+// (UIKit-gated). The button stays hidden until `GoogleSignInConfig.isConfigured`
+// (a real client ID is wired), mirroring how `SiwaRevokeConfig.isConfigured`
+// gates the Apple revoke.
 //
-// TO TURN GOOGLE SIGN-IN ON (the "wire the ID later" step):
-//   1. Add the **GoogleSignIn** Swift package to the project (project.yml +
-//      DODFeatureProfile's Package dependencies).
-//   2. Create an OAuth 2.0 client ID (iOS) in Google Cloud Console; add the
-//      client ID and its **reversed-client-ID URL scheme** to the app Info.plist.
-//   3. Set `GoogleSignInConfig.clientID` (or read it from Info.plist) so
-//      `isConfigured` flips true and the button appears.
-//   4. Replace `UnconfiguredGoogleSignInProvider` with a real provider that
-//      calls `GIDSignIn.sharedInstance.signIn(...)` and maps the `GIDGoogleUser`
-//      (`userID`, `profile?.name`, `profile?.email`) into `.success`.
-//   5. Persist the `.success` identity as a session + profile by generalizing
-//      `AppleProfileSignIn`'s persist path to be provider-agnostic (the session
-//      model is Apple-named today but functionally provider-neutral).
-//   6. Use the official Google logo/branding on the button (see
-//      `GoogleProfileSignInButton`), per Google's sign-in branding guidelines.
+// Config lives in the app Info.plist (read automatically by the SDK):
+//   - `GIDClientID` = the OAuth client ID (also mirrored in `clientID` below so
+//     `isConfigured` can gate the button without touching Info.plist at runtime).
+//   - `CFBundleURLTypes` = the reversed-client-ID URL scheme (the OAuth redirect).
 
-/// Config gate for Sign in with Google. `isConfigured` is false until a real
-/// client ID is wired, so the Google button never ships visible-but-broken.
+/// Config gate for Sign in with Google. `isConfigured` is true once a real
+/// client ID is wired, which surfaces the Google button in the profile editor.
 public enum GoogleSignInConfig {
 
-    /// The Google OAuth client ID. Empty placeholder until provisioned — keep it
-    /// empty so `isConfigured` stays false and the button stays hidden.
-    public static let clientID = ""
+    /// The Google OAuth client ID (DUT-276). Must match the app Info.plist
+    /// `GIDClientID` the GoogleSignIn SDK reads at runtime.
+    public static let clientID = "16278307823-o18m60h5rq1m76b9mqam4nhj8po9pipf.apps.googleusercontent.com"
 
     /// True once a real client ID is wired. The profile editor reads this to
     /// decide whether to surface the Google button.
@@ -37,24 +27,96 @@ public enum GoogleSignInConfig {
 }
 
 /// Result of a Google sign-in attempt. Provider-agnostic identity fields so the
-/// success path can persist a session the same way Apple does.
+/// success path persists a session the same way Apple does.
 public enum GoogleSignInResult: Sendable, Equatable {
     case success(userIdentifier: String, displayName: String?, email: String?)
-    /// Google sign-in isn't configured (no client ID / SDK). The button is gated
-    /// on ``GoogleSignInConfig/isConfigured``, so production never reaches this.
+    /// Google sign-in isn't configured (no client ID). The button is gated on
+    /// ``GoogleSignInConfig/isConfigured``, so production never reaches this.
     case notConfigured
+    /// The user cancelled, or the flow errored.
     case failed
 }
 
-/// Seam for the Google OAuth flow — kept UI/SDK-free so it's L1-testable and so
-/// the app compiles without the GoogleSignIn SDK. The real implementation (added
-/// at wire-up) calls `GIDSignIn` and maps the user into `.success`.
+/// Seam for the Google OAuth flow — kept UI/SDK-free so it's L1-testable. The
+/// real implementation (`GIDSignInProvider`) calls `GIDSignIn` and maps the user
+/// into `.success`. `@MainActor` because presenting the OAuth sheet is a main-
+/// thread UI operation.
 public protocol GoogleSignInProviding: Sendable {
-    func signIn() async -> GoogleSignInResult
+    @MainActor func signIn() async -> GoogleSignInResult
 }
 
-/// Default provider until the SDK + client ID land — always `.notConfigured`.
+/// Fallback provider used when no client ID is wired — always `.notConfigured`.
+/// (The button is gated off in that case, so it's only a belt-and-braces default.)
 public struct UnconfiguredGoogleSignInProvider: GoogleSignInProviding {
     public init() {}
-    public func signIn() async -> GoogleSignInResult { .notConfigured }
+    @MainActor public func signIn() async -> GoogleSignInResult { .notConfigured }
+}
+
+/// Persists a Google sign-in as the app's session + ``UserProfile`` — the
+/// Google-side mirror of ``AppleProfileSignIn`` (DUT-276). Google has no
+/// Apple-style one-time authorization code / refresh token, so there's no
+/// background token exchange or revoke: it just resolves the identity (carrying
+/// a returning user's name/email forward via the shared ``AppleCredentialResolver``),
+/// saves the session, and writes the profile when both fields are present.
+///
+/// Reuses ``AppleAuthSession`` as the app's (provider-neutral) session model and
+/// ``AppleProfileSignIn/Outcome`` so the host reflects the result identically to
+/// the Apple path. Pure value type with injected stores — L1-testable with fakes.
+public struct GoogleProfileSignIn: Sendable {
+
+    private let sessionStore: any AppleAuthSessionStoring
+    private let profileStore: any ProfileStoring
+
+    public init(
+        profileStore: any ProfileStoring,
+        sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore()
+    ) {
+        self.profileStore = profileStore
+        self.sessionStore = sessionStore
+    }
+
+    @discardableResult
+    public func apply(
+        userIdentifier: String,
+        displayName: String?,
+        email: String?
+    ) async -> AppleProfileSignIn.Outcome {
+        let existing = try? sessionStore.load()
+        let resolved = AppleCredentialResolver.resolve(
+            userIdentifier: userIdentifier,
+            credentialDisplayName: displayName,
+            credentialEmail: email,
+            existing: existing
+        )
+        // Preserve any token already on file for the same user so a prior Apple
+        // session for this identity isn't clobbered; Google brings none of its own.
+        let carried = existing?.userIdentifier == resolved.userIdentifier ? existing?.refreshToken : nil
+        try? sessionStore.save(
+            AppleAuthSession(
+                userIdentifier: resolved.userIdentifier,
+                displayName: resolved.displayName,
+                email: resolved.email,
+                refreshToken: carried
+            )
+        )
+
+        var profileSaved = false
+        if let name = resolved.displayName, let mail = resolved.email {
+            let existingProfile = await profileStore.load()
+            let profile = UserProfile(
+                id: existingProfile?.id ?? UUID(),
+                displayName: name,
+                email: mail,
+                photoFilename: existingProfile?.photoFilename,
+                photoOriginalFilename: existingProfile?.photoOriginalFilename
+            )
+            profileSaved = (try? await profileStore.save(profile)) != nil
+        }
+
+        return AppleProfileSignIn.Outcome(
+            displayName: resolved.displayName,
+            email: resolved.email,
+            profileSaved: profileSaved
+        )
+    }
 }
