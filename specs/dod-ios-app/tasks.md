@@ -2849,6 +2849,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `ProfileEditView+AppleSignIn.swift` (merge `appleSignInSection` + `identitySection` → `signInSection` + footer), `ProfileEditView.swift` (body calls `signInSection`), `SettingsView.swift` (drop `AccountSection()`), `AppleProfileSignIn.swift` + `AppleProfileSignInTests.swift` (doc-only: now the single sign-in path). Removed: `SettingsView+Account.swift`, `AccountViewModel.swift`, `AccountViewModelTests.swift`. Spec: `clarifications.md` (CL-251).
 - **AC:** US-46 / DUT-238 (unified login surface; Google stays gated per DUT-276 until its client ID is wired). CL-251 canonical. **Est:** ~1 h. **Deps:** off main (after DUT-276 #294). Branch `fix/unify-account-signin-profile`. **Verification:** swift-format (`--configuration .swift-format --recursive`) + SwiftLint `--strict` clean; DODFeatureProfile + DODFeatureFeed L1 compile on macOS; iOS app build green; unified section visually verified (Apple + name + email in one card, Google hidden since unconfigured).
 
+### T-858 — Light mode (Flour): page background to a slightly darker off-white so cards/cells float (CL-252)
+
+- **What:** Change the light-mode `Surface` colorset from `#FFFFFF` to a warm off-white `#F2F1EC` so the page sits a shade darker than the white `surfaceElevated` cards/cells — giving light mode the same card-float contrast dark mode already has (and the iOS Settings grouped look). Light mode only; dark untouched.
+- **Files:** `Packages/DODDesignSystem/Sources/DODDesignSystem/Resources/Colors.xcassets/Surface.colorset/Contents.json` (light/default entry `0xFF`→`0xF2F1EC`; dark entry unchanged). Re-recorded L4: `__Snapshots__/SnapshotTests/test_moderationBadge_eachKind.1.png` (the one tracked snapshot that renders enough `surface` to exceed tolerance). Spec: `clarifications.md` (CL-252).
+- **AC:** US-43 / AC-43.1 (screen background color — amended). DUT pending (free issue limit). CL-252 canonical. **Est:** ~30 min. **Deps:** off main. Branch `fix/flour-surface-contrast`. **Verification:** Flour render pixel-sampled (`#F2F1EC` page / `#FFFFFF` cards); Cocoa unchanged by construction; DODDesignSystem L4 100/100 green after the one re-record. Feature-package snapshots are local-only (untracked `.gitkeep`-only dirs, not CI-gated, already env-stale) — intentionally not re-baselined.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
