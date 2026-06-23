@@ -229,11 +229,12 @@ public struct SearchView: View {
             spacing: DODSpacing.md
         ) {
             ForEach(viewModel.items) { item in
+                // CL-255 — cook-time chip omitted (browse declutter); Search's
+                // time filter covers cook time for those who want it.
                 RecipeCard(
                     title: item.title,
                     excerpt: item.excerpt,
                     heroImageURL: item.heroImage,
-                    totalTimeDisplay: item.totalTimeDisplay,
                     highlightQuery: viewModel.query
                 )
                 .recipeCardTap { onSelect(item) }
@@ -256,11 +257,12 @@ public struct SearchView: View {
         // keeps the single-column LazyVStack.
         adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
             ForEach(viewModel.items) { item in
+                // CL-255 — cook-time chip omitted (browse declutter); Search's
+                // time filter covers cook time for those who want it.
                 RecipeCard.ListRow(
                     title: item.title,
                     excerpt: item.excerpt,
                     heroImageURL: item.heroImage,
-                    totalTimeDisplay: item.totalTimeDisplay,
                     highlightQuery: viewModel.query
                 )
                 .recipeCardTap { onSelect(item) }

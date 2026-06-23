@@ -2866,6 +2866,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `FeedRow.swift` (gallery adapter) + `FeedView.swift` (`listContent`'s `RecipeCard.ListRow`) — both omit `totalTimeDisplay` (defaults nil → no chip; also drops time from the Feed card a11y label). Spec: `clarifications.md` (CL-254). Untouched: Search / Saved / Categories call sites, the `RecipeCard` component, `RecipeListItem`, data layer.
 - **AC:** US-38 (Recipes feed card presentation). DUT pending (free issue limit). CL-254 canonical. **Est:** ~15 min. **Deps:** off main (after #297). Branch `fix/feed-remove-time-chip`. **Verification:** iPhone 17 sim render — Chicken Florentine card no longer shows its "30 min" pill; swift-format + SwiftLint `--strict` clean; DODFeatureFeed L1 (macOS) green; iOS app build green. No CI-gated snapshot affected (component unchanged; Feed snapshots local-only). Renumbered from T-859 (Ned's #297 took it concurrently).
 
+### T-861 — Remove the cook-time chip from ALL remaining recipe-card surfaces (Search / Saved / Categories) (CL-255)
+
+- **What:** Extend CL-254 (Feed) to every other in-app card surface so the cook-time chip is gone app-wide. Reverses CL-254's "keep on Search" carve-out — Search has a cook-time *filter* that covers the need, so the chip is redundant there too. Cook time now lives only on the recipe detail page + Search's filter.
+- **Files:** `SearchView.swift` (gallery `RecipeCard` + dense `RecipeCard.ListRow`), `SearchView+IngredientSection.swift` (gallery + list), `SavedView.swift` (gallery + delete the now-dead private `totalTimeDisplay(_:)` formatter), `CategoryRecipesView.swift` (gallery) — all omit `totalTimeDisplay` (defaults nil → no chip). Spec: `clarifications.md` (CL-255). Untouched: `RecipeCard` component, `RecipeListItem.totalTimeDisplay`, data layer (Search's time filter still reads the underlying data).
+- **AC:** US-38 (recipe-card presentation). DUT pending (free issue limit). CL-255 canonical. **Est:** ~20 min. **Deps:** off main (after #298). Branch `fix/remove-time-chip-everywhere`. **Verification:** DODFeatureCategories + DODFeatureSaved + DODFeatureSearch compile on macOS; swift-format + SwiftLint `--strict` clean; iOS app build green; grep confirms no card call site passes `totalTimeDisplay`. Same omission proven visually on the Feed (CL-254). No CI-gated snapshot affected.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

@@ -135,7 +135,8 @@ public struct SavedView: View {
                             title: recipe.title,
                             excerpt: recipe.excerpt,
                             heroImageURL: recipe.heroImage,
-                            totalTimeDisplay: totalTimeDisplay(recipe),
+                            // CL-255 — cook-time chip omitted (browse declutter);
+                            // time is on the recipe detail page + Search's filter.
                             // T-774 / DUT-80 — badge the cards that are saved
                             // AND downloaded for offline use.
                             isDownloaded: viewModel.downloadedIDs.contains(recipe.id)
@@ -196,16 +197,6 @@ public struct SavedView: View {
                 .padding(.vertical, DODSpacing.md)
             }
         }
-    }
-
-    private func totalTimeDisplay(_ recipe: Recipe) -> String? {
-        guard let total = recipe.totalTime else { return nil }
-        let seconds = Int(total.components.seconds)
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes) min" }
-        let hours = minutes / 60
-        let remainder = minutes % 60
-        return remainder == 0 ? "\(hours) hr" : "\(hours)h \(remainder)m"
     }
 }
 
