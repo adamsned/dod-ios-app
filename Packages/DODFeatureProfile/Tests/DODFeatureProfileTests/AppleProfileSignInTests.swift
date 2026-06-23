@@ -5,9 +5,10 @@ import Testing
 @testable import DODFeatureProfile
 
 /// L1 for ``AppleProfileSignIn`` (DUT-189) — the profile-surface Sign in with
-/// Apple handler that both persists the ``AppleAuthSession`` (the half
-/// `AccountViewModel.applySignIn` already did) AND writes the local
-/// ``UserProfile`` (the new half). In-memory stores, `nil` revoker (no network).
+/// Apple handler that both persists the ``AppleAuthSession`` AND writes the local
+/// ``UserProfile``. Since DUT-238 this is the app's single sign-in path (the
+/// separate Settings ▸ Account handler was removed). In-memory stores, `nil`
+/// revoker (no network).
 struct AppleProfileSignInTests {
 
     @Test func firstSignIn_writesSessionAndProfile() async {

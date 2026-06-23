@@ -101,10 +101,11 @@ public struct SettingsView: View {
             // `ProfileEditView`.
             // T-783 / DUT-89 — hidden on iPad (Profile lives in the
             // sidebar via SidebarProfileRow); kept on iPhone.
+            // DUT-238 — account + sign-in (Sign in with Apple, Sign Out, Delete)
+            // all live inside the Profile flow now (tap the Profile row →
+            // `ProfileEditView`). The former standalone Settings ▸ Account section
+            // (US-46) was redundant with that and is removed.
             ProfileSettingsSection(viewModel: viewModel)
-
-            // US-46 (T-794, DUT-16) — Account: Sign in with Apple (`SettingsView+Account.swift`).
-            AccountSection()
 
             // T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`.
 

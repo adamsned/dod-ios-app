@@ -1,18 +1,41 @@
 import DODDesignSystem
 import SwiftUI
 
-// DUT-189 — Sign in with Apple on the profile editor (the sign-in entry moved
-// here off Settings ▸ Account). Also holds `identitySection`, moved out of
-// `ProfileEditView.swift` so that file stays under SwiftLint's 400-line
-// `file_length` cap once this section was added.
+// DUT-189 / DUT-238 — the profile editor's unified sign-in menu: provider
+// buttons (Sign in with Apple; Google when configured) + the Display Name /
+// Email fields in one `signInSection`. DUT-238 fused the former separate
+// `appleSignInSection` + `identitySection` here and removed the duplicate
+// Settings ▸ Account section. Split from `ProfileEditView.swift` to keep that
+// file under SwiftLint's 400-line `file_length` cap.
 extension ProfileEditView {
 
-    /// Identity fields — Display Name + Email (both required, basic email regex
-    /// via ``UserProfile/validateEmail(_:)``). Body-referenced by the main
-    /// file's `Form`.
+    /// DUT-238 — the unified sign-in menu: the provider buttons (Sign in with
+    /// Apple; Sign in with Google when configured) sit in the SAME section as the
+    /// manual Display Name / Email fields, so email + SiwA + Google read as one
+    /// "sign in" choice. Replaces the separate `appleSignInSection` +
+    /// `identitySection` and the now-removed duplicate Settings ▸ Account
+    /// section. Provider buttons show only while setting up a NEW profile
+    /// (`existingProfile == nil`); editing an existing profile shows just the
+    /// fields (both required, basic email regex via
+    /// ``UserProfile/validateEmail(_:)``). Body-referenced by the main `Form`.
     @ViewBuilder
-    var identitySection: some View {
+    var signInSection: some View {
         Section {
+            #if canImport(UIKit)
+            if existingProfile == nil {
+                AppleProfileSignInButton(profileStore: store) { outcome in
+                    handleAppleSignIn(outcome)
+                }
+                // Sign in with Google — scaffold, gated behind a real client ID
+                // (GoogleSignInConfig.isConfigured) so it stays hidden until wired.
+                if GoogleSignInConfig.isConfigured {
+                    GoogleProfileSignInButton { result in
+                        handleGoogleSignIn(result)
+                    }
+                }
+            }
+            #endif
+
             TextField("Display name", text: $displayName)
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
@@ -33,44 +56,25 @@ extension ProfileEditView {
             .autocorrectionDisabled(true)
                 #endif
         } footer: {
-            if let emailValidationError {
-                Text(emailValidationError)
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
+            signInSectionFooter
         }
         .listRowBackground(DODColor.surfaceElevated)
     }
 
-    /// Sign in with Apple for a NEW profile: one tap signs the user in and fills
-    /// the name/email fields below. Only shown when setting up a profile for the
-    /// first time (`existingProfile == nil`) — editing an existing profile hides
-    /// it, mirroring `signOutSection`'s `existingProfile != nil` gate. Reachable
-    /// from Settings ▸ Profile, the iPad sidebar Profile, and the recipe ratings
-    /// gate (all present this editor).
+    /// Footer for ``signInSection``: the email-validation error when present,
+    /// else (only while setting up a new profile) the hint that a provider
+    /// sign-in auto-fills the fields.
     @ViewBuilder
-    var appleSignInSection: some View {
-        #if canImport(UIKit)
-        if existingProfile == nil {
-            Section {
-                AppleProfileSignInButton(profileStore: store) { outcome in
-                    handleAppleSignIn(outcome)
-                }
-                // Sign in with Google — scaffold, gated behind a real client ID
-                // (GoogleSignInConfig.isConfigured) so it stays hidden until wired.
-                if GoogleSignInConfig.isConfigured {
-                    GoogleProfileSignInButton { result in
-                        handleGoogleSignIn(result)
-                    }
-                }
-            } footer: {
-                Text("Sign in to fill your name and email automatically, or just enter them below.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            .listRowBackground(DODColor.surfaceElevated)
+    private var signInSectionFooter: some View {
+        if let emailValidationError {
+            Text(emailValidationError)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+        } else if existingProfile == nil {
+            Text("Sign in to fill your name and email automatically, or just enter your details below.")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
         }
-        #endif
     }
 
     #if canImport(UIKit)
