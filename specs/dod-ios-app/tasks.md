@@ -2843,6 +2843,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `GoogleProfileSignIn.swift` (new — config + seam + result + unconfigured provider), `GoogleProfileSignInButton.swift` (new), `ProfileEditView+AppleSignIn.swift` (gated render + `handleGoogleSignIn`), `GoogleProfileSignInTests.swift` (new). Spec: `clarifications.md` (CL-250).
 - **AC:** US-46 / DUT-276 (relates DUT-238). CL-250 canonical. **Est:** ~1 h (scaffold). **Deps:** off main. Branch `feat/DUT-276-google-signin-scaffold`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 52 DODFeatureProfile tests pass; iOS app build green.
 
+### T-857 — DUT-238: Unify the profile sign-in menu + remove the redundant Settings ▸ Account section (CL-251)
+
+- **What:** Fuse the profile editor's separate Apple-button section and identity (name / email) section into one `signInSection`, so Sign in with Apple + the email fields (+ Google when `GoogleSignInConfig.isConfigured`) read as one menu — the unified login surface DUT-238 asks for. Delete the duplicate standalone Settings ▸ Account section, which re-implemented the sign-in / out + delete the profile flow already owns.
+- **Files:** `ProfileEditView+AppleSignIn.swift` (merge `appleSignInSection` + `identitySection` → `signInSection` + footer), `ProfileEditView.swift` (body calls `signInSection`), `SettingsView.swift` (drop `AccountSection()`), `AppleProfileSignIn.swift` + `AppleProfileSignInTests.swift` (doc-only: now the single sign-in path). Removed: `SettingsView+Account.swift`, `AccountViewModel.swift`, `AccountViewModelTests.swift`. Spec: `clarifications.md` (CL-251).
+- **AC:** US-46 / DUT-238 (unified login surface; Google stays gated per DUT-276 until its client ID is wired). CL-251 canonical. **Est:** ~1 h. **Deps:** off main (after DUT-276 #294). Branch `fix/unify-account-signin-profile`. **Verification:** swift-format (`--configuration .swift-format --recursive`) + SwiftLint `--strict` clean; DODFeatureProfile + DODFeatureFeed L1 compile on macOS; iOS app build green; unified section visually verified (Apple + name + email in one card, Google hidden since unconfigured).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

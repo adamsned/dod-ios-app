@@ -6,12 +6,12 @@ import Foundation
 ///   1. **Signs the user in** — persists the ``AppleAuthSession`` and (in the
 ///      background) exchanges the one-time authorization code for a refresh
 ///      token so in-app account deletion can revoke it (App Store 5.1.1(v)).
-///      This mirrors `AccountViewModel.applySignIn` exactly; the sign-in entry
-///      moved off Settings ▸ Account onto the profile editor per Spencer's
-///      request, so this is now where the session is created.
+///      This is the app's single sign-in path: DUT-238 removed the separate
+///      Settings ▸ Account section (and its `AccountViewModel`) and fused
+///      sign-in into the profile editor, so this is where the session is created.
 ///   2. **Fills the local ``UserProfile``** — writes the display name + email
-///      from the credential (the half `applySignIn` never did), so the profile
-///      is set up in one tap.
+///      from the credential (which the old Settings sign-in never did), so the
+///      profile is set up in one tap.
 ///
 /// Pure value type with injected stores (no UIKit) so the L1 suite drives it
 /// with in-memory fakes. The UIKit `SignInWithAppleButton` wrapper that feeds
@@ -22,10 +22,10 @@ public struct AppleProfileSignIn: Sendable {
     private let profileStore: any ProfileStoring
     private let revoker: (any SiwaRevoking)?
 
-    /// The default `sessionStore` + `revoker` match `AccountViewModel`'s: the
-    /// Keychain-backed session store, and the production revoke client only when
-    /// the DUT-98 Worker is configured (else `nil`, so sign-in still works with
-    /// no exchange/revoke). Tests inject in-memory fakes.
+    /// The defaults are the production wiring: the Keychain-backed session store,
+    /// and the production revoke client only when the DUT-98 Worker is configured
+    /// (else `nil`, so sign-in still works with no exchange/revoke). Tests inject
+    /// in-memory fakes.
     public init(
         profileStore: any ProfileStoring,
         sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),

@@ -184,8 +184,8 @@ public struct ProfileEditView: View {
             // above the display-name + email fields (was a 44pt trailing
             // avatar in a labeled row below the identity fields).
             profileEditPhotoSection
-            appleSignInSection
-            identitySection
+            // DUT-238 — providers (Apple / Google) + email fields in one menu.
+            signInSection
             signOutSection
             if let saveError {
                 Section {
