@@ -100,34 +100,40 @@ public struct SavedView: View {
 
     @ViewBuilder
     private var content: some View {
+        // DUT-263 — the "Saved" title is pinned at the top above every state
+        // (loaded grid, empty, loading, error) so it always shows and sits at the
+        // same Y as the other tabs. The grid scrolls beneath the pinned title.
+        VStack(spacing: 0) {
+            DODScreenHeader("Saved")
+            loadStateBody
+        }
+    }
+
+    @ViewBuilder
+    private var loadStateBody: some View {
         switch viewModel.loadState {
         case .idle, .loading:
-            withSavedHeader {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .empty:
-            withSavedHeader {
-                EmptyState(
-                    systemImage: "bookmark",
-                    title: "No saved recipes yet",
-                    message: "Tap the bookmark on any recipe to find it again later."
-                )
-            }
+            EmptyState(
+                systemImage: "bookmark",
+                title: "No saved recipes yet",
+                message: "Tap the bookmark on any recipe to find it again later."
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .error:
-            withSavedHeader {
-                EmptyState(
-                    systemImage: "exclamationmark.triangle",
-                    title: "Couldn't load saved recipes",
-                    message: "Try again in a moment.",
-                    action: .init(title: "Retry") {
-                        Task { await viewModel.refresh() }
-                    }
-                )
-            }
+            EmptyState(
+                systemImage: "exclamationmark.triangle",
+                title: "Couldn't load saved recipes",
+                message: "Try again in a moment.",
+                action: .init(title: "Retry") {
+                    Task { await viewModel.refresh() }
+                }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded:
             ScrollView {
-                DODScreenHeader("Saved")
                 LazyVGrid(
                     columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
                     spacing: DODSpacing.md
@@ -198,22 +204,6 @@ public struct SavedView: View {
                 .padding(.vertical, DODSpacing.md)
             }
         }
-    }
-
-    /// DUT-263 — keeps the "Saved" title on screen in the non-loaded states
-    /// (was: the header only existed inside the `.loaded` `ScrollView`, so the
-    /// empty / error / loading screens had no title at all). The header pins to
-    /// the top via `safeAreaInset` — at the same below-the-nav-bar height as the
-    /// loaded grid's header — while the state content centers in the space below.
-    private func withSavedHeader<Content: View>(
-        @ViewBuilder _ content: () -> Content
-    ) -> some View {
-        content()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                DODScreenHeader("Saved")
-                    .background(DODColor.surface)
-            }
     }
 
     private func totalTimeDisplay(_ recipe: Recipe) -> String? {

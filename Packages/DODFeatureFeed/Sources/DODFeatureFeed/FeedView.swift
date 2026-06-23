@@ -222,40 +222,41 @@ public struct FeedView: View {
         // byte-identical (CC-9 contract preserved); `.list` renders a
         // `LazyVStack` of `RecipeCard.ListRow` rows for denser scanning.
         let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
-        return ScrollView {
-            // DUT-200 — the onboarding "Cooking Tools" speech bubble sits at the
-            // very top so its tail points up at the trailing menu button it
-            // describes. Replaced the First Cookout hero card as the Feed's
-            // single onboarding nudge; dismissible + persisted. (`currentRung`
-            // still feeds the chooser sheet's recommendation.)
-            if !cookingToolsCalloutDismissed {
-                CookingToolsCallout(onDismiss: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        cookingToolsCalloutDismissed = true
-                    }
-                })
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.top, DODSpacing.sm)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            // T-781 / DUT-87 — the title scrolls with the content (no native
-            // minimize); offline shifts it below the OfflineBanner overlay.
+        return VStack(spacing: 0) {
+            // DUT-263 — the title is pinned at the top (not scrolling away) so it
+            // sits at the same Y as every other tab's title, with no nav-bar
+            // button needed to anchor it. Offline shifts it below the banner.
             DODScreenHeader("Recipes & Articles")
                 .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
-            Group {
-                switch layout {
-                case .gallery:
-                    galleryContent
-                case .list:
-                    listContent
+            ScrollView {
+                // DUT-200 — the onboarding "Cooking Tools" speech bubble; tail
+                // points up at the trailing menu button it describes. Dismissible
+                // + persisted. (`currentRung` still feeds the chooser sheet.)
+                if !cookingToolsCalloutDismissed {
+                    CookingToolsCallout(onDismiss: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            cookingToolsCalloutDismissed = true
+                        }
+                    })
+                    .padding(.horizontal, DODSpacing.md)
+                    .padding(.top, DODSpacing.sm)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-            }
-            .padding(.horizontal, DODSpacing.md)
-            .padding(.top, DODSpacing.md)
+                Group {
+                    switch layout {
+                    case .gallery:
+                        galleryContent
+                    case .list:
+                        listContent
+                    }
+                }
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.top, DODSpacing.md)
 
-            if viewModel.loadState == .loadingMore {
-                ProgressView()
-                    .padding(.vertical, DODSpacing.lg)
+                if viewModel.loadState == .loadingMore {
+                    ProgressView()
+                        .padding(.vertical, DODSpacing.lg)
+                }
             }
         }
     }

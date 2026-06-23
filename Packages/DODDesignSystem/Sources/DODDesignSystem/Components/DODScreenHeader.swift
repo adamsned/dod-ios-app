@@ -34,26 +34,19 @@ public struct DODScreenHeader: View {
 }
 
 extension View {
-    /// DUT-263 — reserves a navigation bar on tabs that have no natural toolbar
-    /// button (Search, Settings, the empty Saved state). A NavigationStack only
-    /// reserves the bar's height — and thus insets its content below it — when the
-    /// bar is non-empty; with an empty bar the content rides up under the status
-    /// bar, leaving those tabs' ``DODScreenHeader`` ~64pt higher than Recipes /
-    /// Saved (whose real toolbar buttons keep the bar present). A single hidden
-    /// 1x1 item makes the bar non-empty so every tab's title lands at the same Y.
+    /// DUT-263 — reserves the navigation bar's height on tabs that have no toolbar
+    /// button (Search, Settings, the empty Saved state), so their pinned
+    /// ``DODScreenHeader`` insets to the same Y as Recipes / Saved. An empty
+    /// `inline` navigation title makes the bar non-empty WITHOUT adding a button:
+    /// a hidden toolbar item would render as an empty Liquid-Glass capsule (visual
+    /// noise), whereas an empty title is invisible. Inline (not large) also dodges
+    /// the iOS 26 large-title vanish bug (DUT-82).
     public func dodReservesNavBarHeight() -> some View {
-        // `.topBarTrailing` is iOS-only; on macOS (where the feature packages'
-        // `swift test` compiles this) it doesn't exist, so guard it. The whole
-        // concept — reserving a UINavigationBar's height — is iOS-only anyway, so
-        // macOS is a no-op.
+        // `navigationBarTitleDisplayMode` is iOS-only; on macOS (where the feature
+        // packages' `swift test` compiles this) it doesn't exist — and reserving a
+        // UINavigationBar is an iOS concept anyway — so this is a macOS no-op.
         #if os(iOS)
-        return toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Color.clear
-                    .frame(width: 1, height: 1)
-                    .accessibilityHidden(true)
-            }
-        }
+        return navigationTitle("").navigationBarTitleDisplayMode(.inline)
         #else
         return self
         #endif
