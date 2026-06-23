@@ -296,11 +296,13 @@ public struct FeedView: View {
         // iPhone (compact) keeps the exact single-column LazyVStack.
         adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
             ForEach(viewModel.items) { item in
+                // CL-254 (feed declutter) — no cook-time chip on the Recipes
+                // feed (noise); `totalTimeDisplay` omitted (defaults to nil).
+                // Time still shows on Search + the recipe detail page.
                 RecipeCard.ListRow(
                     title: item.title,
                     excerpt: item.excerpt,
-                    heroImageURL: item.heroImage,
-                    totalTimeDisplay: item.totalTimeDisplay
+                    heroImageURL: item.heroImage
                 )
                 .recipeCardTap { onSelect(item) }
                 .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {

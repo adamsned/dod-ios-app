@@ -2860,6 +2860,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DODFeatureProfile/Package.swift`, `GoogleProfileSignIn.swift`, `GIDSignInProvider.swift` (new), `GoogleProfileSignInButton.swift`, `ProfileEditView+AppleSignIn.swift`, `GoogleProfileSignInTests.swift`, `project.yml` (Info.plist). Spec: `clarifications.md` (CL-253).
 - **AC:** US-46 / DUT-276. CL-253 canonical. **Est:** ~2 h. **Deps:** off main. Branch `feat/DUT-276-google-signin-wireup`. **Device-verify:** the live OAuth round-trip needs a real device (CI verifies compile/wiring only). **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 52 DODFeatureProfile L1 tests pass; iOS app build green (GoogleSignIn 8.0 resolves, Swift 6).
 
+### T-860 — Remove the cook-time chip from the Recipes feed cards (keep on Search) (CL-254)
+
+- **What:** Drop the "30 min"-style cook-time pill from the Recipes/Feed cards (gallery grid + dense list). It reads as noise on the browse feed; time stays on Search and the recipe detail page.
+- **Files:** `FeedRow.swift` (gallery adapter) + `FeedView.swift` (`listContent`'s `RecipeCard.ListRow`) — both omit `totalTimeDisplay` (defaults nil → no chip; also drops time from the Feed card a11y label). Spec: `clarifications.md` (CL-254). Untouched: Search / Saved / Categories call sites, the `RecipeCard` component, `RecipeListItem`, data layer.
+- **AC:** US-38 (Recipes feed card presentation). DUT pending (free issue limit). CL-254 canonical. **Est:** ~15 min. **Deps:** off main (after #297). Branch `fix/feed-remove-time-chip`. **Verification:** iPhone 17 sim render — Chicken Florentine card no longer shows its "30 min" pill; swift-format + SwiftLint `--strict` clean; DODFeatureFeed L1 (macOS) green; iOS app build green. No CI-gated snapshot affected (component unchanged; Feed snapshots local-only). Renumbered from T-859 (Ned's #297 took it concurrently).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
