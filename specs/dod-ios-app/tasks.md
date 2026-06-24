@@ -2894,6 +2894,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `App/RootView.swift` (flag + recovery + interactiveDismissDisabled + alert buttons), `App/RootView+Onboarding.swift` (`runFirstRunSetup` moved here for the file-length cap). Spec: `clarifications.md` (CL-259).
 - **AC:** US-8 / US-41 / US-42 / DUT-301 + DUT-280. CL-259 canonical. **Est:** ~1 h. **Deps:** off main. Branch `fix/first-run-hardening-280-301`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; iOS app build green (RootView 393 lines).
 
+### T-867 — DUT-303: real test for the REG-14 rating-fetch failure-degrade (CL-261) — test-only
+
+- **What:** The live `LiveRecipeDetailDependencies.fetchRatingSummary` do/catch (swallow a ratingsClient.summary throw → degrade to 0/0) had zero coverage; the "offline" tests drove it via an inert `online = false` the Fake ignores. New `RatingFetchDegradeTests` builds the real Live deps with a throwing WPRMRatingsClient transport + asserts the 0/0 degrade; removed the inert red-herring lines.
+- **Files:** new `RatingFetchDegradeTests.swift`; `RecipeDetailRatingsCacheTests.swift` (drop 2 inert lines). Spec: `clarifications.md` (CL-261). No production change.
+- **AC:** US-3 / DUT-303 / REG-14. CL-261 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-303-rating-degrade-test`. **Verification:** swift-format + SwiftLint `--strict` clean; 204 DODFeatureRecipeDetail tests pass (1 new).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
