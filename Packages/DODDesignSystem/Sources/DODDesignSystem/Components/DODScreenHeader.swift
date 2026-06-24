@@ -57,6 +57,20 @@ extension View {
         return self
         #endif
     }
+
+    /// CL-265 — inline navigation-bar title display mode. iOS-only (the API
+    /// doesn't exist on macOS, where the feature packages' `swift test`
+    /// compiles this), so this is a macOS no-op. Pairs with an empty
+    /// `navigationTitle("")` to keep a sheet's nav bar minimal (just its
+    /// toolbar buttons) beneath an in-content header. Wrapping the `#if` here
+    /// keeps call-site chains clean for swift-format.
+    public func dodInlineNavTitle() -> some View {
+        #if os(iOS)
+        return navigationBarTitleDisplayMode(.inline)
+        #else
+        return self
+        #endif
+    }
 }
 
 #Preview("Header") {
