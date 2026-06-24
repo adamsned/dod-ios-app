@@ -2921,6 +2921,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** new `CookStepTimer.swift`, `CookModeViewModel+Timers.swift`; `CookModeViewModel.swift` (state + endCookMode clear), `CookTimer.swift` (rewrite), `CookModeView.swift` (ticker + haptic + call); new `CookModeTimerTests.swift`. Spec: `clarifications.md` (CL-264).
 - **AC:** US-7 / US-11 / DUT-293 + DUT-294. CL-264 canonical. **Est:** ~3 h. **Deps:** off main. Branch `fix/DUT-293-294-persist-cook-timer`. **Verification:** swift-format + SwiftLint `--strict` clean; 210 DODFeatureRecipeDetail tests pass (7 new); xcodegen + iOS app build green. Device-verify the Lock-Screen Live Activity behavior.
 
+### T-871 — Redesign the "Your First Cookout" chooser into a roadmap path (CL-265)
+
+- **What:** Turn the plain grouped-`List` chooser into a visual + functional roadmap: a large "Your First Cookout" header + journey subheader, the rungs as a connected vertical path of tappable dish cards whose nodes show the cook's progress (done / current "START HERE" / upcoming, derived from the recommended rung), and the dump cakes as an "Anytime Treats" off-path section.
+- **Files:** `CookChooserFlow.swift` (rewrite: header + path + treats, in-content title, pure `nodeState` helper, dropped `orderedRungs`), new `CookChooserFlow+PathNode.swift` (the rail-node + dish-card component), `DODScreenHeader.swift` (new `dodInlineNavTitle()` iOS-guarded helper), `CookChooserFlowTests.swift` (rewrite: node-state mapping). Spec: `clarifications.md` (CL-265). Untouched: `GuidedCookout` model, `FirstCookoutView`.
+- **AC:** US-53 (First Cookout guided experience) / DUT-194 (cook chooser). DUT pending (free issue limit). CL-265 canonical. **Est:** ~2 h. **Deps:** off main (rebased onto CL-264). Branch `fix/redesign-first-cookout-path`. **Verification:** rendered both states on the iPhone 17 sim (new-user + mid-progress); swift-format + SwiftLint `--strict` clean; DODFeatureFeed L1 (92 tests) green; iOS app build green. No CI-gated snapshot affected (additive DesignSystem helper; feed snapshots local-only).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
