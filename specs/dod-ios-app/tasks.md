@@ -2927,6 +2927,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookChooserFlow.swift` (rewrite: header + path + treats, in-content title, pure `nodeState` helper, dropped `orderedRungs`), new `CookChooserFlow+PathNode.swift` (the rail-node + dish-card component), `DODScreenHeader.swift` (new `dodInlineNavTitle()` iOS-guarded helper), `CookChooserFlowTests.swift` (rewrite: node-state mapping). Spec: `clarifications.md` (CL-265). Untouched: `GuidedCookout` model, `FirstCookoutView`.
 - **AC:** US-53 (First Cookout guided experience) / DUT-194 (cook chooser). DUT pending (free issue limit). CL-265 canonical. **Est:** ~2 h. **Deps:** off main (rebased onto CL-264). Branch `fix/redesign-first-cookout-path`. **Verification:** rendered both states on the iPhone 17 sim (new-user + mid-progress); swift-format + SwiftLint `--strict` clean; DODFeatureFeed L1 (92 tests) green; iOS app build green. No CI-gated snapshot affected (additive DesignSystem helper; feed snapshots local-only).
 
+### T-873 — DUT-299/300: iPad Profile + sidebar reachable (multitasking + portrait) (CL-267)
+
+- **What:** DUT-299: ProfileSettingsSection hid the Settings Profile row on idiom==.pad, so an iPad multitasking (compact) pane had no profile entry anywhere — fixed by gating on horizontalSizeClass==.regular (the signal RootView uses). DUT-300: dodHidesNavBar blanket-hid the nav bar, removing the split-view sidebar-reveal toggle on iPad portrait — fixed with a size-class-aware ViewModifier that keeps the bar (collapsed title) in regular width.
+- **Files:** `SettingsView+Profile.swift` (horizontalSizeClass), `DODScreenHeader.swift` (DODHidesNavBarModifier). Spec: `clarifications.md` (CL-267).
+- **AC:** US-44 / US-1 / DUT-299 + DUT-300. CL-267 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-299-300-ipad-nav`. **Verification:** swift-format lint + SwiftLint `--strict` clean; DODDesignSystem (19) + DODFeatureFeed (92) green; iOS app build green. **Device-verify iPad:** compact pane shows the Settings Profile row; portrait shows the sidebar toggle on every tab.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

@@ -51,11 +51,7 @@ extension View {
     /// on macOS (where the feature packages' `swift test` compiles this), so this
     /// is a macOS no-op. Wrapping the `#if` here keeps call-site chains clean.
     public func dodHidesNavBar() -> some View {
-        #if os(iOS)
-        return toolbar(.hidden, for: .navigationBar)
-        #else
-        return self
-        #endif
+        modifier(DODHidesNavBarModifier())
     }
 
     /// CL-265 — inline navigation-bar title display mode. iOS-only (the API
@@ -81,4 +77,31 @@ extension View {
         DODScreenHeader("Search")
     }
     .background(DODColor.surface)
+}
+
+// DUT-300 — hide the nav bar ONLY in a compact-width window. On a regular-width
+// iPad the tab roots are the detail column of `RootView`'s `NavigationSplitView`,
+// whose nav bar carries the sidebar-reveal toggle in portrait; blanket-hiding it
+// left the user with no on-screen way to bring the sidebar (Profile + tabs) back.
+// In regular width we keep the bar but collapse its title band (empty inline
+// title) so the pinned `DODScreenHeader` still sits high.
+private struct DODHidesNavBarModifier: ViewModifier {
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if horizontalSizeClass == .regular {
+            content
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+        } else {
+            content.toolbar(.hidden, for: .navigationBar)
+        }
+        #else
+        content
+        #endif
+    }
 }
