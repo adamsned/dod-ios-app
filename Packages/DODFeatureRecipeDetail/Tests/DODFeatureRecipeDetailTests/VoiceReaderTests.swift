@@ -115,6 +115,22 @@ import Testing
         #expect(!reader.isSpeaking)
         #expect(!reader.isPaused)
     }
+
+    /// DUT-283 — after an audio interruption (call / Siri / route change) tears
+    /// down our session, the next `speak(_:)` must re-activate it. Before the fix
+    /// the one-shot `didActivateAudioSession` flag stayed true forever, so Voice
+    /// Mode went permanently silent (or stopped ducking) for the rest of the cook.
+    @Test func interruptionInvalidationForcesReactivationOnTheNextSpeak() {
+        let reader = VoiceReader(synthesizer: MockSpeechSynthesizer())
+        reader.speak("Step one.")
+        #expect(reader.hasActiveAudioSession)
+
+        reader.invalidateAudioSession()  // what the interruption observer does on .began
+        #expect(!reader.hasActiveAudioSession)
+
+        reader.speak("Step two.")
+        #expect(reader.hasActiveAudioSession)  // recovered — not silent for the session
+    }
 }
 
 /// Records calls + flips its own speaking/paused flags so ``VoiceReader``'s

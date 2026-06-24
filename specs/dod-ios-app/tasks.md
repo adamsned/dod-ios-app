@@ -2927,6 +2927,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookChooserFlow.swift` (rewrite: header + path + treats, in-content title, pure `nodeState` helper, dropped `orderedRungs`), new `CookChooserFlow+PathNode.swift` (the rail-node + dish-card component), `DODScreenHeader.swift` (new `dodInlineNavTitle()` iOS-guarded helper), `CookChooserFlowTests.swift` (rewrite: node-state mapping). Spec: `clarifications.md` (CL-265). Untouched: `GuidedCookout` model, `FirstCookoutView`.
 - **AC:** US-53 (First Cookout guided experience) / DUT-194 (cook chooser). DUT pending (free issue limit). CL-265 canonical. **Est:** ~2 h. **Deps:** off main (rebased onto CL-264). Branch `fix/redesign-first-cookout-path`. **Verification:** rendered both states on the iPhone 17 sim (new-user + mid-progress); swift-format + SwiftLint `--strict` clean; DODFeatureFeed L1 (92 tests) green; iOS app build green. No CI-gated snapshot affected (additive DesignSystem helper; feed snapshots local-only).
 
+### T-872 — DUT-283: Voice Mode recovers from an audio interruption (CL-266)
+
+- **What:** VoiceReader activated the audio session once (one-shot flag) and observed no interruption notification, so a call/Siri/route-change left Voice Mode permanently silent. Added interruption + media-reset observers (iOS-only) that invalidate the session so the next speak() reactivates; on .ended+.shouldResume it resumes. Sendable UInts hop to the main actor (not the Notification). Extracted SystemSpeechSynthesizer to its own file for the line cap.
+- **Files:** `VoiceReader.swift` (observers + invalidateAudioSession + hasActiveAudioSession), new `SystemSpeechSynthesizer.swift` (extracted), `VoiceReaderTests.swift` (1 test). Spec: `clarifications.md` (CL-266).
+- **AC:** US-40 / DUT-283. CL-266 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-283-voice-audio-interruption`. **Verification:** swift-format lint + SwiftLint `--strict` clean; 212 DODFeatureRecipeDetail tests pass (1 new); iOS app build green. Device-verify: call mid-Voice-Mode → resume after.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
