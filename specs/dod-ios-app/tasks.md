@@ -2878,6 +2878,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookingToolsCallout.swift` (onActivate + tappable body + a11y action), `FeedView.swift` (state + overlay wiring + confirmationDialog). Spec: `clarifications.md` (CL-256).
 - **AC:** US-1 / DUT-236. CL-256 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-236-cooking-tools-callout-tap`. **Device-verify:** tap the callout body → tools dialog. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 88 DODFeatureFeed tests pass; iOS app build green.
 
+### T-864 — DUT-282: Categories loadMore failure keeps the grid (parity with DUT-223) (CL-258)
+
+- **What:** DUT-265 routed initial + append through one `load`, whose catch set `.error` for any failure — a loadMore blip wiped the whole grid + reset to page 1. Branched the catch on `append`: an append failure keeps `items` + sets `.loaded`; only an initial-load failure errors. Mirrors FeedViewModel/DUT-223.
+- **Files:** `CategoryRecipesViewModel.swift` (catch), `CategoriesTests.swift` (`failOnPage` hook + 1 regression test). Spec: `clarifications.md` (CL-258).
+- **AC:** US-2 / AC-2.3 / DUT-282. CL-258 canonical. **Est:** ~30 min. **Deps:** off main. Branch `fix/DUT-282-categories-loadmore-keeps-grid`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 4 DODFeatureCategories tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
