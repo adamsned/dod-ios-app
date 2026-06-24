@@ -19,6 +19,11 @@ extension RecipeStore {
 
     public func cacheImage(url: URL, bytes: Data, pinnedToSavedRecipeID: Int? = nil) throws {
         let urlString = url.absoluteString
+        // DUT-292: if the caller didn't pin explicitly, auto-pin when this URL is
+        // the hero of a currently-saved recipe — so the post-save widget prefetch
+        // (which caches the hero with no pin) still produces an eviction-proof
+        // row, keeping a merely-saved recipe offline-usable (AC-5.2).
+        let effectivePin = try pinnedToSavedRecipeID ?? savedRecipeID(forHeroURLString: urlString)
         // Diagnostic surface for REG-T-360 / CL-45. A future regression
         // where the snapshot writer plumbs filenames but no caller
         // actually pushes bytes through here would otherwise be invisible
@@ -37,7 +42,7 @@ extension RecipeStore {
             existing.bytes = bytes
             existing.byteCount = bytes.count  // DUT-242: keep the scalar in sync.
             existing.lastUsedAt = .now
-            if let pin = pinnedToSavedRecipeID {
+            if let pin = effectivePin {
                 existing.pinnedToSavedRecipeID = pin
             }
         } else {
@@ -45,7 +50,7 @@ extension RecipeStore {
                 CachedImage(
                     urlString: urlString,
                     bytes: bytes,
-                    pinnedToSavedRecipeID: pinnedToSavedRecipeID
+                    pinnedToSavedRecipeID: effectivePin
                 )
             )
         }
@@ -137,6 +142,32 @@ extension RecipeStore {
             if total <= Self.imageBudgetBytes { break }
         }
         try modelContext.save()
+    }
+
+    /// DUT-292: the id of a currently-saved recipe whose hero image is
+    /// `urlString`, if any — lets `cacheImage` auto-pin a hero cached AFTER the
+    /// save (the post-save widget prefetch caches with no pin), so a merely-saved
+    /// recipe's hero is eviction-proof for offline use (AC-5.2).
+    private func savedRecipeID(forHeroURLString urlString: String) throws -> Int? {
+        var descriptor = FetchDescriptor<CachedRecipe>(
+            predicate: #Predicate { $0.isSaved && $0.heroImageURLString == urlString }
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.id
+    }
+
+    /// DUT-292: pin a just-saved recipe's hero image row if it's already cached
+    /// (the common case — the hero was on screen when the user tapped Save). The
+    /// cache-after-save case is covered by `cacheImage`'s auto-pin. Caller saves.
+    func pinHeroImage(heroURLString: String?, toRecipeID recipeID: Int) throws {
+        guard let heroURLString else { return }
+        var descriptor = FetchDescriptor<CachedImage>(
+            predicate: #Predicate { $0.urlString == heroURLString }
+        )
+        descriptor.fetchLimit = 1
+        if let imageRow = try modelContext.fetch(descriptor).first {
+            imageRow.pinnedToSavedRecipeID = recipeID
+        }
     }
 
     /// DUT-215: clear the save-pin on every cached image belonging to
