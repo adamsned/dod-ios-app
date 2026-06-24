@@ -13,6 +13,9 @@ import SwiftUI
 struct CookingToolsCallout: View {
 
     let onDismiss: () -> Void
+    /// DUT-236 — tapping the bubble body (it literally says "Tap here") opens the
+    /// Cooking Tools, instead of doing nothing. The X button still dismisses.
+    let onActivate: () -> Void
 
     /// Height of the upward tail; also the extra top inset so content clears it.
     private static let tailHeight: CGFloat = 9
@@ -54,8 +57,13 @@ struct CookingToolsCallout: View {
             SpeechBubble(tailHeight: Self.tailHeight)
                 .stroke(DODColor.burntOrange.opacity(0.3), lineWidth: 1)
         )
+        .contentShape(Rectangle())
+        // DUT-236 — the bubble says "Tap here"; the whole bubble now opens the
+        // Cooking Tools. The X dismiss button (a child) keeps its own tap.
+        .onTapGesture { onActivate() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("feed-cooking-tools-callout")
+        .accessibilityAction(named: "Open Cooking Tools") { onActivate() }
     }
 }
 
@@ -117,7 +125,7 @@ private struct SpeechBubble: Shape {
 }
 
 #Preview {
-    CookingToolsCallout(onDismiss: {})
+    CookingToolsCallout(onDismiss: {}, onActivate: {})
         .frame(width: 280)
         .padding()
         .background(DODColor.surface)

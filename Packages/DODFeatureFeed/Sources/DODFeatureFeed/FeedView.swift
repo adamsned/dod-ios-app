@@ -31,6 +31,9 @@ public struct FeedView: View {
     /// Settings ▸ Tools so all cooking-help + cast-iron-care tools live together
     /// in the Feed's "Cooking Tools" menu.
     @State private var showingHeatCoach = false
+    /// DUT-236 — tapping the Cooking Tools callout presents the same tools as the
+    /// menu button (a SwiftUI `Menu` can't be opened programmatically).
+    @State private var showingCookingToolsDialog = false
     /// DUT-200 — the Cooking Tools onboarding callout (the speech bubble under
     /// the menu button); dismissible + persisted so it nudges once. Replaced the
     /// First Cookout hero card (DUT-183) as the Feed's single onboarding nudge.
@@ -102,6 +105,21 @@ public struct FeedView: View {
         }
         .sheet(isPresented: $showingHeatCoach) {
             NavigationStack { HeatCoachView() }
+        }
+        // DUT-236 — the Cooking Tools callout's tap target: the same tools the
+        // menu button lists, presented as a dialog (a `Menu` can't be opened
+        // programmatically).
+        .confirmationDialog(
+            "Cooking Tools",
+            isPresented: $showingCookingToolsDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Your First Cookout") { showingFirstCookout = true }
+            Button("Cooking Journal") { showingJournal = true }
+            Button("Dutch Oven Heat Coach") { showingHeatCoach = true }
+            Button("Buy BuzzyWaxx Seasoning") {
+                openCookingToolURL(SettingsViewModel.buyBuzzyWaxxURLString)
+            }
         }
         .sheet(isPresented: $showingDumpCakeFlow) {
             DumpCakeFlow(onLogCook: { entry in
@@ -248,11 +266,22 @@ public struct FeedView: View {
     @ViewBuilder
     private var cookingToolsCalloutOverlay: some View {
         if !cookingToolsCalloutDismissed {
-            CookingToolsCallout(onDismiss: {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    cookingToolsCalloutDismissed = true
+            CookingToolsCallout(
+                onDismiss: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        cookingToolsCalloutDismissed = true
+                    }
+                },
+                // DUT-236 — "Tap here" now opens the Cooking Tools (presented as a
+                // dialog, since a Menu can't be opened programmatically) and
+                // dismisses the nudge, since the user engaged with it.
+                onActivate: {
+                    showingCookingToolsDialog = true
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        cookingToolsCalloutDismissed = true
+                    }
                 }
-            })
+            )
             .padding(.horizontal, DODSpacing.md)
             .padding(.top, DODSpacing.sm)
             .transition(.opacity.combined(with: .move(edge: .top)))
