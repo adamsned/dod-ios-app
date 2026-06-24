@@ -43,6 +43,12 @@ public enum GoogleSignInResult: Sendable, Equatable {
 /// thread UI operation.
 public protocol GoogleSignInProviding: Sendable {
     @MainActor func signIn() async -> GoogleSignInResult
+    /// DUT-296 — clear the GoogleSignIn SDK's own OAuth tokens on Sign Out /
+    /// Delete. The SDK keeps its access+refresh tokens in a Keychain row separate
+    /// from the app's session, so the app's teardown alone leaves them at rest.
+    /// `revoke == true` (Delete Profile) should revoke server-side + clear;
+    /// `false` (Sign Out) just clears the local SDK session.
+    @MainActor func teardown(revoke: Bool) async
 }
 
 /// Fallback provider used when no client ID is wired — always `.notConfigured`.
@@ -50,6 +56,7 @@ public protocol GoogleSignInProviding: Sendable {
 public struct UnconfiguredGoogleSignInProvider: GoogleSignInProviding {
     public init() {}
     @MainActor public func signIn() async -> GoogleSignInResult { .notConfigured }
+    @MainActor public func teardown(revoke: Bool) async {}
 }
 
 /// Persists a Google sign-in as the app's session + ``UserProfile`` — the
@@ -66,13 +73,20 @@ public struct GoogleProfileSignIn: Sendable {
 
     private let sessionStore: any AppleAuthSessionStoring
     private let profileStore: any ProfileStoring
+    /// DUT-279 — used only to revoke a *different* user's orphaned Apple token
+    /// when a Google sign-in overwrites it (see `apply`). Same default wiring as
+    /// `AppleProfileSignIn`.
+    private let revoker: (any SiwaRevoking)?
 
     public init(
         profileStore: any ProfileStoring,
-        sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore()
+        sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
+        revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
+            ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil
     ) {
         self.profileStore = profileStore
         self.sessionStore = sessionStore
+        self.revoker = revoker
     }
 
     @discardableResult
@@ -88,6 +102,15 @@ public struct GoogleProfileSignIn: Sendable {
             credentialEmail: email,
             existing: existing
         )
+        // DUT-279: if a DIFFERENT user's Apple session (with a refresh token) is
+        // on file, revoke it BEFORE we overwrite it — otherwise that token is
+        // orphaned (dropped from the Keychain, never revoked), re-opening the
+        // 5.1.1(v) gap. Same-user re-auth carries the token forward instead.
+        let orphanedToken =
+            existing?.userIdentifier == resolved.userIdentifier ? nil : existing?.refreshToken
+        if let orphanedToken, let revoker {
+            try? await revoker.revoke(refreshToken: orphanedToken)
+        }
         // Preserve any token already on file for the same user so a prior Apple
         // session for this identity isn't clobbered; Google brings none of its own.
         let carried = existing?.userIdentifier == resolved.userIdentifier ? existing?.refreshToken : nil
