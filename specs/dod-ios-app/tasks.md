@@ -2872,6 +2872,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `SearchView.swift` (gallery `RecipeCard` + dense `RecipeCard.ListRow`), `SearchView+IngredientSection.swift` (gallery + list), `SavedView.swift` (gallery + delete the now-dead private `totalTimeDisplay(_:)` formatter), `CategoryRecipesView.swift` (gallery) — all omit `totalTimeDisplay` (defaults nil → no chip). Spec: `clarifications.md` (CL-255). Untouched: `RecipeCard` component, `RecipeListItem.totalTimeDisplay`, data layer (Search's time filter still reads the underlying data).
 - **AC:** US-38 (recipe-card presentation). DUT pending (free issue limit). CL-255 canonical. **Est:** ~20 min. **Deps:** off main (after #298). Branch `fix/remove-time-chip-everywhere`. **Verification:** DODFeatureCategories + DODFeatureSaved + DODFeatureSearch compile on macOS; swift-format + SwiftLint `--strict` clean; iOS app build green; grep confirms no card call site passes `totalTimeDisplay`. Same omission proven visually on the Feed (CL-254). No CI-gated snapshot affected.
 
+### T-862 — DUT-236: Cooking Tools callout is tappable (was a dead "Tap here") (CL-256)
+
+- **What:** Ned tapped the Feed's "Cooking Tools" speech-bubble (which says "Tap here…") and nothing happened — the bubble only had an X dismiss; the real tap target was the menu button it points at. Added an `onActivate` tap to the whole bubble; since a `Menu` can't be opened programmatically, `FeedView` presents the same four tools via a `.confirmationDialog` on tap and dismisses the nudge.
+- **Files:** `CookingToolsCallout.swift` (onActivate + tappable body + a11y action), `FeedView.swift` (state + overlay wiring + confirmationDialog). Spec: `clarifications.md` (CL-256).
+- **AC:** US-1 / DUT-236. CL-256 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-236-cooking-tools-callout-tap`. **Device-verify:** tap the callout body → tools dialog. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 88 DODFeatureFeed tests pass; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
