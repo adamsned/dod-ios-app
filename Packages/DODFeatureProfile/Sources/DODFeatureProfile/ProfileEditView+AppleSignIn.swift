@@ -86,6 +86,7 @@ extension ProfileEditView {
     /// completion; the session is persisted regardless (the user is signed in).
     @MainActor
     func handleAppleSignIn(_ outcome: AppleProfileSignIn.Outcome) {
+        hasSession = true  // DUT-281 — a session was persisted; keep Sign Out reachable
         if let name = outcome.displayName { displayName = name }
         if let mail = outcome.email { email = mail }
         guard outcome.profileSaved else { return }
@@ -103,6 +104,7 @@ extension ProfileEditView {
     @MainActor
     func handleGoogleSignIn(_ result: GoogleSignInResult) {
         guard case .success(let userIdentifier, let displayName, let email) = result else { return }
+        hasSession = true  // DUT-281 — a session will be persisted; keep Sign Out reachable
         Task {
             let outcome = await GoogleProfileSignIn(profileStore: store).apply(
                 userIdentifier: userIdentifier,
