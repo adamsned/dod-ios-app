@@ -2894,11 +2894,19 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `App/RootView.swift` (flag + recovery + interactiveDismissDisabled + alert buttons), `App/RootView+Onboarding.swift` (`runFirstRunSetup` moved here for the file-length cap). Spec: `clarifications.md` (CL-259).
 - **AC:** US-8 / US-41 / US-42 / DUT-301 + DUT-280. CL-259 canonical. **Est:** ~1 h. **Deps:** off main. Branch `fix/first-run-hardening-280-301`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; iOS app build green (RootView 393 lines).
 
+<<<<<<< HEAD
 ### T-869 — DUT-297: First Cookout bake timer notifies when backgrounded (CL-263)
 
 - **What:** The guided cook-stage bake timer was progressed only by a foreground tick loop, so a backgrounded bake never finished/alerted — breaking the "you can step away" promise. New BakeTimerNotifying seam + SystemBakeTimerNotifier (UNUserNotificationCenter) injected into FirstCookoutView; start schedules a deadline notification, cancel/foreground-finish cancels it.
 - **Files:** new `BakeTimerNotifier.swift`; `FirstCookoutView.swift` (prop/init + onFinished cancel), `FirstCookoutView+Stages.swift` (start→schedule, cancel→cancel); new `FirstCookoutBakeNotifierTests.swift`. Spec: `clarifications.md` (CL-263).
 - **AC:** US-1 / DUT-100 / DUT-297. CL-263 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-297-firstcookout-bake-notification`. **Verification:** swift-format + SwiftLint `--strict` clean; 91 DODFeatureFeed tests pass (3 new); iOS app build green. Device-verify: start bake timer → lock phone → notification fires at the deadline.
+=======
+### T-866 — DUT-295: Google SDK out of the Live Activity extension (DODCookActivity leaf module) (CL-260)
+
+- **What:** The Live Activity appex depended on the whole DODFeatureRecipeDetail feature (just for CookActivityAttributes + the CookActivity*View layouts), transitively linking DODFeatureProfile → GoogleSignIn (+ AppAuth/GTMAppAuth) into the extension — an App Store risk + bloat. Extracted a new SDK-free leaf package DODCookActivity (deps: only DODDesignSystem) holding those two files; swapped the appex dep to it.
+- **Files:** new `Packages/DODCookActivity/` (Package.swift + the 2 moved files); `DODFeatureRecipeDetail/Package.swift` (+ dep); imports in CookLiveActivityController/CookModeViewModel + 2 tests; `LiveActivity/CookActivityWidget.swift` (import); `project.yml` (register pkg + swap LiveActivity dep). Spec: `clarifications.md` (CL-260).
+- **AC:** US-11 / DUT-295. CL-260 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-295-cookactivity-sdk-free-module`. **Verification:** show-dependencies proves DODCookActivity → only DODDesignSystem (no GoogleSignIn); standalone build + 203 DODFeatureRecipeDetail tests pass; xcodegen + iOS app build green; lint clean.
+>>>>>>> origin/main
 
 ---
 

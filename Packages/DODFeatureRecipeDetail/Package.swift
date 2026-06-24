@@ -14,6 +14,10 @@ let package = Package(
         .package(path: "../DODAnalytics"),
         .package(path: "../DODNetworking"),
         .package(path: "../DODPersistence"),
+        // DUT-295 — the Cook Mode Live Activity payload + view layouts live in
+        // this SDK-free leaf module (shared with the appex, which must NOT pull
+        // this whole feature → GoogleSignIn).
+        .package(path: "../DODCookActivity"),
         // US-44 / T-741 / CL-138 — Phase c gate references `ProfileStoring`
         // (for the dependency seam) + `UserProfile` (for the view-model
         // property) + presents `ProfileEditView` as a modal sheet over the
@@ -34,6 +38,7 @@ let package = Package(
                 "DODAnalytics",
                 "DODNetworking",
                 "DODPersistence",
+                "DODCookActivity",
                 "DODFeatureProfile",
             ]
         ),
@@ -42,6 +47,7 @@ let package = Package(
             dependencies: [
                 "DODFeatureRecipeDetail",
                 "DODAnalytics",
+                "DODCookActivity",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             ],
             resources: [.process("__Snapshots__")]
