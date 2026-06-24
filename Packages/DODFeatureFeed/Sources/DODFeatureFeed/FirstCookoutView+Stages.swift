@@ -184,7 +184,7 @@ extension FirstCookoutView {
                     timerEngine.cancel(active.id)
                     Task { await notifier.cancelBakeDone() }
                 }
-                    .foregroundStyle(DODColor.labelSecondary)
+                .foregroundStyle(DODColor.labelSecondary)
             }
             .padding(.top, DODSpacing.xs)
         } else if timerEngine.timers.contains(where: { $0.state == .finished }) {
