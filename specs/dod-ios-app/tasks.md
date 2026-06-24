@@ -2894,19 +2894,26 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `App/RootView.swift` (flag + recovery + interactiveDismissDisabled + alert buttons), `App/RootView+Onboarding.swift` (`runFirstRunSetup` moved here for the file-length cap). Spec: `clarifications.md` (CL-259).
 - **AC:** US-8 / US-41 / US-42 / DUT-301 + DUT-280. CL-259 canonical. **Est:** ~1 h. **Deps:** off main. Branch `fix/first-run-hardening-280-301`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; iOS app build green (RootView 393 lines).
 
-<<<<<<< HEAD
 ### T-869 — DUT-297: First Cookout bake timer notifies when backgrounded (CL-263)
 
 - **What:** The guided cook-stage bake timer was progressed only by a foreground tick loop, so a backgrounded bake never finished/alerted — breaking the "you can step away" promise. New BakeTimerNotifying seam + SystemBakeTimerNotifier (UNUserNotificationCenter) injected into FirstCookoutView; start schedules a deadline notification, cancel/foreground-finish cancels it.
 - **Files:** new `BakeTimerNotifier.swift`; `FirstCookoutView.swift` (prop/init + onFinished cancel), `FirstCookoutView+Stages.swift` (start→schedule, cancel→cancel); new `FirstCookoutBakeNotifierTests.swift`. Spec: `clarifications.md` (CL-263).
 - **AC:** US-1 / DUT-100 / DUT-297. CL-263 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-297-firstcookout-bake-notification`. **Verification:** swift-format + SwiftLint `--strict` clean; 91 DODFeatureFeed tests pass (3 new); iOS app build green. Device-verify: start bake timer → lock phone → notification fires at the deadline.
-=======
+### T-868 — DUT-292: pin the hero on save so saved recipes stay offline-usable (CL-262)
+
+- **What:** No ordinary save path pinned the hero, so a saved-only recipe's hero was evicted on budget pressure / "free up space" and couldn't render offline (AC-5.2). Contained to DODPersistence (both save paths funnel through RecipeStore.toggleSaved): toggleSaved + markSaved pin an already-cached hero; cacheImage auto-pins when the URL is an already-saved recipe's hero (the post-save prefetch race). Unsave's unpinImages (DUT-215) now does real work.
+- **Files:** `RecipeStore+ImageCache.swift` (effectivePin auto-pin + savedRecipeID/pinHeroImage helpers), `RecipeStore+Saved.swift` (pin in toggleSaved + markSaved), new `RecipeStorePinOnSaveTests.swift` (3 tests). Spec: `clarifications.md` (CL-262). No public-API/cross-package change.
+- **AC:** US-5 / AC-5.2 / DUT-292. CL-262 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-292-pin-saved-hero`. **Verification:** swift-format + SwiftLint `--strict` clean; 121 DODPersistence tests pass (3 new); iOS app build green. Device-verify: save (no Download) → free up space → offline → hero still renders.
 ### T-866 — DUT-295: Google SDK out of the Live Activity extension (DODCookActivity leaf module) (CL-260)
 
 - **What:** The Live Activity appex depended on the whole DODFeatureRecipeDetail feature (just for CookActivityAttributes + the CookActivity*View layouts), transitively linking DODFeatureProfile → GoogleSignIn (+ AppAuth/GTMAppAuth) into the extension — an App Store risk + bloat. Extracted a new SDK-free leaf package DODCookActivity (deps: only DODDesignSystem) holding those two files; swapped the appex dep to it.
 - **Files:** new `Packages/DODCookActivity/` (Package.swift + the 2 moved files); `DODFeatureRecipeDetail/Package.swift` (+ dep); imports in CookLiveActivityController/CookModeViewModel + 2 tests; `LiveActivity/CookActivityWidget.swift` (import); `project.yml` (register pkg + swap LiveActivity dep). Spec: `clarifications.md` (CL-260).
 - **AC:** US-11 / DUT-295. CL-260 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-295-cookactivity-sdk-free-module`. **Verification:** show-dependencies proves DODCookActivity → only DODDesignSystem (no GoogleSignIn); standalone build + 203 DODFeatureRecipeDetail tests pass; xcodegen + iOS app build green; lint clean.
->>>>>>> origin/main
+### T-867 — DUT-303: real test for the REG-14 rating-fetch failure-degrade (CL-261) — test-only
+
+- **What:** The live `LiveRecipeDetailDependencies.fetchRatingSummary` do/catch (swallow a ratingsClient.summary throw → degrade to 0/0) had zero coverage; the "offline" tests drove it via an inert `online = false` the Fake ignores. New `RatingFetchDegradeTests` builds the real Live deps with a throwing WPRMRatingsClient transport + asserts the 0/0 degrade; removed the inert red-herring lines.
+- **Files:** new `RatingFetchDegradeTests.swift`; `RecipeDetailRatingsCacheTests.swift` (drop 2 inert lines). Spec: `clarifications.md` (CL-261). No production change.
+- **AC:** US-3 / DUT-303 / REG-14. CL-261 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-303-rating-degrade-test`. **Verification:** swift-format + SwiftLint `--strict` clean; 204 DODFeatureRecipeDetail tests pass (1 new).
 
 ---
 
