@@ -54,6 +54,26 @@ import Testing
         #expect(viewModel.items.count == 55)
     }
 
+    @Test func appendFailureKeepsTheLoadedGrid() async throws {
+        // DUT-282: a transient loadMore (append) failure must keep the
+        // already-loaded grid + the `.loaded` state, not wipe it to a full-screen
+        // error or reset pagination (mirrors the Feed's DUT-223 contract).
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.posts[1] = (1...20).map(Self.makeItem)
+        dependencies.totalPagesOverride = 3
+        dependencies.failOnPage = 2
+        let category = DODDomain.Category(id: 9, name: "Big", slug: "big", count: 60)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.items.count == 20)
+        #expect(viewModel.loadState == .loaded)
+
+        let last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)  // -> page 2 throws
+        #expect(viewModel.items.count == 20)  // grid preserved, not wiped
+        #expect(viewModel.loadState == .loaded)  // NOT .error
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
@@ -73,6 +93,9 @@ final class FakeCategoriesDependencies: CategoriesDependencies, @unchecked Senda
     /// DUT-265: override the reported `X-WP-TotalPages`. When nil, derived from
     /// the highest seeded page (a short final page still ends pagination).
     var totalPagesOverride: Int?
+    /// DUT-282: make `fetchPosts` throw for this page (to exercise a loadMore
+    /// failure on a specific append).
+    var failOnPage: Int?
 
     func fetchCategories() async throws -> [DODDomain.Category] {
         if fetchShouldFail { throw URLError(.notConnectedToInternet) }
@@ -83,6 +106,7 @@ final class FakeCategoriesDependencies: CategoriesDependencies, @unchecked Senda
         categoryID: Int,
         page: Int
     ) async throws -> (items: [RecipeListItem], totalPages: Int) {
+        if page == failOnPage { throw URLError(.notConnectedToInternet) }
         let totalPages = totalPagesOverride ?? max(posts.keys.max() ?? 1, 1)
         return (posts[page] ?? [], totalPages)
     }
