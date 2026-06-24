@@ -2894,6 +2894,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `App/RootView.swift` (flag + recovery + interactiveDismissDisabled + alert buttons), `App/RootView+Onboarding.swift` (`runFirstRunSetup` moved here for the file-length cap). Spec: `clarifications.md` (CL-259).
 - **AC:** US-8 / US-41 / US-42 / DUT-301 + DUT-280. CL-259 canonical. **Est:** ~1 h. **Deps:** off main. Branch `fix/first-run-hardening-280-301`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; iOS app build green (RootView 393 lines).
 
+### T-868 — DUT-292: pin the hero on save so saved recipes stay offline-usable (CL-262)
+
+- **What:** No ordinary save path pinned the hero, so a saved-only recipe's hero was evicted on budget pressure / "free up space" and couldn't render offline (AC-5.2). Contained to DODPersistence (both save paths funnel through RecipeStore.toggleSaved): toggleSaved + markSaved pin an already-cached hero; cacheImage auto-pins when the URL is an already-saved recipe's hero (the post-save prefetch race). Unsave's unpinImages (DUT-215) now does real work.
+- **Files:** `RecipeStore+ImageCache.swift` (effectivePin auto-pin + savedRecipeID/pinHeroImage helpers), `RecipeStore+Saved.swift` (pin in toggleSaved + markSaved), new `RecipeStorePinOnSaveTests.swift` (3 tests). Spec: `clarifications.md` (CL-262). No public-API/cross-package change.
+- **AC:** US-5 / AC-5.2 / DUT-292. CL-262 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-292-pin-saved-hero`. **Verification:** swift-format + SwiftLint `--strict` clean; 121 DODPersistence tests pass (3 new); iOS app build green. Device-verify: save (no Download) → free up space → offline → hero still renders.
 ### T-866 — DUT-295: Google SDK out of the Live Activity extension (DODCookActivity leaf module) (CL-260)
 
 - **What:** The Live Activity appex depended on the whole DODFeatureRecipeDetail feature (just for CookActivityAttributes + the CookActivity*View layouts), transitively linking DODFeatureProfile → GoogleSignIn (+ AppAuth/GTMAppAuth) into the extension — an App Store risk + bloat. Extracted a new SDK-free leaf package DODCookActivity (deps: only DODDesignSystem) holding those two files; swapped the appex dep to it.

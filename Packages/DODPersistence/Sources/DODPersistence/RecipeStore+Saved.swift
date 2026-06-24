@@ -14,6 +14,9 @@ extension RecipeStore {
         // `SyncedSavedRecipe` leaves the device; the recipe cache stays local).
         if row.isSaved {
             try upsertSyncedSaved(from: row)
+            // DUT-292: pin the hero so a merely-saved recipe survives image
+            // eviction + Settings "free up space" and stays offline-usable (AC-5.2).
+            try pinHeroImage(heroURLString: row.heroImageURLString, toRecipeID: id)
         } else {
             try removeSyncedSaved(id: id)
             // DUT-215: unsaving must also tear down the offline download + the
@@ -38,6 +41,8 @@ extension RecipeStore {
         if row.isSaved { return false }
         row.isSaved = true
         try upsertSyncedSaved(from: row)
+        // DUT-292: pin the hero (download = save + pin) so it's offline-usable.
+        try pinHeroImage(heroURLString: row.heroImageURLString, toRecipeID: id)
         try modelContext.save()
         return true
     }
