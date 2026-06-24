@@ -3,6 +3,8 @@ import SnapshotTesting
 import SwiftUI
 import XCTest
 
+import DODCookActivity
+
 @testable import DODFeatureRecipeDetail
 
 /// L4 visual-regression tests for the Cook Mode Live Activity surfaces
