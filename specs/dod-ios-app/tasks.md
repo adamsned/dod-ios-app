@@ -2915,6 +2915,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** new `RatingFetchDegradeTests.swift`; `RecipeDetailRatingsCacheTests.swift` (drop 2 inert lines). Spec: `clarifications.md` (CL-261). No production change.
 - **AC:** US-3 / DUT-303 / REG-14. CL-261 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-303-rating-degrade-test`. **Verification:** swift-format + SwiftLint `--strict` clean; 204 DODFeatureRecipeDetail tests pass (1 new).
 
+### T-870 — DUT-293/294: persist-model Cook Mode step timers (VM-owned, LA reconciled) (CL-264)
+
+- **What:** CookTimer held timer state as view @State reused across steps (step 5 showed step 2's countdown, DUT-293) and stranded the Live Activity on navigation (DUT-294). Per Ned's persist-model decision, moved state into CookModeViewModel keyed by step index (endDate state machine); CookTimer is now a thin TimelineView; CookModeView owns the 1Hz tick + haptic; reconcileLiveActivity drives the soonest-finishing timer or ends the card.
+- **Files:** new `CookStepTimer.swift`, `CookModeViewModel+Timers.swift`; `CookModeViewModel.swift` (state + endCookMode clear), `CookTimer.swift` (rewrite), `CookModeView.swift` (ticker + haptic + call); new `CookModeTimerTests.swift`. Spec: `clarifications.md` (CL-264).
+- **AC:** US-7 / US-11 / DUT-293 + DUT-294. CL-264 canonical. **Est:** ~3 h. **Deps:** off main. Branch `fix/DUT-293-294-persist-cook-timer`. **Verification:** swift-format + SwiftLint `--strict` clean; 210 DODFeatureRecipeDetail tests pass (7 new); xcodegen + iOS app build green. Device-verify the Lock-Screen Live Activity behavior.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
