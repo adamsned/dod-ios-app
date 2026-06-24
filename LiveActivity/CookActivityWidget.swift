@@ -1,6 +1,6 @@
 import ActivityKit
+import DODCookActivity
 import DODDesignSystem
-import DODFeatureRecipeDetail
 import SwiftUI
 import WidgetKit
 

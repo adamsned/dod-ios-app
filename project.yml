@@ -43,6 +43,8 @@ packages:
     path: Packages/DODNetworking
   DODPersistence:
     path: Packages/DODPersistence
+  DODCookActivity:
+    path: Packages/DODCookActivity
   DODFeatureFeed:
     path: Packages/DODFeatureFeed
   DODFeatureCategories:
@@ -267,7 +269,7 @@ targets:
         INFOPLIST_FILE: LiveActivity/Info.plist
         SKIP_INSTALL: YES
     dependencies:
-      - package: DODFeatureRecipeDetail
+      - package: DODCookActivity
       - package: DODDesignSystem
       - sdk: WidgetKit.framework
       - sdk: SwiftUI.framework
