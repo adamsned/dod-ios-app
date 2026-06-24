@@ -2932,6 +2932,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **What:** DUT-299: ProfileSettingsSection hid the Settings Profile row on idiom==.pad, so an iPad multitasking (compact) pane had no profile entry anywhere — fixed by gating on horizontalSizeClass==.regular (the signal RootView uses). DUT-300: dodHidesNavBar blanket-hid the nav bar, removing the split-view sidebar-reveal toggle on iPad portrait — fixed with a size-class-aware ViewModifier that keeps the bar (collapsed title) in regular width.
 - **Files:** `SettingsView+Profile.swift` (horizontalSizeClass), `DODScreenHeader.swift` (DODHidesNavBarModifier). Spec: `clarifications.md` (CL-267).
 - **AC:** US-44 / US-1 / DUT-299 + DUT-300. CL-267 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-299-300-ipad-nav`. **Verification:** swift-format lint + SwiftLint `--strict` clean; DODDesignSystem (19) + DODFeatureFeed (92) green; iOS app build green. **Device-verify iPad:** compact pane shows the Settings Profile row; portrait shows the sidebar toggle on every tab.
+### T-872 — DUT-283: Voice Mode recovers from an audio interruption (CL-266)
+
+- **What:** VoiceReader activated the audio session once (one-shot flag) and observed no interruption notification, so a call/Siri/route-change left Voice Mode permanently silent. Added interruption + media-reset observers (iOS-only) that invalidate the session so the next speak() reactivates; on .ended+.shouldResume it resumes. Sendable UInts hop to the main actor (not the Notification). Extracted SystemSpeechSynthesizer to its own file for the line cap.
+- **Files:** `VoiceReader.swift` (observers + invalidateAudioSession + hasActiveAudioSession), new `SystemSpeechSynthesizer.swift` (extracted), `VoiceReaderTests.swift` (1 test). Spec: `clarifications.md` (CL-266).
+- **AC:** US-40 / DUT-283. CL-266 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-283-voice-audio-interruption`. **Verification:** swift-format lint + SwiftLint `--strict` clean; 212 DODFeatureRecipeDetail tests pass (1 new); iOS app build green. Device-verify: call mid-Voice-Mode → resume after.
 
 ---
 
