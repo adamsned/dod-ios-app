@@ -32,6 +32,18 @@ public struct GIDSignInProvider: GoogleSignInProviding {
         }
     }
 
+    /// DUT-296 — clear the SDK's own OAuth tokens. `disconnect()` revokes the
+    /// grant server-side AND clears the SDK's Keychain tokens (Delete Profile →
+    /// 5.1.1(v)); `signOut()` just clears the local SDK session (Sign Out).
+    @MainActor
+    public func teardown(revoke: Bool) async {
+        if revoke {
+            try? await GIDSignIn.sharedInstance.disconnect()
+        } else {
+            GIDSignIn.sharedInstance.signOut()
+        }
+    }
+
     /// The frontmost presented view controller in the active foreground scene —
     /// what the Google OAuth sheet presents from.
     @MainActor

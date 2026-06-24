@@ -2878,6 +2878,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookingToolsCallout.swift` (onActivate + tappable body + a11y action), `FeedView.swift` (state + overlay wiring + confirmationDialog). Spec: `clarifications.md` (CL-256).
 - **AC:** US-1 / DUT-236. CL-256 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-236-cooking-tools-callout-tap`. **Device-verify:** tap the callout body → tools dialog. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 88 DODFeatureFeed tests pass; iOS app build green.
 
+### T-863 — Auth/teardown compliance cluster: DUT-279/281/296/298 (+268) (CL-257)
+
+- **What:** Four interlocking auth-compliance fixes. DUT-279: GoogleProfileSignIn revokes a different-user's orphaned Apple token before overwrite (injected SiwaRevoking). DUT-281: signOutSection gated on `existingProfile != nil || hasSession` so a profile-less signed-in user can still Sign Out/Delete. DUT-296: GoogleSignInProviding.teardown(revoke:) (GIDSignIn disconnect/signOut) wired into performAccountTeardown. DUT-298: teardown clears the GuestIdentity row (name+email leak). DUT-268 (incidental): each clear independent/best-effort.
+- **Files:** `GoogleProfileSignIn.swift`, `GIDSignInProvider.swift`, `ProfileEditView+Teardown.swift`, `ProfileEditView.swift`, `ProfileEditView+AppleSignIn.swift`, `ProfileEditViewTeardownTests.swift`, `GoogleProfileSignInTests.swift`. Spec: `clarifications.md` (CL-257).
+- **AC:** US-46 / AC-46.6 / DUT-279/281/296/298/268. CL-257 canonical. **Device-verify:** the live GIDSignIn.disconnect/signOut + on-device sign-out/delete. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 55 DODFeatureProfile tests pass; iOS app build green.
 ### T-864 — DUT-282: Categories loadMore failure keeps the grid (parity with DUT-223) (CL-258)
 
 - **What:** DUT-265 routed initial + append through one `load`, whose catch set `.error` for any failure — a loadMore blip wiped the whole grid + reset to page 1. Branched the catch on `append`: an append failure keeps `items` + sets `.loaded`; only an initial-load failure errors. Mirrors FeedViewModel/DUT-223.

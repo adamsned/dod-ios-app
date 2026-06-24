@@ -75,6 +75,13 @@ public struct ProfileEditView: View {
     @State var emailValidationError: String?
     @State var saveError: String?
     @State private var showDeleteConfirmation = false
+    /// DUT-281 — true when a session exists (seeded from `sessionStore` on appear;
+    /// set by a successful Apple/Google sign-in). Gates `signOutSection` so Sign
+    /// Out / Delete stays reachable even when no `UserProfile` was written (Apple
+    /// withholds name/email on re-auth) — otherwise a live session + token could
+    /// never be revoked through the UI. Non-private so the sign-in handlers in
+    /// `+AppleSignIn.swift` can set it.
+    @State var hasSession = false
     /// Non-private so `ProfileEditView+DirtyState.swift` can read it
     /// from the Save button's `.disabled(...)` modifier (T-743).
     @State var isSubmitting = false
@@ -264,6 +271,7 @@ public struct ProfileEditView: View {
                 initialDisplayName = existingProfile?.displayName ?? ""
                 initialEmail = existingProfile?.email ?? ""
                 initialPhotoFilename = existingProfile?.photoFilename
+                hasSession = (try? sessionStore.load()) != nil  // DUT-281
                 didCaptureInitialValues = true
             }
         }
@@ -309,7 +317,9 @@ public struct ProfileEditView: View {
         // Account, and "Sign Out" is the friendlier wording for the
         // common case. Local-only v1 — identical behavior. When DUT-16
         // adds backend state, the two diverge.
-        if existingProfile != nil {
+        // DUT-281 — also show when a session exists without a profile, so a
+        // signed-in-but-profile-less user can still Sign Out / Delete (revoke).
+        if existingProfile != nil || hasSession {
             Section {
                 Button {
                     Task { await handleSignOut() }

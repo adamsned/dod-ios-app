@@ -31,12 +31,23 @@ extension ProfileEditView {
         guard !isSubmitting else { return }
         isSubmitting = true
         defer { isSubmitting = false }
+        // DUT-296 — wire the real GIDSignIn teardown on iOS when Google is
+        // configured; macOS / unconfigured builds get a no-op.
+        var googleTeardown: (@Sendable (Bool) async -> Void)?
+        #if canImport(UIKit)
+        if GoogleSignInConfig.isConfigured {
+            let provider = GIDSignInProvider()
+            googleTeardown = { await provider.teardown(revoke: $0) }
+        }
+        #endif
         do {
             try await Self.performAccountTeardown(
                 revoke: revoke,
                 profileStore: store,
                 sessionStore: sessionStore,
-                revoker: revoker
+                guestIdentity: KeychainGuestIdentityStore(),
+                revoker: revoker,
+                googleTeardown: googleTeardown
             )
             await onProfileChanged()
             dismiss()
@@ -55,13 +66,33 @@ extension ProfileEditView {
         revoke: Bool,
         profileStore: any ProfileStoring,
         sessionStore: any AppleAuthSessionStoring,
-        revoker: (any SiwaRevoking)?
+        guestIdentity: any GuestIdentityStoring,
+        revoker: (any SiwaRevoking)?,
+        googleTeardown: (@Sendable (Bool) async -> Void)? = nil
     ) async throws {
         let token = (try? sessionStore.load())?.refreshToken
-        try await profileStore.clear()
+        // Each local clear is independent/best-effort so one failure can't skip
+        // the others — especially the revoke + the Google teardown (DUT-268).
+        let profileError: Error?
+        do {
+            try await profileStore.clear()
+            profileError = nil
+        } catch {
+            profileError = error
+        }
         try? sessionStore.clear()
+        // DUT-298: clear the guest-identity row too. For a signed-in user it
+        // mirrors the profile's name+email (the comment/rating author), which
+        // would otherwise survive teardown and prefill for the NEXT user.
+        try? guestIdentity.clear()
         if revoke, let token, let revoker {
             try? await revoker.revoke(refreshToken: token)
         }
+        // DUT-296: clear/revoke the GoogleSignIn SDK's own OAuth tokens — they
+        // live in a separate Keychain row the app's clears never touch.
+        await googleTeardown?(revoke)
+        // Surface a profile-clear failure to the UI, but only after everything
+        // else (revoke included) has run.
+        if let profileError { throw profileError }
     }
 }
