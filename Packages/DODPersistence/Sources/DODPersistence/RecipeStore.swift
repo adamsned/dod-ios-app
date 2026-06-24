@@ -21,6 +21,13 @@ public actor RecipeStore {
     /// image blobs at most once per launch.
     var didBackfillImageByteCounts = false
 
+    /// DUT-302: flips true once `AppDependencies.bootstrap` confirms the one-time
+    /// SyncedSaved backfill has completed (via ``markSyncedSavedBackfillComplete()``).
+    /// Until then, ``mergeDetail`` must NOT clear a legacy local `isSaved` pin —
+    /// the backfill (which selects `isSaved == true`) hasn't migrated it to the
+    /// synced store yet, so clearing it would permanently lose an upgrader's save.
+    public internal(set) var didBackfillSyncedSaved = false
+
     // MARK: - List item cache
 
     /// Insert-or-update a list item. Sets `lastViewedAt` so LRU sees it as fresh.
@@ -133,11 +140,20 @@ public actor RecipeStore {
             target.jsonLDFailedAt = .now
         }
 
-        // DUT-35: reconcile the local pin with the synced source of truth so a
-        // recipe saved on another device is pinned (LRU/widget) once it's
-        // cached here. `toggleSaved` writes `SyncedSavedRecipe` synchronously,
-        // so a just-saved recipe's pin is preserved, never cleared.
-        target.isSaved = try fetchSyncedSaved(id: recipe.id) != nil
+        // DUT-35 / DUT-302: reconcile the local pin with the synced source of
+        // truth so a recipe saved on another device is pinned (LRU/widget) once
+        // cached here. `toggleSaved` writes `SyncedSavedRecipe` synchronously, so
+        // a just-saved recipe's pin is preserved. DUT-302: until the one-time
+        // backfill has migrated the legacy pins (`didBackfillSyncedSaved`),
+        // reconcile only UPWARD — a synced row pins it, but a MISSING synced row
+        // must not CLEAR a still-true legacy pin (the backfill selects
+        // `isSaved == true`; clearing it first means the backfill never migrates
+        // it → the upgrader's save is permanently lost).
+        if try fetchSyncedSaved(id: recipe.id) != nil {
+            target.isSaved = true
+        } else if didBackfillSyncedSaved {
+            target.isSaved = false
+        }
 
         // US-12 / AC-12.1: keep the local ingredient index in sync.
         // Article rows have empty `ingredients`, so this clears any
