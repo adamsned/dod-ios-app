@@ -23,7 +23,9 @@ struct CookChooserFlow: View {
 
     var body: some View {
         if let selected {
-            FirstCookoutView(cookout: selected, onLogCook: onLogCook)
+            // CL-267 — `onBack` returns to the roadmap (clears the selection) so a
+            // picked recipe isn't a dead end; the X still closes the whole sheet.
+            FirstCookoutView(cookout: selected, onLogCook: onLogCook, onBack: { self.selected = nil })
         } else {
             // DUT-235 — always show the chooser first (no auto-jump into a dish);
             // the recommended rung is highlighted in place as the "start here".

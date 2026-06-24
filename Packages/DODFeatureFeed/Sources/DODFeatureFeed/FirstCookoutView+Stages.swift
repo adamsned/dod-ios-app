@@ -293,4 +293,39 @@ extension FirstCookoutView {
         let total = Int(seconds.rounded())
         return String(format: "%d:%02d", total / 60, total % 60)
     }
+
+    // MARK: - Pinned corner controls
+
+    /// CL-267 — "back to the path" chevron (top-leading): returns to the roadmap
+    /// (`CookChooserFlow`) via `onBack` instead of closing the whole sheet, so a
+    /// picked recipe isn't a dead end. Hidden when there's no roadmap to return to.
+    @ViewBuilder var backToPathButton: some View {
+        if let onBack {
+            Button {
+                onBack()
+            } label: {
+                Image(systemName: "chevron.backward.circle.fill")
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(DODColor.labelSecondary)
+            }
+            .accessibilityLabel("Back to the path")
+            .accessibilityIdentifier("first-cookout-back")
+        }
+    }
+
+    /// DUT-188 — explicit close (X), top-trailing: dismisses the whole sheet (the
+    /// swipe-down companion). Pinned outside the ScrollView so it never scrolls.
+    var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .font(.title2)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(DODColor.labelSecondary)
+        }
+        .accessibilityLabel("Close")
+        .accessibilityIdentifier("first-cookout-close")
+    }
 }
