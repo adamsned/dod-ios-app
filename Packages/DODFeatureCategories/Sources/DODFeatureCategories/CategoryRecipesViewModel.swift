@@ -89,7 +89,16 @@ public final class CategoryRecipesViewModel {
             loadState = items.isEmpty ? .empty : .loaded
         } catch {
             DODLog.network.error("category load failed: \(String(describing: error))")
-            loadState = .error
+            // DUT-282: a transient APPEND (loadMore) failure must not wipe the
+            // already-loaded grid to a full-screen error + reset pagination —
+            // keep the items + the `.loaded` state so a later near-bottom
+            // appearance retries (mirrors FeedViewModel.loadMore / DUT-223).
+            // Only a failed INITIAL load shows the error screen.
+            if append, !items.isEmpty {
+                loadState = .loaded
+            } else {
+                loadState = .error
+            }
         }
     }
 }
