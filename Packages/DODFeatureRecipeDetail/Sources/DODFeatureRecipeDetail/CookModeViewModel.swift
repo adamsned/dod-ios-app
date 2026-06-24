@@ -46,6 +46,20 @@ public final class CookModeViewModel {
     private var priorIdleTimerDisabled: Bool = false
     private var didBegin: Bool = false
 
+    /// DUT-293/294 — per-step countdown state owned HERE (not the `CookTimer`
+    /// view's `@State`), keyed by step index. This is what lets a running timer
+    /// keep counting while you browse other steps, stops one step from showing
+    /// another step's countdown, and lets the VM reconcile the Live Activity so
+    /// navigating away never strands a ghost card. Mutated by the methods in
+    /// `CookModeViewModel+Timers.swift` (hence `internal(set)`).
+    public internal(set) var stepTimers: [Int: CookStepTimer] = [:]
+    /// Bumped each time a step timer reaches zero so the view can fire the
+    /// completion haptic (a changing value, not a Bool).
+    public internal(set) var timerCompletionTick: Int = 0
+    /// Which step's timer is currently driving the Live Activity card (`nil` =
+    /// none). Lets `reconcileLiveActivity` know when to (re)start vs update.
+    var liveActivityStepKey: Int?
+
     public init(
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
@@ -112,6 +126,10 @@ public final class CookModeViewModel {
         // ghost activity behind would be the Live Activity equivalent of
         // the "battery still draining" idle-timer bug.
         liveActivity.end()
+        // DUT-293/294 — the session's over: drop all step timers + forget which
+        // one drove the card, so a re-entry starts clean.
+        stepTimers.removeAll()
+        liveActivityStepKey = nil
         // AC-7.6 / AC-40.1 — stop any in-flight utterance and release the
         // ducked audio session so the user's music returns to full volume
         // the moment they leave Cook Mode.

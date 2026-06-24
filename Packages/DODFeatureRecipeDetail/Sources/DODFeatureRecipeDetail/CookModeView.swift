@@ -1,3 +1,4 @@
+import Combine
 import DODDesignSystem
 import DODDomain
 import DODSupport
@@ -20,6 +21,10 @@ public struct CookModeView: View {
 
     @State private var viewModel: CookModeViewModel
     @State private var ingredientsDrawerVisible: Bool = false
+    /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
+    /// screen, regardless of which step is shown, so a running timer on a step
+    /// you've navigated away from still counts down + completes.
+    private let timerTicker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     public let onClose: (Set<UUID>) -> Void
     /// Scale factor inherited from the host detail screen so the drawer
     /// ingredient rows agree with the scaled list the user just left. AC-7.5
@@ -65,6 +70,8 @@ public struct CookModeView: View {
             // Idempotent — see CookModeViewModel.beginCookMode().
             viewModel.beginCookMode()
         }
+        .onReceive(timerTicker) { _ in viewModel.tickTimers() }
+        .sensoryFeedback(.success, trigger: viewModel.timerCompletionTick)
         .onDisappear {
             viewModel.endCookMode()
         }
@@ -167,7 +174,7 @@ public struct CookModeView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let duration = StepTimerParser.firstDuration(in: step.text) {
-                CookTimer(duration: duration, stepText: step.text, liveActivitySink: viewModel)
+                CookTimer(stepIndex: viewModel.currentStepIndex, duration: duration, viewModel: viewModel)
             }
         }
         .padding(.horizontal, DODSpacing.md)

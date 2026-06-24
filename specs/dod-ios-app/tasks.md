@@ -2900,6 +2900,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** new `Packages/DODCookActivity/` (Package.swift + the 2 moved files); `DODFeatureRecipeDetail/Package.swift` (+ dep); imports in CookLiveActivityController/CookModeViewModel + 2 tests; `LiveActivity/CookActivityWidget.swift` (import); `project.yml` (register pkg + swap LiveActivity dep). Spec: `clarifications.md` (CL-260).
 - **AC:** US-11 / DUT-295. CL-260 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-295-cookactivity-sdk-free-module`. **Verification:** show-dependencies proves DODCookActivity → only DODDesignSystem (no GoogleSignIn); standalone build + 203 DODFeatureRecipeDetail tests pass; xcodegen + iOS app build green; lint clean.
 
+### T-870 — DUT-293/294: persist-model Cook Mode step timers (VM-owned, LA reconciled) (CL-264)
+
+- **What:** CookTimer held timer state as view @State reused across steps (step 5 showed step 2's countdown, DUT-293) and stranded the Live Activity on navigation (DUT-294). Per Ned's persist-model decision, moved state into CookModeViewModel keyed by step index (endDate state machine); CookTimer is now a thin TimelineView; CookModeView owns the 1Hz tick + haptic; reconcileLiveActivity drives the soonest-finishing timer or ends the card.
+- **Files:** new `CookStepTimer.swift`, `CookModeViewModel+Timers.swift`; `CookModeViewModel.swift` (state + endCookMode clear), `CookTimer.swift` (rewrite), `CookModeView.swift` (ticker + haptic + call); new `CookModeTimerTests.swift`. Spec: `clarifications.md` (CL-264).
+- **AC:** US-7 / US-11 / DUT-293 + DUT-294. CL-264 canonical. **Est:** ~3 h. **Deps:** off main. Branch `fix/DUT-293-294-persist-cook-timer`. **Verification:** swift-format + SwiftLint `--strict` clean; 210 DODFeatureRecipeDetail tests pass (7 new); xcodegen + iOS app build green. Device-verify the Lock-Screen Live Activity behavior.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
