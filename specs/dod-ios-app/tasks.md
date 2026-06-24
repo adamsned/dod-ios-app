@@ -2899,6 +2899,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **What:** The Live Activity appex depended on the whole DODFeatureRecipeDetail feature (just for CookActivityAttributes + the CookActivity*View layouts), transitively linking DODFeatureProfile → GoogleSignIn (+ AppAuth/GTMAppAuth) into the extension — an App Store risk + bloat. Extracted a new SDK-free leaf package DODCookActivity (deps: only DODDesignSystem) holding those two files; swapped the appex dep to it.
 - **Files:** new `Packages/DODCookActivity/` (Package.swift + the 2 moved files); `DODFeatureRecipeDetail/Package.swift` (+ dep); imports in CookLiveActivityController/CookModeViewModel + 2 tests; `LiveActivity/CookActivityWidget.swift` (import); `project.yml` (register pkg + swap LiveActivity dep). Spec: `clarifications.md` (CL-260).
 - **AC:** US-11 / DUT-295. CL-260 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-295-cookactivity-sdk-free-module`. **Verification:** show-dependencies proves DODCookActivity → only DODDesignSystem (no GoogleSignIn); standalone build + 203 DODFeatureRecipeDetail tests pass; xcodegen + iOS app build green; lint clean.
+### T-867 — DUT-303: real test for the REG-14 rating-fetch failure-degrade (CL-261) — test-only
+
+- **What:** The live `LiveRecipeDetailDependencies.fetchRatingSummary` do/catch (swallow a ratingsClient.summary throw → degrade to 0/0) had zero coverage; the "offline" tests drove it via an inert `online = false` the Fake ignores. New `RatingFetchDegradeTests` builds the real Live deps with a throwing WPRMRatingsClient transport + asserts the 0/0 degrade; removed the inert red-herring lines.
+- **Files:** new `RatingFetchDegradeTests.swift`; `RecipeDetailRatingsCacheTests.swift` (drop 2 inert lines). Spec: `clarifications.md` (CL-261). No production change.
+- **AC:** US-3 / DUT-303 / REG-14. CL-261 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-303-rating-degrade-test`. **Verification:** swift-format + SwiftLint `--strict` clean; 204 DODFeatureRecipeDetail tests pass (1 new).
 
 ---
 
