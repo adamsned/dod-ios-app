@@ -17,8 +17,16 @@ struct RootView: View {
     /// after a major redesign we bump to `V2` rather than reading the old key.
     /// Spec trace: US-8 (post-launch amendment to CL-7).
     static let onboardingCompletedKey = "dod.onboardingCompletedV1"
+    /// DUT-280 — gates the first-run permission prompts (notifications + iCloud
+    /// Sync) INDEPENDENTLY of the onboarding-completed flag. Set true only after
+    /// both prompts are answered/dismissed, so a kill mid-flow re-runs them next
+    /// launch instead of losing them forever (the prompts were coupled to the
+    /// one-shot onboarding flag, which is committed before they run).
+    static let firstRunPromptsCompletedKey = "dod.firstRunPromptsCompletedV1"
 
-    @State private var dependencies: AppDependencies
+    // Non-private so the `+Onboarding.swift` extension's `runFirstRunSetup` can
+    // reach it.
+    @State var dependencies: AppDependencies
     @State private var selectedTab: AppTab = .feed
     /// T-762 / CL-159 (DUT-68) — drives the single first-launch welcome sheet
     /// (US-8). The former second sheet (the iCloud-Sync opt-in, AC-41.2) is
@@ -31,7 +39,7 @@ struct RootView: View {
     /// old blocking opt-in sheet, but a new user was then never asked, so their
     /// saved recipes never synced. "Turn On" sets the opt-in (effective next
     /// launch); "Not Now" leaves it off (still changeable in Settings).
-    @State private var showCloudSyncPrompt = false
+    @State var showCloudSyncPrompt = false
     /// US-36 AC-36.2 — user-selected appearance preference. Backed by
     /// `UserDefaults` (key `dod.settings.appearance`) via `@AppStorage`
     /// so a write from `SettingsViewModel.appearance` (the Picker's
@@ -76,6 +84,15 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.2), value: appearance)
         .task {
             await dependencies.bootstrap()
+            // DUT-280 — recover the first-run prompts if a prior launch dismissed
+            // onboarding but didn't finish them (killed mid-flow). The welcome
+            // sheet itself is NOT re-shown; only the prompts re-run.
+            let needsFirstRunPrompts =
+                !showOnboarding && !DODEnvironment.suppressFirstRunPrompts
+                && !UserDefaults.standard.bool(forKey: Self.firstRunPromptsCompletedKey)
+            if needsFirstRunPrompts {
+                await runFirstRunSetup()
+            }
             // Cold-launch index so DOD recipes are findable in Spotlight right
             // away; the foreground refresh below keeps it fresh (US-10 / DUT-12).
             await indexSpotlight()
@@ -125,12 +142,21 @@ struct RootView: View {
                 }
             )
             .presentationDetents([.large])
+            // DUT-301 — block swipe-dismiss: the welcome sheet's CTA is the only
+            // place that sets the onboarding flag + kicks off first-run setup, so
+            // a swipe-dismiss would re-show onboarding forever + skip the prompts.
+            // "Get cooking" is the single exit.
+            .interactiveDismissDisabled(true)
         }
         .alert("Turn On iCloud Sync?", isPresented: $showCloudSyncPrompt) {
             Button("Turn On Sync") {
+                // DUT-280 — both prompts answered; mark complete so they never re-run.
+                UserDefaults.standard.set(true, forKey: Self.firstRunPromptsCompletedKey)
                 Task { await dependencies.settingsDependencies().setCloudSyncOptIn(true) }
             }
-            Button("Not Now", role: .cancel) {}
+            Button("Not Now", role: .cancel) {
+                UserDefaults.standard.set(true, forKey: Self.firstRunPromptsCompletedKey)
+            }
         } message: {
             Text(
                 "Keep your saved recipes and cook journal on all your devices. "
@@ -143,26 +169,6 @@ struct RootView: View {
         // body's `Text` links in every tab; non-recipe / off-site URLs defer
         // to the system handler.
         .environment(\.openURL, OpenURLAction { url in handleArticleLinkTap(url) })
-    }
-
-    /// First-run setup, run once right after the welcome sheet is dismissed on a
-    /// brand-new install: ask for notification permission (the system prompt),
-    /// then ask to turn on iCloud Sync. New users were previously never prompted
-    /// for either — notifications were Settings-only and the sync opt-in sheet
-    /// was removed (DUT-68), so a new user got no alerts and no cross-device
-    /// sync until they happened to dig into Settings.
-    @MainActor
-    private func runFirstRunSetup() async {
-        // 1. Notifications — the system permission prompt. On grant, flip the
-        //    app-level toggle so cook-timer / new-recipe alerts actually fire
-        //    without a second trip to Settings (cohesive with the OS choice).
-        let granted = await dependencies.notificationService.requestAuthorization()
-        if granted {
-            UserDefaults.standard.set(true, forKey: SettingsViewModel.notificationsEnabledKey)
-        }
-        // 2. iCloud Sync — ask (never silently enable). The alert's "Turn On"
-        //    sets the launch-time opt-in.
-        showCloudSyncPrompt = true
     }
 
     private var phoneTabs: some View {

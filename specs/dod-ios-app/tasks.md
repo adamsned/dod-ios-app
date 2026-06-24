@@ -2888,6 +2888,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **What:** DUT-265 routed initial + append through one `load`, whose catch set `.error` for any failure — a loadMore blip wiped the whole grid + reset to page 1. Branched the catch on `append`: an append failure keeps `items` + sets `.loaded`; only an initial-load failure errors. Mirrors FeedViewModel/DUT-223.
 - **Files:** `CategoryRecipesViewModel.swift` (catch), `CategoriesTests.swift` (`failOnPage` hook + 1 regression test). Spec: `clarifications.md` (CL-258).
 - **AC:** US-2 / AC-2.3 / DUT-282. CL-258 canonical. **Est:** ~30 min. **Deps:** off main. Branch `fix/DUT-282-categories-loadmore-keeps-grid`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 4 DODFeatureCategories tests pass; iOS app build green.
+### T-865 — First-run hardening: DUT-301 (no swipe-dismiss) + DUT-280 (prompt recovery) (CL-259)
+
+- **What:** The DUT-278 first-run prompts could be lost forever — by swipe-dismissing the welcome sheet (DUT-301) or a kill mid-flow (DUT-280). DUT-301: `.interactiveDismissDisabled(true)` on the welcome sheet (CTA is the only exit). DUT-280: a new `firstRunPromptsCompletedKey` set only when both prompts are answered, + a `.task` launch-recovery that re-runs `runFirstRunSetup` (without re-showing onboarding) if a prior launch left it unfinished.
+- **Files:** `App/RootView.swift` (flag + recovery + interactiveDismissDisabled + alert buttons), `App/RootView+Onboarding.swift` (`runFirstRunSetup` moved here for the file-length cap). Spec: `clarifications.md` (CL-259).
+- **AC:** US-8 / US-41 / US-42 / DUT-301 + DUT-280. CL-259 canonical. **Est:** ~1 h. **Deps:** off main. Branch `fix/first-run-hardening-280-301`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; iOS app build green (RootView 393 lines).
 
 ---
 

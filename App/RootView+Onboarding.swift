@@ -1,4 +1,6 @@
 import DODDesignSystem
+import DODFeatureFeed
+import Foundation
 
 extension RootView {
 
@@ -32,5 +34,22 @@ extension RootView {
                 caption: "Turn on iCloud Sync to keep your saved recipes on every device."
             ),
         ]
+    }
+
+    /// First-run setup, run right after the welcome sheet's CTA on a brand-new
+    /// install — and re-run next launch if a prior launch left it unfinished
+    /// (DUT-280): ask for notification permission (the system prompt), then ask
+    /// to turn on iCloud Sync. Both `Turn On iCloud Sync?` alert buttons set
+    /// `firstRunPromptsCompletedKey`, so this never re-runs once answered.
+    @MainActor
+    func runFirstRunSetup() async {
+        // 1. Notifications — the system permission prompt. On grant, flip the app
+        //    toggle so alerts fire without a second trip to Settings.
+        let granted = await dependencies.notificationService.requestAuthorization()
+        if granted {
+            UserDefaults.standard.set(true, forKey: SettingsViewModel.notificationsEnabledKey)
+        }
+        // 2. iCloud Sync — ask (never silently enable). The alert presents next.
+        showCloudSyncPrompt = true
     }
 }
