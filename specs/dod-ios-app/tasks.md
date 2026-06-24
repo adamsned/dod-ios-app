@@ -2878,6 +2878,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookingToolsCallout.swift` (onActivate + tappable body + a11y action), `FeedView.swift` (state + overlay wiring + confirmationDialog). Spec: `clarifications.md` (CL-256).
 - **AC:** US-1 / DUT-236. CL-256 canonical. **Est:** ~45 min. **Deps:** off main. Branch `fix/DUT-236-cooking-tools-callout-tap`. **Device-verify:** tap the callout body → tools dialog. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; 88 DODFeatureFeed tests pass; iOS app build green.
 
+### T-865 — First-run hardening: DUT-301 (no swipe-dismiss) + DUT-280 (prompt recovery) (CL-259)
+
+- **What:** The DUT-278 first-run prompts could be lost forever — by swipe-dismissing the welcome sheet (DUT-301) or a kill mid-flow (DUT-280). DUT-301: `.interactiveDismissDisabled(true)` on the welcome sheet (CTA is the only exit). DUT-280: a new `firstRunPromptsCompletedKey` set only when both prompts are answered, + a `.task` launch-recovery that re-runs `runFirstRunSetup` (without re-showing onboarding) if a prior launch left it unfinished.
+- **Files:** `App/RootView.swift` (flag + recovery + interactiveDismissDisabled + alert buttons), `App/RootView+Onboarding.swift` (`runFirstRunSetup` moved here for the file-length cap). Spec: `clarifications.md` (CL-259).
+- **AC:** US-8 / US-41 / US-42 / DUT-301 + DUT-280. CL-259 canonical. **Est:** ~1 h. **Deps:** off main. Branch `fix/first-run-hardening-280-301`. **Verification:** swift-format (recursive) + SwiftLint `--strict` clean; iOS app build green (RootView 393 lines).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
