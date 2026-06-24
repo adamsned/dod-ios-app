@@ -76,12 +76,17 @@ struct ProfileSettingsRow: View {
 
 /// T-783 / DUT-89 — wraps the Settings Profile section so it can be hidden on
 /// iPad, where the Profile lives in the sidebar (``SidebarProfileRow``). The
-/// device idiom — not `horizontalSizeClass` — is the signal: the Settings
-/// sheet is a form sheet on iPad, which reports a COMPACT size class, so only
-/// the idiom distinguishes iPad from iPhone. iPhone (no sidebar) keeps it.
+/// `horizontalSizeClass` — the SAME signal `RootView` uses to choose the shell —
+/// is the gate (DUT-299): hide only in a REGULAR-width window (iPadSplit, where
+/// the sidebar's `SidebarProfileRow` is present). A COMPACT window (iPhone OR an
+/// iPad multitasking / Slide Over pane) has no sidebar, so the Settings Profile
+/// row is the only entry point there and must show.
 struct ProfileSettingsSection: View {
 
     @Bindable var viewModel: SettingsViewModel
+    #if canImport(UIKit)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     var body: some View {
         if !hidesProfileSection {
@@ -93,8 +98,12 @@ struct ProfileSettingsSection: View {
     }
 
     private var hidesProfileSection: Bool {
+        // DUT-299: hide only when the sidebar (SidebarProfileRow) is actually
+        // present — a regular-width window. In compact width (iPhone OR an iPad
+        // multitasking / Slide Over pane) RootView shows phoneTabs with no
+        // sidebar, so this Profile row is the ONLY way to reach the editor.
         #if canImport(UIKit)
-        UIDevice.current.userInterfaceIdiom == .pad
+        horizontalSizeClass == .regular
         #else
         false
         #endif
