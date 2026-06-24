@@ -22,6 +22,9 @@ public struct FirstCookoutView: View {
     let recipeBaseURL: String
     /// DUT-104 — called once when the flow reaches "Done", with the cook to log.
     let onLogCook: ((CookLogEntry) -> Void)?
+    /// DUT-297 — schedules the "bake is done" notification so the guided timer
+    /// reaches the cook even when they "step away" (background the app).
+    let notifier: any BakeTimerNotifying
 
     @Environment(\.openURL) var openURL
     @Environment(\.dismiss) var dismiss
@@ -44,11 +47,13 @@ public struct FirstCookoutView: View {
     public init(
         cookout: GuidedCookout = .firstCookout,
         recipeBaseURL: String = "https://www.dutchovendaddy.com",
-        onLogCook: ((CookLogEntry) -> Void)? = nil
+        onLogCook: ((CookLogEntry) -> Void)? = nil,
+        notifier: any BakeTimerNotifying = SystemBakeTimerNotifier()
     ) {
         self.cookout = cookout
         self.recipeBaseURL = recipeBaseURL
         self.onLogCook = onLogCook
+        self.notifier = notifier
     }
 
     var lastIndex: Int { cookout.steps.count + 1 }
@@ -101,7 +106,14 @@ public struct FirstCookoutView: View {
         .padding(DODSpacing.lg)
         .background(DODColor.surface)
         .animation(.easeInOut(duration: 0.25), value: index)
-        .task { await runTimerTick() }
+        .task {
+            // DUT-297: if the bake finishes while we're on screen, drop the
+            // pending notification — the cook is already looking at "Timer's up!".
+            timerEngine.onFinished = { _ in
+                Task { await notifier.cancelBakeDone() }
+            }
+            await runTimerTick()
+        }
         .sheet(isPresented: $showingHeatCoach) {
             NavigationStack { HeatCoachView() }
         }

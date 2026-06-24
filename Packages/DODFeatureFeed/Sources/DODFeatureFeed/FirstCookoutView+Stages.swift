@@ -180,8 +180,11 @@ extension FirstCookoutView {
                 Text(bakeStepAwayText)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
-                Button("Cancel timer") { timerEngine.cancel(active.id) }
-                    .foregroundStyle(DODColor.labelSecondary)
+                Button("Cancel timer") {
+                    timerEngine.cancel(active.id)
+                    Task { await notifier.cancelBakeDone() }
+                }
+                .foregroundStyle(DODColor.labelSecondary)
             }
             .padding(.top, DODSpacing.xs)
         } else if timerEngine.timers.contains(where: { $0.state == .finished }) {
@@ -196,10 +199,11 @@ extension FirstCookoutView {
             .padding(.top, DODSpacing.xs)
         } else {
             Button("Start the \(cookout.bakeMinutes)-minute bake timer") {
-                timerEngine.start(
-                    label: bakeTimerLabel,
-                    duration: Double(cookout.bakeMinutes) * 60
-                )
+                let duration = Double(cookout.bakeMinutes) * 60
+                timerEngine.start(label: bakeTimerLabel, duration: duration)
+                // DUT-297: schedule the deadline alert so "you can step away" holds
+                // even backgrounded (the tick loop is foreground-only).
+                Task { await notifier.scheduleBakeDone(after: duration) }
             }
             .buttonStyle(.borderedProminent)
             .tint(DODColor.burntOrange)

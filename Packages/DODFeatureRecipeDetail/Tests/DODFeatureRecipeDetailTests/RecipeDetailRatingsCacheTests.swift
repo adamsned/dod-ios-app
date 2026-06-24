@@ -14,7 +14,6 @@ import Testing
 
     @Test func successfulRefreshPreservesRememberedUserRating() async throws {
         let dependencies = FakeRecipeDetailDependencies()
-        dependencies.online = false
         dependencies.cachedRecipes[501] = RecipeDetailTestFixtures.makeRecipe(
             id: 501,
             withDetail: true
@@ -54,7 +53,6 @@ import Testing
 
     @Test func failedRefreshKeepsCachedAggregate() async throws {
         let dependencies = FakeRecipeDetailDependencies()
-        dependencies.online = false
         dependencies.cachedRecipes[502] = RecipeDetailTestFixtures.makeRecipe(
             id: 502,
             withDetail: true
