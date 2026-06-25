@@ -15,13 +15,20 @@ import UIKit
 public struct CookJournalView: View {
 
     private let load: () async -> [CookLogEntry]
+    /// CL-273 — persist an entry's edited reflection / photo. Defaults to a no-op
+    /// so existing previews / tests that only pass `load` keep compiling.
+    private let update: (CookLogEntry) async -> Void
     private let photoStore = CookPhotoStore()
     @State private var cooks: [CookLogEntry] = []
     @State private var loaded = false
     @Environment(\.dismiss) private var dismiss
 
-    public init(load: @escaping () async -> [CookLogEntry]) {
+    public init(
+        load: @escaping () async -> [CookLogEntry],
+        update: @escaping (CookLogEntry) async -> Void = { _ in }
+    ) {
         self.load = load
+        self.update = update
     }
 
     public var body: some View {
@@ -73,7 +80,19 @@ public struct CookJournalView: View {
                 journeyHeader
                 statsHeader
                 ForEach(cooks) { cook in
-                    cookRow(cook)
+                    // CL-273 — tap an entry to open its personal page (write a
+                    // reflection, add a photo). Reload after a save so the row
+                    // reflects the new note / photo.
+                    NavigationLink {
+                        CookJournalEntryView(entry: cook) { updated in
+                            await update(updated)
+                            cooks = await load()
+                        }
+                    } label: {
+                        cookRow(cook)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("journal-row-\(cook.id.uuidString)")
                 }
             }
             .padding(DODSpacing.md)
@@ -164,8 +183,20 @@ public struct CookJournalView: View {
                 Text(cook.cookedAt.formatted(date: .abbreviated, time: .omitted))
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
+                // CL-273 — a glimpse of the reflection, so the journal reads as
+                // memories, not just a log. Tap the row for the full entry.
+                if let note = cook.note, !note.isEmpty {
+                    Text(note)
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.label)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
             }
             Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(DODColor.labelSecondary)
         }
         .padding(DODSpacing.sm)
         .background(

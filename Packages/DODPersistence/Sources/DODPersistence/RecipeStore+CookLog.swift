@@ -28,6 +28,25 @@ extension RecipeStore {
         try modelContext.save()
     }
 
+    /// Update one journal entry's editable, personal fields (reflection note /
+    /// personal rating / photo). No-op if the id isn't there.
+    ///
+    /// CL-273 — this updates an EXISTING row in place; it never inserts. Rank is
+    /// derived from `allCookLogs().count` (see ``CookProgression``), so editing a
+    /// reflection or photo cannot change the cook count and therefore cannot
+    /// affect rank. That separation is the whole point of the personal journal.
+    public func updateCookLog(_ entry: CookLogEntry) throws {
+        let id = entry.id
+        let descriptor = FetchDescriptor<CachedCookLogEntry>(
+            predicate: #Predicate { $0.id == id }
+        )
+        guard let row = try modelContext.fetch(descriptor).first else { return }
+        row.note = entry.note
+        row.personalRating = entry.personalRating
+        row.photoLocalID = entry.photoLocalID
+        try modelContext.save()
+    }
+
     /// Every logged cook, newest first.
     public func allCookLogs() throws -> [CookLogEntry] {
         let descriptor = FetchDescriptor<CachedCookLogEntry>(

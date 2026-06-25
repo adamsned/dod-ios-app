@@ -36,6 +36,11 @@ public protocol FeedDependencies: Sendable {
     /// DUT-104 — every logged cook, newest first (for the Cooking Journal view).
     /// Default `[]` so existing test conformers keep compiling.
     func cookLogs() async throws -> [CookLogEntry]
+    /// CL-273 — update a journal entry's personal reflection / photo. Default
+    /// no-op so existing test conformers keep compiling; the live wiring routes
+    /// to ``RecipeStore/updateCookLog(_:)``. Never changes the cook count, so it
+    /// can't affect rank.
+    func updateCookLog(_ entry: CookLogEntry) async throws
 }
 
 extension FeedDependencies {
@@ -43,6 +48,7 @@ extension FeedDependencies {
     public func savedRecipeIDs() async throws -> Set<Int> { [] }
     public func logCook(_ entry: CookLogEntry) async throws {}
     public func cookLogs() async throws -> [CookLogEntry] { [] }
+    public func updateCookLog(_ entry: CookLogEntry) async throws {}
 }
 
 /// Production wiring. Constructed by the app composition root (T-140).
@@ -134,6 +140,10 @@ public struct LiveFeedDependencies: FeedDependencies {
 
     public func cookLogs() async throws -> [CookLogEntry] {
         try await store.allCookLogs()
+    }
+
+    public func updateCookLog(_ entry: CookLogEntry) async throws {
+        try await store.updateCookLog(entry)
     }
 
     public func publishWidgetSnapshot(items: [RecipeListItem]) async {
