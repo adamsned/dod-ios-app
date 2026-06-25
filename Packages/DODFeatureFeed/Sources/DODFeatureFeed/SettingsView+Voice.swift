@@ -66,7 +66,12 @@ struct VoiceRows: View {
     /// a speaker-icon-only preview button (was three separate cells).
     private var voiceCell: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            picker
+            voicePicker
+            // DUT-327 — the gender tie-break only matters in Automatic mode; once
+            // a specific voice is wired in, gender is irrelevant, so hide it.
+            if viewModel.voiceIdentifier == nil {
+                genderPicker
+            }
             HStack(spacing: DODSpacing.sm) {
                 qualityReadout
                 Spacer(minLength: 0)
@@ -75,16 +80,43 @@ struct VoiceRows: View {
         }
     }
 
-    /// AC-40.10 — the Female / Male / No-preference gender picker. Identifier
-    /// unchanged from T-721 so existing UI coverage keeps resolving it.
-    private var picker: some View {
+    /// DUT-327 — the explicit voice picker: "Automatic (best installed)" plus
+    /// each installed voice for the device language as "Name (Quality)",
+    /// best-sounding first. Picking one pins it (it wins over gender + quality);
+    /// "Automatic" clears the pin. Doubles as a diagnostic — a voice the app can
+    /// see + use appears in this list.
+    private var voicePicker: some View {
+        Picker(selection: $viewModel.voiceIdentifier) {
+            Text("Automatic (best installed)").tag(String?.none)
+            ForEach(viewModel.installedVoiceChoices, id: \.identifier) { descriptor in
+                Text(voiceChoiceLabel(descriptor)).tag(Optional(descriptor.identifier))
+            }
+        } label: {
+            Text("Cook Mode Voice")
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+        }
+        .accessibilityIdentifier("settings-picker-voice-choice")
+    }
+
+    /// Label for one voice row: "Samantha (Enhanced)". Falls back to the
+    /// identifier if the platform reports no name (never seen for real voices).
+    private func voiceChoiceLabel(_ descriptor: VoiceDescriptor) -> String {
+        let name = descriptor.name.isEmpty ? descriptor.identifier : descriptor.name
+        return "\(name) (\(descriptor.quality.displayName))"
+    }
+
+    /// AC-40.10 — the Female / Male / No-preference gender tie-break for
+    /// Automatic mode. Identifier unchanged from T-721 so existing UI coverage
+    /// keeps resolving it.
+    private var genderPicker: some View {
         Picker(selection: voiceGenderBinding) {
             ForEach(VoiceGender.allCases, id: \.self) { value in
                 Text(value.displayName)
                     .tag(value)
             }
         } label: {
-            Text("Cook Mode Voice")
+            Text("Voice Gender")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
         }

@@ -73,16 +73,46 @@ import Testing
         #expect(female == "female.enhanced")
     }
 
-    @Test func genderIsPrimaryOverQuality() {
-        // A compact voice of the requested gender beats a premium voice of the
-        // opposite gender — the explicit gender choice is honored. (The
-        // default-female experience still upgrades because en-US ships
-        // enhanced female voices; this only bites when the requested gender
-        // has only compact voices installed — Phase b's download deep-link is
-        // the escape hatch. CL-109 documents the trade-off.)
+    @Test func naturalVoiceBeatsRoboticEvenOfTheOppositeGender() {
+        // DUT-327 — the bug fix. A natural (premium) voice of the OPPOSITE
+        // gender beats a robotic (compact) voice of the requested gender:
+        // "don't sound like a robot" now trumps the gender preference. The prior
+        // gender-primary ranking returned "female.compact" here, which is why a
+        // user who downloaded a male natural voice still heard the female robot.
         let catalog = [
             voice("female.compact", "en-US", .female, .default),
             voice("male.premium", "en-US", .male, .premium),
+        ]
+        let chosen = VoiceSelector.bestVoiceIdentifier(
+            from: catalog,
+            languageCode: "en-US",
+            preference: VoicePreference(gender: .female)
+        )
+        #expect(chosen == "male.premium")
+    }
+
+    @Test func genderBreaksTiesAmongNaturalVoices() {
+        // Gender still decides BETWEEN two natural voices: with an enhanced
+        // female + an enhanced male installed, the female pref picks the female.
+        let catalog = [
+            voice("male.enhanced", "en-US", .male, .enhanced),
+            voice("female.enhanced", "en-US", .female, .enhanced),
+        ]
+        let chosen = VoiceSelector.bestVoiceIdentifier(
+            from: catalog,
+            languageCode: "en-US",
+            preference: VoicePreference(gender: .female)
+        )
+        #expect(chosen == "female.enhanced")
+    }
+
+    @Test func genderBreaksTiesWhenOnlyRoboticInstalled() {
+        // Robotic-only catalog: gender still applies (a robotic female beats a
+        // robotic male for the female pref) — natural-first only reorders when a
+        // natural voice actually exists.
+        let catalog = [
+            voice("male.compact", "en-US", .male, .default),
+            voice("female.compact", "en-US", .female, .default),
         ]
         let chosen = VoiceSelector.bestVoiceIdentifier(
             from: catalog,

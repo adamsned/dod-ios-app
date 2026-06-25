@@ -43,7 +43,7 @@ extension SettingsViewModel {
         guard let voicePreviewer else { return nil }
         let catalog = voicePreviewer.installedVoices()
         guard !catalog.isEmpty else { return nil }
-        let preference = VoicePreference(gender: voiceGender)
+        let preference = VoicePreference(gender: voiceGender, voiceIdentifier: voiceIdentifier)
         guard
             let identifier = VoiceSelector.bestVoiceIdentifier(
                 from: catalog,
@@ -55,6 +55,17 @@ extension SettingsViewModel {
             return nil
         }
         return descriptor.quality
+    }
+
+    /// DUT-327 — the installed voices for this device's language, for the
+    /// Settings → Cook Mode Voice picker (Automatic + each named voice). Sorted
+    /// natural-first then by name (via ``VoiceSelector/voicesForLanguage(_:in:)``)
+    /// so the good voices are at the top. Empty when no previewer is wired, in
+    /// which case the picker shows only "Automatic". Doubles as a diagnostic: if
+    /// the voice the user downloaded appears here, the app can see + use it.
+    public var installedVoiceChoices: [VoiceDescriptor] {
+        guard let voicePreviewer else { return [] }
+        return VoiceSelector.voicesForLanguage(voiceLanguageCode, in: voicePreviewer.installedVoices())
     }
 
     /// Whether the "download a better voice" tip should surface in the Settings
@@ -98,7 +109,7 @@ extension SettingsViewModel {
         voicePreviewer.speakPreview(
             Self.voicePreviewSampleLine,
             languageCode: voiceLanguageCode,
-            preference: VoicePreference(gender: voiceGender)
+            preference: VoicePreference(gender: voiceGender, voiceIdentifier: voiceIdentifier)
         )
     }
 

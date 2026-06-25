@@ -111,10 +111,11 @@ import Testing
         #expect(viewModel.resolvedVoiceQuality == .enhanced)
     }
 
-    @Test func qualityReadoutTracksGenderPick() {
-        // Enhanced female + only-compact male installed. Flipping the picker to
-        // Male drops the resolved tier to Default — exactly what they'd hear,
-        // and the cue to download the natural male voice.
+    @Test func qualityReadoutStaysNaturalAcrossGenderFlip() {
+        // DUT-327 — natural-first. Enhanced female + only-compact male installed.
+        // Flipping the gender pick to Male does NOT drop to the robotic tier (the
+        // old gender-primary behavior, the bug): the enhanced voice still wins,
+        // so the readout stays Enhanced. "Don't sound like a robot" beats gender.
         let (viewModel, _) = makeViewModel(catalog: [
             voice("female.enhanced", .female, .enhanced),
             voice("male.compact", .male, .default),
@@ -122,7 +123,41 @@ import Testing
         #expect(viewModel.resolvedVoiceQuality == .enhanced)
 
         viewModel.voiceGender = .male
+        #expect(viewModel.resolvedVoiceQuality == .enhanced)
+    }
+
+    @Test func qualityReadoutReflectsExplicitPick() {
+        // DUT-327 — an explicit pick wins, even a deliberately-robotic one: the
+        // readout shows the tier of the voice the user actually wired in.
+        let (viewModel, _) = makeViewModel(catalog: [
+            voice("female.enhanced", .female, .enhanced),
+            voice("male.compact", .male, .default),
+        ])
+        #expect(viewModel.resolvedVoiceQuality == .enhanced)
+
+        viewModel.voiceIdentifier = "male.compact"
         #expect(viewModel.resolvedVoiceQuality == .default)
+    }
+
+    @Test func installedVoiceChoicesListNaturalFirst() {
+        // DUT-327 — the picker's voice list returns the language-matched voices
+        // best-sounding first (premium, then enhanced, then compact).
+        let (viewModel, _) = makeViewModel(catalog: [
+            voice("male.compact", .male, .default),
+            voice("female.premium", .female, .premium),
+            voice("female.enhanced", .female, .enhanced),
+        ])
+        let ids = viewModel.installedVoiceChoices.map(\.identifier)
+        #expect(ids == ["female.premium", "female.enhanced", "male.compact"])
+    }
+
+    @Test func voiceIdentifierPersistsAcrossViewModels() {
+        // The explicit pick round-trips through the store like the gender pick.
+        let defaults = Self.isolatedDefaults()
+        let (first, _) = makeViewModel(catalog: [], defaults: defaults)
+        first.voiceIdentifier = "com.apple.voice.enhanced.en-US.Evan"
+        let (second, _) = makeViewModel(catalog: [], defaults: defaults)
+        #expect(second.voiceIdentifier == "com.apple.voice.enhanced.en-US.Evan")
     }
 
     @Test func qualityReadoutIsNilWithNoPreviewer() {

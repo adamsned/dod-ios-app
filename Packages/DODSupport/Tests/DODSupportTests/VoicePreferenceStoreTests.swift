@@ -60,4 +60,38 @@ import Testing
         // AC-40.11 pins the exact key string the Phase-b Settings UI binds to.
         #expect(VoicePreferenceStore.genderKey == "dod.voice.preferredGenderV1")
     }
+
+    // MARK: - Explicit voice pick (DUT-327)
+
+    @Test func voiceIdentifierDefaultsToNil() {
+        let store = VoicePreferenceStore(defaults: isolatedDefaults("id-unset"))
+        #expect(store.preference().voiceIdentifier == nil)
+    }
+
+    @Test func roundTripsVoiceIdentifier() {
+        let store = VoicePreferenceStore(defaults: isolatedDefaults("id-roundtrip"))
+        store.setVoiceIdentifier("com.apple.voice.enhanced.en-US.Evan")
+        #expect(store.preference().voiceIdentifier == "com.apple.voice.enhanced.en-US.Evan")
+    }
+
+    @Test func clearingVoiceIdentifierReturnsToAutomatic() {
+        let store = VoicePreferenceStore(defaults: isolatedDefaults("id-clear"))
+        store.setVoiceIdentifier("com.apple.voice.premium.en-US.Zoe")
+        store.setVoiceIdentifier(nil)
+        #expect(store.preference().voiceIdentifier == nil)
+    }
+
+    @Test func genderAndIdentifierCoexist() {
+        // The explicit pick and the gender tie-break persist independently.
+        let store = VoicePreferenceStore(defaults: isolatedDefaults("id-and-gender"))
+        store.setGender(.male)
+        store.setVoiceIdentifier("voice.x")
+        let pref = store.preference()
+        #expect(pref.gender == .male)
+        #expect(pref.voiceIdentifier == "voice.x")
+    }
+
+    @Test func identifierKeyMatchesSpec() {
+        #expect(VoicePreferenceStore.identifierKey == "dod.voice.preferredIdentifierV1")
+    }
 }
