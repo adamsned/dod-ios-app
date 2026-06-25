@@ -331,7 +331,13 @@ struct RootView: View {
                     attributeSet: entity.attributeSet
                 )
             }
-            try await CSSearchableIndex.default().indexSearchableItems(items)
+            // DUT-308: drop the whole recipe domain before each (re)index so an
+            // unsaved/cleared recipe doesn't linger in Spotlight (was upsert-only).
+            let index = CSSearchableIndex.default()
+            try await index.deleteSearchableItems(withDomainIdentifiers: [
+                "com.dutchovendaddy.DODApp.recipes"
+            ])
+            try await index.indexSearchableItems(items)
         } catch {
             DODLog.app.error("spotlight index failed: \(String(describing: error))")
         }

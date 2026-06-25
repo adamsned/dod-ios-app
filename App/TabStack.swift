@@ -54,7 +54,11 @@ struct TabStack: View {
         .onChange(of: externalRoute) { _, newValue in
             // App-Intents / Spotlight route push.
             guard let newValue else { return }
-            path.append(newValue)
+            // DUT-310: replace the stack, don't append — an external-origin deep
+            // link (Siri / Spotlight / notification) should land on a single-level
+            // detail whose Back returns to the Feed (matching the widget path),
+            // not stack onto prior deep-linked recipes and corrupt back-navigation.
+            path = [newValue]
             externalRoute = nil
         }
     }

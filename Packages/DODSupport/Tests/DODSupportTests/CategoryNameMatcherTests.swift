@@ -119,6 +119,39 @@ struct CategoryNameMatcherTests {
         #expect(result.isEmpty)
     }
 
+    @Test func shortTopicDoesNotMatchViaRuleFour() {
+        // DUT-317: rule (d) (topic is a substring of the query) now carries
+        // the same `substringOfTopicMinLength` (4) floor as rule (c). A
+        // category whose topic is a short generic token ("egg", 3 chars)
+        // must NOT match an unrelated longer query that merely contains it
+        // ("eggplant parmesan"). Before the fix, "egg" ⊂ "eggplant ..."
+        // fired rule (d) and fanned out a `?categories=` fetch the user
+        // never intended. No other rule applies: query ≠ name, query ≠
+        // topic, and query (17 chars) is not a substring of topic "egg".
+        let shortTopic = DODDomain.Category(
+            id: 4242,
+            name: "Egg Recipes",
+            slug: "egg-recipes",
+            count: 12
+        )
+        let result = CategoryNameMatcher.match(
+            query: "eggplant parmesan",
+            in: [shortTopic]
+        )
+        #expect(result.isEmpty)
+    }
+
+    @Test func longTopicStillMatchesViaRuleFour() {
+        // DUT-317 regression guard: a topic at/above the floor (4+ chars)
+        // still matches rule (d). Topic "side dish" (>= 4) is a substring
+        // of query "easy side dish ideas" → rule (d) fires unchanged.
+        let result = CategoryNameMatcher.match(
+            query: "easy side dish ideas",
+            in: Self.liveFixture
+        )
+        #expect(result.map(\.id) == [334])
+    }
+
     @Test func latestMatchesLatestRecipes() {
         // Special-category sanity: "latest" is the topic of
         // "Latest Recipes" → rule (b) fires.

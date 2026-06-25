@@ -76,7 +76,14 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
 
     func cache(listItems: [RecipeListItem]) async throws {}
 
+    /// DUT-314: count the filter-support fetches so the perf-gate test can
+    /// assert they are skipped on a default (no-filter) search.
+    var categoryIDsCalls: [[Int]] = []
+    var totalSecondsCalls: [[Int]] = []
+    var recentlyViewedCallCount = 0
+
     func categoryIDs(forRecipeIDs ids: [Int]) async throws -> [Int: [Int]] {
+        categoryIDsCalls.append(ids)
         var result: [Int: [Int]] = [:]
         for id in ids {
             if let categoryIDs = categoryMap[id] {
@@ -87,6 +94,7 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
     }
 
     func totalSeconds(forRecipeIDs ids: [Int]) async throws -> [Int: Int] {
+        totalSecondsCalls.append(ids)
         var result: [Int: Int] = [:]
         for id in ids {
             if let seconds = totalSecondsMap[id] {
@@ -132,7 +140,10 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         return Array((categoryFetchResults[categoryID] ?? []).prefix(limit))
     }
 
-    func recentlyViewedRecipeIDs() async throws -> Set<Int> { recentlyViewedSet }
+    func recentlyViewedRecipeIDs() async throws -> Set<Int> {
+        recentlyViewedCallCount += 1
+        return recentlyViewedSet
+    }
 
     /// CL-127 (T-649): returns the pre-seeded cached-titles fixture.
     func cachedRecipeTitles() async throws -> [String] { cachedTitlesArray }

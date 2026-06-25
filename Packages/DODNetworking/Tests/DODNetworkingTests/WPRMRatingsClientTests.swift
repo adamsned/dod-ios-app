@@ -126,6 +126,43 @@ import Testing
         #expect(result.count == 3)
     }
 
+    @Test func postSucceedsButSummaryGetFailsReturnsSubmittedStar() async throws {
+        // DUT-305: the side-effecting POST returned 2xx (the rating WAS
+        // recorded), but the best-effort follow-up summary GET 5xx's. The
+        // submit must NOT throw and must NOT degrade to a zeroed aggregate —
+        // it returns a RecipeRating built from the star just submitted.
+        let fake = FakeHTTPClient()
+        // Summary GET fails hard (500 throws inside `summary(forRecipeID:)`).
+        // Registered first so it wins over the broader "/rating" POST route.
+        await fake.stub(urlContaining: "rating/recipe", json: Data("{}".utf8), statusCode: 500)
+        await fake.stub(urlContaining: "/rating") { request in
+            let response = HTTPURLResponse(
+                url: request.url ?? URL(filePath: "/"),
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )
+            guard let response else {
+                throw WPClientError.underlying(message: "Could not synthesize response")
+            }
+            return (Data("{}".utf8), response)
+        }
+        let client = WPRMRatingsClient(httpClient: fake)
+
+        let result = try await client.postRating(
+            recipeID: 21238,
+            stars: 4,
+            authorName: "Reviewer",
+            authorEmail: "r@example.com"
+        )
+
+        // Non-zero rating built from the submitted star — never a 0/0 blank.
+        #expect(result.recipeID == 21238)
+        #expect(result.userRating == 4)
+        #expect(result.average == 4.0)
+        #expect(result.count == 1)
+    }
+
     @Test func outOfRangeStarsLowThrows() async throws {
         let fake = FakeHTTPClient()
         let client = WPRMRatingsClient(httpClient: fake)

@@ -42,6 +42,18 @@ public enum FractionRenderer {
         let scaledValue = parsed.value * factor
         let rendered = renderQuantity(scaledValue)
         let trailing = ingredientText[parsed.afterIndex...]
+        // DUT-304: a RANGE ingredient ("2-3 cloves", "1½–2 cups") carries a
+        // second quantity behind a range separator. Scale that upper bound
+        // too and re-emit "lo<sep>hi" — otherwise only the lower bound scales
+        // ("4-3 cloves" nonsense). If the trailing slice isn't a range
+        // continuation, fall through to the plain single-quantity rewrite.
+        if let range = scaleRangeContinuation(in: trailing, by: factor) {
+            // `parseLeadingQuantity` may have swallowed one space between the
+            // low bound and the separator ("1 - 2" → trailing "- 2"); re-add
+            // it so a spaced range keeps its spacing ("3 - 6", not "3- 6").
+            let gap = consumedSpaceBeforeTrailing(in: ingredientText, at: parsed.afterIndex)
+            return rendered + gap + range.separator + range.renderedHigh + range.rest
+        }
         // `parseLeadingQuantity` consumes one trailing space so the rewrite
         // glues `<rendered> <trailing>` with a single space — re-add it
         // here unless the trailing slice is empty (quantity-only input).
@@ -88,7 +100,9 @@ public enum FractionRenderer {
     // MARK: - Internals
 
     /// One parse hit on the head of an ingredient string.
-    private struct Quantity {
+    /// `internal` (not `private`) so the range-scaling extension in
+    /// `FractionRenderer+Range.swift` (DUT-304) can read parse hits.
+    struct Quantity {
         let value: Double
         let afterIndex: String.Index
     }
@@ -122,12 +136,15 @@ public enum FractionRenderer {
 
     /// Two-decimal fallback formatter for values that don't snap (rare —
     /// most scaled cook quantities land cleanly on the canonical set).
+    /// DUT-320: this is a DISPLAY formatter, so it stays locale-aware — no
+    /// pinned `en_US_POSIX`. A comma-decimal-locale cook reads "1,5", not the
+    /// POSIX "1.5". (`en_US_POSIX` is reserved for PARSING stability, which
+    /// `Double(_:)` already provides for the parse path above.)
     private static let fallbackFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 0
         formatter.maximumFractionDigits = 2
-        formatter.locale = Locale(identifier: "en_US_POSIX")
         return formatter
     }()
 
@@ -165,7 +182,9 @@ public enum FractionRenderer {
     /// - Plain integer: `"4"`
     /// Returns the index *after* the quantity (and one trailing space if
     /// present) so callers can append the rest of the ingredient line.
-    private static func parseLeadingQuantity(in text: String) -> Quantity? {
+    /// `internal` (not `private`) so the range-scaling extension in
+    /// `FractionRenderer+Range.swift` (DUT-304) can parse the upper bound.
+    static func parseLeadingQuantity(in text: String) -> Quantity? {
         guard !text.isEmpty else { return nil }
         // Try in precedence order — mixed > decimal > fraction > integer —
         // so "1 1/2 cup" doesn't parse as just "1".
