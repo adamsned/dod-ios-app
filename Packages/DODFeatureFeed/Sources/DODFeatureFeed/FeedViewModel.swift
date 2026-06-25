@@ -95,31 +95,40 @@ public final class FeedViewModel {
         }
     }
 
-    /// DUT-323 — set to the rank a just-logged cook bumped the cook UP to, so the
-    /// view can fire the milestone celebration; nil when no rung was crossed.
-    public private(set) var rankUpCelebration: CookRank?
+    /// DUT-323 — set after a logged cook that earns a celebration, so the view can
+    /// present it; nil otherwise. Graduating the First Cookout path supersedes a
+    /// plain rank-up (it's the bigger beat).
+    public private(set) var celebration: CookCelebration?
 
     /// DUT-104 — record a completed cook in the private journal (called when the
     /// "Your First Cookout" flow reaches "Done"). Best-effort: a journal write
     /// failing must never block dismissing the celebration. DUT-323: if the cook
-    /// bumps the cook up a rank, surface the milestone celebration.
+    /// graduates the path or bumps the cook up a rank, surface the celebration.
     public func logCook(_ entry: CookLogEntry) async {
-        let before = (try? await dependencies.cookLogs())?.count ?? 0
+        let logsBefore = (try? await dependencies.cookLogs()) ?? []
         do {
             try await dependencies.logCook(entry)
         } catch {
             // The journal is a nicety, not a blocker — swallow + move on.
             return
         }
-        let after = (try? await dependencies.cookLogs())?.count ?? before
-        if let reached = CookProgression.rankUp(from: before, to: after) {
-            rankUpCelebration = reached
+        let logsAfter = (try? await dependencies.cookLogs()) ?? logsBefore
+        // Graduating the whole First Cookout path is the bigger beat → priority.
+        let wasGraduate = GuidedCookout.nextUncookedRung(
+            cookedRecipeIDs: Set(logsBefore.map(\.recipeID))) == nil
+        let isGraduate = GuidedCookout.nextUncookedRung(
+            cookedRecipeIDs: Set(logsAfter.map(\.recipeID))) == nil
+        if isGraduate && !wasGraduate {
+            celebration = .graduatedFirstCookout
+        } else if let reached = CookProgression.rankUp(
+            from: logsBefore.count, to: logsAfter.count) {
+            celebration = .rankUp(reached)
         }
     }
 
-    /// Dismiss the milestone celebration (DUT-323).
-    public func dismissRankUpCelebration() {
-        rankUpCelebration = nil
+    /// Dismiss the celebration (DUT-323).
+    public func dismissCelebration() {
+        celebration = nil
     }
 
     /// DUT-104 — the logged cooks (newest first) for the Cooking Journal view.

@@ -2966,6 +2966,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookProgression.swift` (+rankUp/Identifiable) + `CookProgressionTests.swift`; `FeedViewModel.swift` (celebration hook) + new `RankUpCelebrationView.swift` + `FeedView.swift` (sheet); `FeedViewModelTests.swift` (stateful fake) + new `FeedViewModelRankUpTests.swift`. Spec: `clarifications.md` (CL-271).
 - **AC:** US-48 / DUT-323. CL-271 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `feat/rank-up-celebration`. **Verification:** swift-format lint + SwiftLint `--strict` clean; DODSupport (481, 1 new) + DODFeatureFeed (97, 3 new) green; iOS app build green. Device-verify the celebration after a rank-crossing cook.
 
+### T-878 — DUT-323: First Cookout graduation celebration (first-win → transformation tie-in) (CL-272)
+
+- **What:** Completing the last uncooked rung of the First Cookout path fires its own "Path complete · You're a Dutch oven cook" celebration, superseding a coincident rank-up. Generalizes CL-271's rankUpCelebration into a CookCelebration enum (.rankUp | .graduatedFirstCookout); FeedViewModel.logCook detects the not-graduate→graduate transition via GuidedCookout.nextUncookedRung (reused from the chooser, no chooser files touched).
+- **Files:** `CookCelebrationView.swift` (was RankUpCelebrationView, +enum +graduation), `FeedViewModel.swift` (celebration/dismissCelebration + graduation detect), `FeedView.swift` (sheet); `FeedViewModelCelebrationTests.swift` (was FeedViewModelRankUpTests, +graduation/priority). Spec: `clarifications.md` (CL-272).
+- **AC:** US-48 / DUT-323. CL-272 canonical. **Est:** ~1.5 h. **Deps:** stacked on T-877. Branch `feat/firstcookout-graduation`. **Verification:** swift-format lint + SwiftLint `--strict` clean; DODFeatureFeed (98) green; iOS app build green. Device-verify cooking the campfire rung fires graduation.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
