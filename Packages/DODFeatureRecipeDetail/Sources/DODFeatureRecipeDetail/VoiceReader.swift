@@ -27,6 +27,13 @@ public protocol SpeechSynthesizing: AnyObject {
     /// True while an utterance has been paused (and can be resumed).
     var isPaused: Bool { get }
 
+    /// The speech rate applied to the next utterance (DUT-325). Expressed as
+    /// the raw `AVSpeechUtterance.rate` value; production clamps it around
+    /// `AVSpeechUtteranceDefaultSpeechRate`. A default implementation makes
+    /// this a no-op store so mocks/fallbacks that don't model pacing keep
+    /// compiling — only ``SystemSpeechSynthesizer`` actually applies it.
+    var speechRate: Float { get set }
+
     /// Enqueue and begin speaking the supplied text. ``VoiceReader`` always
     /// calls ``stop()`` first (AC-40.7), so a conformer may assume it is
     /// starting from a stopped state.
@@ -105,6 +112,9 @@ public final class VoiceReader {
     ) {
         self.synthesizer = synthesizer
         self.languageCode = locale.language.languageCode?.identifier
+        // Seed the platform default so the first utterance reads at a natural
+        // pace (a fresh `Float` would otherwise be 0). DUT-325.
+        self.synthesizer.speechRate = Self.defaultRate
         #if os(iOS)
         registerAudioSessionObservers()
         #endif
@@ -123,6 +133,50 @@ public final class VoiceReader {
 
     /// True while reading has been paused (and can be resumed).
     public var isPaused: Bool { synthesizer.isPaused }
+
+    /// DUT-325 — the speech rate for the **next** utterance, forwarded straight
+    /// to the underlying engine. Session-only; never persisted. `VoiceReader`
+    /// owns the clamped step helpers (``speedUp()`` / ``slowDown()``) so the
+    /// Cook Mode menu can nudge pacing without knowing the AVFoundation bounds.
+    public var speechRate: Float {
+        get { synthesizer.speechRate }
+        set { synthesizer.speechRate = newValue }
+    }
+
+    /// The lowest rate the session menu allows — half the platform default
+    /// (≈0.5×). Slow enough to follow a tricky step, never so slow it drags.
+    static var minimumRate: Float { Self.defaultRate * 0.5 }
+    /// The highest rate the session menu allows — double the platform default
+    /// (≈2×). Fast enough to skim, never so fast it garbles.
+    static var maximumRate: Float { Self.defaultRate * 2 }
+    /// Per-tap increment (a fifth of the default span) so a couple of taps
+    /// spans the comfortable range.
+    static var rateStep: Float { Self.defaultRate * 0.15 }
+
+    /// The platform default speech rate. `AVSpeechUtteranceDefaultSpeechRate`
+    /// where AVFoundation exists; a matching constant on the fallback slice.
+    static var defaultRate: Float {
+        #if canImport(AVFoundation)
+        AVSpeechUtteranceDefaultSpeechRate
+        #else
+        0.5
+        #endif
+    }
+
+    /// DUT-325 — nudge the session speech rate up one step (clamped). Returns
+    /// the new rate so the caller can decide whether to re-speak.
+    @discardableResult
+    public func speedUp() -> Float {
+        speechRate = min(Self.maximumRate, speechRate + Self.rateStep)
+        return speechRate
+    }
+
+    /// DUT-325 — nudge the session speech rate down one step (clamped).
+    @discardableResult
+    public func slowDown() -> Float {
+        speechRate = max(Self.minimumRate, speechRate - Self.rateStep)
+        return speechRate
+    }
 
     /// Speak the supplied text aloud.
     ///

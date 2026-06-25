@@ -15,6 +15,19 @@ extension SpeechSynthesizing {
     func speak(localizedText text: String, languageCode: String?) {
         speak(text)
     }
+
+    /// DUT-325 — default no-op pacing store. Conformers that don't model speech
+    /// rate (test mocks, the non-AVFoundation fallback shape) inherit this so
+    /// the protocol requirement is satisfied without per-conformer boilerplate;
+    /// ``SystemSpeechSynthesizer`` overrides with a real stored property that
+    /// drives `AVSpeechUtterance.rate`.
+    var speechRate: Float {
+        get { 0 }
+        // Intentional no-op: conformers that care (SystemSpeechSynthesizer)
+        // override with a real stored property; the rest discard pacing.
+        // swiftlint:disable:next unused_setter_value
+        set {}
+    }
 }
 
 #if canImport(AVFoundation)
@@ -41,6 +54,19 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
     private let synthesizer = AVSpeechSynthesizer()
     private let preferenceStore: VoicePreferenceStore
 
+    /// DUT-325 — the rate applied to the next utterance. Defaults to the
+    /// platform default; ``VoiceReader`` nudges it (clamped) for the session.
+    /// Clamped on write to the AV-valid `[Min...Max]` range so an out-of-band
+    /// value can never reach the engine.
+    public var speechRate: Float = AVSpeechUtteranceDefaultSpeechRate {
+        didSet {
+            speechRate = min(
+                AVSpeechUtteranceMaximumSpeechRate,
+                max(AVSpeechUtteranceMinimumSpeechRate, speechRate)
+            )
+        }
+    }
+
     public init(preferenceStore: VoicePreferenceStore = VoicePreferenceStore()) {
         self.preferenceStore = preferenceStore
     }
@@ -56,7 +82,9 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
     public func speak(localizedText text: String, languageCode: String?) {
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = resolveVoice(languageCode: languageCode)
-        // Default rate is used (no custom pacing in v1).
+        // DUT-325 — honor the session-selected pace (default unless the user
+        // nudged Slower/Faster from the Cook Mode voice menu).
+        utterance.rate = speechRate
         synthesizer.speak(utterance)
     }
 
@@ -135,6 +163,8 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
 
     public private(set) var isSpeaking = false
     public private(set) var isPaused = false
+    /// DUT-325 — pacing store on the fallback slice (no real engine to drive).
+    public var speechRate: Float = 0.5
 
     public init() {}
 

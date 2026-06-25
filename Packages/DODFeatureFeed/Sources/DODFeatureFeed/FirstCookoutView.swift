@@ -53,6 +53,11 @@ public struct FirstCookoutView: View {
     /// failure isn't silently swallowed; the cook itself still logs. Internal
     /// (not private) so the snackbar overlay in `+Stages.swift` can read it.
     @State var photoSaveError: String?
+    /// DUT-324 — an optional short written reflection the cook can jot on the
+    /// celebration screen ("how did it go?"), saved as the logged cook's note.
+    /// Internal (not private) so the `reflectionField` view-builder in
+    /// `+Stages.swift` can bind to it.
+    @State var reflection: String = ""
 
     public init(
         cookout: GuidedCookout = .firstCookout,
@@ -242,6 +247,7 @@ public struct FirstCookoutView: View {
                 .foregroundStyle(DODColor.label)
                 .multilineTextAlignment(.center)
             shareSection
+            reflectionField
             Text(cookout.nextStepPrompt)
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
@@ -253,14 +259,29 @@ public struct FirstCookoutView: View {
 
     // MARK: - Controls
 
+    /// The paged-flow footer (DUT-324): a centered primary CTA on top, with the
+    /// page dots centered below and a leading "Back" button shown only past the
+    /// intro (`index > 0`).
     private var controls: some View {
-        HStack {
-            if index > 0 {
-                Button("Back") { index -= 1 }
-                    .foregroundStyle(DODColor.labelSecondary)
+        VStack(spacing: DODSpacing.sm) {
+            primaryButton
+            ZStack {
+                HStack {
+                    if index > 0 {
+                        Button("Back") { index -= 1 }
+                            .foregroundStyle(DODColor.labelSecondary)
+                    }
+                    Spacer()
+                }
+                progressDots
             }
-            Spacer()
-            progressDots
+        }
+    }
+
+    /// The centered primary call to action ("Let's Cook" / "Next" / "Done").
+    /// Wrapped between spacers so it centers rather than stretching full-bleed.
+    private var primaryButton: some View {
+        HStack {
             Spacer()
             Button(primaryButtonTitle) {
                 if index >= lastIndex {
@@ -272,22 +293,12 @@ public struct FirstCookoutView: View {
             }
             .fontWeight(.semibold)
             .foregroundStyle(DODColor.burntOrange)
+            Spacer()
         }
-    }
-
-    private var progressDots: some View {
-        HStack(spacing: DODSpacing.xxs) {
-            ForEach(0...lastIndex, id: \.self) { dot in
-                Circle()
-                    .fill(dot == index ? DODColor.burntOrange : DODColor.labelSecondary.opacity(0.3))
-                    .frame(width: 7, height: 7)
-            }
-        }
-        .accessibilityLabel("Step \(index + 1) of \(lastIndex + 1)")
     }
 
     private var primaryButtonTitle: String {
-        if index == 0 { return "Let's cook" }
+        if index == 0 { return "Let's Cook" }
         if index >= lastIndex { return "Done" }
         return "Next"
     }
@@ -310,12 +321,15 @@ public struct FirstCookoutView: View {
                 photoSaveError = "Your cook is logged, but we couldn't save the photo. Try again from your journal."
             }
         }
+        // DUT-324 — carry the written reflection through as the cook's note.
+        let trimmedReflection = reflection.trimmingCharacters(in: .whitespacesAndNewlines)
         onLogCook?(
             CookLogEntry(
                 id: UUID(),
                 recipeID: cookout.recipeID,
                 recipeTitle: cookout.dishTitle,
                 cookedAt: .now,
+                note: trimmedReflection.isEmpty ? nil : trimmedReflection,
                 photoLocalID: photoID
             )
         )

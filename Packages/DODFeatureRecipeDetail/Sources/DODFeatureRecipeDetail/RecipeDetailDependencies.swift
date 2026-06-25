@@ -55,6 +55,15 @@ public protocol RecipeDetailDependencies: Sendable {
     func downloadForOffline(recipe: Recipe) async throws -> DownloadOutcome
     func removeDownload(id: Int) async throws
 
+    // MARK: - Cooking Journal (US-48 / DUT-326)
+
+    /// Append one completed cook to the private Cooking Journal (DUT-326 — the
+    /// Cook Mode "Add to Cooking Journal" action on the Done card). Routes to
+    /// ``RecipeStore/logCook(_:)``. Logging counts toward rank — intentional,
+    /// this is a real completed cook. Default no-op so existing fakes keep
+    /// compiling; only ``LiveRecipeDetailDependencies`` actually persists.
+    func logCook(_ entry: CookLogEntry) async throws
+
     // MARK: - Comments + ratings (US-13/14/15)
 
     /// Fetch the public WPRM rating summary. Never throws — degrades to a
@@ -136,6 +145,11 @@ extension RecipeDetailDependencies {
     /// in the test suite) don't have to opt in to widget publishing. The
     /// live wiring overrides this — see ``LiveRecipeDetailDependencies``.
     public func publishSavedWidgetSnapshot() async {}
+
+    /// DUT-326 — default no-op so fakes that don't model the journal keep
+    /// compiling. ``LiveRecipeDetailDependencies`` overrides to route to
+    /// ``RecipeStore/logCook(_:)``.
+    public func logCook(_ entry: CookLogEntry) async throws {}
 
     // US-44 / CL-138 / DUT-36 Phase c profile-gate defaults
     // (`loadUserProfile()`, `profileStoreForGate`,

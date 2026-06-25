@@ -71,6 +71,8 @@ import Testing
     }
 
     /// AC-40.3 — reaching the Done state speaks a completion line, not a step.
+    /// DUT-325 — the non-dessert completion line is "All done, enjoy your meal"
+    /// (no em dash). On-screen copy is unaffected (TTS only).
     @Test func reachingDoneSpeaksCompletionLine() {
         let mock = MockSpeechSynthesizer()
         let viewModel = CookModeViewModelTests.makeViewModel(
@@ -82,7 +84,50 @@ import Testing
         viewModel.advanceStep()  // -> finished
 
         #expect(viewModel.isFinished)
-        #expect(mock.spokenTexts.last == "All done — enjoy your meal")
+        #expect(mock.spokenTexts.last == "All done, enjoy your meal")
+    }
+
+    /// DUT-325 — a dessert recipe (WP category 336) speaks the dessert-tailored
+    /// completion line. Detection is via `recipe.categoryIDs.contains(336)`.
+    @Test func reachingDoneSpeaksDessertLineForDesserts() {
+        let mock = MockSpeechSynthesizer()
+        let recipe = Recipe(
+            id: 336_001,
+            slug: "dessert",
+            title: "Skillet Brownies",
+            excerpt: "",
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/336001/") ?? URL(filePath: "/"),
+            categoryIDs: [336],
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            instructions: [RecipeInstruction(step: 1, text: "Step 1 body.")]
+        )
+        let viewModel = CookModeViewModel(
+            recipe: recipe,
+            initialCheckedIngredients: [],
+            voiceReader: VoiceReader(synthesizer: mock)
+        )
+        viewModel.setVoiceMode(true)  // speaks the single step
+
+        viewModel.advanceStep()  // -> finished
+
+        #expect(viewModel.isFinished)
+        #expect(mock.spokenTexts.last == "All done, enjoy your dessert")
+    }
+
+    /// DUT-325 — the replay button reads the current step ONE-SHOT even while
+    /// Voice Mode is off (contrast `repeatCurrentStep`, which stays silent).
+    @Test func replayCurrentStepSpeaksEvenWhileVoiceModeOff() {
+        let mock = MockSpeechSynthesizer()
+        let viewModel = CookModeViewModelTests.makeViewModel(
+            stepCount: 3,
+            voiceReader: VoiceReader(synthesizer: mock)
+        )
+        #expect(!viewModel.isVoiceModeEnabled)
+
+        viewModel.replayCurrentStep()
+
+        #expect(mock.spokenTexts == ["Step 1 body."])
+        #expect(!viewModel.isVoiceModeEnabled)  // replay does not flip the toggle
     }
 
     /// AC-40.5 — "repeat" re-speaks the same step without moving position.
