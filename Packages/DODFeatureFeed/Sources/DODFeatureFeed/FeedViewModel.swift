@@ -113,15 +113,14 @@ public final class FeedViewModel {
             return
         }
         let logsAfter = (try? await dependencies.cookLogs()) ?? logsBefore
+        let cookedBefore = Set(logsBefore.map(\.recipeID))
+        let cookedAfter = Set(logsAfter.map(\.recipeID))
         // Graduating the whole First Cookout path is the bigger beat → priority.
-        let wasGraduate = GuidedCookout.nextUncookedRung(
-            cookedRecipeIDs: Set(logsBefore.map(\.recipeID))) == nil
-        let isGraduate = GuidedCookout.nextUncookedRung(
-            cookedRecipeIDs: Set(logsAfter.map(\.recipeID))) == nil
+        let wasGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedBefore) == nil
+        let isGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedAfter) == nil
         if isGraduate && !wasGraduate {
             celebration = .graduatedFirstCookout
-        } else if let reached = CookProgression.rankUp(
-            from: logsBefore.count, to: logsAfter.count) {
+        } else if let reached = CookProgression.rankUp(from: logsBefore.count, to: logsAfter.count) {
             celebration = .rankUp(reached)
         }
     }
