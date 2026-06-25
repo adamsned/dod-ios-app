@@ -1,5 +1,6 @@
 import DODAnalytics
 import DODDomain
+import DODSupport
 import Foundation
 import Testing
 
@@ -232,5 +233,50 @@ import Testing
         #expect(!viewModel.isVoiceModeEnabled)
         #expect(!mock.isSpeaking)
         #expect(mock.calls.last == .stop)
+    }
+
+    // MARK: - Voice upgrade prompt gate (DUT-328)
+
+    private func upgradeViewModel(voices: [VoiceDescriptor]) -> CookModeViewModel {
+        let mock = MockSpeechSynthesizer()
+        mock.stubbedVoices = voices
+        let recipe = Recipe(
+            id: 1,
+            slug: "r",
+            title: "R",
+            excerpt: "",
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/1/") ?? URL(filePath: "/"),
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            instructions: [RecipeInstruction(step: 1, text: "Step 1.")]
+        )
+        return CookModeViewModel(
+            recipe: recipe,
+            initialCheckedIngredients: [],
+            voiceReader: VoiceReader(synthesizer: mock),
+            locale: Locale(identifier: "en-US")
+        )
+    }
+
+    @Test func offersUpgradeWhenOnlyRoboticVoiceInstalled() {
+        let viewModel = upgradeViewModel(voices: [
+            VoiceDescriptor(identifier: "compact", languageCode: "en-US", gender: .female, quality: .default)
+        ])
+        #expect(viewModel.shouldOfferVoiceUpgrade)
+    }
+
+    @Test func noUpgradeWhenANaturalVoiceIsInstalled() {
+        // A natural voice of EITHER gender means the user is set — no prompt.
+        let viewModel = upgradeViewModel(voices: [
+            VoiceDescriptor(identifier: "compact", languageCode: "en-US", gender: .female, quality: .default),
+            VoiceDescriptor(identifier: "enhanced", languageCode: "en-US", gender: .male, quality: .enhanced),
+        ])
+        #expect(!viewModel.shouldOfferVoiceUpgrade)
+    }
+
+    @Test func noUpgradeWhenCatalogIsUnknown() {
+        // An empty catalog reads as "unknown" (e.g. the preview/host double) →
+        // never a false prompt.
+        let viewModel = upgradeViewModel(voices: [])
+        #expect(!viewModel.shouldOfferVoiceUpgrade)
     }
 }
