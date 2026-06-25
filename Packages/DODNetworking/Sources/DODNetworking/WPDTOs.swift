@@ -16,12 +16,17 @@ enum WPDTO {
         let title: RenderedString
         let excerpt: RenderedString
         let date: String?
+        /// Genuine UTC publish timestamp. `date` is site-local with no offset,
+        /// so labeling it as UTC can shift the displayed calendar day (DUT-311);
+        /// prefer `dateGMT` for `publishedAt`.
+        let dateGMT: String?
         let featuredMedia: Int?
         let categories: [Int]?
         let embedded: PostEmbedded?
 
         enum CodingKeys: String, CodingKey {
             case id, slug, link, title, excerpt, date, categories
+            case dateGMT = "date_gmt"
             case featuredMedia = "featured_media"
             case embedded = "_embedded"
         }
@@ -287,7 +292,10 @@ extension WPDTO.Post {
             title: HTMLSanitizer.plainText(from: title.rendered),
             excerpt: HTMLSanitizer.plainText(from: excerpt.rendered),
             heroImage: heroImage,
-            publishedAt: WPDTO.parseWPDate(date),
+            // DUT-311: `date` is site-local without an offset; appending "Z" in
+            // parseWPDate would mislabel it as UTC and can show the wrong day.
+            // `date_gmt` is genuine UTC, so it drives `publishedAt`.
+            publishedAt: WPDTO.parseWPDate(dateGMT ?? date),
             totalTimeDisplay: nil,
             canonicalURL: link,
             categoryIDs: categories
