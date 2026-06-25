@@ -103,6 +103,17 @@ public struct FeedView: View {
         .sheet(isPresented: $showingJournal) {
             CookJournalView(load: { await viewModel.cookLogs() })
         }
+        // DUT-323 — milestone celebration: when a logged cook bumps the cook up a
+        // rank, fire the moment. Presented once the cookout flow's sheet closes.
+        .sheet(
+            item: Binding(
+                get: { viewModel.rankUpCelebration },
+                set: { if $0 == nil { viewModel.dismissRankUpCelebration() } }
+            )
+        ) { rank in
+            RankUpCelebrationView(rank: rank) { viewModel.dismissRankUpCelebration() }
+                .presentationDetents([.medium])
+        }
         .sheet(isPresented: $showingHeatCoach) {
             NavigationStack { HeatCoachView() }
         }

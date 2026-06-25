@@ -43,4 +43,13 @@ import Testing
         #expect(CookProgression.ranks.last?.title == "Dutch Oven Daddy")
         #expect(CookProgression.ranks.map(\.threshold) == CookProgression.ranks.map(\.threshold).sorted())
     }
+
+    @Test func rankUpFiresOnlyWhenCrossingAThreshold() {
+        #expect(CookProgression.rankUp(from: 0, to: 1)?.title == "Fire Starter")  // first cook
+        #expect(CookProgression.rankUp(from: 2, to: 3)?.title == "Coal Tender")  // crosses 3
+        #expect(CookProgression.rankUp(from: 1, to: 2) == nil)  // still Fire Starter
+        #expect(CookProgression.rankUp(from: 5, to: 5) == nil)  // no new cook
+        #expect(CookProgression.rankUp(from: 49, to: 50)?.title == "Dutch Oven Daddy")
+        #expect(CookProgression.rankUp(from: 50, to: 51) == nil)  // already at the top
+    }
 }
