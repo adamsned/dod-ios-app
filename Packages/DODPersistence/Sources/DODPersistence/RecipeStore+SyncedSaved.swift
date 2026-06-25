@@ -82,6 +82,30 @@ extension RecipeStore {
         }
     }
 
+    /// DUT-302: the App calls this from `bootstrap` once the one-time backfill
+    /// has completed (or was already done on a prior launch), flipping
+    /// ``mergeDetail`` from "preserve legacy pins" to "synced set is authoritative".
+    public func markSyncedSavedBackfillComplete() {
+        didBackfillSyncedSaved = true
+    }
+
+    #if DEBUG
+    /// Test-only: simulate a pre-V5 legacy save — a local `isSaved` pin with NO
+    /// synced row — to exercise the DUT-302 mergeDetail-before-backfill race.
+    func seedLegacyLocalSaveForTesting(id: Int) throws {
+        guard let row = try fetchRecipe(id: id) else { return }
+        row.isSaved = true
+        try removeSyncedSaved(id: id)
+        try modelContext.save()
+    }
+
+    /// Test-only: read the LOCAL `CachedRecipe.isSaved` pin (the value DUT-302
+    /// guards). `isSaved(id:)` reads the synced set, so it can't observe the pin.
+    func localIsSavedPinForTesting(id: Int) throws -> Bool {
+        try fetchRecipe(id: id)?.isSaved ?? false
+    }
+    #endif
+
     /// Map a synced saved-row to a Domain `Recipe` for the Saved tab. The
     /// result is intentionally PARTIAL — title, excerpt, hero image, total
     /// time, canonical URL, and kind are enough to render the Saved card and

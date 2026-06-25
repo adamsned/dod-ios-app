@@ -16,10 +16,19 @@ extension AppDependencies {
     /// launch retries. Called once from `bootstrap()`.
     func backfillSyncedSavedIfNeeded() async {
         let key = "dod.cloudkit.didBackfillSyncedSavedV1"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        guard !UserDefaults.standard.bool(forKey: key) else {
+            // Already migrated on a prior launch — tell the store so mergeDetail
+            // reconciles `isSaved` against the synced set authoritatively (DUT-302).
+            await store.markSyncedSavedBackfillComplete()
+            return
+        }
         do {
             try await store.backfillSyncedSaved()
             UserDefaults.standard.set(true, forKey: key)
+            // DUT-302: only now is the synced set authoritative — let mergeDetail
+            // clear stale pins from here on (before this, legacy pins are preserved
+            // so opening a recipe pre-backfill can't lose an upgrader's save).
+            await store.markSyncedSavedBackfillComplete()
         } catch {
             DODLog.app.error(
                 "SyncedSaved backfill failed: \(error.localizedDescription, privacy: .public)"

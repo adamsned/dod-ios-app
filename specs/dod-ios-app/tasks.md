@@ -2938,6 +2938,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `VoiceReader.swift` (observers + invalidateAudioSession + hasActiveAudioSession), new `SystemSpeechSynthesizer.swift` (extracted), `VoiceReaderTests.swift` (1 test). Spec: `clarifications.md` (CL-266).
 - **AC:** US-40 / DUT-283. CL-266 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-283-voice-audio-interruption`. **Verification:** swift-format lint + SwiftLint `--strict` clean; 212 DODFeatureRecipeDetail tests pass (1 new); iOS app build green. Device-verify: call mid-Voice-Mode → resume after.
 
+### T-874 — DUT-302: opening a recipe before the SyncedSaved backfill no longer loses upgrader saves (CL-268)
+
+- **What:** mergeDetail blindly set isSaved = (synced != nil) on every detail open, so opening a previously-saved recipe before the one-time backfill cleared the legacy pin → the backfill (selects isSaved==true) missed it → save permanently lost. Now mergeDetail reconciles only upward until RecipeStore.didBackfillSyncedSaved is set (App calls markSyncedSavedBackfillComplete after the backfill / when the flag was already set); a missing synced row no longer clears a still-true legacy pin pre-migration.
+- **Files:** `RecipeStore.swift` (didBackfillSyncedSaved + mergeDetail gate), `RecipeStore+SyncedSaved.swift` (markSyncedSavedBackfillComplete + DEBUG seams), `App/AppDependencies+SyncedSavedBackfill.swift` (wire markComplete), new `RecipeStoreUpgradeRaceTests.swift` (3 tests). Spec: `clarifications.md` (CL-268).
+- **AC:** US-5 / DUT-302. CL-268 canonical. **Est:** ~2 h. **Deps:** off main. Branch `fix/DUT-302-upgrade-race-saves`. **Verification:** swift-format lint + SwiftLint `--strict` clean; 124 DODPersistence tests pass (3 new); iOS app build green. Device-verify upgrader path. NOTE: DUT-240 (backfill-before-import resurrection) is the inverse race, left for a 2-device session.
 ### T-873 — First Cookout: "back to the path" chevron from a picked recipe (CL-267)
 
 - **What:** Tapping a recipe on the roadmap (CL-265) swapped in the paged `FirstCookoutView` whose only exit (the X) closes the whole sheet — a dead end with no way back to the roadmap. Add an optional `onBack` + a top-leading back chevron (mirroring the X) that returns to the roadmap; the X still closes the sheet.
