@@ -2949,6 +2949,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `FirstCookoutView.swift` (`onBack` prop + init param; corner overlays now reference `+Stages.swift`), `FirstCookoutView+Stages.swift` (new `backToPathButton` + `closeButton` computed props — moved out to stay under the `type_body_length` cap), `CookChooserFlow.swift` (passes `onBack: { selected = nil }`). Spec: `clarifications.md` (CL-267).
 - **AC:** US-53 / DUT-194. DUT pending (free issue limit). CL-267 canonical. **Est:** ~30 min. **Deps:** off main (after Ned's #310 CL-266). Branch `fix/first-cookout-back-to-roadmap`. **Verification:** rendered the recipe intro with the back chevron on the iPhone 17 sim; swift-format + SwiftLint `--strict` clean (incl. body-length cap); DODFeatureFeed L1 (92 tests) green; iOS app build green + installed on the sim. No CI-gated snapshot affected. Renumbered from T-872 (Ned's #310 took it concurrently).
 
+### T-876 — DUT-323: Cooking Journal rank ladder + journey header (transformation pillar) (CL-270)
+
+- **What:** North Star transformation feature. New CookProgression (DODSupport, pure) maps total cooks → an identity rank ladder climbing to "Dutch Oven Daddy"; CookJournalView gains a journey header (rank badge + "You're a {rank}" + progress bar + "{n} more cooks to {next}") above the existing stat tiles. First increment; milestone-crossing celebration + First-Cookout-graduated tie-in deferred.
+- **Files:** new `CookProgression.swift` + `CookProgressionTests.swift` (DODSupport), `CookJournalView.swift` (journey header). Spec: `clarifications.md` (CL-270).
+- **AC:** US-48 / DUT-323. CL-270 canonical. **Est:** ~2 h. **Deps:** off main. Branch `feat/cook-rank-journey`. **Verification:** swift-format lint + SwiftLint `--strict` clean; DODSupport (467, 5 new) + DODFeatureFeed (92) green; iOS app build green. Device-verify the journey header. Rank names/thresholds are Ned's to retune (single array in CookProgression.ranks).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

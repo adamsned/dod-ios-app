@@ -70,6 +70,7 @@ public struct CookJournalView: View {
     private var journalList: some View {
         ScrollView {
             VStack(spacing: DODSpacing.md) {
+                journeyHeader
                 statsHeader
                 ForEach(cooks) { cook in
                     cookRow(cook)
@@ -77,6 +78,48 @@ public struct CookJournalView: View {
             }
             .padding(DODSpacing.md)
         }
+    }
+
+    /// Transformation header (North Star): the cook's identity rank + the next
+    /// rung pulling them forward, so the journal opens with how far they've come,
+    /// not just a count. Only rendered with >= 1 cook (journalList is gated on a
+    /// non-empty list), so `currentRank` is non-nil — the fallbacks are defensive.
+    private var journeyHeader: some View {
+        let total = CookLogStats.totalCooks(cooks)
+        let current = CookProgression.currentRank(totalCooks: total)
+        let next = CookProgression.nextRank(totalCooks: total)
+        let toNext = CookProgression.cooksToNextRank(totalCooks: total)
+        let progress = CookProgression.progressToNextRank(totalCooks: total)
+        return VStack(spacing: DODSpacing.xs) {
+            Text(current?.emoji ?? "🔥")
+                .font(.system(size: 44))
+                .accessibilityHidden(true)
+            Text("You're a \(current?.title ?? "Fire Starter")")
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.label)
+                .multilineTextAlignment(.center)
+            if let next, let toNext {
+                ProgressView(value: progress)
+                    .tint(DODColor.burntOrange)
+                    .padding(.horizontal, DODSpacing.md)
+                Text("\(toNext) more cook\(toNext == 1 ? "" : "s") to \(next.emoji) \(next.title)")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("Top of the path. You're a certified Dutch Oven Daddy. 👑")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.burntOrange)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(DODSpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+                .fill(DODColor.surfaceElevated)
+        )
+        .accessibilityElement(children: .combine)
     }
 
     private var statsHeader: some View {

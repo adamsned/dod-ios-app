@@ -1,0 +1,63 @@
+import Foundation
+
+/// The transformation pillar (North Star): a cook's history isn't just a count —
+/// it's an identity they grow into. `CookProgression` maps the total number of
+/// logged cooks onto a named rank ladder that climbs toward the brand itself
+/// ("Dutch Oven Daddy"), so the Cooking Journal can show how far the cook has
+/// come AND the next rung pulling them forward. Pure value logic; the rung
+/// names/thresholds in ``ranks`` are the single editable source of brand voice.
+public struct CookRank: Equatable, Sendable {
+
+    /// The user-facing rank name (brand voice).
+    public let title: String
+    /// A playful badge for the rank.
+    public let emoji: String
+    /// The minimum number of logged cooks required to hold this rank.
+    public let threshold: Int
+
+    public init(title: String, emoji: String, threshold: Int) {
+        self.title = title
+        self.emoji = emoji
+        self.threshold = threshold
+    }
+}
+
+public enum CookProgression {
+
+    /// The rank ladder, ascending by threshold. EDIT HERE to retune the journey's
+    /// names / pacing — every other value derives from this single source.
+    public static let ranks: [CookRank] = [
+        CookRank(title: "Fire Starter", emoji: "🔥", threshold: 1),
+        CookRank(title: "Coal Tender", emoji: "🪵", threshold: 3),
+        CookRank(title: "Lid Lifter", emoji: "🍳", threshold: 5),
+        CookRank(title: "Cast Iron Convert", emoji: "🛡️", threshold: 10),
+        CookRank(title: "Coal Whisperer", emoji: "💨", threshold: 20),
+        CookRank(title: "Pit Boss", emoji: "🔱", threshold: 35),
+        CookRank(title: "Dutch Oven Daddy", emoji: "👑", threshold: 50),
+    ]
+
+    /// The highest rank the cook currently holds — `nil` before the first cook.
+    public static func currentRank(totalCooks: Int) -> CookRank? {
+        ranks.last { totalCooks >= $0.threshold }
+    }
+
+    /// The next rank to climb toward — `nil` once the top rung is reached.
+    public static func nextRank(totalCooks: Int) -> CookRank? {
+        ranks.first { totalCooks < $0.threshold }
+    }
+
+    /// Cooks remaining to reach the next rank — `nil` at the top.
+    public static func cooksToNextRank(totalCooks: Int) -> Int? {
+        nextRank(totalCooks: totalCooks).map { max(0, $0.threshold - totalCooks) }
+    }
+
+    /// Progress (0...1) from the current rung's threshold toward the next rung's;
+    /// 1.0 once the top rung is reached.
+    public static func progressToNextRank(totalCooks: Int) -> Double {
+        guard let next = nextRank(totalCooks: totalCooks) else { return 1.0 }
+        let floor = currentRank(totalCooks: totalCooks)?.threshold ?? 0
+        let span = next.threshold - floor
+        guard span > 0 else { return 0 }
+        return min(1.0, max(0.0, Double(totalCooks - floor) / Double(span)))
+    }
+}
