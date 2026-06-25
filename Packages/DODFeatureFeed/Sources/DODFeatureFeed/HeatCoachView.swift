@@ -2,39 +2,50 @@ import DODDesignSystem
 import DODSupport
 import SwiftUI
 
-/// **Dutch Oven Heat Coach** (DUT-48) — a starting coal estimate, condition
-/// adjustments, and a cook-by-feel reference.
+/// **Dutch Oven Heat Coach** (DUT-48; redesigned CL-274) — a starting coal
+/// estimate, condition adjustments, and a cook-by-feel reference.
 ///
 /// This screen embodies Dutch Oven Daddy's published method (the
 /// `/dutch-oven-temperature-chart/` page): *stop using the chart; give a
 /// starting point, then adapt by feel.* The estimate is framed everywhere as
-/// "a starting point, not a rule," and the layout leads the cook toward the
-/// feel cues — which are the point of the feature, not the number.
+/// "a starting point, not a rule."
 ///
-/// Self-contained: no data model, no CloudKit, no network. All input state
-/// lives in `@State`; the displayed copy derives purely from
-/// ``HeatCoachModel`` over ``DutchOvenHeatCoach`` (DODSupport). It is reached
-/// via a `NavigationLink` row in the Settings "Tools" section (v1 low-risk
-/// entry point — a dedicated Tools tab is the eventual home).
+/// **CL-274 redesign.** The old single long scroll (setup + result + adjustments
+/// + feel cues + coal management, all stacked) is split into three jump-to pages
+/// via a segmented switcher, to match the other Cooking Tools and so a beginner
+/// gets the answer first instead of scrolling past everything:
+///   - **Coals** — the answer: a compact setup → the coal estimate → optional
+///     condition fine-tuning + the adjustment notes.
+///   - **Feel** — the cook-by-feel cues (the heart of the method).
+///   - **Tips** — coal-management habits + wind guidance.
+/// Every option and guide is preserved; the copy (pinned by the DODSupport
+/// tests) is unchanged. The page compositions live in `HeatCoachView+Sections`.
 ///
-/// Hosted in `DODFeatureFeed` (the module that already owns ``SettingsView``)
-/// so v1 ships without wiring a new SPM module/target. The adjustment,
-/// feel-cue, and coal-management sections live in `HeatCoachView+Sections.swift`
-/// so this file stays under the 400-line `file_length` cap.
+/// Self-contained: no data model, no CloudKit, no network. All input state lives
+/// in `@State`; the displayed copy derives purely from ``HeatCoachModel`` over
+/// ``DutchOvenHeatCoach`` (DODSupport). Reached from the Feed's Cooking Tools
+/// menu + the Settings Tools row.
 ///
 /// Spec trace: DUT-48 (Dutch Oven Heat Coach).
 public struct HeatCoachView: View {
 
-    @State private var ovenDiameterInches: Int = 12
-    @State private var style: CookingStyle = .even
-    @State private var elevationFeet: Int = 0
-    @State private var ambient: AmbientCondition = .mild
-    @State private var windy: Bool = false
+    /// The three jump-to pages, switched by ``pageSwitcher``. Coals is the
+    /// answer; Feel + Tips are the guides.
+    enum Page: Hashable, CaseIterable { case coals, feel, tips }
+
+    @State private var page: Page = .coals
+    // Non-private so the input cards in `+Sections` can bind to them ($-projections).
+    @State var ovenDiameterInches: Int = 12
+    @State var style: CookingStyle = .even
+    @State var elevationFeet: Int = 0
+    @State var ambient: AmbientCondition = .mild
+    @State var windy: Bool = false
 
     public init() {}
 
     /// Rebuilt on every input change — pure value type, no retained state.
-    private var coachModel: HeatCoachModel {
+    /// Non-private so the page compositions in `+Sections` can read it.
+    var coachModel: HeatCoachModel {
         HeatCoachModel(
             ovenDiameterInches: ovenDiameterInches,
             style: style,
@@ -47,119 +58,50 @@ public struct HeatCoachView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                inputsCard
-                resultCard
-                adjustmentsCard(coachModel)
-                feelReferenceSection
-                coalManagementSection
+                Text(
+                    "Managing heat is the trickiest part of Dutch oven cooking. The Heat "
+                        + "Coach gives you a solid starting point for how many coals to use "
+                        + "and where they go, then teaches you to read the cook by feel and "
+                        + "adjust as you go, so you cook with confidence instead of guesswork."
+                )
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                pageSwitcher
+
+                switch page {
+                case .coals:
+                    setupCard
+                    resultCard
+                    conditionsCard(coachModel)
+                case .feel:
+                    feelReferenceSection
+                case .tips:
+                    coalManagementSection
+                }
             }
             .padding(DODSpacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .animation(.easeInOut(duration: 0.2), value: page)
         }
         .background(DODColor.surface)
         .navigationTitle("Heat Coach")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .dodInlineNavTitle()
         .accessibilityIdentifier("heat-coach")
     }
 
-    // MARK: - Inputs
-
-    private var inputsCard: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.md) {
-            sectionHeader("Your Setup")
-
-            labeledRow("Oven size") {
-                Picker("Oven size", selection: $ovenDiameterInches) {
-                    ForEach(HeatCoachModel.ovenSizes, id: \.self) { size in
-                        Text("\(size)\"").tag(size)
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(DODColor.accent)
-                .accessibilityIdentifier("heat-coach-oven-size")
-            }
-
-            labeledRow("Cooking style") {
-                accentSelector(
-                    selection: $style,
-                    options: [(.even, "Even"), (.baking, "Baking")],
-                    accessibilityID: "heat-coach-style"
-                )
-            }
-
-            Divider().overlay(DODColor.surfaceDivider)
-
-            elevationRow
-            ambientRow
-            windRow
-        }
-        .padding(DODSpacing.md)
-        .cardSurface()
-    }
-
-    private var elevationRow: some View {
-        labeledRow("Elevation") {
-            Stepper(value: $elevationFeet, in: 0...15000, step: 500) {
-                Text(elevationFeet == 0 ? "Sea level" : "\(elevationFeet) ft")
-                    .dodFont(DODType.body)
-                    .foregroundStyle(DODColor.label)
-            }
-            .accessibilityIdentifier("heat-coach-elevation")
-        }
-    }
-
-    private var ambientRow: some View {
-        labeledRow("Air temperature") {
-            accentSelector(
-                selection: $ambient,
-                options: [(.hot, "Hot"), (.mild, "Mild"), (.cold, "Cold")],
-                accessibilityID: "heat-coach-ambient"
-            )
-        }
-    }
-
-    private var windRow: some View {
-        Toggle(isOn: $windy) {
-            Text("Windy day")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-        }
-        .tint(DODColor.accent)
-        .accessibilityIdentifier("heat-coach-wind")
-    }
-
-    // MARK: - Result card (the starting estimate, then cook by feel)
-
-    private var resultCard: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text("A starting point. Then cook by feel.")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.9))
-                .textCase(.uppercase)
-
-            Text(coachModel.coalHeadline)
-                .dodFont(DODType.displayMedium)
-                .foregroundStyle(DODColor.labelOnAccent)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text(coachModel.styleNote)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(DODSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
-                .fill(DODColor.accent)
+    /// Top-level page switcher. Reuses the brand ``accentSelector`` so the chosen
+    /// page reads in the app's orange, consistent with the input selectors below.
+    private var pageSwitcher: some View {
+        accentSelector(
+            selection: $page,
+            options: [(.coals, "Coals"), (.feel, "Feel"), (.tips, "Tips")],
+            accessibilityID: "heat-coach-pages"
         )
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("heat-coach-result")
     }
 
-    // MARK: - Shared building blocks
+    // MARK: - Shared building blocks (used across both files)
 
     /// Section header used across the screen's cards.
     @ViewBuilder
@@ -169,10 +111,10 @@ public struct HeatCoachView: View {
             .foregroundStyle(DODColor.label)
     }
 
-    /// A label on top of an arbitrary control, stacked so the segmented /
-    /// menu pickers get full width under their caption.
+    /// A label stacked on top of a control so the menu / segmented pickers get
+    /// full width under their caption. Non-private for the `+Sections` cards.
     @ViewBuilder
-    private func labeledRow<Control: View>(
+    func labeledRow<Control: View>(
         _ label: String,
         @ViewBuilder control: () -> Control
     ) -> some View {
@@ -184,13 +126,12 @@ public struct HeatCoachView: View {
         }
     }
 
-    /// Brand-accent segmented selector (DUT-83). Replaces `.pickerStyle(.segmented)`
-    /// so the chosen option reads in the app's orange accent instead of iOS's
-    /// neutral grey, in both light and dark. Scoped to this screen (no global
-    /// `UISegmentedControl` appearance hack): selected = accent fill +
-    /// `labelOnAccent`; unselected = clear over a recessed `surface` track.
+    /// Brand-accent segmented selector (DUT-83): selected = accent fill +
+    /// `labelOnAccent`; unselected = clear over a recessed `surface` track with a
+    /// hairline so it reads as a grouped control in both light + dark. Non-private
+    /// so the page switcher + the `+Sections` input cards share one control.
     @ViewBuilder
-    private func accentSelector<Value: Hashable>(
+    func accentSelector<Value: Hashable>(
         selection: Binding<Value>,
         options: [(Value, String)],
         accessibilityID: String
@@ -218,9 +159,6 @@ public struct HeatCoachView: View {
             RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
                 .fill(DODColor.surface)
         )
-        // Hairline so the track reads as a grouped control in BOTH modes —
-        // in light, `surface` matches the card and the fill alone is invisible
-        // (DUT-83).
         .overlay(
             RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
                 .strokeBorder(DODColor.surfaceDivider, lineWidth: 1)
@@ -233,8 +171,7 @@ public struct HeatCoachView: View {
 
 extension View {
     /// The brand card treatment shared by every Heat Coach section:
-    /// `surfaceElevated` fill clipped to a continuous rounded rectangle,
-    /// matching ``RecipeCard`` and the rest of the app's card register.
+    /// `surfaceElevated` fill clipped to a continuous rounded rectangle.
     func cardSurface() -> some View {
         frame(maxWidth: .infinity, alignment: .leading)
             .background(
