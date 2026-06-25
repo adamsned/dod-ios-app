@@ -104,15 +104,29 @@ public struct WPRMRatingsClient: Sendable {
             // guest-comments-enabled blog like DOD.
             throw WPClientError.httpStatus(response.statusCode)
         }
-        // Fetch fresh summary so the caller can render the updated average
-        // immediately. We tag userRating with the value we just posted.
-        let updated = try await summary(forRecipeID: recipeID)
-        return RecipeRating(
-            recipeID: updated.recipeID,
-            average: updated.average,
-            count: updated.count,
-            userRating: stars
-        )
+        // DUT-305: the rating WAS recorded the moment the POST returned 2xx.
+        // The follow-up summary GET is a best-effort convenience to render the
+        // updated average without a second round-trip — if it fails (or 5xx),
+        // we must NOT report the whole submit as failed and must NOT hand back
+        // a zeroed aggregate. Fall back to a RecipeRating built from the star
+        // we just submitted so the caller can reconcile (DUT-216) rather than
+        // blanking the user's vote.
+        do {
+            let updated = try await summary(forRecipeID: recipeID)
+            return RecipeRating(
+                recipeID: updated.recipeID,
+                average: updated.average,
+                count: updated.count,
+                userRating: stars
+            )
+        } catch {
+            return RecipeRating(
+                recipeID: recipeID,
+                average: Double(stars),
+                count: 1,
+                userRating: stars
+            )
+        }
     }
 
     // MARK: - Internals

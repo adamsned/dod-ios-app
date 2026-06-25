@@ -36,9 +36,13 @@ extension RecipeDetailViewModel {
                 name: name,
                 email: email
             )
-            ratingSummary = updated
+            // DUT-305: route the post-success summary through the DUT-216
+            // reconciliation instead of assigning/caching it raw. If the
+            // client degraded to a zeroed aggregate (its summary GET failed),
+            // `applyRatingRefresh` keeps the existing/cached rating rather than
+            // blanking the user's just-submitted vote.
             pendingUserRating = stars
-            await dependencies.cacheRatingSummary(updated)
+            await applyRatingRefresh(updated)
             snackbarMessage = "Thanks for rating."
         } catch {
             DODLog.network.error("post rating failed: \(String(describing: error))")

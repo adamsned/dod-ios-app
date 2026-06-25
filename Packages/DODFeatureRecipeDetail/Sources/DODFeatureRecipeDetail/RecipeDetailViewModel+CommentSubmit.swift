@@ -125,9 +125,12 @@ extension RecipeDetailViewModel {
                 name: name,
                 email: email
             )
-            ratingSummary = updated
+            // DUT-305: reconcile through `applyRatingRefresh` (DUT-216) rather
+            // than assigning/caching the summary raw, so a degraded 0/0
+            // aggregate (the client's summary GET failed after a successful
+            // POST) never blanks the user's just-submitted vote.
             pendingUserRating = stars
-            await dependencies.cacheRatingSummary(updated)
+            await applyRatingRefresh(updated)
         } catch {
             // Quiet on failure: the comment POST owns the user-facing result,
             // and the rating can be re-submitted from the stars control. Log
