@@ -151,12 +151,29 @@ extension SearchViewModel {
         trimmed: String
     ) async {
         let allIDs = merged.map(\.id)
-        lastCategoryIDsByRecipe =
-            (try? await dependencies.categoryIDs(forRecipeIDs: allIDs)) ?? [:]
-        lastTotalSecondsByRecipe =
-            (try? await dependencies.totalSeconds(forRecipeIDs: allIDs)) ?? [:]
-        lastRecentlyViewedIDs =
-            (try? await dependencies.recentlyViewedRecipeIDs()) ?? []
+        // DUT-314: `filters.apply` short-circuits to `items` unchanged when
+        // `filters.isAllDefault`, so the three filter-support fetches below
+        // (the last of which is a full `CachedRecipe` table scan) feed maps
+        // that go unread on the common no-filter search. Gate them behind
+        // `!isAllDefault` and pass empties through — behaviour-preserving,
+        // it just skips three persistence round-trips per default search.
+        if filters.isAllDefault {
+            lastCategoryIDsByRecipe = [:]
+            lastTotalSecondsByRecipe = [:]
+            lastRecentlyViewedIDs = []
+            // The caches are deliberately empty — a later chip toggle lazily
+            // hydrates them (see `reapplyFilters` /
+            // `kickOffFilterSupportHydrationIfNeeded`).
+            filterSupportHydrated = false
+        } else {
+            lastCategoryIDsByRecipe =
+                (try? await dependencies.categoryIDs(forRecipeIDs: allIDs)) ?? [:]
+            lastTotalSecondsByRecipe =
+                (try? await dependencies.totalSeconds(forRecipeIDs: allIDs)) ?? [:]
+            lastRecentlyViewedIDs =
+                (try? await dependencies.recentlyViewedRecipeIDs()) ?? []
+            filterSupportHydrated = true
+        }
 
         let filtered = filters.apply(
             to: merged,

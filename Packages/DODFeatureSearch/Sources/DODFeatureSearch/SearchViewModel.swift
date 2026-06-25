@@ -135,6 +135,9 @@ public final class SearchViewModel {
     var lastCategoryIDsByRecipe: [Int: [Int]] = [:]
     var lastTotalSecondsByRecipe: [Int: Int] = [:]
     var lastRecentlyViewedIDs: Set<Int> = []
+    /// DUT-314: `false` after a default search skipped the filter-support
+    /// fetches, so the first chip toggle lazily hydrates (see `+DUT314`).
+    var filterSupportHydrated = false
 
     let dependencies: SearchDependencies
     // T-779 / DUT-85: internal (was `private`) so `+Recents` can record into it.
@@ -313,43 +316,6 @@ public final class SearchViewModel {
         await dependencies.sendSearchTelemetry(queryHash: hash)
     }
 
-    /// US-12 / AC-12.3 amendment / CL-106 (T-637): when the cook-time
-    /// filter is active and the cached `lastTotalSecondsByRecipe` map is
-    /// missing entries for items in the current result set, kick off a
-    /// network hydration task (capped at 20 items per `hydrationCap`)
-    /// and call `reapplyFilters()` when the data lands. No-op when the
-    /// filter is off or every visible item already has a known total
-    /// time (the cache covers it).
-    ///
-    /// The hydration task runs detached on the same actor (this is the
-    /// `@MainActor` view model — `Task { ... }` inherits the actor) so
-    /// the mutation of `lastTotalSecondsByRecipe` and the subsequent
-    /// `reapplyFilters()` call are race-free.
-    func kickOffCookTimeHydrationIfNeeded(against merged: [RecipeListItem]) {
-        // CL-122 (T-644): the guard checks either bound — the wheel-picker
-        // can leave one side at "Any" (nil) and still need hydration when
-        // the other side is set. `hasCookTimeRange` collapses the two-nil
-        // check + the documented intent into one accessor.
-        guard filters.hasCookTimeRange else { return }
-        let unknown = merged.map(\.id).filter { lastTotalSecondsByRecipe[$0] == nil }
-        guard !unknown.isEmpty else { return }
-        let toFetch = Array(unknown.prefix(Self.hydrationCap))
-        Task { [weak self] in
-            guard let self else { return }
-            let fetched = await self.dependencies.fetchTotalSeconds(forRecipeIDs: toFetch)
-            guard !fetched.isEmpty else { return }
-            for (id, seconds) in fetched {
-                self.lastTotalSecondsByRecipe[id] = seconds
-            }
-            self.reapplyFilters()
-        }
-    }
-
-    /// One REST page worth of items — bounds the cook-time hydration
-    /// fan-out so a single filter toggle can't hammer the API. Matches
-    /// `WPRestClient.defaultPageSize` (20) by convention.
-    private static let hydrationCap: Int = 20
-
     /// Re-rank the cached merged set when filters change. Pure function over
     /// stored state — no I/O (apart from the optional cook-time hydration
     /// path below, which fires only when the cook-time filter just flipped
@@ -367,7 +333,10 @@ public final class SearchViewModel {
     /// to hold the full Path A + Path B union; re-running the merger
     /// would re-apply the title-precision filter and drop the Path B-only
     /// category contributions — exactly the regression T-643 fixes.
-    private func reapplyFilters() {
+    ///
+    /// DUT-314: `internal` (was `private`) so `+DUT314`'s lazy hydration can
+    /// re-rank once the skipped filter-support caches land.
+    func reapplyFilters() {
         let base: [RecipeListItem]
         switch lastSurface {
         case .textQuery:
@@ -377,6 +346,10 @@ public final class SearchViewModel {
             guard !lastMergedRESTOrdering.isEmpty else { return }
             base = lastMergedRESTOrdering
         }
+        // DUT-314: when a default search skipped the filter-support fetches,
+        // the first chip toggle lazily hydrates them and re-ranks once they
+        // land (no-op on repeat toggles — see `+DUT314`).
+        kickOffFilterSupportHydrationIfNeeded(against: base)
         let filtered = filters.apply(
             to: base,
             categoryIDsByRecipe: lastCategoryIDsByRecipe,

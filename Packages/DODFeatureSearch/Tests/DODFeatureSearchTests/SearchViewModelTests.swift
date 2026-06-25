@@ -118,6 +118,14 @@ import Testing
         let restCallsBefore = dependencies.searches.count
 
         viewModel.filters.categoryID = 10
+        // DUT-314: the search ran with default filters, so the category-id
+        // support map was skipped. The first chip toggle lazily hydrates it
+        // (a fire-and-forget Task) and re-ranks when it lands — poll for that,
+        // mirroring the cook-time hydration test's pattern. This reads the
+        // local persistence cache, NOT a REST search (asserted below).
+        for _ in 0..<200 where viewModel.items.map(\.id) != [1] {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
         #expect(viewModel.items.map(\.id) == [1])
         #expect(
             dependencies.searches.count == restCallsBefore,
