@@ -33,7 +33,9 @@ import SwiftUI
 /// US-41 AC-41.3, AC-41.4; US-44; CL-89; CL-147; CL-148; CL-149.
 public struct SettingsView: View {
 
-    @State private var viewModel: SettingsViewModel
+    // `internal` (not `private`) so the `Binding` wrappers in
+    // `SettingsView+Bindings.swift` reach it across the file boundary (DUT-307).
+    @State var viewModel: SettingsViewModel
     /// Closure the Clear Cache row delegates to. Returns the total
     /// bytes freed so the snackbar can format the "Freed X.X MB" copy.
     /// Optional so previews + snapshot tests don't need to plumb a
@@ -116,12 +118,26 @@ public struct SettingsView: View {
             // one titled section so the two unit-related controls sit
             // together instead of scattered across the page.
             Section {
-                Toggle(isOn: useMetricUnitsBinding) {
-                    Text("Use Metric Units")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.label)
+                // DUT-307 — the "Use Metric Units" flag persists but NO code
+                // reads it (whole-repo grep finds no consumer): a dead control
+                // that erodes trust. Disable it with a "Coming soon" caption
+                // until the ingredient-conversion consumer (DUT-43) lands. The
+                // stored property + `useMetricUnitsKey` are retained so the
+                // persisted preference survives for that work.
+                VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                    Toggle(isOn: useMetricUnitsBinding) {
+                        Text("Use Metric Units")
+                            .dodFont(DODType.body)
+                            .foregroundStyle(DODColor.label)
+                    }
+                    .disabled(true)
+                    .accessibilityIdentifier("settings-toggle-metric")
+
+                    Text("Coming soon")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .accessibilityIdentifier("settings-toggle-metric-coming-soon")
                 }
-                .accessibilityIdentifier("settings-toggle-metric")
 
                 Picker(selection: temperaturePreferenceBinding) {
                     ForEach(TemperaturePreference.allCases, id: \.self) { value in
@@ -316,65 +332,9 @@ public struct SettingsView: View {
             .foregroundStyle(DODColor.label)
     }
 
-    // MARK: - Bindings
-
-    /// Wraps each view-model property in a SwiftUI Binding so the
-    /// Toggle / Picker drives it without exposing the @Observable
-    /// mutation directly to the view layer.
-
-    private var useMetricUnitsBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.useMetricUnits },
-            set: { viewModel.useMetricUnits = $0 }
-        )
-    }
-
-    private var notificationsEnabledBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.notificationsEnabled },
-            // Turning ON requests system authorization (US-42 / AC-42.1);
-            // a denied prompt leaves the persisted flag OFF so the toggle
-            // springs back. The work is async (the system prompt), so it
-            // runs in a Task — the `@Observable` `notificationsEnabled`
-            // write inside `setNotificationsEnabled` re-renders the toggle.
-            set: { newValue in
-                Task { await viewModel.setNotificationsEnabled(newValue) }
-            }
-        )
-    }
-
-    private var commentReplyNotificationsBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.commentReplyNotificationsEnabled },
-            // Mirrors `notificationsEnabledBinding` — turning ON requests
-            // system authorization (T-750 / CL-147); a denied prompt leaves
-            // the persisted flag OFF so the toggle springs back.
-            set: { newValue in
-                Task { await viewModel.setCommentReplyNotificationsEnabled(newValue) }
-            }
-        )
-    }
-
-    private var appearanceBinding: Binding<AppearancePreference> {
-        Binding(
-            get: { viewModel.appearance },
-            set: { viewModel.appearance = $0 }
-        )
-    }
-
-    private var temperaturePreferenceBinding: Binding<TemperaturePreference> {
-        Binding(
-            get: { viewModel.temperaturePreference },
-            set: { viewModel.temperaturePreference = $0 }
-        )
-    }
-
-    private var telemetryEnabledBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.telemetryEnabled },
-            set: { viewModel.telemetryEnabled = $0 }
-        )
-    }
+    // The SwiftUI `Binding` wrappers (`useMetricUnitsBinding`, etc.) live in
+    // `SettingsView+Bindings.swift` so this host file stays under the 400-line
+    // `file_length` cap (DUT-307, following the T-738 / CL-134 split pattern).
 
     // MARK: - Actions
 
