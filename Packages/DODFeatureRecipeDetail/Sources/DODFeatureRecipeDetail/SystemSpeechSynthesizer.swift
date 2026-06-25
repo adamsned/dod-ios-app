@@ -135,7 +135,8 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
             identifier: voice.identifier,
             languageCode: voice.language,
             gender: gender,
-            quality: quality
+            quality: quality,
+            name: voice.name
         )
     }
 

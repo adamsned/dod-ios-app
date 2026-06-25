@@ -196,6 +196,12 @@ public final class SettingsViewModel {
         didSet { voicePreferenceStore.setGender(voiceGender) }
     }
 
+    /// DUT-327 — the explicitly-picked Cook Mode voice identifier (`nil` =
+    /// Automatic). Persisted on `didSet`; when set it wins over gender + quality.
+    public var voiceIdentifier: String? {
+        didSet { voicePreferenceStore.setVoiceIdentifier(voiceIdentifier) }
+    }
+
     /// AC-36.5. Defaults ON (true). The read uses
     /// `object(forKey:) as? Bool ?? true` so an absent key returns true,
     /// matching the constitution §9 opt-out posture. A future opt-in
@@ -283,6 +289,7 @@ public final class SettingsViewModel {
         self.appearance = AppearancePreference.fromDefaults(defaults)
         self.temperaturePreference = TemperaturePreference.fromDefaults(defaults)
         self.voiceGender = voicePreferenceStore.preference().gender
+        self.voiceIdentifier = voicePreferenceStore.preference().voiceIdentifier
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies

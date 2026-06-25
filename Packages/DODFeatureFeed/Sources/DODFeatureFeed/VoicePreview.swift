@@ -123,7 +123,8 @@ public final class SystemVoicePreviewer: VoicePreviewing {
             identifier: voice.identifier,
             languageCode: voice.language,
             gender: gender,
-            quality: quality
+            quality: quality,
+            name: voice.name
         )
     }
 }

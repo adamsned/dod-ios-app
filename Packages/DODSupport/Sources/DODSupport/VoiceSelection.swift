@@ -50,6 +50,11 @@ public struct VoiceDescriptor: Sendable, Equatable {
     /// `com.apple.voice.enhanced.en-US.Samantha`) — what
     /// `AVSpeechSynthesisVoice(identifier:)` resolves back to a real voice.
     public let identifier: String
+    /// Human-readable voice name (e.g. `Samantha`) — `AVSpeechSynthesisVoice.name`.
+    /// Drives the Settings → Cook Mode Voice picker so the user sees "Samantha
+    /// (Enhanced)" rather than a reverse-DNS identifier. Defaults to "" for the
+    /// selection-only call sites (tests / the engine) that never render a label.
+    public let name: String
     /// BCP-47 language tag (e.g. `en-US`).
     public let languageCode: String
     public let gender: VoiceGender
@@ -59,27 +64,39 @@ public struct VoiceDescriptor: Sendable, Equatable {
         identifier: String,
         languageCode: String,
         gender: VoiceGender,
-        quality: VoiceQuality
+        quality: VoiceQuality,
+        name: String = ""
     ) {
         self.identifier = identifier
+        self.name = name
         self.languageCode = languageCode
         self.gender = gender
         self.quality = quality
     }
 }
 
-/// The user's voice preference. v1 carries only the gender choice; the
-/// quality preference is implicit ("always the best installed"). Defaults to
-/// `.female` to match Apple's own system-default voice (en-US Samantha) so
-/// the default experience is unsurprising.
+/// The user's voice preference.
+///
+/// - ``voiceIdentifier``: an **explicit voice pick** (DUT-327). When set to an
+///   installed voice's identifier, the selector returns exactly that voice —
+///   the user "wired in" a specific voice from the Settings picker, so gender +
+///   quality ranking are bypassed entirely. `nil` means **Automatic**: let the
+///   selector choose the best installed voice for the language.
+/// - ``gender``: the Automatic-mode tie-break — among equally-natural voices,
+///   prefer this gender. Defaults to `.female` to match Apple's own
+///   system-default voice (en-US Samantha) so the default experience is
+///   unsurprising. Ignored when ``voiceIdentifier`` is set.
 public struct VoicePreference: Sendable, Equatable {
     public var gender: VoiceGender
+    /// DUT-327 — the explicitly chosen voice identifier, or `nil` for Automatic.
+    public var voiceIdentifier: String?
 
-    public init(gender: VoiceGender = .female) {
+    public init(gender: VoiceGender = .female, voiceIdentifier: String? = nil) {
         self.gender = gender
+        self.voiceIdentifier = voiceIdentifier
     }
 
-    /// The v1 default — female, matching the platform default voice.
+    /// The default — Automatic selection with a female gender tie-break.
     public static let `default` = VoicePreference(gender: .female)
 }
 
@@ -87,18 +104,28 @@ public struct VoicePreference: Sendable, Equatable {
 
 /// Picks the best available voice for a language + user preference.
 ///
-/// US-40 / AC-40.10 (T-720). The algorithm is **gender-primary,
-/// quality-secondary**: among voices matching the requested language, it
-/// prefers the user's gender, and within that prefers the highest quality
-/// tier. This is the load-bearing fix for the "sounds like a robot"
-/// complaint — `AVSpeechSynthesisVoice(language:)` (the prior behavior)
-/// returns the *default*-quality (compact) voice for a language even when an
-/// `enhanced` Siri voice is already installed; this selector explicitly
-/// reaches past the compact tier to the natural one.
+/// US-40 / AC-40.10 (T-720); **DUT-327 / CL-277 — natural-first re-ranking +
+/// explicit pick.** Two stages:
 ///
-/// Returns `nil` when no voice matches the language at all, in which case the
-/// caller falls back to the system default (the prior behavior) — so a locale
-/// with no installed voices degrades exactly as before, never worse.
+/// 1. **Explicit pick wins.** If ``VoicePreference/voiceIdentifier`` is set and
+///    that voice is still installed, return it verbatim — the user "wired in" a
+///    specific voice from the Settings picker, so no ranking applies.
+/// 2. **Automatic.** Among voices matching the requested language, rank by
+///    **natural-first, then gender, then quality**: any natural (`enhanced` /
+///    `premium`) voice outranks every robotic (`default`/compact) one
+///    *regardless of gender*, and gender only breaks ties *among* natural
+///    voices.
+///
+/// The natural-first order is the DUT-327 bug fix: the prior **gender-primary**
+/// ranking would serve a robotic voice of the preferred gender over a *natural*
+/// voice of another gender — so a user who downloaded, say, an Enhanced male
+/// voice still heard the compact female robot (the default gender is `.female`).
+/// "Don't sound like a robot" now trumps the gender preference; the gender pick
+/// still decides between two natural voices.
+///
+/// Returns `nil` when no voice matches the language at all (and no valid
+/// explicit pick), in which case the caller falls back to the system default —
+/// so a locale with no installed voices degrades exactly as before, never worse.
 public enum VoiceSelector {
 
     /// - Parameters:
@@ -107,18 +134,24 @@ public enum VoiceSelector {
     ///     Matches by language *prefix* so `"en"` matches `en-US` / `en-GB`,
     ///     and `"en-US"` matches `en-US` exactly (exact matches are preferred
     ///     over prefix matches as a tie-break). `nil` matches every voice.
-    ///   - preference: the user's gender preference.
+    ///   - preference: the user's explicit pick (if any) + gender tie-break.
     /// - Returns: the chosen voice's identifier, or `nil` if no language match.
     public static func bestVoiceIdentifier(
         from available: [VoiceDescriptor],
         languageCode: String?,
         preference: VoicePreference
     ) -> String? {
+        // DUT-327 — an explicit pick wins outright, as long as it's still
+        // installed (a deleted voice falls through to Automatic, never to silence).
+        if let chosen = preference.voiceIdentifier, available.contains(where: { $0.identifier == chosen }) {
+            return chosen
+        }
+
         let matches = available.filter { matchesLanguage($0.languageCode, languageCode) }
         guard !matches.isEmpty else { return nil }
 
-        // Sort ascending by (genderRank, qualityRank, exactLocaleRank,
-        // identifier) and take the first — i.e. the most-preferred voice.
+        // Sort ascending by (naturalRank, genderRank, qualityRank,
+        // exactLocaleRank, identifier) and take the first — the most-preferred.
         let best = matches.min { lhs, rhs in
             let lKey = sortKey(for: lhs, languageCode: languageCode, preference: preference)
             let rKey = sortKey(for: rhs, languageCode: languageCode, preference: preference)
@@ -178,11 +211,37 @@ public enum VoiceSelector {
         return best > .default
     }
 
+    /// DUT-327 — the installed voices for a language family, for the Settings
+    /// voice picker. Same prefix matching as ``bestVoiceIdentifier(from:languageCode:preference:)``,
+    /// sorted **natural-first then by name** so the good voices sit at the top of
+    /// the list and the user reads "Samantha (Enhanced)" before the robotic ones.
+    ///
+    /// - Parameters:
+    ///   - languageCode: BCP-47 tag or bare language code; `nil` returns every voice.
+    ///   - available: the installed voice catalog (value projection).
+    /// - Returns: the language-matched voices, best-sounding first.
+    public static func voicesForLanguage(
+        _ languageCode: String?,
+        in available: [VoiceDescriptor]
+    ) -> [VoiceDescriptor] {
+        available
+            .filter { matchesLanguage($0.languageCode, languageCode) }
+            .sorted { lhs, rhs in
+                if lhs.quality != rhs.quality { return lhs.quality > rhs.quality }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+    }
+
     // MARK: - Private
 
     /// A comparable sort key. Lower sorts first (more preferred).
+    ///   - naturalRank: 0 = natural (`enhanced`/`premium`), 1 = robotic
+    ///     (`default`/compact). DUT-327 — PRIMARY axis: a natural voice always
+    ///     outranks a robotic one, so "don't sound like a robot" beats the
+    ///     gender preference.
     ///   - genderRank: 0 = matches preferred gender, 1 = unspecified
-    ///     (acceptable fallback), 2 = opposite gender.
+    ///     (acceptable fallback), 2 = opposite gender. Breaks ties *among*
+    ///     natural voices (and among robotic-only catalogs).
     ///   - qualityRank: 0 = premium, 1 = enhanced, 2 = default (best first).
     ///   - exactLocaleRank: 0 = exact language-tag match, 1 = prefix-only.
     ///   - identifier: final stable tie-break so selection is deterministic.
@@ -191,6 +250,8 @@ public enum VoiceSelector {
         languageCode: String?,
         preference: VoicePreference
     ) -> SortKey {
+        let naturalRank = voice.quality > .default ? 0 : 1
+
         let genderRank: Int
         switch voice.gender {
         case preference.gender: genderRank = 0
@@ -207,6 +268,7 @@ public enum VoiceSelector {
         let exactLocaleRank = isExactLocale ? 0 : 1
 
         return SortKey(
+            natural: naturalRank,
             gender: genderRank,
             quality: qualityRank,
             exactLocale: exactLocaleRank,
@@ -235,12 +297,14 @@ public enum VoiceSelector {
     }
 
     private struct SortKey: Comparable {
+        let natural: Int
         let gender: Int
         let quality: Int
         let exactLocale: Int
         let identifier: String
 
         static func < (lhs: SortKey, rhs: SortKey) -> Bool {
+            if lhs.natural != rhs.natural { return lhs.natural < rhs.natural }
             if lhs.gender != rhs.gender { return lhs.gender < rhs.gender }
             if lhs.quality != rhs.quality { return lhs.quality < rhs.quality }
             if lhs.exactLocale != rhs.exactLocale { return lhs.exactLocale < rhs.exactLocale }
@@ -270,26 +334,32 @@ public struct VoicePreferenceStore {
     /// migrate without colliding (mirrors `dod.cloudkit.syncOptInV1`).
     public static let genderKey = "dod.voice.preferredGenderV1"
 
+    /// DUT-327 — the explicitly-picked voice identifier, or absent for Automatic.
+    public static let identifierKey = "dod.voice.preferredIdentifierV1"
+
     private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
-    /// The current preference, or the `.female` default when unset / unknown.
+    /// The current preference: the gender tie-break (default `.female`) plus any
+    /// explicit voice pick (DUT-327, `nil` for Automatic).
     public func preference() -> VoicePreference {
-        guard let raw = defaults.string(forKey: Self.genderKey) else {
-            return .default
-        }
-        switch raw {
-        case "male": return VoicePreference(gender: .male)
-        case "female": return VoicePreference(gender: .female)
-        case "unspecified": return VoicePreference(gender: .unspecified)
-        default: return .default
+        VoicePreference(gender: gender(), voiceIdentifier: defaults.string(forKey: Self.identifierKey))
+    }
+
+    /// The stored gender tie-break, or `.female` when unset / unknown.
+    private func gender() -> VoiceGender {
+        switch defaults.string(forKey: Self.genderKey) {
+        case "male": return .male
+        case "female": return .female
+        case "unspecified": return .unspecified
+        default: return .female
         }
     }
 
-    /// Persist a gender preference. Phase b's Settings toggle calls this.
+    /// Persist a gender preference (the Settings gender picker calls this).
     public func setGender(_ gender: VoiceGender) {
         let raw: String
         switch gender {
@@ -298,5 +368,16 @@ public struct VoicePreferenceStore {
         case .unspecified: raw = "unspecified"
         }
         defaults.set(raw, forKey: Self.genderKey)
+    }
+
+    /// DUT-327 — persist (or clear, with `nil`) the explicit voice pick. The
+    /// Settings → Cook Mode Voice picker calls this: a specific voice pins the
+    /// identifier; "Automatic" clears it back to gender + quality ranking.
+    public func setVoiceIdentifier(_ identifier: String?) {
+        if let identifier {
+            defaults.set(identifier, forKey: Self.identifierKey)
+        } else {
+            defaults.removeObject(forKey: Self.identifierKey)
+        }
     }
 }
