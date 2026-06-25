@@ -2978,6 +2978,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `RecipeStore+CookLog.swift` (new `updateCookLog` — in-place update), `FeedDependencies.swift` (protocol + default + live wiring), `FeedViewModel.swift` (`updateCook`), new `CookJournalEntryView.swift` (the journal page: photo via CameraPicker/PhotosPicker + CookPhotoStore, reflection TextEditor, rank reassurance), `CookJournalView.swift` (NavigationLink rows + note snippet + reload), `FeedView.swift` (`cookJournalSheet` extension). Spec: `clarifications.md` (CL-273). Untouched: `CookLogEntry` (already had note/photo/rating), `CookProgression` / the rank ladder.
 - **AC:** US-48 (cook journal) / DUT-104. DUT pending (free issue limit). CL-273 canonical. **Est:** ~2 h. **Deps:** off main (after Ned's DUT-323 rank/journal). Branch `feat/journal-reflections`. **Verification:** rendered the entry page (empty + with reflection) on the iPhone 17 sim; swift-format + SwiftLint `--strict` clean (incl. `type_body_length`); DODPersistence (124) + DODFeatureFeed (98) L1 green; iOS app build green. Rank provably unaffected — the update path never changes the cook count.
 
+### T-880 — Heat Coach redesign: split into Coals / Feel / Tips pages (CL-274)
+
+- **What:** Redesign the Dutch Oven Heat Coach from one long, dense scroll into 3 jump-to pages (Coals / Feel / Tips) via a segmented switcher, matching the other Cooking Tools. Answer-first (compact setup → coal estimate → clearly-optional conditions), with the feel cues + coal/wind guides on their own pages. Every input + guide preserved; copy byte-unchanged.
+- **Files:** `HeatCoachView.swift` (rewrite: `Page` enum + page switcher + `body` switch + shared controls now internal), `HeatCoachView+Sections.swift` (rewrite: setupCard / resultCard / conditionsCard + feel + tips pages). Spec: `clarifications.md` (CL-274). Untouched: `HeatCoachModel` + `DutchOvenHeatCoach` (copy pinned by tests).
+- **AC:** DUT-48 (Dutch Oven Heat Coach). DUT pending (free issue limit). CL-274 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `feat/heat-coach-redesign`. **Verification:** rendered all 3 pages on the iPhone 17 sim; swift-format + SwiftLint `--strict` clean (incl. `type_body_length`); DODFeatureFeed L1 (98) + HeatCoachModel (13) green; iOS app build green.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
