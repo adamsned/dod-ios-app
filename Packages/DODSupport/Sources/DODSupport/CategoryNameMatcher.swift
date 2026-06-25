@@ -67,7 +67,9 @@ public enum CategoryNameMatcher {
     ///    if the suffix isn't present).
     /// 3. Normalized query is a substring of the topic AND the query is
     ///    at least ``substringOfTopicMinLength`` characters.
-    /// 4. The topic is a substring of the normalized query.
+    /// 4. The topic is a substring of the normalized query AND the topic
+    ///    is at least ``substringOfTopicMinLength`` characters (DUT-317:
+    ///    same short-token floor as rule 3).
     ///
     /// Junk-query reject: if the normalized query is exactly one of the
     /// ``junkSingleTokens`` (single-token suffix-only `"recipe"` /
@@ -118,7 +120,12 @@ public enum CategoryNameMatcher {
         if query.count >= Self.substringOfTopicMinLength, topic.contains(query) {
             return true
         }
-        if !topic.isEmpty, query.contains(topic) { return true }
+        // DUT-317: gate rule 4 on the same minimum-length floor as rule 3
+        // so a short topic token (e.g. a 3-char category topic) can't
+        // substring-match an unrelated query and fan out a fetch.
+        if topic.count >= Self.substringOfTopicMinLength, query.contains(topic) {
+            return true
+        }
         return false
     }
 }
