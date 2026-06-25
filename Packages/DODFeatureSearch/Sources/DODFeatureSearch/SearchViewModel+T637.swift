@@ -97,4 +97,45 @@ extension SearchViewModel {
 
         kickOffCookTimeHydrationIfNeeded(against: trimmed)
     }
+
+    /// US-12 / AC-12.3 amendment / CL-106 (T-637): when the cook-time
+    /// filter is active and the cached `lastTotalSecondsByRecipe` map is
+    /// missing entries for items in the current result set, kick off a
+    /// network hydration task (capped at 20 items per `hydrationCap`)
+    /// and call `reapplyFilters()` when the data lands. No-op when the
+    /// filter is off or every visible item already has a known total
+    /// time (the cache covers it).
+    ///
+    /// The hydration task runs detached on the same actor (this is the
+    /// `@MainActor` view model — `Task { ... }` inherits the actor) so
+    /// the mutation of `lastTotalSecondsByRecipe` and the subsequent
+    /// `reapplyFilters()` call are race-free.
+    ///
+    /// DUT-314: moved here (was in `SearchViewModel.swift`) to keep that
+    /// file under SwiftLint's `file_length` cap after the perf-gate flag
+    /// + lazy-hydration hook landed.
+    func kickOffCookTimeHydrationIfNeeded(against merged: [RecipeListItem]) {
+        // CL-122 (T-644): the guard checks either bound — the wheel-picker
+        // can leave one side at "Any" (nil) and still need hydration when
+        // the other side is set. `hasCookTimeRange` collapses the two-nil
+        // check + the documented intent into one accessor.
+        guard filters.hasCookTimeRange else { return }
+        let unknown = merged.map(\.id).filter { lastTotalSecondsByRecipe[$0] == nil }
+        guard !unknown.isEmpty else { return }
+        let toFetch = Array(unknown.prefix(Self.hydrationCap))
+        Task { [weak self] in
+            guard let self else { return }
+            let fetched = await self.dependencies.fetchTotalSeconds(forRecipeIDs: toFetch)
+            guard !fetched.isEmpty else { return }
+            for (id, seconds) in fetched {
+                self.lastTotalSecondsByRecipe[id] = seconds
+            }
+            self.reapplyFilters()
+        }
+    }
+
+    /// One REST page worth of items — bounds the cook-time hydration
+    /// fan-out so a single filter toggle can't hammer the API. Matches
+    /// `WPRestClient.defaultPageSize` (20) by convention.
+    static let hydrationCap: Int = 20
 }

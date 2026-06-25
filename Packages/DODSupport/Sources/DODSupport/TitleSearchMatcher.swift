@@ -79,12 +79,17 @@ public enum TitleSearchMatcher {
 
     // MARK: - Normalization
 
-    /// HTML-entity decode → lowercase → punctuation→space → collapse
-    /// whitespace. Reuses ``HTMLSanitizer`` for the entity decode so
-    /// `&amp;` / `&#8217;` etc. don't leak into the comparison; the WP
+    /// HTML-entity decode → lowercase → fold diacritics → punctuation→space
+    /// → collapse whitespace. Reuses ``HTMLSanitizer`` for the entity decode
+    /// so `&amp;` / `&#8217;` etc. don't leak into the comparison; the WP
     /// `title.rendered` payload routinely carries them.
+    ///
+    /// DUT-306: diacritic-insensitive folding (e.g. "Jalapeño" → "jalapeno")
+    /// so an accent-free query matches an accented title and vice-versa.
     static func normalize(_ input: String) -> String {
-        let decoded = HTMLSanitizer.plainText(from: input).lowercased()
+        let decoded = HTMLSanitizer.plainText(from: input)
+            .lowercased()
+            .folding(options: .diacriticInsensitive, locale: nil)
         var scalars = String.UnicodeScalarView()
         scalars.reserveCapacity(decoded.unicodeScalars.count)
         for scalar in decoded.unicodeScalars {

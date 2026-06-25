@@ -2954,6 +2954,11 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **What:** North Star transformation feature. New CookProgression (DODSupport, pure) maps total cooks → an identity rank ladder climbing to "Dutch Oven Daddy"; CookJournalView gains a journey header (rank badge + "You're a {rank}" + progress bar + "{n} more cooks to {next}") above the existing stat tiles. First increment; milestone-crossing celebration + First-Cookout-graduated tie-in deferred.
 - **Files:** new `CookProgression.swift` + `CookProgressionTests.swift` (DODSupport), `CookJournalView.swift` (journey header). Spec: `clarifications.md` (CL-270).
 - **AC:** US-48 / DUT-323. CL-270 canonical. **Est:** ~2 h. **Deps:** off main. Branch `feat/cook-rank-journey`. **Verification:** swift-format lint + SwiftLint `--strict` clean; DODSupport (467, 5 new) + DODFeatureFeed (92) green; iOS app build green. Device-verify the journey header. Rank names/thresholds are Ned's to retune (single array in CookProgression.ranks).
+### T-875 — Medium/Low backlog cleanup: 12 hero-filtered bugs in one pass (CL-269)
+
+- **What:** Parallel cleanup (10 worktree-isolated sub-agents + 2 App-target by hand, integrated into one PR). Fixed DUT-304 (range scaling), 320 (decimal locale), 306 (search diacritics), 316 (Feast heading id-match), 317 (category short-token floor), 311 (published date_gmt), 314 (search perf gate), 313 (feed refresh keeps grid), 307 (disable dead metric toggle), 312 (first-cook photo error surfaced), 305 (rating-summary best-effort + applyRatingRefresh), 308 (Spotlight domain-authoritative reindex), 310 (deep-link path=[newValue]).
+- **Files:** ~30 across DODSupport/DODNetworking/DODFeatureSearch/DODFeatureFeed/DODFeatureRecipeDetail + App/RootView.swift + App/TabStack.swift; ~22 new unit tests. Spec: `clarifications.md` (CL-269).
+- **Shelved (hero-filter):** DUT-315/318/319. **Resolved upstream:** DUT-322 (DUT-293/294 refactor). **AC:** CL-269 canonical. **Deps:** off main. Branch `backlog/medium-cleanup`. **Verification:** swift-format lint + SwiftLint `--strict` clean; 5 package suites green (475/108/81/94/212); iOS app build green; all files <400 lines.
 
 ---
 

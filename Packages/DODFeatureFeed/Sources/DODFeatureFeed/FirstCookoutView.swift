@@ -48,6 +48,11 @@ public struct FirstCookoutView: View {
     @State var showingCamera = false
     /// Guards against double-logging if the user taps Done more than once.
     @State private var hasLoggedCook = false
+    /// DUT-312 — humane copy when the celebration photo fails to persist to
+    /// disk. Surfaced via the snackbar overlay so the hero first-cook photo
+    /// failure isn't silently swallowed; the cook itself still logs. Internal
+    /// (not private) so the snackbar overlay in `+Stages.swift` can read it.
+    @State var photoSaveError: String?
 
     public init(
         cookout: GuidedCookout = .firstCookout,
@@ -100,6 +105,9 @@ public struct FirstCookoutView: View {
         // `+Stages.swift` to keep this struct body under the SwiftLint cap.
         .overlay(alignment: .topLeading) { backToPathButton }
         .overlay(alignment: .topTrailing) { closeButton }
+        // DUT-312 — surface a photo-save failure to the hero cook (instead of
+        // swallowing it) without blocking the logged cook itself.
+        .overlay(alignment: .bottom) { photoSaveErrorSnackbar }
         .padding(DODSpacing.lg)
         .background(DODColor.surface)
         .animation(.easeInOut(duration: 0.25), value: index)
@@ -291,7 +299,17 @@ public struct FirstCookoutView: View {
         hasLoggedCook = true
         // Persist the celebrate photo to disk (DUT-104); the entry keeps only the
         // lightweight filename, not the bytes.
-        let photoID = cookPhotoData.flatMap { try? CookPhotoStore().save($0) }
+        // DUT-312 — don't swallow a disk-write failure on the hero first cook.
+        // Surface a humane snackbar (mirrors the saveError pattern) while still
+        // logging the cook photo-less so the "I did it" moment isn't lost.
+        var photoID: String?
+        if let photoData = cookPhotoData {
+            do {
+                photoID = try CookPhotoStore().save(photoData)
+            } catch {
+                photoSaveError = "Your cook is logged, but we couldn't save the photo. Try again from your journal."
+            }
+        }
         onLogCook?(
             CookLogEntry(
                 id: UUID(),

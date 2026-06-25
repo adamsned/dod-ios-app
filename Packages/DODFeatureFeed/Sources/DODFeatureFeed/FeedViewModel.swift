@@ -136,7 +136,16 @@ public final class FeedViewModel {
     // MARK: - Private
 
     private func loadInitial(forceReplace: Bool = false) async {
-        loadState = .loadingInitial
+        // DUT-313: a pull-to-refresh on a populated grid must NOT blank the
+        // feed into full-screen skeletons. `.loadingInitial` renders skeletons
+        // (FeedView.content), so only enter it when there is nothing to show —
+        // a true first load. On the refresh/forceReplace path with items
+        // already loaded, keep `.loaded` (the system .refreshable spinner
+        // overlays the list) and swap content in only when the fresh page
+        // arrives, mirroring loadMore's non-destructive pattern.
+        if !(forceReplace && !items.isEmpty) {
+            loadState = .loadingInitial
+        }
         errorMessage = nil
         currentPage = 0
         reachedEnd = false
@@ -161,6 +170,17 @@ public final class FeedViewModel {
                 items = hydrated
                 isOffline = true
                 loadState = .loaded
+                return
+            }
+            // DUT-313: a refresh that fails while the grid is already populated
+            // must keep the existing items on screen (mirroring loadMore's
+            // non-destructive failure path) rather than blanking into the
+            // empty/first-launch-offline state. Surface offline status, but
+            // leave items + `.loaded` intact.
+            if forceReplace, !items.isEmpty {
+                isOffline = await !dependencies.isOnline()
+                loadState = .loaded
+                errorMessage = "Couldn't load recipes."
                 return
             }
             isOffline = await !dependencies.isOnline()
