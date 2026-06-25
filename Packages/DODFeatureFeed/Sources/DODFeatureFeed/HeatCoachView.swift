@@ -58,10 +58,15 @@ public struct HeatCoachView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                Text("Your starting coals, then how to cook by feel.")
-                    .dodFont(DODType.body)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "Managing heat is the trickiest part of Dutch oven cooking. The Heat "
+                        + "Coach gives you a solid starting point for how many coals to use "
+                        + "and where they go, then teaches you to read the cook by feel and "
+                        + "adjust as you go, so you cook with confidence instead of guesswork."
+                )
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
 
                 pageSwitcher
 
