@@ -50,6 +50,26 @@ extension FirstCookoutView {
         }
     }
 
+    // MARK: Photo-save error (DUT-312)
+
+    /// Bottom snackbar shown when the celebration photo couldn't be saved to
+    /// disk on the hero first cook. Auto-dismisses on tap; mirrors the
+    /// `SettingsView` snackbar overlay. Lives here (not the main flow file) to
+    /// keep `FirstCookoutView`'s struct body under the SwiftLint length cap.
+    @ViewBuilder var photoSaveErrorSnackbar: some View {
+        if let message = photoSaveError {
+            Snackbar(message: message)
+                .padding(.bottom, DODSpacing.md)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .onTapGesture { photoSaveError = nil }
+                .task {
+                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    photoSaveError = nil
+                }
+                .accessibilityIdentifier("first-cookout-photo-error")
+        }
+    }
+
     // MARK: Gather — gear + ingredients checklist
 
     /// A tappable gear + ingredients checklist so the cook can round everything
