@@ -40,6 +40,10 @@ public struct HeatCoachView: View {
     @State var elevationFeet: Int = 0
     @State var ambient: AmbientCondition = .mild
     @State var windy: Bool = false
+    /// CL-275 — the coach is presented as a sheet (Feed Cooking Tools + the
+    /// First Cookout fire step), so it needs an explicit Done like the other
+    /// tools, not just swipe-to-dismiss.
+    @Environment(\.dismiss) private var dismiss
 
     public init() {}
 
@@ -88,6 +92,12 @@ public struct HeatCoachView: View {
         .background(DODColor.surface)
         .navigationTitle("Heat Coach")
         .dodInlineNavTitle()
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
+                    .tint(DODColor.burntOrange)
+            }
+        }
         .accessibilityIdentifier("heat-coach")
     }
 
