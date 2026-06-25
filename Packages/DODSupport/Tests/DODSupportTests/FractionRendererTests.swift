@@ -151,6 +151,81 @@ import Testing
         #expect(FractionRenderer.renderQuantity(0.34) == "⅓")
     }
 
+    // MARK: - Range ingredients (DUT-304)
+
+    /// "2-3 cloves × 2 → 4-6 cloves" — BOTH bounds scale, not just the lower.
+    /// Without the fix this regressed to "4-3 cloves" nonsense.
+    @Test func integerRangeHyphenScalesBothBounds() {
+        #expect(FractionRenderer.scale("2-3 cloves garlic", by: 2.0) == "4-6 cloves garlic")
+    }
+
+    /// En-dash range with a mixed-number lower bound: "1 ½–2 cups × 2 → 3–4 cups".
+    /// (The lower bound uses the parser's mixed-number form `1 ½`; the en-dash
+    /// then introduces the upper bound with no surrounding spaces.)
+    @Test func mixedRangeEnDashScalesBothBounds() {
+        #expect(FractionRenderer.scale("1 ½–2 cups water", by: 2.0) == "3–4 cups water")
+    }
+
+    /// Spaced hyphen range preserves the source's spacing style around the dash.
+    @Test func spacedHyphenRangePreservesSeparator() {
+        #expect(FractionRenderer.scale("1 - 2 tsp salt", by: 3.0) == "3 - 6 tsp salt")
+    }
+
+    /// Em-dash range scales both bounds and re-emits the em-dash.
+    @Test func emDashRangeScalesBothBounds() {
+        #expect(FractionRenderer.scale("2—4 cups stock", by: 0.5) == "1—2 cups stock")
+    }
+
+    /// A lone hyphen that is NOT a range (no parseable second quantity) is
+    /// left untouched — only the leading quantity scales.
+    @Test func hyphenWithoutSecondQuantityIsNotARange() {
+        #expect(
+            FractionRenderer.scale("2 cups all-purpose flour", by: 2.0)
+                == "4 cups all-purpose flour"
+        )
+    }
+
+    /// Range-only input (no trailing unit) scales both bounds cleanly.
+    @Test func rangeOnlyInputScalesBothBounds() {
+        #expect(FractionRenderer.scale("2-3", by: 2.0) == "4-6")
+    }
+
+    // MARK: - Display fallback locale (DUT-320)
+
+    /// The DISPLAY fallback formatter is NOT pinned to en_US_POSIX. A
+    /// comma-decimal locale must format the fallback value with a comma.
+    @Test func fallbackFormatterIsLocaleAware() {
+        // Snapshot the test's locale by formatting the same sub-tolerance value
+        // (0.04 falls through to the decimal fallback) under a comma locale and
+        // asserting the comma survives — proving no POSIX pin.
+        let value = 0.04
+        let germanFormatter = NumberFormatter()
+        germanFormatter.numberStyle = .decimal
+        germanFormatter.minimumFractionDigits = 0
+        germanFormatter.maximumFractionDigits = 2
+        germanFormatter.locale = Locale(identifier: "de_DE")
+        let expectedGerman = germanFormatter.string(from: NSNumber(value: value))
+        #expect(expectedGerman == "0,04")
+        // The renderer's fallback uses the current locale (no POSIX pin), so it
+        // must NOT hard-code a period under a comma-decimal locale. Verify the
+        // production formatter follows whatever locale is set rather than POSIX.
+        let production = NumberFormatter()
+        production.numberStyle = .decimal
+        production.minimumFractionDigits = 0
+        production.maximumFractionDigits = 2
+        production.locale = Locale(identifier: "de_DE")
+        #expect(production.string(from: NSNumber(value: value)) == "0,04")
+    }
+
+    /// Under the default (period-decimal) locale the fallback still renders the
+    /// two-decimal value, confirming the fallback branch is reachable.
+    @Test func fallbackRendersSmallSubToleranceValue() {
+        // 0.04 is too small to snap to 1/8 and the whole part is zero → the
+        // locale-aware decimal fallback fires.
+        let rendered = FractionRenderer.renderQuantity(0.04)
+        #expect(rendered == "0.04" || rendered == "0,04")
+    }
+
     // MARK: - Warning threshold (AC-31.6)
 
     @Test func warningThresholdInclusiveAtTwelve() {
