@@ -95,15 +95,31 @@ public final class FeedViewModel {
         }
     }
 
+    /// DUT-323 — set to the rank a just-logged cook bumped the cook UP to, so the
+    /// view can fire the milestone celebration; nil when no rung was crossed.
+    public private(set) var rankUpCelebration: CookRank?
+
     /// DUT-104 — record a completed cook in the private journal (called when the
     /// "Your First Cookout" flow reaches "Done"). Best-effort: a journal write
-    /// failing must never block dismissing the celebration.
+    /// failing must never block dismissing the celebration. DUT-323: if the cook
+    /// bumps the cook up a rank, surface the milestone celebration.
     public func logCook(_ entry: CookLogEntry) async {
+        let before = (try? await dependencies.cookLogs())?.count ?? 0
         do {
             try await dependencies.logCook(entry)
         } catch {
             // The journal is a nicety, not a blocker — swallow + move on.
+            return
         }
+        let after = (try? await dependencies.cookLogs())?.count ?? before
+        if let reached = CookProgression.rankUp(from: before, to: after) {
+            rankUpCelebration = reached
+        }
+    }
+
+    /// Dismiss the milestone celebration (DUT-323).
+    public func dismissRankUpCelebration() {
+        rankUpCelebration = nil
     }
 
     /// DUT-104 — the logged cooks (newest first) for the Cooking Journal view.

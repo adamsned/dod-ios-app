@@ -6,7 +6,7 @@ import Foundation
 /// ("Dutch Oven Daddy"), so the Cooking Journal can show how far the cook has
 /// come AND the next rung pulling them forward. Pure value logic; the rung
 /// names/thresholds in ``ranks`` are the single editable source of brand voice.
-public struct CookRank: Equatable, Sendable {
+public struct CookRank: Equatable, Sendable, Identifiable {
 
     /// The user-facing rank name (brand voice).
     public let title: String
@@ -14,6 +14,9 @@ public struct CookRank: Equatable, Sendable {
     public let emoji: String
     /// The minimum number of logged cooks required to hold this rank.
     public let threshold: Int
+
+    /// Stable identity for SwiftUI item-based presentation (thresholds are unique).
+    public var id: Int { threshold }
 
     public init(title: String, emoji: String, threshold: Int) {
         self.title = title
@@ -59,5 +62,15 @@ public enum CookProgression {
         let span = next.threshold - floor
         guard span > 0 else { return 0 }
         return min(1.0, max(0.0, Double(totalCooks - floor) / Double(span)))
+    }
+
+    /// The rank newly REACHED when the cook count goes from `before` to `after`
+    /// (e.g. logging a cook) — `nil` if no rung threshold was crossed. Drives the
+    /// milestone celebration: a cook that bumps you up a rank is a moment, not a
+    /// silent increment.
+    public static func rankUp(from before: Int, to after: Int) -> CookRank? {
+        guard after > before else { return nil }
+        let reached = currentRank(totalCooks: after)
+        return reached != currentRank(totalCooks: before) ? reached : nil
     }
 }

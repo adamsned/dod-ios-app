@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 import Testing
 
@@ -181,6 +182,8 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     var online: Bool = true
     var clearBlocklistCalls: Int = 0
     var savedIDs: Set<Int> = []
+    /// DUT-323 — stateful cook log so the rank-up celebration trigger is testable.
+    var cooks: [CookLogEntry] = []
     /// DUT-237: override the reported `X-WP-TotalPages`. When nil, it derives
     /// from the highest page index that has data, so a short final page still
     /// ends pagination (matching the pre-DUT-237 `< 20` heuristic for tests
@@ -219,4 +222,6 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
         AsyncStream { _ in }
     }
     func savedRecipeIDs() async throws -> Set<Int> { savedIDs }
+    func logCook(_ entry: CookLogEntry) async throws { cooks.append(entry) }
+    func cookLogs() async throws -> [CookLogEntry] { cooks }
 }

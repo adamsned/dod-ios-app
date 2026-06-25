@@ -2960,6 +2960,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** ~30 across DODSupport/DODNetworking/DODFeatureSearch/DODFeatureFeed/DODFeatureRecipeDetail + App/RootView.swift + App/TabStack.swift; ~22 new unit tests. Spec: `clarifications.md` (CL-269).
 - **Shelved (hero-filter):** DUT-315/318/319. **Resolved upstream:** DUT-322 (DUT-293/294 refactor). **AC:** CL-269 canonical. **Deps:** off main. Branch `backlog/medium-cleanup`. **Verification:** swift-format lint + SwiftLint `--strict` clean; 5 package suites green (475/108/81/94/212); iOS app build green; all files <400 lines.
 
+### T-877 — DUT-323 fast-follow: rank-up milestone celebration (CL-271)
+
+- **What:** When a logged cook bumps the cook up a rank, fire a celebration moment. New CookProgression.rankUp(from:to:) (pure) + CookRank Identifiable; FeedViewModel.logCook reads before/after cook counts + sets rankUpCelebration on a threshold cross; new RankUpCelebrationView presented as a .sheet(item:) from FeedView.
+- **Files:** `CookProgression.swift` (+rankUp/Identifiable) + `CookProgressionTests.swift`; `FeedViewModel.swift` (celebration hook) + new `RankUpCelebrationView.swift` + `FeedView.swift` (sheet); `FeedViewModelTests.swift` (stateful fake) + new `FeedViewModelRankUpTests.swift`. Spec: `clarifications.md` (CL-271).
+- **AC:** US-48 / DUT-323. CL-271 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `feat/rank-up-celebration`. **Verification:** swift-format lint + SwiftLint `--strict` clean; DODSupport (481, 1 new) + DODFeatureFeed (97, 3 new) green; iOS app build green. Device-verify the celebration after a rank-crossing cook.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
