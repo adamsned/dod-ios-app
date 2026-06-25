@@ -100,9 +100,7 @@ public struct FeedView: View {
                 }
             )
         }
-        .sheet(isPresented: $showingJournal) {
-            CookJournalView(load: { await viewModel.cookLogs() })
-        }
+        .sheet(isPresented: $showingJournal) { cookJournalSheet }
         // DUT-323 — celebration: a logged cook that graduates the First Cookout
         // path or bumps a rank fires the moment, once the cookout sheet closes.
         .sheet(
@@ -369,5 +367,18 @@ public struct FeedView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Loading recipes")
         }
+    }
+}
+
+extension FeedView {
+    /// CL-273 — the Cooking Journal sheet: loads the logged cooks and wires the
+    /// per-entry reflection/photo save (`updateCook`, which never changes the
+    /// cook count, so it can't affect rank). Extracted here so `FeedView`'s
+    /// struct body stays under SwiftLint's `type_body_length` cap.
+    var cookJournalSheet: some View {
+        CookJournalView(
+            load: { await viewModel.cookLogs() },
+            update: { await viewModel.updateCook($0) }
+        )
     }
 }

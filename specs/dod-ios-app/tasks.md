@@ -2972,6 +2972,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `CookCelebrationView.swift` (was RankUpCelebrationView, +enum +graduation), `FeedViewModel.swift` (celebration/dismissCelebration + graduation detect), `FeedView.swift` (sheet); `FeedViewModelCelebrationTests.swift` (was FeedViewModelRankUpTests, +graduation/priority). Spec: `clarifications.md` (CL-272).
 - **AC:** US-48 / DUT-323. CL-272 canonical. **Est:** ~1.5 h. **Deps:** stacked on T-877. Branch `feat/firstcookout-graduation`. **Verification:** swift-format lint + SwiftLint `--strict` clean; DODFeatureFeed (98) green; iOS app build green. Device-verify cooking the campfire rung fires graduation.
 
+### T-879 — Cooking Journal: editable personal reflection + photo per entry (CL-273)
+
+- **What:** Make journal entries editable personal pages — tap a logged cook to write a free-form reflection and add/replace a photo. Memory-keeping; never affects rank (rank is cook-count based; the update path edits an existing entry and never logs a new cook).
+- **Files:** `RecipeStore+CookLog.swift` (new `updateCookLog` — in-place update), `FeedDependencies.swift` (protocol + default + live wiring), `FeedViewModel.swift` (`updateCook`), new `CookJournalEntryView.swift` (the journal page: photo via CameraPicker/PhotosPicker + CookPhotoStore, reflection TextEditor, rank reassurance), `CookJournalView.swift` (NavigationLink rows + note snippet + reload), `FeedView.swift` (`cookJournalSheet` extension). Spec: `clarifications.md` (CL-273). Untouched: `CookLogEntry` (already had note/photo/rating), `CookProgression` / the rank ladder.
+- **AC:** US-48 (cook journal) / DUT-104. DUT pending (free issue limit). CL-273 canonical. **Est:** ~2 h. **Deps:** off main (after Ned's DUT-323 rank/journal). Branch `feat/journal-reflections`. **Verification:** rendered the entry page (empty + with reflection) on the iPhone 17 sim; swift-format + SwiftLint `--strict` clean (incl. `type_body_length`); DODPersistence (124) + DODFeatureFeed (98) L1 green; iOS app build green. Rank provably unaffected — the update path never changes the cook count.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

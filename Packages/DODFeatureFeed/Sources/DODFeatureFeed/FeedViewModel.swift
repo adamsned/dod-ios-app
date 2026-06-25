@@ -135,6 +135,14 @@ public final class FeedViewModel {
         (try? await dependencies.cookLogs()) ?? []
     }
 
+    /// CL-273 — save a journal entry's personal reflection / photo. Best-effort
+    /// (a journal write never blocks the UI). This updates an existing entry in
+    /// place and never logs a new cook, so it cannot change the cook count and
+    /// therefore cannot affect rank.
+    public func updateCook(_ entry: CookLogEntry) async {
+        try? await dependencies.updateCookLog(entry)
+    }
+
     /// Pull-to-refresh (AC-1.4 + clears blocklist per AC-1.7).
     public func refresh() async {
         try? await dependencies.clearBlocklist()
