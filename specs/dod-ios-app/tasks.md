@@ -2990,6 +2990,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `HeatCoachView.swift` (`@Environment(\.dismiss)` + a `.confirmationAction` toolbar Done). Spec: `clarifications.md` (CL-275).
 - **AC:** DUT-48. DUT pending (free issue limit). CL-275 canonical. **Est:** ~10 min. **Deps:** off main (after CL-274). Branch `fix/heat-coach-close-button`. **Verification:** swift-format + SwiftLint `--strict` clean; DODFeatureFeed compiles; iOS app build green + installed on the sim.
 
+### T-883 — DUT-239: de-em-dash the two new First Cookout fire-step strings (CL-277)
+
+- **What:** The CL-248/DUT-239 fire-step redesign reintroduced em dashes in two user-facing strings in `FirstCookoutView+Stages.swift` (`heatCoachCallToAction` + `coalStartingPointNote`), regressing the no-em-dashes-in-copy rule (Ned's CL-217 direction, first applied to this flow by CL-218/T-824/DUT-188). Replace them: "different — wind" → "different. Wind" (em dash → period, with the clause-splitting capitalization fix CL-218 used); "inch oven — then dial it in" → "inch oven, then dial it in" (em dash → comma). Copy-only; the file's comments / `// MARK:` / doc-comments keep their em dashes (the rule is copy-only).
+- **Files:** `Packages/DODFeatureFeed/Sources/DODFeatureFeed/FirstCookoutView+Stages.swift` (2 `Text` strings). Spec: `clarifications.md` (CL-277).
+- **AC:** US-53 / DUT-239. DUT pending (free issue limit). CL-277 canonical. **Est:** ~5 min. **Deps:** off main. Branch `fix/T-883-firstcookout-fire-em-dash`. No `e2e` label (copy-only). **Verification:** `swift build` (DODFeatureFeed) green; swift-format `lint --strict` + SwiftLint `--strict` clean on the file; no test pins the strings (grep across DODFeatureFeed + DODSupport copy tests = no match).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
