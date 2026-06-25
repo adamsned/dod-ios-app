@@ -126,4 +126,35 @@ import Testing
         #expect(blocks.first == .heading(level: 2, text: AttributedString("Recipe Summary")))
         #expect(blocks.count == 2)
     }
+
+    // MARK: - Token must live in the `id` value, not anywhere in attributes (DUT-316)
+
+    @Test func removesHeadingWhenTokenIsInIdAttribute() {
+        // The Feast signature lives in the WP anchor `id` — strip the heading.
+        let html = """
+            <h3 class="wp-block-heading" id="h-summarize-and-save-the-recipe">\
+            Summarize and Save the Recipe</h3><p>Kept body.</p>
+            """
+        #expect(ArticleHTMLParser.parse(html: html) == [.paragraph(AttributedString("Kept body."))])
+    }
+
+    @Test func keepsHeadingWhenTokenIsOnlyInClassOrOtherAttribute() {
+        // The old "token anywhere in the opening-tag attributes" check
+        // over-matched: a genuine content heading carrying the token in a
+        // `class` / `data-*` attribute (but NOT in its `id`) must survive.
+        let viaClass = """
+            <h2 class="summarize-and-save-section" id="recipe-summary">\
+            Recipe Summary</h2><p>Body.</p>
+            """
+        let classBlocks = ArticleHTMLParser.parse(html: viaClass)
+        #expect(classBlocks.first == .heading(level: 2, text: AttributedString("Recipe Summary")))
+        #expect(classBlocks.count == 2)
+
+        let viaDataAttr = """
+            <h2 data-section="summarize-and-save">How to Save This Recipe</h2><p>Body.</p>
+            """
+        let dataBlocks = ArticleHTMLParser.parse(html: viaDataAttr)
+        #expect(dataBlocks.first == .heading(level: 2, text: AttributedString("How to Save This Recipe")))
+        #expect(dataBlocks.count == 2)
+    }
 }
