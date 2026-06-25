@@ -107,6 +107,12 @@ public struct RecipeDetailView: View {
                 onClose: { updatedChecks in
                     viewModel.mergeIngredientChecks(updatedChecks)
                     isCookModePresented = false
+                },
+                // DUT-326 — persist a Cook Mode "log this cook" to the journal
+                // store. The sheet has already saved the photo + assembled the
+                // entry; the VM writes it through the dependency seam.
+                onLogCook: { entry in
+                    Task { await viewModel.logCook(entry) }
                 }
             )
         }

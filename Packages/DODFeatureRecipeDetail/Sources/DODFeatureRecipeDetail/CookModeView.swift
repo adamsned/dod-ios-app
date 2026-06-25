@@ -19,13 +19,25 @@ import SwiftUI
 @MainActor
 public struct CookModeView: View {
 
-    @State private var viewModel: CookModeViewModel
+    // `internal` (not `private`) so the header composition in
+    // `CookModeView+Header.swift` can read the view model.
+    @State var viewModel: CookModeViewModel
     @State private var ingredientsDrawerVisible: Bool = false
+    /// DUT-326 — drives the "Add to Cooking Journal" capture sheet on the
+    /// Done card.
+    @State private var isJournalLogPresented: Bool = false
     /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
     /// screen, regardless of which step is shown, so a running timer on a step
     /// you've navigated away from still counts down + completes.
     private let timerTicker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     public let onClose: (Set<UUID>) -> Void
+    /// DUT-326 — optional sink for "log this cook" from the Done card. When
+    /// non-nil, the Done card shows an "Add to Cooking Journal" CTA; on Save
+    /// the assembled ``CookLogEntry`` (photo persisted, caption attached) is
+    /// handed here for the host to write to the journal store. `nil` (the
+    /// default) hides the CTA entirely — previews and hosts that don't wire
+    /// persistence stay unaffected.
+    public let onLogCook: ((CookLogEntry) -> Void)?
     /// Scale factor inherited from the host detail screen so the drawer
     /// ingredient rows agree with the scaled list the user just left. AC-7.5
     /// + US-31 carry-over.
@@ -35,7 +47,8 @@ public struct CookModeView: View {
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
         ingredientScaleFactor: Double = 1.0,
-        onClose: @escaping (Set<UUID>) -> Void
+        onClose: @escaping (Set<UUID>) -> Void,
+        onLogCook: ((CookLogEntry) -> Void)? = nil
     ) {
         _viewModel = State(
             initialValue: CookModeViewModel(
@@ -45,11 +58,12 @@ public struct CookModeView: View {
         )
         self.ingredientScaleFactor = ingredientScaleFactor
         self.onClose = onClose
+        self.onLogCook = onLogCook
     }
 
     public var body: some View {
         VStack(spacing: 0) {
-            topBar
+            cookModeHeader
             ScrollView {
                 VStack(alignment: .leading, spacing: DODSpacing.lg) {
                     heroBlock
@@ -66,6 +80,13 @@ public struct CookModeView: View {
             ingredientsDrawer
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $isJournalLogPresented) {
+            // DUT-326 — self-contained capture sheet (equivalent to the Feed
+            // package's CookJournalEntryView, which this package can't import).
+            CookModeJournalLogSheet(recipe: viewModel.recipe) { entry in
+                onLogCook?(entry)
+            }
+        }
         .task {
             // Idempotent — see CookModeViewModel.beginCookMode().
             viewModel.beginCookMode()
@@ -77,42 +98,12 @@ public struct CookModeView: View {
         }
     }
 
-    // MARK: - Top bar (AC-7.2 step counter, AC-7.6 Done exit)
-
-    private var topBar: some View {
-        HStack(alignment: .center) {
-            Button("Done") { close() }
-                .dodFont(DODType.bodyEmphasized)
-                .foregroundStyle(DODColor.label)
-                .accessibilityLabel("Exit Cook Mode")
-            Spacer()
-            Text(viewModel.recipe.title)
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
-            voiceModeToggle
-            Text(stepCounterLabel)
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .monospacedDigit()
-                .accessibilityLabel(stepCounterAccessibilityLabel)
-        }
-        .padding(.horizontal, DODSpacing.md)
-        .padding(.vertical, DODSpacing.sm)
-        .background(DODColor.surface)
-    }
-
-    private var stepCounterLabel: String {
-        if viewModel.isFinished { return "Done" }
-        return "Step \(viewModel.currentStepIndex + 1) of \(viewModel.stepCount)"
-    }
-
-    private var stepCounterAccessibilityLabel: String {
-        if viewModel.isFinished { return "Cooking complete" }
-        return "Step \(viewModel.currentStepIndex + 1) of \(viewModel.stepCount)"
-    }
+    // MARK: - Header (AC-7.2 step counter, AC-7.6 Done exit, DUT-325 layout)
+    //
+    // `cookModeHeader` (the slim Done + voice-controls top row plus the recipe
+    // name with the step counter directly beneath it) and the voice-controls
+    // cluster live in `CookModeView+Header.swift` so this file stays under the
+    // SwiftLint `file_length` cap.
 
     // MARK: - Hero (AC-7.2)
 
@@ -183,19 +174,47 @@ public struct CookModeView: View {
     }
 
     private var doneCard: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.md) {
+        VStack(alignment: .center, spacing: DODSpacing.md) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(DODColor.accent)
-            Text("All done — enjoy!")
+                .frame(maxWidth: .infinity, alignment: .center)
+            Text("All Done, Enjoy!")
                 .dodFont(DODType.displayMedium)
                 .foregroundStyle(DODColor.label)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
             Text("Tap Finish to leave Cook Mode.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
+            // DUT-326 — optional celebratory "log this cook" action.
+            logCookButton
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding(.horizontal, DODSpacing.md)
+    }
+
+    /// DUT-326 — a clear, optional CTA on the Done card to save this cook to
+    /// the Cooking Journal (photo + caption). Hidden when no `onLogCook` sink
+    /// is wired (e.g. previews / hosts that haven't opted in). Logging here
+    /// records a real completed cook and counts toward rank — intentional.
+    @ViewBuilder
+    private var logCookButton: some View {
+        if onLogCook != nil {
+            Button {
+                isJournalLogPresented = true
+            } label: {
+                Label("Add to Cooking Journal", systemImage: "camera.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(DODColor.accent)
+            .padding(.top, DODSpacing.sm)
+            .accessibilityIdentifier("cook-mode-log-cook")
+            .accessibilityLabel("Add this cook to your Cooking Journal")
+        }
     }
 
     // MARK: - Ingredients drawer (AC-7.2, AC-7.5)
@@ -306,33 +325,11 @@ public struct CookModeView: View {
         }
     }
 
-    private func close() {
+    /// `internal` (not `private`) so the header's Done button in
+    /// `CookModeView+Header.swift` can call it.
+    func close() {
         viewModel.endCookMode()
         onClose(viewModel.checkedIngredientIDs)
-    }
-}
-
-// MARK: - Voice Mode toggle (US-40 / AC-40.1)
-
-extension CookModeView {
-    /// Voice Mode toggle (US-40 / AC-40.1) — a `speaker.wave.2` button that
-    /// fills (`speaker.wave.2.fill`) when reading is on. Tapping flips
-    /// ``CookModeViewModel/isVoiceModeEnabled``; turning it on immediately
-    /// reads the current step (AC-40.2), turning it off stops the reader.
-    /// Pulled into an extension so the type body stays under the SwiftLint
-    /// length cap (mirrors `ingredientRow` below).
-    @ViewBuilder
-    fileprivate var voiceModeToggle: some View {
-        Button {
-            viewModel.toggleVoiceMode()
-        } label: {
-            Image(systemName: viewModel.isVoiceModeEnabled ? "speaker.wave.2.fill" : "speaker.wave.2")
-                .foregroundStyle(viewModel.isVoiceModeEnabled ? DODColor.accent : DODColor.label)
-        }
-        .accessibilityIdentifier("cook-mode-voice-toggle")
-        .accessibilityLabel("Voice Mode")
-        .accessibilityHint(viewModel.isVoiceModeEnabled ? "stop reading steps aloud" : "read steps aloud")
-        .accessibilityAddTraits(viewModel.isVoiceModeEnabled ? .isSelected : [])
     }
 }
 

@@ -314,6 +314,47 @@ extension FirstCookoutView {
         return String(format: "%d:%02d", total / 60, total % 60)
     }
 
+    /// DUT-324 — a short, optional written reflection on the celebration screen,
+    /// saved as the logged cook's note. Mirrors `CookJournalEntryView`'s editor:
+    /// a `TextEditor` on a `surfaceElevated` rounded card, with a gentle
+    /// placeholder overlaid while empty.
+    var reflectionField: some View {
+        ZStack(alignment: .topLeading) {
+            if reflection.isEmpty {
+                Text("Add a note about this cook (optional).")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 9)
+                    .allowsHitTesting(false)
+            }
+            TextEditor(text: $reflection)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 96)
+                .accessibilityIdentifier("first-cookout-reflection")
+        }
+        .padding(DODSpacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                .fill(DODColor.surfaceElevated)
+        )
+        .padding(.top, DODSpacing.xs)
+    }
+
+    /// The centered page-progress dots for the paged flow footer (`controls`).
+    var progressDots: some View {
+        HStack(spacing: DODSpacing.xxs) {
+            ForEach(0...lastIndex, id: \.self) { dot in
+                Circle()
+                    .fill(dot == index ? DODColor.burntOrange : DODColor.labelSecondary.opacity(0.3))
+                    .frame(width: 7, height: 7)
+            }
+        }
+        .accessibilityLabel("Step \(index + 1) of \(lastIndex + 1)")
+    }
+
     // MARK: - Pinned corner controls
 
     /// CL-267 — "back to the path" chevron (top-leading): returns to the roadmap
