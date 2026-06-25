@@ -22,6 +22,11 @@ public struct FirstCookoutView: View {
     let recipeBaseURL: String
     /// DUT-104 — called once when the flow reaches "Done", with the cook to log.
     let onLogCook: ((CookLogEntry) -> Void)?
+    /// CL-267 — returns to the roadmap (the `CookChooserFlow` path) instead of
+    /// dismissing the whole sheet. `nil` when presented standalone (no roadmap to
+    /// return to); the chooser sets it so the recipe flow has a "back to the path"
+    /// affordance alongside the close (X).
+    let onBack: (() -> Void)?
     /// DUT-297 — schedules the "bake is done" notification so the guided timer
     /// reaches the cook even when they "step away" (background the app).
     let notifier: any BakeTimerNotifying
@@ -48,11 +53,13 @@ public struct FirstCookoutView: View {
         cookout: GuidedCookout = .firstCookout,
         recipeBaseURL: String = "https://www.dutchovendaddy.com",
         onLogCook: ((CookLogEntry) -> Void)? = nil,
+        onBack: (() -> Void)? = nil,
         notifier: any BakeTimerNotifying = SystemBakeTimerNotifier()
     ) {
         self.cookout = cookout
         self.recipeBaseURL = recipeBaseURL
         self.onLogCook = onLogCook
+        self.onBack = onBack
         self.notifier = notifier
     }
 
@@ -87,22 +94,12 @@ public struct FirstCookoutView: View {
             )
             controls
         }
-        // DUT-188 — explicit dismiss affordance: an X in the top-trailing
-        // corner (pinned outside the ScrollView so it never scrolls away).
-        // Swipe-down already works since this is a `.sheet` with no
-        // `.interactiveDismissDisabled`; the X is the discoverable companion.
-        .overlay(alignment: .topTrailing) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            .accessibilityLabel("Close")
-            .accessibilityIdentifier("first-cookout-close")
-        }
+        // CL-267 / DUT-188 — pinned corner controls (outside the ScrollView so
+        // they never scroll away): "back to the path" (top-leading) returns to the
+        // roadmap; the X (top-trailing) closes the whole sheet. Both live in
+        // `+Stages.swift` to keep this struct body under the SwiftLint cap.
+        .overlay(alignment: .topLeading) { backToPathButton }
+        .overlay(alignment: .topTrailing) { closeButton }
         .padding(DODSpacing.lg)
         .background(DODColor.surface)
         .animation(.easeInOut(duration: 0.25), value: index)

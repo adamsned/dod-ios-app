@@ -2938,6 +2938,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `VoiceReader.swift` (observers + invalidateAudioSession + hasActiveAudioSession), new `SystemSpeechSynthesizer.swift` (extracted), `VoiceReaderTests.swift` (1 test). Spec: `clarifications.md` (CL-266).
 - **AC:** US-40 / DUT-283. CL-266 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `fix/DUT-283-voice-audio-interruption`. **Verification:** swift-format lint + SwiftLint `--strict` clean; 212 DODFeatureRecipeDetail tests pass (1 new); iOS app build green. Device-verify: call mid-Voice-Mode → resume after.
 
+### T-873 — First Cookout: "back to the path" chevron from a picked recipe (CL-267)
+
+- **What:** Tapping a recipe on the roadmap (CL-265) swapped in the paged `FirstCookoutView` whose only exit (the X) closes the whole sheet — a dead end with no way back to the roadmap. Add an optional `onBack` + a top-leading back chevron (mirroring the X) that returns to the roadmap; the X still closes the sheet.
+- **Files:** `FirstCookoutView.swift` (`onBack` prop + init param; corner overlays now reference `+Stages.swift`), `FirstCookoutView+Stages.swift` (new `backToPathButton` + `closeButton` computed props — moved out to stay under the `type_body_length` cap), `CookChooserFlow.swift` (passes `onBack: { selected = nil }`). Spec: `clarifications.md` (CL-267).
+- **AC:** US-53 / DUT-194. DUT pending (free issue limit). CL-267 canonical. **Est:** ~30 min. **Deps:** off main (after Ned's #310 CL-266). Branch `fix/first-cookout-back-to-roadmap`. **Verification:** rendered the recipe intro with the back chevron on the iPhone 17 sim; swift-format + SwiftLint `--strict` clean (incl. body-length cap); DODFeatureFeed L1 (92 tests) green; iOS app build green + installed on the sim. No CI-gated snapshot affected. Renumbered from T-872 (Ned's #310 took it concurrently).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
