@@ -93,6 +93,45 @@ import Testing
         #expect(viewModel.items.count == 3)
     }
 
+    @Test func refreshKeepsItemsAndNeverShowsLoadingInitial() async throws {
+        // DUT-313: pull-to-refresh on a populated grid must not blank it into
+        // full-screen skeletons. `.loadingInitial` is what FeedView maps to
+        // skeletons, so a refresh while items exist must keep items non-empty
+        // throughout and never enter `.loadingInitial`.
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = (1...20).map(Self.makeItem)
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.items.count == 20)
+
+        // Observe state across the refresh: a slow fetch lets us assert the
+        // grid stays populated (and out of `.loadingInitial`) while in flight.
+        dependencies.beforeFetch = { @Sendable in
+            await MainActor.run {
+                #expect(!viewModel.items.isEmpty, "grid must stay populated during refresh")
+                #expect(viewModel.loadState != .loadingInitial, "refresh must not show skeletons")
+            }
+        }
+        await viewModel.refresh()
+        #expect(viewModel.items.count == 20)
+        #expect(viewModel.loadState == .loaded)
+    }
+
+    @Test func failedRefreshKeepsPopulatedGrid() async throws {
+        // DUT-313: a refresh that fails while the grid is populated keeps the
+        // existing items on screen instead of dropping into empty/offline.
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = (1...10).map(Self.makeItem)
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.items.count == 10)
+
+        dependencies.shouldFail = true
+        await viewModel.refresh()
+        #expect(viewModel.items.count == 10, "a failed refresh must keep what we have")
+        #expect(viewModel.loadState == .loaded)
+    }
+
     @Test func blocklistedItemsAreFilteredByCacheLayer() async throws {
         let dependencies = FakeFeedDependencies()
         dependencies.pages[1] = (1...3).map(Self.makeItem)
@@ -147,8 +186,12 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     /// ends pagination (matching the pre-DUT-237 `< 20` heuristic for tests
     /// that predate this).
     var totalPagesOverride: Int?
+    /// DUT-313: optional hook fired at the top of `fetchPosts`, used to assert
+    /// view-model state while a refresh fetch is in flight.
+    var beforeFetch: (@Sendable () async -> Void)?
 
     func fetchPosts(page: Int) async throws -> (items: [RecipeListItem], totalPages: Int) {
+        await beforeFetch?()
         if shouldFail {
             throw URLError(.notConnectedToInternet)
         }
