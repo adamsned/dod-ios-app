@@ -166,4 +166,24 @@ import Testing
         #expect(TitleSearchMatcher.normalize("Mama&#8217;s Casserole!") == "mama s casserole")
         #expect(TitleSearchMatcher.normalize("  Tater  Tot   Nachos  ") == "tater tot nachos")
     }
+
+    // MARK: - Diacritic folding (DUT-306)
+    //
+    // An accent-free query must match an accented title and vice-versa so
+    // "jalapeno" surfaces "Jalapeño Poppers" (and the reverse). Normalize
+    // folds diacritics, so both directions reduce to the same ASCII form.
+
+    @Test func diacriticInsensitiveMatchBothDirections() {
+        // Accent-free query → accented title.
+        #expect(
+            TitleSearchMatcher.match(query: "jalapeno", title: "Jalapeño Poppers") != nil,
+            "Accent-free query must match an accented title"
+        )
+        // Accented query → accent-free title.
+        #expect(
+            TitleSearchMatcher.match(query: "jalapeño", title: "Jalapeno Poppers") != nil,
+            "Accented query must match an accent-free title"
+        )
+        #expect(TitleSearchMatcher.normalize("Jalapeño") == "jalapeno")
+    }
 }
