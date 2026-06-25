@@ -2984,6 +2984,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `HeatCoachView.swift` (rewrite: `Page` enum + page switcher + `body` switch + shared controls now internal), `HeatCoachView+Sections.swift` (rewrite: setupCard / resultCard / conditionsCard + feel + tips pages). Spec: `clarifications.md` (CL-274). Untouched: `HeatCoachModel` + `DutchOvenHeatCoach` (copy pinned by tests).
 - **AC:** DUT-48 (Dutch Oven Heat Coach). DUT pending (free issue limit). CL-274 canonical. **Est:** ~1.5 h. **Deps:** off main. Branch `feat/heat-coach-redesign`. **Verification:** rendered all 3 pages on the iPhone 17 sim; swift-format + SwiftLint `--strict` clean (incl. `type_body_length`); DODFeatureFeed L1 (98) + HeatCoachModel (13) green; iOS app build green.
 
+### T-881 — Heat Coach: add a Done button (CL-275)
+
+- **What:** The Heat Coach is presented as a sheet (Feed Cooking Tools + First Cookout fire step) but had no explicit close, only swipe-down — unlike the other tools. Add a Done toolbar button.
+- **Files:** `HeatCoachView.swift` (`@Environment(\.dismiss)` + a `.confirmationAction` toolbar Done). Spec: `clarifications.md` (CL-275).
+- **AC:** DUT-48. DUT pending (free issue limit). CL-275 canonical. **Est:** ~10 min. **Deps:** off main (after CL-274). Branch `fix/heat-coach-close-button`. **Verification:** swift-format + SwiftLint `--strict` clean; DODFeatureFeed compiles; iOS app build green + installed on the sim.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
