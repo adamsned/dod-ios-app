@@ -62,15 +62,6 @@ public final class SettingsViewModel {
     /// short-circuits when this flag is false.
     public nonisolated static let telemetryEnabledKey = "dod.settings.telemetryEnabled"
 
-    /// US-40 / AC-40.13 (T-722) — "I dismissed the download-a-better-voice
-    /// tip" flag. Bool, defaults false (absent key → tip eligible). Once the
-    /// user taps the tip's dismiss control this flips true and the nudge
-    /// never re-shows, even if they keep only the compact voice installed —
-    /// a nudge they've consciously waved off must not nag (CL-123). `V1`
-    /// suffix mirrors the other canonical keys so a future schema change can
-    /// migrate without colliding.
-    public nonisolated static let downloadVoiceTipDismissedKey = "dod.settings.downloadVoiceTipDismissedV1"
-
     /// `internal` (not `private`) so the voice-section accessors in
     /// `SettingsViewModel+Voice.swift` can read the dismissal flag via the same
     /// store the rest of the view-model uses (the file_length split forces
