@@ -47,6 +47,10 @@ public final class CookModeViewModel {
     /// `internal` (not `private`) so the Voice Mode + pacing methods in
     /// `CookModeViewModel+Voice.swift` can drive the reader from a sibling file.
     let voiceReader: VoiceReader
+    /// DUT-328 — the device language (captured at init, matching the reader's
+    /// default locale), for the "get a better voice" natural-voice check.
+    /// Internal (not private) so the `+Voice` extension can read it.
+    let voiceLanguageCode: String?
     private var priorIdleTimerDisabled: Bool = false
     private var didBegin: Bool = false
 
@@ -69,13 +73,15 @@ public final class CookModeViewModel {
         initialCheckedIngredients: Set<UUID>,
         idleTimer: any IdleTimerController = SystemIdleTimerController(),
         liveActivity: any CookLiveActivityController = SystemCookLiveActivityController(),
-        voiceReader: VoiceReader = VoiceReader()
+        voiceReader: VoiceReader = VoiceReader(),
+        locale: Locale = .current
     ) {
         self.recipe = recipe
         self.checkedIngredientIDs = initialCheckedIngredients
         self.idleTimer = idleTimer
         self.liveActivity = liveActivity
         self.voiceReader = voiceReader
+        self.voiceLanguageCode = locale.language.languageCode?.identifier
     }
 
     /// Total number of steps, derived from the recipe. Zero if the recipe

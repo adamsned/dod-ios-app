@@ -28,6 +28,12 @@ extension SpeechSynthesizing {
         // swiftlint:disable:next unused_setter_value
         set {}
     }
+
+    /// DUT-328 — default empty catalog so test mocks + the non-AVFoundation
+    /// fallback satisfy the requirement without modeling the voice catalog. An
+    /// empty result reads as "unknown" at the call site, which never fires the
+    /// Cook Mode prompt (conservative, matching the Settings nudge posture).
+    func installedVoiceDescriptors() -> [VoiceDescriptor] { [] }
 }
 
 #if canImport(AVFoundation)
@@ -112,6 +118,12 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
             return AVSpeechSynthesisVoice(language: languageCode)
         }
         return nil
+    }
+
+    /// DUT-328 — the live installed catalog, projected for the Cook Mode
+    /// "get a better voice" prompt's natural-voice check.
+    public func installedVoiceDescriptors() -> [VoiceDescriptor] {
+        AVSpeechSynthesisVoice.speechVoices().map(Self.descriptor(for:))
     }
 
     /// Project an `AVSpeechSynthesisVoice` onto the AVFoundation-free

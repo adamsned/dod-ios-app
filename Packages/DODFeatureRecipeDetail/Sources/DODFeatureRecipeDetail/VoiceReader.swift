@@ -56,6 +56,14 @@ public protocol SpeechSynthesizing: AnyObject {
 
     /// Resume a paused utterance.
     func continueSpeaking()
+
+    /// DUT-328 — the installed voice catalog, projected onto the
+    /// AVFoundation-free ``VoiceDescriptor``. Drives the Cook Mode "this may
+    /// sound robotic, get a better voice" prompt (which asks ``VoiceSelector``
+    /// whether any natural voice is installed). A default returns `[]` so mocks +
+    /// the non-AVFoundation fallback need no boilerplate; ``SystemSpeechSynthesizer``
+    /// overrides with the real `AVSpeechSynthesisVoice.speechVoices()` catalog.
+    func installedVoiceDescriptors() -> [VoiceDescriptor]
 }
 
 /// Reads Cook Mode steps aloud using on-device speech synthesis.
@@ -209,6 +217,12 @@ public final class VoiceReader {
     /// Resume a paused utterance (AC-40.4).
     public func resume() {
         synthesizer.continueSpeaking()
+    }
+
+    /// DUT-328 — the installed voice catalog (AVFoundation-free projection),
+    /// for the Cook Mode "get a better voice" prompt's natural-voice check.
+    public func installedVoices() -> [VoiceDescriptor] {
+        synthesizer.installedVoiceDescriptors()
     }
 
     // MARK: - Audio session (iOS only)

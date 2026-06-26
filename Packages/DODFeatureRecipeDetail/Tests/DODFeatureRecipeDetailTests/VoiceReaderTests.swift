@@ -1,3 +1,4 @@
+import DODSupport
 import Foundation
 import Testing
 
@@ -152,6 +153,13 @@ final class MockSpeechSynthesizer: SpeechSynthesizing {
 
     private(set) var isSpeaking = false
     private(set) var isPaused = false
+
+    /// DUT-328 — the catalog `installedVoiceDescriptors()` returns. Default
+    /// empty (reads as "unknown" → no upgrade prompt); tests set it to exercise
+    /// the natural-voice check.
+    var stubbedVoices: [VoiceDescriptor] = []
+
+    func installedVoiceDescriptors() -> [VoiceDescriptor] { stubbedVoices }
 
     func speak(_ text: String) {
         calls.append(.speak(text))

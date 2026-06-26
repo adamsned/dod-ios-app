@@ -1,4 +1,5 @@
 import DODAnalytics
+import DODSupport
 import Foundation
 
 /// Voice Mode (US-40) + voice pacing (DUT-325) surface for ``CookModeViewModel``.
@@ -37,6 +38,17 @@ extension CookModeViewModel {
     /// Convenience for the on-screen toggle button (AC-40.1).
     public func toggleVoiceMode() {
         setVoiceMode(!isVoiceModeEnabled)
+    }
+
+    /// DUT-328 — true when Voice Mode is on a **robotic** voice the user could
+    /// upgrade: a real catalog is loaded AND no natural (enhanced/premium) voice
+    /// is installed for the device language. An empty catalog reads as "unknown"
+    /// → false (never a false prompt), mirroring the Settings download-nudge gate.
+    /// Drives the one-time Cook Mode "get a better voice" prompt.
+    public var shouldOfferVoiceUpgrade: Bool {
+        let catalog = voiceReader.installedVoices()
+        guard !catalog.isEmpty else { return false }
+        return !VoiceSelector.hasNaturalVoice(forLanguage: voiceLanguageCode, in: catalog)
     }
 
     /// Re-speak the current step (or the completion line in the Done state).

@@ -87,6 +87,11 @@ public struct CookModeView: View {
                 onLogCook?(entry)
             }
         }
+        // DUT-328 — one-time "this may sound robotic, get a better voice" prompt
+        // when Voice Mode turns on with only a robotic voice installed. Owns its
+        // own state (in `CookModeView+VoicePrompt.swift`) so this body stays one
+        // line and under the SwiftLint type_body_length cap.
+        .cookModeVoiceUpgradePrompt(viewModel: viewModel)
         .task {
             // Idempotent — see CookModeViewModel.beginCookMode().
             viewModel.beginCookMode()
