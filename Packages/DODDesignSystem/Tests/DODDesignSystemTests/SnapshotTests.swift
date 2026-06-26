@@ -119,36 +119,6 @@ final class DesignSystemSnapshotTests: XCTestCase {
     // the same reason `FlowLayout` and `IdleSuggestionsView` split out
     // of `SearchView.swift`).
 
-    /// US-8 first-launch welcome sheet. iPhone 17 logical size is 402×874pt;
-    /// rendering at .large detent fills (nearly) the full screen and gives
-    /// us a stable baseline to diff against on layout changes.
-    func test_onboardingSheet_default() {
-        let view = OnboardingSheet(
-            title: "Welcome to Dutch Oven Daddy",
-            bullets: [
-                .init(
-                    systemImage: "house.fill",
-                    title: "Browse the latest",
-                    caption: "New cast iron recipes appear at the top."
-                ),
-                .init(
-                    systemImage: "magnifyingglass",
-                    title: "Search what you've got",
-                    caption: "Type any ingredient or technique to filter."
-                ),
-                .init(
-                    systemImage: "bookmark.fill",
-                    title: "Save for offline",
-                    caption: "Tap the bookmark on any recipe to cook it without Wi-Fi."
-                ),
-            ],
-            ctaTitle: "Get cooking",
-            onContinue: {}
-        )
-        .frame(width: 402, height: 874)
-        assertSnapshot(of: view, as: Self.tolerantImage(layout: .fixed(width: 402, height: 874)), record: .missing)
-    }
-
     // MARK: - US-9 home-screen widget
     //
     // First-time record: the harness writes a baseline PNG under

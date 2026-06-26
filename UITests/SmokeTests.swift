@@ -389,7 +389,7 @@ final class SmokeTests: XCTestCase {
 
     /// US-8: the welcome sheet shows on a fresh launch (i.e. when the
     /// `dod.onboardingCompletedV1` UserDefaults flag is unset), and tapping
-    /// "Get cooking" dismisses it so the tab bar becomes reachable.
+    /// "Let's Get Cooking" dismisses it so the tab bar becomes reachable.
     ///
     /// `-DODForceFreshOnboarding` is the escape hatch handled in
     /// `DODApp.applyTestLaunchOverrides()` — it removes the persisted flag at
@@ -413,7 +413,7 @@ final class SmokeTests: XCTestCase {
             "Welcome sheet should appear on first launch"
         )
 
-        let cta = app.buttons["Get cooking"]
+        let cta = app.buttons["Let's Get Cooking"]
         XCTAssertTrue(cta.exists, "CTA button should be visible inside the sheet")
         cta.tap()
 
@@ -423,7 +423,7 @@ final class SmokeTests: XCTestCase {
         )
         XCTAssertFalse(
             welcome.exists,
-            "Welcome sheet should be gone after Get cooking is tapped"
+            "Welcome sheet should be gone after Let's Get Cooking is tapped"
         )
     }
 

@@ -4,34 +4,53 @@ import Foundation
 
 extension RootView {
 
-    /// The highlight rows shown on the single first-launch welcome sheet.
-    /// Declared as a static so the array is not rebuilt every render and so
-    /// tests/previews can reuse the exact content the app ships. T-762 / CL-159
-    /// (DUT-68) — reworded the Save row to the save-a-favorite-for-findability
-    /// framing (T-761 decoupled Save from the offline download) and added the
-    /// iCloud-Sync capability row (informational; the launch-time *ask* lives in
-    /// `runFirstRunSetup`, the full toggle in Settings).
-    static var welcomeBullets: [OnboardingSheet.Bullet] {
+    /// The slides of the first-launch **App Intro** tour (DUT-335). Declared
+    /// static so the array isn't rebuilt every render and tests/previews reuse
+    /// the exact content the app ships. Spotlights only the standout, app-unique
+    /// features — iCloud Sync is intentionally NOT a slide (it has its own
+    /// first-run opt-in prompt, `runFirstRunSetup`). Titles are Title Case;
+    /// descriptions are short but informative. `placeholderSymbol` stands in for
+    /// the real app screenshot until those are wired up later.
+    static var appIntroPages: [AppIntroTour.Page] {
         [
             .init(
-                systemImage: "house.fill",
-                title: "Browse the latest",
-                caption: "New cast iron recipes appear at the top."
+                id: 0,
+                title: "Welcome to Dutch Oven Daddy",
+                description:
+                    "Browse cast iron recipes and articles, save your favorites, and cook them step by step with built-in coaching, even offline.",
+                placeholderSymbol: "flame.fill"
             ),
             .init(
-                systemImage: "magnifyingglass",
-                title: "Search what you've got",
-                caption: "Type any ingredient or technique to filter."
+                id: 1,
+                title: "Browse Recipes & Articles",
+                description: "Explore fresh cast iron recipes to cook and articles to read, all in one tab.",
+                placeholderSymbol: "square.grid.2x2.fill"
             ),
             .init(
-                systemImage: "bookmark.fill",
-                title: "Save your favorites",
-                caption: "Tap the bookmark on any recipe to find it again later."
+                id: 2,
+                title: "Save Recipes for Later",
+                description: "Bookmark any recipe to build your own collection and find it again in a tap.",
+                placeholderSymbol: "bookmark.fill"
             ),
             .init(
-                systemImage: "icloud.fill",
-                title: "Sync across devices",
-                caption: "Turn on iCloud Sync to keep your saved recipes on every device."
+                id: 3,
+                title: "Cook Mode",
+                description:
+                    "Cook one step at a time with large text and voice read-aloud, and the screen stays awake so you never lose your place.",
+                placeholderSymbol: "speaker.wave.2.fill"
+            ),
+            .init(
+                id: 4,
+                title: "Cooking Tools",
+                description:
+                    "New to cast iron? Your First Cookout walks you to a guaranteed win, and the Heat Coach dials in your coals so every cook comes out right.",
+                placeholderSymbol: "thermometer.medium"
+            ),
+            .init(
+                id: 5,
+                title: "Download for Offline",
+                description: "Save recipes to your device and cook anywhere, even with no signal at the campsite.",
+                placeholderSymbol: "arrow.down.circle.fill"
             ),
         ]
     }
