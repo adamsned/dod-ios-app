@@ -54,28 +54,25 @@ extension SettingsViewModel {
         defaults.set(true, forKey: Self.downloadVoiceTipDismissedKey)
     }
 
-    // MARK: - TEMP (DUT-331) voice diagnostic — remove with the diagnostic UI
+    // MARK: - Resolved voice readout + preview (DUT-332)
 
-    /// TEMP (DUT-331) — human-readable lines describing what the real voice
-    /// path resolves on this device, for the on-device diagnostic readout.
-    public var voiceDiagnosticsText: [String] {
-        guard let voicePreviewer else { return ["(no voice previewer wired)"] }
-        let diag = voicePreviewer.voiceDiagnostics(languageCode: voiceLanguageCode)
-        var lines = [
-            "lang: \(diag.languageCode ?? "nil")",
-            "resolved: \(diag.resolvedName ?? "nil") (\(diag.resolvedQuality ?? "?"))",
-            "id: \(diag.resolvedIdentifier ?? "nil")",
-            "AVSpeechSynthesisVoice(identifier:) ok: \(diag.identifierInitSucceeds)",
-            "direct lookup ok: \(diag.foundByDirectLookup)",
-            "— installed (\(diag.catalogLines.count)) —",
-        ]
-        lines.append(contentsOf: diag.catalogLines)
-        return lines
+    /// DUT-332 — the Settings readout: "Voice: <name> (<quality>)" naming the
+    /// voice Cook Mode resolves for this device (e.g. "Voice: Jamie (Premium)").
+    /// Falls back to quality-only, then "Unknown", when a name/catalog isn't
+    /// available (the test double has no live catalog).
+    public var resolvedVoiceDisplay: String {
+        let name = voicePreviewer?.resolvedVoiceName(languageCode: voiceLanguageCode)
+        switch (name, resolvedVoiceQuality) {
+        case (let name?, let quality?): return "Voice: \(name) (\(quality.displayName))"
+        case (nil, let quality?): return "Voice: \(quality.displayName)"
+        default: return "Voice: Unknown"
+        }
     }
 
-    /// TEMP (DUT-331) — speak a test line through the real resolve path.
-    public func speakVoiceDiagnostic() {
-        voicePreviewer?.speakDiagnostic(languageCode: voiceLanguageCode)
+    /// DUT-332 — speak a sample line in the resolved voice (the cell's speaker
+    /// button), so the user can hear their selected voice from Settings.
+    public func previewVoice() {
+        voicePreviewer?.previewVoice(languageCode: voiceLanguageCode)
     }
 }
 

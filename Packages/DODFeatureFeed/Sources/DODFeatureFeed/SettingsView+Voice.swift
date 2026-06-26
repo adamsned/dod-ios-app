@@ -41,54 +41,37 @@ struct VoiceRows: View {
             if viewModel.shouldShowDownloadVoiceTip {
                 downloadVoiceTip
             }
-            voiceDiagnostics  // TEMP (DUT-331) — remove before merge
         }
     }
 
     // MARK: Rows
 
-    /// TEMP (DUT-331) — on-device voice-resolution diagnostic. Shows what the
-    /// real Cook Mode path resolves (name/quality/id, whether the identifier
-    /// initializer works) + the installed catalog, and a button to hear a test
-    /// line through that exact path. Remove this view + its view-model + seam
-    /// support once the robotic-voice bug is pinned.
-    private var voiceDiagnostics: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-            Text("VOICE DIAGNOSTICS (temp — DUT-331)")
-                .dodFont(DODType.detail)
-                .foregroundStyle(DODColor.accent)
-            ForEach(Array(viewModel.voiceDiagnosticsText.enumerated()), id: \.offset) { _, line in
-                Text(line)
+    /// DUT-332 — the Cook Mode Voice cell: the resolved voice name + quality
+    /// ("Voice: Jamie (Premium)") with a trailing speaker button that previews
+    /// it. No picker/gender (CL-279) — voices are chosen in the iOS Settings
+    /// app; this just names + previews the auto-selected one. The section footer
+    /// ("The Cook Mode voice reads recipe steps aloud.") is the description.
+    private var voiceInfo: some View {
+        HStack(alignment: .firstTextBaseline, spacing: DODSpacing.sm) {
+            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                Text("Cook Mode Voice")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                Text(viewModel.resolvedVoiceDisplay)
                     .dodFont(DODType.detail)
                     .foregroundStyle(DODColor.labelSecondary)
-                    .textSelection(.enabled)
+                    .accessibilityIdentifier("settings-voice-quality")
             }
+            Spacer()
             Button {
-                viewModel.speakVoiceDiagnostic()
+                viewModel.previewVoice()
             } label: {
-                Text("Speak test line")
-                    .dodFont(DODType.body)
+                Image(systemName: "speaker.wave.2")
                     .foregroundStyle(DODColor.accent)
             }
-            .accessibilityIdentifier("settings-voice-diagnostic-speak")
-        }
-        .padding(.vertical, DODSpacing.xxs)
-    }
-
-    /// The always-shown info: Cook Mode uses the best installed voice, and the
-    /// resolved quality tier so the user can see whether they're on the robotic
-    /// default. No controls — voices are chosen in the iOS Settings app.
-    private var voiceInfo: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-            Text("Cook Mode Voice")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-            // The section footer ("The Cook Mode voice reads recipe steps
-            // aloud.") is the single description; no inline duplicate here.
-            Text("Voice Quality: \(viewModel.resolvedVoiceQuality?.displayName ?? "Unknown")")
-                .dodFont(DODType.detail)
-                .foregroundStyle(DODColor.labelSecondary)
-                .accessibilityIdentifier("settings-voice-quality")
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings-voice-preview")
+            .accessibilityLabel("Preview voice")
         }
     }
 
