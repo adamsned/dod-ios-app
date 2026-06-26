@@ -41,10 +41,39 @@ struct VoiceRows: View {
             if viewModel.shouldShowDownloadVoiceTip {
                 downloadVoiceTip
             }
+            voiceDiagnostics  // TEMP (DUT-331) — remove before merge
         }
     }
 
     // MARK: Rows
+
+    /// TEMP (DUT-331) — on-device voice-resolution diagnostic. Shows what the
+    /// real Cook Mode path resolves (name/quality/id, whether the identifier
+    /// initializer works) + the installed catalog, and a button to hear a test
+    /// line through that exact path. Remove this view + its view-model + seam
+    /// support once the robotic-voice bug is pinned.
+    private var voiceDiagnostics: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+            Text("VOICE DIAGNOSTICS (temp — DUT-331)")
+                .dodFont(DODType.detail)
+                .foregroundStyle(DODColor.accent)
+            ForEach(Array(viewModel.voiceDiagnosticsText.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .dodFont(DODType.detail)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .textSelection(.enabled)
+            }
+            Button {
+                viewModel.speakVoiceDiagnostic()
+            } label: {
+                Text("Speak test line")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.accent)
+            }
+            .accessibilityIdentifier("settings-voice-diagnostic-speak")
+        }
+        .padding(.vertical, DODSpacing.xxs)
+    }
 
     /// The always-shown info: Cook Mode uses the best installed voice, and the
     /// resolved quality tier so the user can see whether they're on the robotic

@@ -53,6 +53,30 @@ extension SettingsViewModel {
     public func dismissDownloadVoiceTip() {
         defaults.set(true, forKey: Self.downloadVoiceTipDismissedKey)
     }
+
+    // MARK: - TEMP (DUT-331) voice diagnostic — remove with the diagnostic UI
+
+    /// TEMP (DUT-331) — human-readable lines describing what the real voice
+    /// path resolves on this device, for the on-device diagnostic readout.
+    public var voiceDiagnosticsText: [String] {
+        guard let voicePreviewer else { return ["(no voice previewer wired)"] }
+        let diag = voicePreviewer.voiceDiagnostics(languageCode: voiceLanguageCode)
+        var lines = [
+            "lang: \(diag.languageCode ?? "nil")",
+            "resolved: \(diag.resolvedName ?? "nil") (\(diag.resolvedQuality ?? "?"))",
+            "id: \(diag.resolvedIdentifier ?? "nil")",
+            "AVSpeechSynthesisVoice(identifier:) ok: \(diag.identifierInitSucceeds)",
+            "direct lookup ok: \(diag.foundByDirectLookup)",
+            "— installed (\(diag.catalogLines.count)) —",
+        ]
+        lines.append(contentsOf: diag.catalogLines)
+        return lines
+    }
+
+    /// TEMP (DUT-331) — speak a test line through the real resolve path.
+    public func speakVoiceDiagnostic() {
+        voicePreviewer?.speakDiagnostic(languageCode: voiceLanguageCode)
+    }
 }
 
 // MARK: - Quality tier display copy (AC-40.12)
