@@ -1,91 +1,33 @@
 import DODSupport
 import Foundation
 
-/// US-40 / AC-40.12 + AC-40.13 — the Settings Cook Mode Voice section's quality
-/// readout + "install a better voice" nudge.
+/// US-40 / AC-40.12 (DUT-332) — the Settings Cook Mode Voice section's
+/// resolved-voice readout + preview.
 ///
-/// CL-279 / DUT-329 — there is no in-app voice/gender choice + no preview; Cook
-/// Mode uses one auto-selected voice and voices are managed only in the iOS
-/// Settings app, so the section is just an info readout + a prompt to Settings.
-///
-/// These belong in the view-model, not the view: the quality readout + the
-/// nudge-visibility decision are pure functions of the installed catalog + the
-/// dismissal flag, unit-tested on the macOS slice with a recording
-/// `VoicePreviewing` double — no AVFoundation, no simulator (CL-109).
+/// CL-279 / DUT-329 — there is no in-app voice/gender choice; Cook Mode uses one
+/// auto-selected voice and voices are managed only in the iOS Settings app.
+/// DUT-332 names the resolved voice + previews it; DUT-334 — where to download
+/// voices is stated in the section footer, not a popup. These belong in the
+/// view-model, not the view: pure functions of the `VoicePreviewing` seam,
+/// unit-tested on the macOS slice with a recording double (CL-79 / CL-109).
 extension SettingsViewModel {
 
-    /// The synthesis-quality tier of the voice Cook Mode would resolve right now
-    /// for this device's language — the "are you on a robotic voice?" readout
-    /// (AC-40.12). `nil` when no catalog is available (no previewer wired, or an
-    /// empty catalog) so the view renders an honest "Unknown".
-    public var resolvedVoiceQuality: VoiceQuality? {
-        guard let voicePreviewer else { return nil }
-        let catalog = voicePreviewer.installedVoices()
-        guard !catalog.isEmpty else { return nil }
-        guard
-            let identifier = VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: voiceLanguageCode),
-            let descriptor = catalog.first(where: { $0.identifier == identifier })
-        else {
-            return nil
-        }
-        return descriptor.quality
-    }
-
-    /// Whether the "install a better voice" tip should surface (AC-40.13). True
-    /// only when a catalog is available, no natural (enhanced/premium) voice is
-    /// installed for the device language (the best installed tier is the compact
-    /// robotic one), and the user hasn't dismissed it (CL-123).
-    public var shouldShowDownloadVoiceTip: Bool {
-        guard let voicePreviewer, !downloadVoiceTipDismissed else { return false }
-        let catalog = voicePreviewer.installedVoices()
-        guard !catalog.isEmpty else { return false }
-        return !VoiceSelector.hasNaturalVoice(forLanguage: voiceLanguageCode, in: catalog)
-    }
-
-    /// Backing read of the dismissal flag (AC-40.13 / CL-123). Absent key →
-    /// false (tip eligible).
-    public var downloadVoiceTipDismissed: Bool {
-        defaults.bool(forKey: Self.downloadVoiceTipDismissedKey)
-    }
-
-    /// Permanently dismiss the install-a-better-voice tip (CL-123). The nudge
-    /// never re-shows afterward.
-    public func dismissDownloadVoiceTip() {
-        defaults.set(true, forKey: Self.downloadVoiceTipDismissedKey)
-    }
-
-    // MARK: - Resolved voice readout + preview (DUT-332)
-
-    /// DUT-332 — the Settings readout: "Voice: <name> (<quality>)" naming the
-    /// voice Cook Mode resolves for this device (e.g. "Voice: Jamie (Premium)").
-    /// Falls back to quality-only, then "Unknown", when a name/catalog isn't
-    /// available (the test double has no live catalog).
+    /// DUT-332 / DUT-333 — the Settings readout: "Voice: <name>" naming the voice
+    /// Cook Mode resolves for this device (e.g. "Voice: Jamie (Premium)"). Apple's
+    /// voice name already carries the quality tier for Enhanced/Premium voices, so
+    /// we show it verbatim and never append our own tier (that double-tagged it).
+    /// "Voice: Unknown" when no name is available (e.g. the test double / no live
+    /// catalog).
     public var resolvedVoiceDisplay: String {
-        let name = voicePreviewer?.resolvedVoiceName(languageCode: voiceLanguageCode)
-        switch (name, resolvedVoiceQuality) {
-        case (let name?, let quality?): return "Voice: \(name) (\(quality.displayName))"
-        case (nil, let quality?): return "Voice: \(quality.displayName)"
-        default: return "Voice: Unknown"
+        guard let name = voicePreviewer?.resolvedVoiceName(languageCode: voiceLanguageCode) else {
+            return "Voice: Unknown"
         }
+        return "Voice: \(name)"
     }
 
     /// DUT-332 — speak a sample line in the resolved voice (the cell's speaker
     /// button), so the user can hear their selected voice from Settings.
     public func previewVoice() {
         voicePreviewer?.previewVoice(languageCode: voiceLanguageCode)
-    }
-}
-
-// MARK: - Quality tier display copy (AC-40.12)
-
-extension VoiceQuality {
-    /// User-facing label for the resolved-quality readout row. Kept in the
-    /// feature layer (not `DODSupport`) so the domain model stays free of UI copy.
-    var displayName: String {
-        switch self {
-        case .default: return "Default"
-        case .enhanced: return "Enhanced"
-        case .premium: return "Premium"
-        }
     }
 }

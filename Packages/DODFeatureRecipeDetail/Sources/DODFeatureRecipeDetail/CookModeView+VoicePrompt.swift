@@ -45,14 +45,14 @@ private struct CookModeVoiceUpgradePrompt: ViewModifier {
             } message: {
                 Text(
                     "Cook Mode steps may sound robotic. In the Settings app, open "
-                        + "Accessibility, then Spoken Content, then Voices, and download an "
+                        + "Accessibility, then Read & Speak, then Voices, and download an "
                         + "Enhanced or Premium voice. It'll be used here automatically."
                 )
             }
     }
 
     /// Deep-link to the app's Settings root. iOS only exposes the app's own
-    /// Settings page (not the Accessibility → Spoken Content → Voices pane), so
+    /// Settings page (not the Accessibility → Read & Speak → Voices pane), so
     /// the message copy spells out the path (matching the Settings nudge, CL-123).
     private func openVoiceSettings() {
         #if canImport(UIKit)

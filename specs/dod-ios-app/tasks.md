@@ -3032,6 +3032,18 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** `DODFeatureFeed/VoicePreview.swift` (`resolvedVoiceName` + `previewVoice` seam; drop the `VoiceDiagnostics` temp), `DODFeatureFeed/SettingsViewModel+Voice.swift` (`resolvedVoiceDisplay` + `previewVoice`; drop diagnostic accessors), `DODFeatureFeed/SettingsView+Voice.swift` (HStack: name readout + speaker button; drop the diagnostic view). Tests: `SettingsViewModelVoiceTests` (+4), `RecordingVoicePreviewer` (name + preview count). Spec: `clarifications.md` (CL-282).
 - **AC:** US-40 / AC-40.12. Linear DUT-332 (created). CL-282 canonical. **Est:** ~1 h. **Deps:** same branch/PR as DUT-331. Branch `fix/cook-mode-voice-application`. **Verification:** swift-format + SwiftLint `--strict` clean; L1 green (+4 VM tests); package builds green; on-device preview audibility Spencer's to confirm.
 
+### T-889 — Cook Mode Voice readout: stop double-tagging the quality (CL-283 / DUT-333)
+
+- **What:** Readout showed "Voice: Jamie (Premium) (Premium)" — Apple's `AVSpeechSynthesisVoice.name` already includes the tier for Enhanced/Premium voices, and `resolvedVoiceDisplay` appended `(quality)` again. Show Apple's name verbatim ("Voice: \(name)"); compact voices show the bare name. Removed the dead `resolvedVoiceQuality` + `VoiceQuality.displayName`.
+- **Files:** `DODFeatureFeed/SettingsViewModel+Voice.swift` (rewrite: name-only display, drop quality accessor + displayName). Tests: `SettingsViewModelVoiceTests` rewritten. Spec: `clarifications.md` (CL-283).
+- **AC:** US-40 / AC-40.12. Linear DUT-333. CL-283 canonical. **Est:** ~20 min. **Deps:** off main (after DUT-332). Branch `fix/voice-section-readout-and-path`. **Verification:** swift-format + SwiftLint `--strict` clean; L1 green.
+
+### T-890 — Cook Mode Voice: drop the popup; download path in the footer; rename to "Read & Speak" (CL-284 / DUT-334)
+
+- **What:** Removed the Settings "install a better voice" popup + all its dead supports (gate, dismissal flag + key, body copy, openSettings); the Cook Mode Voice cell is now just the named readout + speaker preview. Appended the download path to the Customization section footer. Updated the in-Cook-Mode prompt copy (DUT-328) from "Spoken Content" to Apple's renamed "Read & Speak". Path used everywhere: "Settings › Accessibility › Read & Speak › Voices › English".
+- **Files:** `DODFeatureFeed/SettingsView+Voice.swift` (rewrite: cell = readout + preview, no popup), `SettingsViewModel+Voice.swift` (drop tip accessors), `SettingsViewModel.swift` (drop the dismissal key), `SettingsView.swift` (footer copy), `DODFeatureRecipeDetail/CookModeView+VoicePrompt.swift` (path copy). Spec: `clarifications.md` (CL-284). Note: `installedVoices()` seam kept (iOS-only snapshot scaffolding still uses it) — later cleanup candidate.
+- **AC:** US-40 / AC-40.12. Linear DUT-334. CL-284 canonical. **Est:** ~40 min. **Deps:** same branch as DUT-333. Branch `fix/voice-section-readout-and-path`. **Verification:** swift-format + SwiftLint `--strict` clean; L1 green; DODFeatureFeed + DODFeatureRecipeDetail build green; no em dashes in new copy.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

@@ -214,9 +214,12 @@ public struct SettingsView: View {
             } header: {
                 sectionHeader("Customization")
             } footer: {
-                Text("The Cook Mode voice reads recipe steps aloud.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                Text(
+                    "The Cook Mode voice reads recipe steps aloud. To use a different voice, "
+                        + "download one in Settings › Accessibility › Read & Speak › Voices › English."
+                )
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
             }
             .listRowBackground(DODColor.surfaceElevated)
 
@@ -352,9 +355,3 @@ public struct SettingsView: View {
 
 // `AboutNedView` lives in `AboutNedView.swift` so the host file stays
 // under the 400-line `file_length` cap (T-738 / CL-134, DUT-14).
-//
-// `VoiceQuality.displayName` (the Cook Mode voice-quality readout label) lives
-// in `SettingsViewModel+Voice.swift` alongside the `VoiceRows` that render it
-// (T-752 / CL-149; CL-279 / DUT-329 removed the in-app voice + gender pickers,
-// leaving an info readout + an "install a better voice" prompt) — so it is
-// intentionally not redeclared here.

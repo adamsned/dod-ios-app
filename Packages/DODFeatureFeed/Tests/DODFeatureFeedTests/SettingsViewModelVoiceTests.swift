@@ -4,16 +4,16 @@ import Testing
 
 @testable import DODFeatureFeed
 
-/// L1 coverage for the Settings → Cook Mode Voice view-model surface
-/// (US-40 / AC-40.12 + AC-40.13).
+/// L1 coverage for the Settings → Cook Mode Voice view-model surface (US-40 /
+/// AC-40.12).
 ///
-/// CL-279 / DUT-329 — Cook Mode uses ONE auto-selected voice; there is no in-app
-/// voice or gender choice (the gender + per-voice pickers were removed). So the
-/// view-model surface is just the resolved-quality readout + the
-/// "install a better voice" nudge gate, asserted on the macOS slice with a
-/// recording `VoicePreviewing` double — no AVFoundation, no simulator (CL-109).
+/// CL-279 / DUT-329 — Cook Mode uses ONE auto-selected voice (no in-app picker /
+/// gender). DUT-332/333 — the surface is the resolved-voice name readout
+/// ("Voice: <name>") + a preview; DUT-334 removed the in-Settings download popup.
+/// Asserted on the macOS slice with a recording `VoicePreviewing` double — no
+/// AVFoundation, no simulator (CL-109).
 @MainActor
-@Suite("SettingsViewModel voice (US-40 / DUT-329)") struct SettingsViewModelVoiceTests {
+@Suite("SettingsViewModel voice (US-40 / DUT-332)") struct SettingsViewModelVoiceTests {
 
     /// Fresh, per-test `UserDefaults` suite so a write in one test never leaks
     /// into another (mirrors ``SettingsViewModelTests``).
@@ -24,117 +24,52 @@ import Testing
         return defaults
     }
 
-    private func voice(_ id: String, _ quality: VoiceQuality, lang: String = "en-US") -> VoiceDescriptor {
-        VoiceDescriptor(identifier: id, languageCode: lang, quality: quality)
-    }
-
-    private func makeViewModel(
-        catalog: [VoiceDescriptor],
-        defaults: UserDefaults? = nil
-    ) -> (SettingsViewModel, RecordingVoicePreviewer) {
-        let previewer = RecordingVoicePreviewer(catalog: catalog)
+    private func makeViewModel(resolvedName: String?) -> (SettingsViewModel, RecordingVoicePreviewer) {
+        let previewer = RecordingVoicePreviewer(catalog: [], resolvedName: resolvedName)
         let viewModel = SettingsViewModel(
-            defaults: defaults ?? Self.isolatedDefaults(),
+            defaults: Self.isolatedDefaults(),
             voicePreviewer: previewer,
             voiceLocale: Locale(identifier: "en-US")
         )
         return (viewModel, previewer)
     }
 
-    // MARK: - Resolved quality readout (AC-40.12)
+    // MARK: - Resolved-voice readout (DUT-332 / DUT-333)
 
-    @Test func resolvedQualityIsTheBestInstalledTier() {
-        let (viewModel, _) = makeViewModel(catalog: [
-            voice("compact", .default),
-            voice("enhanced", .enhanced),
-        ])
-        #expect(viewModel.resolvedVoiceQuality == .enhanced)
-    }
-
-    @Test func resolvedQualityIsDefaultWhenOnlyCompactInstalled() {
-        let (viewModel, _) = makeViewModel(catalog: [voice("compact", .default)])
-        #expect(viewModel.resolvedVoiceQuality == .default)
-    }
-
-    @Test func resolvedQualityIsNilWithNoPreviewer() {
-        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
-        #expect(viewModel.resolvedVoiceQuality == nil)
-    }
-
-    @Test func resolvedQualityIsNilWithEmptyCatalog() {
-        let (viewModel, _) = makeViewModel(catalog: [])
-        #expect(viewModel.resolvedVoiceQuality == nil)
-    }
-
-    // MARK: - Named readout + preview (DUT-332)
-
-    @Test func displayShowsResolvedNameAndQuality() {
-        let previewer = RecordingVoicePreviewer(
-            catalog: [voice("premium", .premium)],
-            resolvedName: "Jamie"
-        )
-        let viewModel = SettingsViewModel(
-            defaults: Self.isolatedDefaults(),
-            voicePreviewer: previewer,
-            voiceLocale: Locale(identifier: "en-US")
-        )
+    @Test func displayShowsTheResolvedVoiceName() {
+        // Apple's name already carries the tier for natural voices; we show it
+        // verbatim and never append our own (which double-tagged it — DUT-333).
+        let (viewModel, _) = makeViewModel(resolvedName: "Jamie (Premium)")
         #expect(viewModel.resolvedVoiceDisplay == "Voice: Jamie (Premium)")
     }
 
-    @Test func displayFallsBackToQualityWhenNameUnavailable() {
-        // No name from the seam → quality-only (the host double has no live catalog).
-        let (viewModel, _) = makeViewModel(catalog: [voice("enhanced", .enhanced)])
-        #expect(viewModel.resolvedVoiceDisplay == "Voice: Enhanced")
+    @Test func displayShowsABareCompactNameWithoutATier() {
+        // Compact voices have no parenthetical in Apple's name — shown as-is.
+        let (viewModel, _) = makeViewModel(resolvedName: "Samantha")
+        #expect(viewModel.resolvedVoiceDisplay == "Voice: Samantha")
     }
 
-    @Test func displayIsUnknownWithEmptyCatalog() {
-        let (viewModel, _) = makeViewModel(catalog: [])
+    @Test func displayIsUnknownWhenNoNameResolves() {
+        let (viewModel, _) = makeViewModel(resolvedName: nil)
         #expect(viewModel.resolvedVoiceDisplay == "Voice: Unknown")
     }
 
+    @Test func displayIsUnknownWithNoPreviewer() {
+        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
+        #expect(viewModel.resolvedVoiceDisplay == "Voice: Unknown")
+    }
+
+    // MARK: - Preview (DUT-332)
+
     @Test func previewVoiceForwardsToTheSeam() {
-        let (viewModel, previewer) = makeViewModel(catalog: [voice("premium", .premium)])
+        let (viewModel, previewer) = makeViewModel(resolvedName: "Jamie (Premium)")
         viewModel.previewVoice()
         #expect(previewer.previewCount == 1)
     }
-
-    // MARK: - Install-a-better-voice nudge (AC-40.13)
-
-    @Test func tipShowsWhenOnlyCompactInstalled() {
-        let (viewModel, _) = makeViewModel(catalog: [voice("compact", .default)])
-        #expect(viewModel.shouldShowDownloadVoiceTip)
-    }
-
-    @Test func tipHiddenWhenNaturalVoiceInstalled() {
-        let (viewModel, _) = makeViewModel(catalog: [
-            voice("compact", .default),
-            voice("enhanced", .enhanced),
-        ])
-        #expect(!viewModel.shouldShowDownloadVoiceTip)
-    }
-
-    @Test func tipHiddenAfterDismissal() {
-        let (viewModel, _) = makeViewModel(catalog: [voice("compact", .default)])
-        #expect(viewModel.shouldShowDownloadVoiceTip)
-        viewModel.dismissDownloadVoiceTip()
-        #expect(!viewModel.shouldShowDownloadVoiceTip)
-        #expect(viewModel.downloadVoiceTipDismissed)
-    }
-
-    @Test func tipHiddenWithNoPreviewer() {
-        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
-        #expect(!viewModel.shouldShowDownloadVoiceTip)
-    }
-
-    @Test func tipHiddenWithEmptyCatalog() {
-        let (viewModel, _) = makeViewModel(catalog: [])
-        #expect(!viewModel.shouldShowDownloadVoiceTip)
-    }
 }
 
-/// A recording `VoicePreviewing` double — returns a fixed installed catalog.
-/// Top-level so both `SettingsViewModelVoiceTests` and `SettingsViewSnapshotTests`
-/// share it (DUT-329 — the seam now carries only the catalog read).
+/// A recording `VoicePreviewing` double. Top-level so both
+/// `SettingsViewModelVoiceTests` and `SettingsViewSnapshotTests` share it.
 @MainActor
 final class RecordingVoicePreviewer: VoicePreviewing {
     let catalog: [VoiceDescriptor]
