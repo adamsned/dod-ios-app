@@ -175,4 +175,44 @@ import Testing
     @Test func hasNaturalVoiceIsFalseOnEmptyCatalog() {
         #expect(!VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: []))
     }
+
+    // MARK: - Siri voices are excluded (DUT-331)
+
+    @Test func skipsSiriVoiceForAUsableEnhancedOne() {
+        // A Siri voice resolves + reports premium, but AVSpeechSynthesizer won't
+        // speak with it in a 3rd-party app (falls back to robotic). With a real
+        // downloaded Enhanced voice also installed, pick the Enhanced one.
+        let catalog = [
+            voice("com.apple.voice.compact.en-US.Samantha", "en-US", .default),
+            voice("com.apple.voice.enhanced.en-US.Evan", "en-US", .enhanced),
+            voice("com.apple.ttsbundle.siri_Nicky_en-US_premium", "en-US", .premium),
+        ]
+        #expect(
+            VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US")
+                == "com.apple.voice.enhanced.en-US.Evan"
+        )
+    }
+
+    @Test func fallsBackToCompactWhenOnlyNaturalIsSiri() {
+        // If the only non-compact voice is a Siri voice, it must NOT be picked;
+        // fall back to a usable compact voice instead of the unusable Siri one.
+        let catalog = [
+            voice("com.apple.voice.compact.en-US.Samantha", "en-US", .default),
+            voice("com.apple.ttsbundle.siri_Nicky_en-US_premium", "en-US", .premium),
+        ]
+        #expect(
+            VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US")
+                == "com.apple.voice.compact.en-US.Samantha"
+        )
+    }
+
+    @Test func hasNaturalVoiceIgnoresSiriVoices() {
+        // The "install a better voice" gate must treat a Siri-only catalog as
+        // having NO usable natural voice, so the prompt still surfaces.
+        let catalog = [
+            voice("com.apple.voice.compact.en-US.Samantha", "en-US", .default),
+            voice("com.apple.ttsbundle.siri_Nicky_en-US_premium", "en-US", .premium),
+        ]
+        #expect(!VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
+    }
 }
