@@ -43,6 +43,55 @@ import Testing
         #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US") == "gb.enhanced")
     }
 
+    // MARK: - Default voice is Samantha (DUT-330)
+
+    @Test func defaultsToSamanthaAmongCompactVoices() {
+        // Stock device: only compact en-US voices. The default is Samantha, not
+        // whatever sorts first by identifier (here "Albert" would, without the
+        // Samantha tie-break).
+        let catalog = [
+            voice("com.apple.voice.compact.en-US.Albert", "en-US", .default),
+            voice("com.apple.voice.compact.en-US.Samantha", "en-US", .default),
+            voice("com.apple.voice.compact.en-US.Fred", "en-US", .default),
+        ]
+        #expect(
+            VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US")
+                == "com.apple.voice.compact.en-US.Samantha"
+        )
+    }
+
+    @Test func prefersSamanthaAmongEqualNaturalVoices() {
+        // Two enhanced voices: Samantha wins the tie-break (without it, "Daniel"
+        // sorts first by identifier).
+        let catalog = [
+            voice("enhanced.Daniel", "en-US", .enhanced),
+            voice("enhanced.Samantha", "en-US", .enhanced),
+        ]
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US") == "enhanced.Samantha")
+    }
+
+    @Test func naturalNonSamanthaStillBeatsCompactSamantha() {
+        // Samantha is only a tie-break BELOW quality: a downloaded enhanced
+        // (natural) voice still wins over the compact Samantha, so the DUT-327
+        // "don't sound like a robot" fix is preserved.
+        let catalog = [
+            voice("compact.Samantha", "en-US", .default),
+            voice("enhanced.Daniel", "en-US", .enhanced),
+        ]
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US") == "enhanced.Daniel")
+    }
+
+    @Test func samanthaMatchIsCaseInsensitiveSubstring() {
+        let catalog = [
+            voice("com.apple.voice.compact.en-US.SAMANTHA", "en-US", .default),
+            voice("com.apple.voice.compact.en-US.Aaron", "en-US", .default),
+        ]
+        #expect(
+            VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US")
+                == "com.apple.voice.compact.en-US.SAMANTHA"
+        )
+    }
+
     // MARK: - Language matching
 
     @Test func matchesByLanguageFamilyPrefix() {

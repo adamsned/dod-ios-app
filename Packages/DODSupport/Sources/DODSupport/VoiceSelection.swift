@@ -54,10 +54,13 @@ public struct VoiceDescriptor: Sendable, Equatable {
 /// quality**. Among voices matching the requested language, any natural
 /// (`enhanced` / `premium`) voice outranks every robotic (`default`/compact)
 /// one, the highest quality tier wins, and ties break to an exact language-tag
-/// match then the stable identifier.
+/// match, then **Samantha** (DUT-330 — the out-of-box default voice), then the
+/// stable identifier.
 ///
 /// US-40 / AC-40.9 (T-720); CL-279 / DUT-329 — no user preference (one
-/// auto-selected voice; voices are managed only in the iOS Settings app).
+/// auto-selected voice; voices are managed only in the iOS Settings app);
+/// CL-280 / DUT-330 — Samantha is the default voice (a tie-break *below* quality,
+/// so a downloaded natural voice still wins, keeping the DUT-327 robot fix).
 ///
 /// Returns `nil` when no voice matches the language at all, in which case the
 /// caller falls back to the system default — so a locale with no installed
@@ -111,10 +114,22 @@ public enum VoiceSelector {
 
     // MARK: - Private
 
+    /// DUT-330 — the default voice name. Apple ships the classic en-US voice
+    /// "Samantha" on every device, and its `AVSpeechSynthesisVoice.identifier`
+    /// contains "Samantha" (e.g. `com.apple.voice.compact.en-US.Samantha`), so a
+    /// case-insensitive identifier match reaches it across the compact / enhanced
+    /// / premium variants.
+    private static let defaultVoiceName = "Samantha"
+
     /// A comparable sort key. Lower sorts first (more preferred).
     ///   - naturalRank: 0 = natural (enhanced/premium), 1 = robotic (default).
     ///   - qualityRank: 0 = premium, 1 = enhanced, 2 = default (best first).
     ///   - exactLocaleRank: 0 = exact language-tag match, 1 = prefix-only.
+    ///   - samanthaRank: 0 = Samantha, 1 = anything else. DUT-330 — makes the
+    ///     out-of-box voice Samantha rather than whatever sorts first by
+    ///     identifier (Albert / a novelty voice). Only a tie-break **below**
+    ///     quality: a natural voice still beats a compact Samantha, so a
+    ///     downloaded better voice is still used (the DUT-327 robot fix holds).
     ///   - identifier: final stable tie-break so selection is deterministic.
     private static func sortKey(for voice: VoiceDescriptor, languageCode: String?) -> SortKey {
         let naturalRank = voice.quality > .default ? 0 : 1
@@ -123,10 +138,12 @@ public enum VoiceSelector {
             languageCode.map {
                 voice.languageCode.caseInsensitiveCompare($0) == .orderedSame
             } ?? false
+        let isSamantha = voice.identifier.localizedCaseInsensitiveContains(defaultVoiceName)
         return SortKey(
             natural: naturalRank,
             quality: qualityRank,
             exactLocale: isExactLocale ? 0 : 1,
+            samantha: isSamantha ? 0 : 1,
             identifier: voice.identifier
         )
     }
@@ -149,12 +166,14 @@ public enum VoiceSelector {
         let natural: Int
         let quality: Int
         let exactLocale: Int
+        let samantha: Int
         let identifier: String
 
         static func < (lhs: SortKey, rhs: SortKey) -> Bool {
             if lhs.natural != rhs.natural { return lhs.natural < rhs.natural }
             if lhs.quality != rhs.quality { return lhs.quality < rhs.quality }
             if lhs.exactLocale != rhs.exactLocale { return lhs.exactLocale < rhs.exactLocale }
+            if lhs.samantha != rhs.samantha { return lhs.samantha < rhs.samantha }
             return lhs.identifier < rhs.identifier
         }
     }
