@@ -125,12 +125,17 @@ struct RootView: View {
             handle(intent: newValue)
             dispatcher.consume()
         }
-        .sheet(isPresented: $showOnboarding) {
-            OnboardingSheet(
-                title: "Welcome to Dutch Oven Daddy",
-                bullets: Self.welcomeBullets,
-                ctaTitle: "Get cooking",
-                onContinue: {
+        .fullScreenCover(isPresented: $showOnboarding) {
+            // DUT-335 — the App Intro: a paged feature tour. Presented full-screen
+            // (no swipe-to-dismiss, so it can't be escaped without finishing —
+            // the DUT-301 concern the old sheet handled with
+            // `interactiveDismissDisabled`). The persistent "Let's Get Cooking"
+            // CTA is the single exit: it sets the onboarding flag + kicks off
+            // first-run setup.
+            AppIntroTour(
+                pages: Self.appIntroPages,
+                ctaTitle: "Let's Get Cooking",
+                onFinish: {
                     UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
                     showOnboarding = false
                     // First-run: ask for notifications + iCloud Sync (skipped
@@ -141,12 +146,6 @@ struct RootView: View {
                     }
                 }
             )
-            .presentationDetents([.large])
-            // DUT-301 — block swipe-dismiss: the welcome sheet's CTA is the only
-            // place that sets the onboarding flag + kicks off first-run setup, so
-            // a swipe-dismiss would re-show onboarding forever + skip the prompts.
-            // "Get cooking" is the single exit.
-            .interactiveDismissDisabled(true)
         }
         .alert("Turn On iCloud Sync?", isPresented: $showCloudSyncPrompt) {
             Button("Turn On Sync") {

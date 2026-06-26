@@ -21,7 +21,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
 
     // MARK: - Journey 1: first-launch onboarding → feed → recipe detail
 
-    /// Fresh-install launch shows the welcome sheet → "Get cooking" dismisses
+    /// Fresh-install launch shows the welcome sheet → "Let's Get Cooking" dismisses
     /// it → feed loads → tap the first recipe → recipe detail visible.
     ///
     /// Overlaps deliberately with the existing L3
@@ -40,8 +40,8 @@ final class CoreUserJourneysE2ETests: XCTestCase {
             "Welcome sheet should appear on first launch"
         )
 
-        let cta = app.buttons["Get cooking"]
-        XCTAssertTrue(cta.exists, "Welcome sheet should expose the Get cooking CTA")
+        let cta = app.buttons["Let's Get Cooking"]
+        XCTAssertTrue(cta.exists, "Welcome sheet should expose the Let's Get Cooking CTA")
         cta.tap()
 
         // Tab bar lands after the welcome dismisses (AC-8.3 contract).

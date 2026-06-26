@@ -87,17 +87,6 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: Self.tolerantImage(traits: Self.darkTraits()), record: .missing)
     }
 
-    func test_onboardingSheet_default_dark() {
-        let view = OnboardingSheet(
-            title: "Welcome to Dutch Oven Daddy",
-            bullets: Self.onboardingBullets(),
-            ctaTitle: "Get cooking",
-            onContinue: {}
-        )
-        .frame(width: 402, height: 874)
-        assertSnapshot(of: view, as: Self.darkImage(width: 402, height: 874), record: .missing)
-    }
-
     func test_widgetCard_small_populated_dark() {
         let view = WidgetCard.Small(content: Self.widgetContent())
             .frame(width: 158, height: 158)
@@ -226,21 +215,6 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: Self.tolerantImage(traits: Self.ax5Traits()), record: .missing)
     }
 
-    func test_onboardingSheet_default_AX5() {
-        let view = OnboardingSheet(
-            title: "Welcome to Dutch Oven Daddy",
-            bullets: Self.onboardingBullets(),
-            ctaTitle: "Get cooking",
-            onContinue: {}
-        )
-        .frame(width: 402, height: 1_800)
-        assertSnapshot(
-            of: view,
-            as: Self.tolerantImage(layout: .fixed(width: 402, height: 1_800), traits: Self.ax5Traits()),
-            record: .missing
-        )
-    }
-
     // MARK: - Trait helpers
 
     /// `UITraitCollection` that forces dark appearance at @3x scale.
@@ -285,26 +259,6 @@ final class DesignSystemAppearanceSnapshotTests: XCTestCase {
             heroImageURL: nil,
             totalTimeDisplay: "15 min"
         )
-    }
-
-    private static func onboardingBullets() -> [OnboardingSheet.Bullet] {
-        [
-            .init(
-                systemImage: "house.fill",
-                title: "Browse the latest",
-                caption: "New cast iron recipes appear at the top."
-            ),
-            .init(
-                systemImage: "magnifyingglass",
-                title: "Search what you've got",
-                caption: "Type any ingredient or technique to filter."
-            ),
-            .init(
-                systemImage: "bookmark.fill",
-                title: "Save for offline",
-                caption: "Tap the bookmark on any recipe to cook it without Wi-Fi."
-            ),
-        ]
     }
 }
 
