@@ -6,155 +6,69 @@ import SwiftUI
 import UIKit
 #endif
 
-// US-40 / AC-40.10 + AC-40.12 + AC-40.13 — the Settings → Cook Mode Voice
-// section: gender picker (T-721), resolved-quality readout + Preview button
-// (T-721), and the "download a better voice" nudge (T-722).
+// US-40 / AC-40.12 + AC-40.13 — the Settings → Cook Mode Voice rows.
+//
+// CL-279 / DUT-329 — Cook Mode uses ONE voice: the best installed for the device
+// language. There is NO in-app voice or gender choice (the gender picker + the
+// per-voice picker were removed) and no preview; voices are managed only in the
+// iOS Settings app. So these rows are just: a one-line explanation, the resolved
+// quality readout (so the user can see they're on the robotic default), and the
+// "install a better voice" prompt that points to the Settings app.
+//
+// `openSettingsURLString` only deep-links to the app's own Settings root (not
+// the Accessibility pane), so the prompt copy spells out the full path (CL-123).
 //
 // Extracted from `SettingsView.swift` so that file stays under the SwiftLint
-// 400-line file_length cap — the same split `SettingsView+CloudSync.swift`
-// uses. `VoiceRows` takes the view-model as a constructor parameter (rather
-// than reaching for the host's `private @State`) exactly like `CloudSyncRows`.
-// T-752 / CL-149 renamed `VoiceSection` → `VoiceRows` (rows, not a Section)
-// so the parent "Customization" section composes it with the Appearance picker.
-//
-// Why a nudge instead of an in-app download: Apple ships only the compact
-// ("robotic") voice tier preinstalled, and there is NO public API to bundle or
-// trigger a download of the natural Enhanced/Premium tiers — the user must
-// fetch them in iOS Settings → Accessibility → Spoken Content → Voices. iOS's
-// `openSettingsURLString` only deep-links to the app's own Settings root (not
-// the Accessibility pane), so the tip copy spells out the full path (CL-123).
+// file_length cap. `VoiceRows` takes the view-model as a constructor parameter
+// (rather than the host's `private @State`) like `CloudSyncRows`. T-752 / CL-149
+// renamed `VoiceSection` → `VoiceRows` so the "Customization" section composes
+// it with the Appearance picker.
 
-// MARK: - Voice section
-
-/// Renders the Cook Mode Voice ROWS: the gender `Picker`, the resolved
-/// quality readout, the Preview-voice button, and — when only the compact
-/// (robotic) voice is installed for the device language — the dismissible
-/// download nudge.
-///
-/// **T-752 / CL-149 (DUT-58) — rows, not a Section.** Pre-T-752 this
-/// rendered its own `Section` + footer. It now provides loose rows (a
-/// `Group`) so the parent "Customization" section in `SettingsView` can
-/// compose them alongside the Appearance picker under one header (SwiftUI
-/// `Section`s can't share a header). The footer + `.listRowBackground`
-/// live on the parent Customization section now.
+/// Renders the Cook Mode Voice ROWS: a one-line explanation + resolved-quality
+/// readout, and — when only the compact (robotic) voice is installed — the
+/// dismissible "install a better voice in Settings" prompt.
 struct VoiceRows: View {
 
     @Bindable var viewModel: SettingsViewModel
 
-    /// System `openURL` so the nudge's "Open Settings" button can deep-link to
-    /// the app's Settings root (`UIApplication.openSettingsURLString`). Uses the
-    /// environment action rather than `UIApplication.shared.open` so the type
-    /// compiles on the macOS `swift test` slice (UIKit-free) and stays testable.
+    /// System `openURL` so the prompt's "Open Settings" deep-links to the app's
+    /// Settings root (`UIApplication.openSettingsURLString`).
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         Group {
-            voiceCell
+            voiceInfo
             if viewModel.shouldShowDownloadVoiceTip {
                 downloadVoiceTip
             }
         }
-        // Stop any in-flight preview when the user leaves Settings so a
-        // sample never trails off-screen.
-        .onDisappear { viewModel.stopVoicePreview() }
     }
 
     // MARK: Rows
 
-    /// T-760 / CL-157 (DUT-66) — ONE cell: the gender picker on top, then a
-    /// smaller (``DODType/detail``) line folding the voice-quality readout +
-    /// a speaker-icon-only preview button (was three separate cells).
-    private var voiceCell: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            voicePicker
-            // DUT-327 — the gender tie-break only matters in Automatic mode; once
-            // a specific voice is wired in, gender is irrelevant, so hide it.
-            if viewModel.voiceIdentifier == nil {
-                genderPicker
-            }
-            HStack(spacing: DODSpacing.sm) {
-                qualityReadout
-                Spacer(minLength: 0)
-                previewButton
-            }
-        }
-    }
-
-    /// DUT-327 — the explicit voice picker: "Automatic (best installed)" plus
-    /// each installed voice for the device language as "Name (Quality)",
-    /// best-sounding first. Picking one pins it (it wins over gender + quality);
-    /// "Automatic" clears the pin. Doubles as a diagnostic — a voice the app can
-    /// see + use appears in this list.
-    private var voicePicker: some View {
-        Picker(selection: $viewModel.voiceIdentifier) {
-            Text("Automatic (best installed)").tag(String?.none)
-            ForEach(viewModel.installedVoiceChoices, id: \.identifier) { descriptor in
-                Text(voiceChoiceLabel(descriptor)).tag(Optional(descriptor.identifier))
-            }
-        } label: {
+    /// The always-shown info: Cook Mode uses the best installed voice, and the
+    /// resolved quality tier so the user can see whether they're on the robotic
+    /// default. No controls — voices are chosen in the iOS Settings app.
+    private var voiceInfo: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
             Text("Cook Mode Voice")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
-        }
-        .accessibilityIdentifier("settings-picker-voice-choice")
-    }
-
-    /// Label for one voice row: "Samantha (Enhanced)". Falls back to the
-    /// identifier if the platform reports no name (never seen for real voices).
-    private func voiceChoiceLabel(_ descriptor: VoiceDescriptor) -> String {
-        let name = descriptor.name.isEmpty ? descriptor.identifier : descriptor.name
-        return "\(name) (\(descriptor.quality.displayName))"
-    }
-
-    /// AC-40.10 — the Female / Male / No-preference gender tie-break for
-    /// Automatic mode. Identifier unchanged from T-721 so existing UI coverage
-    /// keeps resolving it.
-    private var genderPicker: some View {
-        Picker(selection: voiceGenderBinding) {
-            ForEach(VoiceGender.allCases, id: \.self) { value in
-                Text(value.displayName)
-                    .tag(value)
-            }
-        } label: {
-            Text("Voice Gender")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-        }
-        .accessibilityIdentifier("settings-picker-voice-gender")
-    }
-
-    /// AC-40.12 — read-only "Voice Quality → Default/Enhanced/Premium" readout
-    /// so the user can SEE whether they're on a robotic (Default) voice.
-    /// Renders "Unknown" when no catalog is available. T-760 / CL-157 — now
-    /// inline in the voice cell at the smaller ``DODType/detail`` size.
-    private var qualityReadout: some View {
-        Text("Voice Quality: \(viewModel.resolvedVoiceQuality?.displayName ?? "Unknown")")
-            .dodFont(DODType.detail)
-            .foregroundStyle(DODColor.labelSecondary)
-            .accessibilityIdentifier("settings-voice-quality")
-    }
-
-    /// AC-40.12 — speaks the fixed sample line with the current pick. T-760 /
-    /// CL-157 — title removed; just the speaker icon now (accent), with the
-    /// label moved to VoiceOver. Inert (no-op) when no previewer is wired.
-    private var previewButton: some View {
-        Button {
-            viewModel.previewVoice()
-        } label: {
-            Image(systemName: "speaker.wave.2.fill")
+            Text("Cook Mode reads recipe steps aloud using the best voice installed on your device.")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Voice Quality: \(viewModel.resolvedVoiceQuality?.displayName ?? "Unknown")")
                 .dodFont(DODType.detail)
-                .foregroundStyle(DODColor.accent)
+                .foregroundStyle(DODColor.labelSecondary)
+                .accessibilityIdentifier("settings-voice-quality")
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("settings-button-voice-preview")
-        .accessibilityLabel("Preview Voice")
-        .accessibilityHint("Plays a sample recipe step in the selected voice.")
     }
 
-    /// AC-40.13 — the dismissible "download a better voice" nudge. Visible only
-    /// when ``SettingsViewModel/shouldShowDownloadVoiceTip`` is true (compact-
-    /// only catalog, not previously dismissed). The copy spells out the full
-    /// Settings path because iOS only deep-links to the app's Settings root.
+    /// AC-40.13 — the dismissible "install a better voice" prompt. Visible only
+    /// when only the compact (robotic) voice is installed and the tip hasn't been
+    /// dismissed. The copy spells out the full Settings path because iOS only
+    /// deep-links to the app's Settings root (CL-123).
     private var downloadVoiceTip: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
             HStack(alignment: .firstTextBaseline, spacing: DODSpacing.xs) {
@@ -190,48 +104,20 @@ struct VoiceRows: View {
         .accessibilityIdentifier("settings-voice-download-tip")
     }
 
-    /// The nudge body copy. Spelled-out path because
-    /// `UIApplication.openSettingsURLString` only opens the app's own Settings
-    /// root, not the Accessibility pane (CL-123).
+    /// The prompt body. Spelled-out path because `openSettingsURLString` only
+    /// opens the app's own Settings root, not the Accessibility pane (CL-123).
     static let downloadTipBody =
         "The natural-sounding voices aren't installed yet, so steps may sound robotic. "
-        + "In the Settings app, go to Accessibility → Spoken Content → Voices → English "
-        + "and download an Enhanced or Premium voice. It'll be used here automatically."
+        + "In the Settings app, go to Accessibility, then Spoken Content, then Voices, and "
+        + "download an Enhanced or Premium voice. It'll be used here automatically."
 
     // MARK: Actions
 
-    /// Deep-link to the app's Settings root via `openSettingsURLString`. On the
-    /// macOS test slice the string constant is UIKit-gated, so this is a no-op
-    /// there; in production iOS it opens Settings.
     private func openSettings() {
         #if canImport(UIKit)
         if let url = URL(string: UIApplication.openSettingsURLString) {
             openURL(url)
         }
         #endif
-    }
-
-    // MARK: Bindings
-
-    private var voiceGenderBinding: Binding<VoiceGender> {
-        Binding(
-            get: { viewModel.voiceGender },
-            set: { viewModel.voiceGender = $0 }
-        )
-    }
-}
-
-// MARK: - VoiceGender display labels (T-721)
-
-extension VoiceGender {
-    /// User-facing label for the Cook Mode voice picker. Kept in the feature
-    /// layer (not `DODSupport`) so the domain model stays free of UI copy —
-    /// mirrors how ``AppearancePreference/displayName`` lives beside its view.
-    var displayName: String {
-        switch self {
-        case .female: return "Female"
-        case .male: return "Male"
-        case .unspecified: return "No Preference"
-        }
     }
 }

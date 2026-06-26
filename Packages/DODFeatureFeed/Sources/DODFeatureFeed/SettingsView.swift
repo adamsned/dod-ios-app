@@ -353,7 +353,8 @@ public struct SettingsView: View {
 // `AboutNedView` lives in `AboutNedView.swift` so the host file stays
 // under the 400-line `file_length` cap (T-738 / CL-134, DUT-14).
 //
-// `VoiceGender.displayName` (the Cook Mode voice-picker label) lives in
-// `SettingsView+Voice.swift` alongside the `VoiceRows` that renders it
-// (T-721; renamed from `VoiceSection` in T-752 / CL-149) — the same
-// file_length split — so it is intentionally not redeclared here.
+// `VoiceQuality.displayName` (the Cook Mode voice-quality readout label) lives
+// in `SettingsViewModel+Voice.swift` alongside the `VoiceRows` that render it
+// (T-752 / CL-149; CL-279 / DUT-329 removed the in-app voice + gender pickers,
+// leaving an info readout + an "install a better voice" prompt) — so it is
+// intentionally not redeclared here.

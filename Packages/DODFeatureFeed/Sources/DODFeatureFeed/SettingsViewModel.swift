@@ -80,7 +80,6 @@ public final class SettingsViewModel {
     /// US-40 / AC-40.10..AC-40.11 (T-721). Backs the Cook Mode voice-gender
     /// picker. Built against the same injected ``defaults`` so the L1 suite
     /// drives it through an isolated `UserDefaults(suiteName:)`.
-    private let voicePreferenceStore: VoicePreferenceStore
 
     /// US-40 / AC-40.12..AC-40.13 (T-721 quality readout + Preview, T-722
     /// nudge). Catalog + preview seam for the Settings voice section. Optional
@@ -188,20 +187,6 @@ public final class SettingsViewModel {
         set { defaults.set(newValue.rawValue, forKey: Self.shareFormatPreferenceKey) }
     }
 
-    /// US-40 / AC-40.10..AC-40.11 (T-721). Cook Mode voice-gender preference.
-    /// **T-756 / CL-153 — observable stored property** (was computed-over-
-    /// ``VoicePreferenceStore`` → the voice picker label never updated).
-    /// Seeded in `init`, persisted via the store on `didSet`.
-    public var voiceGender: VoiceGender {
-        didSet { voicePreferenceStore.setGender(voiceGender) }
-    }
-
-    /// DUT-327 — the explicitly-picked Cook Mode voice identifier (`nil` =
-    /// Automatic). Persisted on `didSet`; when set it wins over gender + quality.
-    public var voiceIdentifier: String? {
-        didSet { voicePreferenceStore.setVoiceIdentifier(voiceIdentifier) }
-    }
-
     /// AC-36.5. Defaults ON (true). The read uses
     /// `object(forKey:) as? Bool ?? true` so an absent key returns true,
     /// matching the constitution §9 opt-out posture. A future opt-in
@@ -283,13 +268,10 @@ public final class SettingsViewModel {
         requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false }
     ) {
         self.defaults = defaults
-        self.voicePreferenceStore = VoicePreferenceStore(defaults: defaults)
         // T-756 / CL-153 — seed the observable picker preferences (didSet
         // doesn't fire for these initial-in-init assignments).
         self.appearance = AppearancePreference.fromDefaults(defaults)
         self.temperaturePreference = TemperaturePreference.fromDefaults(defaults)
-        self.voiceGender = voicePreferenceStore.preference().gender
-        self.voiceIdentifier = voicePreferenceStore.preference().voiceIdentifier
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies

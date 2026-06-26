@@ -2,286 +2,124 @@ import DODSupport
 import Foundation
 import Testing
 
-/// L1 coverage for ``VoiceSelector`` — the Cook Mode Voice Mode quality +
-/// gender-selection engine (US-40 / AC-40.9..AC-40.11, T-720). Pure value-type
-/// logic, zero AVFoundation dependency, so it runs on the macOS `swift test`
-/// slice (CL-109).
-@Suite("VoiceSelector (US-40 / T-720)") struct VoiceSelectionTests {
+/// L1 coverage for ``VoiceSelector`` — the Cook Mode Voice Mode quality
+/// selection engine (US-40 / AC-40.9, T-720; CL-279 / DUT-329 — one
+/// auto-selected voice, no user preference). Pure value-type logic, zero
+/// AVFoundation dependency, so it runs on the macOS `swift test` slice (CL-109).
+@Suite("VoiceSelector (US-40 / DUT-329)") struct VoiceSelectionTests {
 
-    // Convenience builders keep the fixtures readable.
-    private func voice(
-        _ id: String,
-        _ lang: String,
-        _ gender: VoiceGender,
-        _ quality: VoiceQuality
-    ) -> VoiceDescriptor {
-        VoiceDescriptor(identifier: id, languageCode: lang, gender: gender, quality: quality)
+    private func voice(_ id: String, _ lang: String, _ quality: VoiceQuality) -> VoiceDescriptor {
+        VoiceDescriptor(identifier: id, languageCode: lang, quality: quality)
     }
 
     // MARK: - The robotic-fix contract
 
-    @Test func picksEnhancedOverCompactForTheSameGender() {
-        // The core "sounds like a robot" fix: when both a compact (default)
-        // and an enhanced female voice are installed for en-US, the selector
-        // must reach past the compact tier to the enhanced one — the exact
-        // case `AVSpeechSynthesisVoice(language:)` got wrong.
+    @Test func picksEnhancedOverCompact() {
+        // The core "sounds like a robot" fix: with both a compact and an
+        // enhanced voice installed for en-US, reach past the compact tier.
         let catalog = [
-            voice("compact.Samantha", "en-US", .female, .default),
-            voice("enhanced.Samantha", "en-US", .female, .enhanced),
+            voice("compact", "en-US", .default),
+            voice("enhanced", "en-US", .enhanced),
         ]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: .default
-        )
-        #expect(chosen == "enhanced.Samantha")
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US") == "enhanced")
     }
 
     @Test func picksPremiumOverEnhancedOverDefault() {
         let catalog = [
-            voice("compact", "en-US", .female, .default),
-            voice("enhanced", "en-US", .female, .enhanced),
-            voice("premium", "en-US", .female, .premium),
+            voice("compact", "en-US", .default),
+            voice("enhanced", "en-US", .enhanced),
+            voice("premium", "en-US", .premium),
         ]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: .default
-        )
-        #expect(chosen == "premium")
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US") == "premium")
     }
 
-    // MARK: - Gender preference
-
-    @Test func prefersRequestedGenderOverOppositeGender() {
+    @Test func naturalBeatsRoboticAcrossLocaleTieBreak() {
+        // Natural-first dominates the exact-locale tie-break: an enhanced en-GB
+        // voice beats a compact en-US voice even for an en-US request.
         let catalog = [
-            voice("male.enhanced", "en-US", .male, .enhanced),
-            voice("female.enhanced", "en-US", .female, .enhanced),
+            voice("us.compact", "en-US", .default),
+            voice("gb.enhanced", "en-GB", .enhanced),
         ]
-        let male = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: VoicePreference(gender: .male)
-        )
-        #expect(male == "male.enhanced")
-
-        let female = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: VoicePreference(gender: .female)
-        )
-        #expect(female == "female.enhanced")
-    }
-
-    @Test func naturalVoiceBeatsRoboticEvenOfTheOppositeGender() {
-        // DUT-327 — the bug fix. A natural (premium) voice of the OPPOSITE
-        // gender beats a robotic (compact) voice of the requested gender:
-        // "don't sound like a robot" now trumps the gender preference. The prior
-        // gender-primary ranking returned "female.compact" here, which is why a
-        // user who downloaded a male natural voice still heard the female robot.
-        let catalog = [
-            voice("female.compact", "en-US", .female, .default),
-            voice("male.premium", "en-US", .male, .premium),
-        ]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: VoicePreference(gender: .female)
-        )
-        #expect(chosen == "male.premium")
-    }
-
-    @Test func genderBreaksTiesAmongNaturalVoices() {
-        // Gender still decides BETWEEN two natural voices: with an enhanced
-        // female + an enhanced male installed, the female pref picks the female.
-        let catalog = [
-            voice("male.enhanced", "en-US", .male, .enhanced),
-            voice("female.enhanced", "en-US", .female, .enhanced),
-        ]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: VoicePreference(gender: .female)
-        )
-        #expect(chosen == "female.enhanced")
-    }
-
-    @Test func genderBreaksTiesWhenOnlyRoboticInstalled() {
-        // Robotic-only catalog: gender still applies (a robotic female beats a
-        // robotic male for the female pref) — natural-first only reorders when a
-        // natural voice actually exists.
-        let catalog = [
-            voice("male.compact", "en-US", .male, .default),
-            voice("female.compact", "en-US", .female, .default),
-        ]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: VoicePreference(gender: .female)
-        )
-        #expect(chosen == "female.compact")
-    }
-
-    @Test func unspecifiedGenderBeatsOppositeGenderWhenNoMatch() {
-        // No female voice installed: an unspecified-gender enhanced voice
-        // (rank 1) is preferred over an opposite-gender (male) premium voice
-        // (rank 2) — better a neutral natural voice than a wrong-gender one.
-        let catalog = [
-            voice("neutral.enhanced", "en-US", .unspecified, .enhanced),
-            voice("male.premium", "en-US", .male, .premium),
-        ]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: VoicePreference(gender: .female)
-        )
-        #expect(chosen == "neutral.enhanced")
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US") == "gb.enhanced")
     }
 
     // MARK: - Language matching
 
     @Test func matchesByLanguageFamilyPrefix() {
-        // A request for "en" matches an "en-US" voice (same language family).
-        let catalog = [voice("enUS.enhanced", "en-US", .female, .enhanced)]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en",
-            preference: .default
-        )
-        #expect(chosen == "enUS.enhanced")
+        let catalog = [voice("enUS.enhanced", "en-US", .enhanced)]
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en") == "enUS.enhanced")
     }
 
     @Test func prefersExactLocaleOverPrefixAsTieBreak() {
-        // Two same-gender same-quality en voices; the one whose tag exactly
-        // matches the request wins the tie-break.
+        // Two same-quality en voices; the exact-tag match wins the tie-break.
         let catalog = [
-            voice("enGB.enhanced", "en-GB", .female, .enhanced),
-            voice("enUS.enhanced", "en-US", .female, .enhanced),
+            voice("enGB.enhanced", "en-GB", .enhanced),
+            voice("enUS.enhanced", "en-US", .enhanced),
         ]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: .default
-        )
-        #expect(chosen == "enUS.enhanced")
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US") == "enUS.enhanced")
     }
 
     @Test func returnsNilWhenNoLanguageMatch() {
-        // A French-only catalog against an English request → nil, so the
-        // caller falls back to the platform default (degrades as before).
-        let catalog = [voice("fr.enhanced", "fr-FR", .female, .enhanced)]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: "en-US",
-            preference: .default
-        )
-        #expect(chosen == nil)
+        let catalog = [voice("fr.enhanced", "fr-FR", .enhanced)]
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: "en-US") == nil)
     }
 
     @Test func nilLanguageCodeMatchesEveryVoice() {
         let catalog = [
-            voice("fr.compact", "fr-FR", .female, .default),
-            voice("fr.enhanced", "fr-FR", .female, .enhanced),
+            voice("fr.compact", "fr-FR", .default),
+            voice("fr.enhanced", "fr-FR", .enhanced),
         ]
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: catalog,
-            languageCode: nil,
-            preference: .default
-        )
-        #expect(chosen == "fr.enhanced")
+        #expect(VoiceSelector.bestVoiceIdentifier(from: catalog, languageCode: nil) == "fr.enhanced")
     }
 
     @Test func emptyCatalogReturnsNil() {
-        let chosen = VoiceSelector.bestVoiceIdentifier(
-            from: [],
-            languageCode: "en-US",
-            preference: .default
-        )
-        #expect(chosen == nil)
+        #expect(VoiceSelector.bestVoiceIdentifier(from: [], languageCode: "en-US") == nil)
     }
 
     @Test func selectionIsDeterministicAcrossEqualCandidates() {
-        // Two voices identical on every ranked axis — the identifier
-        // tie-break makes the choice stable regardless of catalog order.
-        let voiceA = voice("aaa", "en-US", .female, .enhanced)
-        let voiceB = voice("bbb", "en-US", .female, .enhanced)
-        let forward = VoiceSelector.bestVoiceIdentifier(
-            from: [voiceA, voiceB],
-            languageCode: "en-US",
-            preference: .default
-        )
-        let reversed = VoiceSelector.bestVoiceIdentifier(
-            from: [voiceB, voiceA],
-            languageCode: "en-US",
-            preference: .default
-        )
+        let voiceA = voice("aaa", "en-US", .enhanced)
+        let voiceB = voice("bbb", "en-US", .enhanced)
+        let forward = VoiceSelector.bestVoiceIdentifier(from: [voiceA, voiceB], languageCode: "en-US")
+        let reversed = VoiceSelector.bestVoiceIdentifier(from: [voiceB, voiceA], languageCode: "en-US")
         #expect(forward == "aaa")
         #expect(reversed == "aaa")
     }
 
-    // MARK: - bestAvailableQuality / hasNaturalVoice (T-722 — the nudge signal)
+    // MARK: - bestAvailableQuality / hasNaturalVoice (the "install a better voice" signal)
 
-    @Test func bestAvailableQualityReturnsHighestTierIgnoringGender() {
-        // A male premium + a female compact installed for en-US: the best
-        // *available* tier is premium even though it's the opposite gender —
-        // the nudge cares about "is anything natural installed", not gender.
+    @Test func bestAvailableQualityReturnsHighestTier() {
         let catalog = [
-            voice("female.compact", "en-US", .female, .default),
-            voice("male.premium", "en-US", .male, .premium),
+            voice("compact", "en-US", .default),
+            voice("premium", "en-US", .premium),
         ]
-        #expect(
-            VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == .premium
-        )
+        #expect(VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == .premium)
     }
 
     @Test func bestAvailableQualityIsDefaultWhenOnlyCompactInstalled() {
-        // The stock-device case: only the compact voice is installed. This is
-        // exactly the state that should fire the "download a better voice" tip.
-        let catalog = [voice("compact", "en-US", .female, .default)]
-        #expect(
-            VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == .default
-        )
+        let catalog = [voice("compact", "en-US", .default)]
+        #expect(VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == .default)
     }
 
     @Test func bestAvailableQualityIsNilWhenNoLanguageMatch() {
-        // No en voice at all → nil (the synthesizer falls back to the platform
-        // default; the nudge stays out of it).
-        let catalog = [voice("fr.enhanced", "fr-FR", .female, .enhanced)]
-        #expect(
-            VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == nil
-        )
-    }
-
-    @Test func bestAvailableQualityMatchesByLanguageFamilyPrefix() {
-        // A bare "en" request sees the installed en-US voice's tier.
-        let catalog = [voice("enUS.enhanced", "en-US", .female, .enhanced)]
-        #expect(
-            VoiceSelector.bestAvailableQuality(forLanguage: "en", from: catalog) == .enhanced
-        )
+        let catalog = [voice("fr.enhanced", "fr-FR", .enhanced)]
+        #expect(VoiceSelector.bestAvailableQuality(forLanguage: "en-US", from: catalog) == nil)
     }
 
     @Test func hasNaturalVoiceIsFalseWhenOnlyCompactInstalled() {
-        let catalog = [voice("compact", "en-US", .female, .default)]
+        let catalog = [voice("compact", "en-US", .default)]
         #expect(!VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
     }
 
     @Test func hasNaturalVoiceIsTrueWhenEnhancedInstalled() {
         let catalog = [
-            voice("compact", "en-US", .female, .default),
-            voice("enhanced", "en-US", .female, .enhanced),
+            voice("compact", "en-US", .default),
+            voice("enhanced", "en-US", .enhanced),
         ]
         #expect(VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
     }
 
-    @Test func hasNaturalVoiceIsTrueWhenPremiumInstalled() {
-        let catalog = [voice("premium", "en-US", .male, .premium)]
-        #expect(VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
-    }
-
     @Test func hasNaturalVoiceIsFalseWhenNoLanguageMatch() {
-        // No voice for the language at all → not a "missing natural voice"
-        // situation (degrades to platform default); the nudge must stay quiet.
-        let catalog = [voice("fr.premium", "fr-FR", .female, .premium)]
+        let catalog = [voice("fr.premium", "fr-FR", .premium)]
         #expect(!VoiceSelector.hasNaturalVoice(forLanguage: "en-US", in: catalog))
     }
 

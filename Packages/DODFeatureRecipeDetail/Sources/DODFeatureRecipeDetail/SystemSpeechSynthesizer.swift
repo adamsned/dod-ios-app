@@ -44,21 +44,18 @@ extension SpeechSynthesizing {
 /// compiles on the package's macOS `swift test` slice; the iOS-only audio
 /// session lives in ``VoiceReader`` behind `#if os(iOS)`.
 ///
-/// US-40 / AC-40.9..AC-40.11 (T-720, 2026-05-29) — the resolved voice is the
-/// **best installed quality tier** for the supplied language + the user's
-/// gender preference, via ``VoiceSelector``, NOT the compact-tier voice that
-/// `AVSpeechSynthesisVoice(language:)` returns. The prior behavior picked the
-/// default (concatenative, "robotic") voice for a language even when an
-/// `enhanced` Siri voice was already installed; this path enumerates the live
-/// catalog and explicitly reaches the natural tier. Falls back to the prior
-/// `AVSpeechSynthesisVoice(language:)` behavior (then the platform default)
-/// when the selector finds no language match, so a locale with no installed
-/// voices degrades exactly as before. CL-109 captures the rationale.
+/// US-40 / AC-40.9 (T-720; CL-279 / DUT-329) — the resolved voice is the **best
+/// installed quality tier** for the supplied language, via ``VoiceSelector``,
+/// NOT the compact-tier voice that `AVSpeechSynthesisVoice(language:)` returns.
+/// There is no user voice/gender choice (CL-279) — Cook Mode uses one
+/// auto-selected voice; voices are managed only in the iOS Settings app. Falls
+/// back to `AVSpeechSynthesisVoice(language:)` (then the platform default) when
+/// the selector finds no language match, so a locale with no installed voices
+/// degrades exactly as before. CL-79 / CL-109 capture the rationale.
 @MainActor
 public final class SystemSpeechSynthesizer: SpeechSynthesizing {
 
     private let synthesizer = AVSpeechSynthesizer()
-    private let preferenceStore: VoicePreferenceStore
 
     /// DUT-325 — the rate applied to the next utterance. Defaults to the
     /// platform default; ``VoiceReader`` nudges it (clamped) for the session.
@@ -73,9 +70,7 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
         }
     }
 
-    public init(preferenceStore: VoicePreferenceStore = VoicePreferenceStore()) {
-        self.preferenceStore = preferenceStore
-    }
+    public init() {}
 
     public var isSpeaking: Bool { synthesizer.isSpeaking }
 
@@ -94,20 +89,16 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
         synthesizer.speak(utterance)
     }
 
-    /// Resolve the best installed voice for the language + the user's gender
-    /// preference. Returns `nil` only when neither the quality-aware selector
-    /// NOR the legacy `(language:)` initializer produces a voice, in which
-    /// case the synthesizer uses the platform default (the original CL-79
-    /// fallback).
+    /// Resolve the best installed voice for the language (CL-279 — no user
+    /// preference). Returns `nil` only when neither the quality-aware selector
+    /// NOR the legacy `(language:)` initializer produces a voice, in which case
+    /// the synthesizer uses the platform default (the original CL-79 fallback).
     private func resolveVoice(languageCode: String?) -> AVSpeechSynthesisVoice? {
-        let catalog = AVSpeechSynthesisVoice.speechVoices()
-        let descriptors = catalog.map(Self.descriptor(for:))
-        let preference = preferenceStore.preference()
+        let descriptors = AVSpeechSynthesisVoice.speechVoices().map(Self.descriptor(for:))
 
         if let identifier = VoiceSelector.bestVoiceIdentifier(
             from: descriptors,
-            languageCode: languageCode,
-            preference: preference
+            languageCode: languageCode
         ), let voice = AVSpeechSynthesisVoice(identifier: identifier) {
             return voice
         }
@@ -129,26 +120,16 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
     /// Project an `AVSpeechSynthesisVoice` onto the AVFoundation-free
     /// ``VoiceDescriptor`` the selector consumes.
     static func descriptor(for voice: AVSpeechSynthesisVoice) -> VoiceDescriptor {
-        let gender: VoiceGender
-        switch voice.gender {
-        case .male: gender = .male
-        case .female: gender = .female
-        default: gender = .unspecified
-        }
-
         let quality: VoiceQuality
         switch voice.quality {
         case .premium: quality = .premium
         case .enhanced: quality = .enhanced
         default: quality = .default
         }
-
         return VoiceDescriptor(
             identifier: voice.identifier,
             languageCode: voice.language,
-            gender: gender,
-            quality: quality,
-            name: voice.name
+            quality: quality
         )
     }
 
