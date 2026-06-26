@@ -94,12 +94,20 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
     /// NOR the legacy `(language:)` initializer produces a voice, in which case
     /// the synthesizer uses the platform default (the original CL-79 fallback).
     private func resolveVoice(languageCode: String?) -> AVSpeechSynthesisVoice? {
-        let descriptors = AVSpeechSynthesisVoice.speechVoices().map(Self.descriptor(for:))
+        // Keep the REAL voice objects: we pick the best one by identifier, then
+        // return that exact instance. Earlier this re-resolved the pick via
+        // `AVSpeechSynthesisVoice(identifier:)`, but that initializer returns nil
+        // for many Enhanced/Premium voices even when they're in the live catalog
+        // — so a correctly-picked natural voice (e.g. Evan Enhanced) silently
+        // fell through to the compact `(language:)` default (Samantha). Looking
+        // the pick up in the array we just enumerated can't fail that way.
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+        let descriptors = voices.map(Self.descriptor(for:))
 
         if let identifier = VoiceSelector.bestVoiceIdentifier(
             from: descriptors,
             languageCode: languageCode
-        ), let voice = AVSpeechSynthesisVoice(identifier: identifier) {
+        ), let voice = voices.first(where: { $0.identifier == identifier }) {
             return voice
         }
 

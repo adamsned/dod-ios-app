@@ -54,10 +54,8 @@ struct VoiceRows: View {
             Text("Cook Mode Voice")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
-            Text("Cook Mode reads recipe steps aloud using the best voice installed on your device.")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // The section footer ("The Cook Mode voice reads recipe steps
+            // aloud.") is the single description; no inline duplicate here.
             Text("Voice Quality: \(viewModel.resolvedVoiceQuality?.displayName ?? "Unknown")")
                 .dodFont(DODType.detail)
                 .foregroundStyle(DODColor.labelSecondary)
