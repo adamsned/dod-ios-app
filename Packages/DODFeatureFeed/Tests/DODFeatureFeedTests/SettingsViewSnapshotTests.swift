@@ -198,14 +198,14 @@ final class SettingsViewSnapshotTests: XCTestCase {
 
     /// Stock-device catalog: only the compact en-US voice (fires the nudge).
     static func compactOnlyCatalog() -> [VoiceDescriptor] {
-        [VoiceDescriptor(identifier: "compact.female", languageCode: "en-US", gender: .female, quality: .default)]
+        [VoiceDescriptor(identifier: "compact.female", languageCode: "en-US", quality: .default)]
     }
 
     /// Catalog with an enhanced female voice installed (suppresses the nudge).
     static func enhancedCatalog() -> [VoiceDescriptor] {
         [
-            VoiceDescriptor(identifier: "compact.female", languageCode: "en-US", gender: .female, quality: .default),
-            VoiceDescriptor(identifier: "enhanced.female", languageCode: "en-US", gender: .female, quality: .enhanced),
+            VoiceDescriptor(identifier: "compact.female", languageCode: "en-US", quality: .default),
+            VoiceDescriptor(identifier: "enhanced.female", languageCode: "en-US", quality: .enhanced),
         ]
     }
 

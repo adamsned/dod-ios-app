@@ -13,12 +13,11 @@ import Testing
 /// These tests directly pin the fix: `withObservationTracking` registers a
 /// read of the property, then a mutation must fire `onChange`. On the
 /// pre-T-756 computed-over-store implementation the read registered no
-/// observable access (the value came from `UserDefaults` /
-/// `VoicePreferenceStore`, not a tracked stored property), so `onChange`
-/// never fired — these tests would fail. They pass only once the
-/// properties are observable.
+/// observable access (the value came from `UserDefaults`, not a tracked stored
+/// property), so `onChange` never fired — these tests would fail. They pass only
+/// once the properties are observable.
 ///
-/// Spec trace: US-36 AC-36.2; US-40 AC-40.10; DUT-47; CL-153.
+/// Spec trace: US-36 AC-36.2; DUT-47; CL-153.
 @MainActor
 @Suite("SettingsViewModel observation (T-756 / CL-153)")
 struct SettingsViewModelObservationTests {
@@ -59,18 +58,6 @@ struct SettingsViewModelObservationTests {
         #expect(flag.fired, "Mutating `temperaturePreference` must emit an @Observable change")
     }
 
-    @Test func voiceGenderMutationTriggersObservation() {
-        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
-        let flag = Flag()
-        withObservationTracking {
-            _ = viewModel.voiceGender
-        } onChange: {
-            flag.fired = true
-        }
-        viewModel.voiceGender = (viewModel.voiceGender == .male) ? .female : .male
-        #expect(flag.fired, "Mutating `voiceGender` must emit an @Observable change")
-    }
-
     /// The observable conversion must NOT break the persistence contract:
     /// `didSet` still writes through to the backing store, and a fresh
     /// view-model seeds the persisted value back in `init`.
@@ -79,11 +66,9 @@ struct SettingsViewModelObservationTests {
         let first = SettingsViewModel(defaults: defaults)
         first.appearance = .dark
         first.temperaturePreference = .celsius
-        first.voiceGender = .male
 
         let second = SettingsViewModel(defaults: defaults)
         #expect(second.appearance == .dark)
         #expect(second.temperaturePreference == .celsius)
-        #expect(second.voiceGender == .male)
     }
 }

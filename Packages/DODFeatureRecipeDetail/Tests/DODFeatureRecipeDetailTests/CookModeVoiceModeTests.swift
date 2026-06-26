@@ -259,7 +259,7 @@ import Testing
 
     @Test func offersUpgradeWhenOnlyRoboticVoiceInstalled() {
         let viewModel = upgradeViewModel(voices: [
-            VoiceDescriptor(identifier: "compact", languageCode: "en-US", gender: .female, quality: .default)
+            VoiceDescriptor(identifier: "compact", languageCode: "en-US", quality: .default)
         ])
         #expect(viewModel.shouldOfferVoiceUpgrade)
     }
@@ -267,8 +267,8 @@ import Testing
     @Test func noUpgradeWhenANaturalVoiceIsInstalled() {
         // A natural voice of EITHER gender means the user is set — no prompt.
         let viewModel = upgradeViewModel(voices: [
-            VoiceDescriptor(identifier: "compact", languageCode: "en-US", gender: .female, quality: .default),
-            VoiceDescriptor(identifier: "enhanced", languageCode: "en-US", gender: .male, quality: .enhanced),
+            VoiceDescriptor(identifier: "compact", languageCode: "en-US", quality: .default),
+            VoiceDescriptor(identifier: "enhanced", languageCode: "en-US", quality: .enhanced),
         ])
         #expect(!viewModel.shouldOfferVoiceUpgrade)
     }
