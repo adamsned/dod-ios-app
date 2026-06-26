@@ -53,6 +53,27 @@ extension SettingsViewModel {
     public func dismissDownloadVoiceTip() {
         defaults.set(true, forKey: Self.downloadVoiceTipDismissedKey)
     }
+
+    // MARK: - Resolved voice readout + preview (DUT-332)
+
+    /// DUT-332 — the Settings readout: "Voice: <name> (<quality>)" naming the
+    /// voice Cook Mode resolves for this device (e.g. "Voice: Jamie (Premium)").
+    /// Falls back to quality-only, then "Unknown", when a name/catalog isn't
+    /// available (the test double has no live catalog).
+    public var resolvedVoiceDisplay: String {
+        let name = voicePreviewer?.resolvedVoiceName(languageCode: voiceLanguageCode)
+        switch (name, resolvedVoiceQuality) {
+        case (let name?, let quality?): return "Voice: \(name) (\(quality.displayName))"
+        case (nil, let quality?): return "Voice: \(quality.displayName)"
+        default: return "Voice: Unknown"
+        }
+    }
+
+    /// DUT-332 — speak a sample line in the resolved voice (the cell's speaker
+    /// button), so the user can hear their selected voice from Settings.
+    public func previewVoice() {
+        voicePreviewer?.previewVoice(languageCode: voiceLanguageCode)
+    }
 }
 
 // MARK: - Quality tier display copy (AC-40.12)

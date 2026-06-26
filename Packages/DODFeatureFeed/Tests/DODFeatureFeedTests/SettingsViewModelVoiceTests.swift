@@ -66,6 +66,38 @@ import Testing
         #expect(viewModel.resolvedVoiceQuality == nil)
     }
 
+    // MARK: - Named readout + preview (DUT-332)
+
+    @Test func displayShowsResolvedNameAndQuality() {
+        let previewer = RecordingVoicePreviewer(
+            catalog: [voice("premium", .premium)],
+            resolvedName: "Jamie"
+        )
+        let viewModel = SettingsViewModel(
+            defaults: Self.isolatedDefaults(),
+            voicePreviewer: previewer,
+            voiceLocale: Locale(identifier: "en-US")
+        )
+        #expect(viewModel.resolvedVoiceDisplay == "Voice: Jamie (Premium)")
+    }
+
+    @Test func displayFallsBackToQualityWhenNameUnavailable() {
+        // No name from the seam → quality-only (the host double has no live catalog).
+        let (viewModel, _) = makeViewModel(catalog: [voice("enhanced", .enhanced)])
+        #expect(viewModel.resolvedVoiceDisplay == "Voice: Enhanced")
+    }
+
+    @Test func displayIsUnknownWithEmptyCatalog() {
+        let (viewModel, _) = makeViewModel(catalog: [])
+        #expect(viewModel.resolvedVoiceDisplay == "Voice: Unknown")
+    }
+
+    @Test func previewVoiceForwardsToTheSeam() {
+        let (viewModel, previewer) = makeViewModel(catalog: [voice("premium", .premium)])
+        viewModel.previewVoice()
+        #expect(previewer.previewCount == 1)
+    }
+
     // MARK: - Install-a-better-voice nudge (AC-40.13)
 
     @Test func tipShowsWhenOnlyCompactInstalled() {
@@ -106,6 +138,15 @@ import Testing
 @MainActor
 final class RecordingVoicePreviewer: VoicePreviewing {
     let catalog: [VoiceDescriptor]
-    init(catalog: [VoiceDescriptor]) { self.catalog = catalog }
+    let resolvedName: String?
+    private(set) var previewCount = 0
+
+    init(catalog: [VoiceDescriptor], resolvedName: String? = nil) {
+        self.catalog = catalog
+        self.resolvedName = resolvedName
+    }
+
     func installedVoices() -> [VoiceDescriptor] { catalog }
+    func resolvedVoiceName(languageCode: String?) -> String? { resolvedName }
+    func previewVoice(languageCode: String?) { previewCount += 1 }
 }

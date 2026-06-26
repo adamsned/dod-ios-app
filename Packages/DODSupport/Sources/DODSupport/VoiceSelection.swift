@@ -77,7 +77,9 @@ public enum VoiceSelector {
         from available: [VoiceDescriptor],
         languageCode: String?
     ) -> String? {
-        let matches = available.filter { matchesLanguage($0.languageCode, languageCode) }
+        let matches = available.filter {
+            matchesLanguage($0.languageCode, languageCode) && isUsable($0)
+        }
         guard !matches.isEmpty else { return nil }
         let best = matches.min { lhs, rhs in
             sortKey(for: lhs, languageCode: languageCode) < sortKey(for: rhs, languageCode: languageCode)
@@ -93,7 +95,7 @@ public enum VoiceSelector {
         from available: [VoiceDescriptor]
     ) -> VoiceQuality? {
         available
-            .filter { matchesLanguage($0.languageCode, languageCode) }
+            .filter { matchesLanguage($0.languageCode, languageCode) && isUsable($0) }
             .map(\.quality)
             .max()
     }
@@ -113,6 +115,21 @@ public enum VoiceSelector {
     }
 
     // MARK: - Private
+
+    /// DUT-331 — Siri voices (identifier `com.apple.ttsbundle.siri_*`) appear in
+    /// `AVSpeechSynthesisVoice.speechVoices()` and report enhanced/premium
+    /// quality, AND `AVSpeechSynthesisVoice(identifier:)` resolves them — but
+    /// `AVSpeechSynthesizer` silently refuses to *speak* with a Siri voice in a
+    /// third-party app and falls back to the compact default, so it sounds
+    /// robotic. Worse, because they report a high quality tier, natural-first
+    /// selection would prefer an unusable Siri voice over a genuinely usable
+    /// downloaded Enhanced/Premium one. Exclude them everywhere — selection AND
+    /// the "is a natural voice installed?" gate — so we only ever consider voices
+    /// the app can actually speak with. Matched by the `ttsbundle.siri` marker;
+    /// regular voices are `com.apple.voice.{compact,enhanced,premium}.*` (kept).
+    private static func isUsable(_ voice: VoiceDescriptor) -> Bool {
+        !voice.identifier.localizedCaseInsensitiveContains("ttsbundle.siri")
+    }
 
     /// DUT-330 — the default voice name. Apple ships the classic en-US voice
     /// "Samantha" on every device, and its `AVSpeechSynthesisVoice.identifier`

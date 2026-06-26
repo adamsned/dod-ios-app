@@ -46,22 +46,32 @@ struct VoiceRows: View {
 
     // MARK: Rows
 
-    /// The always-shown info: Cook Mode uses the best installed voice, and the
-    /// resolved quality tier so the user can see whether they're on the robotic
-    /// default. No controls — voices are chosen in the iOS Settings app.
+    /// DUT-332 — the Cook Mode Voice cell: the resolved voice name + quality
+    /// ("Voice: Jamie (Premium)") with a trailing speaker button that previews
+    /// it. No picker/gender (CL-279) — voices are chosen in the iOS Settings
+    /// app; this just names + previews the auto-selected one. The section footer
+    /// ("The Cook Mode voice reads recipe steps aloud.") is the description.
     private var voiceInfo: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-            Text("Cook Mode Voice")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-            Text("Cook Mode reads recipe steps aloud using the best voice installed on your device.")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Voice Quality: \(viewModel.resolvedVoiceQuality?.displayName ?? "Unknown")")
-                .dodFont(DODType.detail)
-                .foregroundStyle(DODColor.labelSecondary)
-                .accessibilityIdentifier("settings-voice-quality")
+        HStack(alignment: .firstTextBaseline, spacing: DODSpacing.sm) {
+            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                Text("Cook Mode Voice")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                Text(viewModel.resolvedVoiceDisplay)
+                    .dodFont(DODType.detail)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .accessibilityIdentifier("settings-voice-quality")
+            }
+            Spacer()
+            Button {
+                viewModel.previewVoice()
+            } label: {
+                Image(systemName: "speaker.wave.2")
+                    .foregroundStyle(DODColor.accent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings-voice-preview")
+            .accessibilityLabel("Preview voice")
         }
     }
 
