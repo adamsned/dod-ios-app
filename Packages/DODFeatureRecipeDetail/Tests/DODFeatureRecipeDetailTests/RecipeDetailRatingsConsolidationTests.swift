@@ -38,6 +38,23 @@ struct RecipeDetailRatingsConsolidationTests {
         #expect(viewModel.canSubmitRatingOrComment)
     }
 
+    /// DUT-350 — re-rating an existing vote (3★ → 5★) must keep the NEW vote, not
+    /// the cached one. The POST result carries the authoritative `userRating`; the
+    /// `??` previously preferred the cached value and silently dropped the change.
+    @Test func reRatingKeepsTheNewVoteNotTheCachedOne() async {
+        let viewModel = Self.makeReadyViewModel(id: 850, withValidIdentity: true)
+        // A cached prior vote of 3★.
+        await viewModel.applyRatingRefresh(
+            RecipeRating(recipeID: 850, average: 4.0, count: 10, userRating: 3)
+        )
+        #expect(viewModel.ratingSummary?.userRating == 3)
+        // User re-rates to 5★; postRating returns the authoritative userRating = 5.
+        await viewModel.applyRatingRefresh(
+            RecipeRating(recipeID: 850, average: 4.1, count: 11, userRating: 5)
+        )
+        #expect(viewModel.ratingSummary?.userRating == 5)
+    }
+
     @Test func canSubmitIsTrueWithCommentOnly() async throws {
         let viewModel = Self.makeReadyViewModel(id: 802, withValidIdentity: true)
         viewModel.setCommentDraft("Great recipe.")
