@@ -49,7 +49,7 @@ struct CookCelebrationView: View {
                 .padding(.horizontal, DODSpacing.md)
             Spacer()
             Button(buttonTitle) { onDismiss() }
-                .buttonStyle(.borderedProminent)
+                .dodProminentButton()
                 .tint(DODColor.burntOrange)
         }
         .padding(DODSpacing.xl)

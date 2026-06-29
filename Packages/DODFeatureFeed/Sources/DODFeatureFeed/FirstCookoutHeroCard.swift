@@ -45,7 +45,7 @@ struct FirstCookoutHeroCard: View {
                 Text("Let's cook")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.burntOrange)
             .padding(.top, DODSpacing.xxs)
             Button(action: onCookDumpCake) {

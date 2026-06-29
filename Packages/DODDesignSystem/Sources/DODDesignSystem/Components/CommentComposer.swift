@@ -122,7 +122,7 @@ public struct CommentComposer: View {
                     .padding(.horizontal, DODSpacing.lg)
                     .padding(.vertical, DODSpacing.sm)
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.accent)
             .disabled(!canSubmit)
 
@@ -134,7 +134,7 @@ public struct CommentComposer: View {
                     .padding(.horizontal, DODSpacing.lg)
                     .padding(.vertical, DODSpacing.sm)
             }
-            .buttonStyle(.bordered)
+            .dodBorderedButton()
             .disabled(isSubmitting)
         }
     }
