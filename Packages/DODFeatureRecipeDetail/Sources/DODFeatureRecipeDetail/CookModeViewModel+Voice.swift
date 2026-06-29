@@ -142,4 +142,12 @@ extension CookModeViewModel {
     public func pauseVoice() {
         voiceReader.pause()
     }
+
+    /// "Resume" / "Continue" — resume a paused utterance (DUT-343). Pairs with
+    /// ``pauseVoice()``; without it a paused reader could only restart by changing
+    /// the step (Next / Previous / Repeat all `stop()` + re-read from the top),
+    /// so "Pause" was a hands-free dead-end.
+    public func resumeVoice() {
+        voiceReader.resume()
+    }
 }

@@ -162,6 +162,25 @@ import Testing
         #expect(mock.isPaused)
     }
 
+    /// DUT-343 — "resume" resumes a paused utterance, so "Pause" isn't a
+    /// hands-free dead-end. Pairs with `pauseVoice()`.
+    @Test func resumeVoiceResumesThePausedReader() {
+        let mock = MockSpeechSynthesizer()
+        let viewModel = CookModeViewModelTests.makeViewModel(
+            stepCount: 3,
+            voiceReader: VoiceReader(synthesizer: mock)
+        )
+        viewModel.setVoiceMode(true)
+        viewModel.pauseVoice()
+        #expect(mock.isPaused)
+
+        viewModel.resumeVoice()
+
+        #expect(mock.calls.contains(.continueSpeaking))
+        #expect(mock.isSpeaking)
+        #expect(!mock.isPaused)
+    }
+
     /// AC-40.1 — toggling Voice Mode off stops the reader and disables the flag.
     @Test func turningVoiceModeOffStopsTheReader() {
         let mock = MockSpeechSynthesizer()

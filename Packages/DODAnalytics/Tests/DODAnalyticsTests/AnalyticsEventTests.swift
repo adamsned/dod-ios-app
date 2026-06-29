@@ -131,6 +131,7 @@ import Testing
         #expect(AnalyticsEvent.voiceCommandFired(command: .previous).payload == ["command": "previous"])
         #expect(AnalyticsEvent.voiceCommandFired(command: .repeat).payload == ["command": "repeat"])
         #expect(AnalyticsEvent.voiceCommandFired(command: .pause).payload == ["command": "pause"])
+        #expect(AnalyticsEvent.voiceCommandFired(command: .resume).payload == ["command": "resume"])
     }
 
     @Test func voiceCommandFiredPayloadHasNoFreeText() {

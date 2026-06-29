@@ -169,5 +169,14 @@ struct DODShortcuts: AppShortcutsProvider {
             shortTitle: "Pause Reading",
             systemImageName: "pause.fill"
         )
+        AppShortcut(
+            intent: ResumeVoiceIntent(),
+            phrases: [
+                "Resume reading in \(.applicationName)",
+                "Continue reading in \(.applicationName)",
+            ],
+            shortTitle: "Resume Reading",
+            systemImageName: "play.fill"
+        )
     }
 }
