@@ -62,6 +62,10 @@ struct RootView: View {
     /// Foreground Spotlight refresh (DUT-12); see `reindexSpotlightOnForeground`.
     @Environment(\.scenePhase) private var scenePhase
     @State private var didInitialSpotlightIndex = false
+    /// DUT-361: serializes `indexSpotlight()` so a foreground reindex can't race the
+    /// cold-launch index (concurrent delete+index can interleave the domain). Not
+    /// `private` so the `+Spotlight` extension file can read it.
+    @State var isIndexingSpotlight = false
 
     init(dependencies: AppDependencies) {
         _dependencies = State(initialValue: dependencies)
@@ -92,6 +96,13 @@ struct RootView: View {
                 && !UserDefaults.standard.bool(forKey: Self.firstRunPromptsCompletedKey)
             if needsFirstRunPrompts {
                 await runFirstRunSetup()
+            }
+            // DUT-352: drain an intent that arrived during cold launch before the
+            // `.onChange(of: dispatcher.pending)` observer attached (onChange doesn't
+            // fire for a value already set when the observer installs).
+            if let pending = dispatcher.pending {
+                handle(intent: pending)
+                dispatcher.consume()
             }
             // Cold-launch index so DOD recipes are findable in Spotlight right
             // away; the foreground refresh below keeps it fresh (US-10 / DUT-12).
@@ -269,9 +280,15 @@ struct RootView: View {
         switch link {
         case .saved:
             selectedTab = .saved
-        case .feed, .recipe:
+        case .feed:
             selectedTab = .feed
             pendingDeepLink = link
+        case .recipe(let id, _):
+            // DUT-358: route a widget recipe tap through the App-Intent fetch-on-miss
+            // resolver, so a cache + snapshot double-miss fetches the recipe instead
+            // of `TabStack.consume` silently dropping the tap.
+            selectedTab = .feed
+            handle(intent: .openRecipe(id: id))
         }
     }
 
@@ -317,29 +334,6 @@ struct RootView: View {
             cachedLookup: { try await dependencies.store.recipeWithoutTouching(id: $0) },
             fetch: { try await dependencies.fetchListItem(forPostID: $0) }
         )
-    }
-
-    private func indexSpotlight() async {
-        do {
-            let payloads = try await RecipeEntityQuery.suggestedPayloads()
-            let items = payloads.map { payload -> CSSearchableItem in
-                let entity = RecipeEntity(payload: payload)
-                return CSSearchableItem(
-                    uniqueIdentifier: "dod.recipe.\(payload.id)",
-                    domainIdentifier: "com.dutchovendaddy.DODApp.recipes",
-                    attributeSet: entity.attributeSet
-                )
-            }
-            // DUT-308: drop the whole recipe domain before each (re)index so an
-            // unsaved/cleared recipe doesn't linger in Spotlight (was upsert-only).
-            let index = CSSearchableIndex.default()
-            try await index.deleteSearchableItems(withDomainIdentifiers: [
-                "com.dutchovendaddy.DODApp.recipes"
-            ])
-            try await index.indexSearchableItems(items)
-        } catch {
-            DODLog.app.error("spotlight index failed: \(String(describing: error))")
-        }
     }
 
     // MARK: - Appearance (US-36 AC-36.2)

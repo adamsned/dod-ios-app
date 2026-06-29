@@ -121,6 +121,9 @@ public enum VoiceCommandName: String, Sendable, Hashable, CaseIterable {
 
     /// "pause" — pauses the current utterance.
     case pause
+
+    /// "resume" / "continue" — resumes a paused utterance (DUT-343).
+    case resume
 }
 
 /// Identifier for the widget surface a `widgetOpened` event originated

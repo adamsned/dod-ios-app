@@ -98,6 +98,9 @@ extension CookModeViewModel {
 
     private func stepText(forStep index: Int) -> String {
         guard index >= 0, index < recipe.instructions.count else { return "" }
-        return recipe.instructions[index].text
+        // DUT-349: clamp before it enters the Live Activity ContentState — ActivityKit
+        // hard-limits the encoded state to ~4KB, and a full multi-sentence recipe step
+        // can blow past it (silently failing the request). The card renders 2 lines.
+        return String(recipe.instructions[index].text.prefix(240))
     }
 }

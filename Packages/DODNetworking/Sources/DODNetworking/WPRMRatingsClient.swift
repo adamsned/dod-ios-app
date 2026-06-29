@@ -40,6 +40,11 @@ public struct WPRMRatingsClient: Sendable {
         let url = try buildURL(path: "rating/recipe/\(recipeID)", queryItems: [])
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "GET"
+        // DUT-355: bypass URLSession heuristic freshness + Cloudflare edge cache so a
+        // post-write refresh reads the just-submitted vote, not a stale aggregate
+        // (WP REST sends only Last-Modified — see WPRestClient.getPaged).
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
 
         let (data, response): (Data, HTTPURLResponse)

@@ -51,14 +51,14 @@ struct TabStack: View {
             guard tab == .feed, let link = pendingDeepLink else { return }
             await consume(link: link)
         }
-        .onChange(of: externalRoute) { _, newValue in
-            // App-Intents / Spotlight route push.
-            guard let newValue else { return }
-            // DUT-310: replace the stack, don't append — an external-origin deep
-            // link (Siri / Spotlight / notification) should land on a single-level
-            // detail whose Back returns to the Feed (matching the widget path),
-            // not stack onto prior deep-linked recipes and corrupt back-navigation.
-            path = [newValue]
+        .task(id: externalRoute) {
+            // App-Intents / Spotlight route push. `.task(id:)` (not `.onChange`) so a
+            // route already non-nil when this tab is first instantiated — iPad
+            // switching to the Feed tab, or a cold-launch intent — is still consumed;
+            // `.onChange` only fires on a live transition, dropping those (DUT-352).
+            guard let route = externalRoute else { return }
+            // DUT-310: replace the stack, don't append, so Back returns to the Feed.
+            path = [route]
             externalRoute = nil
         }
     }

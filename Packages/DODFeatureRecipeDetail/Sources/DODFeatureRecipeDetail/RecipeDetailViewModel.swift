@@ -372,14 +372,14 @@ public final class RecipeDetailViewModel {
         userServings = clampToRange(count)
     }
 
-    /// Sync ``userServings`` to the source servings once the recipe has
-    /// parsed. Called from the view after `loadState` reaches `.ready`.
-    /// Idempotent — re-syncing while already aligned is a no-op so the
-    /// user's manual stepper changes aren't clobbered by a late refresh.
+    private var didSyncServingsToSource = false  // DUT-357 one-shot guard
+
+    /// Sync ``userServings`` to source on the first `.ready` only (DUT-357) — a
+    /// late refresh must not clobber the user's deliberate manual stepper choice.
     public func resetServingsToSourceIfFirstLoad() {
-        guard userServings == Self.defaultServings, sourceServings != Self.defaultServings else {
-            return
-        }
+        guard !didSyncServingsToSource else { return }
+        didSyncServingsToSource = true
+        guard sourceServings != Self.defaultServings else { return }
         userServings = clampToRange(sourceServings)
     }
 

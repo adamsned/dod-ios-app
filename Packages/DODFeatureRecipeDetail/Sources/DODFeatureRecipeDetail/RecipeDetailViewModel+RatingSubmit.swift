@@ -70,7 +70,11 @@ extension RecipeDetailViewModel {
                 recipeID: fresh.recipeID,
                 average: fresh.average,
                 count: fresh.count,
-                userRating: ratingSummary?.userRating ?? fresh.userRating
+                // DUT-350: the just-submitted POST carries the authoritative
+                // userRating; the aggregate-GET refresh always returns nil. Prefer
+                // `fresh` so re-rating (3★→5★) isn't overwritten by the cached vote
+                // — the nil-bearing GET still falls back to the cache.
+                userRating: fresh.userRating ?? ratingSummary?.userRating
             )
             ratingSummary = merged
             await dependencies.cacheRatingSummary(merged)

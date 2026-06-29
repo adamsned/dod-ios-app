@@ -48,22 +48,31 @@ public struct AppIntroTour: View {
     private var isLast: Bool { index >= pages.count - 1 }
 
     public var body: some View {
-        VStack(spacing: DODSpacing.lg) {
-            pager
-            pageDots
-            navRow
-            ctaButton
+        if pages.isEmpty {
+            // DUT-347: no slides → nothing to tour; finish immediately rather than
+            // showing a lone CTA over a blank screen.
+            Color.clear.onAppear { onFinish() }
+        } else {
+            VStack(spacing: DODSpacing.lg) {
+                pager
+                pageDots
+                navRow
+                ctaButton
+            }
+            .padding(.bottom, DODSpacing.lg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(DODColor.surface.ignoresSafeArea())
         }
-        .padding(.bottom, DODSpacing.lg)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(DODColor.surface.ignoresSafeArea())
     }
 
     // MARK: - Paged slides
 
     private var pager: some View {
         TabView(selection: $index) {
-            ForEach(Array(pages.enumerated()), id: \.element.id) { offset, page in
+            // DUT-347: key by offset (matching `.tag(offset)` + the dots' index)
+            // so selection / dots / "current page" stay consistent even if a
+            // caller ever supplies non-contiguous Page ids.
+            ForEach(Array(pages.enumerated()), id: \.offset) { offset, page in
                 slide(page).tag(offset)
             }
         }
@@ -119,7 +128,11 @@ public struct AppIntroTour: View {
                     .frame(width: 8, height: 8)
             }
         }
-        .accessibilityHidden(true)
+        // DUT-344: expose page position to VoiceOver. The system page indicator is
+        // suppressed (`.never`) in favor of these custom dots, so without this a
+        // VoiceOver user gets no "page N of M" feedback on the first-launch tour.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Page \(index + 1) of \(pages.count)")
     }
 
     private var navRow: some View {

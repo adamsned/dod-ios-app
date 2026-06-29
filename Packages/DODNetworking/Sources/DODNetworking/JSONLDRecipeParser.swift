@@ -241,25 +241,47 @@ public enum JSONLDRecipeParser {
 
     /// Decode ISO8601 durations like "PT15M", "PT1H30M".
     static func parseISO8601Duration(_ raw: String?) -> Duration? {
-        guard let raw, raw.hasPrefix("PT") else { return nil }
-        let body = raw.dropFirst(2)
+        // DUT-356: accept an optional date portion before the "T" (e.g. "P0DT8H"
+        // for an 8-hour cook), not just bare "PT…". `D` is days; `H`/`M`/`S` are
+        // valid only in the time part ("M" in the date part means months, which
+        // recipes don't use → reject). A trailing digit run with no unit is
+        // malformed and rejected rather than silently dropped.
+        guard let raw, raw.hasPrefix("P") else { return nil }
+        let body = raw.dropFirst()  // drop "P"
         var seconds: Int64 = 0
         var buffer = ""
+        var inTimePart = false
         for character in body {
+            if character == "T" {
+                guard buffer.isEmpty else { return nil }
+                inTimePart = true
+                continue
+            }
             if character.isNumber {
                 buffer.append(character)
-            } else {
-                guard let value = Int64(buffer) else { return nil }
-                switch character {
-                case "H": seconds += value * 3600
-                case "M": seconds += value * 60
-                case "S": seconds += value
-                default: return nil
-                }
-                buffer.removeAll()
+                continue
             }
+            guard let value = Int64(buffer),
+                let multiplier = iso8601UnitMultiplier(character, inTimePart: inTimePart)
+            else { return nil }
+            seconds += value * multiplier
+            buffer.removeAll()
         }
+        guard buffer.isEmpty else { return nil }
         return seconds > 0 ? .seconds(seconds) : nil
+    }
+
+    /// Seconds-per-unit for an ISO-8601 duration designator, or nil if the unit
+    /// isn't valid in its position (e.g. `D` after the `T`, or `H`/`M`/`S` before
+    /// it). `M` before `T` is months — unsupported for recipes, so nil.
+    private static func iso8601UnitMultiplier(_ unit: Character, inTimePart: Bool) -> Int64? {
+        switch unit {
+        case "D" where !inTimePart: return 86_400
+        case "H" where inTimePart: return 3600
+        case "M" where inTimePart: return 60
+        case "S" where inTimePart: return 1
+        default: return nil
+        }
     }
 
     /// `recipeYield` may be a number, a string, or an array of strings.

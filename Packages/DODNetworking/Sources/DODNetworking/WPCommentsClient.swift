@@ -77,6 +77,11 @@ public struct WPCommentsClient: Sendable {
         let url = try buildURL(path: "comments", queryItems: queryItems)
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "GET"
+        // DUT-355: bypass URLSession heuristic freshness + Cloudflare edge cache so a
+        // post-write refresh reads fresh comments, not a stale page (WP REST sends
+        // only Last-Modified — see WPRestClient.getPaged).
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
 
         // DUT-23 / DUT-7 parity: log the GET target so the owner can confirm

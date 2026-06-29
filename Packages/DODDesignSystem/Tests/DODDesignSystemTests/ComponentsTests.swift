@@ -36,7 +36,7 @@ import Testing
 
     @Test func loadingSkeletonRespectsCustomCorner() {
         let skeleton = LoadingSkeleton(cornerRadius: DODRadius.standard)
-        #expect(skeleton.cornerRadius == 16)
+        #expect(skeleton.cornerRadius == DODRadius.standard)
     }
 
     @Test func snackbarOptionalAction() {

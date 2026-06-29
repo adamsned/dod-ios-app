@@ -27,6 +27,15 @@ import Testing
         #expect(FractionRenderer.scale("2 ½ cups milk", by: 2.0) == "5 cups milk")
     }
 
+    /// DUT-351 — the GLUED unicode mixed form ("1½", no space) must scale as a
+    /// mixed number, not drop the fraction. "1½ × 2 → 3", not "2 ½".
+    @Test func gluedUnicodeMixedNumberScales() {
+        #expect(FractionRenderer.scale("1½ cups flour", by: 2.0) == "3 cups flour")
+        #expect(FractionRenderer.scale("2½ tbsp", by: 2.0) == "5 tbsp")
+        // ASCII "11/2" (no space) stays the fraction 11/2, not a mixed number.
+        #expect(FractionRenderer.scale("11/2 cups", by: 2.0) == "11 cups")
+    }
+
     /// "1 ⅓ × 3 → 4, not 4.0" — the rational-floor case.
     @Test func mixedOneAndOneThirdTimesThree() {
         #expect(FractionRenderer.scale("1 ⅓ cups stock", by: 3.0) == "4 cups stock")

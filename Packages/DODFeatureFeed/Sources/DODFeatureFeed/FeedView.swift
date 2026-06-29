@@ -86,20 +86,21 @@ public struct FeedView: View {
         // bar, so no nav-bar height is reserved and the title sits at the same top
         // Y as every other tab. Pushed detail screens keep their own nav bar.
         .dodHidesNavBar()
-        .sheet(isPresented: $showingFirstCookout) {
-            // DUT-194 — start on the "pick what to cook" chooser (rungs + dump
-            // cakes), with the progress-aware rung recommended. A true beginner
-            // is dropped straight into coaching (CookChooserFlow.initialSelection).
-            CookChooserFlow(
-                recommended: currentRung,
-                onLogCook: { entry in
-                    Task {
-                        await viewModel.logCook(entry)
-                        await refreshCurrentRung()
-                    }
-                }
-            )
-        }
+        .sheet(
+            isPresented: $showingFirstCookout,
+            onDismiss: { viewModel.cookoutFlowDidDismiss() },
+            content: {
+                // DUT-194 — start on the "pick what to cook" chooser (rungs + dump
+                // cakes), with the progress-aware rung recommended. A true beginner
+                // is dropped straight into coaching (CookChooserFlow.initialSelection).
+                CookChooserFlow(
+                    recommended: currentRung,
+                    onLogCook: { logCookAndRefresh($0) }
+                )
+                // DUT-339 — defer any earned celebration until this sheet dismisses.
+                .onAppear { viewModel.cookoutFlowWillPresent() }
+            }
+        )
         .sheet(isPresented: $showingJournal) { cookJournalSheet }
         // DUT-323 — celebration: a logged cook that graduates the First Cookout
         // path or bumps a rank fires the moment, once the cookout sheet closes.
@@ -130,14 +131,15 @@ public struct FeedView: View {
                 openCookingToolURL(SettingsViewModel.buyBuzzyWaxxURLString)
             }
         }
-        .sheet(isPresented: $showingDumpCakeFlow) {
-            DumpCakeFlow(onLogCook: { entry in
-                Task {
-                    await viewModel.logCook(entry)
-                    await refreshCurrentRung()
-                }
-            })
-        }
+        .sheet(
+            isPresented: $showingDumpCakeFlow,
+            onDismiss: { viewModel.cookoutFlowDidDismiss() },
+            content: {
+                DumpCakeFlow(onLogCook: { logCookAndRefresh($0) })
+                    // DUT-339 — defer any earned celebration until this sheet dismisses.
+                    .onAppear { viewModel.cookoutFlowWillPresent() }
+            }
+        )
         .task { await viewModel.onAppear() }
         .task { await refreshCurrentRung() }
         .refreshable { await viewModel.refresh() }
@@ -380,5 +382,14 @@ extension FeedView {
             load: { await viewModel.cookLogs() },
             update: { await viewModel.updateCook($0) }
         )
+    }
+
+    /// Log a completed cook then re-derive the current rung. Extracted here so
+    /// `FeedView`'s struct body stays under SwiftLint's `type_body_length` cap.
+    func logCookAndRefresh(_ entry: CookLogEntry) {
+        Task {
+            await viewModel.logCook(entry)
+            await refreshCurrentRung()
+        }
     }
 }

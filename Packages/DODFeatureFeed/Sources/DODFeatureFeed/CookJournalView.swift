@@ -143,7 +143,12 @@ public struct CookJournalView: View {
 
     private var statsHeader: some View {
         let total = CookLogStats.totalCooks(cooks)
-        let streak = CookLogStats.currentWeeklyStreak(cooks, asOf: .now, calendar: .current)
+        // DUT-346: a fixed-firstWeekday Gregorian calendar (device timezone) so a
+        // locale's week-start (Sun vs Mon) can't bucket the same cook history into
+        // a different streak across devices.
+        var weekCalendar = Calendar(identifier: .gregorian)
+        weekCalendar.firstWeekday = 1
+        let streak = CookLogStats.currentWeeklyStreak(cooks, asOf: .now, calendar: weekCalendar)
         let mostCooked = CookLogStats.mostCooked(cooks)
         return HStack(spacing: DODSpacing.sm) {
             statTile("\(total)", total == 1 ? "cook" : "cooks")

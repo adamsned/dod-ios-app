@@ -36,6 +36,9 @@ struct CookJournalEntryView: View {
     @State var showingCamera = false
     @State var showingPhotoOptions = false
     @State var isSaving = false
+    /// DUT-340: surfaces a photo disk-write failure instead of swallowing it with
+    /// `try?` (mirrors the DUT-312 first-cookout path) so the user can retry.
+    @State var photoSaveError: String?
 
     init(entry: CookLogEntry, onSave: @escaping (CookLogEntry) async -> Void) {
         self.entry = entry
@@ -59,6 +62,17 @@ extension CookJournalEntryView {
         .background(DODColor.surface)
         .navigationTitle("Journal Entry")
         .dodInlineNavTitle()
+        .alert(
+            "Couldn't Save Photo",
+            isPresented: Binding(
+                get: { photoSaveError != nil },
+                set: { if !$0 { photoSaveError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(photoSaveError ?? "")
+        }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { Task { await save() } }
@@ -209,7 +223,16 @@ extension CookJournalEntryView {
         isSaving = true
         var photoID = entry.photoLocalID
         if let data = pendingImageData {
-            photoID = try? photoStore.save(data)
+            do {
+                photoID = try photoStore.save(data)
+            } catch {
+                // DUT-340: don't swallow the write failure with `try?`. Surface it
+                // and bail so the user keeps the photo in the slot and can retry,
+                // rather than silently persisting the entry photo-less + dismissing.
+                photoSaveError = "We couldn't save your photo. Please try again."
+                isSaving = false
+                return
+            }
         } else if photoCleared {
             photoID = nil
         }

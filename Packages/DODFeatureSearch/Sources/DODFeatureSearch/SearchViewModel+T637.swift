@@ -123,10 +123,12 @@ extension SearchViewModel {
         let unknown = merged.map(\.id).filter { lastTotalSecondsByRecipe[$0] == nil }
         guard !unknown.isEmpty else { return }
         let toFetch = Array(unknown.prefix(Self.hydrationCap))
+        let generation = searchGeneration
         Task { [weak self] in
             guard let self else { return }
             let fetched = await self.dependencies.fetchTotalSeconds(forRecipeIDs: toFetch)
-            guard !fetched.isEmpty else { return }
+            // H1: a new search since kickoff supersedes this stale hydration.
+            guard generation == self.searchGeneration, !fetched.isEmpty else { return }
             for (id, seconds) in fetched {
                 self.lastTotalSecondsByRecipe[id] = seconds
             }

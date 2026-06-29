@@ -145,6 +145,13 @@ public final class SearchViewModel {
     /// Autocomplete debounce (DUT-10: tightened 300 -> 150ms). Public so tests control timing.
     public var debounceMilliseconds: Int = 150
     private var debounceTask: Task<Void, Never>?
+    /// H1 (SDET 2026-06-28): monotonic search-generation token. Bumped at the
+    /// start of every `performSearch()`; async completions (the finalize hop +
+    /// the lazy filter / cook-time hydration tasks) capture it and bail if a
+    /// newer search has superseded them — so a slow earlier query can't
+    /// overwrite a faster later one's results. `private(set)` so the `+T637` /
+    /// `+DUT314` extension-file hydration tasks can read it.
+    private(set) var searchGeneration = 0
 
     public init(
         dependencies: SearchDependencies,
@@ -263,6 +270,9 @@ public final class SearchViewModel {
     private func performSearch() async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return }
+        // H1: claim a new generation; stale async completions check it + bail.
+        searchGeneration &+= 1
+        let generation = searchGeneration
 
         // The local ingredient index works offline; the REST pass does not.
         // We try both and gracefully degrade (see the DUT-11 tier below).
@@ -299,7 +309,8 @@ public final class SearchViewModel {
             merged: merged,
             localItems: localItems,
             trimmed: trimmed,
-            online: online
+            online: online,
+            generation: generation
         )
     }
 

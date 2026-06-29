@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// Canonical corner radii (CL-286). Use these for ALL rounded rectangles —
+/// Canonical corner radii (CL-288). Use these for ALL rounded rectangles —
 /// buttons, cards, sheets, containers, thumbnails — so the app's roundness stays
 /// consistent. Do NOT hard-code radius literals and do NOT reuse `DODSpacing`
 /// values for rounding.
