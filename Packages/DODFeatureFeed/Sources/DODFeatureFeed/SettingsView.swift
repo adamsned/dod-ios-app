@@ -303,6 +303,10 @@ public struct SettingsView: View {
     private var snackbarOverlay: some View {
         if let message = viewModel.snackbarMessage {
             Snackbar(message: message)
+                // DUT-362: key the overlay by the message so a NEW message gives it
+                // fresh identity and restarts the 4s auto-dismiss `.task` (otherwise
+                // the first message's timer fires and clears the second one early).
+                .id(message)
                 .padding(.bottom, DODSpacing.md)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .onTapGesture { viewModel.dismissSnackbar() }

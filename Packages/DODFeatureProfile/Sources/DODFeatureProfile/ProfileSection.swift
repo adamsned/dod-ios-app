@@ -92,6 +92,9 @@ public struct ProfileSection<Destination: View>: View {
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
                     .lineLimit(1)
+                    // DUT-359: shrink before truncating so the email stays readable
+                    // at large Dynamic Type sizes (the avatar + row width are fixed).
+                    .minimumScaleFactor(0.7)
             }
             Spacer(minLength: 0)
         }

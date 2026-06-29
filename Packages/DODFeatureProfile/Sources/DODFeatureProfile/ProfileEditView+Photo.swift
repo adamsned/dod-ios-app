@@ -240,7 +240,14 @@ extension ProfileEditView {
                     // a Replace flow (previous original was non-nil and
                     // different from the just-saved UUID-keyed name).
                     if let previous = inFlightPhotoOriginalFilename, previous != originalFilename {
-                        photoOriginalFilenameToClearOnSave = previous
+                        // DUT-353: defer the PERSISTED original to save (so an abandon
+                        // keeps it), but delete a this-session superseded original now
+                        // — the single-slot marker would otherwise drop it and leak.
+                        if previous == existingProfile?.photoOriginalFilename {
+                            photoOriginalFilenameToClearOnSave = previous
+                        } else {
+                            try? await photoStore.clearOriginal(filename: previous)
+                        }
                     }
                     inFlightPhotoOriginalFilename = originalFilename
                 } catch {
@@ -277,7 +284,13 @@ extension ProfileEditView {
             // Mark the previous photo for clean-up if this is a Replace
             // flow (the previous filename was non-nil and different).
             if let previous = inFlightPhotoFilename, previous != filename {
-                photoFilenameToClearOnSave = previous
+                // DUT-353: defer the persisted file to save; delete a this-session
+                // superseded file now so the single-slot marker can't leak it.
+                if previous == existingProfile?.photoFilename {
+                    photoFilenameToClearOnSave = previous
+                } else {
+                    try? await photoStore.clear(filename: previous)
+                }
             }
             inFlightPhotoFilename = filename
             cropCandidate = nil
