@@ -34,11 +34,11 @@ private struct CookModeVoiceUpgradePrompt: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: viewModel.isVoiceModeEnabled) { _, enabled in
-                guard enabled, !hasOffered, viewModel.shouldOfferVoiceUpgrade else { return }
-                hasOffered = true
-                isPresented = true
-            }
+            // DUT-348: evaluate on the false→true transition AND on appear, so an
+            // already-Voice-Mode-on state at mount still offers the upgrade
+            // (onChange alone only sees a transition after the modifier mounts).
+            .onChange(of: viewModel.isVoiceModeEnabled) { _, _ in offerUpgradeIfNeeded() }
+            .onAppear { offerUpgradeIfNeeded() }
             .alert("Want a more natural voice?", isPresented: $isPresented) {
                 Button("Open Settings") { openVoiceSettings() }
                 Button("Not Now", role: .cancel) {}
@@ -49,6 +49,18 @@ private struct CookModeVoiceUpgradePrompt: ViewModifier {
                         + "Enhanced or Premium voice. It'll be used here automatically."
                 )
             }
+    }
+
+    /// DUT-348 — show the one-time upgrade offer when Voice Mode is on, it hasn't
+    /// been offered this session, and only a robotic voice is installed. Called
+    /// from both `.onChange` and `.onAppear` so an already-on-at-mount state is
+    /// covered, not just the transition.
+    private func offerUpgradeIfNeeded() {
+        guard viewModel.isVoiceModeEnabled, !hasOffered, viewModel.shouldOfferVoiceUpgrade else {
+            return
+        }
+        hasOffered = true
+        isPresented = true
     }
 
     /// Deep-link to the app's Settings root. iOS only exposes the app's own
