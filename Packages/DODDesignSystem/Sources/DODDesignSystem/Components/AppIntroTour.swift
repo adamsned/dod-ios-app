@@ -119,7 +119,11 @@ public struct AppIntroTour: View {
                     .frame(width: 8, height: 8)
             }
         }
-        .accessibilityHidden(true)
+        // DUT-344: expose page position to VoiceOver. The system page indicator is
+        // suppressed (`.never`) in favor of these custom dots, so without this a
+        // VoiceOver user gets no "page N of M" feedback on the first-launch tour.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Page \(index + 1) of \(pages.count)")
     }
 
     private var navRow: some View {
