@@ -30,6 +30,7 @@ extension SearchViewModel {
         // one hydration task (subsequent toggles re-rank in-memory).
         filterSupportHydrated = true
         let allIDs = merged.map(\.id)
+        let generation = searchGeneration
         Task { [weak self] in
             guard let self else { return }
             let categoryIDs =
@@ -38,6 +39,8 @@ extension SearchViewModel {
                 (try? await self.dependencies.totalSeconds(forRecipeIDs: allIDs)) ?? [:]
             let recentlyViewed =
                 (try? await self.dependencies.recentlyViewedRecipeIDs()) ?? []
+            // H1: a new search since kickoff supersedes this stale hydration.
+            guard generation == self.searchGeneration else { return }
             self.lastCategoryIDsByRecipe = categoryIDs
             self.lastTotalSecondsByRecipe = totalSeconds
             self.lastRecentlyViewedIDs = recentlyViewed
