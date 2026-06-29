@@ -67,6 +67,43 @@ import Testing
         #expect(viewModel.celebration == nil)
     }
 
+    /// DUT-339 — a celebration earned while the cookout sheet is up must NOT
+    /// present until that sheet dismisses (else iOS swallows the second sheet).
+    @Test func celebrationIsHeldUntilTheCookoutSheetDismisses() async {
+        let dependencies = FakeFeedDependencies()
+        dependencies.cooks = [makeCook(9001), makeCook(9002)]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        viewModel.cookoutFlowWillPresent()
+        await viewModel.logCook(makeCook(9003))  // crosses to Coal Tender while sheet is up
+
+        #expect(viewModel.celebration == nil)  // held — sheet still dismissing
+
+        viewModel.cookoutFlowDidDismiss()
+
+        if case .rankUp(let rank) = viewModel.celebration {
+            #expect(rank.title == "Coal Tender")
+        } else {
+            Issue.record("expected the held rank-up to present, got \(String(describing: viewModel.celebration))")
+        }
+    }
+
+    /// DUT-339 — reverse ordering: the sheet dismisses BEFORE the async log
+    /// resolves; the celebration must still present once the log completes.
+    @Test func celebrationPromotesWhenLogCompletesAfterDismissal() async {
+        let dependencies = FakeFeedDependencies()
+        dependencies.cooks = [makeCook(9001), makeCook(9002)]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        viewModel.cookoutFlowWillPresent()
+        viewModel.cookoutFlowDidDismiss()  // sheet gone before the log resolves
+        #expect(viewModel.celebration == nil)  // nothing pending yet
+
+        await viewModel.logCook(makeCook(9003))
+
+        #expect(viewModel.celebration != nil)  // promotes on log completion
+    }
+
     private func makeCook(_ id: Int) -> CookLogEntry {
         CookLogEntry(
             id: UUID(),
