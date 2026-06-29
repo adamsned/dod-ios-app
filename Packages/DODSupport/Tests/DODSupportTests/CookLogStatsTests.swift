@@ -73,6 +73,29 @@ struct CookLogStatsTests {
         #expect(CookLogStats.currentWeeklyStreak(entries, asOf: now, calendar: calendar) == 3)
     }
 
+    /// DUT-346 — the app pins `firstWeekday` (Sunday) for the streak so the same
+    /// cook history can't read as a different streak under a different device
+    /// locale's week-start. With firstWeekday pinned, the streak is locale-stable.
+    @Test func weeklyStreakIsLocaleStableWhenFirstWeekdayIsPinned() {
+        func pinned(_ localeID: String) -> Calendar {
+            var cal = Calendar(identifier: .gregorian)
+            cal.firstWeekday = 1
+            cal.timeZone = TimeZone(identifier: "UTC") ?? .current
+            cal.locale = Locale(identifier: localeID)
+            return cal
+        }
+        let now = date(2026, 1, 21)
+        let entries = [
+            entry(1, "R", at: date(2026, 1, 20)),
+            entry(1, "R", at: date(2026, 1, 14)),
+            entry(1, "R", at: date(2026, 1, 7)),
+        ]
+        let us = CookLogStats.currentWeeklyStreak(entries, asOf: now, calendar: pinned("en_US"))
+        let fr = CookLogStats.currentWeeklyStreak(entries, asOf: now, calendar: pinned("fr_FR"))
+        #expect(us == fr)
+        #expect(us == 3)
+    }
+
     @Test func weeklyStreakBreaksOnAGap() {
         let now = date(2026, 1, 21)
         let entries = [
