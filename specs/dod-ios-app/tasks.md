@@ -3056,6 +3056,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** DODFeatureSearch (SearchViewModel +T643/+T637/+DUT314), DODPersistence (RecipeStore+CookLog), DODFeatureFeed (FeedViewModel/FeedView/CookJournalEntryView), DODNetworking (ImageLoader), DODFeatureRecipeDetail (VoiceCommandBus/CookModeViewModel+Voice), DODAnalytics (AnalyticsEvent), DODDesignSystem (AppIntroTour), App (VoiceCommandIntents/RecipeAppIntents) + 6 test files. Spec: clarifications.md (CL-286).
 - **AC:** CL-286 canonical. **Deps:** off main. Branch `fix/sdet-batch-highs`. **Verification:** recursive swift-format lint + SwiftLint --strict clean; 655 package tests green across 6 suites; iOS app build green. Device-verify DUT-339/340/343/344.
 
+### T-893 — Senior SDET hunt round 2: 13 verified bugs fixed (CL-287)
+
+- **What:** Second five-hunter sweep (widgets/Live Activity, recipe-detail pipeline, networking/decoding, deep-links/intents/nav, settings/profile/a11y). 14 logged (DUT-349…362); 13 fixed: DUT-349 (Live Activity 4KB clamp), 350 (re-rating precedence), 351 (glued unicode mixed number), 352 (intent route on iPad/.task(id:)), 353 (profile-photo orphan), 355 (rating/comment GET cache bypass), 356 (ISO8601 date-component duration), 357 (one-shot servings sync), 358 (widget tap fetch-on-miss), 359 (email Dynamic Type), 360 (resilient posts decode), 361 (Spotlight reindex serialize), 362 (snackbar id). DUT-354 DEFERRED (contradicts the deliberate DUT-293/294 end-at-completion contract; needs a delayed-dismissal API + product decision).
+- **Files:** DODSupport (FractionRenderer), DODNetworking (JSONLDRecipeParser, WPRMRatingsClient, WPCommentsClient, WPDTOs + new WPPostDecoding), DODFeatureRecipeDetail (RatingSubmit, CookModeViewModel+Timers), DODFeatureProfile (ProfileSection, ProfileEditView + new ProfileEditView+Discard), DODFeatureFeed (SettingsView), App (RootView + new RootView+Spotlight, TabStack) + tests. Spec: clarifications.md (CL-287).
+- **AC:** CL-287 canonical. **Deps:** off main. Branch `fix/sdet-round2`. **Verification:** recursive swift-format lint + SwiftLint --strict clean; DODSupport 479 / DODNetworking 111 / DODFeatureRecipeDetail 219 / DODFeatureProfile 55 / DODFeatureFeed 87 green; iOS app build green. Device-verify DUT-349/352/353/358.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
