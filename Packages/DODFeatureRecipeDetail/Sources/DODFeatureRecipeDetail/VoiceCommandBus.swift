@@ -11,6 +11,7 @@ public enum VoiceCommand: Sendable, Hashable {
     case previous
     case `repeat`
     case pause
+    case resume
 }
 
 /// The surface a ``VoiceCommandBus`` forwards commands to. ``CookModeViewModel``
@@ -25,6 +26,7 @@ public protocol VoiceCommandHandler: AnyObject {
     func previousStep()
     func repeatCurrentStep()
     func pauseVoice()
+    func resumeVoice()
 }
 
 /// Process-wide message bus between the Voice Mode `AppIntent`s (which run
@@ -76,6 +78,7 @@ public final class VoiceCommandBus {
         case .previous: handler.previousStep()
         case .repeat: handler.repeatCurrentStep()
         case .pause: handler.pauseVoice()
+        case .resume: handler.resumeVoice()
         }
     }
 }

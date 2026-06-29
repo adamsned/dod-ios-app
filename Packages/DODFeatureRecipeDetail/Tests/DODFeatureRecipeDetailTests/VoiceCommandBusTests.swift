@@ -15,12 +15,13 @@ import Testing
     /// Records which handler method fired so each command can be asserted in
     /// isolation. Stands in for the live `CookModeViewModel`.
     final class SpyHandler: VoiceCommandHandler {
-        enum Call: Equatable { case advance, previous, repeatStep, pause }
+        enum Call: Equatable { case advance, previous, repeatStep, pause, resume }
         private(set) var calls: [Call] = []
         func advanceStep() { calls.append(.advance) }
         func previousStep() { calls.append(.previous) }
         func repeatCurrentStep() { calls.append(.repeatStep) }
         func pauseVoice() { calls.append(.pause) }
+        func resumeVoice() { calls.append(.resume) }
     }
 
     /// Each command maps to exactly one handler method (AC-40.5). Uses the
@@ -36,8 +37,9 @@ import Testing
         bus.deliver(.previous)
         bus.deliver(.repeat)
         bus.deliver(.pause)
+        bus.deliver(.resume)
 
-        #expect(spy.calls == [.advance, .previous, .repeatStep, .pause])
+        #expect(spy.calls == [.advance, .previous, .repeatStep, .pause, .resume])
     }
 
     /// NextStepIntent → advanceStep().

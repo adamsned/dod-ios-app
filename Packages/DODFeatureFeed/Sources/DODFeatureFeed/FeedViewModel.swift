@@ -95,15 +95,24 @@ public final class FeedViewModel {
         }
     }
 
-    /// DUT-323 — set after a logged cook that earns a celebration, so the view can
-    /// present it; nil otherwise. Graduating the First Cookout path supersedes a
-    /// plain rank-up (it's the bigger beat).
+    /// DUT-323 — the celebration the view is presenting; nil otherwise. Set only
+    /// via ``promoteCelebrationIfReady()`` once the cookout flow's sheet has
+    /// dismissed — never directly from `logCook` (DUT-339).
     public private(set) var celebration: CookCelebration?
+
+    /// DUT-339 — a celebration earned by a just-logged cook, held until the
+    /// cookout flow's sheet has actually dismissed. Presenting a `.sheet` on the
+    /// same view that is mid-dismissing another sheet makes iOS silently swallow
+    /// it, so the celebration was intermittently lost on device. We promote
+    /// pending → `celebration` only when the cookout sheet is gone, triggered by
+    /// whichever of {log completes, sheet dismisses} happens last.
+    private var pendingCelebration: CookCelebration?
+    private var cookoutSheetVisible = false
 
     /// DUT-104 — record a completed cook in the private journal (called when the
     /// "Your First Cookout" flow reaches "Done"). Best-effort: a journal write
     /// failing must never block dismissing the celebration. DUT-323: if the cook
-    /// graduates the path or bumps the cook up a rank, surface the celebration.
+    /// graduates the path or bumps the cook up a rank, queue the celebration.
     public func logCook(_ entry: CookLogEntry) async {
         let logsBefore = (try? await dependencies.cookLogs()) ?? []
         do {
@@ -119,10 +128,33 @@ public final class FeedViewModel {
         let wasGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedBefore) == nil
         let isGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedAfter) == nil
         if isGraduate && !wasGraduate {
-            celebration = .graduatedFirstCookout
+            pendingCelebration = .graduatedFirstCookout
         } else if let reached = CookProgression.rankUp(from: logsBefore.count, to: logsAfter.count) {
-            celebration = .rankUp(reached)
+            pendingCelebration = .rankUp(reached)
         }
+        promoteCelebrationIfReady()
+    }
+
+    /// DUT-339 — the cookout flow's sheet is presenting; defer any pending
+    /// celebration until it dismisses so the two sheets never overlap.
+    public func cookoutFlowWillPresent() {
+        cookoutSheetVisible = true
+    }
+
+    /// DUT-339 — the cookout flow's sheet finished dismissing; a queued
+    /// celebration can present now without a sheet-over-sheet conflict.
+    public func cookoutFlowDidDismiss() {
+        cookoutSheetVisible = false
+        promoteCelebrationIfReady()
+    }
+
+    /// Promote a queued celebration once the cookout sheet is gone — called from
+    /// both `logCook` and `cookoutFlowDidDismiss`, so whichever finishes last
+    /// triggers the present (DUT-339).
+    private func promoteCelebrationIfReady() {
+        guard !cookoutSheetVisible, let pending = pendingCelebration else { return }
+        celebration = pending
+        pendingCelebration = nil
     }
 
     /// Dismiss the celebration (DUT-323).

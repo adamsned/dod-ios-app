@@ -83,3 +83,20 @@ struct PauseVoiceIntent: AppIntent {
         return .result()
     }
 }
+
+/// "Resume" — resume the paused spoken step (DUT-343), so "Pause" isn't a
+/// hands-free dead-end.
+struct ResumeVoiceIntent: AppIntent {
+
+    static let title: LocalizedStringResource = "Resume Reading"
+    static let description = IntentDescription(
+        "Resumes Cook Mode reading the current step aloud after a pause."
+    )
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        VoiceCommandBus.shared.dispatch(.resume)
+        Telemetry.shared.send(.voiceCommandFired(command: .resume))
+        return .result()
+    }
+}

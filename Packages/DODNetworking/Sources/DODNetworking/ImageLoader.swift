@@ -33,7 +33,12 @@ public actor ImageLoader {
             return data
         }
         inFlight[url] = task
-        defer { inFlight[url] = nil }
+        // DUT-341: identity-checked cleanup. The coalescing check above means no
+        // other call can replace this slot while `task` runs (a second caller for
+        // the same URL shares `task`), so today the slot still holds `task` here —
+        // but guard anyway so a future suspension point added to this creator path
+        // can't clobber a newer task for the same URL.
+        defer { if inFlight[url] == task { inFlight[url] = nil } }
         return try await task.value
     }
 

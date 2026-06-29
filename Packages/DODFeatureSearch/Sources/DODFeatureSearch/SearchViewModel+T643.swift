@@ -112,8 +112,11 @@ extension SearchViewModel {
         merged: [RecipeListItem],
         localItems: [RecipeListItem],
         trimmed: String,
-        online: Bool
+        online: Bool,
+        generation: Int
     ) async {
+        // H1: a newer search may have started while we awaited the fan-out.
+        guard generation == searchGeneration else { return }
         let titleIDs = Set(merged.map(\.id))
         let ingredientOnly = localItems.filter { !titleIDs.contains($0.id) }
 
@@ -138,7 +141,7 @@ extension SearchViewModel {
         lastSurface = .textQuery
         ingredientItems = ingredientOnly
 
-        await applyFiltersAndFinalize(merged: merged, trimmed: trimmed)
+        await applyFiltersAndFinalize(merged: merged, trimmed: trimmed, generation: generation)
     }
 
     /// Final hop of `performSearch()`: hydrate the filter-support maps,
@@ -148,7 +151,8 @@ extension SearchViewModel {
     /// T-643 fan-out tuple was inlined into it.
     func applyFiltersAndFinalize(
         merged: [RecipeListItem],
-        trimmed: String
+        trimmed: String,
+        generation: Int
     ) async {
         let allIDs = merged.map(\.id)
         // DUT-314: `filters.apply` short-circuits to `items` unchanged when
@@ -166,12 +170,15 @@ extension SearchViewModel {
             // `kickOffFilterSupportHydrationIfNeeded`).
             filterSupportHydrated = false
         } else {
-            lastCategoryIDsByRecipe =
-                (try? await dependencies.categoryIDs(forRecipeIDs: allIDs)) ?? [:]
-            lastTotalSecondsByRecipe =
-                (try? await dependencies.totalSeconds(forRecipeIDs: allIDs)) ?? [:]
-            lastRecentlyViewedIDs =
-                (try? await dependencies.recentlyViewedRecipeIDs()) ?? []
+            // Fetch into locals first; a newer search can supersede us across
+            // these awaits, so re-check the generation before committing (H1).
+            let categoryIDs = (try? await dependencies.categoryIDs(forRecipeIDs: allIDs)) ?? [:]
+            let totalSeconds = (try? await dependencies.totalSeconds(forRecipeIDs: allIDs)) ?? [:]
+            let recentlyViewed = (try? await dependencies.recentlyViewedRecipeIDs()) ?? []
+            guard generation == searchGeneration else { return }
+            lastCategoryIDsByRecipe = categoryIDs
+            lastTotalSecondsByRecipe = totalSeconds
+            lastRecentlyViewedIDs = recentlyViewed
             filterSupportHydrated = true
         }
 
