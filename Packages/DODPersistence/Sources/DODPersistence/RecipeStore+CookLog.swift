@@ -41,9 +41,16 @@ extension RecipeStore {
             predicate: #Predicate { $0.id == id }
         )
         guard let row = try modelContext.fetch(descriptor).first else { return }
+        // DUT-338: if the photo was replaced or cleared, delete the previous
+        // file so it doesn't orphan in Application Support (never OS-purged).
+        // The new file, if any, is already on disk by the time we get here.
+        let previousPhotoID = row.photoLocalID
         row.note = entry.note
         row.personalRating = entry.personalRating
         row.photoLocalID = entry.photoLocalID
+        if let previousPhotoID, previousPhotoID != entry.photoLocalID {
+            CookPhotoStore().delete(id: previousPhotoID)
+        }
         try modelContext.save()
     }
 
@@ -60,7 +67,13 @@ extension RecipeStore {
         let descriptor = FetchDescriptor<CachedCookLogEntry>(
             predicate: #Predicate { $0.id == id }
         )
+        let photoStore = CookPhotoStore()
         for row in try modelContext.fetch(descriptor) {
+            // DUT-338: drop the entry's photo file too — deleting only the row
+            // leaves the JPEG orphaned in Application Support forever.
+            if let photoLocalID = row.photoLocalID {
+                photoStore.delete(id: photoLocalID)
+            }
             modelContext.delete(row)
         }
         try modelContext.save()
