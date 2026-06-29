@@ -52,7 +52,7 @@ extension WidgetCard {
 
                 Hero(url: row.heroImageURL)
                     .frame(height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
 
                 Text(row.title)
                     .font(.system(.subheadline, design: .default, weight: .semibold))
@@ -148,7 +148,7 @@ extension WidgetCard {
             HStack(spacing: DODSpacing.xs) {
                 Hero(url: row.heroImageURL)
                     .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
 
                 Text(row.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))

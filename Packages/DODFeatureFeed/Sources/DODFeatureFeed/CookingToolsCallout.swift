@@ -71,7 +71,7 @@ struct CookingToolsCallout: View {
 /// edge of the top, so it reads as pointing up at the trailing-edge toolbar
 /// button it sits beneath.
 private struct SpeechBubble: Shape {
-    var cornerRadius: CGFloat = 14
+    var cornerRadius: CGFloat = DODRadius.standard
     var tailWidth: CGFloat = 18
     var tailHeight: CGFloat = 9
     /// Distance from the trailing edge to the tail's center.

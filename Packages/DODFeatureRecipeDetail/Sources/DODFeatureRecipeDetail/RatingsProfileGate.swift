@@ -79,7 +79,7 @@ public struct RatingsProfileGate: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, DODSpacing.sm)
                     .background(
-                        RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                        RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                             .fill(DODColor.castIronBrown)
                     )
             }
@@ -97,7 +97,7 @@ public struct RatingsProfileGate: View {
         // solid even when the parent ZStack composes a translucent
         // `.ultraThinMaterial` overlay underneath the popup.
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surface)
         )
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)

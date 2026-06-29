@@ -44,7 +44,7 @@ public struct RecipeCard: View {
             textSection
         }
         .background(DODColor.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
         // Note: we do NOT collapse children into a single accessibility element.
         // When a feature wraps RecipeCard in a Button, that Button derives its
         // accessibility label from the visible Text content — which gives

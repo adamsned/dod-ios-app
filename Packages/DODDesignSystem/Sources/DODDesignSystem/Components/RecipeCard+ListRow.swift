@@ -14,7 +14,7 @@ extension RecipeCard {
     ///
     /// Layout (CL-64.4):
     ///   - 60×60pt `AsyncImage` thumbnail on the leading edge, clipped to
-    ///     a `RoundedRectangle(cornerRadius: DODSpacing.xs)`.
+    ///     a `RoundedRectangle(cornerRadius: DODRadius.inner)`.
     ///   - `VStack(.leading)` carrying the title (`.lineLimit(1)`,
     ///     `DODType.heading`) and the excerpt (`.lineLimit(1)`,
     ///     `DODType.caption`). The excerpt is single-line in the row
@@ -23,7 +23,7 @@ extension RecipeCard {
     ///     `totalTimeDisplay` is non-nil.
     ///   - `DODSpacing.sm` vertical padding around the row.
     ///   - `DODColor.surfaceElevated` background inside a
-    ///     `RoundedRectangle(cornerRadius: DODSpacing.sm)` (matches the
+    ///     `RoundedRectangle(cornerRadius: DODRadius.standard)` (matches the
     ///     gallery card's surface treatment).
     ///
     /// Composes with the same ``recipeCardTap(_:)`` +
@@ -80,7 +80,7 @@ extension RecipeCard {
             .padding(.horizontal, DODSpacing.sm)
             .padding(.vertical, DODSpacing.sm)
             .background(DODColor.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
         }
 
         /// 60×60pt leading thumbnail. AsyncImage states map to the same
@@ -94,7 +94,7 @@ extension RecipeCard {
             ReliableImage(url: heroImageURL) { phase in
                 switch phase {
                 case .empty:
-                    LoadingSkeleton(cornerRadius: DODSpacing.xs)
+                    LoadingSkeleton(cornerRadius: DODRadius.inner)
                 case .success(let image):
                     image
                         .resizable()
@@ -107,7 +107,7 @@ extension RecipeCard {
                 }
             }
             .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
             .accessibilityHidden(true)
         }
     }

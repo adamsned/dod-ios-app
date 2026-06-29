@@ -3062,6 +3062,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** DODSupport (FractionRenderer), DODNetworking (JSONLDRecipeParser, WPRMRatingsClient, WPCommentsClient, WPDTOs + new WPPostDecoding), DODFeatureRecipeDetail (RatingSubmit, CookModeViewModel+Timers), DODFeatureProfile (ProfileSection, ProfileEditView + new ProfileEditView+Discard), DODFeatureFeed (SettingsView), App (RootView + new RootView+Spotlight, TabStack) + tests. Spec: clarifications.md (CL-287).
 - **AC:** CL-287 canonical. **Deps:** off main. Branch `fix/sdet-round2`. **Verification:** recursive swift-format lint + SwiftLint --strict clean; DODSupport 479 / DODNetworking 111 / DODFeatureRecipeDetail 219 / DODFeatureProfile 55 / DODFeatureFeed 87 green; iOS app build green. Device-verify DUT-349/352/353/358.
 
+### T-894 — Corner-radius standard: DODRadius token + app-wide sweep (CL-288 / DUT-363)
+
+- **What:** New design rule (mirrors the Title Case rule): one canonical corner radius app-wide, matching the Settings inset-grouped cells. New `DODRadius` token (`standard = 12`, `inner = 8`); swept every custom corner radius to it; `Capsule()`/`Circle()` (pills/avatars) + `cornerRadius: 0` (skeletons) exempt. `standard` for buttons/cards/sheets/containers; `inner` only where `standard` would clip content (thumbnails, nested images, small pills).
+- **Files:** new `DODDesignSystem/CornerRadius.swift`; ~56 cornerRadius sites retokenized across 29 files (`DODSpacing.sm`/`.md` + 16/14/12/10 → `standard`; `DODSpacing.xs` + 8/6 → `inner`); `CookingToolsCallout` + `LoadingSkeleton.init` defaults tokenized; `ComponentsTests` assertion fixed (`== 16` → `== DODRadius.standard`). Spec: `clarifications.md` (CL-288).
+- **AC:** design-system standard (new). Linear DUT-363. CL-288 canonical. **Est:** ~2 h. **Deps:** off main (rebased over the CL-286/CL-287 SDET batches). Branch `feat/corner-radius-standard`. **Verification:** 3-agent adversarial audit (missed-API / collateral / widget) — coverage complete; DODDesignSystem + every feature package builds; swift-format + SwiftLint `--strict` clean; L4 snapshots unchanged (no re-record); rendered on the iPhone 17 sim.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

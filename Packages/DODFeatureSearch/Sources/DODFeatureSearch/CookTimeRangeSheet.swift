@@ -171,7 +171,7 @@ struct CookTimeRangeSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, DODSpacing.sm)
                     .background(
-                        RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                        RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                             .fill(DODColor.castIronBrown)
                     )
             }

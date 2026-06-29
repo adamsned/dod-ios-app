@@ -280,7 +280,7 @@ public struct RecipeDetailRatingsSection: View {
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                     .stroke(DODColor.labelSecondary.opacity(0.25), lineWidth: 1)
 
                 TextEditor(

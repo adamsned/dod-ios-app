@@ -51,7 +51,7 @@ public struct RelatedRecipesStrip: View {
             }
             .frame(width: 160, height: 100)
             .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
 
             Text(item.title)
                 .dodFont(DODType.bodyEmphasized)

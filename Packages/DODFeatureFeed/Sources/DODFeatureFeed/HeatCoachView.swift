@@ -156,7 +156,7 @@ public struct HeatCoachView: View {
                     .padding(.vertical, DODSpacing.xs)
                     .foregroundStyle(isSelected ? DODColor.labelOnAccent : DODColor.label)
                     .background(
-                        RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous)
+                        RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
                             .fill(isSelected ? DODColor.accent : Color.clear)
                     )
                     .contentShape(Rectangle())
@@ -166,11 +166,11 @@ public struct HeatCoachView: View {
         }
         .padding(DODSpacing.xxs)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .strokeBorder(DODColor.surfaceDivider, lineWidth: 1)
         )
         .accessibilityIdentifier(accessibilityID)
@@ -185,7 +185,7 @@ extension View {
     func cardSurface() -> some View {
         frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                     .fill(DODColor.surfaceElevated)
             )
     }

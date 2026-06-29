@@ -118,7 +118,7 @@ extension CookJournalEntryView {
                         .resizable()
                         .scaledToFill()
                 } else {
-                    RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+                    RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                         .fill(DODColor.burntOrange.opacity(0.1))
                     VStack(spacing: DODSpacing.xs) {
                         Image(systemName: "camera.fill")
@@ -132,7 +132,7 @@ extension CookJournalEntryView {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(displayImage == nil ? "Add a photo" : "Change photo")
@@ -174,7 +174,7 @@ extension CookJournalEntryView {
             }
             .padding(DODSpacing.xs)
             .background(
-                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                     .fill(DODColor.surfaceElevated)
             )
         }
