@@ -239,6 +239,9 @@ public struct ProfileEditView: View {
             }
             Button("Leave Without Saving", role: .destructive) {
                 showLeaveConfirmation = false
+                #if canImport(UIKit)
+                discardUnsavedPhotoFiles()  // DUT-353
+                #endif
                 dismiss()
             }
         }
