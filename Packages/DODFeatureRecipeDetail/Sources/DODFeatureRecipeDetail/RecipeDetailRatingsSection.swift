@@ -322,7 +322,7 @@ public struct RecipeDetailRatingsSection: View {
                 .padding(.horizontal, DODSpacing.lg)
                 .padding(.vertical, DODSpacing.sm)
         }
-        .buttonStyle(.borderedProminent)
+        .dodProminentButton()
         .tint(DODColor.accent)
         .disabled(!viewModel.canSubmitRatingOrComment || viewModel.isSubmittingRatingOrComment)
         .accessibilityLabel("Submit rating and review")

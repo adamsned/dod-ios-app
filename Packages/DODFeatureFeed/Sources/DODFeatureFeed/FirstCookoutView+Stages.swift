@@ -135,7 +135,7 @@ extension FirstCookoutView {
                 Label("Open the Heat Coach", systemImage: "thermometer.sun.fill")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.burntOrange)
         }
         .padding(.top, DODSpacing.xs)
@@ -225,7 +225,7 @@ extension FirstCookoutView {
                 // even backgrounded (the tick loop is foreground-only).
                 Task { await notifier.scheduleBakeDone(after: duration) }
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.burntOrange)
             .padding(.top, DODSpacing.xs)
         }
@@ -241,7 +241,7 @@ extension FirstCookoutView {
                 dismiss()
             }
         }
-        .buttonStyle(.borderedProminent)
+        .dodProminentButton()
         .tint(DODColor.burntOrange)
         .padding(.top, DODSpacing.xs)
     }
@@ -266,7 +266,7 @@ extension FirstCookoutView {
                 ) {
                     Label("Share / Post, tags Dutch Oven Daddy", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.borderedProminent)
+                .dodProminentButton()
                 .tint(DODColor.burntOrange)
                 // DUT-203 — clear ALL photo state so a Retake-then-Done can't save
                 // the discarded photo, and re-picking the same asset re-fires onChange.
@@ -298,14 +298,14 @@ extension FirstCookoutView {
             } label: {
                 Label("Take a photo", systemImage: "camera.fill")
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.burntOrange)
         }
         #endif
         PhotosPicker(selection: $cookPhotoItem, matching: .images) {
             Label("Choose from library", systemImage: "photo.on.rectangle")
         }
-        .buttonStyle(.bordered)
+        .dodBorderedButton()
         .tint(DODColor.burntOrange)
     }
 

@@ -3068,6 +3068,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** new `DODDesignSystem/CornerRadius.swift`; ~56 cornerRadius sites retokenized across 29 files (`DODSpacing.sm`/`.md` + 16/14/12/10 → `standard`; `DODSpacing.xs` + 8/6 → `inner`); `CookingToolsCallout` + `LoadingSkeleton.init` defaults tokenized; `ComponentsTests` assertion fixed (`== 16` → `== DODRadius.standard`). Spec: `clarifications.md` (CL-288).
 - **AC:** design-system standard (new). Linear DUT-363. CL-288 canonical. **Est:** ~2 h. **Deps:** off main (rebased over the CL-286/CL-287 SDET batches). Branch `feat/corner-radius-standard`. **Verification:** 3-agent adversarial audit (missed-API / collateral / widget) — coverage complete; DODDesignSystem + every feature package builds; swift-format + SwiftLint `--strict` clean; L4 snapshots unchanged (no re-record); rendered on the iPhone 17 sim.
 
+### T-895 — Pin system bordered buttons to DODRadius.standard (CL-289 / DUT-364)
+
+- **What:** Extends the CL-288 radius rule to system buttons (Spencer: "no exceptions, buttons included"). ~18 buttons used `.borderedProminent`/`.bordered` → iOS's own radius, not 12. New helpers `dodProminentButton()` / `dodBorderedButton()` apply the system style + `.buttonBorderShape(.roundedRectangle(radius: DODRadius.standard))`, pinning the corner to 12pt and keeping Apple's fill/padding (radius-only). Confirmed on iOS 26 via the re-recorded EmptyState snapshot. Exempt (unavoidable): icon-only buttons + system chrome (Menu/Picker/alert/sheet/inset-grouped container).
+- **Files:** new `DODDesignSystem/ButtonShape.swift`; 18 button sites across `CookModeView`, `CookTimer`, `RecipeDetailRatingsSection`, `FirstCookoutView+Stages`, `FirstCookoutHeroCard`, `CookCelebrationView`, `GoogleProfileSignInButton`, `EmptyState`, `CommentComposer`. Re-recorded 6 L4 baselines (EmptyState withAction ×3, CommentComposer ×3). Spec: `clarifications.md` (CL-289).
+- **AC:** design-system standard. Linear DUT-364. CL-289 canonical. **Est:** ~1 h. **Deps:** off main (after DUT-363). Branch `feat/button-radius-consistency`. **Verification:** swift-format + SwiftLint `--strict` clean; affected packages build; the EmptyState "Retry" button renders a 12pt rounded rect on the iPhone 17 sim (was the system shape).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
