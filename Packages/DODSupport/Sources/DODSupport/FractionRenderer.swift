@@ -201,9 +201,19 @@ public enum FractionRenderer {
         let wholeEnd = scanInteger(in: text, from: text.startIndex)
         guard wholeEnd > text.startIndex else { return nil }
         let whole = Double(text[text.startIndex..<wholeEnd]) ?? 0
-        // Mandatory whitespace.
+        // Whitespace between the whole part and the fraction is normally required
+        // ("1 1/2"), but the GLUED unicode form ("1½") is unambiguous and common in
+        // WP sources (DUT-351), so allow a unicode-fraction tail with no space.
         let afterSpace = skipWhitespace(in: text, from: wholeEnd)
-        guard afterSpace > wholeEnd else { return nil }
+        if afterSpace == wholeEnd {
+            // No space: only a glued unicode fraction qualifies ("1½"). An ASCII run
+            // like "11/2" is the fraction 11/2, not a mixed number — leave it.
+            return readUnicodeFractionTail(
+                in: text,
+                whole: whole,
+                fractionStart: wholeEnd
+            )
+        }
         // Followed by a Unicode-glyph fraction or an ASCII N/D pair.
         if let unicodeQuantity = readUnicodeFractionTail(
             in: text,
@@ -295,7 +305,10 @@ public enum FractionRenderer {
 
     private static func scanInteger(in text: String, from index: String.Index) -> String.Index {
         var cursor = index
-        while cursor < text.endIndex, text[cursor].isNumber {
+        // DUT-351: `isWholeNumber` (not `isNumber`) so a glued unicode vulgar
+        // fraction like "½" in "1½" stops the integer run instead of being swallowed
+        // into it (which made `Double("1½")` nil and broke glued mixed numbers).
+        while cursor < text.endIndex, text[cursor].isWholeNumber {
             cursor = text.index(after: cursor)
         }
         return cursor
