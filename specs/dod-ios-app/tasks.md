@@ -3050,6 +3050,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** new `DODDesignSystem/Components/AppIntroTour.swift`; deleted `OnboardingSheet.swift`; `App/RootView+Onboarding.swift` (`appIntroPages` replaces `welcomeBullets`), `App/RootView.swift` (`.fullScreenCover` + `AppIntroTour`). Removed snapshot tests `test_onboardingSheet_default`/`_dark`/`_AX5` + 3 baseline PNGs + `onboardingBullets()`; updated `UITests/SmokeTests.swift` + `UITests/E2E/CoreUserJourneysE2ETests.swift` button label. Spec: `clarifications.md` (CL-285).
 - **AC:** US-8 / AC-8.1 (amended) + AC-8.2. Linear DUT-335. CL-285 canonical. **Est:** ~2.5 h. **Deps:** off main. Branch `feat/app-intro-tour`. **Verification:** swift-format + SwiftLint `--strict` clean; DODDesignSystem (macOS, iOS guard) + iOS app build green; rendered slide 1 + a mid-tour slide on the iPhone 17 sim. Real screenshots + a tour L4 snapshot deferred (placeholder content).
 
+### T-892 — Corner-radius standard: DODRadius token + app-wide sweep (CL-286 / DUT-363)
+
+- **What:** New design rule (mirrors the Title Case rule): one canonical corner radius app-wide, matching the Settings inset-grouped cells. New `DODRadius` token (`standard = 12`, `inner = 8`); swept every custom corner radius to it; `Capsule()`/`Circle()` (pills/avatars) + `cornerRadius: 0` (skeletons) exempt. `standard` for buttons/cards/sheets/containers; `inner` only where `standard` would clip content (thumbnails, nested images, small pills).
+- **Files:** new `DODDesignSystem/CornerRadius.swift`; ~56 cornerRadius sites retokenized across 29 files (`DODSpacing.sm`/`.md` + 16/14/12/10 → `standard`; `DODSpacing.xs` + 8/6 → `inner`); `CookingToolsCallout` + `LoadingSkeleton.init` defaults tokenized. Spec: `clarifications.md` (CL-286).
+- **AC:** design-system standard (new). Linear DUT-363. CL-286 canonical. **Est:** ~2 h. **Deps:** off main. Branch `feat/corner-radius-standard`. **Verification:** DODDesignSystem + every feature package builds; swift-format + SwiftLint `--strict` clean; L4 snapshots unchanged (values were already 12/8 or within tolerance — no re-record); rendered on the iPhone 17 sim.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

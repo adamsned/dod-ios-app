@@ -135,7 +135,7 @@ public struct CookJournalView: View {
         .frame(maxWidth: .infinity)
         .padding(DODSpacing.md)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .accessibilityElement(children: .combine)
@@ -168,7 +168,7 @@ public struct CookJournalView: View {
         .frame(maxWidth: .infinity)
         .padding(DODSpacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
     }
@@ -200,7 +200,7 @@ public struct CookJournalView: View {
         }
         .padding(DODSpacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
     }
@@ -211,9 +211,9 @@ public struct CookJournalView: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
         } else {
-            RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
                 .fill(DODColor.burntOrange.opacity(0.15))
                 .frame(width: 56, height: 56)
                 .overlay(

@@ -181,7 +181,7 @@ extension FirstCookoutView {
         .padding(DODSpacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .padding(.top, DODSpacing.xs)
@@ -257,7 +257,7 @@ extension FirstCookoutView {
                     .resizable()
                     .scaledToFit()
                     .frame(maxHeight: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
                 ShareLink(
                     item: photo,
                     subject: Text("My first Dutch oven cook"),
@@ -337,7 +337,7 @@ extension FirstCookoutView {
         }
         .padding(DODSpacing.xs)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .padding(.top, DODSpacing.xs)

@@ -156,7 +156,7 @@ struct IdleSuggestionsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                     .fill(DODColor.surfaceElevated)
             )
         }

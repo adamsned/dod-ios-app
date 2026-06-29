@@ -59,7 +59,7 @@ struct CookTimer: View {
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .accessibilityElement(children: .combine)

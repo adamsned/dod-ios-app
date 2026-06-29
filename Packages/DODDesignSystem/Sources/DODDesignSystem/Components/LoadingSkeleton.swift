@@ -12,7 +12,7 @@ public struct LoadingSkeleton: View {
 
     public let cornerRadius: CGFloat
 
-    public init(cornerRadius: CGFloat = DODSpacing.xs) {
+    public init(cornerRadius: CGFloat = DODRadius.inner) {
         self.cornerRadius = cornerRadius
     }
 

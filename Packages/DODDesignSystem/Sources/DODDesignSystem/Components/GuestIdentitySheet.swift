@@ -82,7 +82,7 @@ public struct GuestIdentitySheet: View {
             input(title: title, text: text, kind: kind)
                 .padding(DODSpacing.sm)
                 .background(
-                    RoundedRectangle(cornerRadius: DODSpacing.xs, style: .continuous)
+                    RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
                         .stroke(DODColor.labelSecondary.opacity(0.25), lineWidth: 1)
                 )
                 .disabled(isSubmitting)
@@ -124,7 +124,7 @@ public struct GuestIdentitySheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DODSpacing.md)
                 .background(
-                    RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                    RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                         .fill(canContinue ? DODColor.accent : DODColor.labelSecondary.opacity(0.5))
                 )
         }

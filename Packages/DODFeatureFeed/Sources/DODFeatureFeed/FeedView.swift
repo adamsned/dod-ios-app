@@ -359,7 +359,7 @@ public struct FeedView: View {
         ScrollView {
             VStack(spacing: DODSpacing.md) {
                 ForEach(0..<6, id: \.self) { _ in
-                    LoadingSkeleton(cornerRadius: DODSpacing.sm)
+                    LoadingSkeleton(cornerRadius: DODRadius.standard)
                         .frame(height: 280)
                 }
             }

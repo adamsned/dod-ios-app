@@ -61,7 +61,7 @@ struct RecipeDetailVideoSection: View {
     }
 
     private var offlinePlaceholder: some View {
-        RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+        RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
             .fill(DODColor.surfaceElevated)
             .frame(height: 200)
             .overlay(
