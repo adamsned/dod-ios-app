@@ -32,4 +32,25 @@ struct CookChooserFlowTests {
             #expect(CookChooserFlow.nodeState(index: index, recommended: nil) == .done)
         }
     }
+
+    @Test func outOfOrderCompletionMarksTheCookedRungDone() {
+        // DUT-381: the roadmap is freely tappable, so a cook can finish rung 2
+        // (index 1) before rung 1. The recommended rung is then rung 1 (the first
+        // un-cooked), but the rung they ACTUALLY cooked must read as done — not
+        // "upcoming" — and the recommended one as the current "start here".
+        let cooked: Set<Int> = [GuidedCookout.path[1].recipeID]
+        let recommended = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cooked)
+        #expect(
+            CookChooserFlow.nodeState(index: 0, recommended: recommended, cookedRecipeIDs: cooked)
+                == .current
+        )
+        #expect(
+            CookChooserFlow.nodeState(index: 1, recommended: recommended, cookedRecipeIDs: cooked)
+                == .done
+        )
+        #expect(
+            CookChooserFlow.nodeState(index: 2, recommended: recommended, cookedRecipeIDs: cooked)
+                == .upcoming
+        )
+    }
 }

@@ -42,6 +42,9 @@ public struct FeedView: View {
     /// cooked yet). Defaults to rung 1; recomputed from the cook journal so the
     /// hero + flow follow the user up the ladder. nil once every rung is cooked.
     @State private var currentRung: GuidedCookout? = .firstCookout
+    /// DUT-381 — the cook's logged recipe ids, so the chooser roadmap can mark a
+    /// rung the user actually cooked as done even if they took it out of order.
+    @State private var cookedRecipeIDs: Set<Int> = []
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
@@ -95,6 +98,7 @@ public struct FeedView: View {
                 // is dropped straight into coaching (CookChooserFlow.initialSelection).
                 CookChooserFlow(
                     recommended: currentRung,
+                    cookedRecipeIDs: cookedRecipeIDs,
                     onLogCook: { logCookAndRefresh($0) }
                 )
                 // DUT-339 — defer any earned celebration until this sheet dismisses.
@@ -150,8 +154,8 @@ public struct FeedView: View {
     /// DUT-183 — recompute the cook's current rung from the journal so the hero
     /// card + the flow advance to the next un-cooked dish as they climb the path.
     private func refreshCurrentRung() async {
-        let cooked = Set((await viewModel.cookLogs()).map(\.recipeID))
-        currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cooked)
+        cookedRecipeIDs = Set((await viewModel.cookLogs()).map(\.recipeID))  // DUT-381
+        currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
     }
 
     /// DUT-196 (the menu) + DUT-200 / T-834 (this refinement): one icon-only

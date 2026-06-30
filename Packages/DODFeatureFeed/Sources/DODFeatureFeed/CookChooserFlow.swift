@@ -16,6 +16,9 @@ struct CookChooserFlow: View {
     /// The progress-aware default (FeedView's `currentRung`) — the cook's
     /// current spot on the path. `nil` once every rung is cooked (a graduate).
     let recommended: GuidedCookout?
+    /// DUT-381 — recipe ids the cook has actually logged, so a rung they cooked
+    /// out of order still renders as done (the roadmap is freely tappable).
+    var cookedRecipeIDs: Set<Int> = []
     let onLogCook: (CookLogEntry) -> Void
 
     @State private var selected: GuidedCookout?
@@ -82,7 +85,12 @@ struct CookChooserFlow: View {
     private var pathRungs: [GuidedCookout] { GuidedCookout.path }
 
     private func nodeState(_ index: Int) -> CookPathNode.NodeState {
-        Self.nodeState(index: index, recommended: recommended, path: pathRungs)
+        Self.nodeState(
+            index: index,
+            recommended: recommended,
+            cookedRecipeIDs: cookedRecipeIDs,
+            path: pathRungs
+        )
     }
 
     /// Pure, testable position → state mapping: rungs before the cook's
@@ -92,8 +100,17 @@ struct CookChooserFlow: View {
     nonisolated static func nodeState(
         index: Int,
         recommended: GuidedCookout?,
+        cookedRecipeIDs: Set<Int> = [],
         path: [GuidedCookout] = GuidedCookout.path
     ) -> CookPathNode.NodeState {
+        // DUT-381: a rung the user ACTUALLY cooked is done regardless of its
+        // position — the roadmap is freely tappable, so completion isn't strictly
+        // in-order (e.g. cooking rung 2 before rung 1). Falls through to the
+        // recommended-position mapping when this rung isn't (yet) cooked, which
+        // preserves the original behavior when no cook history is supplied.
+        if index >= 0, index < path.count, cookedRecipeIDs.contains(path[index].recipeID) {
+            return .done
+        }
         guard let recommended,
             let current = path.firstIndex(where: { $0.recipeID == recommended.recipeID })
         else { return .done }
