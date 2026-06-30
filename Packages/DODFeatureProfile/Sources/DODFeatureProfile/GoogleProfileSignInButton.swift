@@ -35,7 +35,7 @@ public struct GoogleProfileSignInButton: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
         }
-        .buttonStyle(.bordered)
+        .dodBorderedButton()
         .tint(DODColor.label)
         .accessibilityIdentifier("profile-sign-in-google")
     }

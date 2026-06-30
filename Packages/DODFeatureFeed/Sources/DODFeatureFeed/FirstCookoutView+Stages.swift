@@ -135,7 +135,7 @@ extension FirstCookoutView {
                 Label("Open the Heat Coach", systemImage: "thermometer.sun.fill")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.burntOrange)
         }
         .padding(.top, DODSpacing.xs)
@@ -181,7 +181,7 @@ extension FirstCookoutView {
         .padding(DODSpacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .padding(.top, DODSpacing.xs)
@@ -225,7 +225,7 @@ extension FirstCookoutView {
                 // even backgrounded (the tick loop is foreground-only).
                 Task { await notifier.scheduleBakeDone(after: duration) }
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.burntOrange)
             .padding(.top, DODSpacing.xs)
         }
@@ -241,7 +241,7 @@ extension FirstCookoutView {
                 dismiss()
             }
         }
-        .buttonStyle(.borderedProminent)
+        .dodProminentButton()
         .tint(DODColor.burntOrange)
         .padding(.top, DODSpacing.xs)
     }
@@ -257,7 +257,7 @@ extension FirstCookoutView {
                     .resizable()
                     .scaledToFit()
                     .frame(maxHeight: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
                 ShareLink(
                     item: photo,
                     subject: Text("My first Dutch oven cook"),
@@ -266,7 +266,7 @@ extension FirstCookoutView {
                 ) {
                     Label("Share / Post, tags Dutch Oven Daddy", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.borderedProminent)
+                .dodProminentButton()
                 .tint(DODColor.burntOrange)
                 // DUT-203 — clear ALL photo state so a Retake-then-Done can't save
                 // the discarded photo, and re-picking the same asset re-fires onChange.
@@ -298,14 +298,14 @@ extension FirstCookoutView {
             } label: {
                 Label("Take a photo", systemImage: "camera.fill")
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.burntOrange)
         }
         #endif
         PhotosPicker(selection: $cookPhotoItem, matching: .images) {
             Label("Choose from library", systemImage: "photo.on.rectangle")
         }
-        .buttonStyle(.bordered)
+        .dodBorderedButton()
         .tint(DODColor.burntOrange)
     }
 
@@ -337,7 +337,7 @@ extension FirstCookoutView {
         }
         .padding(DODSpacing.xs)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .padding(.top, DODSpacing.xs)

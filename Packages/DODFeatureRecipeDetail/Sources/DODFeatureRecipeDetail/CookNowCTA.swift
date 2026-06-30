@@ -28,7 +28,7 @@ struct CookNowCTA: View {
             .padding(.vertical, DODSpacing.sm)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                     .fill(DODColor.accent)
                     .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 3)
             )

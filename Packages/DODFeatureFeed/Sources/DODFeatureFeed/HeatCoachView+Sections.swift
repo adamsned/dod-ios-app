@@ -67,7 +67,7 @@ extension HeatCoachView {
         .padding(DODSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.accent)
         )
         .accessibilityElement(children: .combine)
@@ -190,7 +190,7 @@ extension HeatCoachView {
         .padding(DODSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
     }

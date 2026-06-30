@@ -74,7 +74,7 @@ public struct CommentComposer: View {
     private var editor: some View {
         ZStack(alignment: .topLeading) {
             // Background border to give the editor visual containment.
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .stroke(DODColor.labelSecondary.opacity(0.25), lineWidth: 1)
 
             TextEditor(text: $text)
@@ -122,7 +122,7 @@ public struct CommentComposer: View {
                     .padding(.horizontal, DODSpacing.lg)
                     .padding(.vertical, DODSpacing.sm)
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.accent)
             .disabled(!canSubmit)
 
@@ -134,7 +134,7 @@ public struct CommentComposer: View {
                     .padding(.horizontal, DODSpacing.lg)
                     .padding(.vertical, DODSpacing.sm)
             }
-            .buttonStyle(.bordered)
+            .dodBorderedButton()
             .disabled(isSubmitting)
         }
     }

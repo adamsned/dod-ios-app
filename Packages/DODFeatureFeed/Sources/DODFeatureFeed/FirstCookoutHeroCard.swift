@@ -45,7 +45,7 @@ struct FirstCookoutHeroCard: View {
                 Text("Let's cook")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.burntOrange)
             .padding(.top, DODSpacing.xxs)
             Button(action: onCookDumpCake) {
@@ -60,11 +60,11 @@ struct FirstCookoutHeroCard: View {
         .padding(DODSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .strokeBorder(DODColor.burntOrange.opacity(0.3), lineWidth: 1)
         )
         .accessibilityElement(children: .contain)

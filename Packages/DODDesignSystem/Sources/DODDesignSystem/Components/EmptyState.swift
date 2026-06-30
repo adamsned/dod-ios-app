@@ -59,7 +59,7 @@ public struct EmptyState: View {
                         .padding(.horizontal, DODSpacing.lg)
                         .padding(.vertical, DODSpacing.sm)
                 }
-                .buttonStyle(.borderedProminent)
+                .dodProminentButton()
                 .tint(DODColor.accent)
             }
         }

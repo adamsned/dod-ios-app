@@ -280,7 +280,7 @@ public struct RecipeDetailRatingsSection: View {
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                     .stroke(DODColor.labelSecondary.opacity(0.25), lineWidth: 1)
 
                 TextEditor(
@@ -322,7 +322,7 @@ public struct RecipeDetailRatingsSection: View {
                 .padding(.horizontal, DODSpacing.lg)
                 .padding(.vertical, DODSpacing.sm)
         }
-        .buttonStyle(.borderedProminent)
+        .dodProminentButton()
         .tint(DODColor.accent)
         .disabled(!viewModel.canSubmitRatingOrComment || viewModel.isSubmittingRatingOrComment)
         .accessibilityLabel("Submit rating and review")

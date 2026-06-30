@@ -102,11 +102,11 @@ struct CookPathNode: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 DODColor.surfaceElevated,
-                in: RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+                in: RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
             )
             .overlay {
                 if state == .current {
-                    RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+                    RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                         .strokeBorder(DODColor.burntOrange, lineWidth: 2)
                 }
             }

@@ -214,7 +214,7 @@ public struct CookModeView: View {
                 Label("Add to Cooking Journal", systemImage: "camera.fill")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.accent)
             .padding(.top, DODSpacing.sm)
             .accessibilityIdentifier("cook-mode-log-cook")
@@ -275,7 +275,7 @@ public struct CookModeView: View {
                     Label("Previous", systemImage: "chevron.left")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .dodBorderedButton()
                 .tint(DODColor.label)
                 .accessibilityLabel("Previous step")
             }
@@ -285,7 +285,7 @@ public struct CookModeView: View {
                 Label(primaryButtonLabel, systemImage: primaryButtonSymbol)
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.accent)
             .accessibilityLabel(primaryButtonLabel)
         }

@@ -35,7 +35,7 @@ struct RecipeDetailMetaPills: View {
         .padding(.horizontal, DODSpacing.sm)
         .padding(.vertical, DODSpacing.xs)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .accessibilityElement(children: .combine)

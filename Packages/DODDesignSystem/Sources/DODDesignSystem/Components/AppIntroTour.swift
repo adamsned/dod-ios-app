@@ -106,7 +106,7 @@ public struct AppIntroTour: View {
     /// Reserved image area — a placeholder until real screenshots land (DUT-335).
     /// Portrait, phone-screenshot-ish, so the eventual image drops straight in.
     private func imagePlaceholder(_ symbol: String) -> some View {
-        RoundedRectangle(cornerRadius: DODSpacing.md, style: .continuous)
+        RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
             .fill(DODColor.surfaceElevated)
             .aspectRatio(0.62, contentMode: .fit)
             .overlay(
@@ -174,7 +174,7 @@ public struct AppIntroTour: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DODSpacing.md)
                 .background(
-                    RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                    RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                         .fill(DODColor.accent)
                 )
         }

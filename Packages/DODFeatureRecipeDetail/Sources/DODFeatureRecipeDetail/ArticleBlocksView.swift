@@ -113,7 +113,7 @@ public struct ArticleBlocksView: View {
             // (e.g. 1200×4000) can't render many screens tall; scaledToFit
             // keeps the aspect ratio within the bound. (review DOD-ART-1)
             .frame(maxWidth: .infinity, maxHeight: Self.imageMaxHeight)
-            .clipShape(RoundedRectangle(cornerRadius: DODSpacing.sm))
+            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard))
             .accessibilityLabel(caption ?? "Article image")
 
             if let caption, !caption.isEmpty {
@@ -126,7 +126,7 @@ public struct ArticleBlocksView: View {
     }
 
     private var placeholder: some View {
-        RoundedRectangle(cornerRadius: DODSpacing.sm)
+        RoundedRectangle(cornerRadius: DODRadius.standard)
             .fill(DODColor.surfaceElevated)
             .aspectRatio(3.0 / 2.0, contentMode: .fit)
             .frame(maxWidth: .infinity)

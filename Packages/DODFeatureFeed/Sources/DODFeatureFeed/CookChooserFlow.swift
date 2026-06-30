@@ -168,7 +168,7 @@ struct CookChooserFlow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         DODColor.surfaceElevated,
-                        in: RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+                        in: RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                     )
                 }
                 .buttonStyle(.plain)

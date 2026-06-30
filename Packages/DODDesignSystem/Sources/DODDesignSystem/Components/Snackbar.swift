@@ -44,7 +44,7 @@ public struct Snackbar: View {
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: DODSpacing.sm, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.castIronBrown)
         )
         .padding(.horizontal, DODSpacing.md)

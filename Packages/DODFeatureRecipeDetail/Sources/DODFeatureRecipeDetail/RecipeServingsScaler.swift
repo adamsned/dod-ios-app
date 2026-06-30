@@ -57,7 +57,7 @@ struct RecipeServingsScaler: View {
         .padding(.vertical, DODSpacing.xs)
         .padding(.horizontal, DODSpacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .accessibilityElement(children: .combine)

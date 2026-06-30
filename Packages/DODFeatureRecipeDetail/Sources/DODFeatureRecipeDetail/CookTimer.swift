@@ -59,7 +59,7 @@ struct CookTimer: View {
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.sm)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
         .accessibilityElement(children: .combine)
@@ -76,13 +76,13 @@ struct CookTimer: View {
                     viewModel.startOrResumeTimer(forStep: stepIndex, totalSeconds: totalSeconds)
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .dodProminentButton()
             .tint(DODColor.accent)
             .disabled(didComplete)
             .accessibilityLabel(isRunning ? "Pause timer" : "Start timer")
 
             Button("Reset") { viewModel.resetTimer(forStep: stepIndex) }
-                .buttonStyle(.bordered)
+                .dodBorderedButton()
                 .tint(DODColor.labelSecondary)
                 .accessibilityLabel("Reset timer")
         }
