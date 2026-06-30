@@ -71,8 +71,8 @@ public struct AppleProfileSignIn: Sendable {
             credentialEmail: email,
             existing: existingSession
         )
-        let carriedToken =
-            existingSession?.userIdentifier == userIdentifier ? existingSession?.refreshToken : nil
+        let sameUser = existingSession?.userIdentifier == userIdentifier
+        let carriedToken = sameUser ? existingSession?.refreshToken : nil
         try? sessionStore.save(
             AppleAuthSession(
                 userIdentifier: resolved.userIdentifier,
@@ -87,7 +87,14 @@ public struct AppleProfileSignIn: Sendable {
         //    merge into the existing profile to preserve its id + photo.
         var profileSaved = false
         if let name = resolved.displayName, let mail = resolved.email {
-            let existingProfile = await profileStore.load()
+            // DUT-371: don't inherit a DIFFERENT signed-in user's profile id/photo
+            // on a shared device. A residual profile is mergeable only when it's
+            // the same Apple user, or when there's no prior session at all (a guest
+            // / manually-created profile this first sign-in is legitimately claiming
+            // — so we don't discard their photo). A different user's session present
+            // means the on-file profile is theirs: start fresh.
+            let differentUserSignedIn = existingSession != nil && !sameUser
+            let existingProfile = differentUserSignedIn ? nil : await profileStore.load()
             let profile = UserProfile(
                 id: existingProfile?.id ?? UUID(),
                 displayName: name,
@@ -134,7 +141,15 @@ public struct AppleProfileSignIn: Sendable {
         Task {
             guard let token = try? await revoker.exchange(authorizationCode: authorizationCode)
             else { return }
-            guard (try? sessionStore.load())?.userIdentifier == userIdentifier else { return }
+            guard (try? sessionStore.load())?.userIdentifier == userIdentifier else {
+                // DUT-368: the session was torn down (sign-out / delete / a different
+                // user) while the exchange was in flight. This token, just minted at
+                // Apple, will never be stored here — so Delete could never revoke it.
+                // Revoke it now directly so it can't outlive the account (App Store
+                // 5.1.1(v)); best-effort, it also expires server-side.
+                try? await revoker.revoke(refreshToken: token)
+                return
+            }
             try? sessionStore.save(
                 AppleAuthSession(
                     userIdentifier: userIdentifier,

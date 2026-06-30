@@ -125,7 +125,13 @@ public struct GoogleProfileSignIn: Sendable {
 
         var profileSaved = false
         if let name = resolved.displayName, let mail = resolved.email {
-            let existingProfile = await profileStore.load()
+            // DUT-371: don't inherit a DIFFERENT signed-in user's profile id/photo
+            // on a shared device (see AppleProfileSignIn). Merge a residual profile
+            // only for the same user, or when no prior session exists at all (a
+            // guest / manually-created profile this first sign-in is claiming).
+            let differentUserSignedIn =
+                existing != nil && existing?.userIdentifier != resolved.userIdentifier
+            let existingProfile = differentUserSignedIn ? nil : await profileStore.load()
             let profile = UserProfile(
                 id: existingProfile?.id ?? UUID(),
                 displayName: name,
