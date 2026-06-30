@@ -3095,4 +3095,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-898 — Profile stats: Cook Rank hero + counts grid + Cooking Journal link (CL-292 / DUT-417)
+
+- **What:** A read-only **stats section** between the Email field and Sign Out (DUT-416 view mode). The "combo of 2 and 3": a **Cook Rank hero** (current rank emoji + title from `CookProgression.currentRank(totalCooks:)`, a progress caption + bar to the next rank), a **counts grid** (Total Cooks, Weekly Streak, Saved Recipes, Ratings written), and a **"View Cooking Journal"** link that presents the existing `CookJournalView` (read + in-place edit). Hidden in edit mode and when no provider is wired (previews / snapshots). New-user state is encouraging ("Log your first cook to start climbing the ranks.").
+- **Files:** DODPersistence — `RecipeStore.userRatingCount()` (+test). DODFeatureProfile — `ProfileStats` + `ProfileStatsHooks` value types; `ProfileEditView+Stats.swift` (section: rank hero / grid / journal link + pure `rankProgressCaption` helper); `ProfileEditView` (`statsHooks` param + `loadedStats` @State + `.task` loader + view-mode render); `ProfileEditView+SignOut.swift` (extracted for file_length); `+4 ProfileStatsTests`. DODFeatureFeed — `SettingsDependencies` stats methods (defaulted); `SettingsViewModel+Stats.swift` (`loadProfileStats` via `CookLogStats`); `SettingsView+Profile.swift` (build hooks + present journal sheet). App — `LiveSettingsDependencies` + `AppDependencies.settingsDependencies()` wire the loaders to `RecipeStore`. Spec: `clarifications.md` (CL-292).
+- **AC:** US-44 (Profile). Linear DUT-417. CL-292 canonical. **Est:** ~3 h. **Deps:** off main (after CL-291 / DUT-416). Branch `feat/profile-stats`. **Verification:** swift-format + SwiftLint `--strict` clean; DODFeatureProfile 70 + DODFeatureFeed 88 + DODPersistence 129 tests green; iOS app build green. Visual (needs a keychain profile + real cook data): confirmed in an Xcode-signed run.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

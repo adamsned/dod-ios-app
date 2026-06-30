@@ -29,6 +29,9 @@ import UIKit  // T-783 / DUT-89 — UIDevice.userInterfaceIdiom (see ProfileSett
 struct ProfileSettingsRow: View {
 
     @Bindable var viewModel: SettingsViewModel
+    /// DUT-417 — drives the "View Cooking Journal" sheet presented from the
+    /// profile stats section.
+    @State private var showingJournal = false
 
     var body: some View {
         #if canImport(UIKit)
@@ -43,7 +46,8 @@ struct ProfileSettingsRow: View {
                     onProfileChanged: { [weak viewModel] in
                         await viewModel?.refreshProfile()
                     },
-                    photoStore: viewModel.profilePhotoStore
+                    photoStore: viewModel.profilePhotoStore,
+                    statsHooks: profileStatsHooks
                 )
             } else {
                 // Previews + snapshot hosts without a wired store:
@@ -54,6 +58,7 @@ struct ProfileSettingsRow: View {
                     .foregroundStyle(DODColor.labelSecondary)
             }
         }
+        .sheet(isPresented: $showingJournal) { cookJournalSheet }
         #else
         ProfileSection(profile: viewModel.profile) {
             if let profileStore = viewModel.profileStore {
@@ -62,7 +67,8 @@ struct ProfileSettingsRow: View {
                     existingProfile: viewModel.profile,
                     onProfileChanged: { [weak viewModel] in
                         await viewModel?.refreshProfile()
-                    }
+                    },
+                    statsHooks: profileStatsHooks
                 )
             } else {
                 Text("Profile editing requires a store.")
@@ -70,7 +76,27 @@ struct ProfileSettingsRow: View {
                     .foregroundStyle(DODColor.labelSecondary)
             }
         }
+        .sheet(isPresented: $showingJournal) { cookJournalSheet }
         #endif
+    }
+
+    /// DUT-417 — composition hooks for the profile stats section. Nil (section
+    /// hidden) until a real dependency is wired (`profileStatsAvailable`).
+    private var profileStatsHooks: ProfileStatsHooks? {
+        guard viewModel.profileStatsAvailable else { return nil }
+        return ProfileStatsHooks(
+            load: { [weak viewModel] in await viewModel?.loadProfileStats() ?? .empty },
+            viewCookingJournal: { showingJournal = true }
+        )
+    }
+
+    /// The Cooking Journal sheet (read + in-place edit), reusing the same
+    /// `CookJournalView` the Feed presents.
+    private var cookJournalSheet: some View {
+        CookJournalView(
+            load: { [weak viewModel] in await viewModel?.profileJournalEntries() ?? [] },
+            update: { [weak viewModel] entry in await viewModel?.updateProfileJournalEntry(entry) }
+        )
     }
 }
 

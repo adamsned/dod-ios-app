@@ -220,6 +220,19 @@ struct CachedRatingsTests {
         #expect(aggregateCount == 0, "No aggregate yet — neutral default")
     }
 
+    @Test func userRatingCountCountsOnlyRowsWithAUserRating() async throws {
+        // DUT-417 — the profile "Ratings" stat counts rows the user actually
+        // rated, not aggregate-only rows cached from a recipe's WP average.
+        let store = try await makeStore()
+        try await store.setUserRating(5, forRecipeID: 1)
+        try await store.setUserRating(3, forRecipeID: 2)
+        try await store.cacheRating(
+            CachedRatingSnapshot(recipeID: 3, average: 4.0, count: 8, userRating: nil)
+        )
+        let count = try await store.userRatingCount()
+        #expect(count == 2)
+    }
+
     @Test func cachingAggregateWithoutUserRatingPreservesExistingUserRating() async throws {
         let store = try await makeStore()
         // First: user has rated.

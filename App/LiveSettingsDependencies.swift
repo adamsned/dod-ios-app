@@ -1,5 +1,6 @@
 import DODFeatureFeed
 import DODPersistence
+import DODSupport
 import Foundation
 
 // MARK: - US-41 / AC-41.3 (T-703) live Settings wiring
@@ -19,16 +20,33 @@ struct LiveSettingsDependencies: SettingsDependencies {
 
     typealias FlagWrite = @Sendable (Bool) async -> Void
     typealias StatusProvider = @Sendable () -> CloudKitSyncStatus
+    // DUT-417 — profile-stats data loaders + the journal edit, injected from
+    // the composition root so this struct stays a thin `RecipeStore` adapter.
+    typealias CookLogsLoad = @Sendable () async throws -> [CookLogEntry]
+    typealias CountLoad = @Sendable () async throws -> Int
+    typealias CookLogWrite = @Sendable (CookLogEntry) async throws -> Void
 
     let flagWrite: FlagWrite
     let statusProvider: StatusProvider
+    let cookLogsLoad: CookLogsLoad
+    let savedCountLoad: CountLoad
+    let ratingCountLoad: CountLoad
+    let cookLogWrite: CookLogWrite
 
     init(
         flagWrite: @escaping FlagWrite,
-        statusProvider: @escaping StatusProvider = { .off }
+        statusProvider: @escaping StatusProvider = { .off },
+        cookLogsLoad: @escaping CookLogsLoad = { [] },
+        savedCountLoad: @escaping CountLoad = { 0 },
+        ratingCountLoad: @escaping CountLoad = { 0 },
+        cookLogWrite: @escaping CookLogWrite = { _ in }
     ) {
         self.flagWrite = flagWrite
         self.statusProvider = statusProvider
+        self.cookLogsLoad = cookLogsLoad
+        self.savedCountLoad = savedCountLoad
+        self.ratingCountLoad = ratingCountLoad
+        self.cookLogWrite = cookLogWrite
     }
 
     func setCloudSyncOptIn(_ enabled: Bool) async {
@@ -42,4 +60,11 @@ struct LiveSettingsDependencies: SettingsDependencies {
     func currentCloudSyncStatus() -> CloudKitSyncStatus {
         statusProvider()
     }
+
+    // MARK: - Profile stats (DUT-417)
+
+    func cookLogs() async throws -> [CookLogEntry] { try await cookLogsLoad() }
+    func savedRecipeCount() async throws -> Int { try await savedCountLoad() }
+    func userRatingCount() async throws -> Int { try await ratingCountLoad() }
+    func updateCookLog(_ entry: CookLogEntry) async throws { try await cookLogWrite(entry) }
 }
