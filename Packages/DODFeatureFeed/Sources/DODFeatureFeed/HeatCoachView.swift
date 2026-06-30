@@ -152,7 +152,7 @@ public struct HeatCoachView: View {
                 let isSelected = selection.wrappedValue == value
                 Text(label)
                     .dodFont(DODType.body)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)  // DUT-291: 44pt tap target
                     .padding(.vertical, DODSpacing.xs)
                     .foregroundStyle(isSelected ? DODColor.labelOnAccent : DODColor.label)
                     .background(

@@ -108,6 +108,11 @@ public enum StepTimerParser {
         currentUnit: Unit
     ) -> Int {
         let skipped = skipWhitespaceAndGlue(in: text, from: index)
+        // DUT-248: the mixed follow-up must begin IMMEDIATELY after the glue (e.g.
+        // "1 hour 30 minutes"), not after intervening words — "1 hour, then rest 30
+        // minutes" must stay 1 hour. `nextQuantityUnit` scans arbitrarily far, so
+        // require a numeric quantity right at the glue-skipped index.
+        guard skipped < text.endIndex, text[skipped].isNumber else { return 0 }
         guard let next = nextQuantityUnit(in: text, from: skipped) else { return 0 }
         guard next.unit.seconds < currentUnit.seconds else { return 0 }
         return Int((next.quantity * Double(next.unit.seconds)).rounded())

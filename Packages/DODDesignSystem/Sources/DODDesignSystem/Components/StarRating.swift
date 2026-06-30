@@ -109,7 +109,19 @@ public struct StarRatingInput: View {
             }
         }
         .opacity(isSubmitting ? 0.5 : 1.0)
-        .accessibilityValue(value == 0 ? "no rating selected" : "\(value) star\(value == 1 ? "" : "s") selected")
+        // DUT-409: present as ONE adjustable control ("3 of 5 stars, adjustable")
+        // rather than five separate buttons VoiceOver swipes through blind.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Rating")
+        .accessibilityValue(value == 0 ? "no rating selected" : "\(value) of 5 stars")
+        .accessibilityAdjustableAction { direction in
+            guard !isSubmitting else { return }
+            switch direction {
+            case .increment: value = min(value + 1, 5)
+            case .decrement: value = max(value - 1, 1)
+            default: break
+            }
+        }
         .sensoryFeedback(.selection, trigger: value)
     }
 }
