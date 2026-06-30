@@ -3087,4 +3087,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-897 — Profile: read-only view mode with an Edit Profile toggle (CL-291 / DUT-416)
+
+- **What:** Opening an existing profile from Settings now lands in read-only **view mode**: Display Name + Email render as static rows, the photo is shown but not tappable, the instructional captions are hidden, and the toolbar trailing item is **"Edit Profile"**. Tapping it enters **edit mode** (the existing editable fields + tappable photo; captions reappear in **Title Case** — "Tap to Add Profile Picture." / "Tap the Photo to Replace, Edit, or Remove It."), with **Cancel** (revert) + **Save** in the toolbar. Save commits and returns to view mode (stays on the page, ready for the DUT-417 stats); Cancel reverts via the existing unsaved-changes dialog. The new-profile setup flow (`existingProfile == nil`) is unchanged — always editing, Save dismisses. Title is mode-aware ("Profile" / "Edit Profile" / "New Profile").
+- **Files:** `ProfileEditView.swift` (`isEditing` @State seeded in init; mode-aware title; dialog branch), `ProfileEditView+DirtyState.swift` (mode-aware toolbar leading/trailing items, `cancelEditing`/`exitEditMode`, pure `navigationTitle(...)`), `ProfileEditView+Save.swift` (`finishAfterSave` — return-to-view-mode vs dismiss), `ProfileEditView+AppleSignIn.swift` (view-mode read-only rows vs editable fields), `ProfileEditView+Photo.swift` (avatar tappable + captions only in edit mode, Title Case). New `ProfileViewEditModeTests.swift` (+3). Spec: `clarifications.md` (CL-291).
+- **AC:** US-44 (Profile). Linear DUT-416. CL-291 canonical. **Est:** ~2 h. **Deps:** off main (after CL-290). Branch `feat/profile-view-edit-mode`. **Verification:** swift-format + SwiftLint `--strict` clean; DODFeatureProfile 66 tests green; iOS app build green + boots on the iPhone 17 sim. Visual (view mode needs a keychain-saved profile): best confirmed in an Xcode-signed run.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
