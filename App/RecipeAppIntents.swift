@@ -97,8 +97,10 @@ struct DODShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: OpenRecipeIntent(),
             phrases: [
+                // DUT-405: dropped the greedy "Show \(recipe)" template — it captured
+                // "Show my saved recipes" (recipe = "my saved recipes") and dead-ended
+                // instead of letting OpenSavedRecipesIntent's literal phrase win.
                 "Open \(\.$recipe) in \(.applicationName)",
-                "Show \(\.$recipe) in \(.applicationName)",
                 "Find \(\.$recipe) in \(.applicationName)",
             ],
             shortTitle: "Open Recipe",

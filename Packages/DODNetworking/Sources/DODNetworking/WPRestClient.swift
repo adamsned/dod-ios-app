@@ -95,13 +95,29 @@ public struct WPRestClient: Sendable {
         return pages
     }
 
+    /// DUT-386: `.urlQueryAllowed` minus "+" and ";". `URLComponents.queryItems`
+    /// leaves both raw, and WordPress/PHP then mis-reads "+" as a space (and ";"
+    /// as a query delimiter), silently corrupting a user's search term.
+    static let queryValueAllowed: CharacterSet = {
+        var set = CharacterSet.urlQueryAllowed
+        set.remove(charactersIn: "+;")
+        return set
+    }()
+
     func buildURL(path: String, queryItems: [URLQueryItem]) throws -> URL {
         let resolved = baseURL.appending(path: path)
         guard var components = URLComponents(url: resolved, resolvingAgainstBaseURL: false) else {
             throw WPClientError.underlying(message: "Bad base URL")
         }
         if !queryItems.isEmpty {
-            components.queryItems = queryItems
+            // DUT-386: encode values ourselves so "+"/";" don't survive raw.
+            components.percentEncodedQueryItems = queryItems.map { item in
+                URLQueryItem(
+                    name: item.name,
+                    value: item.value?
+                        .addingPercentEncoding(withAllowedCharacters: Self.queryValueAllowed)
+                )
+            }
         }
         guard let url = components.url else {
             throw WPClientError.underlying(message: "Bad URL components")

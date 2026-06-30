@@ -18,10 +18,14 @@ public struct GIDSignInProvider: GoogleSignInProviding {
         do {
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenter)
             let user = result.user
+            // DUT-285: an empty identifier must NOT be conflated with success — a
+            // session keyed on "" is a half-state (and would collide across users).
+            // Require a real stable id (Google userID, else email).
+            guard let identifier = user.userID ?? user.profile?.email, !identifier.isEmpty else {
+                return .failed
+            }
             return .success(
-                // userID is the stable Google account identifier; fall back to
-                // the email so the session always has a non-empty key.
-                userIdentifier: user.userID ?? user.profile?.email ?? "",
+                userIdentifier: identifier,
                 displayName: user.profile?.name,
                 email: user.profile?.email
             )

@@ -41,7 +41,9 @@ public struct LoadingSkeleton: View {
             GeometryReader { proxy in
                 let stripeWidth = proxy.size.width * 0.5
                 LinearGradient(
-                    colors: [.clear, DODColor.surfaceElevated.opacity(0.35), .clear],
+                    // DUT-252: appearance-stable light highlight. `surfaceElevated` is
+                    // DARKER than the base in Dark Mode, which inverts/erases the shimmer.
+                    colors: [.clear, Color.white.opacity(0.35), .clear],
                     startPoint: .leading,
                     endPoint: .trailing
                 )

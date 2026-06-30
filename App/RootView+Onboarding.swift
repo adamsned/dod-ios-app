@@ -68,7 +68,25 @@ extension RootView {
         if granted {
             UserDefaults.standard.set(true, forKey: SettingsViewModel.notificationsEnabledKey)
         }
-        // 2. iCloud Sync — ask (never silently enable). The alert presents next.
+        // 2. iCloud Sync — ask (never silently enable). DUT-408: when notification
+        //    auth is already decided, `requestAuthorization` returns instantly (no
+        //    system dialog), so without this hop `showCloudSyncPrompt` would be set
+        //    while the onboarding cover is still dismissing and iOS swallows the
+        //    alert (present-during-dismiss). Yield a beat so the cover finishes.
+        try? await Task.sleep(for: .milliseconds(450))
         showCloudSyncPrompt = true
+    }
+
+    /// DUT-400: migrate the pre-DUT-280 upgrade population — a user who onboarded
+    /// before `firstRunPromptsCompletedKey` existed would otherwise get the recovery
+    /// prompts fired unprompted on their first updated launch. Mark complete instead.
+    /// A one-time, idempotent set; a fresh install (onboarding not done) is untouched.
+    @MainActor
+    func migrateFirstRunFlagsIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: Self.onboardingCompletedKey),
+            defaults.object(forKey: Self.firstRunPromptsCompletedKey) == nil
+        else { return }
+        defaults.set(true, forKey: Self.firstRunPromptsCompletedKey)
     }
 }

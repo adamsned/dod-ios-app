@@ -121,12 +121,9 @@ public actor RecipeStore {
         target.categoryIDs = recipe.categoryIDs.isEmpty ? target.categoryIDs : recipe.categoryIDs
         target.ingredientsJSON = try JSONEncoder().encode(recipe.ingredients)
         target.instructionsJSON = try JSONEncoder().encode(recipe.instructions)
-        target.nutritionJSON = recipe.nutrition.flatMap { try? JSONEncoder().encode($0) }
-        target.videoJSON = recipe.video.flatMap { try? JSONEncoder().encode($0) }
-        target.prepSeconds = recipe.prepTime.map(Self.secondsOf)
-        target.cookSeconds = recipe.cookTime.map(Self.secondsOf)
-        target.totalSeconds = recipe.totalTime.map(Self.secondsOf)
-        target.servings = recipe.servings
+        // DUT-399: copy parsed detail fields without clobbering cached values with
+        // nil (see `applyParsedDetailFields`).
+        applyParsedDetailFields(from: recipe, to: target)
         target.lastViewedAt = .now
 
         // US-37 / CL-63 / T-640: persist article body; kind drives the
@@ -327,7 +324,7 @@ public actor RecipeStore {
         return try modelContext.fetch(descriptor).first
     }
 
-    private static func secondsOf(_ duration: Duration) -> Int {
+    static func secondsOf(_ duration: Duration) -> Int {
         Int(duration.components.seconds)
     }
 

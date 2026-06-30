@@ -88,6 +88,7 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.2), value: appearance)
         .task {
             await dependencies.bootstrap()
+            migrateFirstRunFlagsIfNeeded()  // DUT-400
             // DUT-280 — recover the first-run prompts if a prior launch dismissed
             // onboarding but didn't finish them (killed mid-flow). The welcome
             // sheet itself is NOT re-shown; only the prompts re-run.
@@ -147,6 +148,7 @@ struct RootView: View {
                 pages: Self.appIntroPages,
                 ctaTitle: "Let's Get Cooking",
                 onFinish: {
+                    guard showOnboarding else { return }  // DUT-407: ignore a double-tap
                     UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
                     showOnboarding = false
                     // First-run: ask for notifications + iCloud Sync (skipped
