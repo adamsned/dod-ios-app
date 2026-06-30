@@ -66,6 +66,10 @@ public struct ProfileEditView: View {
     /// 5.1.1(v)) — or the editor's teardown leaves a live, un-revoked token.
     let sessionStore: any AppleAuthSessionStoring
     let revoker: (any SiwaRevoking)?
+    /// DUT-417 — composition-root hooks for the view-mode stats section (Cook
+    /// Rank + counts + journal link). Nil for previews / snapshots / the
+    /// new-profile setup flow → the section is hidden.
+    let statsHooks: ProfileStatsHooks?
 
     @State var displayName: String = ""
     @State var email: String = ""
@@ -74,7 +78,8 @@ public struct ProfileEditView: View {
     /// split).
     @State var emailValidationError: String?
     @State var saveError: String?
-    @State private var showDeleteConfirmation = false
+    /// Non-private so `ProfileEditView+SignOut.swift`'s Delete button can set it.
+    @State var showDeleteConfirmation = false
     /// DUT-281 — true when a session exists (seeded from `sessionStore` on appear;
     /// set by a successful Apple/Google sign-in). Gates `signOutSection` so Sign
     /// Out / Delete stays reachable even when no `UserProfile` was written (Apple
@@ -91,6 +96,10 @@ public struct ProfileEditView: View {
     /// Seeded in `init` so there's no first-render flash. Non-private so the
     /// toolbar + section builders in the satellite files can read/set it.
     @State var isEditing: Bool
+    /// DUT-417 — the loaded view-mode stats; nil until `statsHooks.load()`
+    /// resolves on appear, or when no provider is wired (section stays hidden).
+    /// Non-private so the `+Stats` section builder reads it.
+    @State var loadedStats: ProfileStats?
     /// T-743 / CL-140 / AC-44.16 — initial-value snapshots captured on
     /// `.onAppear` for the dirty-state comparison. Non-private so
     /// `ProfileEditView+DirtyState.swift`'s `isDirty` can read them.
@@ -154,7 +163,8 @@ public struct ProfileEditView: View {
         photoStore: (any ProfilePhotoStoring)? = nil,
         sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
         revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
-            ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil
+            ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil,
+        statsHooks: ProfileStatsHooks? = nil
     ) {
         self.store = store
         self.existingProfile = existingProfile
@@ -162,6 +172,7 @@ public struct ProfileEditView: View {
         self.photoStore = photoStore
         self.sessionStore = sessionStore
         self.revoker = revoker
+        self.statsHooks = statsHooks
         // DUT-416 — existing profile opens in view mode; new-profile setup edits.
         _isEditing = State(initialValue: existingProfile == nil)
     }
@@ -172,13 +183,15 @@ public struct ProfileEditView: View {
         onProfileChanged: @MainActor @escaping () async -> Void,
         sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
         revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
-            ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil
+            ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil,
+        statsHooks: ProfileStatsHooks? = nil
     ) {
         self.store = store
         self.existingProfile = existingProfile
         self.onProfileChanged = onProfileChanged
         self.sessionStore = sessionStore
         self.revoker = revoker
+        self.statsHooks = statsHooks
         // DUT-416 — existing profile opens in view mode; new-profile setup edits.
         _isEditing = State(initialValue: existingProfile == nil)
     }
@@ -203,6 +216,10 @@ public struct ProfileEditView: View {
             profileEditPhotoSection
             // DUT-238 — providers (Apple / Google) + email fields in one menu.
             signInSection
+            // DUT-417 — Cook Rank + counts + journal link, view mode only.
+            if !isEditing {
+                profileStatsSection
+            }
             signOutSection
             if let saveError {
                 Section {
@@ -262,6 +279,12 @@ public struct ProfileEditView: View {
             }
         }
         .profileEditPhotoFlow(view: self)
+        // DUT-417 — load the view-mode stats once (when a provider is wired).
+        .task {
+            if let statsHooks, loadedStats == nil {
+                loadedStats = await statsHooks.load()
+            }
+        }
         .onAppear {
             // Seed the fields from the existing profile (if any) only
             // once — re-applying on every body recompute would clobber
@@ -326,45 +349,10 @@ public struct ProfileEditView: View {
     // `showLeaveConfirmation` `@State` vars above are non-`private`.
 
     // MARK: - Sections
-
-    @ViewBuilder
-    private var signOutSection: some View {
-        // Sign Out + Delete Profile are intentionally rendered as two
-        // separate buttons in two separate sections (Form gives each a
-        // visual gap), per the locked decision: both ship in Phase a
-        // because App Store 5.1.1(v) requires an explicit Delete
-        // Account, and "Sign Out" is the friendlier wording for the
-        // common case. Local-only v1 — identical behavior. When DUT-16
-        // adds backend state, the two diverge.
-        // DUT-281 — also show when a session exists without a profile, so a
-        // signed-in-but-profile-less user can still Sign Out / Delete (revoke).
-        if existingProfile != nil || hasSession {
-            Section {
-                Button {
-                    Task { await handleSignOut() }
-                } label: {
-                    Text("Sign Out")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.accent)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .accessibilityIdentifier("profile-edit-signout")
-            }
-            .listRowBackground(DODColor.surfaceElevated)
-
-            Section {
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Text("Delete Profile")
-                        .dodFont(DODType.body)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .accessibilityIdentifier("profile-edit-delete")
-            }
-            .listRowBackground(DODColor.surfaceElevated)
-        }
-    }
+    //
+    // `signOutSection` (Sign Out + Delete Profile) lives in
+    // `ProfileEditView+SignOut.swift`; `profileStatsSection` (DUT-417) lives in
+    // `ProfileEditView+Stats.swift` — both extracted for the file_length cap.
 
     // MARK: - Toolbar
     //

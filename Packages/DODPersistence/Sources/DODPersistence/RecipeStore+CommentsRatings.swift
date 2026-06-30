@@ -126,6 +126,16 @@ extension RecipeStore {
         try modelContext.save()
     }
 
+    /// Count of recipes this device has submitted a star rating for — the
+    /// number of `CachedRating` rows carrying a non-nil `userRating` (DUT-417
+    /// profile stats, "Ratings" count). Local-only; nothing leaves the device.
+    public func userRatingCount() throws -> Int {
+        let descriptor = FetchDescriptor<CachedRating>(
+            predicate: #Predicate { $0.userRating != nil }
+        )
+        return try modelContext.fetchCount(descriptor)
+    }
+
     // MARK: - Private helpers
 
     private func upsertComment(_ snapshot: CachedCommentSnapshot) throws {

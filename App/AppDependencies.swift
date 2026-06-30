@@ -343,22 +343,23 @@ final class AppDependencies {
         let diagnostics = cloudKitDiagnostics
         return LiveSettingsDependencies(
             flagWrite: { enabled in
-                // Persist the flag the launch-time container factory reads.
                 UserDefaults.standard.set(enabled, forKey: RecipeStore.cloudKitSyncOptInKey)
-                // T-707 / AC-41.9 — record the opt-in change. This is the
-                // single dispatch point for `syncEnabled` / `syncDisabled`:
-                // BOTH the AC-41.3 Settings toggle and the AC-41.2
-                // first-launch prompt route through this seam, so firing here
-                // covers both with no duplication. The prompt's "Not now"
-                // never calls the seam, so declining correctly emits nothing.
+                // T-707 / AC-41.9 — single dispatch point for syncEnabled /
+                // syncDisabled: BOTH the Settings toggle and the first-launch
+                // prompt route here (the prompt's "Not now" never calls the seam,
+                // so declining emits nothing).
                 Telemetry.shared.send(enabled ? .syncEnabled : .syncDisabled)
             },
             statusProvider: {
-                // DUT-6 cause B: surface the App-target mirror observer's
-                // latest coarse status to the Settings row. Read on the main
-                // actor (the Settings view calls this on appear).
+                // DUT-6 cause B: surface the App-target mirror observer's latest
+                // coarse status (read on the main actor; Settings calls on appear).
                 MainActor.assumeIsolated { diagnostics.latestStatus }
-            }
+            },
+            // DUT-417 — profile-stats data, read from the on-device store.
+            cookLogsLoad: { [store] in try await store.allCookLogs() },
+            savedCountLoad: { [store] in try await store.savedRecipes().count },
+            ratingCountLoad: { [store] in try await store.userRatingCount() },
+            cookLogWrite: { [store] entry in try await store.updateCookLog(entry) }
         )
     }
 

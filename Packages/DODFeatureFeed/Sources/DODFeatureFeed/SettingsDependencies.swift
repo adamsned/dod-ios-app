@@ -1,4 +1,5 @@
 import DODPersistence
+import DODSupport
 import Foundation
 
 /// Narrow surface the Settings page needs from external modules for
@@ -52,8 +53,31 @@ public protocol SettingsDependencies: Sendable {
     /// mirror (previews, snapshot hosts, the L1 recording double), so
     /// existing call sites stay source-compatible.
     func currentCloudSyncStatus() -> CloudKitSyncStatus
+
+    // MARK: - Profile stats (DUT-417 / CL-292)
+    //
+    // The Settings ▸ Profile view-mode stats section needs read access to the
+    // local cook log, saved-recipe count, and user-rating count, plus the
+    // journal's in-place edit. All default to empty so previews / the L1
+    // recording double stay source-compatible and render no stats.
+
+    /// All logged cooks (newest first), for the Cook Rank + Total Cooks +
+    /// Weekly Streak stats and the "View Cooking Journal" sheet.
+    func cookLogs() async throws -> [CookLogEntry]
+    /// Number of saved recipes.
+    func savedRecipeCount() async throws -> Int
+    /// Number of recipes this device has submitted a star rating for.
+    func userRatingCount() async throws -> Int
+    /// In-place edit of one cook-log entry from the journal (note / rating /
+    /// photo); never changes the cook count.
+    func updateCookLog(_ entry: CookLogEntry) async throws
 }
 
 extension SettingsDependencies {
     public func currentCloudSyncStatus() -> CloudKitSyncStatus { .off }
+
+    public func cookLogs() async throws -> [CookLogEntry] { [] }
+    public func savedRecipeCount() async throws -> Int { 0 }
+    public func userRatingCount() async throws -> Int { 0 }
+    public func updateCookLog(_ entry: CookLogEntry) async throws {}
 }
