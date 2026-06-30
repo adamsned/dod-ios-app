@@ -14,6 +14,16 @@ extension RecipeStore {
 
     /// Append one cook to the private journal.
     public func logCook(_ entry: CookLogEntry) throws {
+        // DUT-345: idempotency. A double-tap / retry mints a fresh `id` (UUID) each
+        // call, so dedup on the natural key — the same recipe logged within a few
+        // seconds is a duplicate, not a second cook.
+        let recipeID = entry.recipeID
+        let lower = entry.cookedAt.addingTimeInterval(-3)
+        let upper = entry.cookedAt.addingTimeInterval(3)
+        let recent = FetchDescriptor<CachedCookLogEntry>(
+            predicate: #Predicate { $0.recipeID == recipeID && $0.cookedAt >= lower && $0.cookedAt <= upper }
+        )
+        if let existing = try? modelContext.fetch(recent), !existing.isEmpty { return }
         modelContext.insert(
             CachedCookLogEntry(
                 id: entry.id,
