@@ -48,6 +48,12 @@ public final class SavedViewModel {
     /// enough that a synced recipe appears effectively immediately.
     static let remoteChangeDebounce: Duration = .milliseconds(300)
 
+    /// DUT-370: ids optimistically removed by an Unsave tap whose store write
+    /// hasn't committed yet. `refresh()` suppresses these from the fetched set
+    /// until the store stops returning them, so a debounced remote-change
+    /// refresh can't briefly resurrect a just-unsaved card then drop it again.
+    @ObservationIgnored private var pendingRemovedIDs: Set<Int> = []
+
     public init(dependencies: SavedDependencies) {
         self.dependencies = dependencies
     }
@@ -59,16 +65,32 @@ public final class SavedViewModel {
     /// Re-runs every time the view appears so changes from the detail screen
     /// surface immediately.
     public func refresh() async {
-        loadState = .loading
+        // DUT-369: never blank a populated grid to a full-screen spinner on a
+        // background remote-change refresh — only show the loading state on the
+        // true first load (mirrors FeedViewModel's DUT-313 fix).
+        if recipes.isEmpty { loadState = .loading }
         do {
-            recipes = try await dependencies.savedRecipes()
+            var fetched = try await dependencies.savedRecipes()
+            // DUT-370: an optimistic unsave may not have committed to the store
+            // yet when a debounced remote-change refresh fires; keep suppressing
+            // those ids until the fetch stops returning them (write confirmed) so
+            // the just-unsaved card doesn't resurrect then vanish again.
+            pendingRemovedIDs = pendingRemovedIDs.filter { id in fetched.contains { $0.id == id } }
+            fetched.removeAll { pendingRemovedIDs.contains($0.id) }
+            recipes = fetched
             // Best-effort: a download-state read failure just means no badges,
             // never a failed Saved-tab load (T-774 / DUT-80).
             downloadedIDs = (try? await dependencies.downloadedRecipeIDs()) ?? []
             loadState = recipes.isEmpty ? .empty : .loaded
+            // DUT-365: republish the home-screen widget so a cross-device
+            // save/unsave (which reaches us via the remote-change refresh) updates
+            // it — nothing else republishes on the CloudKit-import path.
+            await dependencies.publishSavedWidget()
         } catch {
             DODLog.persistence.error("saved load failed: \(String(describing: error))")
-            loadState = .error
+            // DUT-369: keep the existing grid on a refresh failure; only surface
+            // the error state when there's nothing already on screen.
+            if recipes.isEmpty { loadState = .error }
         }
     }
 
@@ -111,6 +133,7 @@ public final class SavedViewModel {
     /// `refresh()` reconciles on next appear if the store write somehow
     /// failed. T-635 / CL-104.
     public func optimisticallyRemove(id: Int) {
+        pendingRemovedIDs.insert(id)  // DUT-370: suppress re-add until the write commits
         recipes.removeAll { $0.id == id }
         loadState = recipes.isEmpty ? .empty : .loaded
     }
