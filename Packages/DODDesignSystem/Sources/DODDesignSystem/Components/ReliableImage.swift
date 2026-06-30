@@ -47,6 +47,21 @@ public struct ReliableImage<Content: View>: View {
     }
 }
 
+/// DUT-377: composition-root hook giving `ReliableImage` an offline disk
+/// fallback. The app wires this once at launch to `RecipeStore.image(url:)` so a
+/// saved / downloaded recipe's pinned hero renders offline — the app's image
+/// rendering otherwise never read the persisted image cache. No-op where UIKit is
+/// unavailable (the macOS test slice renders network-only).
+public enum ReliableImageConfig {
+    public static func setOfflineDataProvider(
+        _ provider: @escaping @Sendable (URL) async -> Data?
+    ) {
+        #if canImport(UIKit)
+        ReliableImageLoader.offlineDataProvider = provider
+        #endif
+    }
+}
+
 #if canImport(UIKit)
 
 /// Shared in-memory cache of decoded recipe images, keyed by absolute URL.
@@ -70,6 +85,14 @@ final class RecipeImageCache: @unchecked Sendable {
 final class ReliableImageLoader {
 
     private(set) var phase: ReliableImagePhase = .empty
+
+    /// DUT-377: optional disk fallback, consulted ONLY when the network load
+    /// fails. The app's image rendering otherwise never read the persisted
+    /// `CachedImage` store (saved / downloaded recipes' pinned hero bytes), so a
+    /// saved recipe opened offline showed only a placeholder. The composition root
+    /// wires this to `RecipeStore.image(url:)` once at launch; `nil` in previews /
+    /// tests (network-only, behavior unchanged).
+    nonisolated(unsafe) static var offlineDataProvider: (@Sendable (URL) async -> Data?)?
 
     func load(_ url: URL?) async {
         guard let url else {
@@ -95,11 +118,31 @@ final class ReliableImageLoader {
             case .cancelled:
                 return
             case .failed:
-                phase = .failure
+                await loadFromDiskOrFail(url)
                 return
             case .retry:
                 continue
             }
+        }
+        if !Task.isCancelled { await loadFromDiskOrFail(url) }
+    }
+
+    /// DUT-377: the network gave up — fall back to the persisted image store
+    /// (`offlineDataProvider`, wired to `RecipeStore.image(url:)`) so a saved /
+    /// downloaded recipe's pinned hero still renders offline. Only consulted on
+    /// network failure, so the online path is unchanged (no per-image disk hit
+    /// when the network succeeds).
+    private func loadFromDiskOrFail(_ url: URL) async {
+        if Task.isCancelled { return }
+        guard let provider = Self.offlineDataProvider else {
+            phase = .failure
+            return
+        }
+        if let data = await provider(url), let image = UIImage(data: data) {
+            if Task.isCancelled { return }
+            RecipeImageCache.shared.insert(image, for: url)
+            phase = .success(Image(uiImage: image))
+            return
         }
         if !Task.isCancelled { phase = .failure }
     }
