@@ -80,11 +80,27 @@ public enum SearchSuggestionEngine {
         let index = winner.queryTokenIndex
         let suggestion = winner.cacheToken
 
-        let rebuilt = substitute(
-            tokenAt: index,
-            with: suggestion,
-            into: query
-        )
+        let rawTokens = query.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .map(String.init)
+        let rebuilt: String
+        if rawTokens.count == queryTokens.count, index < rawTokens.count {
+            // Counts align (no punctuation split / vanish) — substitute into the
+            // RAW tokens so the user's original casing on the other tokens is
+            // preserved (CL-127), e.g. "Cast Iron naxxos" → "Cast Iron nachos".
+            var tokens = rawTokens
+            tokens[index] = suggestion
+            rebuilt = tokens.joined(separator: " ")
+        } else {
+            // DUT-366: punctuation made the raw + normalized token counts diverge
+            // (e.g. "chiken-pot pie" → 3 normalized tokens, 2 raw). The winner
+            // index points into the NORMALIZED array, so rebuild from THAT —
+            // substituting into the raw split with a normalized index swapped the
+            // wrong word or dropped query context ("chiken-pot pie" → "chicken pie").
+            // Casing is lost here, which is acceptable for a "did you mean?".
+            var tokens = queryTokens
+            tokens[index] = suggestion
+            rebuilt = tokens.joined(separator: " ")
+        }
 
         // Self-suggestion guard — if the rebuilt query normalizes back
         // to the user's input, don't bother surfacing it (covers
@@ -176,30 +192,4 @@ public enum SearchSuggestionEngine {
     }
 
     // MARK: - Substitution
-
-    /// Substitute the query's `index`-th normalized token with
-    /// `replacement`, preserving the surrounding tokens verbatim
-    /// (whitespace + case). The original query is split on whitespace
-    /// — the same simple boundary the view's display uses — so the
-    /// rebuilt string reads naturally even when the user's original
-    /// had mixed case ("Cast Iron Naxhos" → "Cast Iron nachos" — the
-    /// substituted token comes back lowercased to match the canonical
-    /// cache form, but every other token preserves the user's casing).
-    static func substitute(
-        tokenAt index: Int,
-        with replacement: String,
-        into originalQuery: String
-    ) -> String {
-        let splits = originalQuery.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
-        let originalTokens = splits.map(String.init)
-        // Defensive: the normalized-token index can drift if the
-        // original had pure-punctuation tokens that normalize away.
-        // In that case fall back to a whole-string replacement.
-        guard index < originalTokens.count else {
-            return replacement
-        }
-        var rebuilt = originalTokens
-        rebuilt[index] = replacement
-        return rebuilt.joined(separator: " ")
-    }
 }
