@@ -356,15 +356,11 @@ public struct ProfileEditView: View {
     // `ProfileEditView+DirtyState.swift` so this file stays under the
     // SwiftLint caps. See that file for the AC-44.16 contract.
 
-    // MARK: - State
-
-    /// `true` when display name + email are both non-whitespace AND
-    /// the email matches the basic regex. Drives the Save button.
-    var isFormValid: Bool {
-        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return false }
-        return (try? UserProfile.validateEmail(email)) != nil
-    }
+    // MARK: - Validation
+    //
+    // `isFormValid` (the Save gate) + the live per-field error messages
+    // (`displayNameFieldError` / `emailFieldError`, DUT-414 / DUT-415) live in
+    // `ProfileEditView+Validation.swift` to keep this file under the 400-line cap.
 
     // MARK: - Actions
     //
