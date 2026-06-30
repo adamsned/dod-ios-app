@@ -49,6 +49,10 @@ extension RecipeDetailViewModel {
             return "Couldn't read the server's reply — try again."
         case .underlying:
             return "Couldn't post your comment — try again."
+        case .cancelled:
+            // DUT-391: the submit was cancelled (view dismissed mid-request). Rare on
+            // this path, but the case must be handled; a benign retry prompt.
+            return "Couldn't post your comment — try again."
         }
     }
 

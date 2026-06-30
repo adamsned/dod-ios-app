@@ -14,6 +14,11 @@ public struct RecipePageFetcher: Sendable {
     public func html(for url: URL) async throws -> String {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "GET"
+        // DUT-388: bypass URLSession heuristic freshness + the Cloudflare edge cache
+        // so re-opening a recipe after an edit parses fresh JSON-LD, not stale HTML
+        // (WP sends only Last-Modified — the same trap DUT-355 fixed for REST GETs).
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
         request.setValue("text/html", forHTTPHeaderField: "Accept")
 

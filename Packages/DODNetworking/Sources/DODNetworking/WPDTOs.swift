@@ -109,7 +109,10 @@ enum WPDTO {
         /// WP serializes the no-parent case as `0`; we normalize at the
         /// domain boundary.
         let parent: Int?
-        let authorName: String
+        // DUT-384: optional so one comment with a null/absent `author_name` (a
+        // logged-in WP author, a deleted/anonymized author) can't fail the whole
+        // page's array decode — same lenience DUT-27 gave `content`.
+        let authorName: String?
         let dateGMT: String?
         /// Optional + defaulted to empty at the domain boundary: WordPress can
         /// return content as null/absent for a freshly held comment, and that
@@ -365,7 +368,7 @@ extension WPDTO.Comment {
             id: id,
             postID: post,
             parentID: normalizedParent,
-            authorName: HTMLSanitizer.plainText(from: authorName),
+            authorName: HTMLSanitizer.plainText(from: authorName ?? ""),
             // CL-139: WordPress's public `/wp/v2/comments` GET does NOT
             // include `author_email` in the response (privacy — email is
             // moderation-only data, only visible to admins via the

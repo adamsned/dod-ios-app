@@ -107,14 +107,22 @@ struct RecipeEntityQuery: EntityQuery, EntityStringQuery {
         guard let store = AppIntentEnvironment.store else { return [] }
         let saved = (try? await store.savedRecipes()) ?? []
         let recents = (try? await store.recentlyViewed(limit: limit)) ?? []
+        // DUT-406: reserve a slice for recently-viewed so a power user with ≥limit
+        // saved recipes still gets recents represented in Siri/Spotlight (US-10).
+        // The old loop filled entirely from `saved` first. Saved up to (limit -
+        // recentsBudget), then recents, then any leftover saved.
+        let recentsBudget = max(limit / 3, 1)
         var seen: Set<Int> = []
         var out: [RecipeEntityPayload] = []
-        for recipe in saved + recents {
-            guard !seen.contains(recipe.id) else { continue }
-            seen.insert(recipe.id)
-            out.append(.fromRecipe(recipe))
-            if out.count >= limit { break }
+        func fill(_ recipes: [Recipe], upTo cap: Int) {
+            for recipe in recipes where !seen.contains(recipe.id) && out.count < cap {
+                seen.insert(recipe.id)
+                out.append(.fromRecipe(recipe))
+            }
         }
+        fill(saved, upTo: limit - recentsBudget)
+        fill(recents, upTo: limit)
+        fill(saved, upTo: limit)
         return out
     }
 }

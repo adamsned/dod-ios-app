@@ -24,6 +24,10 @@ public enum WPClientError: Error, Sendable, Equatable {
     case decoding(message: String)
     /// Anything else from the URL loading system.
     case underlying(message: String)
+    /// The request was cancelled (the task was superseded — e.g. a search
+    /// debounce re-issue — or the view was dismissed). Callers should treat this
+    /// as a benign no-op, NOT a user-facing error state (DUT-391).
+    case cancelled
 
     /// Coalesce an arbitrary thrown error into a typed case.
     public static func wrap(_ error: Error) -> WPClientError {
@@ -36,6 +40,8 @@ public enum WPClientError: Error, Sendable, Equatable {
             return .networkUnavailable
         case .timedOut:
             return .timeout
+        case .cancelled:
+            return .cancelled
         case .some:
             return .underlying(message: urlError?.localizedDescription ?? "URL error")
         case .none:
