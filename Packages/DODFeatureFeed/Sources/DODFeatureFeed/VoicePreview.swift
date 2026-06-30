@@ -89,6 +89,10 @@ public final class SystemVoicePreviewer: VoicePreviewing {
         guard
             let id = VoiceSelector.bestVoiceIdentifier(from: descriptors, languageCode: languageCode)
         else {
+            // DUT-342: mirror SystemSpeechSynthesizer's compact fallback so the
+            // readout/preview match what Cook Mode actually speaks (it falls back to
+            // the language default), instead of showing "Unknown" / a silent preview.
+            if let languageCode { return AVSpeechSynthesisVoice(language: languageCode) }
             return nil
         }
         return voices.first(where: { $0.identifier == id })

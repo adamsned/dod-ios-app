@@ -178,7 +178,13 @@ public struct CookActivityCompactLeadingView: View {
 @inlinable
 internal func formattedCookActivityCountdown(_ seconds: Int) -> String {
     let clamped = max(seconds, 0)
-    let minutes = clamped / 60
+    let hours = clamped / 3600
+    let minutes = (clamped % 3600) / 60
     let remainder = clamped % 60
+    // DUT-404: match the running Text(timerInterval:) format for ≥1h timers so a
+    // paused ≥60min countdown reads "1:15:00", not "75:00".
+    if hours > 0 {
+        return String(format: "%d:%02d:%02d", hours, minutes, remainder)
+    }
     return String(format: "%02d:%02d", minutes, remainder)
 }

@@ -12,6 +12,9 @@ public actor NetworkMonitor {
 
     private let pathMonitor: NWPathMonitor
     private var continuations: [UUID: AsyncStream<Bool>.Continuation] = [:]
+    /// DUT-206: single ordered pipe for NWPath updates (see `start()`).
+    private var pathContinuation: AsyncStream<Bool>.Continuation?
+    private var drainTask: Task<Void, Never>?
     private(set) public var isOnline: Bool = true
 
     public init() {
@@ -22,9 +25,17 @@ public actor NetworkMonitor {
     public func start() {
         guard pathMonitor.queue == nil else { return }
         let queue = DispatchQueue(label: "com.dutchovendaddy.networkmonitor")
-        pathMonitor.pathUpdateHandler = { [weak self] path in
-            let isOnline = path.status == .satisfied
-            Task { [weak self] in
+        // DUT-206: feed path updates through ONE ordered AsyncStream rather than
+        // spawning an unstructured Task per update (which can run out of order under
+        // a burst and latch a stale isOnline). The handler runs on the serial
+        // NWPathMonitor queue, so the stream preserves OS emission order.
+        let (stream, continuation) = AsyncStream<Bool>.makeStream()
+        pathContinuation = continuation
+        pathMonitor.pathUpdateHandler = { path in
+            continuation.yield(path.status == .satisfied)
+        }
+        drainTask = Task { [weak self] in
+            for await isOnline in stream {
                 await self?.handle(isOnline: isOnline)
             }
         }

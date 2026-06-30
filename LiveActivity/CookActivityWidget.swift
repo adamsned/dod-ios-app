@@ -25,6 +25,8 @@ struct CookActivityWidget: Widget {
             )
             .padding(.horizontal, DODSpacing.sm)
             .padding(.vertical, DODSpacing.xs)
+            // DUT-403: tapping the Live Activity opens the recipe the timer belongs to.
+            .widgetURL(URL(string: "dod://recipe/\(context.attributes.recipeID)"))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
