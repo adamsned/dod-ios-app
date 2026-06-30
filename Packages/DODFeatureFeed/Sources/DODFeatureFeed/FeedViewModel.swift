@@ -189,6 +189,7 @@ public final class FeedViewModel {
     /// Infinite-scroll trigger when a near-bottom row appears (AC-1.2).
     public func loadMoreIfNeeded(currentItem: RecipeListItem) async {
         guard !reachedEnd,
+            !isLoading,
             loadState != .loadingMore,
             loadState != .loadingInitial,
             let lastFew = items.suffix(3).first(where: { $0.id == currentItem.id }) ?? items.last,
@@ -199,7 +200,15 @@ public final class FeedViewModel {
 
     // MARK: - Private
 
+    /// DUT-382: single in-flight latch shared by `loadInitial` + `loadMore` so
+    /// `loadMoreIfNeeded` can't spawn a concurrent `loadMore` during a
+    /// populated-grid pull-to-refresh (which keeps `loadState == .loaded` per
+    /// DUT-313 and resets the page cursor below, blinding the `loadState` guards).
+    private var isLoading = false
+
     private func loadInitial(forceReplace: Bool = false) async {
+        isLoading = true
+        defer { isLoading = false }
         // DUT-313: a pull-to-refresh on a populated grid must NOT blank the
         // feed into full-screen skeletons. `.loadingInitial` renders skeletons
         // (FeedView.content), so only enter it when there is nothing to show —
@@ -254,6 +263,8 @@ public final class FeedViewModel {
     }
 
     private func loadMore() async {
+        isLoading = true
+        defer { isLoading = false }
         loadState = .loadingMore
         let nextPage = currentPage + 1
         do {

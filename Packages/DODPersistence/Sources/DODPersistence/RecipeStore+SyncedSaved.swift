@@ -12,12 +12,24 @@ import SwiftData
 // `RecipeStore+Containers.swift` for the model and the two-configuration split.
 extension RecipeStore {
 
-    /// Look up the synced saved-row for a recipe id, if the user has it saved.
-    func fetchSyncedSaved(id: Int) throws -> SyncedSavedRecipe? {
+    /// All synced rows for a recipe id, earliest save first. Normally one, but
+    /// CloudKit can leave duplicate records: the mirrored `SyncedSavedRecipe`
+    /// model can carry no `@Attribute(.unique)` (CloudKit forbids it), so two
+    /// devices saving the same recipe offline each insert their own CKRecord and
+    /// nothing collapses them. Every id lookup therefore tolerates duplicates
+    /// (DUT-378).
+    func fetchAllSyncedSaved(id: Int) throws -> [SyncedSavedRecipe] {
         let descriptor = FetchDescriptor<SyncedSavedRecipe>(
-            predicate: #Predicate { $0.id == id }
+            predicate: #Predicate { $0.id == id },
+            sortBy: [SortDescriptor(\.savedAt, order: .forward)]
         )
-        return try modelContext.fetch(descriptor).first
+        return try modelContext.fetch(descriptor)
+    }
+
+    /// Look up the synced saved-row for a recipe id, if the user has it saved.
+    /// Returns the earliest of any CloudKit-duplicate rows (DUT-378).
+    func fetchSyncedSaved(id: Int) throws -> SyncedSavedRecipe? {
+        try fetchAllSyncedSaved(id: id).first
     }
 
     /// Insert-or-update the synced saved-row from a `CachedRecipe`'s display
@@ -27,7 +39,13 @@ extension RecipeStore {
     /// reshuffles the Saved tab's newest-first order.
     func upsertSyncedSaved(from row: CachedRecipe) throws {
         let isArticle = row.jsonLDFailedAt != nil && !(row.articleBodyHTML ?? "").isEmpty
-        if let existing = try fetchSyncedSaved(id: row.id) {
+        let existingRows = try fetchAllSyncedSaved(id: row.id)
+        if let existing = existingRows.first {
+            // DUT-378: collapse any CloudKit-duplicate rows into the earliest one
+            // so the set converges to a single record for this id.
+            for duplicate in existingRows.dropFirst() {
+                modelContext.delete(duplicate)
+            }
             existing.title = row.title
             existing.excerptText = row.excerptText
             existing.canonicalURLString = row.canonicalURLString
@@ -55,7 +73,10 @@ extension RecipeStore {
     /// Drop the synced saved-row for a recipe id (the unsave path). Does NOT
     /// call `save()` — the caller owns the transaction boundary.
     func removeSyncedSaved(id: Int) throws {
-        if let existing = try fetchSyncedSaved(id: id) {
+        // DUT-378: delete ALL rows for the id, not just the first — CloudKit may
+        // have left duplicate records, and removing only one leaves a zombie save
+        // that keeps the recipe in the Saved tab and reads `isSaved == true`.
+        for existing in try fetchAllSyncedSaved(id: id) {
             modelContext.delete(existing)
         }
     }

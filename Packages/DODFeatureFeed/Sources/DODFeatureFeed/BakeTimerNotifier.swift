@@ -39,6 +39,14 @@ public struct SystemBakeTimerNotifier: BakeTimerNotifying {
     public func scheduleBakeDone(after seconds: TimeInterval) async {
         #if canImport(UserNotifications)
         guard seconds > 0 else { return }
+        // DUT-379: respect the app's notification toggle — don't schedule a bake
+        // alert the user opted out of ("off ⇒ silence"). Mirrors the post-alert
+        // gate in `NotificationService.scheduleNewPostNotification`. (A bake-done
+        // already scheduled before the user opted out is cancelled by the
+        // Settings toggle's opt-out path.)
+        guard UserDefaults.standard.bool(forKey: SettingsViewModel.notificationsEnabledKey) else {
+            return
+        }
         let content = UNMutableNotificationContent()
         content.title = Self.title
         content.body = Self.body

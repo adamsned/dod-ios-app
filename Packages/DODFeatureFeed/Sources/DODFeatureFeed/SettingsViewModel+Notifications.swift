@@ -24,6 +24,12 @@ extension SettingsViewModel {
     public func setNotificationsEnabled(_ enabled: Bool) async -> Bool {
         guard enabled else {
             notificationsEnabled = false
+            // DUT-379: "off ⇒ silence" — cancel the one future-dated local
+            // notification (the guided-cookout bake alert) so a bake timer started
+            // while notifications were ON doesn't still fire after the user opts
+            // out. New post + bake alerts are already gated on the toggle at
+            // schedule time, so this is the only queued request to flush.
+            await SystemBakeTimerNotifier().cancelBakeDone()
             return false
         }
         let granted = await requestNotificationAuthorization()

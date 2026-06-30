@@ -23,7 +23,14 @@ extension RecipeStore {
         // the hero of a currently-saved recipe — so the post-save widget prefetch
         // (which caches the hero with no pin) still produces an eviction-proof
         // row, keeping a merely-saved recipe offline-usable (AC-5.2).
-        let effectivePin = try pinnedToSavedRecipeID ?? savedRecipeID(forHeroURLString: urlString)
+        // DUT-380 + DUT-292: resolve the pin to REALITY. An explicit pin (the
+        // offline-download path) can race an unsave — `downloadForOffline` awaits
+        // the network OUTSIDE this actor, so the recipe may have been unsaved by
+        // the time the bytes land. Honor the explicit pin only while the recipe is
+        // still saved/downloaded; else fall back to the saved-hero auto-pin, so we
+        // never pin to a recipe nothing references (which would escape both
+        // eviction and Clear Cache forever — re-opening the DUT-215 leak).
+        let effectivePin = try resolveImagePin(explicit: pinnedToSavedRecipeID, heroURLString: urlString)
         // Diagnostic surface for REG-T-360 / CL-45. A future regression
         // where the snapshot writer plumbs filenames but no caller
         // actually pushes bytes through here would otherwise be invisible
@@ -62,6 +69,20 @@ extension RecipeStore {
         // back to its gradient placeholder when the file is absent.
         WidgetImageBridge.writeImage(bytes: bytes, for: url)
         try evictImagesIfNeeded()
+    }
+
+    /// DUT-380: honor an explicit download pin only while its recipe is still
+    /// live (saved or downloaded); otherwise fall back to the saved-hero auto-pin
+    /// (DUT-292), so a download that raced an unsave can't pin bytes to a recipe
+    /// nothing references.
+    private func resolveImagePin(explicit: Int?, heroURLString: String) throws -> Int? {
+        if let explicit, try isPinTargetStillLive(explicit) { return explicit }
+        return try savedRecipeID(forHeroURLString: heroURLString)
+    }
+
+    private func isPinTargetStillLive(_ recipeID: Int) throws -> Bool {
+        if try fetchSyncedSaved(id: recipeID) != nil { return true }
+        return try fetchRecipe(id: recipeID)?.downloadedAt != nil
     }
 
     public func image(url: URL) throws -> Data? {

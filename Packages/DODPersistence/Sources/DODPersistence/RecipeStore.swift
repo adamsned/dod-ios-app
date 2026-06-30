@@ -188,7 +188,10 @@ public actor RecipeStore {
         let descriptor = FetchDescriptor<SyncedSavedRecipe>(
             sortBy: [SortDescriptor(\.savedAt, order: .reverse)]
         )
-        return try modelContext.fetch(descriptor).map(Self.toDomain)
+        var seen = Set<Int>()  // DUT-378: dedup CloudKit-duplicate rows by id
+        return try modelContext.fetch(descriptor).compactMap {
+            seen.insert($0.id).inserted ? Self.toDomain($0) : nil
+        }
     }
 
     // MARK: - Explicit download (US-35 / AC-35.2 / AC-35.5)

@@ -84,28 +84,39 @@ extension RecipeStore {
     /// missing one would just render a dead row.
     public func savedRecipesForWidget(limit: Int) throws -> [SavedRecipeWidgetRow] {
         guard limit > 0 else { return [] }
-        var descriptor = FetchDescriptor<CachedRecipe>(
-            predicate: #Predicate { $0.isSaved == true },
-            sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
+        // DUT-365: read the SYNCED source of truth (the same set the Saved tab
+        // shows) so a recipe saved on ANOTHER device reaches the widget — not just
+        // rows this device happens to have locally `isSaved`-pinned (which a
+        // cross-device save doesn't populate until that recipe's detail is opened).
+        // Ordered newest-save first to match the tab, and deduped by id (CloudKit
+        // can leave duplicate rows — DUT-378). An uncached hero renders the
+        // placeholder and is prefetched by the publisher for next refresh.
+        let descriptor = FetchDescriptor<SyncedSavedRecipe>(
+            sortBy: [SortDescriptor(\.savedAt, order: .reverse)]
         )
-        descriptor.fetchLimit = limit
-        let rows = try modelContext.fetch(descriptor)
-        return rows.compactMap { row -> SavedRecipeWidgetRow? in
-            guard !row.canonicalURLString.isEmpty,
+        var seen = Set<Int>()
+        var rows: [SavedRecipeWidgetRow] = []
+        for row in try modelContext.fetch(descriptor) {
+            if rows.count >= limit { break }
+            guard seen.insert(row.id).inserted,
+                !row.canonicalURLString.isEmpty,
                 let canonical = URL(string: row.canonicalURLString)
-            else { return nil }
+            else { continue }
             let heroImageURL = row.heroImageURLString.flatMap { URL(string: $0) }
             let cached =
                 heroImageURL.map { imageBytesAreCached(forURLString: $0.absoluteString) } ?? false
-            return SavedRecipeWidgetRow(
-                recipeID: row.id,
-                title: row.title,
-                canonicalURL: canonical,
-                heroImageURL: heroImageURL,
-                heroImageCached: cached,
-                savedAt: row.lastViewedAt
+            rows.append(
+                SavedRecipeWidgetRow(
+                    recipeID: row.id,
+                    title: row.title,
+                    canonicalURL: canonical,
+                    heroImageURL: heroImageURL,
+                    heroImageCached: cached,
+                    savedAt: row.savedAt
+                )
             )
         }
+        return rows
     }
 
     /// Probe whether the bytes for `urlString` are already present in the

@@ -41,12 +41,23 @@ public protocol SavedDependencies: Sendable {
     /// connectivity read as "online" (no warning); the live wiring reads
     /// ``NetworkMonitor``.
     func isOnline() async -> Bool
+
+    /// DUT-365: republish the saved-recipes home-screen widget snapshot. The view
+    /// model calls this after a refresh (incl. the debounced CloudKit remote-import
+    /// refresh) so a recipe saved/unsaved on ANOTHER device updates the widget —
+    /// nothing else republishes on the import path. Default no-op so fake conformers
+    /// (previews/tests) don't need to model the widget.
+    func publishSavedWidget() async
 }
 
 extension SavedDependencies {
     public func remoteChanges() -> AsyncStream<Void> {
         AsyncStream { $0.finish() }
     }
+
+    /// Default no-op (see ``publishSavedWidget()``); live wiring republishes the
+    /// widget snapshot, fakes inherit the no-op. DUT-365.
+    public func publishSavedWidget() async {}
 
     /// Default: no downloaded recipes, so no "Downloaded" badges. The live
     /// wiring overrides this; fake conformers that don't care about download
@@ -83,17 +94,28 @@ public struct LiveSavedDependencies: SavedDependencies {
     /// guard. Defaults to ``NetworkMonitor/shared`` (the instance the App
     /// composition root starts), so existing call sites compile unchanged.
     private let monitor: NetworkMonitor
+    /// DUT-365 — Sendable hook the app supplies to republish the saved-recipes
+    /// widget snapshot. Built in the App target (the only place the widget
+    /// publisher is linked); `nil` means no widget republish (previews/tests).
+    public typealias WidgetPublishHook = @Sendable () async -> Void
+    private let publishWidget: WidgetPublishHook?
 
     public init(
         store: RecipeStore,
         imageLoader: ImageLoader,
         remoteChangeStream: RemoteChangeStreamFactory? = nil,
-        monitor: NetworkMonitor = .shared
+        monitor: NetworkMonitor = .shared,
+        publishWidget: WidgetPublishHook? = nil
     ) {
         self.store = store
         self.imageLoader = imageLoader
         self.remoteChangeStream = remoteChangeStream
         self.monitor = monitor
+        self.publishWidget = publishWidget
+    }
+
+    public func publishSavedWidget() async {
+        await publishWidget?()
     }
 
     public func savedRecipes() async throws -> [Recipe] {

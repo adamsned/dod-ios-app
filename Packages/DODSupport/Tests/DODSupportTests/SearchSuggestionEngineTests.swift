@@ -181,4 +181,19 @@ struct SearchSuggestionEngineTests {
         )
         #expect(suggestion == "Cast Iron nachos")
     }
+
+    @Test func hyphenatedQueryKeepsAllTokenPositions() {
+        // DUT-366: with a hyphen the raw whitespace-split ("chiken-pot", "pie" → 2)
+        // and the normalized split (chiken, pot, pie → 3) diverge. The winner index
+        // points into the normalized array, so indexing the RAW split with it used
+        // to substitute the wrong word or drop a token (collapse to 2 words). The
+        // fix rebuilds from the normalized tokens, so the suggestion keeps all three
+        // positions regardless of which token the engine picks as the typo.
+        let titles = ["Chicken Pot Pie"]
+        let suggestion = SearchSuggestionEngine.suggest(
+            query: "chiken-pot pie",
+            cachedTitles: titles
+        )
+        #expect(suggestion?.split(separator: " ").count == 3)
+    }
 }

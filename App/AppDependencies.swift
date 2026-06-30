@@ -1,5 +1,6 @@
 import CloudKit
 import DODAnalytics
+import DODDesignSystem
 import DODDomain
 import DODFeatureCategories
 import DODFeatureFeed
@@ -126,6 +127,8 @@ final class AppDependencies {
     /// Called once from `@main` at app launch.
     func bootstrap() async {
         await networkMonitor.start()
+        // DUT-377: ReliableImage offline disk fallback (saved/downloaded heroes).
+        ReliableImageConfig.setOfflineDataProvider { [store] url in try? await store.image(url: url) }
         // TelemetryDeck app ID lives in DODApp.xcconfig (gitignored per
         // constitution §9). For v1 we read from Info.plist; if unset we
         // skip telemetry rather than fail launch.
@@ -305,12 +308,14 @@ final class AppDependencies {
         // target (the only place CloudKit + Core Data are linked) from
         // `NotificationCenter`; the `DODFeatureSaved` package consumes it
         // abstractly through the `SavedDependencies.remoteChanges()` seam.
-        LiveSavedDependencies(
+        let widgetPublisher = savedWidgetPublisher()
+        return LiveSavedDependencies(
             store: store,
             imageLoader: imageLoader,
             remoteChangeStream: { SavedRemoteChangeBridge.makeStream() },
             // DUT-84 — connectivity for the offline remove-download guard.
-            monitor: networkMonitor
+            monitor: networkMonitor,
+            publishWidget: { await widgetPublisher.publish() }  // DUT-365 widget republish
         )
     }
 

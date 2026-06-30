@@ -70,7 +70,22 @@ extension ProfileEditView {
         revoker: (any SiwaRevoking)?,
         googleTeardown: (@Sendable (Bool) async -> Void)? = nil
     ) async throws {
-        let token = (try? sessionStore.load())?.refreshToken
+        // DUT-367: distinguish "no session" from "the Keychain READ failed." A bare
+        // `try?` collapsed both to nil, so a transient Keychain error during Delete
+        // (e.g. `errSecInteractionNotAllowed` just after the device locks) silently
+        // skipped revocation while still clearing the session — stranding a live,
+        // un-revoked Apple token (App Store 5.1.1(v)). On a revoke teardown,
+        // propagate a read failure and abort BEFORE clearing anything, so the user
+        // retries Delete rather than orphaning the token at Apple. (`load()` returns
+        // nil — it does NOT throw — for a genuinely absent session, so a real Delete
+        // with no token still proceeds to clear.) Sign Out doesn't revoke, so a read
+        // failure there stays best-effort.
+        let token: String?
+        if revoke {
+            token = try sessionStore.load()?.refreshToken
+        } else {
+            token = (try? sessionStore.load())?.refreshToken
+        }
         // Each local clear is independent/best-effort so one failure can't skip
         // the others — especially the revoke + the Google teardown (DUT-268).
         let profileError: Error?
