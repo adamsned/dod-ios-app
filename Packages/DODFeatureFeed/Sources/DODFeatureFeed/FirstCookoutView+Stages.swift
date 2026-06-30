@@ -111,6 +111,9 @@ extension FirstCookoutView {
             }
         }
         .buttonStyle(.plain)
+        // DUT-402: expose the checked state to VoiceOver (mirrors IngredientCheckRow).
+        .accessibilityValue(isChecked ? "checked" : "unchecked")
+        .accessibilityAddTraits(isChecked ? [.isSelected] : [])
     }
 
     // MARK: Fire — Heat Coach first, then a rough starting point (DUT-239)
@@ -385,6 +388,8 @@ extension FirstCookoutView {
                 .font(.title2)
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(DODColor.labelSecondary)
+                .frame(minWidth: 44, minHeight: 44)  // DUT-291: 44pt tap target
+                .contentShape(Rectangle())
         }
         .accessibilityLabel("Close")
         .accessibilityIdentifier("first-cookout-close")

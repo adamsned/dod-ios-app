@@ -175,7 +175,7 @@ public enum IngredientAggregator {
             guard let unit = parsed.unit, let name = parsed.name, parsed.quantity != nil else {
                 return "raw:\(parsed.originalText)#\(firstSeen)"
             }
-            return "merge:\(unit)|\(name)"
+            return "merge:\(unit)|\(name.lowercased())"  // DUT-224: case-insensitive merge key
         }
 
         /// `"<qty> <unit> <name>"` for parsed lines; verbatim text otherwise.
@@ -218,7 +218,7 @@ public enum IngredientAggregator {
             // suffix guarantees uniqueness even for identical text.
             return "raw:\(fallback)#\(UUID().uuidString)"
         }
-        return "merge:\(unit)|\(name)"
+        return "merge:\(unit)|\(name.lowercased())"  // DUT-224: case-insensitive merge key
     }
 
     private static func aisleRank(_ aisle: IngredientAisleClassifier.Aisle) -> Int {

@@ -145,7 +145,7 @@ enum IngredientLineParser {
     private static func readUnit(_ text: String) -> (String?, String.Index) {
         let wordEnd = text.firstIndex(where: { $0 == " " }) ?? text.endIndex
         let firstWord = text[text.startIndex..<wordEnd]
-            .lowercased(with: .current)
+            .lowercased()
             .trimmingCharacters(in: CharacterSet(charactersIn: ".,"))
         guard let canonical = unitAliases[firstWord] else {
             return (nil, text.startIndex)
@@ -157,7 +157,7 @@ enum IngredientLineParser {
     /// an empty result.
     private static func normalizeName(_ raw: String) -> String? {
         var working = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if working.lowercased(with: .current).hasPrefix("of ") {
+        if working.lowercased().hasPrefix("of ") {
             working = String(working.dropFirst(3)).trimmingCharacters(in: .whitespaces)
         }
         let collapsed =

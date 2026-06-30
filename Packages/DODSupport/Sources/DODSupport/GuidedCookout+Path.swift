@@ -189,4 +189,11 @@ extension GuidedCookout {
     public var isCampfire: Bool {
         recipeID == Self.campfire.recipeID
     }
+
+    /// DUT-207: the intro-screen eyebrow. `FirstCookoutView` is reused for every
+    /// rung, so it must NOT always read "Your First Cookout".
+    public var introEyebrow: String {
+        if isCampfire { return "You're Ready" }
+        return isFirstRung ? "Your First Cookout" : "Your Next Cookout"
+    }
 }

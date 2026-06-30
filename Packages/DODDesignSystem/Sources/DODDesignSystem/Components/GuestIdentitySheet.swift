@@ -120,7 +120,9 @@ public struct GuestIdentitySheet: View {
         Button(action: onContinue) {
             Text(isSubmitting ? "Saving..." : "Continue")
                 .dodFont(DODType.bodyEmphasized)
-                .foregroundStyle(DODColor.cream)
+                // DUT-253: dark label on the muted disabled fill so the default
+                // (empty-field) state meets AA contrast; cream only on the accent fill.
+                .foregroundStyle(canContinue ? DODColor.cream : DODColor.label)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DODSpacing.md)
                 .background(

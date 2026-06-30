@@ -189,7 +189,7 @@ public struct FirstCookoutView: View {
             Image(systemName: "flame.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(DODColor.burntOrange)
-            Text("Your First Cookout")
+            Text(cookout.introEyebrow)  // DUT-207: per-rung header (not always "First")
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.labelSecondary)
             Text(cookout.dishTitle)

@@ -35,6 +35,8 @@ struct CookingToolsCallout: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(DODColor.labelSecondary)
                         .padding(DODSpacing.xxs)
+                        .frame(minWidth: 44, minHeight: 44)  // DUT-291: 44pt tap target
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Dismiss")
                 .accessibilityIdentifier("feed-cooking-tools-callout-dismiss")
@@ -63,6 +65,10 @@ struct CookingToolsCallout: View {
         .onTapGesture { onActivate() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("feed-cooking-tools-callout")
+        // DUT-286: a bare `.onTapGesture` is invisible to VoiceOver — give the bubble
+        // the button trait + a DEFAULT activate action so a double-tap opens the tools.
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { onActivate() }
         .accessibilityAction(named: "Open Cooking Tools") { onActivate() }
     }
 }

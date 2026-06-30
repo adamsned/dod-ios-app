@@ -60,7 +60,7 @@ public enum IngredientAisleClassifier {
     ///   e.g. `"1 ½ pounds boneless skinless chicken thighs"`).
     /// - Returns: The matched ``Aisle``, or ``Aisle/other`` if nothing matches.
     public static func classify(_ ingredientName: String) -> Aisle {
-        let haystack = ingredientName.lowercased(with: .current)
+        let haystack = ingredientName.lowercased()  // DUT-244: locale-independent (ASCII table)
         guard !haystack.isEmpty else { return .other }
         for keyword in sortedKeywords where haystack.contains(keyword) {
             // `keywordMap[keyword]` is guaranteed present — `sortedKeywords`
