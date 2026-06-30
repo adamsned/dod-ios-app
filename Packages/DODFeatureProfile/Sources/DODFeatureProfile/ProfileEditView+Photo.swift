@@ -25,46 +25,40 @@ extension ProfileEditView {
 
     // MARK: - Photo header
 
-    /// Diameter of the centered profile-photo header avatar. T-753 / CL-150
-    /// lifted it from the prior 44pt trailing-row avatar to a prominent
-    /// header size; T-754 / CL-151 (DUT-60) bumped it 88 → 120 to fill the
-    /// dead space at the top of the form (Apple-ID-scale). Quality-safe:
-    /// 120pt @3x = 360px, within the 512×512 saved JPG (no upscaling).
+    /// Diameter of the centered profile-photo header avatar. T-754 / CL-151
+    /// (DUT-60) settled on 120 (Apple-ID-scale) to fill the top of the form.
+    /// Quality-safe: 120pt @3x = 360px, within the 512×512 saved JPG.
     static let headerAvatarDiameter: CGFloat = 120
 
     /// **T-753 / CL-150 (DUT-59) — centered photo header.** Renders the
-    /// profile photo as a large, centered, circular, tappable avatar at
-    /// the TOP of the edit form (above the display-name + email fields),
-    /// with the tap-action caption directly below it. Pre-T-753 the photo
-    /// was a 44pt trailing avatar inside a labeled "Profile Picture" row;
-    /// this lifts it OUT of the elevated cell box (`.listRowBackground(.clear)`
-    /// + hidden separator) so it floats on the page surface like the
-    /// Contacts / Apple ID avatar header. The circle shape is intrinsic to
-    /// ``ProfilePhotoView`` (it clips both the loaded photo + the
-    /// initial-letter fallback to `Circle()`).
+    /// profile photo as a large, centered, circular avatar at the TOP of the
+    /// form (above the identity fields), floating on the page surface
+    /// (`.listRowBackground(.clear)` + hidden separator) like the Contacts /
+    /// Apple ID avatar header. The circle is intrinsic to ``ProfilePhotoView``.
     ///
-    /// **T-745 / CL-142 / DUT-39 — load-bearing direct-picker gate
-    /// (preserved).** Tapping the avatar runs ``handleProfilePictureRowTap()``:
-    /// no photo → straight to the picker; a photo set → the Replace /
-    /// Edit / Remove action sheet. The `profile-edit-photo` identifier is
-    /// preserved on the avatar Button for existing coverage.
+    /// **T-745 / CL-142 / DUT-39 — load-bearing direct-picker gate (preserved).**
+    /// In edit mode, tapping the avatar runs ``handleProfilePictureRowTap()``:
+    /// no photo → picker; a photo set → the Replace / Edit / Remove action sheet.
+    /// The `profile-edit-photo` identifier is preserved on the avatar.
     @ViewBuilder
     var profileEditPhotoSection: some View {
         Section {
             VStack(spacing: DODSpacing.sm) {
-                Button(action: handleProfilePictureRowTap) {
+                // DUT-416 — the avatar is an interactive picker affordance only
+                // in edit mode; view mode shows a plain image + hides the caption.
+                if isEditing {
+                    Button(action: handleProfilePictureRowTap) { photoHeaderAvatar }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(photoHeaderCaption)
+
+                    Text(photoHeaderCaption)
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
                     photoHeaderAvatar
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("profile-edit-photo")
-                .accessibilityLabel("Profile Picture")
-                .accessibilityHint(photoHeaderCaption)
-
-                Text(photoHeaderCaption)
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, DODSpacing.sm)
@@ -78,21 +72,27 @@ extension ProfileEditView {
 
     /// The header avatar itself — UIKit passes the photo store so a saved
     /// JPG renders; the macOS slice falls through to the initial-letter
-    /// circle. Both clip to `Circle()` inside ``ProfilePhotoView``.
+    /// circle. Both clip to `Circle()` inside ``ProfilePhotoView``. Carries the
+    /// `profile-edit-photo` identifier + "Profile Picture" label so both the
+    /// edit-mode Button and the view-mode plain image expose them (DUT-416).
     @ViewBuilder
     private var photoHeaderAvatar: some View {
-        #if canImport(UIKit)
-        ProfilePhotoView(
-            profile: previewProfile,
-            diameter: Self.headerAvatarDiameter,
-            photoStore: photoStore
-        )
-        #else
-        ProfilePhotoView(
-            profile: previewProfile,
-            diameter: Self.headerAvatarDiameter
-        )
-        #endif
+        Group {
+            #if canImport(UIKit)
+            ProfilePhotoView(
+                profile: previewProfile,
+                diameter: Self.headerAvatarDiameter,
+                photoStore: photoStore
+            )
+            #else
+            ProfilePhotoView(
+                profile: previewProfile,
+                diameter: Self.headerAvatarDiameter
+            )
+            #endif
+        }
+        .accessibilityIdentifier("profile-edit-photo")
+        .accessibilityLabel("Profile Picture")
     }
 
     /// State-dependent caption below the header avatar. Mentions Edit
@@ -100,9 +100,10 @@ extension ProfileEditView {
     /// exists; invites a first upload when none does.
     private var photoHeaderCaption: String {
         #if canImport(UIKit)
+        // DUT-416 — Title Case; shown only in edit mode.
         return inFlightPhotoFilename != nil
-            ? "Tap the photo to replace, edit, or remove it."
-            : "Tap to add a profile picture."
+            ? "Tap the Photo to Replace, Edit, or Remove It."
+            : "Tap to Add Profile Picture."
         #else
         return "Photo upload requires UIKit."
         #endif

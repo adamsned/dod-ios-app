@@ -1,5 +1,6 @@
 # Xcode
 build/
+build-sim/
 DerivedData/
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj

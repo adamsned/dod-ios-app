@@ -65,7 +65,7 @@ extension ProfileEditView {
             }
             #endif
             await onProfileChanged()
-            dismiss()
+            finishAfterSave(cleanedName: cleanedName, cleanedEmail: cleanedEmail)
         } catch let error as UserProfile.ValidationError {
             switch error {
             case .displayNameEmpty:
@@ -78,5 +78,23 @@ extension ProfileEditView {
         } catch {
             saveError = "Couldn't Save Your Profile. Try Again."
         }
+    }
+
+    /// DUT-416 — post-save success path. Editing an existing profile returns to
+    /// read-only view mode (stays on the page so the user sees their saved
+    /// profile + stats), re-baselining the dirty snapshots + reflecting the
+    /// cleaned values; the new-profile setup flow dismisses as before.
+    @MainActor
+    func finishAfterSave(cleanedName: String, cleanedEmail: String) {
+        guard existingProfile != nil else {
+            dismiss()
+            return
+        }
+        displayName = cleanedName
+        email = cleanedEmail
+        initialDisplayName = cleanedName
+        initialEmail = cleanedEmail
+        initialPhotoFilename = inFlightPhotoFilename
+        isEditing = false
     }
 }

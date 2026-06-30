@@ -85,6 +85,12 @@ public struct ProfileEditView: View {
     /// Non-private so `ProfileEditView+DirtyState.swift` can read it
     /// from the Save button's `.disabled(...)` modifier (T-743).
     @State var isSubmitting = false
+    /// DUT-416 / CL-291 — view-vs-edit mode. An existing profile opens in
+    /// read-only view mode (static rows, photo not tappable, captions hidden,
+    /// "Edit Profile" toolbar); the new-profile setup flow starts editing.
+    /// Seeded in `init` so there's no first-render flash. Non-private so the
+    /// toolbar + section builders in the satellite files can read/set it.
+    @State var isEditing: Bool
     /// T-743 / CL-140 / AC-44.16 — initial-value snapshots captured on
     /// `.onAppear` for the dirty-state comparison. Non-private so
     /// `ProfileEditView+DirtyState.swift`'s `isDirty` can read them.
@@ -156,6 +162,8 @@ public struct ProfileEditView: View {
         self.photoStore = photoStore
         self.sessionStore = sessionStore
         self.revoker = revoker
+        // DUT-416 — existing profile opens in view mode; new-profile setup edits.
+        _isEditing = State(initialValue: existingProfile == nil)
     }
     #else
     public init(
@@ -171,6 +179,8 @@ public struct ProfileEditView: View {
         self.onProfileChanged = onProfileChanged
         self.sessionStore = sessionStore
         self.revoker = revoker
+        // DUT-416 — existing profile opens in view mode; new-profile setup edits.
+        _isEditing = State(initialValue: existingProfile == nil)
     }
     #endif
 
@@ -205,7 +215,7 @@ public struct ProfileEditView: View {
         }
         .scrollContentBackground(.hidden)
         .background(DODColor.surface)
-        .navigationTitle(existingProfile == nil ? "New Profile" : "Profile")
+        .navigationTitle(navigationTitleText)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -242,7 +252,13 @@ public struct ProfileEditView: View {
                 #if canImport(UIKit)
                 discardUnsavedPhotoFiles()  // DUT-353
                 #endif
-                dismiss()
+                // DUT-416 — for an existing profile this is the "Cancel edit"
+                // path: revert + drop to view mode. New-profile setup dismisses.
+                if existingProfile != nil {
+                    exitEditMode()
+                } else {
+                    dismiss()
+                }
             }
         }
         .profileEditPhotoFlow(view: self)

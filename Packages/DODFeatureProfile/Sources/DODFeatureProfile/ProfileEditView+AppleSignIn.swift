@@ -21,65 +21,107 @@ extension ProfileEditView {
     @ViewBuilder
     var signInSection: some View {
         Section {
-            #if canImport(UIKit)
-            if existingProfile == nil {
-                AppleProfileSignInButton(profileStore: store) { outcome in
-                    handleAppleSignIn(outcome)
-                }
-                // Sign in with Google (DUT-276) — shown once a real client ID is
-                // wired (GoogleSignInConfig.isConfigured); the GIDSignIn flow runs
-                // via GoogleProfileSignInButton's default GIDSignInProvider.
-                if GoogleSignInConfig.isConfigured {
-                    GoogleProfileSignInButton { result in
-                        handleGoogleSignIn(result)
-                    }
-                }
-            }
-            #endif
-
-            // DUT-414 / DUT-415 — each required field carries a live error
-            // message directly below it (required when blank; "pick a different
-            // name" when the display name fails moderation). The same checks gate
-            // the Save button (`isFormValid`).
-            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                TextField("Display name", text: $displayName)
-                    .dodFont(DODType.body)
-                    .foregroundStyle(DODColor.label)
-                    .textContentType(.name)
-                    .accessibilityIdentifier("profile-edit-displayname")
-                    #if os(iOS)
-                .autocapitalization(.words)
-                    #endif
-                if let displayNameFieldError {
-                    Text(displayNameFieldError)
-                        .dodFont(DODType.caption)
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .accessibilityIdentifier("profile-edit-displayname-error")
-                }
-            }
-
-            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                TextField("Email", text: $email)
-                    .dodFont(DODType.body)
-                    .foregroundStyle(DODColor.label)
-                    .textContentType(.emailAddress)
-                    .accessibilityIdentifier("profile-edit-email")
-                    #if os(iOS)
-                .keyboardType(.emailAddress)
-                .autocapitalization(.none)
-                .autocorrectionDisabled(true)
-                    #endif
-                if let emailFieldError {
-                    Text(emailFieldError)
-                        .dodFont(DODType.caption)
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .accessibilityIdentifier("profile-edit-email-error")
-                }
+            // DUT-416 — read-only rows in view mode; the provider buttons +
+            // editable fields only render while editing (or setting up a new
+            // profile, which is always editing).
+            if isEditing {
+                editableIdentityFields
+            } else {
+                identityViewRow(
+                    label: "Display Name",
+                    value: displayName,
+                    identifier: "profile-view-displayname"
+                )
+                identityViewRow(
+                    label: "Email",
+                    value: email,
+                    identifier: "profile-view-email"
+                )
             }
         } footer: {
-            signInSectionFooter
+            if isEditing { signInSectionFooter }
         }
         .listRowBackground(DODColor.surfaceElevated)
+    }
+
+    /// DUT-416 — the editable identity surface (provider sign-in buttons for a
+    /// new profile + the Display Name / Email TextFields with their live DUT-414
+    /// / DUT-415 inline errors). Shown only in edit mode.
+    @ViewBuilder
+    private var editableIdentityFields: some View {
+        #if canImport(UIKit)
+        if existingProfile == nil {
+            AppleProfileSignInButton(profileStore: store) { outcome in
+                handleAppleSignIn(outcome)
+            }
+            // Sign in with Google (DUT-276) — shown once a real client ID is
+            // wired (GoogleSignInConfig.isConfigured); the GIDSignIn flow runs
+            // via GoogleProfileSignInButton's default GIDSignInProvider.
+            if GoogleSignInConfig.isConfigured {
+                GoogleProfileSignInButton { result in
+                    handleGoogleSignIn(result)
+                }
+            }
+        }
+        #endif
+
+        // DUT-414 / DUT-415 — each required field carries a live error
+        // message directly below it (required when blank; "pick a different
+        // name" when the display name fails moderation). The same checks gate
+        // the Save button (`isFormValid`).
+        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+            TextField("Display name", text: $displayName)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+                .textContentType(.name)
+                .accessibilityIdentifier("profile-edit-displayname")
+                #if os(iOS)
+            .autocapitalization(.words)
+                #endif
+            if let displayNameFieldError {
+                Text(displayNameFieldError)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .accessibilityIdentifier("profile-edit-displayname-error")
+            }
+        }
+
+        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+            TextField("Email", text: $email)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+                .textContentType(.emailAddress)
+                .accessibilityIdentifier("profile-edit-email")
+                #if os(iOS)
+            .keyboardType(.emailAddress)
+            .autocapitalization(.none)
+            .autocorrectionDisabled(true)
+                #endif
+            if let emailFieldError {
+                Text(emailFieldError)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .accessibilityIdentifier("profile-edit-email-error")
+            }
+        }
+    }
+
+    /// DUT-416 — a single read-only identity row for view mode: a small
+    /// secondary-colored label stacked above the value (mirrors the edit-mode
+    /// field layout so the page doesn't jump when toggling modes).
+    @ViewBuilder
+    private func identityViewRow(label: String, value: String, identifier: String) -> some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+            Text(label)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+            Text(value)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
     }
 
     /// Footer for ``signInSection``: the email-validation error when present,
