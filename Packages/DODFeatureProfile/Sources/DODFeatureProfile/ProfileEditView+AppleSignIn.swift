@@ -37,25 +37,45 @@ extension ProfileEditView {
             }
             #endif
 
-            TextField("Display name", text: $displayName)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .textContentType(.name)
-                .accessibilityIdentifier("profile-edit-displayname")
-                #if os(iOS)
-            .autocapitalization(.words)
-                #endif
+            // DUT-414 / DUT-415 — each required field carries a live error
+            // message directly below it (required when blank; "pick a different
+            // name" when the display name fails moderation). The same checks gate
+            // the Save button (`isFormValid`).
+            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                TextField("Display name", text: $displayName)
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                    .textContentType(.name)
+                    .accessibilityIdentifier("profile-edit-displayname")
+                    #if os(iOS)
+                .autocapitalization(.words)
+                    #endif
+                if let displayNameFieldError {
+                    Text(displayNameFieldError)
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .accessibilityIdentifier("profile-edit-displayname-error")
+                }
+            }
 
-            TextField("Email", text: $email)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .textContentType(.emailAddress)
-                .accessibilityIdentifier("profile-edit-email")
-                #if os(iOS)
-            .keyboardType(.emailAddress)
-            .autocapitalization(.none)
-            .autocorrectionDisabled(true)
-                #endif
+            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                TextField("Email", text: $email)
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                    .textContentType(.emailAddress)
+                    .accessibilityIdentifier("profile-edit-email")
+                    #if os(iOS)
+                .keyboardType(.emailAddress)
+                .autocapitalization(.none)
+                .autocorrectionDisabled(true)
+                    #endif
+                if let emailFieldError {
+                    Text(emailFieldError)
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .accessibilityIdentifier("profile-edit-email-error")
+                }
+            }
         } footer: {
             signInSectionFooter
         }

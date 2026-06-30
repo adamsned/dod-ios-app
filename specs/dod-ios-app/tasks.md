@@ -3079,6 +3079,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** new `DODDesignSystem/ButtonShape.swift`; 18 button sites across `CookModeView`, `CookTimer`, `RecipeDetailRatingsSection`, `FirstCookoutView+Stages`, `FirstCookoutHeroCard`, `CookCelebrationView`, `GoogleProfileSignInButton`, `EmptyState`, `CommentComposer`. Re-recorded 6 L4 baselines (EmptyState withAction ×3, CommentComposer ×3). Spec: `clarifications.md` (CL-289).
 - **AC:** design-system standard. Linear DUT-364. CL-289 canonical. **Est:** ~1 h. **Deps:** off main (after DUT-363). Branch `feat/button-radius-consistency`. **Verification:** swift-format + SwiftLint `--strict` clean; affected packages build; the EmptyState "Retry" button renders a 12pt rounded rect on the iPhone 17 sim (was the system shape).
 
+### T-896 — Profile: require + moderate Display Name with live inline errors (CL-290 / DUT-414 + DUT-415)
+
+- **What:** DUT-414 — Display Name + Email required to save; live error message directly below each field ("Display name is required." / "Email is required." / "Enter a valid email address."); the Save gate (`isFormValid`) already required them. DUT-415 — block vulgar/crass + impersonating Display Names via a new on-device `DisplayNameValidator` (normalize to defeat evasion → curated blocklist: substrings for long vulgar terms, whole-words for Scunthorpe-prone short ones, substrings for barred figures); inappropriate name greys Save + shows "pick a different display name and try again." Privacy-first, on-device, conservative starter blocklist.
+- **Files:** new `DisplayNameValidator.swift` + `DisplayNameValidatorTests.swift` (+8); new `ProfileEditView+Validation.swift` (isFormValid + per-field error computeds, extracted for the 400-line cap); `ProfileEditView.swift` + `ProfileEditView+AppleSignIn.swift` (inline error rows under each field). Spec: `clarifications.md` (CL-290).
+- **AC:** US-44 (Profile). Linear DUT-414 + DUT-415. CL-290 canonical. **Est:** ~2 h. **Deps:** off main. Branch `feat/profile-name-validation`. **Verification:** swift-format + SwiftLint `--strict` clean; DODFeatureProfile 63 tests green; iOS app build green + installed on the iPhone 17 sim. Visual: navigate Settings → Profile (new) to see the inline errors + greyed Save.
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
