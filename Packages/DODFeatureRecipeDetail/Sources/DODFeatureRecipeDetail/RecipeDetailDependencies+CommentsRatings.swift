@@ -101,6 +101,18 @@ extension LiveRecipeDetailDependencies {
         }
     }
 
+    public func cachePendingComment(_ comment: RecipeComment, postID: Int) async {
+        // DUT-387 — route to the pending bucket; `upsertPendingComment` sets
+        // `isPendingFromThisDevice = true` (the snapshot's default `false` is
+        // overridden), so a held comment is filtered from public reader UI and
+        // flips to approved when a later fetch returns it.
+        do {
+            try await store.upsertPendingComment(Self.commentToSnapshot(comment, postID: postID))
+        } catch {
+            DODLog.persistence.error("cache pending comment failed: \(String(describing: error))")
+        }
+    }
+
     public func postComment(
         postID: Int,
         body: String,

@@ -245,6 +245,13 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
         cachedCommentsByPost[postID] = comments
     }
 
+    /// DUT-387 — records held-comment writes routed to the pending bucket.
+    var cachedPendingCommentWrites: [(comment: RecipeComment, postID: Int)] = []
+
+    func cachePendingComment(_ comment: RecipeComment, postID: Int) async {
+        cachedPendingCommentWrites.append((comment, postID))
+    }
+
     func postComment(
         postID: Int,
         body: String,

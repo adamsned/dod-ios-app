@@ -12,6 +12,16 @@ import Foundation
 /// and are intentionally NOT touched.
 extension ArticleHTMLParser {
 
+    /// DUT-288 — resolve an `<a>` tag's `href` to a link URL, dropping bare
+    /// intra-page `#fragment` anchors (the WPRM/Feast table-of-contents jump
+    /// links). The in-app reader can't scroll to a `#section` anchor, so those
+    /// render as dead orange links; returning `nil` renders their text plain.
+    /// Real off-page links are untouched.
+    static func resolvedLinkURL<S: StringProtocol>(inTag tagBody: S) -> URL? {
+        let href = HTMLSanitizer.decodingEntities(attributeValue("href", in: tagBody))
+        return href.hasPrefix("#") ? nil : URL(string: href)
+    }
+
     /// Feast-theme "SEO action button" `<div>` class tokens. These render as a
     /// non-functional / orphaned cluster in the native article view — an AI
     /// prompt launcher ("Summarize and Save…": ChatGPT / Google AI / Perplexity

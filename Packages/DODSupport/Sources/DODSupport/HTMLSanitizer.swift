@@ -17,7 +17,11 @@ public enum HTMLSanitizer {
     /// - Decodes numeric entities (`&#1234;` and `&#xABCD;`).
     /// - Collapses consecutive whitespace to a single space, trims edges.
     public static func plainText(from html: String) -> String {
-        let withoutTags = stripTags(html)
+        // DUT-389: strip comments before tags — a comment body containing a `>`
+        // (e.g. `<!-- a > b -->`) would otherwise mis-terminate at the inner
+        // `>` and leak the trailing fragment into the output.
+        let withoutComments = strippingComments(html)
+        let withoutTags = stripTags(withoutComments)
         let withDecodedEntities = decodeEntities(withoutTags)
         return collapseWhitespace(withDecodedEntities)
     }
@@ -25,6 +29,34 @@ public enum HTMLSanitizer {
     /// Decode named + numeric HTML entities WITHOUT stripping tags or collapsing
     /// whitespace — used by the rich article parser to decode inline text runs.
     public static func decodingEntities(_ html: String) -> String { decodeEntities(html) }
+
+    /// DUT-389 — remove HTML comments (`<!-- … -->`) from the input. An
+    /// unterminated comment is dropped through end-of-string (matching the
+    /// unterminated-`<script>` policy). Exposed so both this sanitizer and
+    /// ``ArticleHTMLParser`` strip comments before scanning: a comment
+    /// containing an inner `>` mis-terminates tag scanning, and one containing
+    /// `<div`/`<li`/`<span` corrupts block-depth tracking (dropping or merging
+    /// recipe rows).
+    public static func strippingComments(_ input: String) -> String {
+        guard input.contains("<!--") else { return input }
+        var output = ""
+        output.reserveCapacity(input.count)
+        var index = input.startIndex
+        while index < input.endIndex {
+            guard let open = input.range(of: "<!--", range: index..<input.endIndex) else {
+                output.append(contentsOf: input[index..<input.endIndex])
+                break
+            }
+            output.append(contentsOf: input[index..<open.lowerBound])
+            if let closeEnd = input.range(of: "-->", range: open.upperBound..<input.endIndex) {
+                index = closeEnd.upperBound
+            } else {
+                // Unterminated comment — drop the remainder.
+                index = input.endIndex
+            }
+        }
+        return output
+    }
 
     // MARK: - Steps
 

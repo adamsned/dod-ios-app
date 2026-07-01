@@ -199,7 +199,13 @@ extension RecipeDetailViewModel {
                 // non-approved status with the "Awaiting approval" badge
                 // (US-15), so the user sees their words on screen immediately.
                 insertPostedCommentIfNew(stamped)
-                await dependencies.cacheComments(comments, postID: listItem.id)
+                // DUT-387: persist the held comment into the PENDING bucket, not
+                // as a normal public row. Caching it via `cacheComments` marks it
+                // `isPendingFromThisDevice: false`, so it rendered as a normal
+                // approved comment on every cold/offline open and — if WP later
+                // rejects it — stuck forever. The pending bucket is filtered from
+                // the public reader and flips to approved when a fetch returns it.
+                await dependencies.cachePendingComment(stamped, postID: listItem.id)
                 snackbarMessage = "Comment submitted — it will appear after approval."
             }
             commentDraft = ""
