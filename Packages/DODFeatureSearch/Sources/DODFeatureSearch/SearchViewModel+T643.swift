@@ -211,7 +211,11 @@ extension SearchViewModel {
             trimmed: trimmed
         )
 
-        await sendSearchTelemetry(trimmed: trimmed)
+        // DUT-254: the `recipe_searched` event fires on FINALIZED searches only
+        // (Return / keyboard dismissal via `commitRecentSearch`), NOT on every
+        // debounced pass — typing "chicken" used to emit ~5 partial-query events
+        // ("ch", "chi", …), inflating counts and polluting the query-hash
+        // distribution. This per-debounce finalize hop no longer sends it.
         kickOffCookTimeHydrationIfNeeded(against: merged)
     }
 

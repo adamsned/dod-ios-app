@@ -88,13 +88,33 @@ import Testing
             dependencies: dependencies,
             recentSearches: Self.scratchRecents()
         )
-        viewModel.query = "secret query"
-        await viewModel.runImmediateSearch()
+        // DUT-254: `recipe_searched` now fires from the FINALIZED-search path
+        // (`sendSearchTelemetry`, driven by `commitRecentSearch`), not from each
+        // debounced pass — so exercise that method directly here.
+        await viewModel.sendSearchTelemetry(trimmed: "secret query")
         let sent = try? #require(dependencies.searchHashes.first)
         let expected = StringHasher.sha256Hex("secret query")
         #expect(sent == expected)
         // The raw text must never reach analytics.
         #expect(!(sent ?? "").contains("secret"))
+    }
+
+    /// DUT-254: a live (debounced) search must NOT emit `recipe_searched`; only
+    /// a finalized commit does. Prevents the per-keystroke inflation.
+    @Test func debouncedSearchDoesNotEmitTelemetry() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["chicken"] = []
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        viewModel.query = "chicken"
+        await viewModel.runImmediateSearch()
+        #expect(dependencies.searchHashes.isEmpty)
+        // Finalizing the search (Return / keyboard dismissal) emits exactly one.
+        viewModel.commitRecentSearch()
+        for _ in 0..<20 where dependencies.searchHashes.isEmpty { await Task.yield() }
+        #expect(dependencies.searchHashes.count == 1)
     }
 
     // MARK: - US-12

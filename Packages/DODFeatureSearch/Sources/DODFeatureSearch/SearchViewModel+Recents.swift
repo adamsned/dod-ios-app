@@ -16,5 +16,9 @@ extension SearchViewModel {
         guard trimmed.count >= 2, !queryFromCuratedTap else { return }
         recents.record(trimmed)
         recentSearches = recents.recent()
+        // DUT-254: emit the `recipe_searched` analytics event here — the
+        // FINALIZED-search trigger (Return / keyboard dismissal) — so one event
+        // equals one finalized search, not one per debounced keystroke.
+        Task { await sendSearchTelemetry(trimmed: trimmed) }
     }
 }

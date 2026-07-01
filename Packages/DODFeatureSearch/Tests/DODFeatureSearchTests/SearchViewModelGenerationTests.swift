@@ -48,6 +48,39 @@ import Testing
         #expect(viewModel.items.map(\.id) == [2])
     }
 
+    /// DUT-221: tapping Clear (X) while a query is still in flight must not let
+    /// that slow query repaint its results over the now-idle screen. `clear()`
+    /// bumps the generation, so a finalize carrying the pre-clear token bails.
+    @Test func clearMakesInFlightSearchBailInsteadOfRepainting() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["chicken"] = [Self.makeItem(1, title: "Chicken")]
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+
+        viewModel.query = "chicken"
+        await viewModel.runImmediateSearch()
+        // A search is conceptually in flight at this generation.
+        let inFlightGeneration = viewModel.searchGeneration
+
+        // User taps Clear before the slow query returns.
+        viewModel.clear()
+        #expect(viewModel.state == .idle)
+        #expect(viewModel.items.isEmpty)
+
+        // The slow query now returns; its finalize must NOT repaint over idle.
+        await viewModel.finishTextSearch(
+            merged: [Self.makeItem(9, title: "Chicken Soup")],
+            localItems: [],
+            trimmed: "chicken",
+            online: true,
+            generation: inFlightGeneration
+        )
+        #expect(viewModel.state == .idle)
+        #expect(viewModel.items.isEmpty)
+    }
+
     static func makeItem(_ id: Int, title: String) -> RecipeListItem {
         RecipeListItem(
             id: id,
