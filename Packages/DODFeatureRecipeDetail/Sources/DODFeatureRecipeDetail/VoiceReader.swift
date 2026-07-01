@@ -34,6 +34,18 @@ public protocol SpeechSynthesizing: AnyObject {
     /// compiling — only ``SystemSpeechSynthesizer`` actually applies it.
     var speechRate: Float { get set }
 
+    /// DUT-390 — invoked (on the main actor) when the synthesizer's queue
+    /// drains: the last utterance finished or was cancelled and nothing else is
+    /// speaking. ``VoiceReader`` uses it to release the audio session after a
+    /// one-shot read (e.g. replay while Voice Mode is off) so ducked audio isn't
+    /// left dipped for the rest of the cook. Declared as a requirement — not
+    /// just an extension member — so the assignment reaches
+    /// ``SystemSpeechSynthesizer``'s real storage through dynamic dispatch (an
+    /// extension-only property would statically dispatch to the no-op default).
+    /// A default no-op store lets mocks/fallbacks satisfy it without wiring a
+    /// real `AVSpeechSynthesizerDelegate`.
+    var onQueueDidEmpty: (() -> Void)? { get set }
+
     /// Enqueue and begin speaking the supplied text. ``VoiceReader`` always
     /// calls ``stop()`` first (AC-40.7), so a conformer may assume it is
     /// starting from a stopped state.
@@ -91,7 +103,19 @@ public final class VoiceReader {
     /// activate once (lazily on the first ``speak(_:)``) and only deactivate
     /// when we actually have an active session to release. Merely holding a
     /// `VoiceReader` never disturbs other audio (CL-79).
-    private var didActivateAudioSession = false
+    ///
+    /// `nonisolated(unsafe)` so ``deinit`` (nonisolated in Swift 6) can read it
+    /// to release a still-active session (DUT-390). Only ever mutated on the
+    /// main actor, and `deinit` runs once no other reference survives, so the
+    /// unchecked access is safe.
+    nonisolated(unsafe) private var didActivateAudioSession = false
+
+    /// DUT-390 — when true, the audio session is held open across utterances
+    /// (Voice Mode is on) and the queue-drained callback must NOT release it,
+    /// so ducked audio doesn't flap between steps. False for one-shot reads
+    /// (e.g. replay while Voice Mode is off), where completion releases the
+    /// session so other audio un-ducks promptly.
+    private var holdsSessionOpen = false
 
     /// DUT-283 — true while we hold an activated audio session. Exposed for
     /// tests; the real `AVAudioSession` work is iOS-only.
@@ -100,6 +124,12 @@ public final class VoiceReader {
     #if os(iOS)
     nonisolated(unsafe) private var interruptionObserver: (any NSObjectProtocol)?
     nonisolated(unsafe) private var mediaResetObserver: (any NSObjectProtocol)?
+
+    /// DUT-385 — set on interruption `.began` when we were mid-utterance, so
+    /// the `.ended` handler knows to resume even though iOS may have cleared
+    /// the synthesizer's `isPaused` flag (interrupting a `.playback` session
+    /// cancels the in-flight utterance rather than parking it resumably).
+    private var wasInterruptedWhileSpeaking = false
     #endif
 
     /// The language code used to resolve the speech voice — the device's
@@ -123,9 +153,24 @@ public final class VoiceReader {
         // Seed the platform default so the first utterance reads at a natural
         // pace (a fresh `Float` would otherwise be 0). DUT-325.
         self.synthesizer.speechRate = Self.defaultRate
+        // DUT-390 — release the audio session when the queue drains unless
+        // Voice Mode is holding it open, so a one-shot read (replay) doesn't
+        // leave other audio ducked for the rest of the cook.
+        self.synthesizer.onQueueDidEmpty = { [weak self] in
+            guard let self, !self.holdsSessionOpen else { return }
+            self.deactivateAudioSession()
+        }
         #if os(iOS)
         registerAudioSessionObservers()
         #endif
+    }
+
+    /// DUT-390 — Voice Mode holds the audio session open across steps; a
+    /// one-shot read does not. ``CookModeViewModel`` sets this true when Voice
+    /// Mode turns on and false when it turns off, so the queue-drained callback
+    /// only releases the session for one-shot reads.
+    public func setSessionHold(_ hold: Bool) {
+        holdsSessionOpen = hold
     }
 
     /// DUT-283 — force the next `speak(_:)` to re-activate the audio session.
@@ -295,17 +340,31 @@ public final class VoiceReader {
         else { return }
         switch type {
         case .began:
+            // DUT-385: interrupting a `.playback` session CANCELS the in-flight
+            // utterance (afterward `isPaused` is false), so the `.ended` resume
+            // path — gated on `isPaused` — was dead for the common phone-call /
+            // Siri case. Park it ourselves: pause now (best effort at parking it
+            // resumably) and remember we were speaking so `.ended` can resume off
+            // our own flag rather than the engine's cleared paused state.
+            if synthesizer.isSpeaking {
+                synthesizer.pause()
+                wasInterruptedWhileSpeaking = true
+            }
             // The system deactivated our session — the next speak() must reactivate.
             invalidateAudioSession()
         case .ended:
             invalidateAudioSession()
-            // If the system says we may resume and we were mid-utterance, duck +
-            // continue right away rather than waiting for the next step.
+            // If the system says we may resume and we were mid-utterance when the
+            // interruption began, duck + continue right away rather than waiting
+            // for the next step. DUT-385: gate on our own flag (or a still-paused
+            // engine), not solely `isPaused`, which iOS may have cleared.
             let options = optionsRaw.map(AVAudioSession.InterruptionOptions.init(rawValue:))
-            if options?.contains(.shouldResume) == true, synthesizer.isPaused {
+            let shouldResume = options?.contains(.shouldResume) == true
+            if shouldResume, wasInterruptedWhileSpeaking || synthesizer.isPaused {
                 activateAudioSessionIfNeeded()
                 synthesizer.continueSpeaking()
             }
+            wasInterruptedWhileSpeaking = false
         @unknown default:
             break
         }
@@ -319,6 +378,15 @@ public final class VoiceReader {
         }
         if let mediaResetObserver {
             NotificationCenter.default.removeObserver(mediaResetObserver)
+        }
+        // DUT-390 — if the reader is dropped while it still holds an activated
+        // session (e.g. Cook Mode torn down off the `endCookMode` path after a
+        // replay activated it), release it so ducked audio isn't left dipped.
+        if didActivateAudioSession {
+            try? AVAudioSession.sharedInstance().setActive(
+                false,
+                options: [.notifyOthersOnDeactivation]
+            )
         }
         #endif
     }

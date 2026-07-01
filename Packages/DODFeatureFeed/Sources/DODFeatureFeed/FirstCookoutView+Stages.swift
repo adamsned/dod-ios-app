@@ -199,6 +199,9 @@ extension FirstCookoutView {
                         .dodFont(DODType.displayMedium)
                         .monospacedDigit()
                         .foregroundStyle(DODColor.burntOrange)
+                        .accessibilityLabel(  // DUT-401 — spell "5:03" out for VoiceOver
+                            bakeCountdownLabel(active.remaining(at: context.date))
+                        )
                 }
                 Text(bakeStepAwayText)
                     .dodFont(DODType.caption)
@@ -220,6 +223,11 @@ extension FirstCookoutView {
                     .foregroundStyle(DODColor.label)
             }
             .padding(.top, DODSpacing.xs)
+            // DUT-401 — announce the silent finished swap (DUT-297 covers only
+            // the backgrounded case). SwiftUI API → macOS test slice compiles.
+            .onAppear {
+                AccessibilityNotification.Announcement("Timer's up! \(goCheckText)").post()
+            }
         } else {
             Button("Start the \(cookout.bakeMinutes)-minute bake timer") {
                 let duration = Double(cookout.bakeMinutes) * 60
@@ -310,11 +318,6 @@ extension FirstCookoutView {
         }
         .dodBorderedButton()
         .tint(DODColor.burntOrange)
-    }
-
-    func formatRemaining(_ seconds: TimeInterval) -> String {
-        let total = Int(seconds.rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
     }
 
     /// DUT-324 — a short, optional written reflection on the celebration screen,

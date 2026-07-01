@@ -23,9 +23,11 @@ public struct CookModeView: View {
     // `CookModeView+Header.swift` can read the view model.
     @State var viewModel: CookModeViewModel
     @State private var ingredientsDrawerVisible: Bool = false
+    // `internal` (not `private`) so the step-body composition in
+    // `CookModeView+StepBody.swift` can present the journal-log sheet.
     /// DUT-326 — drives the "Add to Cooking Journal" capture sheet on the
     /// Done card.
-    @State private var isJournalLogPresented: Bool = false
+    @State var isJournalLogPresented: Bool = false
     /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
     /// screen, regardless of which step is shown, so a running timer on a step
     /// you've navigated away from still counts down + completes.
@@ -42,6 +44,16 @@ public struct CookModeView: View {
     /// ingredient rows agree with the scaled list the user just left. AC-7.5
     /// + US-31 carry-over.
     private let ingredientScaleFactor: Double
+
+    // `internal` (not `private`) so `CookModeView+StepBody.swift` can resolve
+    // the temperature unit for the displayed step text (DUT-245).
+    /// DUT-245 — the same temperature-unit preference Recipe Detail reads, so
+    /// Cook Mode shows the converted temps the user saw a tap earlier (rather
+    /// than reverting to the author's raw Fahrenheit on the one screen they
+    /// cook from). `nil` ("Recipe default" / absent / malformed) leaves the
+    /// step text exactly as written. Display-time transform only.
+    @AppStorage(TemperatureConverter.preferenceKey)
+    var temperatureUnitRaw: String = ""
 
     public init(
         recipe: Recipe,
@@ -98,6 +110,18 @@ public struct CookModeView: View {
         }
         .onReceive(timerTicker) { _ in viewModel.tickTimers() }
         .sensoryFeedback(.success, trigger: viewModel.timerCompletionTick)
+        // DUT-401 — a step timer reaching 00:00 had only visual + haptic
+        // feedback; announce it so a cook who set the phone down (or a
+        // VoiceOver user) hears it. Paired with the same completion trigger the
+        // haptic uses. Skip the initial 0 so mounting doesn't announce.
+        .onChange(of: viewModel.timerCompletionTick) { _, tick in
+            if tick > 0 { announce("Timer complete.") }
+        }
+        // DUT-401 — advancing/going back swaps the step silently; announce the
+        // new step (or the completion state) so VoiceOver users aren't left
+        // hunting for the changed text after tapping Next.
+        .onChange(of: viewModel.currentStepIndex) { _, _ in announceCurrentStep() }
+        .onChange(of: viewModel.isFinished) { _, _ in announceCurrentStep() }
         .onDisappear {
             viewModel.endCookMode()
         }
@@ -140,85 +164,6 @@ public struct CookModeView: View {
             }
             .frame(height: 200)
             .accessibilityHidden(true)
-        }
-    }
-
-    // MARK: - Step body (AC-7.2 large step, AC-7.4 finished state)
-
-    @ViewBuilder
-    private var stepBody: some View {
-        if viewModel.isFinished {
-            doneCard
-        } else if let step = viewModel.currentStep {
-            stepCard(step)
-        }
-    }
-
-    private func stepCard(_ step: RecipeInstruction) -> some View {
-        VStack(alignment: .leading, spacing: DODSpacing.md) {
-            HStack(alignment: .top, spacing: DODSpacing.md) {
-                Text("\(step.step)")
-                    .dodFont(DODType.displayMedium)
-                    .foregroundStyle(DODColor.cream)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(DODColor.burntOrange))
-                    .accessibilityHidden(true)
-                Text(step.text)
-                    .dodFont(DODType.displayMedium)
-                    .foregroundStyle(DODColor.label)
-                    .lineSpacing(DODSpacing.xs)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            if let duration = StepTimerParser.firstDuration(in: step.text) {
-                CookTimer(stepIndex: viewModel.currentStepIndex, duration: duration, viewModel: viewModel)
-            }
-        }
-        .padding(.horizontal, DODSpacing.md)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(step.step). \(step.text)")
-    }
-
-    private var doneCard: some View {
-        VStack(alignment: .center, spacing: DODSpacing.md) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(DODColor.accent)
-                .frame(maxWidth: .infinity, alignment: .center)
-            Text("All Done, Enjoy!")
-                .dodFont(DODType.displayMedium)
-                .foregroundStyle(DODColor.label)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, alignment: .center)
-            Text("Tap Finish to leave Cook Mode.")
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.labelSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, alignment: .center)
-            // DUT-326 — optional celebratory "log this cook" action.
-            logCookButton
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.horizontal, DODSpacing.md)
-    }
-
-    /// DUT-326 — a clear, optional CTA on the Done card to save this cook to
-    /// the Cooking Journal (photo + caption). Hidden when no `onLogCook` sink
-    /// is wired (e.g. previews / hosts that haven't opted in). Logging here
-    /// records a real completed cook and counts toward rank — intentional.
-    @ViewBuilder
-    private var logCookButton: some View {
-        if onLogCook != nil {
-            Button {
-                isJournalLogPresented = true
-            } label: {
-                Label("Add to Cooking Journal", systemImage: "camera.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .dodProminentButton()
-            .tint(DODColor.accent)
-            .padding(.top, DODSpacing.sm)
-            .accessibilityIdentifier("cook-mode-log-cook")
-            .accessibilityLabel("Add this cook to your Cooking Journal")
         }
     }
 
