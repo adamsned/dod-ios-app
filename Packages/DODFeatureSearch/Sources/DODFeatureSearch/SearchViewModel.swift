@@ -163,6 +163,12 @@ public final class SearchViewModel {
     }
 
     public func clear() {
+        // DUT-221: cancel the in-flight debounce AND bump the generation so a
+        // slow query already past the debounce (awaiting the REST fan-out)
+        // bails in `finishTextSearch` instead of repainting its results over
+        // the now-idle screen after the user tapped Clear.
+        debounceTask?.cancel()
+        searchGeneration &+= 1
         query = ""
         items = []
         ingredientItems = []  // DUT-11: wipe the ingredient tier too.
@@ -253,6 +259,10 @@ public final class SearchViewModel {
         debounceTask?.cancel()
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else {
+            // DUT-221: bump the generation so an earlier ≥2-char search still
+            // in flight bails rather than repainting over the reset-to-idle
+            // screen when the user deletes back down to <2 characters.
+            searchGeneration &+= 1
             items = []
             ingredientItems = []  // DUT-11: don't strand a stale tier.
             state = .idle
