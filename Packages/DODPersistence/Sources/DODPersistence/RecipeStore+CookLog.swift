@@ -23,7 +23,13 @@ extension RecipeStore {
         let recent = FetchDescriptor<CachedCookLogEntry>(
             predicate: #Predicate { $0.recipeID == recipeID && $0.cookedAt >= lower && $0.cookedAt <= upper }
         )
-        if let existing = try? modelContext.fetch(recent), !existing.isEmpty { return }
+        if let existing = try? modelContext.fetch(recent), !existing.isEmpty {
+            // DUT-423: the caller already wrote the photo JPEG to disk before calling
+            // us; on a dedup skip, delete it so it doesn't orphan (no row will ever
+            // reference its `photoLocalID`, so the DUT-338 cleanup can't reach it).
+            if let photoID = entry.photoLocalID { CookPhotoStore().delete(id: photoID) }
+            return
+        }
         modelContext.insert(
             CachedCookLogEntry(
                 id: entry.id,

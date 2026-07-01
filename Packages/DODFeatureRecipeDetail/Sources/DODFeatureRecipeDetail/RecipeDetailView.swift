@@ -322,6 +322,7 @@ public struct RecipeDetailView: View {
     private var snackbar: some View {
         if let message = viewModel.snackbarMessage {
             Snackbar(message: message)
+                .id(message)  // DUT-419: a new message restarts the auto-dismiss timer
                 .padding(.bottom, DODSpacing.md)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .task {
