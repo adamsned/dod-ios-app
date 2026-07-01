@@ -80,6 +80,9 @@ public struct ProfileEditView: View {
     @State var saveError: String?
     /// Non-private so `ProfileEditView+SignOut.swift`'s Delete button can set it.
     @State var showDeleteConfirmation = false
+    /// DUT-429 — gates Sign Out behind a confirmation, mirroring Delete (the
+    /// alert lives on the Sign Out section in `ProfileEditView+SignOut`).
+    @State var showSignOutConfirmation = false
     /// DUT-281 — true when a session exists (seeded from `sessionStore` on appear;
     /// set by a successful Apple/Google sign-in). Gates `signOutSection` so Sign
     /// Out / Delete stays reachable even when no `UserProfile` was written (Apple

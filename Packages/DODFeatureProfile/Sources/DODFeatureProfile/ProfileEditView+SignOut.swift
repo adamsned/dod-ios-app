@@ -20,7 +20,9 @@ extension ProfileEditView {
         if existingProfile != nil || hasSession {
             Section {
                 Button {
-                    Task { await handleSignOut() }
+                    // DUT-429 — confirm first (see the `.alert` in
+                    // ProfileEditView), matching the guarded Delete button.
+                    showSignOutConfirmation = true
                 } label: {
                     Text("Sign Out")
                         .dodFont(DODType.body)
@@ -30,6 +32,20 @@ extension ProfileEditView {
                 .accessibilityIdentifier("profile-edit-signout")
             }
             .listRowBackground(DODColor.surfaceElevated)
+            // DUT-429 — Sign Out is a destructive local teardown (clears the
+            // guest-identity prefill too), so confirm it like Delete rather
+            // than acting on a single unguarded tap.
+            .alert("Sign out of your profile?", isPresented: $showSignOutConfirmation) {
+                Button("Sign Out", role: .destructive) {
+                    Task { await handleSignOut() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "This clears your saved name and email on this device. "
+                        + "Future comments will be attributed to a guest."
+                )
+            }
 
             Section {
                 Button(role: .destructive) {
