@@ -19,7 +19,9 @@ public enum DeepLinkIntent: Equatable, Sendable {
     /// a recognized `dod://` action so the caller can ignore it without
     /// touching navigation state.
     public static func parse(_ url: URL) -> DeepLinkIntent? {
-        guard url.scheme == "dod" else { return nil }
+        // DUT-428: case-insensitive scheme, matching WidgetDeepLinkParser — iOS does
+        // not normalize scheme case, so an uppercase "DOD://" would otherwise dead-end.
+        guard url.scheme?.lowercased() == "dod" else { return nil }
         // URL.host is the action verb. Empty host (e.g. "dod:///saved")
         // falls through to the path-only branch below.
         let host = url.host?.lowercased()

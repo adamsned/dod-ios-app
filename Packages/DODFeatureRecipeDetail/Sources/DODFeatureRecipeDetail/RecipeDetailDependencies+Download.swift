@@ -78,6 +78,19 @@ extension LiveRecipeDetailDependencies {
                     bytes: bytes,
                     pinnedToSavedRecipeID: recipe.id
                 )
+                // DUT-418: the saved-recipes widget derives its filename from the
+                // SMALL hero URL (SyncedSavedRecipe stores `heroImage`, not the large),
+                // so also cache the small URL — else the downloaded recipe's widget
+                // thumbnail shows the placeholder forever. Reuse the large bytes if
+                // the small fetch fails.
+                if let small = recipe.heroImage, small != url {
+                    let smallBytes = (try? await imageLoader.data(for: small)) ?? bytes
+                    try? await store.cacheImage(
+                        url: small,
+                        bytes: smallBytes,
+                        pinnedToSavedRecipeID: recipe.id
+                    )
+                }
             } catch {
                 DODLog.network.error(
                     "download hero image failed: \(String(describing: error))"

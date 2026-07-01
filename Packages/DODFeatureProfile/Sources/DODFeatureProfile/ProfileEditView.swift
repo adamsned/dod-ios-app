@@ -285,6 +285,12 @@ public struct ProfileEditView: View {
                 loadedStats = await statsHooks.load()
             }
         }
+        // DUT-424: reload on every appear so the Cook Rank + counts aren't stale
+        // after cooking (or editing a journal rating) and returning to this
+        // still-mounted screen — `.task` only fires once per view identity.
+        .onAppear {
+            if let statsHooks { Task { loadedStats = await statsHooks.load() } }
+        }
         .onAppear {
             // Seed the fields from the existing profile (if any) only
             // once — re-applying on every body recompute would clobber

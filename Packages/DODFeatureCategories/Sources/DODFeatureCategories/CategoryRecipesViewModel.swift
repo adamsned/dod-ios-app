@@ -74,11 +74,12 @@ public final class CategoryRecipesViewModel {
             let result = try await dependencies.fetchPosts(categoryID: category.id, page: page)
             try await dependencies.cache(listItems: result.items)
             if append {
-                let combinedIDs = (items.map(\.id) + result.items.map(\.id))
-                    .reduce(into: [Int]()) { acc, id in
-                        if !acc.contains(id) { acc.append(id) }
-                    }
-                items = try await dependencies.cachedListItems(forIDs: combinedIDs)
+                // DUT-425: merge the fetched page in-memory rather than re-reading
+                // through the LRU cache — page-1 items (older lastViewedAt) can be
+                // evicted by the time page 2 is cached, and cachedListItems(forIDs:)
+                // silently drops missing ids, vanishing already-shown recipes.
+                var seen = Set(items.map(\.id))
+                items += result.items.filter { seen.insert($0.id).inserted }
             } else {
                 items = try await dependencies.cachedListItems(forIDs: result.items.map(\.id))
             }

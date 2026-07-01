@@ -25,10 +25,26 @@ extension SettingsViewModel {
         let reviews = try? await deps.userRatingCount()
         return ProfileStats(
             totalCooks: CookLogStats.totalCooks(logs),
-            weeklyStreak: CookLogStats.currentWeeklyStreak(logs, asOf: Date()),
+            // DUT-427: use the same pinned calendar the Cooking Journal uses so the
+            // streak reads identically in both places (locale-independent) — the
+            // default `Calendar.current` follows device locale and diverges.
+            weeklyStreak: CookLogStats.currentWeeklyStreak(
+                logs,
+                asOf: Date(),
+                calendar: Self.streakCalendar
+            ),
             savedRecipes: saved,
             reviewsWritten: reviews
         )
+    }
+
+    /// DUT-427: the pinned Sunday-first Gregorian calendar the weekly-streak buckets
+    /// must use everywhere (matches `CookJournalView`), so the number never drifts by
+    /// device locale.
+    static var streakCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = 1
+        return calendar
     }
 
     /// Cook log for the journal sheet presented from the profile stats link.

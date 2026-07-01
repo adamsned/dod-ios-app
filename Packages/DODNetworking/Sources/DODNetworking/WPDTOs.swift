@@ -308,7 +308,9 @@ extension WPDTO.Post {
 
 extension WPDTO.Category {
     func toDomain() -> DODDomain.Category {
-        DODDomain.Category(id: id, name: name, slug: slug, count: count)
+        // DUT-426: sanitize like every other WP string — category names come
+        // HTML-encoded ("Breads &amp; Rolls").
+        DODDomain.Category(id: id, name: HTMLSanitizer.plainText(from: name), slug: slug, count: count)
     }
 }
 
