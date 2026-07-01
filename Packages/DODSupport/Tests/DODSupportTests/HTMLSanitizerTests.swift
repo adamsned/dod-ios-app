@@ -48,4 +48,32 @@ import Testing
         let result = HTMLSanitizer.plainText(from: "Read &foobar; about it")
         #expect(result == "Read &foobar; about it")
     }
+
+    // MARK: - DUT-389: comment stripping
+
+    @Test func stripsSimpleHTMLComment() {
+        let result = HTMLSanitizer.plainText(from: "<p>Before<!-- hidden -->After</p>")
+        #expect(result == "BeforeAfter")
+    }
+
+    @Test func commentWithInnerAngleBracketDoesNotLeak() {
+        // The inner `>` must NOT terminate the comment early and leak "b -->".
+        let result = HTMLSanitizer.plainText(from: "<p>x<!-- a > b -->y</p>")
+        #expect(result == "xy")
+    }
+
+    @Test func commentWithInnerDivDoesNotLeak() {
+        let result = HTMLSanitizer.plainText(from: "A<!-- <div id=ad> --><p>B</p>")
+        #expect(result == "AB")
+    }
+
+    @Test func unterminatedCommentDropsToEnd() {
+        // Mirrors the unterminated-<script> policy: drop the remainder.
+        let result = HTMLSanitizer.plainText(from: "Keep<!-- never closes and runs on")
+        #expect(result == "Keep")
+    }
+
+    @Test func strippingCommentsLeavesNonCommentInputUntouched() {
+        #expect(HTMLSanitizer.strippingComments("<p>no comments here</p>") == "<p>no comments here</p>")
+    }
 }

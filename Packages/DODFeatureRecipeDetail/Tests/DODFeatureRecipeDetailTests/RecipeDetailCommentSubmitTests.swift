@@ -97,9 +97,19 @@ struct RecipeDetailCommentSubmitTests {
         // the "Awaiting approval" badge.
         #expect(viewModel.comments.first?.id == 5001)
         #expect(viewModel.comments.first?.status == .hold)
-        // The pending comment was cached so a relaunch keeps showing it.
-        let cachedWrite = dependencies.cachedCommentWrites.last
-        #expect(cachedWrite?.comments.first?.id == 5001)
+        // DUT-387: the held comment is cached into the PENDING bucket (not as a
+        // normal public row), so a relaunch keeps showing it with the "Awaiting
+        // approval" badge and it's dropped/flipped rather than stuck forever.
+        let pendingWrite = dependencies.cachedPendingCommentWrites.last
+        #expect(pendingWrite?.comment.id == 5001)
+        #expect(pendingWrite?.postID == 80)
+        // And the held comment is NOT written to the normal (approved) cache —
+        // that's the DUT-387 defect (it made a rejected comment stick forever).
+        #expect(
+            dependencies.cachedCommentWrites.allSatisfy { write in
+                !write.comments.contains { $0.id == 5001 }
+            }
+        )
     }
 
     /// DUT-27 (build 8): a 409 that carries the WordPress "Duplicate comment

@@ -361,8 +361,11 @@ public struct RecipeDetailRatingsSection: View {
                     .foregroundStyle(DODColor.labelSecondary)
             } else {
                 LazyVStack(alignment: .leading, spacing: DODSpacing.md) {
-                    ForEach(viewModel.comments) { comment in
-                        commentRow(for: comment)
+                    // DUT-392: render threaded — replies nest indented beneath
+                    // the comment they answer instead of floating mid-thread.
+                    ForEach(CommentThreader.thread(viewModel.comments)) { threaded in
+                        commentRow(for: threaded.comment)
+                            .padding(.leading, threaded.isReply ? DODSpacing.lg : 0)
                     }
                 }
             }

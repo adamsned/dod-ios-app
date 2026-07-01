@@ -103,6 +103,14 @@ public protocol RecipeDetailDependencies: Sendable {
     /// at the call site.
     func cacheComments(_ comments: [RecipeComment], postID: Int) async
 
+    /// DUT-387 — persist a just-submitted held (non-approved) comment into the
+    /// **pending** bucket (`isPendingFromThisDevice: true`), NOT as a normal
+    /// public row. A pending row is filtered from the public reader UI and is
+    /// overwritten to approved when a later fetch returns it; caching it as a
+    /// normal row (via ``cacheComments(_:postID:)``) leaves a rejected comment
+    /// stuck in the cache forever. A default no-op keeps fakes compiling.
+    func cachePendingComment(_ comment: RecipeComment, postID: Int) async
+
     /// POST a new comment. Returns the comment WP echoed back — the view
     /// model branches on `status` to decide between "Posted" and
     /// "Awaiting approval" copy. Sends the
@@ -150,6 +158,11 @@ extension RecipeDetailDependencies {
     /// compiling. ``LiveRecipeDetailDependencies`` overrides to route to
     /// ``RecipeStore/logCook(_:)``.
     public func logCook(_ entry: CookLogEntry) async throws {}
+
+    /// DUT-387 — default no-op so fakes that don't model the pending-comment
+    /// bucket keep compiling. ``LiveRecipeDetailDependencies`` overrides to
+    /// route to ``RecipeStore/upsertPendingComment(_:)``.
+    public func cachePendingComment(_ comment: RecipeComment, postID: Int) async {}
 
     // US-44 / CL-138 / DUT-36 Phase c profile-gate defaults
     // (`loadUserProfile()`, `profileStoreForGate`,

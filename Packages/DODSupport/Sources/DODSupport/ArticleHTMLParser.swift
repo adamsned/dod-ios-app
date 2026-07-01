@@ -14,8 +14,9 @@ public enum ArticleHTMLParser {
     public static func parse(html: String) -> [ArticleBlock] {
         // Scope to the WP body wrapper when present; else scan the whole input.
         let scoped = ArticleBodyExtractor.extractEntryContentSlice(in: html) ?? html
+        // DUT-389: strip HTML comments first (an inner `>` / `<div` corrupts scanning).
+        var content = HTMLSanitizer.strippingComments(scoped)
         // Drop blocks that never carry renderable prose, content and all.
-        var content = scoped
         for tag in ["script", "style", "noscript", "svg"] {
             content = removeBlock(tag: tag, from: content)
         }
@@ -242,7 +243,7 @@ extension ArticleHTMLParser {
         case "/strong", "/b": state.boldDepth = max(0, state.boldDepth - 1)
         case "em", "i": state.italicDepth += 1
         case "/em", "/i": state.italicDepth = max(0, state.italicDepth - 1)
-        case "a": state.link = URL(string: HTMLSanitizer.decodingEntities(attributeValue("href", in: tagBody)))
+        case "a": state.link = Self.resolvedLinkURL(inTag: tagBody)
         case "/a": state.link = nil
         case "br", "br/": result.append(AttributedString("\n"))
         default: break
