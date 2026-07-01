@@ -22,8 +22,14 @@ extension CookModeViewModel {
         let changed = isVoiceModeEnabled != enabled
         isVoiceModeEnabled = enabled
         if enabled {
+            // DUT-390 — hold the audio session open across steps while Voice
+            // Mode is on so other audio doesn't un-duck/re-duck between reads.
+            voiceReader.setSessionHold(true)
             speakCurrentStep()
         } else {
+            // DUT-390 — stop() releases the session now; drop the hold so any
+            // later one-shot replay releases it on completion too.
+            voiceReader.setSessionHold(false)
             voiceReader.stop()
         }
         // AC-40.8 / CL-83 — report the user-driven on/off as an allowlisted
@@ -73,7 +79,15 @@ extension CookModeViewModel {
             // the em dash. On-screen copy is unaffected (TTS only).
             return isDessert ? "All done, enjoy your dessert" : "All done, enjoy your meal"
         }
-        return currentStep?.text ?? ""
+        let text = currentStep?.text ?? ""
+        // DUT-245 — read the current step in the user's chosen temperature unit
+        // so the voice matches the on-screen text (which Cook Mode + Recipe
+        // Detail both convert). `nil` preference leaves the text untouched.
+        let rawUnit = UserDefaults.standard.string(forKey: TemperatureConverter.preferenceKey)
+        guard let unit = TemperatureConverter.resolvedUnit(fromRawValue: rawUnit) else {
+            return text
+        }
+        return TemperatureConverter.converting(text, to: unit)
     }
 
     /// DUT-325 — true when this recipe is filed under the "Dessert Recipes" WP

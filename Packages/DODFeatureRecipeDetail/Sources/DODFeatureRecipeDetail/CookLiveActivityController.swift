@@ -44,7 +44,13 @@ public protocol CookLiveActivityController: AnyObject {
 @MainActor
 public final class SystemCookLiveActivityController: CookLiveActivityController {
 
-    public init() {}
+    public init() {
+        #if os(iOS)
+        if #available(iOS 16.1, *) {
+            reconcileOrphans()
+        }
+        #endif
+    }
 
     #if os(iOS)
     @available(iOS 16.1, *)
@@ -112,6 +118,29 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     }
 
     #if os(iOS)
+    /// DUT-309 — ActivityKit Live Activities outlive app termination: a card
+    /// requested before a kill persists on the Lock Screen / Dynamic Island
+    /// across the relaunch. This fresh controller holds no in-memory handle for
+    /// it (the handle lived in the dead process), so it can neither update nor
+    /// end it — a stale cook timer lingers with no way to dismiss it from the
+    /// app. Called at init: with no active handle of our own, end any activity
+    /// left over from a previous process so the Lock Screen matches reality.
+    @available(iOS 16.1, *)
+    private func reconcileOrphans() {
+        guard activity == nil else { return }
+        for orphan in Activity<CookActivityAttributes>.activities {
+            Self.pushEndOrphan(orphan)
+        }
+    }
+
+    @available(iOS 16.1, *)
+    nonisolated private static func pushEndOrphan(
+        _ activity: Activity<CookActivityAttributes>
+    ) {
+        let box = UncheckedSendableActivity(activity)
+        Task { await box.activity.end(nil, dismissalPolicy: .immediate) }
+    }
+
     @available(iOS 16.1, *)
     private func endExistingActivity() {
         guard let activity else { return }

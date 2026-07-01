@@ -34,6 +34,17 @@ extension SpeechSynthesizing {
     /// empty result reads as "unknown" at the call site, which never fires the
     /// Cook Mode prompt (conservative, matching the Settings nudge posture).
     func installedVoiceDescriptors() -> [VoiceDescriptor] { [] }
+
+    /// DUT-390 — default no-op completion store. Conformers that don't model a
+    /// real synthesizer delegate (test mocks, the non-AVFoundation fallback)
+    /// inherit this; ``SystemSpeechSynthesizer`` overrides with real storage
+    /// driven by its `AVSpeechSynthesizerDelegate`.
+    var onQueueDidEmpty: (() -> Void)? {
+        get { nil }
+        // Intentional no-op: only SystemSpeechSynthesizer stores + fires it.
+        // swiftlint:disable:next unused_setter_value
+        set {}
+    }
 }
 
 #if canImport(AVFoundation)
@@ -53,9 +64,13 @@ extension SpeechSynthesizing {
 /// the selector finds no language match, so a locale with no installed voices
 /// degrades exactly as before. CL-79 / CL-109 capture the rationale.
 @MainActor
-public final class SystemSpeechSynthesizer: SpeechSynthesizing {
+public final class SystemSpeechSynthesizer: NSObject, SpeechSynthesizing {
 
     private let synthesizer = AVSpeechSynthesizer()
+
+    /// DUT-390 — fired when the queue drains (last utterance finished/cancelled)
+    /// so ``VoiceReader`` can release the audio session after a one-shot read.
+    public var onQueueDidEmpty: (() -> Void)?
 
     /// DUT-325 — the rate applied to the next utterance. Defaults to the
     /// platform default; ``VoiceReader`` nudges it (clamped) for the session.
@@ -70,7 +85,10 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
         }
     }
 
-    public init() {}
+    public override init() {
+        super.init()
+        synthesizer.delegate = self
+    }
 
     public var isSpeaking: Bool { synthesizer.isSpeaking }
 
@@ -151,6 +169,31 @@ public final class SystemSpeechSynthesizer: SpeechSynthesizing {
 
     public func continueSpeaking() {
         synthesizer.continueSpeaking()
+    }
+}
+
+// MARK: - AVSpeechSynthesizerDelegate (DUT-390)
+
+extension SystemSpeechSynthesizer: AVSpeechSynthesizerDelegate {
+
+    /// The last utterance finished on its own — the queue is now empty, so let
+    /// ``VoiceReader`` release the session. Hop to the main actor (delegate
+    /// callbacks aren't guaranteed on it) before touching isolated state.
+    public nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor in self.onQueueDidEmpty?() }
+    }
+
+    /// A `stopSpeaking(at:)` cancelled the utterance. `VoiceReader.stop()`
+    /// already releases the session on the explicit-stop path; this covers a
+    /// system-driven cancel so the callback stays symmetric with `didFinish`.
+    public nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didCancel utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor in self.onQueueDidEmpty?() }
     }
 }
 
