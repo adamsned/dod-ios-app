@@ -66,18 +66,35 @@ public enum ReliableImageConfig {
 
 /// Shared in-memory cache of decoded recipe images, keyed by absolute URL.
 /// `NSCache` is thread-safe and evicts under memory pressure.
+///
+/// DUT-251: bounded by decoded-pixel memory (`totalCostLimit`, ~64 MB) rather
+/// than object count, and each entry's cost is its decoded byte estimate
+/// (`width * height * 4`). A count limit let up to 250 full-res decodes sit in
+/// RAM regardless of total size; the cost limit caps the actual bitmap memory
+/// and lets `NSCache` evict the largest / least-recently-used entries first.
 final class RecipeImageCache: @unchecked Sendable {
     static let shared = RecipeImageCache()
     private let cache = NSCache<NSString, UIImage>()
 
-    private init() { cache.countLimit = 250 }
+    /// ~64 MB of decoded bitmaps. At the 1200px downsample ceiling a hero is
+    /// well under ~6 MB, so this holds a healthy working set for a feed scroll
+    /// while staying bounded under memory pressure.
+    private static let totalCostLimit = 64 * 1024 * 1024
+
+    private init() { cache.totalCostLimit = Self.totalCostLimit }
 
     func image(for url: URL) -> UIImage? {
         cache.object(forKey: url.absoluteString as NSString)
     }
 
     func insert(_ image: UIImage, for url: URL) {
-        cache.setObject(image, forKey: url.absoluteString as NSString)
+        let size = image.size
+        let scale = image.scale
+        let cost = ImageDownsampler.decodedByteCost(
+            width: Int(size.width * scale),
+            height: Int(size.height * scale)
+        )
+        cache.setObject(image, forKey: url.absoluteString as NSString, cost: cost)
     }
 }
 
@@ -138,13 +155,27 @@ final class ReliableImageLoader {
             phase = .failure
             return
         }
-        if let data = await provider(url), let image = UIImage(data: data) {
+        if let data = await provider(url), let image = Self.decode(data) {
             if Task.isCancelled { return }
             RecipeImageCache.shared.insert(image, for: url)
             phase = .success(Image(uiImage: image))
             return
         }
         if !Task.isCancelled { phase = .failure }
+    }
+
+    /// DUT-251: decode image bytes to a display-sized `UIImage`, downsampling
+    /// via ImageIO to the ``ImageDownsampler/maxPixelSize`` ceiling so a
+    /// full-res WP hero no longer holds a multi-MB bitmap for a card-size
+    /// render. Falls back to a plain `UIImage(data:)` decode only if ImageIO
+    /// can't produce a thumbnail (e.g. an exotic format), preserving the prior
+    /// behavior for that edge case. The DISK cache bytes are untouched — this
+    /// only bounds the in-memory decode used for display.
+    private static func decode(_ data: Data) -> UIImage? {
+        if let cgImage = ImageDownsampler.downsample(data: data) {
+            return UIImage(cgImage: cgImage)
+        }
+        return UIImage(data: data)
     }
 
     private enum FetchOutcome {
@@ -166,7 +197,7 @@ final class ReliableImageLoader {
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                 return .retry
             }
-            return UIImage(data: data).map(FetchOutcome.image) ?? .failed
+            return Self.decode(data).map(FetchOutcome.image) ?? .failed
         } catch is CancellationError {
             return .cancelled
         } catch let error as URLError where error.code == .cancelled {
