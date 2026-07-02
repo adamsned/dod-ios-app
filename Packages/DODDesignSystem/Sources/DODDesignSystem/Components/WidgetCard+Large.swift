@@ -39,8 +39,10 @@ extension WidgetCard {
                         .textCase(.uppercase)
                         .tracking(0.5)
 
+                    // DUT-479 — the large size has room, so the info reads bigger
+                    // than medium/small: a `.title3` title + a 3-line excerpt.
                     Text(content.title)
-                        .font(.system(.headline, design: .default, weight: .semibold))
+                        .font(.system(.title3, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.label)
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
@@ -50,14 +52,14 @@ extension WidgetCard {
                         Text(content.excerpt)
                             .font(.system(.subheadline, design: .default))
                             .foregroundStyle(DODColor.labelSecondary)
-                            .lineLimit(2)
+                            .lineLimit(3)
                             .minimumScaleFactor(0.7)
                             .multilineTextAlignment(.leading)
                     }
 
                     if let totalTime = content.totalTimeDisplay {
                         TimeChip(text: totalTime)
-                            .padding(.top, DODSpacing.xxs)
+                            .padding(.top, DODSpacing.xs)
                     }
                 }
                 // DUT-458 — the content region wins its space over the greedy

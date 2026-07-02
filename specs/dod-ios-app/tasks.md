@@ -3145,4 +3145,15 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-903 — Round 3 widget polish: center the home-screen Cooking Tip + bring the large featured widget in line with small/medium (CL-297 / DUT-476, DUT-478, DUT-479)
+
+- **What:** Two Round-3 refinements Spencer asked for after poking around the Round 2 build.
+  - **DUT-478 (center tip):** `WidgetCard.TipCard` centers its content (was top-leading) — drop the `Spacer`, frame alignment `.topLeading → .center`, `.multilineTextAlignment(.center)`. Applies to `.systemSmall` + `.systemMedium`.
+  - **DUT-479 (large + TimeChip):** `WidgetCard.FeaturedLarge` grows the info to use the large size's extra room — title `.headline → .title3`, excerpt `lineLimit 2 → 3`, `TimeChip` `.padding(.top, DODSpacing.xs)`; keeps the DUT-458 `.layoutPriority(1)` + `.minimumScaleFactor(0.7)` clip-guard (the large size already rendered eyebrow + title + excerpt + cook-time chip). Separately, `TimeChip` becomes rendering-mode-aware: in `.accented` (Tinted/Clear) it swaps its FILLED `castIronBrown` capsule (which flattens to a solid tint blob, hiding the cream text) for an OUTLINED capsule (`strokeBorder` `DODColor.label.opacity(0.55)`) + tint-adaptive `DODColor.label` text; `.fullColor` keeps the cream-on-brown pill. Affects the chip in Small + Medium + Large.
+- **Files:** DODDesignSystem `WidgetCard+Tip.swift` (center), `WidgetCard+Large.swift` (larger title/excerpt + chip padding), `WidgetCard.swift` (`TimeChip` accented-aware via `@Environment(\.widgetRenderingMode)`, `#if canImport(WidgetKit)`-guarded). L4: 7 baselines re-recorded by CI (local render drifts) — `tipCard_small`, `tipCard_medium`, `featuredLarge_populated`, `featuredLarge_populated_tinted`, `featuredLarge_article`, `widgetCard_small_populated_tinted`, `widgetCard_medium_populated_tinted`. Spec: `clarifications.md` (CL-297).
+- **Not in scope:** the Cooking Tip in-app popup restyle (originally DUT-477) — canceled as a duplicate of DUT-461, which ships it separately.
+- **AC:** US-9 (featured), US-23 (tinted). Linear DUT-478 + DUT-479 (parent DUT-476, Round 3); DUT-477 canceled (dup of DUT-461). CL-297 canonical. **Est:** ~2 h. **Deps:** off main (after CL-296). Branch `feat/widgets-round3-polish`. **Verification:** swift-format + SwiftLint `--strict` clean; DODDesignSystem compiles; tip centering + larger large-widget info + outlined tinted chip eyeballed via a local record. L4 baselines CI-recorded (local render drifts). Tinted chip best confirmed in an Xcode-signed widget run.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
