@@ -139,6 +139,11 @@ public enum WidgetKind: String, Sendable, Hashable, CaseIterable {
     /// US-17 (T-321). Covers both the per-row recipe tap and the
     /// chrome / empty-state tap that lands on `dod://saved`.
     case saved
+
+    /// Cooking Tip widget (inline + home-screen small/medium) — a
+    /// `dod://tip/<index>` tap that opens the full tip in a dialog
+    /// (DUT-457 / DUT-459).
+    case cookingTip
 }
 
 /// Closed-set category for a `syncFailed` event (US-41 / AC-41.9). The wire

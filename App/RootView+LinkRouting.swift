@@ -1,3 +1,4 @@
+import DODAnalytics
 import DODSupport
 import SwiftUI
 
@@ -8,6 +9,35 @@ import SwiftUI
 // `RootView` for exactly this cross-file access.
 
 extension RootView {
+
+    /// Widget URL handler (spec.md US-9 AC-9.2, US-17 AC-17.4). Recipe + feed
+    /// routes switch to Feed and hand the link to the TabStack via
+    /// `pendingDeepLink`; the saved route switches tabs; the tip route (DUT-457)
+    /// shows the full cooking tip in a dialog. Fires `widgetOpened(kind:,
+    /// recipeID:)` once per consumed link (T-323 / AC-17.9). Moved here from
+    /// `RootView.swift` for the file_length cap (DUT-457).
+    func handle(widgetLink link: WidgetDeepLink) {
+        Telemetry.shared.send(.widgetOpened(kind: link.widgetKind, recipeID: link.recipeID))
+        switch link {
+        case .saved:
+            selectedTab = .saved
+        case .feed:
+            selectedTab = .feed
+            pendingDeepLink = link
+        case .recipe(let id, _):
+            // DUT-358: route a widget recipe tap through the App-Intent fetch-on-miss
+            // resolver, so a cache + snapshot double-miss fetches the recipe instead
+            // of `TabStack.consume` silently dropping the tap.
+            selectedTab = .feed
+            handle(intent: .openRecipe(id: id))
+        case .tip(let index):
+            // DUT-457 — show the full tip (widget truncated it) in a dialog.
+            if let tip = CookingTip.tip(atIndex: index) {
+                tipDialogText = tip
+                showTipDialog = true
+            }
+        }
+    }
 
     /// The external-route sink for one tab. Feed/Saved/Search each own a
     /// sink so both layouts (phone tabs + iPad split detail) can hand every

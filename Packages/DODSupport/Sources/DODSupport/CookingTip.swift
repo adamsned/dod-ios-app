@@ -30,7 +30,20 @@ public enum CookingTip {
     /// injectable so the L1 suite can pin the rotation.
     public static func tip(for date: Date, calendar: Calendar = .current) -> String {
         guard !all.isEmpty else { return "" }
+        return all[index(for: date, calendar: calendar)]
+    }
+
+    /// The rotation index for a given day (DUT-457) — carried in the widget's
+    /// `dod://tip/<index>` deep link so the app can show the full tip.
+    public static func index(for date: Date, calendar: Calendar = .current) -> Int {
+        guard !all.isEmpty else { return 0 }
         let day = calendar.ordinality(of: .day, in: .era, for: date) ?? 0
-        return all[day % all.count]
+        return day % all.count
+    }
+
+    /// Safe lookup by index (DUT-457) — `nil` when out of range (e.g. a widget
+    /// built by a newer binary with more tips deep-links into an older app).
+    public static func tip(atIndex index: Int) -> String? {
+        all.indices.contains(index) ? all[index] : nil
     }
 }

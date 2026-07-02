@@ -13,11 +13,12 @@ import WidgetKit
 /// lock-screen kinds go last so existing installs see the same first-
 /// two ordering they had before T-370.
 ///
-/// `.accessoryInline` ships in DUT-454 as ``CookingTipInlineWidget`` (a daily
-/// cooking tip beside the clock). (`.systemLarge` shipped in CL-165;
-/// `.accessoryCircular` shipped as a Saved shortcut per CL-168.)
+/// The daily ``CookingTipWidget`` ships `.accessoryInline` (DUT-454) plus
+/// `.systemSmall` + `.systemMedium` home-screen cards (DUT-459). (`.systemLarge`
+/// shipped in CL-165; `.accessoryCircular` shipped as a Saved shortcut per
+/// CL-168.)
 ///
-/// Spec trace: US-9, US-17 (AC-17.1), US-22 (AC-22.1, AC-22.7); DUT-454.
+/// Spec trace: US-9, US-17 (AC-17.1), US-22 (AC-22.1, AC-22.7); DUT-454, DUT-459.
 @main
 struct DODAppWidgetBundle: WidgetBundle {
     var body: some Widget {
@@ -25,6 +26,6 @@ struct DODAppWidgetBundle: WidgetBundle {
         SavedRecipesWidget()
         LatestRecipeLockScreenWidget()
         SavedLockScreenWidget()
-        CookingTipInlineWidget()
+        CookingTipWidget()
     }
 }

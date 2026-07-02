@@ -123,6 +123,10 @@ public enum WidgetDeepLinkParser {
         case recipe(id: Int, source: Source = .featured)
         case feed
         case saved
+        /// `dod://tip/<index>` (DUT-457). The Cooking Tip widget's tap — the app
+        /// shows the full tip (`CookingTip.all[index]`) in a dialog on open. The
+        /// index is the day's tip index the widget was showing.
+        case tip(index: Int)
     }
 
     /// Returns `nil` for any URL we don't recognize so callers never spawn
@@ -145,6 +149,11 @@ public enum WidgetDeepLinkParser {
             let trimmed = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             guard trimmed.isEmpty else { return nil }
             return .saved
+        case "tip":
+            // `dod://tip/<index>` (DUT-457) — a non-negative tip index.
+            let trimmed = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard let index = Int(trimmed), index >= 0 else { return nil }
+            return .tip(index: index)
         default:
             return nil
         }

@@ -32,6 +32,8 @@ extension WidgetDeepLink {
             .saved
         case .recipe(_, let source):
             source == .saved ? .saved : .featured
+        case .tip:
+            .cookingTip
         }
     }
 
@@ -40,7 +42,7 @@ extension WidgetDeepLink {
     var recipeID: Int? {
         switch self {
         case .recipe(let id, _): id
-        case .feed, .saved: nil
+        case .feed, .saved, .tip: nil
         }
     }
 }

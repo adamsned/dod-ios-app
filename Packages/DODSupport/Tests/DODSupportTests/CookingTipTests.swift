@@ -38,4 +38,22 @@ struct CookingTipTests {
         let afterCycle = try #require(cal.date(byAdding: .day, value: CookingTip.all.count, to: day0))
         #expect(CookingTip.tip(for: day0, calendar: cal) == CookingTip.tip(for: afterCycle, calendar: cal))
     }
+
+    // DUT-457 — index carried in the tap deep link resolves back to the tip.
+    @Test func indexResolvesBackToTheSameTip() {
+        let cal = utc
+        let idx = CookingTip.index(for: day0, calendar: cal)
+        #expect(CookingTip.tip(atIndex: idx) == CookingTip.tip(for: day0, calendar: cal))
+    }
+
+    @Test func indexIsInBounds() {
+        let cal = utc
+        #expect(CookingTip.all.indices.contains(CookingTip.index(for: day0, calendar: cal)))
+    }
+
+    @Test func tipAtIndexGuardsOutOfRange() {
+        #expect(CookingTip.tip(atIndex: -1) == nil)
+        #expect(CookingTip.tip(atIndex: CookingTip.all.count) == nil)
+        #expect(CookingTip.tip(atIndex: 0) == CookingTip.all.first)
+    }
 }

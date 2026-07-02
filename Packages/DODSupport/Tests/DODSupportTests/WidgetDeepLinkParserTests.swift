@@ -18,6 +18,24 @@ import Testing
         #expect(WidgetDeepLinkParser.parse(url) == .feed)
     }
 
+    // DUT-457 — the Cooking Tip widget's `dod://tip/<index>` route.
+    @Test func parsesTipRouteWithIndex() throws {
+        let url = try #require(URL(string: "dod://tip/5"))
+        #expect(WidgetDeepLinkParser.parse(url) == .tip(index: 5))
+    }
+
+    @Test func parsesTipRouteZeroIndex() throws {
+        let url = try #require(URL(string: "dod://tip/0"))
+        #expect(WidgetDeepLinkParser.parse(url) == .tip(index: 0))
+    }
+
+    @Test func rejectsNonNumericOrNegativeTipIndex() throws {
+        let bad = try #require(URL(string: "dod://tip/abc"))
+        #expect(WidgetDeepLinkParser.parse(bad) == nil)
+        let negative = try #require(URL(string: "dod://tip/-1"))
+        #expect(WidgetDeepLinkParser.parse(negative) == nil)
+    }
+
     @Test func schemeIsCaseInsensitive() throws {
         let url = try #require(URL(string: "DOD://recipe/12"))
         #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 12))
