@@ -120,8 +120,7 @@ extension WidgetCard {
     /// the `AccessoryWidgetBackground` disc + `.widgetAccentable()` tint pass.
     public struct LockScreenCircularBookmark: View {
 
-        /// Saved-recipe count shown inside the bookmark (DUT-453). `nil`/0 →
-        /// the plain bookmark shortcut (unchanged from DUT-77).
+        /// Saved-recipe count shown inside the bookmark (DUT-453). `nil` → 0.
         public let count: Int?
 
         public init(count: Int? = nil) {
@@ -129,29 +128,25 @@ extension WidgetCard {
         }
 
         public var body: some View {
-            if let count, count > 0 {
-                // DUT-453 — knock the count OUT of the filled bookmark so the
-                // number reads as the accessory disc / wallpaper behind it. A
-                // plain overlay would paint number + glyph in the same tint
-                // color (invisible); `.destinationOut` + `compositingGroup`
-                // carves it, surviving the monochrome tint pass.
-                ZStack {
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 38, weight: .semibold))
-                    Text(Self.badge(count))
-                        .font(.system(size: 15, weight: .heavy))
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                        .blendMode(.destinationOut)
-                        .offset(y: -3)  // bookmark's visual center sits above middle
-                }
-                .compositingGroup()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
+            // DUT-453 — knock the count OUT of the filled bookmark so the number
+            // reads as the accessory disc / wallpaper behind it. A plain overlay
+            // would paint number + glyph in the same tint color (invisible);
+            // `.destinationOut` + `compositingGroup` carves it, surviving the
+            // monochrome tint pass.
+            // DUT-456 — always show the count (including 0) at the SAME glyph size,
+            // so the empty state doesn't shrink/jump vs. a populated count.
+            ZStack {
                 Image(systemName: "bookmark.fill")
-                    .font(.system(size: 24, weight: .semibold))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .font(.system(size: 38, weight: .semibold))
+                Text(Self.badge(count ?? 0))
+                    .font(.system(size: 15, weight: .heavy))
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .blendMode(.destinationOut)
+                    .offset(y: -3)  // bookmark's visual center sits above middle
             }
+            .compositingGroup()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
 
         /// The count string that fits inside the glyph — caps at "99+".

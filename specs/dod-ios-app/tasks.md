@@ -3115,4 +3115,14 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-900 — Widget Round 2 fixes: Saved bookmark "0" at consistent size + large-widget clipping (CL-294 / DUT-455, DUT-456, DUT-458)
+
+- **What:** Two view-only widget fixes (parent DUT-455).
+  - **DUT-456** — `WidgetCard.LockScreenCircularBookmark` now always renders the count (including **0**) knocked out of the bookmark at the SAME 38pt glyph size; removed the old `count > 0` branch that fell back to a smaller plain bookmark, so the empty state no longer shrinks/jumps.
+  - **DUT-458** — `WidgetCard.FeaturedLarge` no longer clips on `.systemLarge` with long real-world content / large Dynamic Type: replaced DUT-75's `.fixedSize(vertical:)` (which forced the natural height and could push the last excerpt line / time chip past the frame) with `.layoutPriority(1)` on the content region + `.minimumScaleFactor(0.7)` on the title + excerpt, so text scales to fit instead of clipping and the hero shrinks toward the remainder.
+- **Files:** DODDesignSystem `WidgetCard+LockScreen.swift` (bookmark), `WidgetCard+Large.swift` (FeaturedLarge); `WidgetLargeSnapshotTests.swift` fixture stressed to a 2-full-line title + 2-line excerpt. L4 baselines re-recorded by CI: `test_lockScreenWidget_circularBookmark` (now "0"), `test_featuredLarge_populated`, `test_featuredLarge_populated_tinted`. Spec: `clarifications.md` (CL-294).
+- **AC:** US-22 / US-9 (widgets). Linear DUT-456 + DUT-458. CL-294 canonical. **Est:** ~1.5 h. **Deps:** off main (after CL-293). Branch `feat/widgets-round2-fixes`. **Verification:** swift-format + SwiftLint clean; DODDesignSystem builds; both renders eyeballed via a local record (bookmark shows "0" at consistent size; stressed large content fits, no clip). L4 baselines re-recorded by CI (local render drifts).
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
