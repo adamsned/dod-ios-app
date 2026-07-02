@@ -31,7 +31,7 @@ enum HTMLEntityDecoder {
     ]
 
     /// Decode the HTML entities in `string` into their Unicode characters.
-    /// Three passes, in order:
+    /// Passes, in order:
     ///
     /// 1. Numeric references — decimal `&#NNNN;` and hex `&#xHHHH;` — resolved
     ///    via the referenced Unicode scalar (e.g. `&#8217;` → `’`, the right
@@ -39,8 +39,21 @@ enum HTMLEntityDecoder {
     /// 2. The common named entities in ``namedEntities``.
     /// 3. `&amp;` last, so the ampersand it stands for cannot re-form an
     ///    entity from an earlier pass; a literal `&amp;` collapses to `&`.
+    /// 4. DUT-394: one more numeric+named pass, because WP REST bodies routinely
+    ///    double-encode (`&amp;#8217;`). After step 3 turns that into `&#8217;`,
+    ///    this second pass resolves it to `’`. This unwinds exactly ONE level of
+    ///    double encoding; deeper nesting is left as-is.
     static func decode(_ string: String) -> String {
         guard string.contains("&") else { return string }
+        let firstPass = resolvePass(string)
+        guard firstPass.contains("&") else { return firstPass }
+        return resolvePass(firstPass)
+    }
+
+    /// One full decode pass: numeric references, then the named-entity table,
+    /// then `&amp;` → `&` last so the ampersand it stands for cannot re-form an
+    /// entity resolved earlier in the same pass.
+    private static func resolvePass(_ string: String) -> String {
         var result = decodeNumericReferences(string)
         for (entity, replacement) in namedEntities {
             result = result.replacingOccurrences(of: entity, with: replacement)

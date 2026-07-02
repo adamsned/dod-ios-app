@@ -62,12 +62,21 @@ struct HTMLEntityDecoderTests {
         #expect(HTMLEntityDecoder.decode("More&hellip;") == "More\u{2026}")
     }
 
-    /// `&amp;` collapses to a single `&` and is decoded last, so an
-    /// already-escaped `&amp;#8217;` first becomes `&#8217;` (the literal
-    /// text), not a decoded curly quote — we do not double-decode.
-    @Test func ampersandDecodesLastAndDoesNotDoubleDecode() {
+    /// `&amp;` collapses to a single `&`, and a lone literal `&amp;` stays a
+    /// single `&` (the second pass finds no further entity to resolve).
+    @Test func ampersandDecodesToSingleAmpersand() {
         #expect(HTMLEntityDecoder.decode("Tom &amp; Jerry") == "Tom & Jerry")
-        #expect(HTMLEntityDecoder.decode("&amp;#8217;") == "&#8217;")
+        #expect(HTMLEntityDecoder.decode("&amp;") == "&")
+    }
+
+    /// DUT-394: WP REST comment/error bodies routinely double-encode. A second
+    /// numeric+named pass unwinds exactly one level, so `&amp;#8217;` becomes
+    /// the curly apostrophe (not the leaked literal `&#8217;`), and `&amp;amp;`
+    /// collapses all the way to a single `&`.
+    @Test func oneLevelOfDoubleEncodingIsUnwound() {
+        #expect(HTMLEntityDecoder.decode("you&amp;#8217;ve") == "you\u{2019}ve")
+        #expect(HTMLEntityDecoder.decode("&amp;#8217;") == "\u{2019}")
+        #expect(HTMLEntityDecoder.decode("&amp;amp;") == "&")
     }
 
     // MARK: - Pass-through

@@ -84,11 +84,12 @@ public struct WPRestClient: Sendable {
         }
     }
 
-    /// Parse WP's `X-WP-TotalPages` header, defaulting to 1 when absent or
-    /// unparseable (DUT-237).
+    /// Parse WP's `X-WP-TotalPages` header, defaulting to 1 when absent,
+    /// unparseable, or non-positive (DUT-237, DUT-397 — a present `"0"` must
+    /// still clamp to 1 to honor the documented "at least one page" contract).
     static func parseTotalPages(_ response: HTTPURLResponse) -> Int {
         guard let raw = response.value(forHTTPHeaderField: "X-WP-TotalPages"),
-            let pages = Int(raw)
+            let pages = Int(raw), pages >= 1
         else {
             return 1
         }

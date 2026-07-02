@@ -338,7 +338,7 @@ public actor RecipeStore {
             excerpt: row.excerptText,
             heroImage: row.heroImageURLString.flatMap { URL(string: $0) },
             publishedAt: row.publishedAt,
-            totalTimeDisplay: row.totalSeconds.map(formatTime),
+            totalTimeDisplay: row.totalSeconds.flatMap(formatTime),
             canonicalURL: row.canonicalURLString.isEmpty ? nil : URL(string: row.canonicalURLString)
         )
     }
@@ -390,11 +390,14 @@ public actor RecipeStore {
     }
 }
 
-private func formatTime(seconds: Int) -> String {
+/// DUT-373: `<= 0`s → `nil` (no chip), `1...59`s → `"<1 min"`, spaced hour form.
+func formatTime(seconds: Int) -> String? {
+    guard seconds > 0 else { return nil }
     let minutes = seconds / 60
+    if minutes == 0 { return "<1 min" }
     if minutes < 60 { return "\(minutes) min" }
     let hours = minutes / 60
     let remainder = minutes % 60
     if remainder == 0 { return "\(hours) hr" }
-    return "\(hours)h \(remainder)m"
+    return "\(hours) hr \(remainder) min"
 }

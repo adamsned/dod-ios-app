@@ -241,6 +241,47 @@ import Testing
     }
 }
 
+/// DUT-397: the header parser documents "default to 1 when absent or
+/// unparseable", so a present `"0"` (or negative) must also clamp to 1 rather
+/// than return the self-contradictory 0.
+@Suite("WPRestClient.parseTotalPages") struct WPRestClientTotalPagesTests {
+
+    private static let url = URL(string: "https://example.com") ?? URL(filePath: "/dev/null")
+
+    private func response(totalPages: String?) throws -> HTTPURLResponse {
+        var headers: [String: String] = [:]
+        if let totalPages { headers["X-WP-TotalPages"] = totalPages }
+        return try #require(
+            HTTPURLResponse(
+                url: Self.url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: headers
+            )
+        )
+    }
+
+    @Test func parsesAPresentPositiveHeader() throws {
+        #expect(WPRestClient.parseTotalPages(try response(totalPages: "7")) == 7)
+    }
+
+    @Test func defaultsToOneWhenHeaderAbsent() throws {
+        #expect(WPRestClient.parseTotalPages(try response(totalPages: nil)) == 1)
+    }
+
+    @Test func defaultsToOneWhenHeaderUnparseable() throws {
+        #expect(WPRestClient.parseTotalPages(try response(totalPages: "abc")) == 1)
+    }
+
+    @Test func clampsPresentZeroHeaderToOne() throws {
+        #expect(WPRestClient.parseTotalPages(try response(totalPages: "0")) == 1)
+    }
+
+    @Test func clampsNegativeHeaderToOne() throws {
+        #expect(WPRestClient.parseTotalPages(try response(totalPages: "-3")) == 1)
+    }
+}
+
 // MARK: - helpers
 
 private func makeClient(stubURL: String, json: String) async -> WPRestClient {
