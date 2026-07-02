@@ -22,6 +22,20 @@ extension RootView {
         }
     }
 
+    /// DUT-250 — the hoisted navigation-stack binding for one tab. The paths
+    /// live in `RootView`'s `tabPaths` dictionary (which survives the iPad
+    /// size-class flip), and each `TabStack` reads/writes its slot through this
+    /// binding instead of owning a local `@State`. A `get` on a missing key
+    /// returns an empty stack; the `set` writes the slot back. Both layouts
+    /// (phone tabs + iPad split detail) call this so a pushed detail persists
+    /// across the compact↔regular tree swap.
+    func pathBinding(for tab: AppTab) -> Binding<[RecipeRoute]> {
+        Binding(
+            get: { tabPaths[tab] ?? [] },
+            set: { tabPaths[tab] = $0 }
+        )
+    }
+
     /// Custom `openURL` handler for in-app article recipe links. A
     /// `dutchovendaddy.com` recipe link is resolved to its post and pushed
     /// into the CURRENT tab's stack (DUT-243 — reading a round-up in Saved
