@@ -75,6 +75,12 @@ extension ProfileEditView {
             case .emailInvalid:
                 emailValidationError = "Enter a valid email address."
             }
+            // DUT-410 — the inline error lands far from the focused field, so
+            // announce it to VoiceOver too (SwiftUI's AccessibilityNotification,
+            // not UIAccessibility — the macOS test slice must compile).
+            if let emailValidationError {
+                AccessibilityNotification.Announcement(emailValidationError).post()
+            }
         } catch {
             saveError = "Couldn't Save Your Profile. Try Again."
         }

@@ -93,6 +93,12 @@ public struct RecipeDetailView: View {
         .onChange(of: viewModel.loadState) { _, newValue in
             handleLoadStateChange(newValue)
         }
+        // DUT-315 — a recipe swapped in AFTER `.ready` (no loadState transition)
+        // must still re-seed the stepper to the new source yield; keyed on the
+        // changed yield so it doesn't clobber the user's manual edits.
+        .onChange(of: viewModel.recipe?.servings) { _, _ in
+            viewModel.resyncServingsIfSourceYieldChanged()
+        }
         // DUT-84 — offline guard on the toolbar download toggle's remove path.
         .modifier(OfflineRemoveDownloadWarningModifier(viewModel: viewModel))
     }

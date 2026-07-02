@@ -91,10 +91,24 @@ extension RecipeDetailViewModel {
             // post the comment so the comment's snackbar is the final, primary
             // confirmation the user sees. The rating step is quiet on its own —
             // it never overwrites the comment's success/failure message.
+            var ratingRecorded = false
             if hasRating {
-                await recordRatingAlongsideComment(stars: pendingUserRating)
+                ratingRecorded = await recordRatingAlongsideComment(stars: pendingUserRating)
             }
+            // DUT-395: a failed comment POST preserves the draft (success
+            // clears it). Capture the draft state around the call so we can tell
+            // the two apart without a separate flag.
+            let draftBefore = commentDraft
             await submitComment()
+            let commentFailed = !draftBefore.isEmpty && commentDraft == draftBefore
+            // DUT-395: when the rating landed but the comment then failed, the
+            // rating is silently saved behind a bare comment-error snackbar.
+            // Replace it so the user knows their stars stuck and only the
+            // comment needs a retry.
+            if ratingRecorded, commentFailed {
+                snackbarMessage =
+                    "Your rating was saved, but the comment didn't post — try again."
+            }
         } else {
             await submitRating(stars: pendingUserRating)
         }
@@ -113,11 +127,16 @@ extension RecipeDetailViewModel {
     /// rating" when the comment itself succeeded. So this path updates the
     /// summary + caches the new aggregate on success and only LOGS on failure
     /// — the comment, which lands on its own POST, is unaffected either way.
-    func recordRatingAlongsideComment(stars: Int) async {
-        guard (1...5).contains(stars) else { return }
+    ///
+    /// DUT-395: returns `true` iff the rating POST succeeded, so the combined
+    /// flow can detect a rating-saved-but-comment-failed half-state and message
+    /// it (the helper itself stays snackbar-silent).
+    @discardableResult
+    func recordRatingAlongsideComment(stars: Int) async -> Bool {
+        guard (1...5).contains(stars) else { return false }
         let name = commentAuthorName.trimmingCharacters(in: .whitespacesAndNewlines)
         let email = commentAuthorEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, !email.isEmpty else { return }
+        guard !name.isEmpty, !email.isEmpty else { return false }
         do {
             let updated = try await dependencies.postRating(
                 recipeID: listItem.id,
@@ -131,6 +150,7 @@ extension RecipeDetailViewModel {
             // POST) never blanks the user's just-submitted vote.
             pendingUserRating = stars
             await applyRatingRefresh(updated)
+            return true
         } catch {
             // Quiet on failure: the comment POST owns the user-facing result,
             // and the rating can be re-submitted from the stars control. Log
@@ -138,6 +158,7 @@ extension RecipeDetailViewModel {
             DODLog.network.error(
                 "rating-alongside-comment failed: \(String(describing: error))"
             )
+            return false
         }
     }
 

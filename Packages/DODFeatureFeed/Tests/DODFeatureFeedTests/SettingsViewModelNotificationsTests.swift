@@ -72,6 +72,47 @@ struct SettingsViewModelNotificationsTests {
         #expect(viewModel.snackbarMessage != nil)
     }
 
+    /// DUT-430 — the recipe-drop toggle is now an `@Observable` stored
+    /// property (was computed-over-`defaults`, which `@Observable` couldn't
+    /// track). A denied enable must both revert the in-memory flag to OFF AND
+    /// persist OFF via `didSet` — without relying on a nearby snackbar write to
+    /// force the re-render, the exact bug the promotion fixes.
+    @Test func setNotificationsEnabledOnDenyRevertsAndPersistsOff() async throws {
+        let defaults = Self.isolatedDefaults()
+        let viewModel = SettingsViewModel(
+            defaults: defaults,
+            requestNotificationAuthorization: { false }
+        )
+
+        let granted = await viewModel.setNotificationsEnabled(true)
+        #expect(granted == false)
+        // In-memory flag reverted to OFF (observable stored property).
+        #expect(viewModel.notificationsEnabled == false)
+        // And `didSet` persisted the reverted value.
+        #expect(defaults.bool(forKey: SettingsViewModel.notificationsEnabledKey) == false)
+        #expect(viewModel.snackbarMessage != nil)
+    }
+
+    /// DUT-430 — a granted enable persists via `didSet` and survives across
+    /// view-model instances (the stored property is seeded from `defaults` in
+    /// `init`), proving the promotion kept the persistence semantics intact.
+    @Test func setNotificationsEnabledOnGrantPersistsAndRoundTrips() async throws {
+        let defaults = Self.isolatedDefaults()
+        let viewModel = SettingsViewModel(
+            defaults: defaults,
+            requestNotificationAuthorization: { true }
+        )
+
+        let granted = await viewModel.setNotificationsEnabled(true)
+        #expect(granted == true)
+        #expect(viewModel.notificationsEnabled == true)
+        #expect(defaults.bool(forKey: SettingsViewModel.notificationsEnabledKey) == true)
+
+        // Seeded from defaults on the next instance.
+        let next = SettingsViewModel(defaults: defaults)
+        #expect(next.notificationsEnabled == true)
+    }
+
     @Test func setCommentReplyNotificationsEnabledOffPersistsFalseWithoutAuth() async throws {
         let defaults = Self.isolatedDefaults()
         // Seed it ON, then turn OFF — the OFF path must not call auth.

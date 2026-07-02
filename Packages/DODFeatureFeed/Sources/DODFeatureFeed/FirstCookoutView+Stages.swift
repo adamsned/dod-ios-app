@@ -59,6 +59,10 @@ extension FirstCookoutView {
     @ViewBuilder var photoSaveErrorSnackbar: some View {
         if let message = photoSaveError {
             Snackbar(message: message)
+                // DUT-422 — re-identify per message so a new error text drives a
+                // fresh appearance + a restarted auto-dismiss timer (mirrors
+                // SettingsView / DUT-362 / DUT-419).
+                .id(message)
                 .padding(.bottom, DODSpacing.md)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .onTapGesture { photoSaveError = nil }
@@ -88,16 +92,19 @@ extension FirstCookoutView {
             Text(title)
                 .dodFont(DODType.bodyEmphasized)
                 .foregroundStyle(DODColor.label)
-            ForEach(items, id: \.self) { item in
-                checklistRow(item)
+            // DUT-374 — key by section + index, not the ingredient string, so a
+            // recipe that lists the same item twice (e.g. two "1 cup water" lines)
+            // gets independent ticks instead of toggling every duplicate together.
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                checklistRow(item, key: "\(title)#\(index)")
             }
         }
     }
 
-    private func checklistRow(_ item: String) -> some View {
-        let isChecked = checkedItems.contains(item)
+    private func checklistRow(_ item: String, key: String) -> some View {
+        let isChecked = checkedItems.contains(key)
         return Button {
-            if isChecked { checkedItems.remove(item) } else { checkedItems.insert(item) }
+            if isChecked { checkedItems.remove(key) } else { checkedItems.insert(key) }
         } label: {
             HStack(spacing: DODSpacing.sm) {
                 Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
