@@ -26,16 +26,29 @@ public struct SavedRecipesWidgetSnapshot: Codable, Sendable, Equatable {
     public let schemaVersion: Int
     public let writtenAt: Date
     public let entries: [Entry]
+    /// DUT-453 — the TRUE total number of saved recipes, independent of the
+    /// 5-entry `entries` cap (the lock-screen Saved widget shows this count in
+    /// the bookmark). Optional + defaulted so it stays backward-compatible with
+    /// v1 payloads written before this field existed (no schema bump): an old
+    /// payload decodes with `totalCount == nil`, and readers fall back to
+    /// `entries.count`.
+    public let totalCount: Int?
 
     public init(
         schemaVersion: Int = SavedRecipesWidgetSnapshot.currentSchemaVersion,
         writtenAt: Date,
-        entries: [Entry]
+        entries: [Entry],
+        totalCount: Int? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.writtenAt = writtenAt
         self.entries = entries
+        self.totalCount = totalCount
     }
+
+    /// The count to display: the true total when known, else the (capped)
+    /// entry count — never negative.
+    public var displayCount: Int { totalCount ?? entries.count }
 
     public struct Entry: Codable, Sendable, Equatable, Identifiable {
         /// WordPress recipe ID — same identifier used by the
@@ -115,14 +128,24 @@ extension WidgetSnapshotStore {
     /// and write it. Caps at ``SavedRecipesWidgetSnapshotConfig/maxEntries``
     /// and sorts by `savedAt` descending so the widget always shows the
     /// most-recently-saved first (AC-17.3).
+    ///
+    /// `totalCount` (DUT-453) is the true saved-recipe total for the
+    /// lock-screen bookmark badge — pass it when the caller knows the full
+    /// count (the `entries` list is capped at 5, so it can't be derived here).
+    /// When nil, readers fall back to the (capped) entry count.
     @discardableResult
     public func writeSavedRecipes(
         entries: [SavedRecipesWidgetSnapshot.Entry],
+        totalCount: Int? = nil,
         now: Date = Date()
     ) throws -> Data {
         let sorted = entries.sorted { $0.savedAt > $1.savedAt }
         let trimmed = Array(sorted.prefix(SavedRecipesWidgetSnapshotConfig.maxEntries))
-        let snapshot = SavedRecipesWidgetSnapshot(writtenAt: now, entries: trimmed)
+        let snapshot = SavedRecipesWidgetSnapshot(
+            writtenAt: now,
+            entries: trimmed,
+            totalCount: totalCount
+        )
         return try writeSavedRecipes(snapshot)
     }
 

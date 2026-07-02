@@ -3103,4 +3103,16 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-899 — Lock-screen widget refresh, Round 1: Latest Recipe redesign + Saved count + inline tip (CL-293 / DUT-450, DUT-451, DUT-453, DUT-454)
+
+- **What:** Round 1 of the lock-screen widget refresh (parent DUT-450), three changes:
+  - **DUT-451** — `LockScreenRectangular` redesign: smaller eyebrow (was `.caption2` → 9pt), the description/excerpt line removed, and the title expanded from 2 → 3 lines so more of the recipe name shows. `LockScreenContent` now carries `{eyebrow, title}` (was `{title, excerpt}`); `LockScreenEmpty` parameterized (eyebrow/message) — both refactored for reuse by the deferred Latest Article widget.
+  - **DUT-453** — the `.accessoryCircular` Saved widget badges the saved-recipe count inside the bookmark. `SavedRecipesWidgetSnapshot` gains a backward-compatible optional `totalCount` (no schema bump); `RecipeStore.savedRecipeCount()` (deduped) feeds it via `SavedRecipesWidgetPublisher`; the count is knocked out of the filled glyph (`.destinationOut` + `compositingGroup`) so it survives the monochrome tint pass; the widget went from a static shortcut to a snapshot-reading provider (6h fallback + app reload on save).
+  - **DUT-454** — new `.accessoryInline` **Cooking Tip** widget: a short daily Dutch-oven tip beside the clock, from a pure `CookingTip.tip(for:)` daily rotation (14-day timeline, no App Group read). Distinct from the Latest/Saved widgets (informational, not a shortcut).
+  - **DUT-452 (Latest Article) — DEFERRED** to a later round: articles aren't identifiable at the feed level (kind needs a per-post JSON-LD detail fetch, CL-63). Decision captured on the Linear issue.
+- **Files:** DODDesignSystem `WidgetCard+LockScreen.swift` (rectangular + empty + bookmark) + `LockScreenWidgetSnapshotTests` (fixtures + count baseline; 3 rectangular baselines re-recorded by CI). DODSupport `CookingTip.swift` (+ `CookingTipTests`), `SavedRecipesWidgetSnapshot.swift` (`totalCount`/`displayCount`). DODPersistence `RecipeStore+SavedWidget.swift` (`savedRecipeCount()`). DODFeatureRecipeDetail `SavedRecipesWidgetPublisher.swift` (write `totalCount`). Widget target: `LatestRecipeLockScreenWidgetEntryView`, `SavedLockScreenWidget`, new `CookingTipInlineWidget`, `DODAppWidgetBundle`. App `AppDependencies` (reload-all on save). Spec: `clarifications.md` (CL-293).
+- **AC:** US-22 (lock-screen widgets). Linear DUT-450/451/453/454. CL-293 canonical. **Est:** ~4 h. **Deps:** off main. Branch `feat/widgets-round-1`. **Verification:** swift-format + SwiftLint clean (pre-existing `RecipeStore.swift` 403-line warning only); DODSupport 501 + DODPersistence 136 + DODFeatureRecipeDetail 230 tests green; app + widget targets compile. L4 lock-screen baselines re-recorded by CI (local render drifts). Widget visuals confirmed in an Xcode-signed run.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

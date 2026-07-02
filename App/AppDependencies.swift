@@ -287,9 +287,8 @@ final class AppDependencies {
     /// hero URLs through `ImageLoader` + `RecipeStore.cacheImage`, which writes
     /// the bridge file via `WidgetImageBridge`.
     func savedWidgetPublisher() -> SavedRecipesWidgetPublisher {
-        let reload: SavedRecipesWidgetPublisher.ReloadHook = {
-            WidgetCenter.shared.reloadTimelines(ofKind: "SavedRecipesWidget")
-        }
+        // DUT-453 — reload all kinds so the lock-screen Saved count refreshes too.
+        let reload: SavedRecipesWidgetPublisher.ReloadHook = { WidgetCenter.shared.reloadAllTimelines() }
         let loader = imageLoader
         let cacheStore = store
         let prefetch: SavedRecipesWidgetPublisher.ImagePrefetcher = { urls in

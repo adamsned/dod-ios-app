@@ -78,6 +78,10 @@ public struct SavedRecipesWidgetPublisher: Sendable {
         }
 
         let entries = rows.map(Self.toSnapshotEntry)
+        // DUT-453 — the true total (independent of the 5-row `entries` cap) for
+        // the lock-screen Saved widget's bookmark badge. Best-effort: fall back
+        // to the (capped) entry count if the count read fails.
+        let totalCount = (try? await store.savedRecipeCount()) ?? entries.count
 
         do {
             if entries.isEmpty {
@@ -85,9 +89,9 @@ public struct SavedRecipesWidgetPublisher: Sendable {
                 // `clearSavedRecipes()` so the widget always sees a fresh
                 // `writtenAt` timestamp and rebuilds its timeline. Either
                 // path drives the widget to its empty state (AC-17.5).
-                try widgetStore.writeSavedRecipes(entries: [])
+                try widgetStore.writeSavedRecipes(entries: [], totalCount: 0)
             } else {
-                try widgetStore.writeSavedRecipes(entries: entries)
+                try widgetStore.writeSavedRecipes(entries: entries, totalCount: totalCount)
             }
         } catch {
             DODLog.app.error(
