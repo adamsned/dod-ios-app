@@ -1,3 +1,4 @@
+import DODSupport
 import Foundation
 
 // DUT-293 / DUT-294 — the Cook Mode step-timer state machine. Lives in the view
@@ -98,9 +99,16 @@ extension CookModeViewModel {
 
     private func stepText(forStep index: Int) -> String {
         guard index >= 0, index < recipe.instructions.count else { return "" }
+        // DUT-440: match the on-screen + spoken step (DUT-245) — the Lock
+        // Screen card must not show 350°F while the app says 175°C.
+        var text = recipe.instructions[index].text
+        let rawUnit = UserDefaults.standard.string(forKey: TemperatureConverter.preferenceKey)
+        if let unit = TemperatureConverter.resolvedUnit(fromRawValue: rawUnit) {
+            text = TemperatureConverter.converting(text, to: unit)
+        }
         // DUT-349: clamp before it enters the Live Activity ContentState — ActivityKit
         // hard-limits the encoded state to ~4KB, and a full multi-sentence recipe step
         // can blow past it (silently failing the request). The card renders 2 lines.
-        return String(recipe.instructions[index].text.prefix(240))
+        return String(text.prefix(240))
     }
 }

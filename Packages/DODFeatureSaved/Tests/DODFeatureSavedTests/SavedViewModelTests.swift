@@ -214,7 +214,6 @@ import Testing
 final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     var recipes: [Recipe] = []
     var shouldFail = false
-    var preDownloadedRecipeIDs: [Int] = []
     /// T-774 / DUT-80 — the set ``downloadedRecipeIDs()`` returns, so a test can
     /// assert the view model hydrates `downloadedIDs` for the Saved-tab badge.
     var downloadedIDs: Set<Int> = []
@@ -252,10 +251,6 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     }
 
     func isOnline() async -> Bool { online }
-
-    func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {
-        preDownloadedRecipeIDs.append(recipeID)
-    }
 
     func remoteChanges() -> AsyncStream<Void> {
         remoteChangeStream

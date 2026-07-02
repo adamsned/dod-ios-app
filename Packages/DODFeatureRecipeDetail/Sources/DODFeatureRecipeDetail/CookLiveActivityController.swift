@@ -118,15 +118,26 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     }
 
     #if os(iOS)
+    /// DUT-431 — reconcile once per PROCESS, not per controller instance.
+    /// `SystemCookLiveActivityController()` is a default init parameter of
+    /// `CookModeViewModel`, which SwiftUI re-constructs (and discards via
+    /// `@State`) every time the presenting detail view re-renders under the
+    /// Cook Mode cover — an instance-scoped reconcile ended the activity the
+    /// INSTALLED controller was legitimately driving, killing the Lock-Screen
+    /// timer mid-countdown. True orphans only exist at process launch.
+    private static var didReconcileOrphans = false
+
     /// DUT-309 — ActivityKit Live Activities outlive app termination: a card
     /// requested before a kill persists on the Lock Screen / Dynamic Island
     /// across the relaunch. This fresh controller holds no in-memory handle for
     /// it (the handle lived in the dead process), so it can neither update nor
     /// end it — a stale cook timer lingers with no way to dismiss it from the
-    /// app. Called at init: with no active handle of our own, end any activity
-    /// left over from a previous process so the Lock Screen matches reality.
+    /// app. Runs once per process (DUT-431): end any activity left over from a
+    /// PREVIOUS process so the Lock Screen matches reality.
     @available(iOS 16.1, *)
     private func reconcileOrphans() {
+        guard !Self.didReconcileOrphans else { return }
+        Self.didReconcileOrphans = true
         guard activity == nil else { return }
         for orphan in Activity<CookActivityAttributes>.activities {
             Self.pushEndOrphan(orphan)
