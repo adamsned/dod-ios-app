@@ -70,7 +70,9 @@ struct FeaturedRecipeWidgetEntryView: View {
             title: recipe.title,
             excerpt: recipe.excerpt,
             heroImageURL: heroFileURL,
-            totalTimeDisplay: recipe.totalTimeDisplay
+            totalTimeDisplay: recipe.totalTimeDisplay,
+            // DUT-460 — adaptive eyebrow (was hardcoded "New on DOD").
+            eyebrow: recipe.isArticle ? "Latest Article" : "Latest Recipe"
         )
     }
 

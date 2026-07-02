@@ -38,7 +38,7 @@ final class AppDependencies {
     let notificationService: NotificationService
 
     private let restClient: WPRestClient
-    private let pageFetcher: RecipePageFetcher
+    let pageFetcher: RecipePageFetcher  // internal for +WidgetClassifier (DUT-460)
     private let imageLoader: ImageLoader
     private let networkMonitor: NetworkMonitor
     private let commentsClient: WPCommentsClient
@@ -242,7 +242,8 @@ final class AppDependencies {
             store: store,
             monitor: networkMonitor,
             widgetReload: reload,
-            imagePrefetcher: prefetch
+            imagePrefetcher: prefetch,
+            latestKindClassifier: makeLatestKindClassifier()  // DUT-460 adaptive eyebrow
         )
     }
 

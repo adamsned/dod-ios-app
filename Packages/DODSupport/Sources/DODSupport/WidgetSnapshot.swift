@@ -45,6 +45,12 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         /// that don't know about the field still parse the rest of the
         /// payload via Codable's default-value handling for missing keys.
         public let heroImageFilename: String?
+        /// DUT-460 — `true` when this post is an article (no parseable JSON-LD
+        /// Recipe block, CL-63) rather than a recipe. Drives the widget's
+        /// adaptive "Latest Article" / "Latest Recipe" eyebrow. Only the top
+        /// (shown) entry is classified; defaults `false` (recipe) for the rest
+        /// and for back-compat with payloads written before this field.
+        public let isArticle: Bool
 
         public init(
             id: Int,
@@ -54,7 +60,8 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
             canonicalURL: URL?,
             publishedAt: Date,
             totalTimeDisplay: String?,
-            heroImageFilename: String? = nil
+            heroImageFilename: String? = nil,
+            isArticle: Bool = false
         ) {
             self.id = id
             self.title = title
@@ -64,6 +71,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
             self.publishedAt = publishedAt
             self.totalTimeDisplay = totalTimeDisplay
             self.heroImageFilename = heroImageFilename
+            self.isArticle = isArticle
         }
 
         // Custom decoder so the new `heroImageFilename` field defaults to
@@ -87,6 +95,8 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
                 String.self,
                 forKey: .heroImageFilename
             )
+            // DUT-460 — additive; older payloads omit it (default recipe).
+            self.isArticle = try container.decodeIfPresent(Bool.self, forKey: .isArticle) ?? false
         }
     }
 }

@@ -33,17 +33,23 @@ public enum WidgetCard {
         public let excerpt: String
         public let heroImageURL: URL?
         public let totalTimeDisplay: String?
+        /// DUT-460 — the adaptive eyebrow ("Latest Recipe" / "Latest Article"),
+        /// replacing the old hardcoded "New on DOD". Defaults to "Latest Recipe"
+        /// so existing call sites (previews / tests) stay source-compatible.
+        public let eyebrow: String
 
         public init(
             title: String,
             excerpt: String,
             heroImageURL: URL? = nil,
-            totalTimeDisplay: String? = nil
+            totalTimeDisplay: String? = nil,
+            eyebrow: String = "Latest Recipe"
         ) {
             self.title = title
             self.excerpt = excerpt
             self.heroImageURL = heroImageURL
             self.totalTimeDisplay = totalTimeDisplay
+            self.eyebrow = eyebrow
         }
     }
 
@@ -99,7 +105,7 @@ public enum WidgetCard {
                     .frame(maxWidth: .infinity)
 
                 VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                    Text("New on DOD")
+                    Text(content.eyebrow)  // DUT-460 — was "New on DOD"
                         .font(.system(.caption2, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.burntOrange)
                         .textCase(.uppercase)

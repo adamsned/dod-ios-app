@@ -33,7 +33,7 @@ extension WidgetCard {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                    Text("New on DOD")
+                    Text(content.eyebrow)  // DUT-460 — was "New on DOD"
                         .font(.system(.caption2, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.burntOrange)
                         .textCase(.uppercase)

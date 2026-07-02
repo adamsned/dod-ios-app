@@ -95,6 +95,26 @@ final class LockScreenWidgetSnapshotTests: XCTestCase {
         )
     }
 
+    /// DUT-460 — the adaptive "Latest Article" eyebrow on the lock-screen face.
+    func test_lockScreenWidget_rectangular_article() {
+        let view = WidgetCard.LockScreenRectangular(
+            content: .init(
+                eyebrow: "Latest Article",
+                title: "Seasoning Cast Iron: The Only Guide You Need"
+            )
+        )
+        .frame(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
+        assertSnapshot(
+            of: view,
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: Self.lockScreenSize.width, height: Self.lockScreenSize.height)
+            ),
+            record: .missing
+        )
+    }
+
     // MARK: - Empty (CL-37 / AC-22.4)
 
     /// AC-22.4: when no snapshot exists (first launch / App Group

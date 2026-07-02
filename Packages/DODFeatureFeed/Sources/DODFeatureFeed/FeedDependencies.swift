@@ -79,12 +79,21 @@ public struct LiveFeedDependencies: FeedDependencies {
     /// timeline tick after prefetch completes). REG-T-360 / CL-45 / T-362.
     public typealias ImagePrefetcher = @Sendable ([URL]) async -> Void
 
+    /// DUT-460 — classifies the latest (top-of-feed) post as an article. The app
+    /// supplies this (fetch the post's page + JSON-LD parse; a parse throw means
+    /// no Recipe block → article, per CL-63). Returns `true` for an article. The
+    /// widget's adaptive eyebrow reads the resulting `Entry.isArticle`. Nil (or a
+    /// failed classification) defaults to recipe. Called only for the ONE shown
+    /// entry, so it's a single fetch per snapshot publish.
+    public typealias LatestKindClassifier = @Sendable (RecipeListItem) async -> Bool
+
     let client: WPRestClient
     let store: RecipeStore
     let monitor: NetworkMonitor
     private let widgetStore: WidgetSnapshotStore?
     private let widgetReload: WidgetReloadHook?
     private let imagePrefetcher: ImagePrefetcher?
+    private let latestKindClassifier: LatestKindClassifier?
 
     public init(
         client: WPRestClient,
@@ -92,7 +101,8 @@ public struct LiveFeedDependencies: FeedDependencies {
         monitor: NetworkMonitor,
         widgetStore: WidgetSnapshotStore? = WidgetSnapshotStore(),
         widgetReload: WidgetReloadHook? = nil,
-        imagePrefetcher: ImagePrefetcher? = nil
+        imagePrefetcher: ImagePrefetcher? = nil,
+        latestKindClassifier: LatestKindClassifier? = nil
     ) {
         self.client = client
         self.store = store
@@ -100,6 +110,7 @@ public struct LiveFeedDependencies: FeedDependencies {
         self.widgetStore = widgetStore
         self.widgetReload = widgetReload
         self.imagePrefetcher = imagePrefetcher
+        self.latestKindClassifier = latestKindClassifier
     }
 
     public func fetchPosts(page: Int) async throws -> (items: [RecipeListItem], totalPages: Int) {
@@ -175,18 +186,30 @@ public struct LiveFeedDependencies: FeedDependencies {
         // precache below (T-392) handles getting the bytes onto disk
         // through the existing `store.cacheImage` chain which mirrors
         // to the bridge.
-        let entries = items.prefix(WidgetSnapshotConfig.maxEntries).map {
-            WidgetSnapshot.Entry(
-                id: $0.id,
-                title: $0.title,
-                excerpt: $0.excerpt,
-                heroImageURL: $0.heroImage,
-                canonicalURL: $0.canonicalURL,
-                publishedAt: $0.publishedAt,
-                totalTimeDisplay: $0.totalTimeDisplay,
-                heroImageFilename: $0.heroImage.map(WidgetImageBridge.filename(for:))
-            )
+        // DUT-460 — classify only the top (shown) post's kind so the widget's
+        // eyebrow reads "Latest Article" vs "Latest Recipe". One fetch; defaults
+        // to recipe if no classifier is wired or the classification fails.
+        var topIsArticle = false
+        if let latestKindClassifier, let top = items.first {
+            topIsArticle = await latestKindClassifier(top)
         }
+        let entries =
+            items
+            .prefix(WidgetSnapshotConfig.maxEntries)
+            .enumerated()
+            .map { offset, item in
+                WidgetSnapshot.Entry(
+                    id: item.id,
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    heroImageURL: item.heroImage,
+                    canonicalURL: item.canonicalURL,
+                    publishedAt: item.publishedAt,
+                    totalTimeDisplay: item.totalTimeDisplay,
+                    heroImageFilename: item.heroImage.map(WidgetImageBridge.filename(for:)),
+                    isArticle: offset == 0 ? topIsArticle : false
+                )
+            }
         guard let widgetStore else {
             // App Group missing (e.g. running without the entitlement in a
             // dev simulator). Surface the issue in logs but never throw —
