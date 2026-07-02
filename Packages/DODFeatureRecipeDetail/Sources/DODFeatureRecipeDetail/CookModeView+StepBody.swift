@@ -116,11 +116,20 @@ extension CookModeView {
     /// Announce the step the user just landed on, in the resolved temperature
     /// unit (matching the on-screen text), or the completion line in the Done
     /// state.
+    ///
+    /// DUT-441: while Voice Mode is on, the step change already speaks the full
+    /// body through `speakCurrentStep()` — announcing it too would read the
+    /// text twice over itself. Announce only a short position cue then, so a
+    /// VoiceOver user still hears where they landed without the overlap.
     func announceCurrentStep() {
         if viewModel.isFinished {
-            announce("All done. Tap Finish to leave Cook Mode.")
+            announce(viewModel.isVoiceModeEnabled ? "Done" : "All done. Tap Finish to leave Cook Mode.")
         } else if let step = viewModel.currentStep {
-            announce("Step \(step.step). \(convertedStepText(step.text))")
+            if viewModel.isVoiceModeEnabled {
+                announce("Step \(step.step)")
+            } else {
+                announce("Step \(step.step). \(convertedStepText(step.text))")
+            }
         }
     }
 }

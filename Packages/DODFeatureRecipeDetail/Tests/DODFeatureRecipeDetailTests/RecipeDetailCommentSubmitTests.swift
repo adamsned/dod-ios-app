@@ -112,6 +112,66 @@ struct RecipeDetailCommentSubmitTests {
         )
     }
 
+    /// DUT-433: a successful ONLINE comments refresh must not wipe this
+    /// device's still-pending comment from the thread — the public GET never
+    /// returns `hold` rows, so `comments = approved` alone made the author's
+    /// awaiting-approval comment vanish on every re-open (the "did my comment
+    /// post?" re-submit loop). The cached pending row is re-appended.
+    @Test func onlineRefreshKeepsPendingCommentVisible() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 90, withDetail: true)
+        let approved = RecipeDetailTestFixtures.makeComment(
+            id: 7001,
+            postID: 90,
+            body: "Public.",
+            status: .approved
+        )
+        let pending = RecipeDetailTestFixtures.makeComment(
+            id: 7002,
+            postID: 90,
+            body: "Mine, awaiting approval.",
+            status: .hold
+        )
+        // Cache hydration returns approved + this device's pending row; the
+        // network page returns ONLY the approved comment.
+        dependencies.cachedCommentsByPost[90] = [approved, pending]
+        dependencies.fetchedComments = [approved]
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 90)
+        await viewModel.onAppear()
+
+        #expect(viewModel.comments.contains { $0.id == 7001 })
+        #expect(
+            viewModel.comments.contains { $0.id == 7002 && $0.status == .hold },
+            "The author's pending comment must survive the online refresh"
+        )
+    }
+
+    /// DUT-433: once WP approves the comment, the fresh page supersedes the
+    /// cached pending row — no duplicate.
+    @Test func onlineRefreshDeduplicatesOnceApproved() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 91, withDetail: true)
+        let nowApproved = RecipeDetailTestFixtures.makeComment(
+            id: 7003,
+            postID: 91,
+            body: "Mine.",
+            status: .approved
+        )
+        let stalePending = RecipeDetailTestFixtures.makeComment(
+            id: 7003,
+            postID: 91,
+            body: "Mine.",
+            status: .hold
+        )
+        dependencies.cachedCommentsByPost[91] = [stalePending]
+        dependencies.fetchedComments = [nowApproved]
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 91)
+        await viewModel.onAppear()
+
+        #expect(viewModel.comments.filter { $0.id == 7003 }.count == 1)
+        #expect(viewModel.comments.first { $0.id == 7003 }?.status == .approved)
+    }
+
     /// DUT-27 (build 8): a 409 that carries the WordPress "Duplicate comment
     /// detected …" body surfaces the FRIENDLY duplicate line end-to-end — not
     /// the raw "server said 409: …" text — and the draft is preserved.

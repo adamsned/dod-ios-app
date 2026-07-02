@@ -98,9 +98,15 @@ public struct WPRestClient: Sendable {
     /// DUT-386: `.urlQueryAllowed` minus "+" and ";". `URLComponents.queryItems`
     /// leaves both raw, and WordPress/PHP then mis-reads "+" as a space (and ";"
     /// as a query delimiter), silently corrupting a user's search term.
+    ///
+    /// DUT-438: also minus "&" and "=" — `.urlQueryAllowed` contains BOTH raw
+    /// query delimiters, and values assigned via `percentEncodedQueryItems` are
+    /// used verbatim, so a search for "mac & cheese" went over the wire as
+    /// `?search=mac%20&%20cheese`: the server received `search = "mac "` plus a
+    /// bogus `%20cheese` parameter, silently wrecking the results.
     static let queryValueAllowed: CharacterSet = {
         var set = CharacterSet.urlQueryAllowed
-        set.remove(charactersIn: "+;")
+        set.remove(charactersIn: "+;&=")
         return set
     }()
 

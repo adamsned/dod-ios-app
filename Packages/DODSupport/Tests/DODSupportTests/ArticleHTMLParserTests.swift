@@ -294,6 +294,9 @@ import Testing
         #expect(text(body) == "Serve hot <")
     }
 
+    // DUT-437 comment-vs-slice-boundary regression tests live in
+    // `ArticleHTMLParserCommentBoundaryTests.swift` (type_body_length cap).
+
     // MARK: - Fixture
 
     /// A focused multi-block fixture mirroring the live round-up (post 23406):

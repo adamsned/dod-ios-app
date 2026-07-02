@@ -171,6 +171,21 @@ import Testing
         #expect(url.contains("per_page=100"), "Search must widen per_page to 100 (CL-120 / T-642)")
         #expect(url.contains("search=nachos"))
     }
+
+    /// DUT-438: `&` and `=` are raw query delimiters that `.urlQueryAllowed`
+    /// permits — unencoded, "mac & cheese" split the query string and the
+    /// server received `search = "mac "`. They must round-trip as %26 / %3D.
+    @Test func ampersandAndEqualsInQueryAreProperlyEncoded() async throws {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts", json: Data("[]".utf8))
+        let client = WPRestClient(httpClient: fake)
+        _ = try await client.search(query: "mac & a=b cheese")
+        let captured = await fake.capturedRequests
+        let url = try #require(captured.first?.url?.absoluteString)
+        #expect(url.contains("search=mac%20%26%20a%3Db%20cheese"))
+        // The raw delimiters must not appear inside the value.
+        #expect(!url.contains("search=mac%20&"))
+    }
 }
 
 @Suite("WPRestClient.categories") struct WPRestClientCategoriesTests {

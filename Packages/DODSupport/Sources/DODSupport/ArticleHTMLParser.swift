@@ -12,10 +12,12 @@ public enum ArticleHTMLParser {
     ///
     /// - Parameter html: the full rendered HTML page (or any fragment).
     public static func parse(html: String) -> [ArticleBlock] {
+        // DUT-389/DUT-437: strip comments BEFORE the entry-content extraction —
+        // a comment carrying `<div`/`</div>` corrupts the slice boundary's
+        // depth tracking. The stripper is `<script>`/`<style>`-opaque (DUT-437).
+        let stripped = HTMLSanitizer.strippingComments(html)
         // Scope to the WP body wrapper when present; else scan the whole input.
-        let scoped = ArticleBodyExtractor.extractEntryContentSlice(in: html) ?? html
-        // DUT-389: strip HTML comments first (an inner `>` / `<div` corrupts scanning).
-        var content = HTMLSanitizer.strippingComments(scoped)
+        var content = ArticleBodyExtractor.extractEntryContentSlice(in: stripped) ?? stripped
         // Drop blocks that never carry renderable prose, content and all.
         for tag in ["script", "style", "noscript", "svg"] {
             content = removeBlock(tag: tag, from: content)
