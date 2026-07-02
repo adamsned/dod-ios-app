@@ -22,23 +22,24 @@ import SwiftUI
 extension WidgetCard {
 
     /// Plain-old-data input for the lock-screen rectangular variant.
-    /// Mirrors the *subset* of ``WidgetSnapshot.Entry`` (DODSupport) the
-    /// rectangular surface needs — just title + excerpt. We deliberately
-    /// drop `heroImageURL` / `totalTimeDisplay` here so callers can't
-    /// accidentally try to render an image in a monochrome surface.
+    /// A small `eyebrow` label ("LATEST RECIPE" / "LATEST ARTICLE") over the
+    /// post `title`. DUT-451: the excerpt/description line was removed so the
+    /// title gets the freed vertical space; DUT-452: the eyebrow is now a
+    /// parameter so the Latest Article widget reuses this exact layout.
     public struct LockScreenContent: Equatable, Sendable {
+        public let eyebrow: String
         public let title: String
-        public let excerpt: String
 
-        public init(title: String, excerpt: String) {
+        public init(eyebrow: String, title: String) {
+            self.eyebrow = eyebrow
             self.title = title
-            self.excerpt = excerpt
         }
     }
 
-    /// `.accessoryRectangular` layout: two-line title over a one-line
-    /// excerpt. Rendered text-only — the system applies the monochrome
-    /// tint pass at present-time so we paint nothing decorative.
+    /// `.accessoryRectangular` layout (DUT-451): a small eyebrow over a
+    /// multi-line title. No description line — the title takes the whole card
+    /// so more of the post name shows. Rendered text-only; the system applies
+    /// the monochrome tint pass at present-time so we paint nothing decorative.
     public struct LockScreenRectangular: View {
 
         public let content: LockScreenContent
@@ -48,24 +49,19 @@ extension WidgetCard {
         }
 
         public var body: some View {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Latest Recipe")
-                    .font(.system(.caption2, design: .default, weight: .semibold))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(content.eyebrow)
+                    // DUT-451 — smaller eyebrow (was .caption2) to free room.
+                    .font(.system(size: 9, weight: .semibold))
                     .textCase(.uppercase)
                     .tracking(0.5)
                     .lineLimit(1)
 
                 Text(content.title)
                     .font(.system(.headline, design: .default, weight: .semibold))
-                    .lineLimit(2)
+                    // DUT-451 — was 2 lines; the dropped excerpt frees a 3rd.
+                    .lineLimit(3)
                     .multilineTextAlignment(.leading)
-
-                if !content.excerpt.isEmpty {
-                    Text(content.excerpt)
-                        .font(.system(.caption, design: .default))
-                        .lineLimit(1)
-                        .multilineTextAlignment(.leading)
-                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -79,12 +75,23 @@ extension WidgetCard {
     /// state per AC-9.4).
     public struct LockScreenEmpty: View {
 
-        public init() {}
+        let eyebrow: String
+        let message: String
+
+        /// Defaults match the latest-recipe surface; the Latest Article widget
+        /// (DUT-452) passes its own eyebrow + message to reuse this face.
+        public init(
+            eyebrow: String = "Latest Recipe",
+            message: String = "Open the app to see the latest recipe."
+        ) {
+            self.eyebrow = eyebrow
+            self.message = message
+        }
 
         public var body: some View {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Latest Recipe")
-                    .font(.system(.caption2, design: .default, weight: .semibold))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(eyebrow)
+                    .font(.system(size: 9, weight: .semibold))
                     .textCase(.uppercase)
                     .tracking(0.5)
                     .lineLimit(1)
@@ -93,7 +100,7 @@ extension WidgetCard {
                     .font(.system(.headline, design: .default, weight: .semibold))
                     .lineLimit(1)
 
-                Text("Open the app to see the latest recipe.")
+                Text(message)
                     .font(.system(.caption, design: .default))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -113,22 +120,50 @@ extension WidgetCard {
     /// the `AccessoryWidgetBackground` disc + `.widgetAccentable()` tint pass.
     public struct LockScreenCircularBookmark: View {
 
-        public init() {}
+        /// Saved-recipe count shown inside the bookmark (DUT-453). `nil`/0 →
+        /// the plain bookmark shortcut (unchanged from DUT-77).
+        public let count: Int?
+
+        public init(count: Int? = nil) {
+            self.count = count
+        }
 
         public var body: some View {
-            Image(systemName: "bookmark.fill")
-                .font(.system(size: 24, weight: .semibold))
+            if let count, count > 0 {
+                // DUT-453 — knock the count OUT of the filled bookmark so the
+                // number reads as the accessory disc / wallpaper behind it. A
+                // plain overlay would paint number + glyph in the same tint
+                // color (invisible); `.destinationOut` + `compositingGroup`
+                // carves it, surviving the monochrome tint pass.
+                ZStack {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 38, weight: .semibold))
+                    Text(Self.badge(count))
+                        .font(.system(size: 15, weight: .heavy))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                        .blendMode(.destinationOut)
+                        .offset(y: -3)  // bookmark's visual center sits above middle
+                }
+                .compositingGroup()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 24, weight: .semibold))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+
+        /// The count string that fits inside the glyph — caps at "99+".
+        static func badge(_ count: Int) -> String {
+            count > 99 ? "99+" : "\(count)"
         }
     }
 }
 
 #Preview("Lock Screen Rectangular — populated") {
     WidgetCard.LockScreenRectangular(
-        content: .init(
-            title: "Garlic Butter Skillet Corn",
-            excerpt: "An easy 15-minute side dish that pairs with everything."
-        )
+        content: .init(eyebrow: "Latest Recipe", title: "Garlic Butter Skillet Corn")
     )
     .frame(width: 172, height: 76)
 }
@@ -136,8 +171,18 @@ extension WidgetCard {
 #Preview("Lock Screen Rectangular — long title") {
     WidgetCard.LockScreenRectangular(
         content: .init(
-            title: "Slow-Roasted Bourbon Berry Cheesecake with Maple Glaze",
-            excerpt: "A weekend project worth every minute in the oven."
+            eyebrow: "Latest Recipe",
+            title: "Slow-Roasted Bourbon Berry Cheesecake with Maple Glaze"
+        )
+    )
+    .frame(width: 172, height: 76)
+}
+
+#Preview("Lock Screen Rectangular — article") {
+    WidgetCard.LockScreenRectangular(
+        content: .init(
+            eyebrow: "Latest Article",
+            title: "Seasoning Cast Iron: The Only Guide You Need"
         )
     )
     .frame(width: 172, height: 76)
@@ -148,7 +193,7 @@ extension WidgetCard {
         .frame(width: 172, height: 76)
 }
 
-#Preview("Lock Screen Circular — Saved bookmark") {
-    WidgetCard.LockScreenCircularBookmark()
+#Preview("Lock Screen Circular — Saved bookmark (count)") {
+    WidgetCard.LockScreenCircularBookmark(count: 12)
         .frame(width: 76, height: 76)
 }

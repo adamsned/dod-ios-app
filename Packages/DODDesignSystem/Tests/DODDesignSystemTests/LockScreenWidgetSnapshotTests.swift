@@ -47,17 +47,15 @@ final class LockScreenWidgetSnapshotTests: XCTestCase {
     private static let circularSize = CGSize(width: 76, height: 76)
 
     private static let sampleContent = WidgetCard.LockScreenContent(
-        title: "Garlic Butter Skillet Corn",
-        excerpt: "An easy 15-minute side dish that pairs with everything."
+        eyebrow: "Latest Recipe",
+        title: "Garlic Butter Skillet Corn"
     )
 
-    /// Long-enough title to exercise the 2-line cap + the truncation
-    /// behaviour the `.lineLimit(2)` modifier provides. Excerpt is
-    /// longer than will fit on one line so the `.lineLimit(1)` cap is
-    /// also exercised.
+    /// Long-enough title to exercise the DUT-451 3-line cap + truncation
+    /// (`.lineLimit(3)`). No excerpt any more — the title owns the card.
     private static let longTitleContent = WidgetCard.LockScreenContent(
-        title: "Slow-Roasted Bourbon Berry Cheesecake with Maple Glaze",
-        excerpt: "A weekend project worth every minute in the oven and on the cooling rack."
+        eyebrow: "Latest Recipe",
+        title: "Slow-Roasted Bourbon Berry Cheesecake with Maple Glaze and Toasted Pecans"
     )
 
     // MARK: - Populated
@@ -128,6 +126,23 @@ final class LockScreenWidgetSnapshotTests: XCTestCase {
     /// monochrome tint are present-time chrome, not part of this primitive).
     func test_lockScreenWidget_circularBookmark() {
         let view = WidgetCard.LockScreenCircularBookmark()
+            .frame(width: Self.circularSize.width, height: Self.circularSize.height)
+        assertSnapshot(
+            of: view,
+            as: .image(
+                precision: 0.98,
+                perceptualPrecision: 0.97,
+                layout: .fixed(width: Self.circularSize.width, height: Self.circularSize.height)
+            ),
+            record: .missing
+        )
+    }
+
+    /// DUT-453: the Saved bookmark badged with the saved count. The count is
+    /// knocked out of the filled glyph (`.destinationOut`), so this pins that
+    /// the number reads as negative space rather than same-tint-on-tint.
+    func test_lockScreenWidget_circularBookmark_withCount() {
+        let view = WidgetCard.LockScreenCircularBookmark(count: 12)
             .frame(width: Self.circularSize.width, height: Self.circularSize.height)
         assertSnapshot(
             of: view,

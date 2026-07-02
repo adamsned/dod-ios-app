@@ -119,6 +119,20 @@ extension RecipeStore {
         return rows
     }
 
+    /// DUT-453 — the true count of saved recipes, deduped by id to match
+    /// ``savedRecipesForWidget(limit:)`` semantics (CloudKit can leave
+    /// duplicate `SyncedSavedRecipe` rows, DUT-378). Backs the lock-screen
+    /// Saved widget's bookmark badge; the entry list there is capped at 5, so
+    /// this is the only accurate total.
+    public func savedRecipeCount() throws -> Int {
+        let descriptor = FetchDescriptor<SyncedSavedRecipe>()
+        var seen = Set<Int>()
+        for row in try modelContext.fetch(descriptor) {
+            seen.insert(row.id)
+        }
+        return seen.count
+    }
+
     /// Probe whether the bytes for `urlString` are already present in the
     /// `CachedImage` table. Avoids the public ``image(url:)`` accessor
     /// here because it bumps `lastUsedAt` — widget-snapshot generation

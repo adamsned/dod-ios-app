@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODSupport
 import SwiftUI
 import WidgetKit
 
@@ -28,8 +29,8 @@ struct SavedLockScreenWidget: Widget {
     static let kind = "com.dutchovendaddy.DODApp.Widget.SavedLockScreen"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: Self.kind, provider: SavedLockScreenTimelineProvider()) { _ in
-            SavedLockScreenWidgetEntryView()
+        StaticConfiguration(kind: Self.kind, provider: SavedLockScreenTimelineProvider()) { entry in
+            SavedLockScreenWidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
                     // The translucent, wallpaper-aware disc the system draws
                     // behind circular accessory content. Without it the glyph
@@ -45,42 +46,62 @@ struct SavedLockScreenWidget: Widget {
     }
 }
 
-/// Single fixed timeline entry — the widget is a static shortcut with no
-/// per-time content, so one entry with a `.never` refresh policy is all the
-/// timeline needs.
+/// Timeline entry carrying the saved-recipe count (DUT-453) shown inside the
+/// bookmark. Sourced from the saved-recipes App Group snapshot's true total.
 struct SavedLockScreenEntry: TimelineEntry {
     let date: Date
+    let savedCount: Int
 }
 
-/// Trivial provider: the widget shows the same `bookmark.fill` shortcut at
-/// all times, so every callback returns one fixed entry and the timeline
-/// never needs to refresh (`.never`). No App Group read, no snapshot.
+/// Reads the saved-recipes snapshot's true total (DUT-453) so the bookmark can
+/// badge the count. The host app force-reloads this widget kind whenever the
+/// saved set changes (see `SavedRecipesWidgetPublisher`); a modest periodic
+/// fallback covers cross-device (CloudKit) saves that don't route through the
+/// local publisher.
 struct SavedLockScreenTimelineProvider: TimelineProvider {
 
+    private func savedCount() -> Int {
+        WidgetSnapshotStore()?.readSavedRecipes()?.displayCount ?? 0
+    }
+
     func placeholder(in context: Context) -> SavedLockScreenEntry {
-        SavedLockScreenEntry(date: Date())
+        SavedLockScreenEntry(date: Date(), savedCount: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SavedLockScreenEntry) -> Void) {
-        completion(SavedLockScreenEntry(date: Date()))
+        completion(SavedLockScreenEntry(date: Date(), savedCount: savedCount()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SavedLockScreenEntry>) -> Void) {
-        completion(Timeline(entries: [SavedLockScreenEntry(date: Date())], policy: .never))
+        let entry = SavedLockScreenEntry(date: Date(), savedCount: savedCount())
+        // 6-hour fallback refresh; real changes arrive via the app's explicit
+        // reload after a save/unsave.
+        let next = Date().addingTimeInterval(6 * 60 * 60)
+        completion(Timeline(entries: [entry], policy: .after(next)))
     }
 }
 
-/// The circular face: the design-system `bookmark.fill` glyph opted into the
-/// system accent tint pass (`.widgetAccentable`), tapping through to the
-/// Saved tab via `dod://saved` (already covered by US-9's
-/// `WidgetDeepLinkParser` — no new parser case).
+/// The circular face: the design-system `bookmark.fill` glyph (now badged with
+/// the saved count, DUT-453) opted into the system accent tint pass
+/// (`.widgetAccentable`), tapping through to the Saved tab via `dod://saved`
+/// (already covered by US-9's `WidgetDeepLinkParser` — no new parser case).
 struct SavedLockScreenWidgetEntryView: View {
 
+    let entry: SavedLockScreenEntry
+
     var body: some View {
-        WidgetCard.LockScreenCircularBookmark()
+        WidgetCard.LockScreenCircularBookmark(count: entry.savedCount)
             .widgetAccentable()
             .widgetURL(URL(string: "dod://saved"))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Saved recipes. Open your saved recipes.")
+            .accessibilityLabel(Self.accessibilityLabel(for: entry.savedCount))
+    }
+
+    static func accessibilityLabel(for count: Int) -> String {
+        switch count {
+        case 0: return "Saved recipes. Open your saved recipes."
+        case 1: return "Saved recipes. 1 saved. Open your saved recipes."
+        default: return "Saved recipes. \(count) saved. Open your saved recipes."
+        }
     }
 }
