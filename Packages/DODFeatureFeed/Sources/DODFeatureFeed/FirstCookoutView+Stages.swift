@@ -242,20 +242,8 @@ extension FirstCookoutView {
         }
     }
 
-    /// Open the recipe. The app's `openURL` override resolves a DOD recipe URL
-    /// to the in-app recipe detail; dismiss this sheet so that navigation is
-    /// actually visible (it was opening behind the sheet).
-    var recipeButton: some View {
-        Button(recipeLinkLabel) {
-            if let url = URL(string: "\(recipeBaseURL)/\(cookout.recipeSlug)/") {
-                openURL(url)
-                dismiss()
-            }
-        }
-        .dodProminentButton()
-        .tint(DODColor.burntOrange)
-        .padding(.top, DODSpacing.xs)
-    }
+    // `recipeButton` (DUT-246 — awaitable open, sheet stays up until the
+    // resolve lands) lives in `FirstCookoutView+RecipeLink.swift`.
 
     // MARK: Celebrate — photo + share to social
 
