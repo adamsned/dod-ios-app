@@ -59,10 +59,18 @@ public struct CookActivityLockScreenView: View {
             }
 
             HStack(alignment: .center, spacing: DODSpacing.md) {
+                // DUT-267: while RUNNING with a wall-clock deadline, the ring's
+                // fill would freeze the moment the app backgrounds (it's a pure
+                // function of the last PUSHED remainingSeconds, while the
+                // numeral self-ticks) — so the running state drives progress
+                // with the system's self-updating timer bar below instead, and
+                // the ring renders the numeral only. Paused / snapshot states
+                // keep the full static arc (their numbers can't drift).
                 CookActivityProgressArc(
                     progress: progress,
                     isPaused: isPaused,
-                    countdown: countdownText
+                    countdown: countdownText,
+                    showsRing: !isSelfTicking
                 )
                 .frame(width: 88, height: 88)
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
@@ -73,12 +81,33 @@ public struct CookActivityLockScreenView: View {
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                         .lineLimit(2)
+                    if let endDate, isSelfTicking {
+                        // Self-updating on the Lock Screen even while the app
+                        // is backgrounded — same primitive as the numeral.
+                        let start = endDate.addingTimeInterval(-TimeInterval(totalSeconds))
+                        ProgressView(
+                            timerInterval: start...endDate,
+                            countsDown: false,
+                            label: { EmptyView() },
+                            currentValueLabel: { EmptyView() }
+                        )
+                        .progressViewStyle(.linear)
+                        .tint(DODColor.accent)
+                    }
                 }
                 Spacer(minLength: 0)
             }
         }
         .padding(DODSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// DUT-267 — true when the countdown renders as a self-updating
+    /// `Text(timerInterval:)` (running with a future deadline); the progress
+    /// treatment must self-update the same way or it visibly desyncs.
+    private var isSelfTicking: Bool {
+        guard let endDate, !isPaused else { return false }
+        return endDate > Date()
     }
 
     /// DUT-218: self-updating `Text(timerInterval:)` while running (ticks even
@@ -108,21 +137,28 @@ public struct CookActivityProgressArc: View {
     /// DUT-218: a `Text` (not a `String`) so callers can pass a self-updating
     /// `Text(timerInterval:)` while running, or a static `Text` for snapshots.
     public let countdown: Text
+    /// DUT-267: false while the numeral self-ticks — the trim-based ring can't
+    /// self-update, so showing it then means a visibly frozen fill against a
+    /// live numeral. The base circle stays as the numeral's frame.
+    public let showsRing: Bool
 
-    public init(progress: Double, isPaused: Bool, countdown: Text) {
+    public init(progress: Double, isPaused: Bool, countdown: Text, showsRing: Bool = true) {
         self.progress = progress
         self.isPaused = isPaused
         self.countdown = countdown
+        self.showsRing = showsRing
     }
 
     public var body: some View {
         ZStack {
             Circle()
                 .stroke(DODColor.surfaceElevated, lineWidth: 6)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(arcColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .rotationEffect(.degrees(-90))
+            if showsRing {
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(arcColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
             countdown
                 .dodFont(DODType.heading)
                 .monospacedDigit()

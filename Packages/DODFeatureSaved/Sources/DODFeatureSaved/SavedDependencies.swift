@@ -15,8 +15,13 @@ public protocol SavedDependencies: Sendable {
     /// so its "Downloaded" badge clears. Default no-op; the live wiring routes
     /// to ``RecipeStore/removeDownload(id:)``. The recipe stays saved.
     func removeDownload(id: Int) async throws
-    /// Pre-download hero images for newly-saved recipe (AC-5.2).
-    func preDownloadImages(forRecipeID: Int, urls: [URL]) async
+    // DUT-421 — the former `preDownloadImages(forRecipeID:urls:)` (AC-5.2's
+    // declared pre-download path) is deleted: it had ZERO production call
+    // sites, so the offline-hero guarantee it claimed to own was actually
+    // delivered by the widget-publisher prefetch + `cacheImage`'s DUT-292
+    // auto-pin (which pins any cached hero whose URL matches a saved recipe's
+    // `heroImageURLString`). That pair IS the AC-5.2 mechanism of record —
+    // documented here so nobody re-adds a parallel dead path.
     /// Emit a signal every time the on-disk store changes underneath us
     /// because CloudKit imported remote changes from another device (DUT-6,
     /// the UI-refresh half). The Saved tab reads through a one-shot
@@ -134,12 +139,7 @@ public struct LiveSavedDependencies: SavedDependencies {
         await monitor.isOnline
     }
 
-    public func preDownloadImages(forRecipeID recipeID: Int, urls: [URL]) async {
-        for url in urls {
-            guard let bytes = try? await imageLoader.data(for: url) else { continue }
-            try? await store.cacheImage(url: url, bytes: bytes, pinnedToSavedRecipeID: recipeID)
-        }
-    }
+    // DUT-421 — `preDownloadImages` deleted; see the protocol-site note.
 
     public func remoteChanges() -> AsyncStream<Void> {
         guard let remoteChangeStream else {

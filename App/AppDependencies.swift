@@ -129,6 +129,7 @@ final class AppDependencies {
         await networkMonitor.start()
         // DUT-377: ReliableImage offline disk fallback (saved/downloaded heroes).
         ReliableImageConfig.setOfflineDataProvider { [store] url in try? await store.image(url: url) }
+        RecipeStore.onBridgedImagesEvicted = { WidgetCenter.shared.reloadAllTimelines() }
         // TelemetryDeck app ID lives in DODApp.xcconfig (gitignored per
         // constitution §9). For v1 we read from Info.plist; if unset we
         // skip telemetry rather than fail launch.
@@ -220,19 +221,18 @@ final class AppDependencies {
         let reload: LiveFeedDependencies.WidgetReloadHook = { _ in
             WidgetCenter.shared.reloadAllTimelines()
         }
-        // Fixes REG-T-360 / CL-45. The widget snapshot's `heroImageFilename`
-        // strings are deterministic SHA256-of-URL, but the bridge files only
-        // exist after `RecipeStore.cacheImage` writes them. This prefetcher
-        // routes the snapshotted hero URLs through the same `ImageLoader` +
-        // `cacheImage` path, fire-and-forget inside `publishWidgetSnapshot`.
+        // Fixes REG-T-360 / CL-45. The snapshot's `heroImageFilename`s are
+        // SHA256-of-URL, but bridge files only exist once `cacheImage` writes
+        // them — this prefetcher routes the snapshotted hero URLs through the
+        // same path, fire-and-forget inside `publishWidgetSnapshot`.
         let loader = imageLoader
         let cacheStore = store
         let prefetch: LiveFeedDependencies.ImagePrefetcher = { urls in
             for url in urls {
-                // DUT-420: skip URLs already on disk (mirrors the saved-widget
-                // publisher's `!heroImageCached` gate) so a re-published snapshot
-                // doesn't re-fetch + re-evict + re-write bytes we already have.
-                if (try? await cacheStore.image(url: url)) != nil { continue }
+                // DUT-420/442: skip fully-bridged URLs — the probe doesn't bump
+                // the LRU / fault the blob, and requires the App Group FILE too
+                // (a lost bridge write still self-heals). See `hasBridgedImage`.
+                if (try? await cacheStore.hasBridgedImage(url: url)) == true { continue }
                 guard let bytes = try? await loader.data(for: url) else { continue }
                 try? await cacheStore.cacheImage(url: url, bytes: bytes)
             }

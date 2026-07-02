@@ -96,6 +96,35 @@ extension RecipeStore {
         return row.bytes
     }
 
+    /// DUT-442 — existence probe for background jobs (the feed widget-snapshot
+    /// prefetch gate). Unlike ``image(url:)`` it does NOT bump `lastUsedAt`
+    /// (a snapshot job must not promote rows in the image LRU over images the
+    /// user actually viewed — parity with `recipeWithoutTouching`), does NOT
+    /// fault the blob, and also requires the App Group bridge FILE to exist —
+    /// `writeImage` is best-effort, so a row can exist with no file, and
+    /// gating on the row alone would skip the re-fetch that self-heals the
+    /// widget's gradient placeholder (DUT-227 family).
+    public func hasBridgedImage(url: URL) throws -> Bool {
+        let urlString = url.absoluteString
+        var descriptor = FetchDescriptor<CachedImage>(
+            predicate: #Predicate { $0.urlString == urlString }
+        )
+        descriptor.propertiesToFetch = [\.urlString]
+        descriptor.fetchLimit = 1
+        guard try !modelContext.fetch(descriptor).isEmpty else { return false }
+        let filename = WidgetImageBridge.filename(for: url)
+        guard let fileURL = WidgetImageBridge.fileURL(forFilename: filename) else { return false }
+        return FileManager.default.fileExists(atPath: fileURL.path)
+    }
+
+    /// DUT-227 — fired (best-effort) after ``evictImagesIfNeeded()`` deletes
+    /// bridged image files, so the app layer can `WidgetCenter.reloadTimelines`
+    /// and a published snapshot doesn't keep naming a now-missing file (stuck
+    /// gradient placeholder until the 4-hour refresh). Static because the
+    /// persistence package can't import WidgetKit; `AppDependencies.bootstrap`
+    /// wires it once at launch.
+    nonisolated(unsafe) public static var onBridgedImagesEvicted: (@Sendable () -> Void)?
+
     /// Purge every unpinned `CachedImage` row + its App Group file
     /// bridge mirror. Returns the total bytes freed so the Settings
     /// row's snackbar can format a humane "Freed X.X MB" message
@@ -155,14 +184,21 @@ extension RecipeStore {
         let all = try modelContext.fetch(descriptor)
         var total = all.reduce(0) { $0 + $1.byteCount }
         guard total > Self.imageBudgetBytes else { return }
+        var evictedAny = false
         for row in all where row.pinnedToSavedRecipeID == nil {
             let size = row.byteCount
             if let url = URL(string: row.urlString) { WidgetImageBridge.deleteImage(for: url) }
             modelContext.delete(row)
+            evictedAny = true
             total -= size
             if total <= Self.imageBudgetBytes { break }
         }
         try modelContext.save()
+        // DUT-227: an evicted bridge file may be the one a PUBLISHED widget
+        // snapshot references — tell the app layer to reload timelines so the
+        // widget re-renders (and re-fetches) instead of showing the gradient
+        // placeholder until its 4-hour refresh.
+        if evictedAny { Self.onBridgedImagesEvicted?() }
     }
 
     /// DUT-292: the id of a currently-saved recipe whose hero image is
