@@ -41,6 +41,12 @@ public protocol FeedDependencies: Sendable {
     /// to ``RecipeStore/updateCookLog(_:)``. Never changes the cook count, so it
     /// can't affect rank.
     func updateCookLog(_ entry: CookLogEntry) async throws
+    /// DUT-208 — delete an orphaned cook photo whose journal write failed. The
+    /// caller wrote the JPEG to disk before ``logCook(_:)``; when that throws, no
+    /// row will ever reference the `photoLocalID`, so the DUT-338 cleanup can't
+    /// reach it. Default no-op so existing test conformers keep compiling; the
+    /// live wiring routes to ``CookPhotoStore/delete(id:)``.
+    func deleteCookPhoto(id: String) async
 }
 
 extension FeedDependencies {
@@ -49,6 +55,7 @@ extension FeedDependencies {
     public func logCook(_ entry: CookLogEntry) async throws {}
     public func cookLogs() async throws -> [CookLogEntry] { [] }
     public func updateCookLog(_ entry: CookLogEntry) async throws {}
+    public func deleteCookPhoto(id: String) async {}
 }
 
 /// Production wiring. Constructed by the app composition root (T-140).
@@ -144,6 +151,13 @@ public struct LiveFeedDependencies: FeedDependencies {
 
     public func updateCookLog(_ entry: CookLogEntry) async throws {
         try await store.updateCookLog(entry)
+    }
+
+    public func deleteCookPhoto(id: String) async {
+        // DUT-208 — mirrors the DUT-423 dedup-branch cleanup in
+        // RecipeStore+CookLog: the JPEG was written to disk before the failed
+        // `logCook`, so delete it here rather than orphan it.
+        CookPhotoStore().delete(id: id)
     }
 
     public func publishWidgetSnapshot(items: [RecipeListItem]) async {

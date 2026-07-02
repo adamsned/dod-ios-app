@@ -37,6 +37,13 @@ public enum AppleCredentialResolver {
     /// The credential's values always win when present (a user who re-enabled
     /// name/email sharing in Settings → Apple ID gets the fresh values). The
     /// `userIdentifier` from the new credential is authoritative.
+    ///
+    /// DUT-375: the `refreshToken` is likewise carried forward from `existing`
+    /// on a same-user re-auth (Apple's `ASAuthorizationAppleIDCredential` never
+    /// re-issues it — it's only ever delivered to the server-side token exchange,
+    /// not this client credential — so dropping it here logged the user back out
+    /// of the token-backed flows). A different `userIdentifier` nils it, same as
+    /// name/email, so a second person on a shared device can't inherit it.
     public static func resolve(
         userIdentifier: String,
         credentialDisplayName: String?,
@@ -46,6 +53,12 @@ public enum AppleCredentialResolver {
         let sameUser = existing?.userIdentifier == userIdentifier
         let name = credentialDisplayName ?? (sameUser ? existing?.displayName : nil)
         let email = credentialEmail ?? (sameUser ? existing?.email : nil)
-        return AppleAuthSession(userIdentifier: userIdentifier, displayName: name, email: email)
+        let refreshToken = sameUser ? existing?.refreshToken : nil
+        return AppleAuthSession(
+            userIdentifier: userIdentifier,
+            displayName: name,
+            email: email,
+            refreshToken: refreshToken
+        )
     }
 }

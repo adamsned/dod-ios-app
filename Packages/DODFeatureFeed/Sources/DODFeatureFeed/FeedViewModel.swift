@@ -119,6 +119,13 @@ public final class FeedViewModel {
             try await dependencies.logCook(entry)
         } catch {
             // The journal is a nicety, not a blocker — swallow + move on.
+            // DUT-208: the caller wrote the photo JPEG to disk before this call,
+            // so a failed write would orphan it (no row ever references its
+            // `photoLocalID`). Delete it here, mirroring the DUT-423 dedup-branch
+            // cleanup in RecipeStore+CookLog.
+            if let photoID = entry.photoLocalID {
+                await dependencies.deleteCookPhoto(id: photoID)
+            }
             return
         }
         let logsAfter = (try? await dependencies.cookLogs()) ?? logsBefore

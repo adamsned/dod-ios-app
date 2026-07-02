@@ -80,6 +80,44 @@ struct AppleCredentialResolverTests {
         #expect(session.email == nil)
     }
 
+    @Test func reauthSameUserCarriesRefreshTokenForward() {
+        // DUT-375: Apple never re-issues the refresh token on a client credential,
+        // so a same-user re-auth must preserve the one already on file — otherwise
+        // the token-backed flows silently log the user out.
+        let existing = AppleAuthSession(
+            userIdentifier: "user-1",
+            displayName: "Ned Adams",
+            email: "ned@example.com",
+            refreshToken: "rt-abc123"
+        )
+        let session = AppleCredentialResolver.resolve(
+            userIdentifier: "user-1",
+            credentialDisplayName: nil,
+            credentialEmail: nil,
+            existing: existing
+        )
+        #expect(session.refreshToken == "rt-abc123")
+    }
+
+    @Test func reauthDifferentUserNilsRefreshToken() {
+        // DUT-375: a different Apple ID must never inherit the prior user's refresh
+        // token (parity with name/email), so a second person on a shared device
+        // can't reuse it.
+        let existing = AppleAuthSession(
+            userIdentifier: "user-1",
+            displayName: "Ned Adams",
+            email: "ned@example.com",
+            refreshToken: "rt-abc123"
+        )
+        let session = AppleCredentialResolver.resolve(
+            userIdentifier: "user-2",
+            credentialDisplayName: "Other Person",
+            credentialEmail: "other@example.com",
+            existing: existing
+        )
+        #expect(session.refreshToken == nil)
+    }
+
     @Test func freshCredentialValuesOverrideExisting() {
         // A user who re-enabled name/email sharing gets the fresh values, not
         // the stale stored ones.

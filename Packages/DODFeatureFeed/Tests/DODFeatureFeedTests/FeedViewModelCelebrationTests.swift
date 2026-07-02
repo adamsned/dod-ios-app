@@ -27,6 +27,37 @@ import Testing
         }
     }
 
+    /// DUT-208 — when the journal write fails, the photo the flow wrote to disk
+    /// before handing off must be deleted so it isn't orphaned (no journal row
+    /// will ever reference its `photoLocalID`).
+    @Test func failedLogCookDeletesTheOrphanedPhoto() async {
+        let dependencies = FakeFeedDependencies()
+        dependencies.logCookShouldFail = true
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        let entry = CookLogEntry(
+            id: UUID(),
+            recipeID: 9100,
+            recipeTitle: "R9100",
+            cookedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            photoLocalID: "orphan-photo-9100.jpg"
+        )
+        await viewModel.logCook(entry)
+
+        #expect(dependencies.deletedCookPhotoIDs == ["orphan-photo-9100.jpg"])
+    }
+
+    /// DUT-208 — a failed write with no photo attached must not attempt a delete.
+    @Test func failedLogCookWithNoPhotoDeletesNothing() async {
+        let dependencies = FakeFeedDependencies()
+        dependencies.logCookShouldFail = true
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        await viewModel.logCook(makeCook(9101))  // makeCook attaches no photo
+
+        #expect(dependencies.deletedCookPhotoIDs.isEmpty)
+    }
+
     @Test func loggingACookThatStaysInRankCelebratesNothing() async {
         let dependencies = FakeFeedDependencies()
         dependencies.cooks = [makeCook(9001)]  // 1 cook -> Fire Starter

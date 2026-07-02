@@ -20,6 +20,12 @@ extension RecipeDetailViewModel {
             snackbarMessage = "Saved to your Cooking Journal."
         } catch {
             DODLog.persistence.error("log cook failed: \(String(describing: error))")
+            // DUT-208: the photo was persisted to CookPhotoStore before this call,
+            // so a failed write would orphan it (no row references its
+            // `photoLocalID`). Delete it here, mirroring the DUT-423 dedup cleanup.
+            if let photoID = entry.photoLocalID {
+                await dependencies.deleteCookPhoto(id: photoID)
+            }
             snackbarMessage = "Couldn't save to your journal. Try again from the journal."
         }
     }

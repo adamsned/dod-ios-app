@@ -96,6 +96,21 @@ extension RecipeStore {
         return row.bytes
     }
 
+    /// DUT-412 — non-touching byte read for Spotlight thumbnail indexing.
+    /// Returns the cached bytes for `url` WITHOUT bumping `lastUsedAt` (parity
+    /// with ``recipeWithoutTouching`` / ``hasBridgedImage``): indexing must not
+    /// promote rows in the image LRU over images the user actually viewed.
+    /// Returns nil when the image isn't cached — CoreSpotlight never fetches a
+    /// remote thumbnail, so the caller simply omits the thumbnail in that case.
+    public func imageBytesWithoutTouching(url: URL) throws -> Data? {
+        let urlString = url.absoluteString
+        var descriptor = FetchDescriptor<CachedImage>(
+            predicate: #Predicate { $0.urlString == urlString }
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.bytes
+    }
+
     /// DUT-442 — existence probe for background jobs (the feed widget-snapshot
     /// prefetch gate). Unlike ``image(url:)`` it does NOT bump `lastUsedAt`
     /// (a snapshot job must not promote rows in the image LRU over images the
