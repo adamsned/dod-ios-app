@@ -59,3 +59,50 @@ import Testing
         #expect(item.publishedAt == WPDTO.parseWPDate("2026-05-23T08:00:00"))
     }
 }
+
+/// DUT-398: `parseWPDate` must not fall back to `Date()` (which stamps a
+/// months-old recipe as "published today") for stamps that carry their own
+/// offset or fractional seconds. The old code blindly appended "Z", turning
+/// "…+00:00" into the un-parseable "…+00:00Z".
+@Suite("parseWPDate handles offsets + fractional seconds (DUT-398)")
+struct ParseWPDateTests {
+
+    /// 2026-05-23 08:00:00 UTC as a Unix timestamp — the instant every stamp
+    /// under test resolves to, checked absolutely so a fallback-to-`now` would
+    /// fail rather than accidentally match another parsed value.
+    private let reference = Date(timeIntervalSince1970: 1_779_523_200)
+
+    @Test func plainOffsetlessStampParsesAsUTC() {
+        #expect(WPDTO.parseWPDate("2026-05-23T08:00:00") == reference)
+    }
+
+    @Test func explicitZuluOffsetParses() {
+        #expect(WPDTO.parseWPDate("2026-05-23T08:00:00Z") == reference)
+    }
+
+    @Test func colonSeparatedOffsetParses() {
+        // "+00:00" is the same instant as the offsetless UTC reference.
+        #expect(WPDTO.parseWPDate("2026-05-23T08:00:00+00:00") == reference)
+        // A non-zero offset resolves to the correct instant, not `Date()`.
+        #expect(WPDTO.parseWPDate("2026-05-23T10:00:00+02:00") == reference)
+    }
+
+    @Test func basicOffsetWithoutColonParses() {
+        #expect(WPDTO.parseWPDate("2026-05-23T10:00:00+0200") == reference)
+    }
+
+    @Test func fractionalSecondsParse() {
+        #expect(WPDTO.parseWPDate("2026-05-23T08:00:00.000Z") == reference)
+        #expect(WPDTO.parseWPDate("2026-05-23T08:00:00.000+00:00") == reference)
+    }
+
+    /// Garbage falls back to "now" — but a *valid* stamp never should. We bound
+    /// the fallback to the current instant rather than pinning it.
+    @Test func garbageFallsBackToApproximatelyNow() {
+        let before = Date()
+        let parsed = WPDTO.parseWPDate("not-a-date")
+        let after = Date()
+        #expect(parsed >= before)
+        #expect(parsed <= after)
+    }
+}

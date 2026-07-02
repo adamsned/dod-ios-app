@@ -48,6 +48,19 @@ struct IngredientAggregatorTests {
         #expect(result[0].sourceCount == 2)
     }
 
+    /// DUT-383: the merge is case-insensitive (the doc promises it), so
+    /// `"Flour"` and `"flour"` roll into one summed row. The display keeps the
+    /// first-seen casing.
+    @Test func differentlyCasedNamesMergeCaseInsensitively() {
+        let result = IngredientAggregator.aggregate(
+            ingredients("2 cups Flour", "1 cup flour")
+        )
+        #expect(result.count == 1)
+        #expect(result[0].quantity == 3)
+        #expect(result[0].sourceCount == 2)
+        #expect(result[0].displayText == "3 cups Flour")
+    }
+
     @Test func unitAbbreviationAndSpelledOutMerge() {
         // "tbsp" and "tablespoons" normalize to the same canonical unit.
         let result = IngredientAggregator.aggregate(

@@ -36,6 +36,8 @@ public struct RecipeRating: Sendable, Hashable, Codable {
         // Defensive clamp — REG-14 promises this invariant to consumers.
         self.average = max(0.0, min(5.0, average))
         self.count = max(0, count)
-        self.userRating = userRating
+        // DUT-376: clamp a present vote to the valid 1...5 star range (nil — the
+        // "hasn't voted" case — is preserved), matching the average/count guards.
+        self.userRating = userRating.map { max(1, min(5, $0)) }
     }
 }

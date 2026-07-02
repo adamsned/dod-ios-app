@@ -89,14 +89,29 @@ enum WPDTO {
         }
     }
 
-    /// WP `date` field is ISO8601 without a timezone, e.g. "2026-05-23T08:00:00".
-    /// We assume UTC since the API normalizes server time.
+    /// Parse a WP ISO8601 `date`. DUT-398: append "Z" only when the stamp lacks
+    /// its own offset (doing so blindly niled "…+00:00"/fractional stamps → `now`).
     static func parseWPDate(_ raw: String?) -> Date {
         guard let raw else { return Date() }
-        let withZone = raw.hasSuffix("Z") ? raw : raw + "Z"
+        let withZone = hasExplicitOffset(raw) ? raw : raw + "Z"
         let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: withZone) ?? Date()
+        for options: ISO8601DateFormatter.Options in [
+            [.withInternetDateTime, .withFractionalSeconds], [.withInternetDateTime],
+        ] {
+            formatter.formatOptions = options
+            if let date = formatter.date(from: withZone) { return date }
+        }
+        return Date()
+    }
+
+    /// True when `raw` carries a timezone ("Z" or a "+HH:MM"/"-HHMM" time offset).
+    private static func hasExplicitOffset(_ raw: String) -> Bool {
+        if raw.hasSuffix("Z") { return true }
+        guard let tIndex = raw.lastIndex(of: "T") else { return false }
+        let time = raw[raw.index(after: tIndex)...]
+        guard let sign = time.lastIndex(where: { $0 == "+" || $0 == "-" }) else { return false }
+        let digits = time[sign...].dropFirst().filter { $0 != ":" }
+        return (digits.count == 2 || digits.count == 4) && digits.allSatisfy(\.isNumber)
     }
 
     // MARK: - Comments (US-13 / REG-13)
@@ -281,23 +296,18 @@ extension WPDTO.Post {
     /// or use of the featured media link if pre-resolved).
     ///
     /// `categoryIDs` is propagated from the wire payload (T-530 / CL-53 /
-    /// REG-17) so the Search-tab category chip can filter fresh REST hits
-    /// without waiting for a recipe-detail open to hydrate
-    /// `CachedRecipe.categoryIDs` via the JSON-LD merge path. When the
-    /// payload omits the field (`categories == nil`), the field stays
-    /// nil rather than being forced to an empty array — that distinction
-    /// is what the cache-side guard inside `RecipeStore.cache(listItem:)`
-    /// uses to avoid clobbering a populated `CachedRecipe.categoryIDs`
-    /// value with an absent-on-the-wire one.
+    /// REG-17) so the Search-tab category chip can filter fresh REST hits before
+    /// a recipe-detail open hydrates `CachedRecipe.categoryIDs`. An omitted field
+    /// (`categories == nil`) stays nil, not `[]` — the distinction lets the guard
+    /// in `RecipeStore.cache(listItem:)` avoid clobbering a populated value.
     func toRecipeListItem(heroImage: URL?) -> RecipeListItem {
         RecipeListItem(
             id: id,
             title: HTMLSanitizer.plainText(from: title.rendered),
             excerpt: HTMLSanitizer.plainText(from: excerpt.rendered),
             heroImage: heroImage,
-            // DUT-311: `date` is site-local without an offset; appending "Z" in
-            // parseWPDate would mislabel it as UTC and can show the wrong day.
-            // `date_gmt` is genuine UTC, so it drives `publishedAt`.
+            // DUT-311: `date` is site-local; `date_gmt` is genuine UTC, so it
+            // drives `publishedAt` (parseWPDate assumes UTC for offsetless input).
             publishedAt: WPDTO.parseWPDate(dateGMT ?? date),
             totalTimeDisplay: nil,
             canonicalURL: link,

@@ -80,6 +80,11 @@ enum IngredientLineParser {
         if let attached = readSlashFraction(text, numeratorStart: text.startIndex, slashAt: wholeEnd) {
             return attached
         }
+        // Glued vulgar fraction with no space: `"1½"` (DUT-393). The ASCII digit
+        // scan stops before the glyph, so it sits directly at `wholeEnd`.
+        if wholeEnd < text.endIndex, let glyph = vulgarFractions[text[wholeEnd]] {
+            return (whole + glyph, text.index(after: wholeEnd))
+        }
         if let mixed = readMixedTail(text, whole: whole, afterWhole: wholeEnd) {
             return mixed
         }
@@ -169,9 +174,14 @@ enum IngredientLineParser {
 
     // MARK: - Scanning
 
+    /// Scan a run of ASCII digits. DUT-393: `Character.isNumber` is `true` for
+    /// vulgar fractions (`½`, `¼`, …), so an unrestricted scan would swallow the
+    /// glyph in a glued `"1½"` and yield `Double("1½") == nil → 0`. Restricting
+    /// to ASCII leaves the glued fraction for the mixed/attached-tail logic to
+    /// pick up.
     private static func scanDigits(_ text: String, from index: String.Index) -> String.Index {
         var cursor = index
-        while cursor < text.endIndex, text[cursor].isNumber {
+        while cursor < text.endIndex, text[cursor].isASCII, text[cursor].isNumber {
             cursor = text.index(after: cursor)
         }
         return cursor
