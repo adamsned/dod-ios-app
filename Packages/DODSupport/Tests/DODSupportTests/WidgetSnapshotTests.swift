@@ -25,6 +25,32 @@ import Testing
         #expect(roundTripped.entries == entries)
     }
 
+    // DUT-460 — the adaptive-eyebrow flag round-trips, and a legacy payload
+    // written before the field decodes to `false` (recipe) instead of throwing.
+    @Test func isArticleRoundTripsAndDefaultsForLegacyPayloads() throws {
+        let article = WidgetSnapshot.Entry(
+            id: 7,
+            title: "Best Dutch Oven Roundups",
+            excerpt: "e",
+            heroImageURL: nil,
+            canonicalURL: nil,
+            publishedAt: Date(timeIntervalSince1970: 1),
+            totalTimeDisplay: nil,
+            isArticle: true
+        )
+        let data = try JSONEncoder().encode(article)
+        #expect(try JSONDecoder().decode(WidgetSnapshot.Entry.self, from: data).isArticle)
+
+        // Strip the key to simulate a pre-DUT-460 payload → must default false.
+        var json = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        json.removeValue(forKey: "isArticle")
+        let legacyData = try JSONSerialization.data(withJSONObject: json)
+        let decoded = try JSONDecoder().decode(WidgetSnapshot.Entry.self, from: legacyData)
+        #expect(decoded.isArticle == false)
+    }
+
     @Test func writeWithEntriesConvenienceCapsAtMaxEntries() throws {
         let defaults = try Self.freshDefaults()
         let store = WidgetSnapshotStore(defaults: defaults, key: "test.cap")

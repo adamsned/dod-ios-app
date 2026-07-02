@@ -41,6 +41,22 @@ final class WidgetLargeSnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: Self.largeImage(), record: .missing)
     }
 
+    /// DUT-460 — the adaptive "Latest Article" eyebrow (no recipe time chip).
+    func test_featuredLarge_article() {
+        let base = Self.widgetContent()
+        let content = WidgetCard.Content(
+            title: "Seasoning Cast Iron: The Only Guide You Need",
+            excerpt: base.excerpt,
+            heroImageURL: nil,
+            totalTimeDisplay: nil,
+            eyebrow: "Latest Article"
+        )
+        let view = WidgetCard.FeaturedLarge(content: content)
+            .frame(width: 364, height: 382)
+            .background(DODColor.surfaceElevated)
+        assertSnapshot(of: view, as: Self.largeImage(), record: .missing)
+    }
+
     func test_savedLarge_fiveEntries() {
         let view = WidgetCard.SavedLarge(rows: Self.savedSampleRows)
             .frame(width: 364, height: 382)

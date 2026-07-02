@@ -3135,4 +3135,14 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-902 — Adaptive "Latest Recipe" / "Latest Article" widget header; remove "New on DOD" (CL-296 / DUT-455, DUT-460; supersedes DUT-452)
+
+- **What:** One widget whose eyebrow flips between "Latest Recipe" and "Latest Article" based on the latest post's kind, on BOTH the home-screen featured widget and the lock-screen rectangular widget — replacing the hardcoded **"New on DOD"** (Spencer wants the "DOD" acronym out of user-facing widget text; App Store review + Department-of-Defense concern). Supersedes the deferred separate Latest Article widget (DUT-452).
+  - **Classification:** `WidgetSnapshot.Entry` gains `isArticle: Bool` (additive, back-compat decode → recipe). Only the top (shown) post is classified: `LiveFeedDependencies` gets an injected `latestKindClassifier` closure; the app builds it (`AppDependencies.makeLatestKindClassifier`) from `pageFetcher.html(for:)` + `JSONLDRecipeParser.parse` — a parse throw means no Recipe block → article (CL-63). Defensive `try?` everywhere → defaults to recipe on any fetch/parse failure. One fetch per publish.
+  - **Eyebrow:** `WidgetCard.Content` gains `eyebrow` (default "Latest Recipe"); `FeaturedLarge` + `Medium` render `content.eyebrow`. The featured + lock-screen entry views build the eyebrow from `entry.isArticle`.
+- **Files:** DODSupport `WidgetSnapshot.swift` (`Entry.isArticle` + decode) + `WidgetSnapshotTests` (round-trip + legacy). DODFeatureFeed `FeedDependencies.swift` (`LatestKindClassifier` + classify top in publish). DODDesignSystem `WidgetCard.swift` (`Content.eyebrow` + Medium), `WidgetCard+Large.swift` (FeaturedLarge). App `AppDependencies.swift` (wire classifier; `pageFetcher` internal) + new `AppDependencies+WidgetClassifier.swift`. Widget `FeaturedRecipeWidgetEntryView.swift` + `LatestRecipeLockScreenWidgetEntryView.swift` (adaptive eyebrow). L4: 6 populated Medium/Large baselines re-recorded (eyebrow text) + 2 new article baselines (`featuredLarge_article`, `lockScreenWidget_rectangular_article`), all CI-recorded. Spec: `clarifications.md` (CL-296).
+- **AC:** US-9 / US-22 (widgets). Linear DUT-460 (parent DUT-455); closes DUT-452 as superseded. CL-296 canonical. **Est:** ~4 h. **Deps:** off main (after CL-295). Branch `feat/widgets-round2-adaptive-header`. **Verification:** swift-format + SwiftLint clean; DODSupport (isArticle round-trip + legacy) green; app + widget targets compile; both eyebrows eyeballed via local record (recipe → "LATEST RECIPE", article → "LATEST ARTICLE", "NEW ON DOD" gone). L4 baselines CI-recorded (local render drifts). Live classification best confirmed in an Xcode-signed run (widget runtime).
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

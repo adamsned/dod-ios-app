@@ -67,7 +67,11 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
     /// including `heroImageURL` + `totalTimeDisplay` we don't render
     /// on the lock screen) onto the lock-screen-specific subset.
     static func content(from recipe: WidgetSnapshot.Entry) -> WidgetCard.LockScreenContent {
-        WidgetCard.LockScreenContent(eyebrow: "Latest Recipe", title: recipe.title)
+        // DUT-460 — adaptive eyebrow: the latest post is a recipe or an article.
+        WidgetCard.LockScreenContent(
+            eyebrow: recipe.isArticle ? "Latest Article" : "Latest Recipe",
+            title: recipe.title
+        )
     }
 
     static func accessibilityLabel(for recipe: WidgetSnapshot.Entry) -> String {
