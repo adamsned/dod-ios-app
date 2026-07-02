@@ -84,10 +84,14 @@ extension RecipeStore {
     /// One-time backfill (DUT-35): seed the synced store from any pre-V5 local
     /// saves so the Saved tab is NOT empty after the update that introduced
     /// `SyncedSavedRecipe`. Idempotent — it only inserts ids not already in the
-    /// synced store, so re-running it is harmless. The caller
-    /// (`AppDependencies.bootstrap`) still guards it behind a one-shot
-    /// `UserDefaults` flag so a later cross-device unsave is never resurrected
-    /// by a device whose stale local pin still reads `isSaved == true`.
+    /// synced store, so re-running it is harmless.
+    ///
+    /// DUT-240 — the one-shot flag alone does NOT prevent cross-device
+    /// resurrection (the first run could still seed a stale local pin before
+    /// the remote unsave imported). The caller
+    /// (`AppDependencies.backfillSyncedSavedIfNeeded`) owns that protection:
+    /// with CloudKit sync live it defers this seed until the first finished
+    /// import and skips it entirely when the imported set is already non-empty.
     public func backfillSyncedSaved() throws {
         let descriptor = FetchDescriptor<CachedRecipe>(
             predicate: #Predicate { $0.isSaved == true }
@@ -108,6 +112,17 @@ extension RecipeStore {
     /// ``mergeDetail`` from "preserve legacy pins" to "synced set is authoritative".
     public func markSyncedSavedBackfillComplete() {
         didBackfillSyncedSaved = true
+    }
+
+    /// DUT-240 — true when ANY synced saved-row exists. After the first
+    /// CloudKit import lands, a non-empty set means another ≥V5 device already
+    /// seeded the shared set — so the launch-time backfill must NOT re-insert
+    /// local-only pins (their absence from the set IS the user's cross-device
+    /// unsave). Cheap: `fetchLimit = 1`.
+    public func hasAnySyncedSaved() throws -> Bool {
+        var descriptor = FetchDescriptor<SyncedSavedRecipe>()
+        descriptor.fetchLimit = 1
+        return try !modelContext.fetch(descriptor).isEmpty
     }
 
     #if DEBUG

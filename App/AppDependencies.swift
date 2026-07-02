@@ -59,11 +59,11 @@ final class AppDependencies {
 
     /// `true` when the persisted opt-in flag was ON but the CloudKit-backed
     /// `.private` container failed to open at launch, so the DOD-CRASH-1
-    /// safety net (DUT-6) degraded to a plain local container. Surfaced to
-    /// the diagnostics log; sync stays dormant (local data intact) until the
-    /// underlying CloudKit problem — most likely an undeployed Production
-    /// schema — is fixed and the app relaunches.
-    private let usedCloudKitFallback: Bool
+    /// safety net (DUT-6) degraded to a plain local container. Sync stays
+    /// dormant (local data intact) until the underlying CloudKit problem is
+    /// fixed and the app relaunches. Internal (not private) so the
+    /// `+SyncedSavedBackfill.swift` extension can gate the DUT-240 seed on it.
+    let usedCloudKitFallback: Bool
 
     init() {
         var fellBackToLocal = false
