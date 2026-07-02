@@ -22,7 +22,8 @@ extension WidgetCard {
         }
 
         public var body: some View {
-            VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            // DUT-478 — center the tip within the widget (was top-leading).
+            VStack(spacing: DODSpacing.xs) {
                 Label {
                     Text("Cooking Tip")
                         .font(.system(.caption2, design: .default, weight: .semibold))
@@ -39,11 +40,9 @@ extension WidgetCard {
                     .foregroundStyle(DODColor.label)
                     .lineLimit(isCompact ? 5 : 3)
                     .minimumScaleFactor(0.7)
-                    .multilineTextAlignment(.leading)
-
-                Spacer(minLength: 0)
+                    .multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .padding(DODSpacing.md)
         }
     }

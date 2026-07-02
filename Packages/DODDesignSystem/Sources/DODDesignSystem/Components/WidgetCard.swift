@@ -313,16 +313,41 @@ public enum WidgetCard {
 
         let text: String
 
+        #if canImport(WidgetKit)
+        @Environment(\.widgetRenderingMode) private var widgetRenderingMode
+        #endif
+
+        /// DUT-479 — in `.accented` (Tinted/Clear) the system flattens a FILLED
+        /// capsule into a solid tint blob, and the cream text tints to match it
+        /// (→ invisible). So in accented mode we drop the fill for an OUTLINED
+        /// capsule + tint-adaptive text (both take the wallpaper tint while the
+        /// interior stays clear → legible), matching how the rest of the widget
+        /// content stays legible in Tinted mode (DUT-73 / DUT-9). `.fullColor`
+        /// keeps the cream-on-brown pill.
+        private var isAccented: Bool {
+            #if canImport(WidgetKit)
+            return widgetRenderingMode == .accented
+            #else
+            return false
+            #endif
+        }
+
         var body: some View {
             HStack(spacing: 4) {
                 Image(systemName: "clock")
                 Text(text)
             }
             .font(.system(.caption2, design: .default, weight: .semibold))
-            .foregroundStyle(DODColor.cream)
+            .foregroundStyle(isAccented ? DODColor.label : DODColor.cream)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(Capsule().fill(DODColor.castIronBrown.opacity(0.92)))
+            .background {
+                if isAccented {
+                    Capsule().strokeBorder(DODColor.label.opacity(0.55), lineWidth: 1)
+                } else {
+                    Capsule().fill(DODColor.castIronBrown.opacity(0.92))
+                }
+            }
         }
     }
 }
