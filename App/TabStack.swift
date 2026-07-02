@@ -11,9 +11,11 @@ import DODSupport
 import SwiftUI
 import WidgetKit
 
-/// One tab's navigation stack. Each tab gets its own `@State` path so
-/// SwiftUI's binding identity stays stable across re-renders of the host
-/// TabView — moving the @State out of the parent was the fix for DOD-NAV-1.
+/// One tab's navigation stack. The per-tab `path` is owned by `RootView`
+/// (DUT-250) and injected here as a `@Binding` so it survives the iPad
+/// size-class flip, which re-instantiates the TabStack tree. The path used to
+/// be local `@State`; hoisting it out of the parent's `Group` boundary keeps
+/// a pushed detail alive across the compact↔regular swap.
 struct TabStack: View {
 
     let tab: AppTab
@@ -26,16 +28,28 @@ struct TabStack: View {
     /// in-app article-link taps (DUT-243, push semantics). Every tab gets a
     /// sink now so a link tapped in Saved/Search opens in place.
     @Binding var externalRoute: ExternalRoute?
-    @State private var path: [RecipeRoute] = []
+    /// DUT-250 — the per-tab navigation stack is now HOISTED into
+    /// `RootView`-owned state and injected as a `@Binding`. Previously this
+    /// was a local `@State private var path`, but on iPad the size-class flip
+    /// (Slide Over / Split View / Stage Manager resize) swaps `RootView`'s
+    /// `iPadSplit` (one detail `TabStack`, keyed `.id(selectedTab)`) for
+    /// `phoneTabs` (four `TabStack`s) — two structurally different trees. The
+    /// TabStack identities differ across the boundary, so SwiftUI tore down
+    /// the old TabStack and its local `path`, dropping any pushed detail back
+    /// to the tab root. Hoisting the path to `RootView` (which itself survives
+    /// the flip, like `selectedTab`) keeps the pushed stack alive.
+    @Binding var path: [RecipeRoute]
 
     init(
         tab: AppTab,
         dependencies: AppDependencies,
+        path: Binding<[RecipeRoute]> = .constant([]),
         pendingDeepLink: Binding<WidgetDeepLink?> = .constant(nil),
         externalRoute: Binding<ExternalRoute?> = .constant(nil)
     ) {
         self.tab = tab
         self.dependencies = dependencies
+        self._path = path
         self._pendingDeepLink = pendingDeepLink
         self._externalRoute = externalRoute
     }

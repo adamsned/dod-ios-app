@@ -61,6 +61,16 @@ struct RootView: View {
     @State var feedExternalRoute: ExternalRoute?
     @State var savedExternalRoute: ExternalRoute?
     @State var searchExternalRoute: ExternalRoute?
+    /// DUT-250 — per-tab navigation stacks, hoisted out of `TabStack`'s local
+    /// `@State` into `RootView` so they SURVIVE the iPad size-class flip. `body`
+    /// swaps structurally different trees at the `.regular` boundary —
+    /// `iPadSplit` (one detail `TabStack`, keyed `.id(selectedTab)`) vs
+    /// `phoneTabs` (four) — so TabStack identities differ and SwiftUI tore down
+    /// the old stack (and its local `path`). `RootView` survives the flip (like
+    /// `selectedTab`), so a path owned here does too; each `TabStack` reads its
+    /// slot via `pathBinding(for:)`. `.id(selectedTab)` on the iPad detail is
+    /// kept (resets the TabStack's *other* @State). Non-private for the ext.
+    @State var tabPaths: [AppTab: [RecipeRoute]] = [:]
     @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The system `openURL`, captured before RootView overrides it for its
@@ -201,6 +211,7 @@ struct RootView: View {
                 TabStack(
                     tab: tab,
                     dependencies: dependencies,
+                    path: pathBinding(for: tab),
                     pendingDeepLink: tab == .feed ? $pendingDeepLink : .constant(nil),
                     externalRoute: externalRouteBinding(for: tab)
                 )
@@ -262,6 +273,7 @@ struct RootView: View {
             TabStack(
                 tab: selectedTab,
                 dependencies: dependencies,
+                path: pathBinding(for: selectedTab),
                 pendingDeepLink: selectedTab == .feed ? $pendingDeepLink : .constant(nil),
                 externalRoute: externalRouteBinding(for: selectedTab)
             )
@@ -382,7 +394,7 @@ extension RootView {
     }
 }
 
-// DOD-ART-2 / DUT-243 / DUT-246 — the in-app article-link routing
+// DOD-ART-2 / DUT-243 / DUT-246 / DUT-250 — in-app article-link routing
 // (`handleArticleLinkTap`, `openRecipeLink`, `routeIntoCurrentTab`,
-// `externalRouteBinding(for:)`) lives in `RootView+LinkRouting.swift` so this
-// file stays under the SwiftLint `file_length` cap.
+// `externalRouteBinding(for:)`) and the hoisted-path helper (`pathBinding(for:)`)
+// live in `RootView+LinkRouting.swift` so this file stays under `file_length`.
