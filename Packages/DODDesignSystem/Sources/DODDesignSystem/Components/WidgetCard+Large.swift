@@ -43,6 +43,7 @@ extension WidgetCard {
                         .font(.system(.headline, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.label)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.7)
                         .multilineTextAlignment(.leading)
 
                     if !content.excerpt.isEmpty {
@@ -50,6 +51,7 @@ extension WidgetCard {
                             .font(.system(.subheadline, design: .default))
                             .foregroundStyle(DODColor.labelSecondary)
                             .lineLimit(2)
+                            .minimumScaleFactor(0.7)
                             .multilineTextAlignment(.leading)
                     }
 
@@ -58,13 +60,16 @@ extension WidgetCard {
                             .padding(.top, DODSpacing.xxs)
                     }
                 }
-                // T-769 / CL-166 (DUT-75) — `.fixedSize` so the content takes its
-                // full natural height and the greedy hero takes the remainder;
-                // this is what keeps the title/excerpt from being squeezed +
-                // clipped on `.systemLarge`.
-                .fixedSize(horizontal: false, vertical: true)
+                // DUT-458 — the content region wins its space over the greedy
+                // hero (`.layoutPriority(1)`, replacing DUT-75's `.fixedSize`
+                // which forced the natural height and could push the last line /
+                // time chip past the frame with long real-world content or large
+                // Dynamic Type). The `.minimumScaleFactor(0.7)` on the title +
+                // excerpt then shrinks text to fit instead of clipping; the hero
+                // shrinks toward the remainder.
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(DODSpacing.md)
+                .layoutPriority(1)
             }
         }
     }
