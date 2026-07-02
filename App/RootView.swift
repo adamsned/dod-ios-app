@@ -52,7 +52,13 @@ struct RootView: View {
     @AppStorage(SettingsViewModel.appearancePreferenceKey)
     private var appearanceRaw: String = AppearancePreference.system.rawValue
     /// Widget deep link (spec.md US-9 AC-9.2). Feed tab consumes via .task(id:).
-    @State private var pendingDeepLink: WidgetDeepLink?
+    /// Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)` can set it.
+    @State var pendingDeepLink: WidgetDeepLink?
+    /// DUT-457 — the Cooking Tip widget's `dod://tip/<index>` tap shows the full
+    /// tip in a dialog. Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)`
+    /// can set them.
+    @State var showTipDialog = false
+    @State var tipDialogText = ""
     // Per-tab external-route sinks. Feed carries deep links (App Intents /
     // Spotlight, spec.md US-10, replace semantics) AND in-app link taps;
     // Saved + Search exist so an article link tapped there opens in place
@@ -193,6 +199,12 @@ struct RootView: View {
                     + "Takes effect next time you open the app — change it anytime in Settings."
             )
         }
+        // DUT-457 — the Cooking Tip widget opens the full tip here.
+        .alert("Cooking Tip", isPresented: $showTipDialog) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(tipDialogText)
+        }
         // Intercept in-app link taps (DOD-ART-2): a dutchovendaddy.com recipe
         // link inside a rendered article opens the recipe in-app instead of
         // bouncing to Safari. Set on the whole tree so it reaches the article
@@ -292,33 +304,13 @@ struct RootView: View {
     }
 
     // MARK: - Deep-link routing
-
-    /// Widget URL handler (spec.md US-9 AC-9.2, US-17 AC-17.4). Recipe + feed
-    /// routes switch to Feed and hand the link to the TabStack via
-    /// `pendingDeepLink`; the saved route (US-17) just switches tabs (Saved owns
-    /// its destination). Fires `widgetOpened(kind:, recipeID:)` once per consumed
-    /// link (T-323 / AC-17.9) — kind from the URL `source` param (recipe URLs) or
-    /// host (chrome URLs); payload is kind + integer recipe id (nil for chrome /
-    /// empty-state taps landing on Saved or Feed without a specific target).
-    private func handle(widgetLink link: WidgetDeepLink) {
-        Telemetry.shared.send(.widgetOpened(kind: link.widgetKind, recipeID: link.recipeID))
-        switch link {
-        case .saved:
-            selectedTab = .saved
-        case .feed:
-            selectedTab = .feed
-            pendingDeepLink = link
-        case .recipe(let id, _):
-            // DUT-358: route a widget recipe tap through the App-Intent fetch-on-miss
-            // resolver, so a cache + snapshot double-miss fetches the recipe instead
-            // of `TabStack.consume` silently dropping the tap.
-            selectedTab = .feed
-            handle(intent: .openRecipe(id: id))
-        }
-    }
+    //
+    // `handle(widgetLink:)` lives in `RootView+LinkRouting.swift` (keeps this
+    // file under the SwiftLint `file_length` cap).
 
     /// Routes a parsed `DeepLinkIntent` into tab + path state (US-10).
-    private func handle(intent: DeepLinkIntent) {
+    /// Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)` can call it.
+    func handle(intent: DeepLinkIntent) {
         switch intent {
         case .openSaved:
             selectedTab = .saved

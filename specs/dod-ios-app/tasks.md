@@ -3125,4 +3125,14 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-901 — Cooking Tip: tap-to-full-tip dialog + home-screen small/medium (CL-295 / DUT-455, DUT-457, DUT-459)
+
+- **What:** (parent DUT-455)
+  - **DUT-457** — tapping the Cooking Tip widget opens the app and shows the FULL tip in a dialog (the inline slot truncates it). New `dod://tip/<index>` route on `WidgetDeepLinkParser`; `RootView` presents an `.alert("Cooking Tip")` with `CookingTip.tip(atIndex:)`. `CookingTip` gained `index(for:)` + `tip(atIndex:)` (guarded); the widget encodes the day's index in its `widgetURL`.
+  - **DUT-459** — the Cooking Tip widget now ships `.systemSmall` + `.systemMedium` home-screen cards (new `WidgetCard.TipCard`, flame eyebrow + tip) alongside the `.accessoryInline` variant, from one widget (`CookingTipInlineWidget` renamed → `CookingTipWidget`, kind preserved). Family-aware `containerBackground` (clear inline / `DODColor.surface` home). New analytics `WidgetKind.cookingTip`.
+- **Files:** DODSupport `WidgetSnapshot.swift` (`.tip` route + parse), `CookingTip.swift` (`index`/`tip(atIndex:)`), `WidgetDeepLinkParserTests` (+3), `CookingTipTests` (+3). DODAnalytics `AnalyticsEvent.swift` (`WidgetKind.cookingTip`). DODDesignSystem `WidgetCard+Tip.swift` (`TipCard`) + `WidgetTipSnapshotTests` (small + medium, CI-recorded). App `WidgetDeepLink.swift` (`.tip` in `widgetKind`/`recipeID`), `RootView.swift` (tip alert state + `.alert`; `handle(intent:)`/`pendingDeepLink` de-privatized), `RootView+LinkRouting.swift` (`handle(widgetLink:)` moved here + `.tip`), `TabStack.swift` (`.tip` unreachable case). Widget: `CookingTipWidget.swift` (was `CookingTipInlineWidget.swift`), `DODAppWidgetBundle.swift`. Spec: `clarifications.md` (CL-295).
+- **AC:** US-22 / US-9 (widgets). Linear DUT-457 + DUT-459. CL-295 canonical. **Est:** ~3 h. **Deps:** off main (after CL-294). Branch `feat/widgets-round2-tip`. **Verification:** swift-format + SwiftLint clean; DODSupport (26 tip/parser tests) green; app + widget targets compile; both `TipCard` sizes eyeballed via local record. L4 tip baselines recorded by CI.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

@@ -288,11 +288,11 @@ struct TabStack: View {
             // Already on Feed (RootView set the tab); just clear any push
             // stack so the user lands on the root list.
             path = []
-        case .saved:
-            // RootView routes `.saved` directly to the Saved tab and
-            // never sets `pendingDeepLink`, so this branch is unreachable
-            // in practice. Kept exhaustive so the compiler catches any
-            // future caller that does forward the link through here.
+        case .saved, .tip:
+            // RootView routes `.saved` (Saved tab) + `.tip` (the DUT-457 dialog)
+            // directly and never sets `pendingDeepLink`, so these are unreachable
+            // here. Kept exhaustive so the compiler catches any future caller
+            // that does forward the link through here.
             break
         }
     }
