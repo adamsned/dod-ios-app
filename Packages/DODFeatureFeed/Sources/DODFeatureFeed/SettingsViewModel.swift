@@ -138,20 +138,25 @@ public final class SettingsViewModel {
         set { defaults.set(newValue, forKey: Self.useMetricUnitsKey) }
     }
 
-    /// AC-36.1. Defaults to false; `defaults.bool(forKey:)` returns false
-    /// for an absent key which is the documented v1 starting state.
+    /// AC-36.1. **DUT-430 — observable stored property** (was
+    /// computed-over-`defaults`, which `@Observable` can't track → the
+    /// deny-path revert only re-rendered because a nearby snackbar write
+    /// happened to fire). Seeded from `defaults` in `init`, `didSet`-persisted.
+    /// Defaults to false (absent key → off, the documented v1 starting state).
     public var notificationsEnabled: Bool {
-        get { defaults.bool(forKey: Self.notificationsEnabledKey) }
-        set { defaults.set(newValue, forKey: Self.notificationsEnabledKey) }
+        didSet { defaults.set(notificationsEnabled, forKey: Self.notificationsEnabledKey) }
     }
 
     /// T-750 / CL-147 (DUT-56). The "When Someone Replies to My Comment"
-    /// preference. Defaults false (absent key → off). Written through the
-    /// async ``setCommentReplyNotificationsEnabled(_:)`` so an enable
-    /// requests system authorization, mirroring ``notificationsEnabled``.
+    /// preference. **DUT-430 — observable stored property** (same fix as
+    /// ``notificationsEnabled``). Seeded in `init`, `didSet`-persisted;
+    /// defaults false (absent key → off). Written through the async
+    /// ``setCommentReplyNotificationsEnabled(_:)`` so an enable requests
+    /// system authorization, mirroring ``notificationsEnabled``.
     public var commentReplyNotificationsEnabled: Bool {
-        get { defaults.bool(forKey: Self.commentReplyNotificationsEnabledKey) }
-        set { defaults.set(newValue, forKey: Self.commentReplyNotificationsEnabledKey) }
+        didSet {
+            defaults.set(commentReplyNotificationsEnabled, forKey: Self.commentReplyNotificationsEnabledKey)
+        }
     }
 
     /// AC-36.2. **T-756 / CL-153 — observable stored property** (was
@@ -263,6 +268,10 @@ public final class SettingsViewModel {
         // doesn't fire for these initial-in-init assignments).
         self.appearance = AppearancePreference.fromDefaults(defaults)
         self.temperaturePreference = TemperaturePreference.fromDefaults(defaults)
+        // DUT-430 — seed the observable notification flags from defaults
+        // (didSet doesn't fire for these initial-in-init assignments).
+        self.notificationsEnabled = defaults.bool(forKey: Self.notificationsEnabledKey)
+        self.commentReplyNotificationsEnabled = defaults.bool(forKey: Self.commentReplyNotificationsEnabledKey)
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies

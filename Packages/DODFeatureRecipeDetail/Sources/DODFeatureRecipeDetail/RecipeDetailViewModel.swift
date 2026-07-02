@@ -69,7 +69,10 @@ public final class RecipeDetailViewModel {
     /// Current user-selected serving count. Defaults to the recipe's source
     /// `recipeYield` once the detail loads; stays at the AC-31.3 default
     /// sentinel `4` until then. AC-31.1 / AC-31.2 / AC-31.3 / AC-31.8.
-    public private(set) var userServings: Int = RecipeDetailViewModel.defaultServings
+    /// `internal(set)` (not `private(set)`) so the servings-scaler action
+    /// methods in `RecipeDetailViewModel+Servings.swift` set it across the file
+    /// split (DUT-315); the public read-only contract is unchanged.
+    public internal(set) var userServings: Int = RecipeDetailViewModel.defaultServings
     /// Servings stepper range (AC-31.2). 1..24 — single serving up to
     /// roughly 4× a typical 6-serving recipe.
     public let userServingsRange: ClosedRange<Int> = 1...24
@@ -364,30 +367,16 @@ public final class RecipeDetailViewModel {
         FractionRenderer.shouldShowDutchOvenWarning(forServings: userServings)
     }
 
-    /// Adjust the user's serving count (clamped to ``userServingsRange``).
-    /// Called from the stepper's `value` binding. AC-31.7: changing the
-    /// serving count never clears ``checkedIngredientIDs`` — the user's
-    /// in-progress check state survives a scale.
-    public func setUserServings(_ count: Int) {
-        userServings = clampToRange(count)
-    }
+    // DUT-357 one-shot guard + DUT-315 changed-yield tracker. `internal` (not
+    // `private`) so the servings-sync methods in
+    // `RecipeDetailViewModel+Servings.swift` reach them across the file split.
+    var didSyncServingsToSource = false
+    var lastSyncedSourceServings: Int?
 
-    private var didSyncServingsToSource = false  // DUT-357 one-shot guard
-
-    /// Sync ``userServings`` to source on the first `.ready` only (DUT-357) — a
-    /// late refresh must not clobber the user's deliberate manual stepper choice.
-    public func resetServingsToSourceIfFirstLoad() {
-        guard !didSyncServingsToSource else { return }
-        didSyncServingsToSource = true
-        guard sourceServings != Self.defaultServings else { return }
-        userServings = clampToRange(sourceServings)
-    }
-
-    /// Clamp `count` to ``userServingsRange``. Centralized so the setter
-    /// and the source-sync path agree on bounds.
-    private func clampToRange(_ count: Int) -> Int {
-        min(max(count, userServingsRange.lowerBound), userServingsRange.upperBound)
-    }
+    // The servings scaler's action methods (`setUserServings`,
+    // `resetServingsToSourceIfFirstLoad`, `resyncServingsIfSourceYieldChanged`,
+    // `clampToRange`) live in `RecipeDetailViewModel+Servings.swift` to keep
+    // this file under the SwiftLint 400-line file_length cap (DUT-315).
 
     public func dismissSnackbar() {
         snackbarMessage = nil

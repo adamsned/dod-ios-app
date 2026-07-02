@@ -92,6 +92,10 @@ extension ProfileEditView {
                 .foregroundStyle(DODColor.label)
                 .textContentType(.emailAddress)
                 .accessibilityIdentifier("profile-edit-email")
+                // DUT-410 — bind the validation error to the field itself so
+                // VoiceOver reads "Invalid email" on the Email TextField rather
+                // than leaving the error orphaned in the section footer.
+                .accessibilityValue(emailValidationError == nil ? "" : "Invalid email")
                 #if os(iOS)
             .keyboardType(.emailAddress)
             .autocapitalization(.none)

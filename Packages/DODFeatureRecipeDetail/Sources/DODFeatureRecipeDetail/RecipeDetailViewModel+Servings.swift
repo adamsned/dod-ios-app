@@ -1,0 +1,50 @@
+import Foundation
+
+// US-31 servings-scaler action methods, extracted from
+// `RecipeDetailViewModel.swift` so that file stays under the SwiftLint
+// 400-line file_length cap after the DUT-315 recipe-swap re-sync landed
+// (the same partitioning rule `+Fetch` / `+Blurb` / `+CommentSubmit` follow).
+// The stored state these mutate (`userServings`, `didSyncServingsToSource`,
+// `lastSyncedSourceServings`) lives on the host and is `internal`-widened so
+// this sibling-file extension can reach it.
+//
+// Spec trace: US-31 AC-31.3, AC-31.7, AC-31.8; DUT-357; DUT-315.
+
+extension RecipeDetailViewModel {
+
+    /// Adjust the user's serving count (clamped to ``userServingsRange``).
+    /// Called from the stepper's `value` binding. AC-31.7: changing the
+    /// serving count never clears ``checkedIngredientIDs`` — the user's
+    /// in-progress check state survives a scale.
+    public func setUserServings(_ count: Int) {
+        userServings = clampToRange(count)
+    }
+
+    /// Sync ``userServings`` to source on the first `.ready` only (DUT-357) — a
+    /// late refresh must not clobber the user's deliberate manual stepper choice.
+    public func resetServingsToSourceIfFirstLoad() {
+        guard !didSyncServingsToSource else { return }
+        didSyncServingsToSource = true
+        guard sourceServings != Self.defaultServings else { return }
+        lastSyncedSourceServings = sourceServings
+        userServings = clampToRange(sourceServings)
+    }
+
+    /// DUT-315 — re-sync the stepper when a *different* recipe (new source
+    /// yield) is swapped in after `.ready`, with no loadState transition to
+    /// re-fire the one-shot. Keyed on a CHANGED yield so unrelated re-renders
+    /// (same yield) never clobber a manual edit; defers to the one-shot for the
+    /// first sync (`lastSyncedSourceServings == nil`).
+    public func resyncServingsIfSourceYieldChanged() {
+        guard sourceServings != Self.defaultServings else { return }
+        guard let last = lastSyncedSourceServings, sourceServings != last else { return }
+        lastSyncedSourceServings = sourceServings
+        userServings = clampToRange(sourceServings)
+    }
+
+    /// Clamp `count` to ``userServingsRange``. Centralized so the setter
+    /// and the source-sync path agree on bounds.
+    func clampToRange(_ count: Int) -> Int {
+        min(max(count, userServingsRange.lowerBound), userServingsRange.upperBound)
+    }
+}
