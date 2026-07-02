@@ -1,3 +1,4 @@
+import DODPersistence
 import DODSupport
 import Foundation
 
@@ -13,5 +14,12 @@ extension LiveRecipeDetailDependencies {
 
     public func logCook(_ entry: CookLogEntry) async throws {
         try await store.logCook(entry)
+    }
+
+    public func deleteCookPhoto(id: String) async {
+        // DUT-208 — mirrors the DUT-423 dedup-branch cleanup in
+        // RecipeStore+CookLog: the photo was persisted before the failed
+        // `logCook`, so delete it here rather than orphan it.
+        CookPhotoStore().delete(id: id)
     }
 }

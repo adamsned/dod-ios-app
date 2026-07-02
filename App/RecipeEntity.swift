@@ -49,15 +49,18 @@ extension RecipeEntity {
     /// a default `CSSearchableItemAttributeSet` from `displayRepresentation`,
     /// but we want the recipe excerpt searchable too and a stable content
     /// type so the user can spot DOD results in mixed Spotlight lists.
+    ///
+    /// DUT-412 — `thumbnailData` (LOCAL bytes) is set by the caller when the
+    /// hero image is already in the disk cache; we deliberately do NOT set
+    /// `thumbnailURL = heroImage` here — that's a remote https URL and
+    /// CoreSpotlight never fetches remote thumbnails (the row rendered blank).
+    /// The Siri `displayRepresentation` path keeps the remote URL (fine there).
     var attributeSet: CSSearchableItemAttributeSet {
         let set = CSSearchableItemAttributeSet(contentType: .content)
         set.title = title
         set.displayName = title
         set.contentDescription = excerpt
         set.keywords = ["recipe", "dutch oven", "cooking"]
-        if let heroImage {
-            set.thumbnailURL = heroImage
-        }
         return set
     }
 }

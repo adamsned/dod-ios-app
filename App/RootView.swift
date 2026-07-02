@@ -283,24 +283,23 @@ struct RootView: View {
         .onChange(of: selectedTab) { _, newValue in
             Telemetry.shared.send(.screenView(name: newValue.telemetryName))
         }
+        .onAppear {
+            // DUT-318 — emit the launch screen_view on iPad too (phoneTabs already
+            // does; iPadSplit previously only had .onChange, so the first screen
+            // was never reported).
+            Telemetry.shared.send(.screenView(name: selectedTab.telemetryName))
+        }
     }
 
     // MARK: - Deep-link routing
 
-    /// Widget URL handler (spec.md US-9 AC-9.2, US-17 AC-17.4). For
-    /// recipe + feed routes, switches to Feed and hands the link to the
-    /// TabStack via the `pendingDeepLink` binding. For the saved route
-    /// (US-17), the Saved tab owns the destination directly so we just
-    /// switch tabs — no pending-link push.
-    ///
-    /// Fires `widgetOpened(kind:, recipeID:)` once per consumed link
-    /// (T-323 / AC-17.9). The kind reflects which widget surface the tap
-    /// came from — the parser inspects the URL's `source` query parameter
-    /// for recipe URLs and the host name itself for chrome URLs. Per
-    /// constitution §9 (US-17 amendment) the payload carries only the
-    /// kind plus an integer recipe id (or nil for chrome / empty-state
-    /// taps that land on the Saved or Feed tab without a specific
-    /// recipe target).
+    /// Widget URL handler (spec.md US-9 AC-9.2, US-17 AC-17.4). Recipe + feed
+    /// routes switch to Feed and hand the link to the TabStack via
+    /// `pendingDeepLink`; the saved route (US-17) just switches tabs (Saved owns
+    /// its destination). Fires `widgetOpened(kind:, recipeID:)` once per consumed
+    /// link (T-323 / AC-17.9) — kind from the URL `source` param (recipe URLs) or
+    /// host (chrome URLs); payload is kind + integer recipe id (nil for chrome /
+    /// empty-state taps landing on Saved or Feed without a specific target).
     private func handle(widgetLink link: WidgetDeepLink) {
         Telemetry.shared.send(.widgetOpened(kind: link.widgetKind, recipeID: link.recipeID))
         switch link {

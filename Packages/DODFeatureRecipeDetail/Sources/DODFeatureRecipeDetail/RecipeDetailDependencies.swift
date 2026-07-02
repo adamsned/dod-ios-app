@@ -64,6 +64,13 @@ public protocol RecipeDetailDependencies: Sendable {
     /// compiling; only ``LiveRecipeDetailDependencies`` actually persists.
     func logCook(_ entry: CookLogEntry) async throws
 
+    /// DUT-208 — delete an orphaned cook photo whose journal write failed. Cook
+    /// Mode persists the photo to ``CookPhotoStore`` before ``logCook(_:)``; when
+    /// that throws, no row references its `photoLocalID`, so the DUT-338 cleanup
+    /// can't reach it. Default no-op so existing fakes keep compiling; the live
+    /// wiring routes to ``CookPhotoStore/delete(id:)``.
+    func deleteCookPhoto(id: String) async
+
     // MARK: - Comments + ratings (US-13/14/15)
 
     /// Fetch the public WPRM rating summary. Never throws — degrades to a
@@ -158,6 +165,11 @@ extension RecipeDetailDependencies {
     /// compiling. ``LiveRecipeDetailDependencies`` overrides to route to
     /// ``RecipeStore/logCook(_:)``.
     public func logCook(_ entry: CookLogEntry) async throws {}
+
+    /// DUT-208 — default no-op so fakes that don't model photo cleanup keep
+    /// compiling. ``LiveRecipeDetailDependencies`` overrides to route to
+    /// ``CookPhotoStore/delete(id:)``.
+    public func deleteCookPhoto(id: String) async {}
 
     /// DUT-387 — default no-op so fakes that don't model the pending-comment
     /// bucket keep compiling. ``LiveRecipeDetailDependencies`` overrides to

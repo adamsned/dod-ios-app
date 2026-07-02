@@ -148,6 +148,9 @@ public actor RecipeStore {
         // it → the upgrader's save is permanently lost).
         if try fetchSyncedSaved(id: recipe.id) != nil {
             target.isSaved = true
+            // DUT-413: pin the hero too — `isSaved` alone leaves the just-cached
+            // bytes evictable (`toggleSaved` pins via `pinHeroImage`; missed here).
+            try pinHeroImage(heroURLString: target.heroImageURLString, toRecipeID: recipe.id)
         } else if didBackfillSyncedSaved {
             target.isSaved = false
         }

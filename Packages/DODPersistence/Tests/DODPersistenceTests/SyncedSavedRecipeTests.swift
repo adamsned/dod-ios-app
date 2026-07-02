@@ -167,6 +167,40 @@ struct SyncedSavedRecipeTests {
         #expect(pinned?.isSaved == true, "mergeDetail must pin a synced-saved recipe")
     }
 
+    /// DUT-413 — the cross-device reconcile in `mergeDetail` must PIN the hero
+    /// image too, not just flip `isSaved`. A recipe saved on another device
+    /// caches its hero unpinned via the feed/widget prefetch, then reconciles to
+    /// saved on detail open — without pinning, `evictImagesIfNeeded()` /
+    /// `clearImageCache()` reclaim the bytes and the saved recipe loses its
+    /// offline hero (AC-5.2), the same gap `toggleSaved` closes via `pinHeroImage`.
+    @Test("mergeDetail pins the hero of a synced-saved recipe (DUT-413)")
+    func mergePinsSyncedSavedHero() async throws {
+        let container = try RecipeStore.inMemoryContainer()
+        // A recipe saved on another device: synced row present, no local pin.
+        let setup = ModelContext(container)
+        setup.insert(
+            SyncedSavedRecipe(
+                id: 8,
+                title: "Cross-device Cobbler",
+                excerptText: "Excerpt",
+                canonicalURLString: "https://dutchovendaddy.com/8"
+            )
+        )
+        try setup.save()
+
+        let store = RecipeStore(modelContainer: container)
+        // Hero cached UNPINNED (the prefetch path) at the URL sampleRecipe uses.
+        let heroURL = url("https://dutchovendaddy.com/8.jpg")
+        try await store.cacheImage(url: heroURL, bytes: Data(repeating: 0x08, count: 2048))
+
+        // Detail open reconciles the pin from the synced set.
+        try await store.mergeDetail(sampleRecipe(id: 8, title: "Cross-device Cobbler"))
+
+        let freed = try await store.clearImageCache()
+        #expect(freed == 0, "mergeDetail must pin the synced-saved hero so it isn't reclaimed")
+        #expect(try await store.image(url: heroURL) != nil)  // survives for offline use
+    }
+
     @Test("Article saves carry the article discriminator into the synced row")
     func articleSaveTracksKind() async throws {
         let store = RecipeStore(modelContainer: try RecipeStore.inMemoryContainer())

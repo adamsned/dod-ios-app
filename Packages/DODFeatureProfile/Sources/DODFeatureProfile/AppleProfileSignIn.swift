@@ -72,15 +72,10 @@ public struct AppleProfileSignIn: Sendable {
             existing: existingSession
         )
         let sameUser = existingSession?.userIdentifier == userIdentifier
-        let carriedToken = sameUser ? existingSession?.refreshToken : nil
-        try? sessionStore.save(
-            AppleAuthSession(
-                userIdentifier: resolved.userIdentifier,
-                displayName: resolved.displayName,
-                email: resolved.email,
-                refreshToken: carriedToken
-            )
-        )
+        // DUT-375: `resolve` now carries the refresh token forward itself (same
+        // user) / nils it (different user), so we persist `resolved` directly
+        // rather than re-merging the token here.
+        try? sessionStore.save(resolved)
 
         // 2. Profile — the new half. Only write when BOTH fields are known
         //    (a `UserProfile` save validates non-empty name + a real email);
