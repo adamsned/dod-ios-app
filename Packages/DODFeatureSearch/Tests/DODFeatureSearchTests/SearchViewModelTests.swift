@@ -115,6 +115,20 @@ import Testing
         viewModel.commitRecentSearch()
         for _ in 0..<20 where dependencies.searchHashes.isEmpty { await Task.yield() }
         #expect(dependencies.searchHashes.count == 1)
+
+        // DUT-435: Return fires BOTH `.onSubmit` and the focus-loss commit —
+        // the immediate second commit for the same query must NOT emit again.
+        viewModel.commitRecentSearch()
+        for _ in 0..<20 { await Task.yield() }
+        #expect(dependencies.searchHashes.count == 1)
+
+        // A re-typed (mutated) query commits — and counts — again.
+        viewModel.query = "chicken pie"
+        dependencies.results["chicken pie"] = []
+        await viewModel.runImmediateSearch()
+        viewModel.commitRecentSearch()
+        for _ in 0..<20 where dependencies.searchHashes.count < 2 { await Task.yield() }
+        #expect(dependencies.searchHashes.count == 2)
     }
 
     // MARK: - US-12

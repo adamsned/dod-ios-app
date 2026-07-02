@@ -34,6 +34,15 @@ public struct SystemBakeTimerNotifier: BakeTimerNotifying {
     static let title = "Your bake is done!"
     static let body = "Time to check your Dutch oven — carefully lift the lid and see how it turned out."
 
+    /// DUT-443 — schedule the alert this far AFTER the engine deadline. The
+    /// foreground finish is detected on the NEXT 1 Hz tick (~0.5s average) and
+    /// `cancelBakeDone` only removes PENDING requests — with the alert at the
+    /// exact deadline it was already delivered by cancel time, so an on-screen
+    /// finish showed the in-app "Timer's up!" card AND the system banner. The
+    /// grace lets the foreground cancel win; a backgrounded bake alert lands a
+    /// negligible 2s late.
+    static let deliveryGrace: TimeInterval = 2
+
     public init() {}
 
     public func scheduleBakeDone(after seconds: TimeInterval) async {
@@ -51,7 +60,10 @@ public struct SystemBakeTimerNotifier: BakeTimerNotifying {
         content.title = Self.title
         content.body = Self.body
         content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: seconds + Self.deliveryGrace,
+            repeats: false
+        )
         let request = UNNotificationRequest(
             identifier: Self.identifier,
             content: content,

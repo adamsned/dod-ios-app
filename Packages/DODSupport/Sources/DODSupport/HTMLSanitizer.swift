@@ -37,6 +37,14 @@ public enum HTMLSanitizer {
     /// containing an inner `>` mis-terminates tag scanning, and one containing
     /// `<div`/`<li`/`<span` corrupts block-depth tracking (dropping or merging
     /// recipe rows).
+    ///
+    /// DUT-437 — `<script>`/`<style>` bodies are raw text in HTML5: a `<!--`
+    /// inside one (a JS string literal, or `a<!--b`, which is valid JS) is NOT
+    /// a comment open. Treat those elements as opaque — copy them through
+    /// untouched — so a script's stray `<!--` can't swallow the article prose
+    /// that follows it. This also makes the strip safe to run FIRST, before
+    /// the entry-content slice extraction whose `<div` depth-tracking a
+    /// comment would otherwise corrupt.
     public static func strippingComments(_ input: String) -> String {
         guard input.contains("<!--") else { return input }
         var output = ""
@@ -47,6 +55,13 @@ public enum HTMLSanitizer {
                 output.append(contentsOf: input[index..<input.endIndex])
                 break
             }
+            // DUT-437: if a raw-text element opens before this comment does,
+            // copy the element through opaquely and rescan from its close.
+            if let rawText = earliestRawTextElement(in: input, from: index, before: open.lowerBound) {
+                output.append(contentsOf: input[index..<rawText.upperBound])
+                index = rawText.upperBound
+                continue
+            }
             output.append(contentsOf: input[index..<open.lowerBound])
             if let closeEnd = input.range(of: "-->", range: open.upperBound..<input.endIndex) {
                 index = closeEnd.upperBound
@@ -56,6 +71,29 @@ public enum HTMLSanitizer {
             }
         }
         return output
+    }
+
+    /// DUT-437 — the full range (open tag through matching close tag) of the
+    /// earliest `<script>`/`<style>` element that OPENS in `from..<limit`, or
+    /// nil when none does. An unterminated element runs to end-of-string
+    /// (mirrors `ArticleHTMLParser.removeBlock`'s policy).
+    private static func earliestRawTextElement(
+        in input: String,
+        from: String.Index,
+        before limit: String.Index
+    ) -> Range<String.Index>? {
+        var earliest: Range<String.Index>?
+        for tag in ["script", "style"] {
+            let searchRange = from..<limit
+            guard let open = input.range(of: "<\(tag)", options: .caseInsensitive, range: searchRange)
+            else { continue }
+            let tail = open.upperBound..<input.endIndex
+            let close = input.range(of: "</\(tag)>", options: .caseInsensitive, range: tail)
+            let range = open.lowerBound..<(close?.upperBound ?? input.endIndex)
+            if let current = earliest, current.lowerBound <= range.lowerBound { continue }
+            earliest = range
+        }
+        return earliest
     }
 
     // MARK: - Steps

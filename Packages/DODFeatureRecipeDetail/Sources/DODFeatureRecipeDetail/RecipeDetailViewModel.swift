@@ -213,16 +213,16 @@ public final class RecipeDetailViewModel {
         }
 
         // Step 2: network refresh (best-effort). DUT-216: don't blindly adopt
-        // `fresh` — carry the remembered userRating forward and never zero a
-        // good cached aggregate on a transient failure. See `applyRatingRefresh`.
+        // `fresh` — `applyRatingRefresh` carries the remembered userRating
+        // forward and never zeros a good cached aggregate on a failure.
         let fresh = await dependencies.fetchRatingSummary(recipeID: listItem.id)
         await applyRatingRefresh(fresh)
 
         do {
             let page = try await dependencies.fetchComments(postID: listItem.id, page: 1)
-            // Show approved comments only per AC-14.2.
+            // AC-14.2 approved-only; DUT-433 keeps own pending visible (see helper).
             let approved = page.comments.filter { $0.status == .approved }
-            comments = approved
+            comments = approved + Self.stillPendingComments(in: cachedComments, approved: approved)
             await dependencies.cacheComments(approved, postID: listItem.id)
             commentsLoadState = .ready
         } catch {

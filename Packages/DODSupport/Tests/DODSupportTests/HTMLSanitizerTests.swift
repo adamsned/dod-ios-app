@@ -76,4 +76,30 @@ import Testing
     @Test func strippingCommentsLeavesNonCommentInputUntouched() {
         #expect(HTMLSanitizer.strippingComments("<p>no comments here</p>") == "<p>no comments here</p>")
     }
+
+    // MARK: - DUT-437: script/style bodies are opaque to the comment strip
+
+    @Test func commentOpenInsideScriptDoesNotEatFollowingProse() {
+        // `a<!--b` is valid JS; the un-closed "comment" must NOT swallow the
+        // script close or the paragraph after it.
+        let html = #"<script>var x = a<!--b;</script><p>Keep me</p>"#
+        let stripped = HTMLSanitizer.strippingComments(html)
+        #expect(stripped.contains("<p>Keep me</p>"))
+        #expect(stripped.contains("</script>"))
+    }
+
+    @Test func realCommentAfterScriptStillStripped() {
+        let html = #"<script>var s = "<!--";</script><!-- gone --><p>Body</p>"#
+        let stripped = HTMLSanitizer.strippingComments(html)
+        #expect(!stripped.contains("gone"))
+        #expect(stripped.contains("<p>Body</p>"))
+        #expect(stripped.contains("</script>"))
+    }
+
+    @Test func commentBeforeScriptStillStripped() {
+        let html = "<!-- top --><script>1</script><p>Body</p>"
+        let stripped = HTMLSanitizer.strippingComments(html)
+        #expect(!stripped.contains("top"))
+        #expect(stripped.contains("<script>1</script>"))
+    }
 }

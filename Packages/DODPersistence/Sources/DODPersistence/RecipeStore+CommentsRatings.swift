@@ -38,6 +38,12 @@ extension RecipeStore {
     /// them out before display, but this store returns the full set so the
     /// view layer can branch on `isPendingFromThisDevice` per row.
     public func cachedComments(forPostID id: Int) throws -> [CachedCommentSnapshot] {
+        // DUT-439: age out stale pending rows first. A pending comment's only
+        // other exit is WP approving it (the fetch → `cacheComments` overwrite)
+        // — a REJECTED comment never comes back from the public GET, so
+        // without an age-out the author would see "Awaiting approval" forever.
+        // Two weeks comfortably outlasts real moderation latency.
+        try purgeExpiredPendingComments(forPostID: id)
         let descriptor = FetchDescriptor<CachedComment>(
             predicate: #Predicate { row in row.postID == id },
             sortBy: [SortDescriptor(\.dateGMT, order: .reverse)]
@@ -46,6 +52,27 @@ extension RecipeStore {
         let approved = rows.filter { !$0.isPendingFromThisDevice }
         let pending = rows.filter { $0.isPendingFromThisDevice }
         return (approved + pending).map(Self.toSnapshot)
+    }
+
+    /// DUT-439 — the pending-row age-out window. Internal so tests can pin it.
+    static let pendingCommentMaxAge: TimeInterval = 14 * 24 * 60 * 60
+
+    /// DUT-439 — delete this-device pending rows older than
+    /// ``pendingCommentMaxAge`` (rejected comments never return from the
+    /// public GET, so age is the only rejection signal available client-side).
+    private func purgeExpiredPendingComments(forPostID id: Int) throws {
+        let cutoff = Date(timeIntervalSinceNow: -Self.pendingCommentMaxAge)
+        let descriptor = FetchDescriptor<CachedComment>(
+            predicate: #Predicate { row in
+                row.postID == id && row.isPendingFromThisDevice == true && row.cachedAt < cutoff
+            }
+        )
+        let expired = try modelContext.fetch(descriptor)
+        guard !expired.isEmpty else { return }
+        for row in expired {
+            modelContext.delete(row)
+        }
+        try modelContext.save()
     }
 
     /// Insert (or update) a comment row that THIS device just submitted

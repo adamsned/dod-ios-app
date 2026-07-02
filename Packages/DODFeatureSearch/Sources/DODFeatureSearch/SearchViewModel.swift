@@ -28,6 +28,8 @@ public final class SearchViewModel {
             // sets the flag AFTER the assignment, so the default reset
             // here covers the typed + recent-tap paths.
             queryFromCuratedTap = false
+            // DUT-435: a mutated query re-arms the finalized-search commit.
+            lastCommittedQuery = nil
             // US-29 / AC-29.1 amendment / CL-106 (T-637): a typed query
             // also reverts the surface back to the default text-search
             // path; the Latest-Recipes branch only stays "active" while
@@ -36,6 +38,12 @@ public final class SearchViewModel {
             scheduleSearch()
         }
     }
+
+    /// DUT-435 — the trimmed query most recently committed by
+    /// ``commitRecentSearch()``, nil once the query mutates. Return fires BOTH
+    /// `.onSubmit` and the focus-loss commit; this guard stops the duplicate
+    /// `recipe_searched` event. Internal for the `+Recents` extension.
+    var lastCommittedQuery: String?
 
     /// `true` while the current `query` originated from a curated "Try"
     /// suggestion tap (US-29 / AC-29.1) rather than the user typing. Used
@@ -149,9 +157,9 @@ public final class SearchViewModel {
     /// start of every `performSearch()`; async completions (the finalize hop +
     /// the lazy filter / cook-time hydration tasks) capture it and bail if a
     /// newer search has superseded them — so a slow earlier query can't
-    /// overwrite a faster later one's results. `private(set)` so the `+T637` /
-    /// `+DUT314` extension-file hydration tasks can read it.
-    private(set) var searchGeneration = 0
+    /// overwrite a faster later one's results. Fully internal (DUT-436) so
+    /// `+T637`'s `surfaceLatestRecipes` can claim a generation too.
+    var searchGeneration = 0
 
     public init(
         dependencies: SearchDependencies,

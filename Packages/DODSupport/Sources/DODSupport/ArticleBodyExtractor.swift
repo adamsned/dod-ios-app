@@ -36,7 +36,9 @@ public enum ArticleBodyExtractor {
     ///   ``DODNetworking/RecipePageFetcher/html(for:)`` produces).
     /// - Returns: a sanitized plain-text body, or empty string if no
     ///   suitable container was found.
-    public static func extract(html: String) -> String {
+    public static func extract(html rawHTML: String) -> String {
+        // DUT-437: strip comments first (`</div>` inside one corrupts the boundary scan).
+        let html = HTMLSanitizer.strippingComments(rawHTML)
         // 1. Try the canonical WordPress `entry-content` wrapper first.
         if let slice = extractEntryContentSlice(in: html) {
             return HTMLSanitizer.plainText(from: slice)
@@ -74,7 +76,9 @@ public enum ArticleBodyExtractor {
     /// consumer that reads the *content* is `ArticleDetailView`; every other
     /// site treats the field as a non-empty "is renderable article" flag, so
     /// switching the stored form from plain text to HTML is behavior-safe.
-    public static func extractContentHTML(html: String) -> String {
+    public static func extractContentHTML(html rawHTML: String) -> String {
+        // DUT-437: comments out before the boundary scan (see `extract`).
+        let html = HTMLSanitizer.strippingComments(rawHTML)
         if let slice = extractEntryContentSlice(in: html) {
             return slice
         }
@@ -128,7 +132,9 @@ public enum ArticleBodyExtractor {
     /// (option (b) in the CL-129 decision): option (a) would have dragged the
     /// recipe card's structured content into the blurb render, duplicating
     /// what AC-4.2 / AC-4.3 already render below.
-    public static func extractRecipeBlurb(html: String, paragraphLimit: Int = 2) -> String {
+    public static func extractRecipeBlurb(html rawHTML: String, paragraphLimit: Int = 2) -> String {
+        // DUT-437: comments out first (they also inflated the `</p>` cap count).
+        let html = HTMLSanitizer.strippingComments(rawHTML)
         guard let entryContent = extractEntryContentSlice(in: html) else {
             return ""
         }

@@ -61,4 +61,38 @@ import Testing
         #expect(threaded.count == 1)
         #expect(threaded[0].isReply == false)
     }
+
+    /// DUT-432: a reply-to-a-reply (depth ≥ 2) must render — flattened under
+    /// its thread's top-level root — not silently vanish because its group was
+    /// keyed by a mid-level id the emit loop never visits.
+    @Test func replyToAReplyRendersUnderTheThreadRoot() {
+        let flat = [
+            comment(id: 1, date: 100),  // top-level
+            comment(id: 2, parent: 1, date: 200),  // reply to 1
+            comment(id: 3, parent: 2, date: 300),  // reply to the reply
+        ]
+        let threaded = CommentThreader.thread(flat)
+        #expect(threaded.map(\.comment.id) == [1, 2, 3])
+        #expect(threaded.map(\.isReply) == [false, true, true])
+    }
+
+    /// DUT-432: a depth-5 chain (WP's default max) keeps every comment.
+    @Test func deepChainKeepsEveryComment() {
+        let flat = (1...5).map {
+            comment(id: $0, parent: $0 == 1 ? nil : $0 - 1, date: Double($0) * 100)
+        }
+        let threaded = CommentThreader.thread(flat)
+        #expect(threaded.map(\.comment.id) == [1, 2, 3, 4, 5])
+    }
+
+    /// DUT-432: a (malformed) parent cycle must not hang — both comments
+    /// survive rather than looping forever in the ancestor walk.
+    @Test func parentCycleDoesNotHangAndKeepsComments() {
+        let flat = [
+            comment(id: 1, parent: 2, date: 100),
+            comment(id: 2, parent: 1, date: 200),
+        ]
+        let threaded = CommentThreader.thread(flat)
+        #expect(Set(threaded.map(\.comment.id)) == [1, 2])
+    }
 }

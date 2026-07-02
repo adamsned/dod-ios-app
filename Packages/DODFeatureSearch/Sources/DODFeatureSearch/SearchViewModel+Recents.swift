@@ -14,6 +14,12 @@ extension SearchViewModel {
     public func commitRecentSearch() {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2, !queryFromCuratedTap else { return }
+        // DUT-435: Return fires BOTH `.onSubmit` and (by ending editing) the
+        // focus-loss callback — two commits for one finalized search. Skip the
+        // duplicate; `query`'s didSet clears the marker so a re-typed search
+        // commits (and counts) again.
+        guard trimmed != lastCommittedQuery else { return }
+        lastCommittedQuery = trimmed
         recents.record(trimmed)
         recentSearches = recents.recent()
         // DUT-254: emit the `recipe_searched` analytics event here — the

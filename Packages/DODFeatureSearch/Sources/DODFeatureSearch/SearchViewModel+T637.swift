@@ -31,38 +31,48 @@ extension SearchViewModel {
     /// query string to hash (AC-3.6 covers text queries; this is a feed
     /// fetch, not a search).
     public func surfaceLatestRecipes(limit: Int = 5) async {
+        // DUT-436: join the H1 search-generation protocol. Without a bump, a
+        // typed search still in flight when the pill was tapped passed its own
+        // guard and clobbered the latest set — and without checks below, a slow
+        // latest fetch repainted over a newer typed search (silently flipping
+        // `lastSurface`, so chip toggles then re-ranked the wrong base set).
+        searchGeneration &+= 1
+        let generation = searchGeneration
         state = .searching
         // DUT-11: the Latest-Recipes pill is a feed fetch, not a text query,
         // so there's no ingredient term — clear any tier left from a prior
         // search so it doesn't bleed into the latest-recipes surface.
         ingredientItems = []
         guard await dependencies.isOnline() else {
+            guard generation == searchGeneration else { return }
             state = .offline
             items = []
             return
         }
         let overFetch = Int((Double(limit) * 1.5).rounded(.up))
-        guard let fetched = await fetchLatestOrFail(overFetch: overFetch) else {
-            return
-        }
+        guard let fetched = await fetchLatestOrFail(overFetch: overFetch, generation: generation)
+        else { return }
         try? await dependencies.cache(listItems: fetched)
+        guard generation == searchGeneration else { return }
 
         // Trim back to the requested limit. The article-vs-recipe
         // discriminator is a JSON-LD parse outcome, so we don't know the
         // kind for uncached fresh-fetch items here. The detail-screen
         // path classifies on open per US-37 / AC-37.2.
         let trimmed = Array(fetched.prefix(limit))
-        await applyLatestRecipes(trimmed: trimmed)
+        await applyLatestRecipes(trimmed: trimmed, generation: generation)
     }
 
     /// Helper: wrap the dependency fetch + error-to-offline mapping in a
     /// nullable return so the parent stays under SwiftLint's
     /// `function_body_length` cap.
-    private func fetchLatestOrFail(overFetch: Int) async -> [RecipeListItem]? {
+    private func fetchLatestOrFail(overFetch: Int, generation: Int) async -> [RecipeListItem]? {
         do {
             return try await dependencies.fetchLatestRecipes(limit: overFetch)
         } catch {
             DODLog.network.error("surfaceLatestRecipes failed: \(String(describing: error))")
+            // DUT-436: a newer search owns the surface — don't repaint offline.
+            guard generation == searchGeneration else { return nil }
             state = .offline
             items = []
             return nil
@@ -72,19 +82,23 @@ extension SearchViewModel {
     /// Helper: stitch the trimmed latest-recipes set into the same
     /// `lastMergedRESTOrdering` / filter-application path the typed-search
     /// flow uses, so subsequent filter mutations re-apply correctly.
-    private func applyLatestRecipes(trimmed: [RecipeListItem]) async {
+    private func applyLatestRecipes(trimmed: [RecipeListItem], generation: Int) async {
         items = trimmed
         lastQuery = ""
         lastSurface = .latestRecipes
         lastMergedRESTOrdering = trimmed
         lastMergedLocalOrdering = []
         let allIDs = trimmed.map(\.id)
-        lastCategoryIDsByRecipe =
-            (try? await dependencies.categoryIDs(forRecipeIDs: allIDs)) ?? [:]
-        lastTotalSecondsByRecipe =
-            (try? await dependencies.totalSeconds(forRecipeIDs: allIDs)) ?? [:]
-        lastRecentlyViewedIDs =
-            (try? await dependencies.recentlyViewedRecipeIDs()) ?? []
+        // DUT-436: fetch into locals, then re-check the generation before
+        // committing — a newer search can supersede us across these awaits
+        // (mirrors `applyFiltersAndFinalize`'s H1 pattern).
+        let categoryIDs = (try? await dependencies.categoryIDs(forRecipeIDs: allIDs)) ?? [:]
+        let totalSeconds = (try? await dependencies.totalSeconds(forRecipeIDs: allIDs)) ?? [:]
+        let recentlyViewed = (try? await dependencies.recentlyViewedRecipeIDs()) ?? []
+        guard generation == searchGeneration else { return }
+        lastCategoryIDsByRecipe = categoryIDs
+        lastTotalSecondsByRecipe = totalSeconds
+        lastRecentlyViewedIDs = recentlyViewed
 
         let filtered = filters.apply(
             to: trimmed,

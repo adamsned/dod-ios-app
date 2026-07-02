@@ -118,7 +118,11 @@ public struct StarRatingInput: View {
             guard !isSubmitting else { return }
             switch direction {
             case .increment: value = min(value + 1, 5)
-            case .decrement: value = max(value - 1, 1)
+            // DUT-444: floor at 0, not 1 — from the "no rating" sentinel a
+            // decrement used to compute max(-1, 1) = 1, so swiping DOWN set a
+            // 1-star rating; and the floor of 1 meant VoiceOver could never
+            // clear back to "no rating selected".
+            case .decrement: value = max(value - 1, 0)
             default: break
             }
         }

@@ -225,6 +225,21 @@ extension RecipeDetailViewModel {
         comments.insert(comment, at: 0)
     }
 
+    /// DUT-433 — the cached comments this device is still waiting on. The
+    /// public comments GET never returns `hold` rows, so a refresh that
+    /// adopted the fetched page verbatim wiped the author's own
+    /// awaiting-approval comment from the thread on every online re-open —
+    /// recreating the build-8 "did my comment post?" re-submit loop DUT-27 /
+    /// DUT-387 exist to prevent. Pending rows come back from the cache with a
+    /// non-approved status; keep the ones the fresh page didn't supersede.
+    static func stillPendingComments(
+        in cached: [RecipeComment],
+        approved: [RecipeComment]
+    ) -> [RecipeComment] {
+        let approvedIDs = Set(approved.map(\.id))
+        return cached.filter { $0.status != .approved && !approvedIDs.contains($0.id) }
+    }
+
     /// CL-139 / DUT-36 Phase d — return a copy of the just-posted
     /// comment with its `authorEmail` field set to the value we sent on
     /// the wire. WordPress's public `/wp/v2/comments` GET response does
