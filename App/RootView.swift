@@ -27,7 +27,9 @@ struct RootView: View {
     // Non-private so the `+Onboarding.swift` extension's `runFirstRunSetup` can
     // reach it.
     @State var dependencies: AppDependencies
-    @State private var selectedTab: AppTab = .feed
+    // Non-private so the `+LinkRouting.swift` extension can route into the
+    // currently-selected tab (DUT-243).
+    @State var selectedTab: AppTab = .feed
     /// T-762 / CL-159 (DUT-68) — drives the single first-launch welcome sheet
     /// (US-8). The former second sheet (the iCloud-Sync opt-in, AC-41.2) is
     /// removed; sync is opt-in only from Settings (AC-41.3) now, and the
@@ -51,14 +53,20 @@ struct RootView: View {
     private var appearanceRaw: String = AppearancePreference.system.rawValue
     /// Widget deep link (spec.md US-9 AC-9.2). Feed tab consumes via .task(id:).
     @State private var pendingDeepLink: WidgetDeepLink?
-    /// App Intents / Spotlight route (spec.md US-10).
-    @State private var feedExternalRoute: RecipeRoute?
+    // Per-tab external-route sinks. Feed carries deep links (App Intents /
+    // Spotlight, spec.md US-10, replace semantics) AND in-app link taps;
+    // Saved + Search exist so an article link tapped there opens in place
+    // instead of yanking the user to Feed (DUT-243, push semantics).
+    // Non-private so the `+LinkRouting.swift` extension can write them.
+    @State var feedExternalRoute: ExternalRoute?
+    @State var savedExternalRoute: ExternalRoute?
+    @State var searchExternalRoute: ExternalRoute?
     @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The system `openURL`, captured before RootView overrides it for its
     /// descendants — used to defer non-recipe article links to the browser
-    /// (DOD-ART-2).
-    @Environment(\.openURL) private var systemOpenURL
+    /// (DOD-ART-2). Non-private for the `+LinkRouting.swift` extension.
+    @Environment(\.openURL) var systemOpenURL
     /// Foreground Spotlight refresh (DUT-12); see `reindexSpotlightOnForeground`.
     @Environment(\.scenePhase) private var scenePhase
     @State private var didInitialSpotlightIndex = false
@@ -181,6 +189,10 @@ struct RootView: View {
         // body's `Text` links in every tab; non-recipe / off-site URLs defer
         // to the system handler.
         .environment(\.openURL, OpenURLAction { url in handleArticleLinkTap(url) })
+        // DUT-246 — the awaitable variant of the same routing, for flows that
+        // must know when (and whether) navigation happened before tearing
+        // themselves down (the First Cookout sheet's "Open the recipe").
+        .environment(\.recipeLinkOpener, RecipeLinkOpener { url in await openRecipeLink(url) })
     }
 
     private var phoneTabs: some View {
@@ -190,7 +202,7 @@ struct RootView: View {
                     tab: tab,
                     dependencies: dependencies,
                     pendingDeepLink: tab == .feed ? $pendingDeepLink : .constant(nil),
-                    externalRoute: tab == .feed ? $feedExternalRoute : .constant(nil)
+                    externalRoute: externalRouteBinding(for: tab)
                 )
                 .tabItem {
                     // T-660 / CL-65: bottom-tab `Label` reads `tabLabel`
@@ -251,7 +263,7 @@ struct RootView: View {
                 tab: selectedTab,
                 dependencies: dependencies,
                 pendingDeepLink: selectedTab == .feed ? $pendingDeepLink : .constant(nil),
-                externalRoute: selectedTab == .feed ? $feedExternalRoute : .constant(nil)
+                externalRoute: externalRouteBinding(for: selectedTab)
             )
             .id(selectedTab)
         }
@@ -305,7 +317,8 @@ struct RootView: View {
                 guard let route = await resolveRecipeRoute(id: id, autoStartCookMode: false) else {
                     return
                 }
-                feedExternalRoute = route
+                // DUT-310 — deep links replace the stack (Back → tab root).
+                feedExternalRoute = .replaceStack(route)
             }
         case .startCookMode(let recipeID):
             selectedTab = .feed
@@ -316,7 +329,7 @@ struct RootView: View {
                         autoStartCookMode: true
                     )
                 else { return }
-                feedExternalRoute = route
+                feedExternalRoute = .replaceStack(route)
             }
         }
     }
@@ -360,8 +373,6 @@ struct RootView: View {
     }
 }
 
-// MARK: - DOD-ART-2 in-app article-link routing
-
 extension RootView {
     /// Re-index Spotlight on each foreground return so later-session saves stay
     /// searchable without a cold launch; the launch `.active` is gated (DUT-12).
@@ -369,26 +380,9 @@ extension RootView {
         guard newPhase == .active, didInitialSpotlightIndex else { return }
         Task { await indexSpotlight() }
     }
-
-    /// Custom `openURL` handler for in-app article recipe links. A
-    /// `dutchovendaddy.com` link is resolved to its post and pushed into the
-    /// Feed stack (the same surface Spotlight / Siri / notifications route to);
-    /// a non-recipe `dutchovendaddy.com` URL or any off-site URL opens in the
-    /// browser. Returns synchronously — the resolve is a fire-and-forget Task.
-    /// Lives in an extension so the deep-link addition stays under the
-    /// `type_body_length` cap on the (already large) `RootView` struct.
-    func handleArticleLinkTap(_ url: URL) -> OpenURLAction.Result {
-        guard AppDependencies.recipeSlug(fromDODURL: url) != nil else {
-            return .systemAction
-        }
-        Task { @MainActor in
-            if let item = await dependencies.resolveRecipe(forArticleLink: url) {
-                selectedTab = .feed
-                feedExternalRoute = .recipe(item: item, autoStartCookMode: false)
-            } else {
-                systemOpenURL(url)
-            }
-        }
-        return .handled
-    }
 }
+
+// DOD-ART-2 / DUT-243 / DUT-246 — the in-app article-link routing
+// (`handleArticleLinkTap`, `openRecipeLink`, `routeIntoCurrentTab`,
+// `externalRouteBinding(for:)`) lives in `RootView+LinkRouting.swift` so this
+// file stays under the SwiftLint `file_length` cap.

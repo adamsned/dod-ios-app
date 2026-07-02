@@ -22,16 +22,17 @@ struct TabStack: View {
     /// Feed tab consumes it — see the `.task(id:)` modifier in `body`.
     @Binding var pendingDeepLink: WidgetDeepLink?
     /// Binding-style sink so RootView can drive a tab's stack from outside —
-    /// used by App Intents / Spotlight deep links (US-10). Optional so the
-    /// non-feed stacks don't need to plumb anything.
-    @Binding var externalRoute: RecipeRoute?
+    /// App Intents / Spotlight deep links (US-10, replace semantics) and
+    /// in-app article-link taps (DUT-243, push semantics). Every tab gets a
+    /// sink now so a link tapped in Saved/Search opens in place.
+    @Binding var externalRoute: ExternalRoute?
     @State private var path: [RecipeRoute] = []
 
     init(
         tab: AppTab,
         dependencies: AppDependencies,
         pendingDeepLink: Binding<WidgetDeepLink?> = .constant(nil),
-        externalRoute: Binding<RecipeRoute?> = .constant(nil)
+        externalRoute: Binding<ExternalRoute?> = .constant(nil)
     ) {
         self.tab = tab
         self.dependencies = dependencies
@@ -52,13 +53,20 @@ struct TabStack: View {
             await consume(link: link)
         }
         .task(id: externalRoute) {
-            // App-Intents / Spotlight route push. `.task(id:)` (not `.onChange`) so a
-            // route already non-nil when this tab is first instantiated — iPad
-            // switching to the Feed tab, or a cold-launch intent — is still consumed;
-            // `.onChange` only fires on a live transition, dropping those (DUT-352).
+            // External route sink. `.task(id:)` (not `.onChange`) so a route
+            // already non-nil when this tab is first instantiated — iPad
+            // switching to the Feed tab, or a cold-launch intent — is still
+            // consumed; `.onChange` only fires on a live transition (DUT-352).
             guard let route = externalRoute else { return }
-            // DUT-310: replace the stack, don't append, so Back returns to the Feed.
-            path = [route]
+            switch route {
+            case .replaceStack(let destination):
+                // DUT-310: deep links replace, so Back returns to the tab root.
+                path = [destination]
+            case .push(let destination):
+                // DUT-243: in-app link taps append, so Back returns to the
+                // article the user was reading.
+                path.append(destination)
+            }
             externalRoute = nil
         }
     }

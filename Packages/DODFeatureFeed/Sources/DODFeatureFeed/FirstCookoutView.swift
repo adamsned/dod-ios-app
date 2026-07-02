@@ -33,9 +33,19 @@ public struct FirstCookoutView: View {
 
     @Environment(\.openURL) var openURL
     @Environment(\.dismiss) var dismiss
+    /// DUT-246 — the app shell's awaitable recipe-link opener. When present,
+    /// "Open the recipe" keeps this sheet up until the resolve completes and
+    /// dismisses only if in-app navigation actually happened (no more blank
+    /// dead interval while the resolve is in flight). `nil` in unwired hosts
+    /// (previews/tests) → the legacy openURL + dismiss path.
+    @Environment(\.recipeLinkOpener) var recipeLinkOpener
     /// 0 = intro; 1...steps.count = each coached step; steps.count + 1 = celebration.
     /// Internal (not private) so the swipe handler in `+Stages.swift` can page it.
     @State var index = 0
+    /// DUT-246 — true while the "Open the recipe" resolve is in flight; drives
+    /// the button's busy state so the sheet visibly waits instead of
+    /// dismissing into a blank gap. Internal for `+RecipeLink.swift`.
+    @State var isOpeningRecipe = false
     /// Drives the live bake timer offered at the *cook* stage (DUT-100).
     @State var timerEngine = CookTimerEngine()
     @State var showingHeatCoach = false
