@@ -175,4 +175,18 @@ struct SyncedSavedRecipeTests {
         let saved = try await store.savedRecipes()
         #expect(saved.first?.kind == .article)
     }
+
+    /// DUT-240 — the app's post-import reconcile branches on whether ANY
+    /// synced row exists (a non-empty imported set means another ≥V5 device
+    /// already seeded it, so local-only pins are cross-device unsaves).
+    @Test("hasAnySyncedSaved reflects the synced set")
+    func hasAnySyncedSavedReflectsTheSet() async throws {
+        let store = RecipeStore(modelContainer: try RecipeStore.inMemoryContainer())
+        #expect(try await store.hasAnySyncedSaved() == false)
+        try await store.cache(listItem: sampleListItem(id: 9, title: "Chili"))
+        _ = try await store.toggleSaved(id: 9)
+        #expect(try await store.hasAnySyncedSaved())
+        _ = try await store.toggleSaved(id: 9)  // unsave empties the set
+        #expect(try await store.hasAnySyncedSaved() == false)
+    }
 }
