@@ -199,12 +199,13 @@ struct RootView: View {
                     + "Takes effect next time you open the app — change it anytime in Settings."
             )
         }
-        // DUT-457 — the Cooking Tip widget opens the full tip here.
-        .alert("Cooking Tip", isPresented: $showTipDialog) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(tipDialogText)
+        // DUT-457 / DUT-461 — the Cooking Tip widget opens the full tip in a
+        // styled card (matching the Cooking Tools callout), not a system alert.
+        // Overlay lives in `RootView+TipDialog.swift` (file_length).
+        .overlay {
+            if showTipDialog { cookingTipOverlay }
         }
+        .animation(.easeInOut(duration: 0.2), value: showTipDialog)
         // Intercept in-app link taps (DOD-ART-2): a dutchovendaddy.com recipe
         // link inside a rendered article opens the recipe in-app instead of
         // bouncing to Safari. Set on the whole tree so it reaches the article

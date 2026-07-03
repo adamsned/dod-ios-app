@@ -3156,4 +3156,13 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-904 — Restyle the Cooking Tip in-app popup to a Cooking-Tools-callout card (CL-298 / DUT-461)
+
+- **What:** Replace the DUT-457 system `.alert` tip popup with a custom card styled like `CookingToolsCallout`. New `TipDialogCard` (DODDesignSystem): rounded `surfaceElevated` card (`DODRadius.standard`) + `burntOrange.opacity(0.3)` stroke, flame + "Cooking Tip" title, 44pt X dismiss, full tip body. `RootView` swaps `.alert` for `.overlay { if showTipDialog { cookingTipOverlay } }` + a 0.2s animation; `cookingTipOverlay` (in `RootView+TipDialog.swift`, file_length) is a dimmed tap-to-dismiss scrim + the centered card (max width 320, scale/opacity transition). `showTipDialog` / `tipDialogText` state + the DUT-457 deep-link path unchanged.
+- **Files:** DODDesignSystem `TipDialogCard.swift` (new). App `RootView.swift` (alert → overlay) + `RootView+TipDialog.swift` (new; `cookingTipOverlay`). Spec `clarifications.md` (CL-298).
+- **L4:** none — `TipDialogCard` is a new standalone component not used by any existing snapshot, so no baseline changes; a dedicated `TipDialogCard` L4 test is a follow-up.
+- **AC:** US-22 (widgets / tip). Linear DUT-461 (follow-up to DUT-457); supersedes canceled DUT-477. CL-298 canonical. **Est:** ~1.5 h. **Deps:** off main (after CL-297). Branch `feat/dut-461-tip-popup-card`. **Verification:** swift-format + SwiftLint `--strict` clean; DODDesignSystem compiles; app builds; styled card eyeballed on a tip-widget tap in an Xcode-signed run.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
