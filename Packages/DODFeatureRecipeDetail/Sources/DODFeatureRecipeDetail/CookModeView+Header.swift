@@ -82,6 +82,9 @@ extension CookModeView {
         } label: {
             Image(systemName: viewModel.isVoiceModeEnabled ? "speaker.wave.2.fill" : "speaker.wave.2")
                 .foregroundStyle(viewModel.isVoiceModeEnabled ? DODColor.accent : DODColor.label)
+                // DUT-527 — SF-Symbol-only button; guarantee a 44pt tap target.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .accessibilityIdentifier("cook-mode-voice-toggle")
         .accessibilityLabel("Voice Mode")
@@ -118,6 +121,9 @@ extension CookModeView {
         } label: {
             Image(systemName: "arrow.trianglehead.counterclockwise")
                 .foregroundStyle(DODColor.accent)
+                // DUT-527 — SF-Symbol-only button; guarantee a 44pt tap target.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .accessibilityIdentifier("cook-mode-replay-step")
         .accessibilityLabel("Replay step")

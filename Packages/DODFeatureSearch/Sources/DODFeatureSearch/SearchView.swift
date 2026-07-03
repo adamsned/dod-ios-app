@@ -87,6 +87,13 @@ public struct SearchView: View {
             }
             content
         }
+        // DUT-527 — announce the result count once the search settles, so a
+        // VoiceOver user hears how many recipes came back (or that none did)
+        // instead of silently landing in the results list. Gated on the two
+        // terminal states so the transient `.searching` flip never speaks.
+        .onChange(of: viewModel.state) { _, newState in
+            announceSearchState(newState)
+        }
         .background(DODColor.surface)
         // DUT-275 — nav bar hidden so the title pins at the very top, at the same
         // Y as every other tab (the title is the `DODScreenHeader` above).
@@ -95,6 +102,24 @@ public struct SearchView: View {
             await viewModel.loadCategoriesIfNeeded()
             await viewModel.refreshSavedRecipeIDs()  // T-765: state-aware menu on appear
         }
+    }
+
+    /// DUT-527 — announce the result count once the search settles, so a
+    /// VoiceOver user hears how many recipes came back (or that none did)
+    /// instead of silently landing in the results list. Gated on the two
+    /// terminal states so the transient `.searching` flip never speaks.
+    private func announceSearchState(_ state: SearchViewModel.State) {
+        let message: String
+        switch state {
+        case .results:
+            let count = viewModel.items.count
+            message = "\(count) \(count == 1 ? "recipe" : "recipes") found."
+        case .noResults:
+            message = "No recipes found."
+        case .idle, .searching, .offline:
+            return
+        }
+        AccessibilityNotification.Announcement(message).post()
     }
 
     /// CL-127 (T-649): gate the banner on a settled state so it never
@@ -121,6 +146,8 @@ public struct SearchView: View {
                 .underline()
             Spacer()
         }
+        // DUT-527 — guarantee a 44pt tap target for the tappable rescue banner.
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
         .onTapGesture { viewModel.applyDidYouMean() }
         .padding(.horizontal, DODSpacing.md)
@@ -276,114 +303,8 @@ public struct SearchView: View {
     }
 }
 
-// MARK: - Filter chips
-
-/// Horizontal row of filter chips above the results list. Each chip flips
-/// one slice of `SearchFilters`; mutating the binding triggers
-/// `SearchViewModel`'s `reapplyFilters` and the result set re-ranks
-/// instantly without a network call (US-12 / AC-12.3).
-struct FilterChipRow: View {
-    @Binding var filters: SearchFilters
-    /// CL-122 (T-644): the chip is a `Button` that opens the wheel-picker
-    /// half-sheet instead of the pre-T-644 inline `Menu`. The sheet is
-    /// presented from the row so the chip itself stays a one-liner.
-    @State private var cookTimeSheetPresented: Bool = false
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: DODSpacing.xs) {
-                cookTimeChip
-            }
-            .padding(.horizontal, DODSpacing.md)
-            .padding(.bottom, DODSpacing.sm)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Search filters")
-        // CL-122 (T-644): half-sheet hosting the two-wheel min/max picker.
-        // Drag-down dismisses without applying (no auto-commit on
-        // selection change — Apple-Timer pattern). The sheet's "Apply"
-        // button writes the committed selection back into `$filters`.
-        .sheet(isPresented: $cookTimeSheetPresented) {
-            CookTimeRangeSheet(
-                initialMinSeconds: filters.cookTimeMinSeconds,
-                initialMaxSeconds: filters.cookTimeMaxSeconds,
-                onApply: { newMin, newMax in
-                    filters.cookTimeMinSeconds = newMin
-                    filters.cookTimeMaxSeconds = newMax
-                    cookTimeSheetPresented = false
-                },
-                onCancel: { cookTimeSheetPresented = false }
-            )
-            // T-646 / CL-124 — content-fitted custom detent (was `.medium`
-            // which left a tall dead-space tail above the home indicator).
-            // 340pt comfortably hosts header + wheels (160) + Apply + Reset
-            // + reduced bottom padding + the home-indicator safe area.
-            .presentationDetents([.height(340)])
-            .presentationDragIndicator(.visible)
-            // T-645 / CL-123 — fill the system sheet chrome with the
-            // brand surface color so the brown (dark) / white (light)
-            // panel reaches the bottom of the screen instead of letting
-            // the default chrome blur show through the safe-area gap.
-            .presentationBackground(DODColor.surface)
-        }
-    }
-
-    // US-29 / AC-29.4 / CL-49.4 + CL-105 (T-636): the "All categories"
-    // filter chip was removed because the Categories tab (bottom nav)
-    // already serves as the canonical "browse all categories" surface,
-    // making the chip duplicative. `filters.categoryID` is retained on
-    // the model (always nil here → "all categories" pipeline path) so
-    // the search merge logic remains untouched; only the UI affordance
-    // to mutate it is gone.
-
-    private var cookTimeChip: some View {
-        let label = cookTimeChipLabel(
-            min: filters.cookTimeMinSeconds,
-            max: filters.cookTimeMaxSeconds
-        )
-        return Button {
-            cookTimeSheetPresented = true
-        } label: {
-            chipLabel(
-                text: label,
-                systemImage: "clock",
-                isOn: filters.hasCookTimeRange
-            )
-        }
-        .accessibilityLabel("Cook time filter, \(label)")
-        // T-638 / CL-107 — stable test handle for the L5 E2E
-        // `test_search_chip_row_hidden_on_idle` (negative-asserts the chip is
-        // not queryable on the idle Search tab — pins CL-106 part 1's
-        // `viewModel.state != .idle` gate) and `test_search_cook_time_filter_narrows_results`
-        // (taps the chip → opens the wheel sheet → picks max → asserts the
-        // filtered result count narrows via the hydration path — pins
-        // CL-106 part 2 + REG-21 + REG-31).
-        .accessibilityIdentifier("dod.search.cookTimeChip")
-    }
-
-    // US-33 / CL-105 (T-636): the "Recently viewed" toggle chip was
-    // removed because the Recent searches section in
-    // `IdleSuggestionsView` already surfaces a user's recent activity,
-    // making the toggle duplicative. `filters.recentlyViewedOnly` is
-    // retained on the model (defaults to false → no-op filter) so the
-    // search pipeline stays unchanged; only the UI to mutate it is gone.
-
-    private func chipLabel(text: String, systemImage: String, isOn: Bool) -> some View {
-        HStack(spacing: DODSpacing.xxs) {
-            Image(systemName: systemImage)
-            Text(text).lineLimit(1)
-        }
-        .dodFont(DODType.caption)
-        .foregroundStyle(isOn ? DODColor.cream : DODColor.label)
-        .padding(.horizontal, DODSpacing.sm)
-        .padding(.vertical, DODSpacing.xxs)
-        .background(
-            Capsule().fill(isOn ? DODColor.castIronBrown : DODColor.surfaceElevated)
-        )
-    }
-}
-
-// `FlowLayout` (FlowLayout.swift), `IdleSuggestionsView`
-// (IdleSuggestionsView.swift), and the DUT-25 search-field affordance
-// (SearchFieldAffordance.swift) live in their own files to keep this one
-// under SwiftLint's 400-line cap. None depend on `SearchView`'s source.
+// `FlowLayout` (FlowLayout.swift), `FilterChipRow` (FilterChipRow.swift),
+// `IdleSuggestionsView` (IdleSuggestionsView.swift), and the DUT-25
+// search-field affordance (SearchFieldAffordance.swift) live in their own
+// files to keep this one under SwiftLint's 400-line cap. None depend on
+// `SearchView`'s source.

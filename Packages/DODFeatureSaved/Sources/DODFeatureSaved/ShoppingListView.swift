@@ -98,6 +98,9 @@ public struct ShoppingListView: View {
                 Image(systemName: checked ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22, weight: .regular))
                     .foregroundStyle(checked ? DODColor.accent : DODColor.labelSecondary)
+                    // DUT-527 — SF-Symbol-only toggle; guarantee a 44pt tap target.
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("shopping-list-row-toggle")

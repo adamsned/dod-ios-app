@@ -15,7 +15,8 @@ extension RecipeCard {
     /// Layout (CL-64.4):
     ///   - 60×60pt `AsyncImage` thumbnail on the leading edge, clipped to
     ///     a `RoundedRectangle(cornerRadius: DODRadius.inner)`.
-    ///   - `VStack(.leading)` carrying the title (`.lineLimit(1)`,
+    ///   - `VStack(.leading)` carrying the title (`.lineLimit(2)` — DUT-527,
+    ///     so large Dynamic Type doesn't truncate the name;
     ///     `DODType.heading`) and the excerpt (`.lineLimit(1)`,
     ///     `DODType.caption`). The excerpt is single-line in the row
     ///     variant to keep the density (gallery card uses 2 lines).
@@ -39,12 +40,6 @@ extension RecipeCard {
         /// Active search query (DUT-10) — see ``RecipeCard/highlightQuery``.
         public let highlightQuery: String?
 
-        /// T-782 / DUT-88 — on iPad (regular) the dense rows tile into a
-        /// multi-column grid where each cell is narrower than a full-width
-        /// iPhone row; allow the title two lines there so recipe names don't
-        /// truncate to "Veget…". Compact (iPhone) keeps the single-line title.
-        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-
         public init(
             title: String,
             excerpt: String,
@@ -66,7 +61,10 @@ extension RecipeCard {
                     RecipeCard.titleText(title, highlightQuery: highlightQuery)
                         .dodFont(DODType.heading)
                         .foregroundStyle(DODColor.label)
-                        .lineLimit(horizontalSizeClass == .regular ? 2 : 1)
+                        // DUT-527 — allow 2 title lines on compact (iPhone) too,
+                        // matching the gallery card, so larger Dynamic Type sizes
+                        // no longer truncate recipe names to "Veget…".
+                        .lineLimit(2)
                     Text(excerpt)
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)

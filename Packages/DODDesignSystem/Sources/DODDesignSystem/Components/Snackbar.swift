@@ -51,7 +51,14 @@ public struct Snackbar: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(action.map { "\(message). \($0.title) available." } ?? message)
         .sensoryFeedback(.impact(weight: .light), trigger: appearanceTrigger)
-        .onAppear { appearanceTrigger &+= 1 }
+        .onAppear {
+            appearanceTrigger &+= 1
+            // DUT-527 — the snackbar auto-dismisses in a few seconds, so a
+            // VoiceOver user who isn't focused on it would never hear it.
+            // Announce the message (and any action) once on appear.
+            let spoken = action.map { "\(message). \($0.title) available." } ?? message
+            AccessibilityNotification.Announcement(spoken).post()
+        }
     }
 }
 

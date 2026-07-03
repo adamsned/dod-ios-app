@@ -31,7 +31,14 @@ public struct RelatedRecipesStrip: View {
                                 .onTapGesture { onSelect(item) }
                                 // T-610 — stable handle for the L5 related-recipes
                                 // journey (tap a sibling → its detail).
+                                // DUT-527 — the card is tapped via `.onTapGesture`
+                                // on a VStack, which VoiceOver reads as static
+                                // text with no action. Give it a button trait +
+                                // an explicit combined label so VoiceOver
+                                // announces "<title>, recipe, button".
                                 .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(item.title), recipe")
+                                .accessibilityAddTraits(.isButton)
                                 .accessibilityIdentifier("dod.related.card")
                         }
                     }
