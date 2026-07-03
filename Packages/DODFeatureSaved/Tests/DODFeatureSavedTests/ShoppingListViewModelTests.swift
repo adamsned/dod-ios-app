@@ -66,8 +66,10 @@ import Testing
     // MARK: - add(recipes:) — build / append in place (DUT-487 / T-906)
 
     @Test func addRecipesToEmptyModelPopulatesRows() {
-        // Empty-first: a fresh `init()` model fills in place on the first add.
-        let viewModel = ShoppingListViewModel()
+        // Empty-first: a fresh model fills in place on the first add. `store:
+        // nil` (DUT-488) keeps this a pure in-memory VM so it starts empty
+        // regardless of any list persisted on the machine's App Group suite.
+        let viewModel = ShoppingListViewModel(store: nil)
         #expect(viewModel.isEmpty)
 
         viewModel.add(recipes: [
@@ -95,8 +97,9 @@ import Testing
 
     @Test func addRecipesClassifiesAppendedRowsByAisle() {
         // Classification still applies to appended rows, so they land in the
-        // right store-walk sections (AC-39.4).
-        let viewModel = ShoppingListViewModel()
+        // right store-walk sections (AC-39.4). `store: nil` (DUT-488) — pure
+        // in-memory VM, starts empty.
+        let viewModel = ShoppingListViewModel(store: nil)
         viewModel.add(recipes: [
             Self.recipe(id: 1, title: "A", ingredients: ["1 lb chicken", "1 tsp cumin", "2 limes"])
         ])
