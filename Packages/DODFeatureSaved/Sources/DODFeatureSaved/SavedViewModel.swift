@@ -106,9 +106,16 @@ public final class SavedViewModel {
     public func startObserving() {
         guard remoteChangeTask == nil else { return }
         remoteChangeTask = Task { [weak self] in
-            guard let self else { return }
-            let stream = dependencies.remoteChanges()
+            // DUT-481: read the stream via a weak touch, then re-acquire `self`
+            // weakly PER iteration. A `guard let self` before the `for await`
+            // would upgrade to a strong reference held for the whole loop — and
+            // the stream never ends on its own, so the strong ref would keep the
+            // view model alive forever, defeating the `deinit`-driven cancel
+            // (the cycle VM → Task → self → VM). Touching `self` per tick lets
+            // the strong scope end each iteration, so an @State drop deinits.
+            guard let stream = self?.dependencies.remoteChanges() else { return }
             for await _ in stream {
+                guard let self else { return }
                 self.remoteChangeDidArrive()
             }
         }

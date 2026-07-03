@@ -57,10 +57,16 @@ public final class FeedViewModel {
         // Subscribe once.
         if connectivityTask == nil {
             connectivityTask = Task { [weak self] in
-                guard let self else { return }
-                let stream = await dependencies.connectivityChanges()
+                // DUT-481: acquire the stream via a weak touch, then re-acquire
+                // `self` weakly PER iteration. A `guard let self` before the
+                // `for await` upgrades to a strong reference held for the whole
+                // loop; the stream never finishes on its own, so that strong ref
+                // would pin the view model forever, defeating the `deinit`
+                // cancel (VM → Task → self → VM). Per-tick touch lets the strong
+                // scope end each iteration so an @State drop deinits.
+                guard let stream = await self?.dependencies.connectivityChanges() else { return }
                 for await isOnline in stream {
-                    await self.handleConnectivity(isOnline: isOnline)
+                    await self?.handleConnectivity(isOnline: isOnline)
                 }
             }
         }
