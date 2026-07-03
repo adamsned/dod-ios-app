@@ -49,6 +49,26 @@ import Testing
         #expect(result == "Read &foobar; about it")
     }
 
+    // MARK: - DUT-466: double-encoded entities (mirrors DUT-394)
+
+    @Test func decodesDoubleEncodedNumericEntity() {
+        // WP REST bodies routinely double-encode: `&amp;#8217;` must resolve all
+        // the way to the apostrophe, not stop at the raw `&#8217;`.
+        let result = HTMLSanitizer.plainText(from: "It&amp;#8217;s great!")
+        #expect(result == "It\u{2019}s great!")
+    }
+
+    @Test func decodesDoubleEncodedAmpersand() {
+        let result = HTMLSanitizer.plainText(from: "Salt &amp;amp; pepper")
+        #expect(result == "Salt & pepper")
+    }
+
+    @Test func singleEncodedAmpersandStillDecodesToOne() {
+        // The second pass must NOT over-decode a genuine single `&amp;`.
+        let result = HTMLSanitizer.plainText(from: "Sweet &amp; salty")
+        #expect(result == "Sweet & salty")
+    }
+
     // MARK: - DUT-389: comment stripping
 
     @Test func stripsSimpleHTMLComment() {
