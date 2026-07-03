@@ -59,6 +59,10 @@ public struct RecipeDetailView: View {
     /// (iPad) bounds the content below the hero to a centered column;
     /// `.compact` (iPhone) leaves the layout byte-identical.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// DUT-529 — when Reduce Motion is on, the blurb More/Less expand/collapse
+    /// (in `RecipeDetailView+Blurb.swift`) skips its animation (constitution §7).
+    /// `internal` (not `private`) so the `+Blurb` extension can read it.
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     public let onSelectRelated: (RecipeListItem) -> Void
 
     public init(

@@ -36,6 +36,9 @@ public struct SettingsView: View {
     // `internal` (not `private`) so the `Binding` wrappers in
     // `SettingsView+Bindings.swift` reach it across the file boundary (DUT-307).
     @State var viewModel: SettingsViewModel
+    /// DUT-529 — when Reduce Motion is on, the cache-clear snackbar crossfades in
+    /// (opacity only) instead of sliding up from the bottom edge (constitution §7).
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Closure the Clear Cache row delegates to. Returns the total
     /// bytes freed so the snackbar can format the "Freed X.X MB" copy.
     /// Optional so previews + snapshot tests don't need to plumb a
@@ -79,6 +82,9 @@ public struct SettingsView: View {
         .overlay(alignment: .bottom) {
             snackbarOverlay
         }
+        // DUT-529 — drive the snackbar's present/dismiss transition; `nil` under
+        // Reduce Motion so it appears/disappears without motion (constitution §7).
+        .animation(reduceMotion ? nil : .default, value: viewModel.snackbarMessage)
         // DUT-6 cause B — pull the latest CloudKit mirror status into the iCloud
         // Sync row's status sublabel when the screen appears. (T-759 / CL-156
         // removed the per-toggle confirmation dialog; the toggle in
@@ -304,7 +310,13 @@ public struct SettingsView: View {
                 // the first message's timer fires and clears the second one early).
                 .id(message)
                 .padding(.bottom, DODSpacing.md)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                // DUT-529: under Reduce Motion, drop the slide and crossfade in
+                // with opacity only (constitution §7); otherwise slide up + fade.
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .move(edge: .bottom).combined(with: .opacity)
+                )
                 .onTapGesture { viewModel.dismissSnackbar() }
                 .task {
                     // Auto-dismiss after 4 seconds. Matches the Snackbar

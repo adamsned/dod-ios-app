@@ -160,6 +160,29 @@ public final class CookModeViewModel {
         }
     }
 
+    /// DUT-529 — belt-and-suspenders idle-timer net for when the app backgrounds
+    /// while Cook Mode is still on screen. Restores the *prior* idle-timer value
+    /// (undoing `beginCookMode`'s `= true`) WITHOUT tearing down the session:
+    /// the Live Activity, step timers, and voice state are all left intact so the
+    /// Lock Screen card (US-11) keeps running while backgrounded and the session
+    /// resumes cleanly on return. Idempotent — no-op unless a session is live and
+    /// the timer is currently held, so it never double-restores against
+    /// `endCookMode`.
+    public func suspendIdleTimerForBackground() {
+        guard didBegin, idleTimer.isDisabled != priorIdleTimerDisabled else { return }
+        idleTimer.isDisabled = priorIdleTimerDisabled
+    }
+
+    /// DUT-529 — re-arm the idle timer on return to the foreground if the session
+    /// is still live (paired with ``suspendIdleTimerForBackground()``). No-op when
+    /// no session is running or the timer is already held. Deliberately does NOT
+    /// touch `priorIdleTimerDisabled` — that stays captured from the original
+    /// `beginCookMode` so the eventual `endCookMode` restores the true prior value.
+    public func resumeIdleTimerIfActive() {
+        guard didBegin, !idleTimer.isDisabled else { return }
+        idleTimer.isDisabled = true
+    }
+
     // MARK: - Voice Mode (US-40 / DUT-325)
     //
     // The Voice Mode toggle, the dessert-aware spoken-completion line, the

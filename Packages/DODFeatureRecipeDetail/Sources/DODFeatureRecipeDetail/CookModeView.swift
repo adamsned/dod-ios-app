@@ -23,6 +23,17 @@ public struct CookModeView: View {
     // `CookModeView+Header.swift` can read the view model.
     @State var viewModel: CookModeViewModel
     @State private var ingredientsDrawerVisible: Bool = false
+    /// DUT-529 — belt-and-suspenders idle-timer safety net. `.onDisappear`
+    /// already restores the idle timer on a normal teardown; this observer also
+    /// restores it when the app backgrounds (so an atypical teardown that never
+    /// fires `.onDisappear` can't leave `isIdleTimerDisabled` stuck on), and
+    /// re-arms it on return to `.active` if the session is still up. Both
+    /// `begin`/`endCookMode` are idempotent, so this never double-restores.
+    @Environment(\.scenePhase) private var scenePhase
+    /// DUT-529 — when Reduce Motion is on, drop the step-change slide/scale
+    /// animation (constitution §7); the step swap still happens, just without the
+    /// motion. Mirrors the `LoadingSkeleton` shimmer guard.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // `internal` (not `private`) so the step-body composition in
     // `CookModeView+StepBody.swift` can present the journal-log sheet.
     /// DUT-326 — drives the "Add to Cooking Journal" capture sheet on the
@@ -133,6 +144,29 @@ public struct CookModeView: View {
         .onDisappear {
             viewModel.endCookMode()
         }
+        // DUT-529 — idle-timer safety net for atypical teardowns that never fire
+        // `.onDisappear`. On background, restore *just* the idle timer (leaving
+        // the Live Activity + timers running, US-11); on return to active, re-arm
+        // it if the session is still live. Both calls are idempotent and preserve
+        // the `didBegin` / `priorIdleTimerDisabled` symmetry, so they never
+        // double-restore against the `.onDisappear` `endCookMode` above.
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .background:
+                viewModel.suspendIdleTimerForBackground()
+            case .active:
+                viewModel.resumeIdleTimerIfActive()
+            default:
+                break
+            }
+        }
+    }
+
+    /// DUT-529 — the step-change animation, gated on Reduce Motion: `nil` (no
+    /// animation) when the user has asked to reduce motion, otherwise the usual
+    /// short ease. Used by the Next/Previous buttons and the swipe gesture.
+    private var stepChangeAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.2)
     }
 
     // MARK: - Header (AC-7.2 step counter, AC-7.6 Done exit, DUT-325 layout)
@@ -233,7 +267,7 @@ public struct CookModeView: View {
         HStack(spacing: DODSpacing.sm) {
             if viewModel.currentStepIndex > 0 || viewModel.isFinished {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { viewModel.goBack() }
+                    withAnimation(stepChangeAnimation) { viewModel.goBack() }
                 } label: {
                     Label("Previous", systemImage: "chevron.left")
                         .frame(maxWidth: .infinity)
@@ -276,9 +310,9 @@ public struct CookModeView: View {
                 let isMostlyHorizontal = abs(value.translation.width) > abs(value.translation.height) * 1.2
                 guard isMostlyHorizontal else { return }
                 if value.translation.width < -horizontalThreshold {
-                    withAnimation(.easeInOut(duration: 0.2)) { advance() }
+                    withAnimation(stepChangeAnimation) { advance() }
                 } else if value.translation.width > horizontalThreshold {
-                    withAnimation(.easeInOut(duration: 0.2)) { viewModel.goBack() }
+                    withAnimation(stepChangeAnimation) { viewModel.goBack() }
                 }
             }
     }

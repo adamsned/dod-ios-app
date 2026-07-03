@@ -1,8 +1,47 @@
 import DODDesignSystem
 import DODFeatureFeed
 import Foundation
+import SwiftUI
 
 extension RootView {
+
+    /// DUT-335 — the App Intro cover content (extracted here so `RootView`'s
+    /// body stays under the SwiftLint `file_length` cap). The persistent
+    /// "Let's Get Cooking" CTA is the tour's single exit: it records onboarding
+    /// as done and kicks off first-run setup (notifications + the deferred
+    /// iCloud-Sync prompt).
+    @MainActor
+    var onboardingCover: some View {
+        AppIntroTour(
+            pages: Self.appIntroPages,
+            ctaTitle: "Let's Get Cooking",
+            onFinish: {
+                guard showOnboarding else { return }  // DUT-407: ignore a double-tap
+                UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
+                // First-run prompts (skipped under the onboarding UI test, which
+                // can't dismiss the system dialogs). Arm the pending flag BEFORE
+                // dismissing so it's set no matter how fast the dismiss animation
+                // (and its `onDismiss:`) races the async setup; the sync prompt
+                // itself is presented from `presentCloudSyncPromptIfPending`.
+                if !DODEnvironment.suppressFirstRunPrompts {
+                    pendingCloudSyncPromptAfterOnboarding = true
+                    Task { await runFirstRunSetup(presentingFromCoverDismiss: true) }
+                }
+                showOnboarding = false
+            }
+        )
+    }
+
+    /// DUT-408 / DUT-529 — the onboarding cover's `onDismiss:` completion. Fires
+    /// after the dismiss animation finishes, so presenting the iCloud-Sync alert
+    /// here can't be swallowed as present-during-dismiss (replaces the old fixed
+    /// 450 ms sleep). No-op unless `onFinish` armed the pending flag.
+    @MainActor
+    func presentCloudSyncPromptIfPending() {
+        guard pendingCloudSyncPromptAfterOnboarding else { return }
+        pendingCloudSyncPromptAfterOnboarding = false
+        showCloudSyncPrompt = true
+    }
 
     /// The slides of the first-launch **App Intro** tour (DUT-335). Declared
     /// static so the array isn't rebuilt every render and tests/previews reuse
@@ -60,21 +99,31 @@ extension RootView {
     /// (DUT-280): ask for notification permission (the system prompt), then ask
     /// to turn on iCloud Sync. Both `Turn On iCloud Sync?` alert buttons set
     /// `firstRunPromptsCompletedKey`, so this never re-runs once answered.
+    ///
+    /// - Parameter presentingFromCoverDismiss: `true` when this runs off the
+    ///   onboarding CTA (`onFinish`), while the `fullScreenCover` is still
+    ///   dismissing. DUT-408: when notification auth is already decided,
+    ///   `requestAuthorization` returns instantly (no system dialog), so setting
+    ///   `showCloudSyncPrompt` here would present the alert mid-dismiss and iOS
+    ///   swallows it (present-during-dismiss). In that case the caller (`onFinish`)
+    ///   has already armed `pendingCloudSyncPromptAfterOnboarding`, and the cover's
+    ///   `onDismiss:` presents the alert once the dismiss animation has finished
+    ///   (see `RootView.swift`); this method leaves the prompt alone. When `false`
+    ///   (the `.task` recovery path — no cover on screen) it presents directly.
     @MainActor
-    func runFirstRunSetup() async {
+    func runFirstRunSetup(presentingFromCoverDismiss: Bool = false) async {
         // 1. Notifications — the system permission prompt. On grant, flip the app
         //    toggle so alerts fire without a second trip to Settings.
         let granted = await dependencies.notificationService.requestAuthorization()
         if granted {
             UserDefaults.standard.set(true, forKey: SettingsViewModel.notificationsEnabledKey)
         }
-        // 2. iCloud Sync — ask (never silently enable). DUT-408: when notification
-        //    auth is already decided, `requestAuthorization` returns instantly (no
-        //    system dialog), so without this hop `showCloudSyncPrompt` would be set
-        //    while the onboarding cover is still dismissing and iOS swallows the
-        //    alert (present-during-dismiss). Yield a beat so the cover finishes.
-        try? await Task.sleep(for: .milliseconds(450))
-        showCloudSyncPrompt = true
+        // 2. iCloud Sync — ask (never silently enable). When riding the onboarding
+        //    cover's dismissal the prompt is presented from `onDismiss:` (DUT-408),
+        //    so do nothing here; otherwise present it now.
+        if !presentingFromCoverDismiss {
+            showCloudSyncPrompt = true
+        }
     }
 
     /// DUT-400: migrate the pre-DUT-280 upgrade population — a user who onboarded

@@ -14,10 +14,13 @@ extension RecipeDetailView {
 
     var ingredientsSection: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            Text("Ingredients")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-            if let ingredients = viewModel.recipe?.ingredients {
+            // DUT-529: only emit the header when there's an actual list to show —
+            // a `.ready` recipe with no ingredients otherwise renders a bare
+            // "Ingredients" title with no rows beneath it.
+            if let ingredients = viewModel.recipe?.ingredients, !ingredients.isEmpty {
+                Text("Ingredients")
+                    .dodFont(DODType.heading)
+                    .foregroundStyle(DODColor.label)
                 // US-31 / AC-31.4 + AC-31.5: scale at render time.
                 // Source recipe `ingredient.text` stays untouched (AC-31.8).
                 let factor = viewModel.servingsScaleFactor
@@ -51,10 +54,12 @@ extension RecipeDetailView {
         // converter at display time (stored data untouched, AC-31.8-style).
         let temperatureUnit = TemperatureConverter.resolvedUnit(fromRawValue: temperatureUnitRaw)
         return VStack(alignment: .leading, spacing: DODSpacing.md) {
-            Text("Instructions")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-            if let instructions = viewModel.recipe?.instructions {
+            // DUT-529: gate the header on a non-empty list so a `.ready` recipe
+            // with no instructions doesn't show a lone "Instructions" title.
+            if let instructions = viewModel.recipe?.instructions, !instructions.isEmpty {
+                Text("Instructions")
+                    .dodFont(DODType.heading)
+                    .foregroundStyle(DODColor.label)
                 ForEach(instructions) { step in
                     InstructionStepView(
                         step: step,
