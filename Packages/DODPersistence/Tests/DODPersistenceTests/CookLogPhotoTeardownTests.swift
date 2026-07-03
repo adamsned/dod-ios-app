@@ -95,4 +95,28 @@ import Testing
 
         #expect(photoStore.data(forID: fileID) == nil)
     }
+
+    /// DUT-515 — the edit path writes the new JPEG to disk BEFORE calling
+    /// `updateCookLog`. If the row was deleted out from under an open edit, the
+    /// guard-miss must delete that just-written file so it doesn't orphan (no row
+    /// will ever reference its `photoLocalID`).
+    @Test func updatingANonExistentRowDeletesTheJustWrittenPhoto() async throws {
+        let photoStore = CookPhotoStore()
+        let fileID = try photoStore.save(Data([0x04]))
+        #expect(photoStore.data(forID: fileID) != nil)
+
+        let store = try await makeStore()
+        // No row with this id was ever logged — the edit targets a deleted entry.
+        try await store.updateCookLog(
+            CookLogEntry(
+                id: UUID(),
+                recipeID: 4,
+                recipeTitle: "Cornbread",
+                cookedAt: Self.cookedAt,
+                photoLocalID: fileID
+            )
+        )
+
+        #expect(photoStore.data(forID: fileID) == nil)  // just-written file cleaned up, not orphaned
+    }
 }

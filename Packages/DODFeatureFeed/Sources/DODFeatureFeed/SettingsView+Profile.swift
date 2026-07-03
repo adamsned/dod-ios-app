@@ -95,7 +95,8 @@ struct ProfileSettingsRow: View {
     private var cookJournalSheet: some View {
         CookJournalView(
             load: { [weak viewModel] in await viewModel?.profileJournalEntries() ?? [] },
-            update: { [weak viewModel] entry in await viewModel?.updateProfileJournalEntry(entry) }
+            update: { [weak viewModel] entry in await viewModel?.updateProfileJournalEntry(entry) },
+            delete: { [weak viewModel] entry in await viewModel?.deleteProfileJournalEntry(entry) }  // DUT-514
         )
     }
 }

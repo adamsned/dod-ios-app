@@ -20,6 +20,10 @@ struct CookJournalEntryView: View {
     let entry: CookLogEntry
     /// Persist the edited entry (note + photo). The journal reloads after this.
     let onSave: (CookLogEntry) async -> Void
+    /// DUT-514 — delete this entry (cascades its photo). The journal reloads +
+    /// recomputes stats after this. Defaults to a no-op so the Delete affordance
+    /// simply doesn't appear for callers (previews/tests) that don't wire it.
+    let onDelete: (() async -> Void)?
 
     private let photoStore = CookPhotoStore()
     @Environment(\.dismiss) private var dismiss
@@ -39,10 +43,17 @@ struct CookJournalEntryView: View {
     /// DUT-340: surfaces a photo disk-write failure instead of swallowing it with
     /// `try?` (mirrors the DUT-312 first-cookout path) so the user can retry.
     @State var photoSaveError: String?
+    /// DUT-514 — drives the delete-confirmation alert.
+    @State var showingDeleteConfirm = false
 
-    init(entry: CookLogEntry, onSave: @escaping (CookLogEntry) async -> Void) {
+    init(
+        entry: CookLogEntry,
+        onSave: @escaping (CookLogEntry) async -> Void,
+        onDelete: (() async -> Void)? = nil
+    ) {
         self.entry = entry
         self.onSave = onSave
+        self.onDelete = onDelete
         _note = State(initialValue: entry.note ?? "")
     }
 }
@@ -56,6 +67,7 @@ extension CookJournalEntryView {
                 headerSection
                 reflectionSection
                 reassurance
+                if onDelete != nil { deleteSection }
             }
             .padding(DODSpacing.md)
         }
@@ -72,6 +84,13 @@ extension CookJournalEntryView {
             Button("OK", role: .cancel) {}
         } message: {
             Text(photoSaveError ?? "")
+        }
+        // DUT-514 — confirm before deleting; a cook counts toward rank.
+        .alert("Delete This Cook?", isPresented: $showingDeleteConfirm) {
+            Button("Delete", role: .destructive) { Task { await deleteEntry() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes \"\(entry.recipeTitle)\" and its photo from your journal. This can't be undone.")
         }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
@@ -192,6 +211,20 @@ extension CookJournalEntryView {
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
+    /// DUT-514 — the destructive Delete affordance inside the entry page. Only
+    /// shown when a caller wired `onDelete` (previews/tests that don't stay clean).
+    private var deleteSection: some View {
+        Button(role: .destructive) {
+            showingDeleteConfirm = true
+        } label: {
+            Label("Delete This Cook", systemImage: "trash")
+                .dodFont(DODType.bodyEmphasized)
+                .frame(maxWidth: .infinity)
+        }
+        .disabled(isSaving)
+        .accessibilityIdentifier("journal-entry-delete")
+    }
+
     // MARK: - Photo + save logic
 
     private func loadExistingPhoto() {
@@ -247,6 +280,15 @@ extension CookJournalEntryView {
             photoLocalID: photoID
         )
         await onSave(updated)
+        dismiss()
+    }
+
+    /// DUT-514 — delete this entry, then pop back to the journal (which reloads +
+    /// recomputes its stats in its own `onDelete` handler).
+    private func deleteEntry() async {
+        guard let onDelete else { return }
+        isSaving = true
+        await onDelete()
         dismiss()
     }
 }

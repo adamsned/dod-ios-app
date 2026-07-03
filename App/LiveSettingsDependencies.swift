@@ -25,6 +25,8 @@ struct LiveSettingsDependencies: SettingsDependencies {
     typealias CookLogsLoad = @Sendable () async throws -> [CookLogEntry]
     typealias CountLoad = @Sendable () async throws -> Int
     typealias CookLogWrite = @Sendable (CookLogEntry) async throws -> Void
+    // DUT-514 — delete one journal entry by id (cascades its photo in the store).
+    typealias CookLogDelete = @Sendable (UUID) async throws -> Void
 
     let flagWrite: FlagWrite
     let statusProvider: StatusProvider
@@ -32,6 +34,7 @@ struct LiveSettingsDependencies: SettingsDependencies {
     let savedCountLoad: CountLoad
     let ratingCountLoad: CountLoad
     let cookLogWrite: CookLogWrite
+    let cookLogDelete: CookLogDelete
 
     init(
         flagWrite: @escaping FlagWrite,
@@ -39,7 +42,8 @@ struct LiveSettingsDependencies: SettingsDependencies {
         cookLogsLoad: @escaping CookLogsLoad = { [] },
         savedCountLoad: @escaping CountLoad = { 0 },
         ratingCountLoad: @escaping CountLoad = { 0 },
-        cookLogWrite: @escaping CookLogWrite = { _ in }
+        cookLogWrite: @escaping CookLogWrite = { _ in },
+        cookLogDelete: @escaping CookLogDelete = { _ in }
     ) {
         self.flagWrite = flagWrite
         self.statusProvider = statusProvider
@@ -47,6 +51,7 @@ struct LiveSettingsDependencies: SettingsDependencies {
         self.savedCountLoad = savedCountLoad
         self.ratingCountLoad = ratingCountLoad
         self.cookLogWrite = cookLogWrite
+        self.cookLogDelete = cookLogDelete
     }
 
     func setCloudSyncOptIn(_ enabled: Bool) async {
@@ -67,4 +72,5 @@ struct LiveSettingsDependencies: SettingsDependencies {
     func savedRecipeCount() async throws -> Int { try await savedCountLoad() }
     func userRatingCount() async throws -> Int { try await ratingCountLoad() }
     func updateCookLog(_ entry: CookLogEntry) async throws { try await cookLogWrite(entry) }
+    func deleteCookLog(id: UUID) async throws { try await cookLogDelete(id) }
 }

@@ -161,6 +161,35 @@ import Testing
         #expect(viewModel.savedRecipeIDs == [1])
     }
 
+    // DUT-514 — deleting a journal entry routes through the store (records the id)
+    // AND removes the row, so the journal's reload (`cookLogs()`) recomputes stats
+    // off the shrunken list. This mirrors the `updateCook` path but, unlike an
+    // edit, it DOES change the cook count.
+    @Test func deleteCookRemovesEntryAndShrinksTheJournal() async throws {
+        let dependencies = FakeFeedDependencies()
+        let keep = Self.makeCook(recipeID: 1)
+        let remove = Self.makeCook(recipeID: 2)
+        dependencies.cooks = [keep, remove]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        #expect(await viewModel.cookLogs().count == 2)
+
+        await viewModel.deleteCook(remove)
+
+        #expect(dependencies.deletedCookLogIDs == [remove.id])  // routed to the store by id
+        let after = await viewModel.cookLogs()
+        #expect(after.map(\.id) == [keep.id])  // list reload reflects the delete → stats recompute
+    }
+
+    static func makeCook(recipeID: Int) -> CookLogEntry {
+        CookLogEntry(
+            id: UUID(),
+            recipeID: recipeID,
+            recipeTitle: "Recipe \(recipeID)",
+            cookedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
@@ -188,6 +217,8 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     /// exercised; `deletedCookPhotoIDs` records what the view model asked to purge.
     var logCookShouldFail: Bool = false
     var deletedCookPhotoIDs: [String] = []
+    /// DUT-514 — records the ids the view model asked to delete from the journal.
+    var deletedCookLogIDs: [UUID] = []
     /// DUT-237: override the reported `X-WP-TotalPages`. When nil, it derives
     /// from the highest page index that has data, so a short final page still
     /// ends pagination (matching the pre-DUT-237 `< 20` heuristic for tests
@@ -262,4 +293,10 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     }
     func cookLogs() async throws -> [CookLogEntry] { cooks }
     func deleteCookPhoto(id: String) async { deletedCookPhotoIDs.append(id) }
+    // DUT-514 — remove the row so a subsequent `cookLogs()` reflects the delete
+    // (lets a test assert both the recorded id AND the recomputed journal list).
+    func deleteCookLog(id: UUID) async throws {
+        deletedCookLogIDs.append(id)
+        cooks.removeAll { $0.id == id }
+    }
 }
