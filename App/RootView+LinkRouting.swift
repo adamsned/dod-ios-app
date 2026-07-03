@@ -93,28 +93,45 @@ extension RootView {
             systemOpenURL(url)
             return false
         }
+        // DUT-462: capture the tab that was selected WHEN the link was tapped,
+        // BEFORE the async resolve. Reading `selectedTab` after the await would
+        // route into whatever tab is selected when the resolve completes — if
+        // the user switched tabs, or a guided-cookout sheet dismissed and
+        // changed the selection mid-flight, the recipe lands in the wrong stack.
+        let originTab = selectedTab
         guard let item = await dependencies.resolveRecipe(forArticleLink: url) else {
             systemOpenURL(url)
             return false
         }
-        routeIntoCurrentTab(.recipe(item: item, autoStartCookMode: false))
+        route(.recipe(item: item, autoStartCookMode: false), from: originTab)
         return true
     }
 
-    /// DUT-243 — push a route onto the CURRENTLY-SELECTED tab's stack
-    /// (mirroring `onSelectRelated`, which appends in place) instead of
+    /// DUT-243 — push a route onto the stack of the tab the link was tapped
+    /// from (mirroring `onSelectRelated`, which appends in place) instead of
     /// hard-coding a switch to Feed. The forced `.feed` switch remains only
     /// for genuine external entry points (Spotlight / App Intents /
     /// notifications — see `handle(intent:)`) and for Settings, which has no
-    /// article surface of its own.
-    private func routeIntoCurrentTab(_ route: RecipeRoute) {
-        switch selectedTab {
+    /// article surface of its own. DUT-462: routes into `originTab` (captured
+    /// at tap time), not `selectedTab` read after the resolve.
+    private func route(_ route: RecipeRoute, from originTab: AppTab) {
+        let destination = Self.linkRoutingDestination(for: originTab)
+        // Settings has no article surface, so a link tapped there also brings
+        // the user to Feed; every other tab keeps its own stack.
+        if destination != originTab { selectedTab = destination }
+        switch destination {
         case .feed: feedExternalRoute = .push(route)
         case .saved: savedExternalRoute = .push(route)
         case .search: searchExternalRoute = .push(route)
-        case .settings:
-            selectedTab = .feed
-            feedExternalRoute = .push(route)
+        case .settings: break  // unreachable: linkRoutingDestination never yields .settings
         }
+    }
+
+    /// DUT-462 / DUT-243 — which tab receives an in-app recipe route for a link
+    /// tapped from `originTab`. Settings redirects to Feed (no article surface);
+    /// every other tab keeps its own stack. Pure, so it's unit-testable without
+    /// a SwiftUI host.
+    nonisolated static func linkRoutingDestination(for originTab: AppTab) -> AppTab {
+        originTab == .settings ? .feed : originTab
     }
 }
