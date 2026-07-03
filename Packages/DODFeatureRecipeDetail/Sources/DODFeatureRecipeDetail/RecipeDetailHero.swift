@@ -18,7 +18,13 @@ struct RecipeDetailHero: View {
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fill)
-                default:
+                case .failure:
+                    // DUT-524 — a missing / permanently-failing hero used to fall
+                    // through to `default` and draw the animated skeleton forever
+                    // (an infinite "loading" shimmer). Render a neutral static
+                    // placeholder instead, matching the app's feed-card empty tile.
+                    heroFailurePlaceholder
+                case .empty:
                     LoadingSkeleton(cornerRadius: 0)
                 }
             }
@@ -46,5 +52,17 @@ struct RecipeDetailHero: View {
         .frame(height: 320)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
+    }
+
+    /// DUT-524 — neutral static tile shown when the hero image can't load, so a
+    /// missing photo reads as "no image" rather than a perpetual shimmer.
+    private var heroFailurePlaceholder: some View {
+        DODColor.surfaceElevated
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 48))
+                    .foregroundStyle(DODColor.labelSecondary)
+            )
     }
 }

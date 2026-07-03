@@ -145,9 +145,17 @@ public enum WidgetCard {
 
     /// AC-9.4: shown when no snapshot exists (first launch, App Group
     /// missing, version mismatch).
+    ///
+    /// DUT-504 — the `message` is now injectable so the Articles-mode empty
+    /// state ("no recent articles") doesn't reuse the recipe copy. Defaults
+    /// keep the featured-recipe wording, so existing callers are unchanged.
     public struct Placeholder: View {
 
-        public init() {}
+        let message: String
+
+        public init(message: String = "Open the app to see today's featured recipe here.") {
+            self.message = message
+        }
 
         public var body: some View {
             VStack(alignment: .leading, spacing: DODSpacing.xs) {
@@ -157,7 +165,7 @@ public enum WidgetCard {
                 Text("Dutch Oven Daddy")
                     .font(.system(.headline, design: .default, weight: .semibold))
                     .foregroundStyle(DODColor.label)
-                Text("Open the app to see today's featured recipe here.")
+                Text(message)
                     .font(.system(.caption, design: .default))
                     .foregroundStyle(DODColor.labelSecondary)
                     .lineLimit(3)

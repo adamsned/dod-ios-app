@@ -34,12 +34,15 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(Self.accessibilityLabel(for: recipe))
             } else {
-                WidgetCard.LockScreenEmpty()
-                    .widgetAccentable()
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(
-                        "Latest Recipe widget. Open the app to see the latest recipe."
-                    )
+                // DUT-504 — mode-aware empty state: `.articles` (no article yet)
+                // names the article surface rather than reusing the recipe copy.
+                WidgetCard.LockScreenEmpty(
+                    eyebrow: Self.emptyEyebrow(for: entry.content),
+                    message: Self.emptyMessage(for: entry.content)
+                )
+                .widgetAccentable()
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Self.emptyAccessibilityLabel(for: entry.content))
             }
         }
         // Single chrome-level URL — `.accessoryRectangular` is one tap
@@ -51,6 +54,26 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
     }
 
     // MARK: - Helpers
+
+    /// DUT-504 — empty-state eyebrow. `.articles` names the article surface;
+    /// otherwise the latest-recipe wording (matching `LockScreenEmpty`'s default).
+    static func emptyEyebrow(for mode: LatestContent) -> String {
+        mode == .articles ? "Latest Article" : "Latest Recipe"
+    }
+
+    /// DUT-504 — empty-state body copy, mode-aware.
+    static func emptyMessage(for mode: LatestContent) -> String {
+        mode == .articles
+            ? "No recent articles yet. Open the app to catch up."
+            : "Open the app to see the latest recipe."
+    }
+
+    /// DUT-504 — matching VoiceOver label for the empty tile.
+    static func emptyAccessibilityLabel(for mode: LatestContent) -> String {
+        mode == .articles
+            ? "Latest Article widget. No recent articles. Open the app to catch up."
+            : "Latest Recipe widget. Open the app to see the latest recipe."
+    }
 
     /// Build a `dod://recipe/<id>` URL for tap-through. Mirrors
     /// `FeaturedRecipeWidgetEntryView.deepLink(for:)` so all three
