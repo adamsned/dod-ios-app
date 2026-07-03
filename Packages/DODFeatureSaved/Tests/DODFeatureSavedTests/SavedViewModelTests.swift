@@ -116,6 +116,38 @@ import Testing
         #expect(viewModel.loadState == .loaded)
     }
 
+    @Test func pendingUnsaveStaysSuppressedWithinTTL() async {
+        // DUT-370: a refresh that fires before the unsave write commits (the
+        // store still returns the id) must NOT resurrect the just-unsaved card.
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+
+        viewModel.optimisticallyRemove(id: 2)
+        // The store write hasn't committed — savedRecipes() still returns id 2.
+        await viewModel.refresh()
+        #expect(viewModel.recipes.map(\.id) == [1])  // 2 stays suppressed
+    }
+
+    @Test func reSavedRecipeReappearsAfterTTL() async throws {
+        // DUT-482: unsaving then re-saving a recipe (the store returns it again)
+        // must let it reappear once the suppression TTL elapses — the old
+        // set-based version hid it for the rest of the session.
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        viewModel.pendingRemovalTTL = .milliseconds(30)
+        await viewModel.refresh()
+
+        viewModel.optimisticallyRemove(id: 2)  // user unsaves 2…
+        #expect(viewModel.recipes.map(\.id) == [1])  // suppressed immediately
+        // …then re-saves 2 from another surface; the store still returns it.
+        try await Task.sleep(for: .milliseconds(60))  // outlive the TTL
+        await viewModel.refresh()
+        #expect(viewModel.recipes.map(\.id) == [1, 2])  // re-saved 2 is visible again
+    }
+
     // DUT-6 — the Saved tab must re-fetch when CloudKit imports a recipe
     // saved on another device, instead of staying stale until relaunch. The
     // view model subscribes to `dependencies.remoteChanges()`; firing a
