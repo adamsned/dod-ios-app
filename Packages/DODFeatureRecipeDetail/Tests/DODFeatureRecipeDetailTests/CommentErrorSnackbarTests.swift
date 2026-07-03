@@ -19,7 +19,7 @@ struct CommentErrorSnackbarTests {
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
             for: WPClientError.networkUnavailable
         )
-        #expect(snackbar == "You're offline — comment will need to wait.")
+        #expect(snackbar == "You're offline — reconnect and try again.")
     }
 
     @Test func timeoutSurfacesServerTookTooLongMessage() {
@@ -88,6 +88,6 @@ struct CommentErrorSnackbarTests {
         // WPClientError.wrap then mapped — proves the safety net.
         let urlError = URLError(.notConnectedToInternet)
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(for: urlError)
-        #expect(snackbar == "You're offline — comment will need to wait.")
+        #expect(snackbar == "You're offline — reconnect and try again.")
     }
 }

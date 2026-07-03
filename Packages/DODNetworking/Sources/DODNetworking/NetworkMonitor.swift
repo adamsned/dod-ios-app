@@ -15,6 +15,12 @@ public actor NetworkMonitor {
     /// DUT-206: single ordered pipe for NWPath updates (see `start()`).
     private var pathContinuation: AsyncStream<Bool>.Continuation?
     private var drainTask: Task<Void, Never>?
+    /// DUT-522: seeded to the real `currentPath.status` inside ``start()`` (see
+    /// below). It stays `true` only until `start()` runs; the initial `true` is
+    /// never observed by callers because `start()` is invoked at launch before
+    /// any `await isOnline` read. `true` (rather than `false`) is the safe
+    /// pre-start default: it avoids a false-positive offline banner in the
+    /// sub-millisecond window before `start()` seeds the truth.
     private(set) public var isOnline: Bool = true
 
     public init() {
@@ -40,6 +46,16 @@ public actor NetworkMonitor {
             }
         }
         pathMonitor.start(queue: queue)
+        // DUT-522: `NWPathMonitor` only delivers `pathUpdateHandler` on a later
+        // async hop, so before this line `isOnline` is still the pre-start
+        // default (`true`) and an `await isOnline` in the launch window would
+        // mis-read a genuinely offline device as online (e.g. Airplane Mode →
+        // empty state rendered as "loaded, nothing here"). `currentPath` is
+        // populated synchronously once `start(queue:)` has run, so seed the real
+        // state now. Routed through `handle(_:)` so the DUT-206 de-dup holds and
+        // any subsequent first `pathUpdateHandler` carrying the SAME status is
+        // coalesced — while a DIFFERENT later status still fires a notification.
+        handle(isOnline: pathMonitor.currentPath.status == .satisfied)
     }
 
     /// AsyncStream of connectivity changes. The first value emitted is the
