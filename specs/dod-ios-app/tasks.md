@@ -3200,4 +3200,14 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-908 — Saved tab respects the unified list/grid layout toggle (CL-302 / DUT-530)
+
+- **What:** Make `SavedView` honor the global `@AppStorage(RecipeListLayout.storageKey)` like Feed/Search already do, so list/grid is consistent across all tabs. Toggle stays in Settings (no in-tab buttons), unified preference (no per-tab keys).
+  - **SavedView:** add the `@AppStorage` binding; `.loaded` branches `.gallery` (existing `LazyVGrid` + `RecipeCard`) vs `.list` (`adaptiveListRows` + `RecipeCard.ListRow`), mirroring `FeedView.listContent`, preserving Saved's context menu (`isSaved: true`, downloaded check, remove-download), tap, empty/error states, header cart, shopping-list token.
+  - **RecipeCard.ListRow (DODDesignSystem):** additive `isDownloaded: Bool = false` → compact `arrow.down.circle.fill` (accent). Default false ⇒ existing Feed/Search call sites + existing L4 baselines unchanged (no L4 dance).
+- **Files:** DODFeatureSaved `SavedView.swift` + `SavedViewSnapshotTests.swift` (new local list-layout variants). DODDesignSystem `RecipeCard+ListRow.swift`. Spec `clarifications.md` (CL-302).
+- **AC:** browse consistency. Linear DUT-530. CL-302 canonical. **Est:** ~1.5 h. **Deps:** off main (after Round 4). Branch `feat/dut-530-saved-listgrid`. **Verification:** DODDesignSystem (22, baselines unchanged) + DODFeatureSaved (59) `swift test` green; Saved list snapshots recorded + re-asserted on the iPhone 17 Pro sim (6/6, local-only/not CI-gated); swiftlint + swift-format `--strict` clean; DODApp compiles. Search confirmed already branching to list.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
