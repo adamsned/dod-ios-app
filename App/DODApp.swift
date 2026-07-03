@@ -68,6 +68,14 @@ struct DODApp: App {
         // trace: AC-T5 / CL-58.
         if args.contains("-DOD_E2E_MODE=1") || env["DOD_E2E_MODE"] == "1" {
             DODEnvironment.isE2EMode = true
+            // T-610: the comment-moderation store (DUT-501) persists blocked
+            // authors + reported comment ids in `UserDefaults.standard`, which
+            // survives relaunch on a shared simulator. Clear it at E2E launch so
+            // the report/block journey starts from a clean, deterministic slate
+            // (mirrors the in-memory store the E2E network stub already uses).
+            let defaults = UserDefaults.standard
+            defaults.removeObject(forKey: "dod.moderation.blockedAuthorsV1")
+            defaults.removeObject(forKey: "dod.moderation.hiddenCommentIDsV1")
         }
     }
 }

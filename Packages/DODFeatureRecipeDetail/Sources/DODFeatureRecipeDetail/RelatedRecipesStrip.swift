@@ -27,7 +27,12 @@ public struct RelatedRecipesStrip: View {
                     HStack(spacing: DODSpacing.sm) {
                         ForEach(items) { item in
                             relatedCard(item)
+                                .contentShape(Rectangle())
                                 .onTapGesture { onSelect(item) }
+                                // T-610 — stable handle for the L5 related-recipes
+                                // journey (tap a sibling → its detail).
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("dod.related.card")
                         }
                     }
                     .padding(.horizontal, DODSpacing.md)

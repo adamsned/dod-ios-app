@@ -85,6 +85,9 @@ public struct CategoryRecipesView: View {
             viewModel.applyOptimisticSaveToggle(id: item.id)
             onSave?(item)
         }
+        // T-610 — stable L5 handle for the category → recipe journey.
+        // Mirrors `dod.feed.card` / `dod.search.card`.
+        .accessibilityIdentifier("dod.category.card")
         .task { await viewModel.loadMoreIfNeeded(currentItem: item) }
     }
 }

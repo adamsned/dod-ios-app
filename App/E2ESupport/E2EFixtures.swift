@@ -48,6 +48,9 @@ enum E2EFixtures {
             categoryID: 11,
             categoryName: "Mains"
         ),
+        // T-610: intentionally category 11 "Mains" — a SIBLING of Dutch Oven
+        // Lasagna (also category 11) — so `posts?categories=11` returns ≥2 and
+        // the recipe-detail "Related recipes" strip renders deterministically.
         Recipe(
             id: 22294,
             slug: "peach-dump-cake",
@@ -59,8 +62,8 @@ enum E2EFixtures {
                 "Dump the peaches into the Dutch oven.", "Top with the dry cake mix.",
                 "Dot with butter and bake 40 minutes.",
             ],
-            categoryID: 12,
-            categoryName: "Desserts"
+            categoryID: 11,
+            categoryName: "Mains"
         ),
     ]
 
@@ -128,6 +131,7 @@ enum E2EFixtures {
 
     // MARK: - Comments (/wp/v2/comments)
 
+    /// The two canned comments — both authored on post 21238 (the corn recipe).
     static let commentsJSONObjects: [[String: Any]] = [
         [
             "id": 6805, "post": 21238, "parent": 0, "author": 0, "author_name": "Maria",
@@ -148,12 +152,39 @@ enum E2EFixtures {
         ],
     ]
 
+    /// The canned comments for a given post. Only post 21238 (the corn recipe)
+    /// has comments; every other post returns an empty list. Fixes the T-610
+    /// stub-fidelity bug where the `/wp/v2/comments` branch ignored the `post`
+    /// query and served post 21238's comments for every recipe.
+    static func commentsJSONObjects(forPost postID: Int?) -> [[String: Any]] {
+        postID == 21238 ? commentsJSONObjects : []
+    }
+
     // MARK: - Categories / media / ratings
 
+    /// One entry per DISTINCT category id, with the true recipe count for that
+    /// category. (Peach Dump Cake now shares category 11 "Mains" with Dutch Oven
+    /// Lasagna, so "Mains" reports count 2 — the sibling that makes the related
+    /// strip render.)
     static var categoriesJSONObjects: [[String: Any]] {
-        recipes.map {
-            ["id": $0.categoryID, "name": $0.categoryName, "slug": $0.categoryName.lowercased(), "count": 1]
+        var byID: [Int: (name: String, count: Int)] = [:]
+        for recipe in recipes {
+            if var existing = byID[recipe.categoryID] {
+                existing.count += 1
+                byID[recipe.categoryID] = existing
+            } else {
+                byID[recipe.categoryID] = (recipe.categoryName, 1)
+            }
         }
+        return byID.sorted { $0.key < $1.key }
+            .map { id, value in
+                [
+                    "id": id,
+                    "name": value.name,
+                    "slug": value.name.lowercased(),
+                    "count": value.count,
+                ]
+            }
     }
 
     static let mediaJSONObject: [String: Any] = [

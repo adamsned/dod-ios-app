@@ -48,7 +48,10 @@ struct E2EStubHTTPClient: HTTPClient {
             return Self.json(E2EFixtures.postsListJSONObjects(matching: query), url: url)
         }
         if path.contains("/wp/v2/comments") {
-            return Self.json(E2EFixtures.commentsJSONObjects, url: url)
+            // Honor the `post` query so each recipe shows only its own comments
+            // (only post 21238 has canned comments; every other post → []).
+            let postID = query["post"].flatMap(Int.init)
+            return Self.json(E2EFixtures.commentsJSONObjects(forPost: postID), url: url)
         }
         if path.contains("/wp/v2/categories") {
             return Self.json(E2EFixtures.categoriesJSONObjects, url: url)
