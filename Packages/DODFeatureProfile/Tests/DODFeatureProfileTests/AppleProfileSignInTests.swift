@@ -134,4 +134,78 @@ struct AppleProfileSignInTests {
         #expect(profile?.email == "new@dod.com")
         #expect(profile?.photoFilename == "avatar.jpg")
     }
+
+    /// DUT-503 — an Apple sign-in that overwrites a DIFFERENT user's session
+    /// revokes that orphaned refresh token instead of dropping it from the
+    /// Keychain, and does so BEFORE the new session is saved. Mirrors the Google
+    /// path (DUT-279) so the two sign-in surfaces close the 5.1.1(v) gap alike.
+    @Test func differentUserSignIn_revokesOverwrittenOrphanedToken() async {
+        let sessionStore = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "user-a", refreshToken: "rt-a")
+        )
+        let profileStore = InMemoryProfileStore()
+        let revoker = SpyRevoker(sessionStore: sessionStore)
+        let signIn = AppleProfileSignIn(
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            revoker: revoker
+        )
+
+        _ = await signIn.apply(
+            userIdentifier: "user-b",
+            displayName: "Ned",
+            email: "ned@example.com",
+            authorizationCode: nil
+        )
+
+        // User A's orphaned token was revoked, exactly once.
+        #expect(revoker.revokedTokens == ["rt-a"])
+        // ...and the revoke happened BEFORE the new session was persisted.
+        #expect(revoker.userIdentifierAtRevoke == "user-a")
+        // The session is now User B's.
+        #expect((try? sessionStore.load())?.userIdentifier == "user-b")
+    }
+
+    /// A same-user re-auth carries the token forward — it must NOT revoke.
+    @Test func sameUserReAuth_doesNotRevoke() async {
+        let sessionStore = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "user-a", refreshToken: "rt-a")
+        )
+        let profileStore = InMemoryProfileStore()
+        let revoker = SpyRevoker(sessionStore: sessionStore)
+        let signIn = AppleProfileSignIn(
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            revoker: revoker
+        )
+
+        _ = await signIn.apply(
+            userIdentifier: "user-a",
+            displayName: nil,
+            email: nil,
+            authorizationCode: nil
+        )
+
+        #expect(revoker.revokedTokens.isEmpty)
+        #expect((try? sessionStore.load())?.refreshToken == "rt-a")  // carried forward
+    }
+}
+
+/// Records revoked tokens and captures the on-file session's user at revoke time,
+/// so a test can assert the revoke ran BEFORE the overwriting session was saved.
+private final class SpyRevoker: SiwaRevoking, @unchecked Sendable {
+    private let sessionStore: any AppleAuthSessionStoring
+    private(set) var revokedTokens: [String] = []
+    private(set) var userIdentifierAtRevoke: String?
+
+    init(sessionStore: any AppleAuthSessionStoring) {
+        self.sessionStore = sessionStore
+    }
+
+    func exchange(authorizationCode: String) async throws -> String { "rt" }
+
+    func revoke(refreshToken: String) async throws {
+        userIdentifierAtRevoke = (try? sessionStore.load())?.userIdentifier
+        revokedTokens.append(refreshToken)
+    }
 }
