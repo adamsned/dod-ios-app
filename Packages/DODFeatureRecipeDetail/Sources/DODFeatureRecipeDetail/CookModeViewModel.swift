@@ -67,6 +67,11 @@ public final class CookModeViewModel {
     /// Which step's timer is currently driving the Live Activity card (`nil` =
     /// none). Lets `reconcileLiveActivity` know when to (re)start vs update.
     var liveActivityStepKey: Int?
+    /// DUT-354: true once the finished-timer "buzzer" card has been pushed, so
+    /// the per-tick reconcile doesn't re-push the frozen 0:00 state every second
+    /// while it lingers. Cleared when a running timer takes the card over or the
+    /// activity ends.
+    var liveActivityShowingCompleted = false
 
     public init(
         recipe: Recipe,
@@ -140,6 +145,7 @@ public final class CookModeViewModel {
         // one drove the card, so a re-entry starts clean.
         stepTimers.removeAll()
         liveActivityStepKey = nil
+        liveActivityShowingCompleted = false  // DUT-354
         // AC-7.6 / AC-40.1 — stop any in-flight utterance and release the
         // ducked audio session so the user's music returns to full volume
         // the moment they leave Cook Mode.

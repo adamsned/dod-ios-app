@@ -81,12 +81,31 @@ extension CookModeViewModel {
             .min { $0.end < $1.end }
 
         guard let soonest, let timer = stepTimers[soonest.key] else {
-            if liveActivityStepKey != nil {
+            // No RUNNING timer. DUT-354: if the timer that was driving the card
+            // just COMPLETED, keep the card up on a frozen 0:00 "done" state (the
+            // buzzer moment) — Ned's call: it lingers until the cook leaves Cook
+            // Mode (endCookMode ends it) or starts another timer (which takes the
+            // card over below). Push it ONCE — the flag guards per-tick re-pushes
+            // while it lingers. Any other reason the driving timer is gone — Reset
+            // (→ .idle) or cleared — still ends the card, preserving DUT-294's
+            // no-stale-card guarantee.
+            if let key = liveActivityStepKey, stepTimers[key]?.state == .completed {
+                if !liveActivityShowingCompleted {
+                    updateTimerLiveActivity(
+                        remainingSeconds: 0,
+                        stepText: stepText(forStep: key),
+                        isPaused: true
+                    )
+                    liveActivityShowingCompleted = true
+                }
+            } else if liveActivityStepKey != nil {
                 endTimerLiveActivity()
                 liveActivityStepKey = nil
+                liveActivityShowingCompleted = false
             }
             return
         }
+        liveActivityShowingCompleted = false  // DUT-354: a running timer drives the card again
         let text = stepText(forStep: soonest.key)
         if liveActivityStepKey != soonest.key {
             // A different (or no) timer was driving the card — (re)start so its

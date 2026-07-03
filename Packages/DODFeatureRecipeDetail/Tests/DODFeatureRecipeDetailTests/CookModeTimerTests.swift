@@ -56,7 +56,11 @@ struct CookModeTimerTests {
         #expect(vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(500)) == 60)
     }
 
-    @Test func tickToZeroCompletesBumpsHapticAndEndsLiveActivity() {
+    /// DUT-354 — when a timer completes while the app is foregrounded, the Live
+    /// Activity must NOT vanish the instant it hits zero. It lingers on a frozen
+    /// 0:00 "done" state (the buzzer moment) until the cook leaves Cook Mode or
+    /// starts another timer.
+    @Test func tickToZeroCompletesBumpsHapticAndKeepsTheBuzzerCard() {
         let spy = FakeLiveActivityController()
         let vm = CookModeViewModelTests.makeViewModel(stepCount: 1, liveActivity: spy)
 
@@ -66,7 +70,23 @@ struct CookModeTimerTests {
 
         #expect(vm.timer(forStep: 0)?.didComplete == true)
         #expect(vm.timerCompletionTick == before + 1)
-        #expect(spy.isActive == false)  // card ended on completion
+        #expect(spy.isActive == true)  // DUT-354: card lingers on the finished state
+        #expect(spy.lastUpdateState?.remainingSeconds == 0)
+        #expect(spy.lastUpdateState?.isPaused == true)  // frozen 0:00, not a live-ticking countdown
+    }
+
+    /// DUT-354 — resetting a completed timer (→ .idle) dismisses the lingering
+    /// buzzer card, preserving DUT-294's no-stale-card guarantee.
+    @Test func resettingACompletedTimerEndsTheLingeringCard() {
+        let spy = FakeLiveActivityController()
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1, liveActivity: spy)
+
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 5, now: t0)
+        vm.tickTimers(now: t0.addingTimeInterval(6))  // completes → card lingers
+        #expect(spy.isActive == true)
+
+        vm.resetTimer(forStep: 0, now: t0.addingTimeInterval(7))
+        #expect(spy.isActive == false)  // reset dismisses the finished card
     }
 
     @Test func resetReturnsToIdleAndEndsLiveActivity() {
