@@ -155,7 +155,7 @@ final class ReliableImageLoader {
             phase = .failure
             return
         }
-        if let data = await provider(url), let image = Self.decode(data) {
+        if let data = await provider(url), let image = await Self.decode(data) {
             if Task.isCancelled { return }
             RecipeImageCache.shared.insert(image, for: url)
             phase = .success(Image(uiImage: image))
@@ -171,7 +171,15 @@ final class ReliableImageLoader {
     /// can't produce a thumbnail (e.g. an exotic format), preserving the prior
     /// behavior for that edge case. The DISK cache bytes are untouched — this
     /// only bounds the in-memory decode used for display.
-    private static func decode(_ data: Data) -> UIImage? {
+    ///
+    /// DUT-465: `nonisolated async`. This class is `@MainActor`, so a plain
+    /// static would inherit main-actor isolation and — because
+    /// `ImageDownsampler.downsample` uses `kCGImageSourceShouldCacheImmediately`
+    /// to force full decompression at the call site — decompress the hero ON
+    /// the main thread, hitching scroll. `nonisolated async` runs the decode on
+    /// the global executor; only the `phase` publish hops back to the main
+    /// actor. (`await` from `loadFromDiskOrFail`/`fetchOnce` keeps it off-main.)
+    private nonisolated static func decode(_ data: Data) async -> UIImage? {
         if let cgImage = ImageDownsampler.downsample(data: data) {
             return UIImage(cgImage: cgImage)
         }
@@ -190,14 +198,14 @@ final class ReliableImageLoader {
     /// `CancellationError`) so the caller never flips a recycled cell to failure,
     /// and re-checks `Task.isCancelled` after the await so a resumed-stale task
     /// can't overwrite the new URL's phase.
-    private static func fetchOnce(_ url: URL) async -> FetchOutcome {
+    private nonisolated static func fetchOnce(_ url: URL) async -> FetchOutcome {
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             if Task.isCancelled { return .cancelled }
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                 return .retry
             }
-            return Self.decode(data).map(FetchOutcome.image) ?? .failed
+            return await Self.decode(data).map(FetchOutcome.image) ?? .failed
         } catch is CancellationError {
             return .cancelled
         } catch let error as URLError where error.code == .cancelled {
