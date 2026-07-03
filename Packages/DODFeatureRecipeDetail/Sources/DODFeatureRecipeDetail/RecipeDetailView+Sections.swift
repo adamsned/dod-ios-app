@@ -24,7 +24,7 @@ extension RecipeDetailView {
                 ForEach(ingredients) { ingredient in
                     IngredientCheckRow(
                         ingredient: ingredient,
-                        displayText: FractionRenderer.scale(ingredient.text, by: factor),
+                        displayText: displayIngredientText(ingredient.text, scaledBy: factor),
                         isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
                         onToggle: { viewModel.toggleIngredient(ingredient.id) }
                     )
@@ -32,6 +32,16 @@ extension RecipeDetailView {
             }
         }
         .padding(.horizontal, DODSpacing.md)
+    }
+
+    /// The display string for one ingredient row: scale the source text for the
+    /// chosen servings (US-31 / AC-31.4), then — when "Use Metric Units" is on
+    /// (DUT-517) — convert the ALREADY-SCALED line to metric. Order matters: the
+    /// converter reads the post-scale quantity, so `"1 cup" ×2 → "2 cups" →
+    /// "475 ml"`. Non-convertible lines fall through unchanged.
+    func displayIngredientText(_ text: String, scaledBy factor: Double) -> String {
+        let scaled = FractionRenderer.scale(text, by: factor)
+        return useMetricUnits ? IngredientMetricConverter.metric(scaled) : scaled
     }
 
     var instructionsSection: some View {

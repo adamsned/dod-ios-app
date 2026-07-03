@@ -40,7 +40,15 @@ extension SearchViewModel {
             let recentlyViewed =
                 (try? await self.dependencies.recentlyViewedRecipeIDs()) ?? []
             // H1: a new search since kickoff supersedes this stale hydration.
-            guard generation == self.searchGeneration else { return }
+            // DUT-505: reset the coalescing flag so a later chip toggle re-arms
+            // hydration — otherwise `filterSupportHydrated` stays `true` with the
+            // caches empty, and `reapplyFilters` evaluates category / recently-
+            // viewed filters against empty maps → every row fails → spurious
+            // "No results".
+            guard generation == self.searchGeneration else {
+                self.filterSupportHydrated = false
+                return
+            }
             self.lastCategoryIDsByRecipe = categoryIDs
             self.lastTotalSecondsByRecipe = totalSeconds
             self.lastRecentlyViewedIDs = recentlyViewed

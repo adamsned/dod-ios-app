@@ -39,6 +39,22 @@ struct CookTimerEngineTests {
         #expect(engine.timers.isEmpty)
     }
 
+    /// DUT-495 — `start` stamps the timer's `recipeID` so a consumer sharing one
+    /// engine across rungs (DUT-484) can scope its lookup to its own rung and
+    /// never surface a bake started on a different rung.
+    @Test func startStampsRecipeIDForCrossRungScoping() {
+        let engine = makeEngine(TestClock())
+        let rungA = engine.start(label: "A bake", duration: 60, recipeID: 683)
+        let rungB = engine.start(label: "B bake", duration: 60, recipeID: 22294)
+        #expect(rungA?.recipeID == 683)
+        #expect(rungB?.recipeID == 22294)
+        // A rung-683 consumer sees only its own running timer.
+        let visibleToA = engine.timers.filter { $0.isRunning && $0.recipeID == 683 }
+        #expect(visibleToA.map(\.label) == ["A bake"])
+        // A default (nil-recipeID) start still works — no regression.
+        #expect(engine.start(label: "Loose", duration: 30)?.recipeID == nil)
+    }
+
     @Test func remainingCountsDownAsTheClockAdvances() {
         let clock = TestClock()
         let engine = makeEngine(clock)

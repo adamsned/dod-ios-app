@@ -116,6 +116,74 @@ import Testing
         #expect(viewModel.loadState == .loaded)
     }
 
+    @Test func pendingUnsaveStaysSuppressedWithinTTL() async {
+        // DUT-370: a refresh that fires before the unsave write commits (the
+        // store still returns the id) must NOT resurrect the just-unsaved card.
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+
+        viewModel.optimisticallyRemove(id: 2)
+        // The store write hasn't committed — savedRecipes() still returns id 2.
+        await viewModel.refresh()
+        #expect(viewModel.recipes.map(\.id) == [1])  // 2 stays suppressed
+    }
+
+    @Test func reSavedRecipeReappearsAfterTTL() async throws {
+        // DUT-482: unsaving then re-saving a recipe (the store returns it again)
+        // must let it reappear once the suppression TTL elapses — the old
+        // set-based version hid it for the rest of the session.
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        viewModel.pendingRemovalTTL = .milliseconds(30)
+        await viewModel.refresh()
+
+        viewModel.optimisticallyRemove(id: 2)  // user unsaves 2…
+        #expect(viewModel.recipes.map(\.id) == [1])  // suppressed immediately
+        // …then re-saves 2 from another surface; the store still returns it.
+        try await Task.sleep(for: .milliseconds(60))  // outlive the TTL
+        await viewModel.refresh()
+        #expect(viewModel.recipes.map(\.id) == [1, 2])  // re-saved 2 is visible again
+    }
+
+    @Test func reSaveWithinTTLClearsSuppressionAndShowsRecipe() async throws {
+        // DUT-513: unsaving then RE-saving a recipe WITHIN the TTL window must
+        // drop the suppression immediately (via `clearPendingRemoval`) so the
+        // re-saved card reappears on the next refresh — before the fix nothing
+        // cleared `pendingRemovals[id]` on re-save, so the recipe stayed hidden
+        // until the TTL elapsed.
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        viewModel.pendingRemovalTTL = .seconds(5)  // long window: prove it's the clear, not the TTL
+        await viewModel.refresh()
+
+        viewModel.optimisticallyRemove(id: 2)  // user unsaves 2…
+        #expect(viewModel.recipes.map(\.id) == [1])  // suppressed immediately
+
+        // …then re-saves 2 (from Feed/Search/detail); the store returns it again.
+        viewModel.clearPendingRemoval(id: 2)
+        await viewModel.refresh()  // refresh WITHIN the TTL window
+        #expect(viewModel.recipes.map(\.id) == [1, 2], "Re-saved 2 must reappear within the TTL")
+    }
+
+    @Test func genuineUnsaveStillSuppressedAfterClearForDifferentID() async {
+        // DUT-513 guard: clearing a re-save for one id must NOT lift the
+        // suppression of a still-in-flight unsave for a different id.
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+
+        viewModel.optimisticallyRemove(id: 2)  // genuine unsave, write still in flight
+        viewModel.clearPendingRemoval(id: 1)  // unrelated id (no-op)
+        // The store still returns 2 (write not yet committed) → stays suppressed.
+        await viewModel.refresh()
+        #expect(viewModel.recipes.map(\.id) == [1], "Genuine unsave still suppressed within TTL")
+    }
+
     // DUT-6 — the Saved tab must re-fetch when CloudKit imports a recipe
     // saved on another device, instead of staying stale until relaunch. The
     // view model subscribes to `dependencies.remoteChanges()`; firing a

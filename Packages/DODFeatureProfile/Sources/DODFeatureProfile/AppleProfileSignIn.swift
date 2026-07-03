@@ -72,6 +72,15 @@ public struct AppleProfileSignIn: Sendable {
             existing: existingSession
         )
         let sameUser = existingSession?.userIdentifier == userIdentifier
+        // DUT-503: if a DIFFERENT user's session (with a refresh token) is on file,
+        // revoke it BEFORE we overwrite it — otherwise that token is orphaned
+        // (dropped from the Keychain, never revoked), re-opening the 5.1.1(v) gap.
+        // Same-user re-auth carries the token forward instead. Mirrors the Google
+        // path (DUT-279) so the two sign-in surfaces behave identically.
+        let orphanedToken = sameUser ? nil : existingSession?.refreshToken
+        if let orphanedToken, let revoker {
+            try? await revoker.revoke(refreshToken: orphanedToken)
+        }
         // DUT-375: `resolve` now carries the refresh token forward itself (same
         // user) / nils it (different user), so we persist `resolved` directly
         // rather than re-merging the token here.

@@ -87,6 +87,10 @@ public struct SiwaRevokeClient: SiwaRevoking {
             throw SiwaRevokeError.badURL
         }
         var request = URLRequest(url: url)
+        // DUT-523: this exchange/revoke runs on the Delete Account path
+        // (5.1.1(v)). Cap the per-request idle timeout so a stalled Worker
+        // can't hang the deletion UI indefinitely.
+        request.timeoutInterval = 30
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(config.appKey, forHTTPHeaderField: "X-DOD-App-Key")
@@ -96,9 +100,24 @@ public struct SiwaRevokeClient: SiwaRevoking {
         return data
     }
 
-    /// Production transport — a plain `URLSession` POST.
+    /// Production transport — a POST over ``hardenedSession``.
     public static let urlSessionTransport: Transport = { request in
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await hardenedSession.data(for: request)
         return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }
+
+    /// DUT-523: don't use `URLSession.shared` for the Delete Account
+    /// exchange/revoke. Mirroring the DUT-519 hardening on
+    /// `URLSessionHTTPClient` in DODNetworking — but inlined here because
+    /// DODSupport doesn't depend on that module — cap the whole transfer at
+    /// 30s (`timeoutIntervalForResource`) and disable connectivity-waiting
+    /// (`waitsForConnectivity = false`) so an offline device fails fast during
+    /// account deletion instead of parking the request. The per-request
+    /// `timeoutInterval: 30` (request-idle timeout, set in `post`) is separate.
+    static let hardenedSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForResource = 30
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
 }

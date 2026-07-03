@@ -49,10 +49,24 @@ public final class SavedViewModel {
     static let remoteChangeDebounce: Duration = .milliseconds(300)
 
     /// DUT-370: ids optimistically removed by an Unsave tap whose store write
-    /// hasn't committed yet. `refresh()` suppresses these from the fetched set
-    /// until the store stops returning them, so a debounced remote-change
-    /// refresh can't briefly resurrect a just-unsaved card then drop it again.
-    @ObservationIgnored private var pendingRemovedIDs: Set<Int> = []
+    /// hasn't committed yet, each stamped with WHEN it was marked. `refresh()`
+    /// suppresses these from the fetched set until the store stops returning
+    /// them (write confirmed) so a debounced remote-change refresh can't briefly
+    /// resurrect a just-unsaved card then drop it again.
+    ///
+    /// DUT-482: the stamp bounds the suppression to ``pendingRemovalTTL``. The
+    /// old set-based version cleared an id ONLY when the store stopped returning
+    /// it — so unsaving then RE-saving a recipe (from Search/Feed/detail) left
+    /// it in the fetch set, kept it suppressed, and hid it from the Saved tab
+    /// for the rest of the session. Past the TTL a still-returned id is treated
+    /// as a genuine re-save and shown again.
+    @ObservationIgnored private var pendingRemovals: [Int: ContinuousClock.Instant] = [:]
+
+    /// DUT-482: how long an optimistic unsave stays suppressed before a
+    /// still-present id is read as a re-save. Comfortably exceeds the store
+    /// write-commit window (and ``remoteChangeDebounce``); `var` so tests can
+    /// shrink it.
+    @ObservationIgnored var pendingRemovalTTL: Duration = .seconds(2)
 
     public init(dependencies: SavedDependencies) {
         self.dependencies = dependencies
@@ -71,12 +85,17 @@ public final class SavedViewModel {
         if recipes.isEmpty { loadState = .loading }
         do {
             var fetched = try await dependencies.savedRecipes()
-            // DUT-370: an optimistic unsave may not have committed to the store
-            // yet when a debounced remote-change refresh fires; keep suppressing
-            // those ids until the fetch stops returning them (write confirmed) so
-            // the just-unsaved card doesn't resurrect then vanish again.
-            pendingRemovedIDs = pendingRemovedIDs.filter { id in fetched.contains { $0.id == id } }
-            fetched.removeAll { pendingRemovedIDs.contains($0.id) }
+            // DUT-370/482: keep suppressing only ids whose unsave write is still
+            // in flight — within the TTL AND still returned by the store. Drop
+            // the rest: an id the store no longer returns has committed; one
+            // that outlives the TTL while STILL returned was re-saved from
+            // another surface, so it must reappear (the old code kept it
+            // suppressed forever, hiding a re-saved recipe all session).
+            let now = ContinuousClock.now
+            pendingRemovals = pendingRemovals.filter { id, markedAt in
+                now - markedAt < pendingRemovalTTL && fetched.contains { $0.id == id }
+            }
+            fetched.removeAll { pendingRemovals.keys.contains($0.id) }
             recipes = fetched
             // Best-effort: a download-state read failure just means no badges,
             // never a failed Saved-tab load (T-774 / DUT-80).
@@ -150,9 +169,21 @@ public final class SavedViewModel {
     /// `refresh()` reconciles on next appear if the store write somehow
     /// failed. T-635 / CL-104.
     public func optimisticallyRemove(id: Int) {
-        pendingRemovedIDs.insert(id)  // DUT-370: suppress re-add until the write commits
+        pendingRemovals[id] = ContinuousClock.now  // DUT-370/482: suppress until commit, bounded by TTL
         recipes.removeAll { $0.id == id }
         loadState = recipes.isEmpty ? .empty : .loaded
+    }
+
+    /// DUT-513 — drop a recipe's optimistic-unsave suppression the instant it is
+    /// re-saved, so an unsave→re-save within ``pendingRemovalTTL`` doesn't keep
+    /// the (now legitimately-saved) recipe hidden from the grid until the TTL
+    /// expires. Call this from the re-save surface (the Saved-tab card's own
+    /// Save toggle, and any external surface that re-saves a recipe the user
+    /// just unsaved here). Idempotent and safe for ids that were never pending.
+    /// Preserves the DUT-482 TTL bound — that still governs the genuine
+    /// write-in-flight case; this only clears the entry on a real re-save.
+    public func clearPendingRemoval(id: Int) {
+        pendingRemovals[id] = nil
     }
 
     /// T-775 / DUT-81 — un-download from the Saved-tab context menu. Clears the

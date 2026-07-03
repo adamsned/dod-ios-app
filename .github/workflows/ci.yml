@@ -167,7 +167,16 @@ jobs:
                      DODPersistence DODFeatureFeed DODFeatureCategories \
                      DODFeatureSearch DODFeatureRecipeDetail DODFeatureSaved; do
             echo "::group::swift test — $pkg"
-            (cd "Packages/$pkg" && swift test --parallel)
+            if [ "$pkg" = "DODFeatureSearch" ]; then
+              # DODFeatureSearch intermittently aborts with signal 6 (SIGABRT)
+              # on exit under `swift test --parallel` on macos-15, even though
+              # every test passes — the parallel swift-testing harness crashes
+              # while tearing down. Run this one package serially to dodge the
+              # flake; all other packages keep --parallel.
+              (cd "Packages/$pkg" && swift test)
+            else
+              (cd "Packages/$pkg" && swift test --parallel)
+            fi
             echo "::endgroup::"
           done
 
@@ -348,34 +357,16 @@ jobs:
     # flaky M5 iPad) are non-blocking; the iPhone legs stay strict and still
     # red L3 on a genuine failure.
     continue-on-error: ${{ matrix.continue_on_error || false }}
-    # Device matrix (DUT-16 follow-up): the smoke suite runs on iPhone 14/15/16/17
-    # so a layout/regression that only shows on an older/smaller iPhone is caught.
-    # iPad runs the full SmokeTests class too: the suite is device-agnostic
-    # (waits on the Settings gear, not a tab bar; a sidebar-aware nav helper
-    # handles tab navigation), and the two genuinely iPhone-bottom-tab tests
-    # self-skip on iPad (XCTSkipIf — iPad uses a sidebar, US-38 / DUT-89).
-    # `fail-fast: false` so one device's flake doesn't sink the others.
+    # L3 UI Smoke is a NON-REQUIRED single-device (iPhone 16) smoke check,
+    # trimmed from a 5-device matrix to conserve the scarce single macOS runner
+    # and unblock merge throughput. The required jobs (Format/Lint/L1/Build/L4)
+    # are the merge gate; L3 never blocks a merge.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - device: "iPhone 14"
-            only_testing: "-only-testing:DODAppUITests"
-          - device: "iPhone 15"
-            only_testing: "-only-testing:DODAppUITests"
           - device: "iPhone 16"
             only_testing: "-only-testing:DODAppUITests"
-          - device: "iPhone 17"
-            only_testing: "-only-testing:DODAppUITests"
-          - device: "iPad Pro 11-inch (M5)"
-            only_testing: "-only-testing:DODAppUITests/SmokeTests"
-            # Best-effort leg: the M5 iPad sim is flaky on shared GitHub runners
-            # at BOTH provisioning (the iOS 26 runtime isn't always installable,
-            # now handled by skip_if_unavailable) AND the XCUITest run itself
-            # (test-runner SIGKILL/crash through all 3 retries even when the sim
-            # is present). L3 is non-required; a flaky iPad leg must not red the
-            # check. The device-agnostic + sim-stability retrofit is #226 / DUT.
-            continue_on_error: true
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26 (Swift 6 / iOS 26 SDK)

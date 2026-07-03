@@ -199,7 +199,10 @@ extension FirstCookoutView {
 
     /// The live bake timer (DUT-100): not started → counting down → done.
     @ViewBuilder var cookTimerCard: some View {
-        if let active = timerEngine.timers.first(where: { $0.isRunning }) {
+        // DUT-495: scope lookups to this rung's recipeID (shared engine, DUT-484).
+        if let active = timerEngine.timers.first(where: {
+            $0.isRunning && $0.recipeID == cookout.recipeID
+        }) {
             VStack(spacing: DODSpacing.xxs) {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(formatRemaining(active.remaining(at: context.date)))
@@ -220,7 +223,9 @@ extension FirstCookoutView {
                 .foregroundStyle(DODColor.labelSecondary)
             }
             .padding(.top, DODSpacing.xs)
-        } else if timerEngine.timers.contains(where: { $0.state == .finished }) {
+        } else if timerEngine.timers.contains(where: {
+            $0.state == .finished && $0.recipeID == cookout.recipeID
+        }) {
             VStack(spacing: DODSpacing.xxs) {
                 Text("Timer's up!")
                     .dodFont(DODType.heading)
@@ -238,7 +243,7 @@ extension FirstCookoutView {
         } else {
             Button("Start the \(cookout.bakeMinutes)-minute bake timer") {
                 let duration = Double(cookout.bakeMinutes) * 60
-                timerEngine.start(label: bakeTimerLabel, duration: duration)
+                timerEngine.start(label: bakeTimerLabel, duration: duration, recipeID: cookout.recipeID)
                 // DUT-297: schedule the deadline alert so "you can step away" holds
                 // even backgrounded (the tick loop is foreground-only).
                 Task { await notifier.scheduleBakeDone(after: duration) }

@@ -27,7 +27,19 @@ public struct RelatedRecipesStrip: View {
                     HStack(spacing: DODSpacing.sm) {
                         ForEach(items) { item in
                             relatedCard(item)
+                                .contentShape(Rectangle())
                                 .onTapGesture { onSelect(item) }
+                                // T-610 — stable handle for the L5 related-recipes
+                                // journey (tap a sibling → its detail).
+                                // DUT-527 — the card is tapped via `.onTapGesture`
+                                // on a VStack, which VoiceOver reads as static
+                                // text with no action. Give it a button trait +
+                                // an explicit combined label so VoiceOver
+                                // announces "<title>, recipe, button".
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(item.title), recipe")
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityIdentifier("dod.related.card")
                         }
                     }
                     .padding(.horizontal, DODSpacing.md)
@@ -45,7 +57,17 @@ public struct RelatedRecipesStrip: View {
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fill)
-                default:
+                case .failure:
+                    // DUT-524 — neutral static placeholder instead of the
+                    // infinite skeleton shimmer when a thumbnail can't load.
+                    DODColor.surfaceElevated
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .overlay(
+                            Image(systemName: "fork.knife")
+                                .font(.system(size: 28))
+                                .foregroundStyle(DODColor.labelSecondary)
+                        )
+                case .empty:
                     LoadingSkeleton(cornerRadius: 0)
                 }
             }

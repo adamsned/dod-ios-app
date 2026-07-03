@@ -130,7 +130,20 @@ public enum HTMLSanitizer {
         "ldquo": "\u{201C}",
     ]
 
+    /// DUT-466 (mirrors DUT-394 in `HTMLEntityDecoder`) — WP REST bodies
+    /// routinely DOUBLE-encode (`&amp;#8217;`). A single left-to-right scan
+    /// turns that into `&#8217;` and stops, leaving the numeric reference shown
+    /// raw. Run a second scan when the first still leaves an `&`, unwinding
+    /// exactly one level of double-encoding: `&amp;#8217;` → `&#8217;` → `’`
+    /// and `&amp;amp;` → `&amp;` → `&`, while a lone literal `&amp;` still → `&`.
     private static func decodeEntities(_ input: String) -> String {
+        guard input.contains("&") else { return input }
+        let firstPass = decodeEntitiesOnce(input)
+        guard firstPass.contains("&") else { return firstPass }
+        return decodeEntitiesOnce(firstPass)
+    }
+
+    private static func decodeEntitiesOnce(_ input: String) -> String {
         var output = ""
         output.reserveCapacity(input.count)
         var index = input.startIndex

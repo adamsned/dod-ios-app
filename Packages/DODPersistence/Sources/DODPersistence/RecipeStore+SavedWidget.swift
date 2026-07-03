@@ -58,7 +58,12 @@ extension RecipeStore {
     /// long-press menu to render the correct Save/Unsave label on every surface.
     public func savedRecipeIDs() throws -> Set<Int> {
         let descriptor = FetchDescriptor<SyncedSavedRecipe>()
-        return Set(try modelContext.fetch(descriptor).map(\.id))
+        var ids = Set(try modelContext.fetch(descriptor).map(\.id))
+        // DUT-470: pre-backfill, include the local legacy pins so the card
+        // long-press menu shows "Unsave" for a not-yet-mirrored save (matches
+        // `savedRecipes()` / `isSaved(id:)`). Local-only, display-only.
+        ids.formUnion(try provisionalSavedPins().map(\.id))
+        return ids
     }
 
     /// T-774 / CL-171 (DUT-80) — the id set of every recipe explicitly

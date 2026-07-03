@@ -48,6 +48,26 @@ extension RecipeStore {
         defaults.bool(forKey: cloudKitSyncOptInKey)
     }
 
+    /// `UserDefaults` key for the one-time synced-saved backfill-complete flag
+    /// (DUT-240). Written by `AppDependencies.backfillSyncedSavedIfNeeded` once
+    /// a seed/reconcile completes; the App target reads it through this shared
+    /// constant so the writer and the store's reader can never diverge.
+    public static let didBackfillSyncedSavedKey = "dod.cloudkit.didBackfillSyncedSavedV1"
+
+    /// DUT-493 — the DURABLE backfill-complete state. `RecipeStore` seeds its
+    /// in-memory ``didBackfillSyncedSaved`` from this at construction so a
+    /// user who finished the backfill on a PRIOR launch never opens the
+    /// pre-backfill provisional-union window (DUT-470) before `bootstrap()`
+    /// flips the in-memory flag — which was briefly resurrecting a
+    /// cross-device-unsaved recipe on the Saved tab on every cold launch.
+    /// `nonisolated static` over an injectable `UserDefaults`, mirroring
+    /// ``cloudKitSyncOptIn(in:)`` so it's testable against an isolated suite.
+    public nonisolated static func backfillDidComplete(
+        in defaults: UserDefaults = .standard
+    ) -> Bool {
+        defaults.bool(forKey: didBackfillSyncedSavedKey)
+    }
+
     /// Create the on-disk container for production use. Pinned to
     /// `SchemaV5` — older on-disk stores migrate via `MigrationPlan` at
     /// open (V1 → V2 → V3 → V5, all lightweight; the phantom V4 is skipped).

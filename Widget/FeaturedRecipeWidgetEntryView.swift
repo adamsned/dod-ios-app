@@ -31,11 +31,13 @@ struct FeaturedRecipeWidgetEntryView: View {
                         .accessibilityLabel(Self.smallAccessibilityLabel(for: recipe))
                 }
             } else {
-                WidgetCard.Placeholder()
+                // DUT-504 — the empty state is mode-aware: in `.articles` mode
+                // (no article yet) it names the article surface instead of
+                // reusing the "featured recipe" copy the recipe placeholder used
+                // to lie with.
+                WidgetCard.Placeholder(message: Self.emptyMessage(for: entry.content))
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel(
-                        "Dutch Oven Daddy widget. Open the app to load today's featured recipe."
-                    )
+                    .accessibilityLabel(Self.emptyAccessibilityLabel(for: entry.content))
             }
         }
         // Deep link into the app: `dod://recipe/<id>` matches the URL the
@@ -43,6 +45,27 @@ struct FeaturedRecipeWidgetEntryView: View {
         // is nil we open to the feed instead so the user lands somewhere
         // useful rather than nowhere.
         .widgetURL(entry.recipe.flatMap { Self.deepLink(for: $0) } ?? URL(string: "dod://feed"))
+    }
+
+    /// DUT-504 — empty-state body copy. `.articles` names the (missing) article
+    /// surface; every other mode keeps the original featured-recipe wording.
+    static func emptyMessage(for mode: LatestContent) -> String {
+        switch mode {
+        case .articles:
+            return "No recent articles yet. Open the app to catch up."
+        case .auto, .recipes:
+            return "Open the app to see today's featured recipe here."
+        }
+    }
+
+    /// DUT-504 — matching VoiceOver label for the empty tile.
+    static func emptyAccessibilityLabel(for mode: LatestContent) -> String {
+        switch mode {
+        case .articles:
+            return "Dutch Oven Daddy widget. No recent articles. Open the app to catch up."
+        case .auto, .recipes:
+            return "Dutch Oven Daddy widget. Open the app to load today's featured recipe."
+        }
     }
 
     /// Build a `dod://recipe/<id>` URL for tap-through.

@@ -68,24 +68,18 @@ final class AppDependencies {
     init() {
         var fellBackToLocal = false
         do {
-            // L3 isolation hook: `-DODUseInMemoryStore` gives each UI-test
-            // launch a clean, empty SwiftData store so saved recipes don't
-            // persist across runs on a shared CI simulator (the cause of the
-            // flaky "No saved recipes yet" empty-state assertions). Never set
-            // in production — the app always uses the on-disk container.
-            if ProcessInfo.processInfo.arguments.contains("-DODUseInMemoryStore") {
+            // L3 isolation hook (`-DODUseInMemoryStore`) + T-610 hermetic E2E
+            // both use a clean in-memory store so nothing persists across runs
+            // on a shared CI simulator. Never used in production.
+            if Self.useInMemoryStore() {
                 self.modelContainer = try RecipeStore.inMemoryContainer()
             } else {
-                // DUT-6: build the container to match the persisted opt-in
-                // flag (the single source of truth, read at launch) WITH the
-                // DOD-CRASH-1 safety net. If sync is ON but the CloudKit
-                // `.private` open throws (e.g. the Production schema was never
-                // deployed), `productionContainer(defaults:)` falls back to a
-                // plain local container instead of throwing — so the app
-                // launches cleanly rather than crash-looping the way build 3
-                // did. A plain opt-out container that fails to open is still a
-                // real migration error and surfaces via the `fatalError`
-                // below (MIGRATION.md discipline rule 4).
+                // DUT-6: build the container for the persisted opt-in flag WITH
+                // the DOD-CRASH-1 safety net — if the CloudKit `.private` open
+                // throws, `productionContainer(defaults:)` falls back to a plain
+                // local container so the app launches instead of crash-looping
+                // (build 3). A plain opt-out open failure is a real migration
+                // error and surfaces via the `fatalError` below (MIGRATION rule 4).
                 let result = try RecipeStore.productionContainer(defaults: .standard)
                 self.modelContainer = result.container
                 fellBackToLocal = result.usedCloudKitFallback
@@ -98,9 +92,11 @@ final class AppDependencies {
         }
         self.usedCloudKitFallback = fellBackToLocal
         self.store = RecipeStore(modelContainer: modelContainer)
-        self.restClient = WPRestClient()
-        self.pageFetcher = RecipePageFetcher()
-        self.imageLoader = ImageLoader()
+        // T-610: shared HTTPClient (canned stub in E2E) — see AppDependencies+E2E.
+        let httpClient = Self.makeHTTPClient()
+        self.restClient = WPRestClient(httpClient: httpClient)
+        self.pageFetcher = RecipePageFetcher(httpClient: httpClient)
+        self.imageLoader = ImageLoader(httpClient: httpClient)
         self.networkMonitor = NetworkMonitor.shared
         // US-13/14/15 integration: the comments + ratings + guest-identity
         // clients are constructed alongside the rest of the long-lived
@@ -110,9 +106,10 @@ final class AppDependencies {
         // the comment POST carries `X-DOD-App-Key` and WordPress allows the
         // app's anonymous comments. nil/empty in dev + PR builds.
         self.commentsClient = WPCommentsClient(
+            httpClient: httpClient,
             appKey: Bundle.main.object(forInfoDictionaryKey: "DODCommentAPIKey") as? String
         )
-        self.ratingsClient = WPRMRatingsClient()
+        self.ratingsClient = WPRMRatingsClient(httpClient: httpClient)
         self.guestIdentityStore = KeychainGuestIdentityStore()
         // Phase b (T-740) — wire the on-disk photo store into the
         // profile store so Sign Out + Delete Profile clean up both

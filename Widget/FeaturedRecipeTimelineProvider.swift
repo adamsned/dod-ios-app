@@ -80,17 +80,16 @@ struct FeaturedRecipeTimelineProvider: AppIntentTimelineProvider {
         in context: Context
     ) async -> FeaturedRecipeEntry {
         // Mirror the `placeholder(in:)` path: prefer the live snapshot,
-        // fall back to the hardcoded brand placeholder only when the
-        // selected mode yields nothing. T-391.
-        let entry = currentEntry(for: configuration.content)
-        return entry.recipe == nil ? .placeholder : entry
+        // fall back to the brand placeholder only when the selected mode
+        // yields nothing. T-391 / DUT-504.
+        fallbackIfEmpty(currentEntry(for: configuration.content))
     }
 
     func timeline(
         for configuration: LatestWidgetConfigurationIntent,
         in context: Context
     ) async -> Timeline<FeaturedRecipeEntry> {
-        let entry = currentEntry(for: configuration.content)
+        let entry = fallbackIfEmpty(currentEntry(for: configuration.content))
         let next = Date().addingTimeInterval(refreshInterval)
         return Timeline(entries: [entry], policy: .after(next))
     }
@@ -101,5 +100,21 @@ struct FeaturedRecipeTimelineProvider: AppIntentTimelineProvider {
         let snapshot = store?.read()
         let selected = content.entry(from: snapshot)
         return FeaturedRecipeEntry(date: Date(), recipe: selected, content: content)
+    }
+
+    /// DUT-504 — resolve the empty case. In `.auto` / `.recipes` we still fall
+    /// back to the hardcoded brand RECIPE placeholder ("Garlic Butter Skillet
+    /// Corn") so the gallery / first-launch look is unchanged. In `.articles`
+    /// mode, though, that placeholder is a fabricated recipe with a dead
+    /// `dod://recipe/0` tap and a lying "Latest Recipe" eyebrow — so instead we
+    /// keep `recipe: nil` (carrying the `.articles` mode) and let the entry view
+    /// render the honest "no articles yet" empty tile, which routes to
+    /// `dod://feed` rather than a rejected recipe deep link.
+    private func fallbackIfEmpty(_ entry: FeaturedRecipeEntry) -> FeaturedRecipeEntry {
+        guard entry.recipe == nil else { return entry }
+        if entry.content == .articles {
+            return FeaturedRecipeEntry(date: entry.date, recipe: nil, content: .articles)
+        }
+        return .placeholder
     }
 }

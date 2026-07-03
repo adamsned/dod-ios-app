@@ -95,4 +95,15 @@ struct SiwaRevokeClientTests {
     @Test func liveConfigIsConfigured() {
         #expect(Self.liveConfig.isConfigured)
     }
+
+    /// DUT-523: the exchange/revoke request (Delete Account, 5.1.1(v)) must
+    /// carry a bounded per-request timeout so a stalled Worker can't hang the
+    /// deletion UI indefinitely.
+    @Test func requestCarriesThirtySecondTimeout() async throws {
+        let rec = Recorder(body: Data(#"{"revoked":true}"#.utf8), status: 200)
+        let client = SiwaRevokeClient(config: Self.liveConfig, transport: rec.transport)
+        try await client.revoke(refreshToken: "rt-abc-123")
+        let request = try #require(rec.lastRequest)
+        #expect(request.timeoutInterval == 30)
+    }
 }

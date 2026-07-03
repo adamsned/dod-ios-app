@@ -28,6 +28,10 @@ struct RecipeDetailMetaPills: View {
         HStack(spacing: DODSpacing.xxs) {
             Image(systemName: item.icon)
                 .foregroundStyle(DODColor.labelSecondary)
+                // DUT-527 — hide the decorative SF Symbol so VoiceOver doesn't
+                // read the raw glyph name; the explicit label below carries the
+                // meaning (e.g. "45 minutes", "Serves 6").
+                .accessibilityHidden(true)
             Text(item.label)
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.label)
@@ -39,5 +43,6 @@ struct RecipeDetailMetaPills: View {
                 .fill(DODColor.surfaceElevated)
         )
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(item.label)
     }
 }

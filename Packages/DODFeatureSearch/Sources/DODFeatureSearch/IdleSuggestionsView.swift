@@ -228,7 +228,11 @@ struct IdleSuggestionsView: View {
             .foregroundStyle(DODColor.label)
             .padding(.horizontal, DODSpacing.sm)
             .padding(.vertical, DODSpacing.xs)
+            // DUT-526 — Try / Recent pills are short; guarantee a 44pt tap
+            // target so the hit area meets the a11y minimum.
+            .frame(minHeight: 44)
             .background(Capsule().fill(DODColor.surfaceElevated))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(text), suggestion")

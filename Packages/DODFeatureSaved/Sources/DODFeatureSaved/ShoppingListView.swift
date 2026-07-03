@@ -250,6 +250,9 @@ public struct ShoppingListView: View {
                 Image(systemName: checked ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22, weight: .regular))
                     .foregroundStyle(checked ? DODColor.accent : DODColor.labelSecondary)
+                    // DUT-527 — SF-Symbol-only toggle; guarantee a 44pt tap target.
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("shopping-list-row-toggle")
@@ -274,6 +277,14 @@ public struct ShoppingListView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel(for: item))
         .accessibilityAddTraits(checked ? .isSelected : [])
+        // DUT-483 / AC-39.11 — `.accessibilityElement(.ignore)` collapses the
+        // row and swallows the leading check-toggle Button, and the trailing
+        // swipe action REMOVES the row (markAlreadyHave). Without this a
+        // VoiceOver shopper has no way to check a row off — their only action
+        // deletes it. Re-expose the core AC-39.5 check-off as a custom action.
+        .accessibilityAction(named: checked ? "Mark as still need" : "Mark as already have") {
+            viewModel.toggleChecked(item)
+        }
         // AC-39.5 / CL-82 — the trailing "I already have this" affordance.
         .swipeActions(edge: .trailing) {
             Button {

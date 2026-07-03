@@ -62,6 +62,38 @@ public enum ReliableImageConfig {
     }
 }
 
+/// DUT-520: how a thrown `URLError` should be handled by the hero loader.
+/// Platform-independent (pure `Foundation`) so the retry policy is unit-testable
+/// on the macOS test slice, where `ReliableImageLoader` itself is a UIKit-less
+/// stub.
+enum ReliableImageRetryDecision: Equatable {
+    /// A recycled cell (DUT-201): `URLSession` surfaces Task cancellation as
+    /// `URLError(.cancelled)`. Must not flip the cell to failure.
+    case cancelled
+    /// A momentary connectivity blip a second attempt can plausibly recover.
+    case retry
+    /// Permanent (bad URL, unsupported response, etc.) — fail fast instead of
+    /// burning a second full fetch.
+    case terminal
+}
+
+enum ReliableImageRetry {
+    /// Classify a thrown `URLError` for the hero loader. Only genuinely transient
+    /// connectivity errors retry; everything else is terminal so a permanent
+    /// failure resolves the cell immediately.
+    static func decision(for error: URLError) -> ReliableImageRetryDecision {
+        switch error.code {
+        case .cancelled:
+            return .cancelled
+        case .timedOut, .networkConnectionLost, .cannotConnectToHost,
+            .cannotFindHost, .dnsLookupFailed, .notConnectedToInternet:
+            return .retry
+        default:
+            return .terminal
+        }
+    }
+}
+
 #if canImport(UIKit)
 
 /// Shared in-memory cache of decoded recipe images, keyed by absolute URL.
@@ -111,6 +143,19 @@ final class ReliableImageLoader {
     /// tests (network-only, behavior unchanged).
     nonisolated(unsafe) static var offlineDataProvider: (@Sendable (URL) async -> Data?)?
 
+    /// DUT-520: dedicated hardened session instead of `URLSession.shared`.
+    /// `URLSession.shared` leaves `timeoutIntervalForResource` at its 7-day
+    /// default, so a slow/trickling hero body parks the `await` effectively
+    /// forever (a feed cell never resolves). Cap the whole transfer at 30s and
+    /// disable connectivity-waiting so an offline device fails fast instead of
+    /// stalling. Mirrors the DUT-519 hardening in `URLSessionHTTPClient`.
+    private nonisolated static let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForResource = 30
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
+
     func load(_ url: URL?) async {
         guard let url else {
             phase = .failure
@@ -155,7 +200,7 @@ final class ReliableImageLoader {
             phase = .failure
             return
         }
-        if let data = await provider(url), let image = Self.decode(data) {
+        if let data = await provider(url), let image = await Self.decode(data) {
             if Task.isCancelled { return }
             RecipeImageCache.shared.insert(image, for: url)
             phase = .success(Image(uiImage: image))
@@ -171,7 +216,15 @@ final class ReliableImageLoader {
     /// can't produce a thumbnail (e.g. an exotic format), preserving the prior
     /// behavior for that edge case. The DISK cache bytes are untouched — this
     /// only bounds the in-memory decode used for display.
-    private static func decode(_ data: Data) -> UIImage? {
+    ///
+    /// DUT-465: `nonisolated async`. This class is `@MainActor`, so a plain
+    /// static would inherit main-actor isolation and — because
+    /// `ImageDownsampler.downsample` uses `kCGImageSourceShouldCacheImmediately`
+    /// to force full decompression at the call site — decompress the hero ON
+    /// the main thread, hitching scroll. `nonisolated async` runs the decode on
+    /// the global executor; only the `phase` publish hops back to the main
+    /// actor. (`await` from `loadFromDiskOrFail`/`fetchOnce` keeps it off-main.)
+    private nonisolated static func decode(_ data: Data) async -> UIImage? {
         if let cgImage = ImageDownsampler.downsample(data: data) {
             return UIImage(cgImage: cgImage)
         }
@@ -190,20 +243,37 @@ final class ReliableImageLoader {
     /// `CancellationError`) so the caller never flips a recycled cell to failure,
     /// and re-checks `Task.isCancelled` after the await so a resumed-stale task
     /// can't overwrite the new URL's phase.
-    private static func fetchOnce(_ url: URL) async -> FetchOutcome {
+    ///
+    /// DUT-520: uses the hardened ``session`` with an explicit 30s per-request
+    /// timeout, and classifies outcomes so a permanent error resolves the cell
+    /// immediately instead of burning a second full fetch:
+    /// - a non-2xx response (404/403/5xx) is TERMINAL (`.failed`) — a retry of a
+    ///   permanent error just doubles the latency before the cell fails,
+    /// - a decode failure is TERMINAL (`.failed`) — a truncated / HTML-error body
+    ///   won't become an image on a re-fetch,
+    /// - only a genuinely transient `URLError` (timeout / network-lost /
+    ///   cannot-connect) yields `.retry`.
+    private nonisolated static func fetchOnce(_ url: URL) async -> FetchOutcome {
+        let request = URLRequest(url: url, timeoutInterval: 30)
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await session.data(for: request)
             if Task.isCancelled { return .cancelled }
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                return .retry
+                return .failed
             }
-            return Self.decode(data).map(FetchOutcome.image) ?? .failed
+            return await Self.decode(data).map(FetchOutcome.image) ?? .failed
         } catch is CancellationError {
             return .cancelled
-        } catch let error as URLError where error.code == .cancelled {
-            return .cancelled
+        } catch let error as URLError {
+            // DUT-520: classify via the platform-independent policy so a
+            // permanent error fails fast and only a transient blip retries.
+            switch ReliableImageRetry.decision(for: error) {
+            case .cancelled: return .cancelled
+            case .retry: return .retry
+            case .terminal: return .failed
+            }
         } catch {
-            return .retry
+            return .failed
         }
     }
 }

@@ -26,7 +26,9 @@ public actor RecipeStore {
     /// Until then, ``mergeDetail`` must NOT clear a legacy local `isSaved` pin —
     /// the backfill (which selects `isSaved == true`) hasn't migrated it to the
     /// synced store yet, so clearing it would permanently lose an upgrader's save.
-    public internal(set) var didBackfillSyncedSaved = false
+    ///
+    /// DUT-493: seeded from the durable ``backfillDidComplete(in:)`` flag (skips the DUT-470 launch window).
+    public internal(set) var didBackfillSyncedSaved = RecipeStore.backfillDidComplete()
 
     // MARK: - List item cache
 
@@ -153,6 +155,8 @@ public actor RecipeStore {
             try pinHeroImage(heroURLString: target.heroImageURLString, toRecipeID: recipe.id)
         } else if didBackfillSyncedSaved {
             target.isSaved = false
+            // DUT-512: mirror the explicit-unsave teardown (drop download + pins).
+            try tearDownUnsavedPins(target)
         }
 
         // US-12 / AC-12.1: keep the local ingredient index in sync.
@@ -171,12 +175,7 @@ public actor RecipeStore {
 
     // MARK: - Save / unsave (AC-5.1)
 
-    public func isSaved(id: Int) throws -> Bool {
-        // DUT-35: the synced set is the source of truth, so the bookmark glyph
-        // reflects a save made on another device even before the local
-        // `CachedRecipe` pin is reconciled on detail open.
-        try fetchSyncedSaved(id: id) != nil
-    }
+    // `isSaved(id:)` lives in `RecipeStore+SyncedSaved.swift` (file_length cap).
 
     // US-5 / DUT-35 — `toggleSaved(id:)` + `markSaved(id:)` (incl. the DUT-215
     // unsave teardown) live in `RecipeStore+Saved.swift` (file_length cap).
@@ -189,9 +188,18 @@ public actor RecipeStore {
             sortBy: [SortDescriptor(\.savedAt, order: .reverse)]
         )
         var seen = Set<Int>()  // DUT-378: dedup CloudKit-duplicate rows by id
-        return try modelContext.fetch(descriptor).compactMap {
+        var result = try modelContext.fetch(descriptor).compactMap {
             seen.insert($0.id).inserted ? Self.toDomain($0) : nil
         }
+        // DUT-470: while the one-time backfill hasn't completed (sync ON but the
+        // CloudKit mirror hasn't landed an import — e.g. signed out of iCloud),
+        // union the local legacy `isSaved` pins so the Saved tab isn't empty.
+        // Display-only + local-only (no mirror write) → no resurrection risk;
+        // empty once backfill reconciles (see `provisionalSavedPins`).
+        for pin in try provisionalSavedPins() where seen.insert(pin.id).inserted {
+            result.append(Self.toDomain(pin))
+        }
+        return result
     }
 
     // MARK: - Explicit download (US-35 / AC-35.2 / AC-35.5)
@@ -389,5 +397,4 @@ public actor RecipeStore {
         )
     }
 }
-// `formatTime(seconds:)` moved to `TimeFormatting.swift` to keep this file
-// under the SwiftLint 400-line file_length cap (DUT-373/413 pushed it to 403).
+// `formatTime(seconds:)` moved to `TimeFormatting.swift` for the 400-line cap.
