@@ -74,10 +74,13 @@ struct ShoppingListBuilderSheet: View {
                     row(for: recipe)
                 }
             } header: {
-                Text("Pick the recipes you're shopping for. We'll merge their ingredients into one list, sorted by store aisle so you can shop in one loop.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .textCase(nil)
+                Text(
+                    "Pick the recipes you're shopping for. We'll merge their ingredients "
+                        + "into one list, sorted by store aisle so you can shop in one loop."
+                )
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .textCase(nil)
             }
         }
         .scrollContentBackground(.hidden)
