@@ -140,6 +140,56 @@ import Testing
         #expect(idleTimer.isDisabled, "endCookMode without begin must not change anything")
     }
 
+    // MARK: - Idle timer scenePhase safety net (DUT-529)
+
+    @Test func suspendIdleTimerForBackgroundRestoresPriorWithoutEndingSession() {
+        // Belt-and-suspenders net: backgrounding while Cook Mode is up must
+        // restore the prior idle-timer value even if .onDisappear never fires,
+        // and must NOT tear the session down (didBegin stays true so resume works).
+        let idleTimer = FakeIdleTimerController()
+        idleTimer.isDisabled = false  // baseline
+        let viewModel = Self.makeViewModel(stepCount: 1, idleTimer: idleTimer)
+        viewModel.beginCookMode()
+        #expect(idleTimer.isDisabled)
+        viewModel.suspendIdleTimerForBackground()
+        #expect(!idleTimer.isDisabled, "DUT-529 — background must restore prior idle-timer value")
+    }
+
+    @Test func resumeIdleTimerReArmsWhenSessionStillActive() {
+        let idleTimer = FakeIdleTimerController()
+        let viewModel = Self.makeViewModel(stepCount: 1, idleTimer: idleTimer)
+        viewModel.beginCookMode()
+        viewModel.suspendIdleTimerForBackground()
+        #expect(!idleTimer.isDisabled)
+        viewModel.resumeIdleTimerIfActive()
+        #expect(idleTimer.isDisabled, "DUT-529 — returning to active must re-arm the idle timer")
+    }
+
+    @Test func suspendAndResumePreserveEndCookModeRestore() {
+        // A background/foreground round-trip must not corrupt the captured
+        // prior value: the eventual endCookMode still restores the true baseline.
+        let idleTimer = FakeIdleTimerController()
+        idleTimer.isDisabled = false
+        let viewModel = Self.makeViewModel(stepCount: 1, idleTimer: idleTimer)
+        viewModel.beginCookMode()
+        viewModel.suspendIdleTimerForBackground()
+        viewModel.resumeIdleTimerIfActive()
+        viewModel.endCookMode()
+        #expect(!idleTimer.isDisabled, "DUT-529 — exit after a bg/fg cycle still restores baseline")
+    }
+
+    @Test func suspendAndResumeAreNoOpsWithoutActiveSession() {
+        // No session running: neither method should touch a timer some other
+        // surface owns.
+        let idleTimer = FakeIdleTimerController()
+        idleTimer.isDisabled = true  // owned elsewhere
+        let viewModel = Self.makeViewModel(stepCount: 1, idleTimer: idleTimer)
+        viewModel.suspendIdleTimerForBackground()
+        #expect(idleTimer.isDisabled, "DUT-529 — suspend without a session must not change state")
+        viewModel.resumeIdleTimerIfActive()
+        #expect(idleTimer.isDisabled, "DUT-529 — resume without a session must not change state")
+    }
+
     @Test func isIdleTimerDisabledProxiesUnderlyingController() {
         let idleTimer = FakeIdleTimerController()
         let viewModel = Self.makeViewModel(stepCount: 1, idleTimer: idleTimer)

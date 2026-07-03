@@ -94,7 +94,9 @@ extension RecipeDetailView {
                 if isBlurbExpanded, hasExpandableTextBlurb {
                     ArticleBlocksView(blocks: textOnlyBlocks)
                     Button {
-                        withAnimation { isBlurbExpanded = false }
+                        // DUT-529: skip the expand/collapse animation under
+                        // Reduce Motion (constitution §7); the state still flips.
+                        withAnimation(reduceMotion ? nil : .default) { isBlurbExpanded = false }
                     } label: {
                         Text("Less")
                             .dodFont(DODType.caption)
@@ -113,7 +115,9 @@ extension RecipeDetailView {
                     ArticleBlocksView(blocks: collapsedBlocks)
                     if hasExpandableTextBlurb {
                         Button {
-                            withAnimation { isBlurbExpanded = true }
+                            // DUT-529: skip the expand animation under Reduce
+                            // Motion (constitution §7); the state still flips.
+                            withAnimation(reduceMotion ? nil : .default) { isBlurbExpanded = true }
                         } label: {
                             Text("More")
                                 .dodFont(DODType.caption)

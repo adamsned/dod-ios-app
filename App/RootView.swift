@@ -34,7 +34,9 @@ struct RootView: View {
     /// (US-8). The former second sheet (the iCloud-Sync opt-in, AC-41.2) is
     /// removed; sync is opt-in only from Settings (AC-41.3) now, and the
     /// welcome sheet mentions it as a capability instead.
-    @State private var showOnboarding: Bool
+    /// Non-private so the `+Onboarding.swift` extension's `onboardingCover`
+    /// (extracted for file_length) can read/flip it (DUT-529).
+    @State var showOnboarding: Bool
     /// First-run iCloud-Sync opt-in prompt, shown once right after the welcome
     /// sheet on a brand-new install (paired with the notification permission
     /// request). Re-introduces a launch-time *ask* for sync — DUT-68 removed the
@@ -42,6 +44,13 @@ struct RootView: View {
     /// saved recipes never synced. "Turn On" sets the opt-in (effective next
     /// launch); "Not Now" leaves it off (still changeable in Settings).
     @State var showCloudSyncPrompt = false
+    /// DUT-408 / DUT-529 — set by `runFirstRunSetup(presentingFromCoverDismiss:)`
+    /// when the iCloud-Sync prompt must wait for the onboarding cover to finish
+    /// dismissing. The cover's `onDismiss:` reads and clears this to fire
+    /// `showCloudSyncPrompt`, so the alert presents *after* the dismiss animation
+    /// completes rather than being swallowed mid-dismiss (replaces the old fixed
+    /// 450 ms sleep).
+    @State var pendingCloudSyncPromptAfterOnboarding = false
     /// US-36 AC-36.2 — user-selected appearance preference. Backed by
     /// `UserDefaults` (key `dod.settings.appearance`) via `@AppStorage`
     /// so a write from `SettingsViewModel.appearance` (the Picker's
@@ -175,29 +184,18 @@ struct RootView: View {
             handle(intent: newValue)
             dispatcher.consume()
         }
-        .fullScreenCover(isPresented: $showOnboarding) {
-            // DUT-335 — the App Intro: a paged feature tour. Presented full-screen
-            // (no swipe-to-dismiss, so it can't be escaped without finishing —
-            // the DUT-301 concern the old sheet handled with
-            // `interactiveDismissDisabled`). The persistent "Let's Get Cooking"
-            // CTA is the single exit: it sets the onboarding flag + kicks off
-            // first-run setup.
-            AppIntroTour(
-                pages: Self.appIntroPages,
-                ctaTitle: "Let's Get Cooking",
-                onFinish: {
-                    guard showOnboarding else { return }  // DUT-407: ignore a double-tap
-                    UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
-                    showOnboarding = false
-                    // First-run: ask for notifications + iCloud Sync (skipped
-                    // under the onboarding UI test, which can't dismiss the
-                    // system permission dialogs).
-                    if !DODEnvironment.suppressFirstRunPrompts {
-                        Task { await runFirstRunSetup() }
-                    }
-                }
-            )
-        }
+        // DUT-335 — the App Intro paged feature tour. Presented full-screen (no
+        // swipe-to-dismiss, so it can't be escaped without finishing — the
+        // DUT-301 concern). The "Let's Get Cooking" CTA is the single exit.
+        // DUT-408 / DUT-529 — `onDismiss:` presents the iCloud-Sync prompt only
+        // after the cover's dismiss animation completes (this fires afterwards),
+        // so iOS can't swallow it as present-during-dismiss (replaces the old
+        // fixed 450 ms sleep in `runFirstRunSetup`).
+        .fullScreenCover(
+            isPresented: $showOnboarding,
+            onDismiss: presentCloudSyncPromptIfPending,
+            content: { onboardingCover }
+        )
         .alert("Turn On iCloud Sync?", isPresented: $showCloudSyncPrompt) {
             Button("Turn On Sync") {
                 // DUT-280 — both prompts answered; mark complete so they never re-run.
