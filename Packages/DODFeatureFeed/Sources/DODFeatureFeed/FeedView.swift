@@ -10,7 +10,11 @@ import SwiftUI
 /// can navigate without this module knowing about the detail feature.
 public struct FeedView: View {
 
-    @State private var viewModel: FeedViewModel
+    // DUT-527 — `internal` (no `private`) so the helpers extracted to
+    // `FeedView+Helpers.swift` (file-length relief) can read the view model,
+    // mirroring how `SearchView`'s `@State var viewModel` is promoted for the
+    // same cross-file-extension reason.
+    @State var viewModel: FeedViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// System `openURL` (RootView's override). The Cooking Tools menu's "Buy
     /// BuzzyWaxx Seasoning" item hands off to the browser — buzzywaxx.com isn't a
@@ -146,14 +150,18 @@ public struct FeedView: View {
         )
         .task { await viewModel.onAppear() }
         .task { await refreshCurrentRung() }
-        .refreshable { await viewModel.refresh() }
+        // DUT-527 — `refreshAndAnnounce` runs the pull-to-refresh, then posts a
+        // VoiceOver completion + result-count announcement (see FeedView+Helpers).
+        .refreshable { await refreshAndAnnounce() }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isOffline)
         .sensoryFeedback(.success, trigger: viewModel.refreshCount)
     }
 
     /// DUT-183 — recompute the cook's current rung from the journal so the hero
     /// card + the flow advance to the next un-cooked dish as they climb the path.
-    private func refreshCurrentRung() async {
+    /// DUT-527 — `internal` (was `private`) so the helpers extracted to
+    /// `FeedView+Helpers.swift` (file-length relief) can still call it.
+    func refreshCurrentRung() async {
         cookedRecipeIDs = Set((await viewModel.cookLogs()).map(\.recipeID))  // DUT-381
         currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
     }
@@ -372,28 +380,6 @@ public struct FeedView: View {
             .padding(DODSpacing.md)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Loading recipes")
-        }
-    }
-}
-
-extension FeedView {
-    /// CL-273 — the Cooking Journal sheet: loads the logged cooks and wires the
-    /// per-entry reflection/photo save (`updateCook`, which never changes the
-    /// cook count, so it can't affect rank). Extracted here so `FeedView`'s
-    /// struct body stays under SwiftLint's `type_body_length` cap.
-    var cookJournalSheet: some View {
-        CookJournalView(
-            load: { await viewModel.cookLogs() },
-            update: { await viewModel.updateCook($0) }
-        )
-    }
-
-    /// Log a completed cook then re-derive the current rung. Extracted here so
-    /// `FeedView`'s struct body stays under SwiftLint's `type_body_length` cap.
-    func logCookAndRefresh(_ entry: CookLogEntry) {
-        Task {
-            await viewModel.logCook(entry)
-            await refreshCurrentRung()
         }
     }
 }
