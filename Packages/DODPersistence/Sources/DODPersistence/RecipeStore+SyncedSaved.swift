@@ -114,6 +114,20 @@ extension RecipeStore {
         didBackfillSyncedSaved = true
     }
 
+    /// True when the recipe is saved. Reads the synced source of truth (so the
+    /// bookmark glyph reflects a save made on another device even before the
+    /// local `CachedRecipe` pin is reconciled on detail open), plus — pre-backfill
+    /// only — the DUT-470 provisional local pin (a legacy save the CloudKit
+    /// mirror hasn't landed yet). Moved here from `RecipeStore.swift` for the
+    /// file_length cap.
+    public func isSaved(id: Int) throws -> Bool {
+        if try fetchSyncedSaved(id: id) != nil { return true }
+        // DUT-470: pre-backfill, a legacy local pin (no synced row) is a real
+        // not-yet-mirrored save — reflect it so the glyph matches the Saved tab.
+        if !didBackfillSyncedSaved { return try fetchRecipe(id: id)?.isSaved == true }
+        return false
+    }
+
     /// DUT-240 — true when ANY synced saved-row exists. After the first
     /// CloudKit import lands, a non-empty set means another ≥V5 device already
     /// seeded the shared set — so the launch-time backfill must NOT re-insert
@@ -146,6 +160,34 @@ extension RecipeStore {
             predicate: #Predicate { $0.isSaved == true }
         )
         return Set(try modelContext.fetch(descriptor).map(\.id))
+    }
+
+    /// DUT-470 — the local `isSaved` pins to surface for DISPLAY as a
+    /// *provisional* saved-set, newest-viewed first, but ONLY while the one-time
+    /// backfill hasn't completed.
+    ///
+    /// The gap this closes: with sync ON but the CloudKit mirror unavailable
+    /// (signed out of iCloud, CK account trouble), no import ever fires, so the
+    /// synced `SyncedSavedRecipe` set stays empty and the Saved tab is blank
+    /// every launch — even though the upgrader's legacy pins are real saves.
+    ///
+    /// These pins live on `CachedRecipe`, which is in the LOCAL-ONLY
+    /// configuration (`cloudKitDatabase: .none`), so surfacing them for display
+    /// writes NOTHING to the CloudKit mirror — it cannot resurrect a cross-device
+    /// unsave (the DUT-240 / DUT-468 hazard). Once the first real import
+    /// reconciles and `didBackfillSyncedSaved` flips (seed OR skip), the synced
+    /// set becomes authoritative and this returns `[]`, so stale local-only pins
+    /// (cross-device unsaves) correctly stop showing. This is the read-time
+    /// half of the "provisional seed, reconciled on sign-in" fix — no separate
+    /// mirrored model needed, because the local pins already ARE the local-only
+    /// provisional store.
+    func provisionalSavedPins() throws -> [CachedRecipe] {
+        guard !didBackfillSyncedSaved else { return [] }
+        let descriptor = FetchDescriptor<CachedRecipe>(
+            predicate: #Predicate { $0.isSaved == true },
+            sortBy: [SortDescriptor(\.lastViewedAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor)
     }
 
     #if DEBUG

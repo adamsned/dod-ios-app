@@ -126,7 +126,9 @@ struct SyncedSavedRecipeTests {
         try setup.save()
 
         let store = RecipeStore(modelContainer: container)
-        #expect(try await store.savedRecipes().isEmpty)  // synced store empty pre-backfill
+        // The SYNCED store is empty pre-backfill (DUT-470: `savedRecipes()` now
+        // unions the local pin for display, so assert the synced set directly).
+        #expect(try await store.hasAnySyncedSaved() == false)
 
         try await store.backfillSyncedSaved()
         #expect(try await store.savedRecipes().map(\.id) == [3])
@@ -255,5 +257,63 @@ struct SyncedSavedRecipeTests {
         try setup.save()
         #expect(try await store.syncedSavedIDSet() == [30, 31])
         #expect(try await store.locallyPinnedSavedIDSet() == [30])  // 31 has no pin
+    }
+
+    /// DUT-470 — sync ON but the CloudKit mirror never lands an import (signed
+    /// out of iCloud): the synced set is empty, but the upgrader's legacy local
+    /// pins are real saves and must surface for DISPLAY so the Saved tab isn't
+    /// blank every launch. Backfill-not-complete is the gate.
+    @Test("Pre-backfill, a legacy local pin surfaces in the saved set (provisional display)")
+    func provisionalPinsDisplayBeforeBackfill() async throws {
+        let container = try RecipeStore.inMemoryContainer()
+        let setup = ModelContext(container)
+        setup.insert(
+            CachedRecipe(
+                id: 3,
+                slug: "pre-v5",
+                title: "Pre-V5 Save",
+                excerptText: "Excerpt",
+                canonicalURLString: "https://dutchovendaddy.com/3",
+                publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                isSaved: true
+            )
+        )
+        try setup.save()
+
+        let store = RecipeStore(modelContainer: container)
+        // Backfill not complete (didBackfillSyncedSaved == false) → the legacy
+        // pin surfaces even though the synced set is empty.
+        #expect(try await store.savedRecipes().map(\.id) == [3])
+        #expect(try await store.isSaved(id: 3))
+        #expect(try await store.savedRecipeIDs() == [3])
+    }
+
+    /// DUT-470 — once the first real import reconciles and the backfill flag
+    /// flips (here the skip branch: remote authoritative, pins NOT seeded), the
+    /// synced set is the source of truth. A local-only pin is then a cross-device
+    /// unsave and must NOT show — the provisional union stops. (No mirror write
+    /// happened, so nothing resurrected.)
+    @Test("After backfill completes, a local-only pin no longer shows (synced authoritative)")
+    func provisionalPinsHiddenAfterBackfill() async throws {
+        let container = try RecipeStore.inMemoryContainer()
+        let setup = ModelContext(container)
+        setup.insert(
+            CachedRecipe(
+                id: 3,
+                slug: "pre-v5",
+                title: "Pre-V5 Save",
+                excerptText: "Excerpt",
+                canonicalURLString: "https://dutchovendaddy.com/3",
+                publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                isSaved: true
+            )
+        )
+        try setup.save()
+
+        let store = RecipeStore(modelContainer: container)
+        await store.markSyncedSavedBackfillComplete()  // first import reconciled
+        #expect(try await store.savedRecipes().isEmpty)
+        #expect(try await store.isSaved(id: 3) == false)
+        #expect(try await store.savedRecipeIDs().isEmpty)
     }
 }

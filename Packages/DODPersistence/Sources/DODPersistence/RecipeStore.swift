@@ -171,12 +171,8 @@ public actor RecipeStore {
 
     // MARK: - Save / unsave (AC-5.1)
 
-    public func isSaved(id: Int) throws -> Bool {
-        // DUT-35: the synced set is the source of truth, so the bookmark glyph
-        // reflects a save made on another device even before the local
-        // `CachedRecipe` pin is reconciled on detail open.
-        try fetchSyncedSaved(id: id) != nil
-    }
+    // `isSaved(id:)` lives in `RecipeStore+SyncedSaved.swift` (reads the synced
+    // set + the DUT-470 provisional local pins) to keep this file under the cap.
 
     // US-5 / DUT-35 — `toggleSaved(id:)` + `markSaved(id:)` (incl. the DUT-215
     // unsave teardown) live in `RecipeStore+Saved.swift` (file_length cap).
@@ -189,9 +185,18 @@ public actor RecipeStore {
             sortBy: [SortDescriptor(\.savedAt, order: .reverse)]
         )
         var seen = Set<Int>()  // DUT-378: dedup CloudKit-duplicate rows by id
-        return try modelContext.fetch(descriptor).compactMap {
+        var result = try modelContext.fetch(descriptor).compactMap {
             seen.insert($0.id).inserted ? Self.toDomain($0) : nil
         }
+        // DUT-470: while the one-time backfill hasn't completed (sync ON but the
+        // CloudKit mirror hasn't landed an import — e.g. signed out of iCloud),
+        // union the local legacy `isSaved` pins so the Saved tab isn't empty.
+        // Display-only + local-only (no mirror write) → no resurrection risk;
+        // empty once backfill reconciles (see `provisionalSavedPins`).
+        for pin in try provisionalSavedPins() where seen.insert(pin.id).inserted {
+            result.append(Self.toDomain(pin))
+        }
+        return result
     }
 
     // MARK: - Explicit download (US-35 / AC-35.2 / AC-35.5)
