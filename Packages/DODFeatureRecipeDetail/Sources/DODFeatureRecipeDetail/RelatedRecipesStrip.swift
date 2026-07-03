@@ -50,7 +50,17 @@ public struct RelatedRecipesStrip: View {
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fill)
-                default:
+                case .failure:
+                    // DUT-524 — neutral static placeholder instead of the
+                    // infinite skeleton shimmer when a thumbnail can't load.
+                    DODColor.surfaceElevated
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .overlay(
+                            Image(systemName: "fork.knife")
+                                .font(.system(size: 28))
+                                .foregroundStyle(DODColor.labelSecondary)
+                        )
+                case .empty:
                     LoadingSkeleton(cornerRadius: 0)
                 }
             }

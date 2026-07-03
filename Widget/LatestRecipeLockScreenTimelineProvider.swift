@@ -85,17 +85,16 @@ struct LatestRecipeLockScreenTimelineProvider: AppIntentTimelineProvider {
         in context: Context
     ) async -> LatestRecipeLockScreenEntry {
         // Mirror the `placeholder(in:)` path: prefer the live snapshot,
-        // fall back to the hardcoded brand placeholder only when the
-        // selected mode yields nothing. T-391.
-        let entry = currentEntry(for: configuration.content)
-        return entry.recipe == nil ? .placeholder : entry
+        // fall back to the brand placeholder only when the selected mode
+        // yields nothing. T-391 / DUT-504.
+        fallbackIfEmpty(currentEntry(for: configuration.content))
     }
 
     func timeline(
         for configuration: LatestWidgetConfigurationIntent,
         in context: Context
     ) async -> Timeline<LatestRecipeLockScreenEntry> {
-        let entry = currentEntry(for: configuration.content)
+        let entry = fallbackIfEmpty(currentEntry(for: configuration.content))
         let next = Date().addingTimeInterval(refreshInterval)
         return Timeline(entries: [entry], policy: .after(next))
     }
@@ -106,5 +105,19 @@ struct LatestRecipeLockScreenTimelineProvider: AppIntentTimelineProvider {
         let snapshot = store?.read()
         let selected = content.entry(from: snapshot)
         return LatestRecipeLockScreenEntry(date: Date(), recipe: selected, content: content)
+    }
+
+    /// DUT-504 — resolve the empty case. `.auto` / `.recipes` keep the
+    /// hardcoded brand RECIPE placeholder so the gallery / first-launch look is
+    /// unchanged. `.articles` with no article keeps `recipe: nil` (carrying the
+    /// `.articles` mode) so the entry view shows the honest "no articles yet"
+    /// empty tile routing to `dod://feed`, rather than the fabricated
+    /// "Garlic Butter Skillet Corn" recipe whose `dod://recipe/0` tap is dead.
+    private func fallbackIfEmpty(_ entry: LatestRecipeLockScreenEntry) -> LatestRecipeLockScreenEntry {
+        guard entry.recipe == nil else { return entry }
+        if entry.content == .articles {
+            return LatestRecipeLockScreenEntry(date: entry.date, recipe: nil, content: .articles)
+        }
+        return .placeholder
     }
 }
