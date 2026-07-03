@@ -101,3 +101,95 @@ private actor CapturedURLs {
         urls.append(contentsOf: batch)
     }
 }
+
+/// DUT-485 / T-905 — the bounded classification scan populates the snapshot's
+/// `latestRecipe` / `latestArticle` for the user-configurable "Latest" widget.
+@Suite("LiveFeedDependencies latest recipe/article scan (DUT-485 / T-905)")
+struct LiveFeedDependenciesLatestScanTests {
+
+    @Test("scan records the newest recipe and newest article, and the top eyebrow flag")
+    func scanFindsBothKinds() async throws {
+        let suiteName = "DUT-485.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let widgetStore = WidgetSnapshotStore(defaults: defaults)
+        let container = try RecipeStore.inMemoryContainer()
+        let store = RecipeStore(modelContainer: container)
+
+        // Top post (id 1) is an article; id 2 is a recipe. The classifier
+        // returns true (article) only for id 1.
+        let classifier: LiveFeedDependencies.LatestKindClassifier = { item in item.id == 1 }
+        let dependencies = LiveFeedDependencies(
+            client: WPRestClient(),
+            store: store,
+            monitor: NetworkMonitor(),
+            widgetStore: widgetStore,
+            widgetReload: nil,
+            imagePrefetcher: nil,
+            latestKindClassifier: classifier
+        )
+
+        let items = [
+            RecipeListItem(
+                id: 1,
+                title: "An Article",
+                excerpt: "",
+                heroImage: nil,
+                publishedAt: Date(timeIntervalSince1970: 2),
+                totalTimeDisplay: nil
+            ),
+            RecipeListItem(
+                id: 2,
+                title: "A Recipe",
+                excerpt: "",
+                heroImage: nil,
+                publishedAt: Date(timeIntervalSince1970: 1),
+                totalTimeDisplay: nil
+            ),
+        ]
+
+        await dependencies.publishWidgetSnapshot(items: items)
+
+        let snapshot = try #require(widgetStore.read())
+        // Top post is an article → Auto eyebrow flag on entry 0.
+        #expect(snapshot.entries.first?.isArticle == true)
+        #expect(snapshot.latestArticle?.id == 1)
+        #expect(snapshot.latestArticle?.isArticle == true)
+        #expect(snapshot.latestRecipe?.id == 2)
+        #expect(snapshot.latestRecipe?.isArticle == false)
+    }
+
+    @Test("no classifier wired → latestRecipe is the top item, no article (degraded path)")
+    func scanWithoutClassifierMatchesLegacy() async throws {
+        let suiteName = "DUT-485.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let widgetStore = WidgetSnapshotStore(defaults: defaults)
+        let container = try RecipeStore.inMemoryContainer()
+        let store = RecipeStore(modelContainer: container)
+        let dependencies = LiveFeedDependencies(
+            client: WPRestClient(),
+            store: store,
+            monitor: NetworkMonitor(),
+            widgetStore: widgetStore
+        )
+
+        let items = [
+            RecipeListItem(
+                id: 5,
+                title: "Top",
+                excerpt: "",
+                heroImage: nil,
+                publishedAt: Date(timeIntervalSince1970: 1),
+                totalTimeDisplay: nil
+            )
+        ]
+
+        await dependencies.publishWidgetSnapshot(items: items)
+
+        let snapshot = try #require(widgetStore.read())
+        #expect(snapshot.entries.first?.isArticle == false)
+        #expect(snapshot.latestRecipe?.id == 5)
+        #expect(snapshot.latestArticle == nil)
+    }
+}

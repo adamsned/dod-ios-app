@@ -79,13 +79,23 @@ public struct LiveFeedDependencies: FeedDependencies {
     /// timeline tick after prefetch completes). REG-T-360 / CL-45 / T-362.
     public typealias ImagePrefetcher = @Sendable ([URL]) async -> Void
 
-    /// DUT-460 — classifies the latest (top-of-feed) post as an article. The app
-    /// supplies this (fetch the post's page + JSON-LD parse; a parse throw means
-    /// no Recipe block → article, per CL-63). Returns `true` for an article. The
-    /// widget's adaptive eyebrow reads the resulting `Entry.isArticle`. Nil (or a
-    /// failed classification) defaults to recipe. Called only for the ONE shown
-    /// entry, so it's a single fetch per snapshot publish.
+    /// DUT-460 / DUT-485 — classifies a post as an article. The app supplies
+    /// this (fetch the post's page + JSON-LD parse; a parse throw means no
+    /// Recipe block → article, per CL-63). Returns `true` for an article. Nil
+    /// (or a failed classification) defaults to recipe. Originally called only
+    /// for the top-of-feed post (DUT-460 adaptive eyebrow); DUT-485 / T-905
+    /// widens this to a bounded top-down scan (see ``maxClassificationScan``) to
+    /// locate the newest recipe AND the newest article for the user-configurable
+    /// "Latest" widget's `.recipes` / `.articles` modes.
     public typealias LatestKindClassifier = @Sendable (RecipeListItem) async -> Bool
+
+    /// DUT-485 / T-905 — upper bound on how many top-of-feed items the
+    /// classification scan will fetch+classify looking for the newest recipe
+    /// and the newest article. Articles are rare, so in the common case (top
+    /// post is a recipe) the scan classifies index 0, records it as the recipe,
+    /// and keeps going only until it also finds an article or hits this cap.
+    /// Bounding the scan caps the per-publish fetch cost.
+    static let maxClassificationScan = 10
 
     let client: WPRestClient
     let store: RecipeStore
@@ -186,29 +196,19 @@ public struct LiveFeedDependencies: FeedDependencies {
         // precache below (T-392) handles getting the bytes onto disk
         // through the existing `store.cacheImage` chain which mirrors
         // to the bridge.
-        // DUT-460 — classify only the top (shown) post's kind so the widget's
-        // eyebrow reads "Latest Article" vs "Latest Recipe". One fetch; defaults
-        // to recipe if no classifier is wired or the classification fails.
-        var topIsArticle = false
-        if let latestKindClassifier, let top = items.first {
-            topIsArticle = await latestKindClassifier(top)
-        }
+        // DUT-460 / DUT-485 — a bounded top-down classification scan. It finds
+        // the top post's kind (for the Auto eyebrow), the newest recipe, and the
+        // newest article, early-exiting once BOTH the recipe and article are
+        // found (or the scan cap is hit). One fetch per scanned item; defaults
+        // to recipe when no classifier is wired or a classification fails. The
+        // scan never throws — the classifier swallows failures app-side (CL-63).
+        let scan = await classifyLatest(items: items)
         let entries =
             items
             .prefix(WidgetSnapshotConfig.maxEntries)
             .enumerated()
             .map { offset, item in
-                WidgetSnapshot.Entry(
-                    id: item.id,
-                    title: item.title,
-                    excerpt: item.excerpt,
-                    heroImageURL: item.heroImage,
-                    canonicalURL: item.canonicalURL,
-                    publishedAt: item.publishedAt,
-                    totalTimeDisplay: item.totalTimeDisplay,
-                    heroImageFilename: item.heroImage.map(WidgetImageBridge.filename(for:)),
-                    isArticle: offset == 0 ? topIsArticle : false
-                )
+                Self.makeEntry(from: item, isArticle: offset == 0 ? scan.topIsArticle : false)
             }
         guard let widgetStore else {
             // App Group missing (e.g. running without the entitlement in a
@@ -218,7 +218,11 @@ public struct LiveFeedDependencies: FeedDependencies {
             return
         }
         do {
-            try widgetStore.write(entries: Array(entries))
+            try widgetStore.write(
+                entries: Array(entries),
+                latestRecipe: scan.latestRecipe,
+                latestArticle: scan.latestArticle
+            )
         } catch {
             DODLog.app.error("widget snapshot write failed: \(String(describing: error))")
             return
@@ -238,5 +242,62 @@ public struct LiveFeedDependencies: FeedDependencies {
         Task.detached { [imagePrefetcher, urls] in
             await imagePrefetcher(urls)
         }
+    }
+
+    /// Result of the DUT-485 / T-905 bounded classification scan.
+    private struct LatestScan {
+        /// Whether the top-of-feed post is an article — drives the Auto eyebrow.
+        var topIsArticle = false
+        /// Newest post classified as a recipe (built entry), or nil if none in scan.
+        var latestRecipe: WidgetSnapshot.Entry?
+        /// Newest post classified as an article (built entry), or nil if none in scan.
+        var latestArticle: WidgetSnapshot.Entry?
+    }
+
+    /// Scans `items` top-down, classifying each via the wired
+    /// ``latestKindClassifier`` to find the top post's kind, the newest recipe,
+    /// and the newest article. Early-exits once both a recipe and an article are
+    /// found, and never scans more than ``maxClassificationScan`` items
+    /// (articles are rare, so this caps the fetch cost). Degraded / test path
+    /// (no classifier wired): returns the top item as the recipe, no article —
+    /// matching the pre-DUT-485 behaviour. Never throws.
+    private func classifyLatest(items: [RecipeListItem]) async -> LatestScan {
+        var result = LatestScan()
+        guard let latestKindClassifier else {
+            // No classifier: preserve prior behaviour — top post is the recipe,
+            // no article. Auto eyebrow stays "Latest Recipe".
+            result.latestRecipe = items.first.map { Self.makeEntry(from: $0, isArticle: false) }
+            return result
+        }
+        for (offset, item) in items.prefix(Self.maxClassificationScan).enumerated() {
+            let isArticle = await latestKindClassifier(item)
+            if offset == 0 { result.topIsArticle = isArticle }
+            if isArticle {
+                if result.latestArticle == nil {
+                    result.latestArticle = Self.makeEntry(from: item, isArticle: true)
+                }
+            } else if result.latestRecipe == nil {
+                result.latestRecipe = Self.makeEntry(from: item, isArticle: false)
+            }
+            if result.latestRecipe != nil, result.latestArticle != nil { break }
+        }
+        return result
+    }
+
+    /// Builds a ``WidgetSnapshot/Entry`` from a `RecipeListItem`, resolving the
+    /// bridged hero-image filename. Shared by the visible-entries map and the
+    /// recipe/article scan so the two never drift.
+    private static func makeEntry(from item: RecipeListItem, isArticle: Bool) -> WidgetSnapshot.Entry {
+        WidgetSnapshot.Entry(
+            id: item.id,
+            title: item.title,
+            excerpt: item.excerpt,
+            heroImageURL: item.heroImage,
+            canonicalURL: item.canonicalURL,
+            publishedAt: item.publishedAt,
+            totalTimeDisplay: item.totalTimeDisplay,
+            heroImageFilename: item.heroImage.map(WidgetImageBridge.filename(for:)),
+            isArticle: isArticle
+        )
     }
 }

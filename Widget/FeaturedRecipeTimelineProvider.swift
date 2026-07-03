@@ -1,3 +1,4 @@
+import AppIntents
 import DODSupport
 import Foundation
 import WidgetKit
@@ -13,6 +14,12 @@ struct FeaturedRecipeEntry: TimelineEntry {
     /// `nil` means show the placeholder (first launch, or the snapshot file
     /// is empty / version-mismatched). AC-9.4.
     let recipe: WidgetSnapshot.Entry?
+
+    /// DUT-485 / T-905 — the user-selected content mode. The entry view reads
+    /// this so it can render the correct eyebrow even in `.articles` mode where
+    /// the shown entry's own `isArticle` flag might not be set (e.g. the empty
+    /// placeholder fallback). Defaults to `.auto` for the brand placeholder.
+    var content: LatestContent = .auto
 
     /// Placeholder shown by WidgetKit before any data is available — e.g.
     /// in the widget gallery, redacted screenshots, or while the user is
@@ -37,7 +44,13 @@ struct FeaturedRecipeEntry: TimelineEntry {
 /// then ask WidgetKit to refresh. The app also calls
 /// `WidgetCenter.shared.reloadAllTimelines()` whenever it writes a new
 /// snapshot, which preempts our 4-hour cadence (AC-9.3).
-struct FeaturedRecipeTimelineProvider: TimelineProvider {
+///
+/// DUT-485 / T-905 — now an `AppIntentTimelineProvider`: the user picks the
+/// content mode (Auto / Recipes / Articles) via long-press → Edit Widget, and
+/// the selected ``LatestContent`` chooses which snapshot entry we show. Default
+/// `.auto` reproduces the pre-DUT-485 adaptive-newest behaviour, so existing
+/// installs are unchanged.
+struct FeaturedRecipeTimelineProvider: AppIntentTimelineProvider {
 
     /// Lazily-built reader. Initializer can fail if the App Group isn't
     /// provisioned (e.g. running the widget in a vanilla simulator slice
@@ -53,41 +66,40 @@ struct FeaturedRecipeTimelineProvider: TimelineProvider {
     private let refreshInterval: TimeInterval = 4 * 60 * 60
 
     func placeholder(in context: Context) -> FeaturedRecipeEntry {
-        // T-391/T-392 follow-up: WidgetKit calls `placeholder(in:)` first
-        // for the gallery preview thumbnail — it does NOT necessarily call
-        // `getSnapshot(in:completion:)` before painting the thumbnail. The
-        // earlier fix only updated `getSnapshot` so the gallery still showed
-        // the hardcoded "Garlic Butter Skillet Corn" placeholder. Reading
-        // the snapshot synchronously here is cheap (UserDefaults plist
-        // load, single-digit ms) and gives the gallery the user's real
-        // latest recipe immediately. Fall back to the hardcoded brand
-        // placeholder only when the App Group is empty (first launch
-        // before the feed has loaded). AC-21.3.
-        let entry = currentEntry()
+        // No configuration is available in `placeholder(in:)` (the gallery
+        // thumbnail is painted before the user has picked a mode), so read in
+        // `.auto`. T-391/T-392: reading the snapshot synchronously here is cheap
+        // and gives the gallery the user's real latest post; fall back to the
+        // hardcoded brand placeholder only when the App Group is empty. AC-21.3.
+        let entry = currentEntry(for: .auto)
         return entry.recipe == nil ? .placeholder : entry
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (FeaturedRecipeEntry) -> Void) {
+    func snapshot(
+        for configuration: LatestWidgetConfigurationIntent,
+        in context: Context
+    ) async -> FeaturedRecipeEntry {
         // Mirror the `placeholder(in:)` path: prefer the live snapshot,
         // fall back to the hardcoded brand placeholder only when the
-        // App Group is empty (first launch before the feed has loaded).
-        // T-391.
-        let entry = currentEntry()
-        completion(entry.recipe == nil ? .placeholder : entry)
+        // selected mode yields nothing. T-391.
+        let entry = currentEntry(for: configuration.content)
+        return entry.recipe == nil ? .placeholder : entry
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<FeaturedRecipeEntry>) -> Void) {
-        let entry = currentEntry()
+    func timeline(
+        for configuration: LatestWidgetConfigurationIntent,
+        in context: Context
+    ) async -> Timeline<FeaturedRecipeEntry> {
+        let entry = currentEntry(for: configuration.content)
         let next = Date().addingTimeInterval(refreshInterval)
-        let timeline = Timeline(entries: [entry], policy: .after(next))
-        completion(timeline)
+        return Timeline(entries: [entry], policy: .after(next))
     }
 
     // MARK: - Private
 
-    private func currentEntry() -> FeaturedRecipeEntry {
+    private func currentEntry(for content: LatestContent) -> FeaturedRecipeEntry {
         let snapshot = store?.read()
-        let first = snapshot?.entries.first
-        return FeaturedRecipeEntry(date: Date(), recipe: first)
+        let selected = content.entry(from: snapshot)
+        return FeaturedRecipeEntry(date: Date(), recipe: selected, content: content)
     }
 }

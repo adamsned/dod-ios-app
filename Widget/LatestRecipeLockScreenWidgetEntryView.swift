@@ -24,7 +24,7 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
     var body: some View {
         Group {
             if let recipe = entry.recipe {
-                WidgetCard.LockScreenRectangular(content: Self.content(from: recipe))
+                WidgetCard.LockScreenRectangular(content: Self.content(from: recipe, mode: entry.content))
                     // `.widgetAccentable` is the documented opt-in for
                     // the system's per-wallpaper tint pass on accessory
                     // family widgets. The system handles the actual
@@ -66,12 +66,26 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
     /// Map the home-screen-widget snapshot `Entry` (full payload
     /// including `heroImageURL` + `totalTimeDisplay` we don't render
     /// on the lock screen) onto the lock-screen-specific subset.
-    static func content(from recipe: WidgetSnapshot.Entry) -> WidgetCard.LockScreenContent {
-        // DUT-460 — adaptive eyebrow: the latest post is a recipe or an article.
+    static func content(from recipe: WidgetSnapshot.Entry, mode: LatestContent) -> WidgetCard.LockScreenContent {
+        // DUT-460 / DUT-485 — adaptive eyebrow in `.auto`; fixed to the chosen
+        // surface in the explicit `.recipes` / `.articles` modes.
         WidgetCard.LockScreenContent(
-            eyebrow: recipe.isArticle ? "Latest Article" : "Latest Recipe",
+            eyebrow: Self.eyebrow(for: recipe, mode: mode),
             title: recipe.title
         )
+    }
+
+    /// DUT-485 — eyebrow copy. `.auto` keys off the shown post's own kind; the
+    /// explicit modes key off the user's chosen surface.
+    static func eyebrow(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
+        switch mode {
+        case .auto:
+            return recipe.isArticle ? "Latest Article" : "Latest Recipe"
+        case .recipes:
+            return "Latest Recipe"
+        case .articles:
+            return "Latest Article"
+        }
     }
 
     static func accessibilityLabel(for recipe: WidgetSnapshot.Entry) -> String {

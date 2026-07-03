@@ -22,10 +22,36 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     public let writtenAt: Date
     public let entries: [Entry]
 
-    public init(version: Int = WidgetSnapshot.currentVersion, writtenAt: Date, entries: [Entry]) {
+    /// DUT-485 / T-905 — the newest post that classified as a recipe, carried
+    /// alongside `entries` so the user-configurable "Latest" widget's
+    /// `.recipes` mode can show a recipe even when the top-of-feed post is an
+    /// article. `nil` when no recipe was found in the bounded classification
+    /// scan (or no classifier was wired — degraded / test path); the widget
+    /// falls back to `entries.first`. Additive optional field: synthesized
+    /// Codable decodes a missing key to nil (Swift's synthesized decoder uses
+    /// `decodeIfPresent` for optional properties), so pre-DUT-485 payloads
+    /// keep parsing at `currentVersion = 1`.
+    public let latestRecipe: Entry?
+
+    /// DUT-485 / T-905 — the newest post that classified as an article, for the
+    /// "Latest" widget's `.articles` mode. `nil` when the scan found no article
+    /// (articles are rare) — the widget shows its graceful empty/placeholder
+    /// state rather than crashing. Same additive back-compat story as
+    /// ``latestRecipe``.
+    public let latestArticle: Entry?
+
+    public init(
+        version: Int = WidgetSnapshot.currentVersion,
+        writtenAt: Date,
+        entries: [Entry],
+        latestRecipe: Entry? = nil,
+        latestArticle: Entry? = nil
+    ) {
         self.version = version
         self.writtenAt = writtenAt
         self.entries = entries
+        self.latestRecipe = latestRecipe
+        self.latestArticle = latestArticle
     }
 
     public struct Entry: Codable, Sendable, Equatable, Identifiable {
@@ -261,8 +287,29 @@ public struct WidgetSnapshotStore: @unchecked Sendable {
     /// Convenience: build a snapshot from a list of entries and write it.
     @discardableResult
     public func write(entries: [WidgetSnapshot.Entry], now: Date = Date()) throws -> Data {
+        try write(entries: entries, latestRecipe: nil, latestArticle: nil, now: now)
+    }
+
+    /// DUT-485 / T-905 — build a snapshot from the entry list plus the
+    /// separately-classified newest recipe / newest article and write it.
+    /// The "Latest" widget's `.recipes` / `.articles` modes read those two
+    /// fields; `.auto` still reads `entries.first`. `entries` is capped at
+    /// ``WidgetSnapshotConfig/maxEntries``; the two extra fields are not part
+    /// of that list so they're never trimmed away.
+    @discardableResult
+    public func write(
+        entries: [WidgetSnapshot.Entry],
+        latestRecipe: WidgetSnapshot.Entry?,
+        latestArticle: WidgetSnapshot.Entry?,
+        now: Date = Date()
+    ) throws -> Data {
         let trimmed = Array(entries.prefix(WidgetSnapshotConfig.maxEntries))
-        let snapshot = WidgetSnapshot(writtenAt: now, entries: trimmed)
+        let snapshot = WidgetSnapshot(
+            writtenAt: now,
+            entries: trimmed,
+            latestRecipe: latestRecipe,
+            latestArticle: latestArticle
+        )
         return try write(snapshot)
     }
 
