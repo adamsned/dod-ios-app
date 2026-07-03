@@ -3189,4 +3189,15 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-907 — Control Center control that opens the Shopping List; `dod://shopping-list` deep link (CL-301 / DUT-486, DUT-480)
+
+- **What:** An iOS 18 `ControlWidget` (Control Center / Lock Screen / Action button) with a cart icon + "Shopping List" label that opens the app to the main Shopping List screen (empty-first), via a new `dod://shopping-list` deep link.
+  - **Deep link (DODSupport):** `WidgetDeepLinkParser.Route` gains `case shoppingList`; `parse` maps host `shopping-list`/`shoppinglist`, bare-only (shared `isBare(_:)` helper reused by `.saved`). +5 parser tests.
+  - **Control (Widget, iOS 18):** new `ShoppingListControl.swift` — `@available(iOS 18.0, *) ControlWidget` + `OpenShoppingListIntent` (`openAppWhenRun`; `perform` opens `OpenURLIntent("dod://shopping-list")`). Registered in `DODAppWidgetBundle` via inline `if #available(iOS 18.0, *)` in the bundle builder (a gated computed property fails to compile). iOS 17 just doesn't offer it.
+  - **Routing (App):** `RootView` `savedShoppingListToken: UUID?`; `handle(widgetLink:)` `.shoppingList` → `selectedTab = .saved` + new token. `TabStack` + `SavedView` gain `@Binding openShoppingListToken` (wired only for the `.saved` tab; `.constant(nil)` elsewhere/defaults). `SavedView.task(id:)` consumes the token → pushes `ShoppingListView(viewModel: ShoppingListViewModel(), recipes:)` (reuses the header-cart push). `onOpenURL` → `WidgetDeepLink(url:)` → `handle`.
+- **Files:** DODSupport `WidgetSnapshot.swift` (+ `WidgetDeepLinkParserTests`). Widget `ShoppingListControl.swift` (new) + `DODAppWidgetBundle.swift`. App `WidgetDeepLink.swift`, `RootView.swift`, `RootView+LinkRouting.swift`, `TabStack.swift`; DODFeatureSaved `SavedView.swift`. Spec `clarifications.md` (CL-301).
+- **AC:** US-19 / US-22. Linear DUT-480 (parent DUT-486, Round 4); depends on DUT-487. CL-301 canonical. **Est:** ~3 h. **Deps:** off DUT-487 branch (needs the openable `ShoppingListView`). Branch `feat/dut-480-control-center`. **Verification:** DODSupport `swift test` (513, 25 parser) green; swift-format + SwiftLint `--strict` clean; app + widget targets compile (`xcodebuild build -scheme DODAppWidget` + `-scheme DODApp` exit 0; iOS-18 ControlWidget compiled). Live control confirmed in an Xcode-signed run on iOS 18.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
