@@ -53,6 +53,16 @@ struct URLSessionHTTPClientTests {
         #expect(ua.contains("iOS") || ua.contains("macOS") || ua.contains("unknown"))
         #expect(ua.contains("("))
     }
+
+    /// DUT-519 — the default production session must cap the whole transfer so
+    /// a slow/trickling body can't hang the `await` for the 7-day
+    /// `URLSession.shared` default. Offline requests fail fast rather than
+    /// parking on connectivity.
+    @Test func hardenedConfigurationCapsResourceTimeoutAndDisablesConnectivityWait() {
+        let configuration = URLSessionHTTPClient.hardenedConfiguration()
+        #expect(configuration.timeoutIntervalForResource == 60)
+        #expect(configuration.waitsForConnectivity == false)
+    }
 }
 
 // MARK: - RecordingURLProtocol

@@ -264,7 +264,15 @@ public enum JSONLDRecipeParser {
             guard let value = Int64(buffer),
                 let multiplier = iso8601UnitMultiplier(character, inTimePart: inTimePart)
             else { return nil }
-            seconds += value * multiplier
+            // DUT-518: scraped JSON-LD is untrusted — a giant digit run (e.g.
+            // "PT99999999999999H") overflows Int64 under trapping `*`/`+` and
+            // crashes. Report overflow and bail; the caller treats nil as
+            // "no duration".
+            let (product, mulOverflow) = value.multipliedReportingOverflow(by: multiplier)
+            guard !mulOverflow else { return nil }
+            let (sum, addOverflow) = seconds.addingReportingOverflow(product)
+            guard !addOverflow else { return nil }
+            seconds = sum
             buffer.removeAll()
         }
         guard buffer.isEmpty else { return nil }
@@ -287,7 +295,12 @@ public enum JSONLDRecipeParser {
     /// `recipeYield` may be a number, a string, or an array of strings.
     static func parseServings(_ raw: Any?) -> Int? {
         if let int = raw as? Int { return int }
-        if let double = raw as? Double { return Int(double) }
+        if let double = raw as? Double {
+            // DUT-518: `Int(Double)` traps on out-of-range or non-finite input
+            // (e.g. `recipeYield: 1e30` or `1e400`). Guard the range before
+            // converting so untrusted scraped values return nil, not a crash.
+            return Int(exactly: double.rounded())
+        }
         if let string = raw as? String { return Int(string) ?? Int(string.split(separator: " ").first ?? "") }
         if let array = raw as? [String], let first = array.first { return Int(first) }
         return nil

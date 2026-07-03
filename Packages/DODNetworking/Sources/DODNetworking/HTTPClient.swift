@@ -23,8 +23,26 @@ public struct URLSessionHTTPClient: HTTPClient {
     private let session: URLSession
     private let userAgent: String
 
+    /// Shared production session. DUT-519: `URLSession.shared` leaves
+    /// `timeoutIntervalForResource` at its 7-day default, so a slow/trickling
+    /// response body hangs the `await` effectively forever. Cap the whole
+    /// transfer at 60s and disable connectivity-waiting so an offline device
+    /// fails fast instead of parking the request. The per-request
+    /// `timeoutInterval: 30` (request-idle timeout) is unaffected.
+    public static let sharedSession = URLSession(configuration: hardenedConfiguration())
+
+    /// The `URLSessionConfiguration` behind ``sharedSession``. Factored out so
+    /// tests can assert the DUT-519 hardening without exposing a stored
+    /// session on the public API.
+    static func hardenedConfiguration() -> URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForResource = 60
+        configuration.waitsForConnectivity = false
+        return configuration
+    }
+
     public init(
-        session: URLSession = .shared,
+        session: URLSession = URLSessionHTTPClient.sharedSession,
         userAgent: String = URLSessionHTTPClient.defaultUserAgent()
     ) {
         self.session = session
