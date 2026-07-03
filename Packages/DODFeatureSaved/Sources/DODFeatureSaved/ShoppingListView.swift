@@ -48,6 +48,12 @@ public struct ShoppingListView: View {
     /// covers the list and interaction is disabled until the rows are built.
     @State private var isBuilding = false
 
+    /// DUT-488 — gates the "Clear list" confirmation dialog. With the list now
+    /// persisted, a saved list needs a way to be emptied; clearing is
+    /// destructive (drops every row + all checked / already-have state) so it
+    /// confirms first.
+    @State private var isConfirmingClear = false
+
     public init(
         viewModel: ShoppingListViewModel,
         recipes: [Recipe] = [],
@@ -64,10 +70,26 @@ public struct ShoppingListView: View {
             .navigationTitle("Shopping List")
             .toolbar { shareToolbar }
             .toolbar { addToolbar }
+            .toolbar { clearToolbar }
             .sheet(isPresented: $isPickingRecipes) {
                 ShoppingListBuilderSheet(recipes: recipes) { selected in
                     build(from: selected)
                 }
+            }
+            // DUT-488 — confirm before wiping a persisted list. Destructive
+            // role tints the button red; the list clears + persists empty on
+            // confirm (survives close/reopen).
+            .confirmationDialog(
+                "Clear this shopping list?",
+                isPresented: $isConfirmingClear,
+                titleVisibility: .visible
+            ) {
+                Button("Clear list", role: .destructive) {
+                    viewModel.clearAll()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes every item. You can build a new list from your saved recipes.")
             }
             // DUT-487 — while hydrating the picked recipes, dim + disable the
             // list and float a spinner so the user sees the list is building
@@ -131,6 +153,26 @@ public struct ShoppingListView: View {
                     Label("Add recipes", systemImage: "plus")
                 }
                 .accessibilityIdentifier("shopping-list-add")
+            }
+        }
+    }
+
+    /// DUT-488 — the "Clear list" affordance. With the list persisted, this is
+    /// how a saved list gets emptied. A destructive toolbar button that opens
+    /// the ``confirmationDialog`` above, then calls
+    /// ``ShoppingListViewModel/clearAll()``. Shown only on the populated list
+    /// (mirrors the Share / "Add recipes" hide-while-empty posture).
+    @ToolbarContentBuilder
+    private var clearToolbar: some ToolbarContent {
+        if !viewModel.isEmpty {
+            ToolbarItem(placement: .primaryAction) {
+                Button(role: .destructive) {
+                    isConfirmingClear = true
+                } label: {
+                    Label("Clear list", systemImage: "trash")
+                }
+                .accessibilityIdentifier("shopping-list-clear")
+                .accessibilityLabel("Clear shopping list")
             }
         }
     }
@@ -305,6 +347,8 @@ private struct AisleHeader: View {
 
 #Preview("Shopping list — empty") {
     NavigationStack {
-        ShoppingListView(viewModel: ShoppingListViewModel())
+        // `store: nil` so the preview shows the empty state regardless of any
+        // list persisted on the dev machine's App Group (DUT-488).
+        ShoppingListView(viewModel: ShoppingListViewModel(store: nil))
     }
 }

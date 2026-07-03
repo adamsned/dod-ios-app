@@ -32,7 +32,9 @@ struct ShoppingListHydrationTests {
         let hydrated = await deps.recipeWithIngredients(empty)
         #expect(!hydrated.ingredients.isEmpty)
 
-        let viewModel = ShoppingListViewModel()
+        // `store: nil` — pure in-memory VM (DUT-488) so the test starts empty
+        // regardless of any list persisted on the machine's App Group suite.
+        let viewModel = ShoppingListViewModel(store: nil)
         viewModel.add(recipes: [hydrated])
         #expect(!viewModel.isEmpty)
         #expect(viewModel.remainingCount == 2)
@@ -59,7 +61,8 @@ struct ShoppingListHydrationTests {
         let result = await deps.recipeWithIngredients(empty)
         #expect(result == empty)
 
-        let viewModel = ShoppingListViewModel()
+        // `store: nil` — pure in-memory VM (DUT-488), starts empty.
+        let viewModel = ShoppingListViewModel(store: nil)
         viewModel.add(recipes: [result])
         #expect(viewModel.isEmpty)
     }
