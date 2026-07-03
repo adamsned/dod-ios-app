@@ -5,6 +5,14 @@ import Foundation
 /// SwiftLint `file_length` cap.
 extension FirstCookoutView {
 
+    /// The share-sheet caption for a completed cook (moved here from the main
+    /// struct body for the type_body_length cap — DUT-484).
+    var shareCaption: String {
+        cookout.isCampfire
+            ? "I cooked at the campfire with @dutchovendaddy! 🔥 #DutchOvenDaddy"
+            : "I made my first \(cookout.dishTitle) with @dutchovendaddy! 🔥 #DutchOvenDaddy"
+    }
+
     func formatRemaining(_ seconds: TimeInterval) -> String {
         let total = Int(seconds.rounded())
         return String(format: "%d:%02d", total / 60, total % 60)

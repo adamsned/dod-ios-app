@@ -47,7 +47,11 @@ public struct FirstCookoutView: View {
     /// dismissing into a blank gap. Internal for `+RecipeLink.swift`.
     @State var isOpeningRecipe = false
     /// Drives the live bake timer offered at the *cook* stage (DUT-100).
-    @State var timerEngine = CookTimerEngine()
+    /// DUT-484: injectable so the guided-path host (`CookChooserFlow`) can OWN
+    /// the engine and keep a running bake alive across a "Back to the path" →
+    /// re-enter cycle (which tears this view down + rebuilds it). When not
+    /// injected (DumpCakeFlow / previews) the view owns its own.
+    @State var timerEngine: CookTimerEngine
     @State var showingHeatCoach = false
     /// Items the cook has ticked off the *gather* checklist.
     @State var checkedItems: Set<String> = []
@@ -74,22 +78,28 @@ public struct FirstCookoutView: View {
         recipeBaseURL: String = "https://www.dutchovendaddy.com",
         onLogCook: ((CookLogEntry) -> Void)? = nil,
         onBack: (() -> Void)? = nil,
-        notifier: any BakeTimerNotifying = SystemBakeTimerNotifier()
+        notifier: any BakeTimerNotifying = SystemBakeTimerNotifier(),
+        timerEngine: CookTimerEngine? = nil
     ) {
         self.cookout = cookout
         self.recipeBaseURL = recipeBaseURL
         self.onLogCook = onLogCook
         self.onBack = onBack
         self.notifier = notifier
+        // DUT-484: adopt the host-owned engine when provided (so a bake timer
+        // survives a Back → re-enter cycle); otherwise own a fresh one. On
+        // re-creation `State(initialValue:)` re-adopts the SAME injected
+        // instance from the host's surviving state, so the countdown persists
+        // and the cook step shows it rather than re-offering Start (which would
+        // re-schedule the bake-done alert to a wrong, full-length deadline).
+        _timerEngine = State(initialValue: timerEngine ?? CookTimerEngine())
     }
 
     var lastIndex: Int { cookout.steps.count + 1 }
 
-    var shareCaption: String {
-        cookout.isCampfire
-            ? "I cooked at the campfire with @dutchovendaddy! 🔥 #DutchOvenDaddy"
-            : "I made my first \(cookout.dishTitle) with @dutchovendaddy! 🔥 #DutchOvenDaddy"
-    }
+    // `shareCaption` moved to `FirstCookoutView+TimerFormat.swift` (DUT-484 — the
+    // injectable-engine init pushed this struct body over the type_body_length
+    // cap; extension members in a sibling file don't count).
 
     // DUT-192 campfire-aware copy helpers + DUT-197 swipe handler live in
     // FirstCookoutView+Stages.swift (keeps this struct body under the cap).

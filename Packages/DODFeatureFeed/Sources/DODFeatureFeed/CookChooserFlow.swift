@@ -22,13 +22,24 @@ struct CookChooserFlow: View {
     let onLogCook: (CookLogEntry) -> Void
 
     @State private var selected: GuidedCookout?
+    /// DUT-484: the guided path OWNS the bake-timer engine so a running
+    /// countdown survives a "Back to the path" → re-enter cycle (which tears the
+    /// `FirstCookoutView` down and rebuilds it). Without this the rebuilt view
+    /// lost the timer and, on restart, re-scheduled the bake-done alert to a
+    /// wrong full-length deadline.
+    @State private var timerEngine = CookTimerEngine()
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         if let selected {
             // CL-267 — `onBack` returns to the roadmap (clears the selection) so a
             // picked recipe isn't a dead end; the X still closes the whole sheet.
-            FirstCookoutView(cookout: selected, onLogCook: onLogCook, onBack: { self.selected = nil })
+            FirstCookoutView(
+                cookout: selected,
+                onLogCook: onLogCook,
+                onBack: { self.selected = nil },
+                timerEngine: timerEngine
+            )
         } else {
             // DUT-235 — always show the chooser first (no auto-jump into a dish);
             // the recommended rung is highlighted in place as the "start here".
