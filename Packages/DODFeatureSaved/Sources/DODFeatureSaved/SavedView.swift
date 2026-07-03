@@ -20,21 +20,29 @@ public struct SavedView: View {
     /// (used by Feed/Categories/Search per their respective TODO markers).
     public let onSave: ((Recipe) -> Void)?
 
-    /// US-39 / AC-39.3 / CL-85 — drives the "Make Shopping List" entry. When the
-    /// builder sheet is presented this is `true`; the recipes the user picks
-    /// land in ``builtListRecipes``, which pushes ``ShoppingListView``.
-    @State private var isBuildingShoppingList = false
-    /// The recipes the picker built a list from. Non-nil pushes the shopping
-    /// list onto the navigation stack (AC-39.3 → AC-39.4 render). Wrapped so
-    /// `navigationDestination(item:)` keys on it.
-    @State private var builtListRecipes: ShoppingListSelection?
+    /// US-39 / AC-39.3 — drives the "Make Shopping List" cart entry. DUT-487 /
+    /// T-906 — the cart now opens ``ShoppingListView`` empty-first (was a
+    /// builder-sheet-first path); the recipe picker lives inside that view. Non-nil
+    /// pushes the (empty) shopping list onto the navigation stack; the pushed view
+    /// carries the saved recipes so its own picker can build / append in place.
+    @State private var shoppingListEntry: ShoppingListSelection?
+
+    /// DUT-480 — external trigger for the iOS 18 Control Center control's
+    /// `dod://shopping-list` deep link. `RootView` mints a fresh `UUID` when the
+    /// control is tapped; each new value pushes the Shopping List empty-first
+    /// (same push the header cart does), even on a repeat tap. `nil`/unchanged
+    /// does nothing. Defaulted to a constant `nil` so the Saved-tab snapshot
+    /// tests and the other tabs' call sites are unaffected.
+    @Binding private var openShoppingListToken: UUID?
 
     public init(
         viewModel: SavedViewModel,
+        openShoppingListToken: Binding<UUID?> = .constant(nil),
         onSelect: @escaping (Recipe) -> Void,
         onSave: ((Recipe) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
+        _openShoppingListToken = openShoppingListToken
         self.onSelect = onSelect
         self.onSave = onSave
     }
@@ -47,13 +55,32 @@ public struct SavedView: View {
             .background(DODColor.surface)
             // DUT-275 — nav bar hidden; the cart lives in the header row above.
             .dodHidesNavBar()
-            .sheet(isPresented: $isBuildingShoppingList) {
-                ShoppingListBuilderSheet(recipes: viewModel.recipes) { selected in
-                    builtListRecipes = ShoppingListSelection(recipes: selected)
-                }
+            // DUT-487 / T-906 — push the Shopping List empty-first. The picker
+            // now lives inside ``ShoppingListView``; the saved recipes ride along
+            // so its "Build List" / "Add recipes" affordances can build in place.
+            .navigationDestination(item: $shoppingListEntry) { selection in
+                ShoppingListView(
+                    viewModel: ShoppingListViewModel(),
+                    recipes: selection.recipes,
+                    // DUT-487 — hydrate each picked recipe's ingredients before
+                    // the Shopping List builds rows. Saved recipes often arrive
+                    // with empty `ingredients` (detail never fetched), which
+                    // produced ZERO rows; this fetches + parses + caches on demand.
+                    // Covers the deep-link path too — it drives this same
+                    // destination (`shoppingListEntry`).
+                    hydrate: { await viewModel.recipeWithIngredients($0) }
+                )
             }
-            .navigationDestination(item: $builtListRecipes) { selection in
-                ShoppingListView(viewModel: ShoppingListViewModel(recipes: selection.recipes))
+            // DUT-480 — the iOS 18 Control Center control's `dod://shopping-list`
+            // deep link. `.task(id:)` (not `.onChange`) so a token already set
+            // when this tab is first instantiated (cold launch straight from the
+            // control) is still consumed. Opens the Shopping List empty-first,
+            // carrying the saved recipes so its picker can build in place — the
+            // same push the header cart does.
+            .task(id: openShoppingListToken) {
+                guard openShoppingListToken != nil else { return }
+                shoppingListEntry = ShoppingListSelection(recipes: viewModel.recipes)
+                openShoppingListToken = nil
             }
             .task {
                 // DUT-6: subscribe to CloudKit remote-import signals (no-op
@@ -88,7 +115,7 @@ public struct SavedView: View {
                 // build a list from otherwise), mirroring the hide-when-empty rule.
                 if viewModel.loadState == .loaded {
                     Button {
-                        isBuildingShoppingList = true
+                        shoppingListEntry = ShoppingListSelection(recipes: viewModel.recipes)
                     } label: {
                         Image(systemName: "cart")
                             .accessibilityLabel("Make Shopping List")
@@ -202,10 +229,12 @@ public struct SavedView: View {
 
 // MARK: - Shopping-list navigation payload
 
-/// Wraps the recipes the builder sheet selected so `navigationDestination(item:)`
-/// can key on it (US-39 / AC-39.3 → AC-39.4). Identity is a fresh `UUID` per
-/// build so re-building from the same recipes still pushes a new list. The
-/// `recipes` order matches the picker's source order (CL-77 per-recipe rows).
+/// Wraps the saved recipes handed to the pushed ``ShoppingListView`` so
+/// `navigationDestination(item:)` can key on it (US-39 / AC-39.3 → AC-39.4).
+/// DUT-487 / T-906 — this now carries the *pickable* recipes (the list opens
+/// empty and builds in place), not a pre-built selection. Identity is a fresh
+/// `UUID` per tap so re-entering pushes a new (empty) list. The `recipes` order
+/// matches the Saved tab's source order (CL-77 per-recipe rows).
 struct ShoppingListSelection: Identifiable, Hashable {
     let id = UUID()
     let recipes: [Recipe]

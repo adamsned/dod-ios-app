@@ -142,6 +142,9 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
 ///     AC-17.5; CL-29). Both the empty-state placeholder and any tap on
 ///     widget chrome (outside a recipe row) of the saved-recipes widget
 ///     fire this URL.
+///   - `dod://shopping-list` — open the app straight to the Shopping List
+///     screen empty-first (DUT-480 / CL-301). Emitted by the iOS 18
+///     Control Center / Lock Screen control ``ShoppingListControl``.
 public enum WidgetDeepLinkParser {
 
     /// Which widget surface produced the URL. Inferred from the URL itself:
@@ -163,6 +166,10 @@ public enum WidgetDeepLinkParser {
         /// shows the full tip (`CookingTip.all[index]`) in a dialog on open. The
         /// index is the day's tip index the widget was showing.
         case tip(index: Int)
+        /// `dod://shopping-list` (DUT-480 / CL-301). The iOS 18 Control Center /
+        /// Lock Screen control's tap — the app switches to the Saved tab and opens
+        /// the Shopping List screen empty-first. Bare URL only.
+        case shoppingList
     }
 
     /// Returns `nil` for any URL we don't recognize so callers never spawn
@@ -182,17 +189,29 @@ public enum WidgetDeepLinkParser {
             // (`dod://saved/`, `dod://saved/123`, etc.). The widget
             // chrome and empty-state placeholder both emit the bare URL;
             // anything with a path is malformed and ignored. AC-17.8.
-            let trimmed = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            guard trimmed.isEmpty else { return nil }
-            return .saved
+            return isBare(url) ? .saved : nil
         case "tip":
             // `dod://tip/<index>` (DUT-457) — a non-negative tip index.
             let trimmed = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             guard let index = Int(trimmed), index >= 0 else { return nil }
             return .tip(index: index)
+        case "shopping-list", "shoppinglist":
+            // `dod://shopping-list` only (DUT-480 / CL-301) — bare URL,
+            // reject any path-bearing variant, mirroring the `.saved` case.
+            // The control emits the bare URL; anything with a path is
+            // malformed and ignored.
+            return isBare(url) ? .shoppingList : nil
         default:
             return nil
         }
+    }
+
+    /// `true` when the URL carries no path component after its host — the
+    /// contract for the bare-host routes (`dod://saved`, `dod://shopping-list`).
+    /// A trailing slash normalizes to an empty path, so `dod://saved/` counts
+    /// as bare.
+    private static func isBare(_ url: URL) -> Bool {
+        url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).isEmpty
     }
 
     /// Reads the optional `?source=<value>` query parameter off the URL.

@@ -34,6 +34,10 @@ extension WidgetDeepLink {
             source == .saved ? .saved : .featured
         case .tip:
             .cookingTip
+        case .shoppingList:
+            // DUT-480 — the Control Center control's tap. It belongs to the
+            // Saved surface (the Shopping List lives under the Saved tab).
+            .saved
         }
     }
 
@@ -42,7 +46,7 @@ extension WidgetDeepLink {
     var recipeID: Int? {
         switch self {
         case .recipe(let id, _): id
-        case .feed, .saved, .tip: nil
+        case .feed, .saved, .tip, .shoppingList: nil
         }
     }
 }

@@ -3177,4 +3177,27 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-906 — Shopping List restructure: open empty-first, Build List button, pick→Confirm populates in place, clearer copy (CL-300 / DUT-486, DUT-487)
+
+- **What:** Restructure the Shopping List (in `DODFeatureSaved`) so it opens **empty-first** to its own screen; the empty state has a primary **"Build List"** button that presents the recipe picker; the user selects recipes and taps **Confirm**; the picker dismisses back to the same list and the ingredients **populate in place** (not a pushed new screen); when populated an **"Add recipes"** `+` appends more. Also clearer picker + empty-state copy.
+  - **ViewModel:** `ShoppingListViewModel` gains `init()` (empty), `add(recipes:)` (appends exploded+aisle-classified rows, per-recipe rows stay distinct), and a shared `static rows(from:)` helper reused by `init(recipes:)` + `add(recipes:)`.
+  - **View:** `ShoppingListView` owns the picker (was `SavedView`'s builder-sheet-first path); `init(viewModel:recipes:)` with `recipes` default `[]` so it's constructible empty-first (unblocks the `dod://shopping-list` deep link, DUT-480). Empty-state "Build List" button (`accessibilityIdentifier` `shopping-list-build`) + populated "Add recipes" `+` (`shopping-list-add`) both present `ShoppingListBuilderSheet`; confirm → `viewModel.add(recipes:)`.
+  - **Sheet:** confirm label "Build List" → "Confirm" (keeps id `shopping-builder-build`); header + empty-state copy rewritten (clearer, no em dashes).
+  - **SavedView:** cart button pushes the list empty-first; removed the `isBuildingShoppingList` / `builtListRecipes` state.
+- **Files:** `DODFeatureSaved` `ShoppingListViewModel.swift`, `ShoppingListView.swift`, `ShoppingListBuilderSheet.swift`, `SavedView.swift`, + `ShoppingListViewModelTests.swift` (new `add(recipes:)` tests). L4: `ShoppingListViewSnapshotTests` (`test_shoppingList_light`, `test_shoppingList_dark`) re-recorded by CI (populated state gained the "Add recipes" `+`). Spec: `clarifications.md` (CL-300).
+- **AC:** US-19 (shopping list). Linear DUT-487 (parent DUT-486, Round 4); unblocks DUT-480. CL-300 canonical. **Est:** ~3 h. **Deps:** off main (after CL-298). Branch `feat/dut-487-shopping-list-restructure`. **Verification:** `swift build` + `swift test` (DODFeatureSaved, 39 tests incl. new append/classification/empty→populated) green; swift-format + SwiftLint `--strict` clean; new flow eyeballed. L4 baselines CI-recorded (local render drifts).
+
+---
+
+### T-907 — Control Center control that opens the Shopping List; `dod://shopping-list` deep link (CL-301 / DUT-486, DUT-480)
+
+- **What:** An iOS 18 `ControlWidget` (Control Center / Lock Screen / Action button) with a cart icon + "Shopping List" label that opens the app to the main Shopping List screen (empty-first), via a new `dod://shopping-list` deep link.
+  - **Deep link (DODSupport):** `WidgetDeepLinkParser.Route` gains `case shoppingList`; `parse` maps host `shopping-list`/`shoppinglist`, bare-only (shared `isBare(_:)` helper reused by `.saved`). +5 parser tests.
+  - **Control (Widget, iOS 18):** new `ShoppingListControl.swift` — `@available(iOS 18.0, *) ControlWidget` + `OpenShoppingListIntent` (`openAppWhenRun`; `perform` opens `OpenURLIntent("dod://shopping-list")`). Registered in `DODAppWidgetBundle` via inline `if #available(iOS 18.0, *)` in the bundle builder (a gated computed property fails to compile). iOS 17 just doesn't offer it.
+  - **Routing (App):** `RootView` `savedShoppingListToken: UUID?`; `handle(widgetLink:)` `.shoppingList` → `selectedTab = .saved` + new token. `TabStack` + `SavedView` gain `@Binding openShoppingListToken` (wired only for the `.saved` tab; `.constant(nil)` elsewhere/defaults). `SavedView.task(id:)` consumes the token → pushes `ShoppingListView(viewModel: ShoppingListViewModel(), recipes:)` (reuses the header-cart push). `onOpenURL` → `WidgetDeepLink(url:)` → `handle`.
+- **Files:** DODSupport `WidgetSnapshot.swift` (+ `WidgetDeepLinkParserTests`). Widget `ShoppingListControl.swift` (new) + `DODAppWidgetBundle.swift`. App `WidgetDeepLink.swift`, `RootView.swift`, `RootView+LinkRouting.swift`, `TabStack.swift`; DODFeatureSaved `SavedView.swift`. Spec `clarifications.md` (CL-301).
+- **AC:** US-19 / US-22. Linear DUT-480 (parent DUT-486, Round 4); depends on DUT-487. CL-301 canonical. **Est:** ~3 h. **Deps:** off DUT-487 branch (needs the openable `ShoppingListView`). Branch `feat/dut-480-control-center`. **Verification:** DODSupport `swift test` (513, 25 parser) green; swift-format + SwiftLint `--strict` clean; app + widget targets compile (`xcodebuild build -scheme DODAppWidget` + `-scheme DODApp` exit 0; iOS-18 ControlWidget compiled). Live control confirmed in an Xcode-signed run on iOS 18.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

@@ -53,6 +53,21 @@ public protocol SavedDependencies: Sendable {
     /// nothing else republishes on the import path. Default no-op so fake conformers
     /// (previews/tests) don't need to model the widget.
     func publishSavedWidget() async
+
+    /// DUT-487 — return `recipe` guaranteed to carry its `ingredients`, fetching
+    /// the recipe's detail when needed. `RecipeStore.savedRecipes()` returns
+    /// `[Recipe]` whose `ingredients` stay EMPTY until the detail has been fetched
+    /// (see `RecipeStore+SyncedSaved.swift` — "ingredients/instructions stay
+    /// empty… route to detail"), so building the Shopping List straight from the
+    /// saved list produced ZERO rows. The Shopping List picker calls this on each
+    /// selected recipe before building, so a never-opened saved recipe still
+    /// contributes its ingredients.
+    ///
+    /// Defensive: never throws. A recipe that can't be hydrated (offline, no URL,
+    /// parse failure) is returned unchanged and simply contributes no rows — the
+    /// same behavior as before this fix. Default is identity so fake conformers
+    /// (previews/tests) keep compiling; the live wiring fetches + parses + caches.
+    func recipeWithIngredients(_ recipe: Recipe) async -> Recipe
 }
 
 extension SavedDependencies {
@@ -76,6 +91,11 @@ extension SavedDependencies {
     /// Default "online" (see ``isOnline()``) so fake conformers opt in only
     /// when a test exercises the offline warning. T-778 / DUT-84.
     public func isOnline() async -> Bool { true }
+
+    /// Default: identity — return the recipe unchanged so fake conformers
+    /// (previews/tests) don't need to model the fetch+parse path (DUT-487).
+    /// The live wiring (``LiveSavedDependencies``) overrides this to hydrate.
+    public func recipeWithIngredients(_ recipe: Recipe) async -> Recipe { recipe }
 }
 
 public struct LiveSavedDependencies: SavedDependencies {
@@ -94,6 +114,11 @@ public struct LiveSavedDependencies: SavedDependencies {
 
     let store: RecipeStore
     let imageLoader: ImageLoader
+    /// DUT-487 — fetches a recipe page's HTML so ``recipeWithIngredients(_:)``
+    /// can hydrate a saved recipe whose `ingredients` are empty (never opened,
+    /// so its detail was never parsed). Optional so call sites that don't build
+    /// shopping lists can omit it; `nil` skips the network fetch (cache-only).
+    private let pageFetcher: RecipePageFetcher?
     private let remoteChangeStream: RemoteChangeStreamFactory?
     /// DUT-84 — process-wide reachability for the offline remove-download
     /// guard. Defaults to ``NetworkMonitor/shared`` (the instance the App
@@ -108,12 +133,14 @@ public struct LiveSavedDependencies: SavedDependencies {
     public init(
         store: RecipeStore,
         imageLoader: ImageLoader,
+        pageFetcher: RecipePageFetcher? = nil,
         remoteChangeStream: RemoteChangeStreamFactory? = nil,
         monitor: NetworkMonitor = .shared,
         publishWidget: WidgetPublishHook? = nil
     ) {
         self.store = store
         self.imageLoader = imageLoader
+        self.pageFetcher = pageFetcher
         self.remoteChangeStream = remoteChangeStream
         self.monitor = monitor
         self.publishWidget = publishWidget
@@ -137,6 +164,59 @@ public struct LiveSavedDependencies: SavedDependencies {
 
     public func isOnline() async -> Bool {
         await monitor.isOnline
+    }
+
+    /// DUT-487 — hydrate a saved recipe's ingredients so the Shopping List can
+    /// build rows from it. Mirrors the fetch+parse path
+    /// `LiveRecipeDetailDependencies.parseJSONLD` / the widget classifier
+    /// (`AppDependencies+WidgetClassifier`) use — same `JSONLDRecipeParser.parse`.
+    ///
+    /// 1. Already has ingredients → return unchanged (no work).
+    /// 2. Store cache (`recipe(id:)`) has ingredients → return the cached copy
+    ///    (cheap; hydrated by a prior detail open / merge).
+    /// 3. Fetch the page HTML + JSON-LD-parse into a `Recipe` WITH ingredients,
+    ///    persist it via `mergeDetail` (so future opens are hydrated), return it.
+    /// 4. ANY failure (no fetcher, fetch throws, parse throws) → the ORIGINAL
+    ///    recipe unchanged. Defensive — never throws; an un-hydratable recipe
+    ///    just contributes no rows, the same as before this fix.
+    public func recipeWithIngredients(_ recipe: Recipe) async -> Recipe {
+        guard recipe.ingredients.isEmpty else { return recipe }
+
+        // Cheap first: the store cache is hydrated if a detail open merged before.
+        if let cached = try? await store.recipe(id: recipe.id), !cached.ingredients.isEmpty {
+            return cached
+        }
+
+        // Fall back to a fetch + parse. Build a `RecipeListItem` from the recipe
+        // to merge the parsed detail onto (the parser stitches list fields —
+        // id/title/image — onto the JSON-LD-only detail data, per AC-4.11).
+        guard let pageFetcher,
+            let html = try? await pageFetcher.html(for: recipe.canonicalURL)
+        else {
+            return recipe
+        }
+        let listItem = RecipeListItem(
+            id: recipe.id,
+            title: recipe.title,
+            excerpt: recipe.excerpt,
+            heroImage: recipe.heroImage,
+            publishedAt: recipe.publishedAt,
+            canonicalURL: recipe.canonicalURL,
+            categoryIDs: recipe.categoryIDs
+        )
+        guard
+            let hydrated = try? JSONLDRecipeParser.parse(
+                html: html,
+                merging: listItem,
+                canonicalURL: recipe.canonicalURL
+            )
+        else {
+            return recipe
+        }
+        // Persist so future opens are hydrated (best-effort — a merge failure
+        // just means we re-fetch next time; the rows still build from `hydrated`).
+        try? await store.mergeDetail(hydrated)
+        return hydrated
     }
 
     // DUT-421 — `preDownloadImages` deleted; see the protocol-site note.

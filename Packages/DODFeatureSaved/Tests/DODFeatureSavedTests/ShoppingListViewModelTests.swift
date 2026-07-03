@@ -63,6 +63,58 @@ import Testing
         #expect(viewModel.items.map(\.recipeTitle) == ["A", "A", "B"])
     }
 
+    // MARK: - add(recipes:) — build / append in place (DUT-487 / T-906)
+
+    @Test func addRecipesToEmptyModelPopulatesRows() {
+        // Empty-first: a fresh model fills in place on the first add. `store:
+        // nil` (DUT-488) keeps this a pure in-memory VM so it starts empty
+        // regardless of any list persisted on the machine's App Group suite.
+        let viewModel = ShoppingListViewModel(store: nil)
+        #expect(viewModel.isEmpty)
+
+        viewModel.add(recipes: [
+            Self.recipe(id: 1, title: "A", ingredients: ["1 onion", "1 tsp salt"])
+        ])
+        #expect(!viewModel.isEmpty)
+        #expect(viewModel.items.count == 2)
+        #expect(viewModel.items.map(\.recipeTitle) == ["A", "A"])
+    }
+
+    @Test func addRecipesAppendsAndKeepsExistingRows() {
+        // Appending accumulates — existing rows are kept, new ones stack on
+        // (no de-dup; per-recipe rows are intentional, CL-77).
+        let viewModel = ShoppingListViewModel(recipes: [
+            Self.recipe(id: 1, title: "A", ingredients: ["1 onion"])
+        ])
+        #expect(viewModel.items.count == 1)
+
+        viewModel.add(recipes: [
+            Self.recipe(id: 2, title: "B", ingredients: ["2 carrots", "1 lb chicken"])
+        ])
+        #expect(viewModel.items.count == 3)
+        #expect(viewModel.items.map(\.recipeTitle) == ["A", "B", "B"])
+    }
+
+    @Test func addRecipesClassifiesAppendedRowsByAisle() {
+        // Classification still applies to appended rows, so they land in the
+        // right store-walk sections (AC-39.4). `store: nil` (DUT-488) — pure
+        // in-memory VM, starts empty.
+        let viewModel = ShoppingListViewModel(store: nil)
+        viewModel.add(recipes: [
+            Self.recipe(id: 1, title: "A", ingredients: ["1 lb chicken", "1 tsp cumin", "2 limes"])
+        ])
+        #expect(viewModel.sections.map(\.aisle) == [.produce, .meat, .spices])
+    }
+
+    @Test func addingSameRecipeTwiceStacksItsRows() {
+        // Re-adding a recipe already on the list appends its rows again — no
+        // cross-add de-dup (CL-77).
+        let recipe = Self.recipe(id: 1, title: "A", ingredients: ["1 onion", "1 tsp salt"])
+        let viewModel = ShoppingListViewModel(recipes: [recipe])
+        viewModel.add(recipes: [recipe])
+        #expect(viewModel.items.count == 4)
+    }
+
     // MARK: - Check toggle (AC-39.5)
 
     @Test func toggleCheckedFlipsMembershipAndDecrementsUncheckedCount() {

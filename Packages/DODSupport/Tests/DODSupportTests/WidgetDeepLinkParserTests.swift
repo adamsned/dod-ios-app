@@ -138,4 +138,40 @@ import Testing
         let url = try #require(URL(string: "dod://recipe/9?source=SAVED"))
         #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 9, source: .saved))
     }
+
+    // MARK: - DUT-480 / CL-301 `dod://shopping-list` (Control Center control)
+
+    /// The iOS 18 Control Center / Lock Screen control emits the bare
+    /// `dod://shopping-list` URL to open the Shopping List screen empty-first.
+    @Test func parsesShoppingListRoute() throws {
+        let url = try #require(URL(string: "dod://shopping-list"))
+        #expect(WidgetDeepLinkParser.parse(url) == .shoppingList)
+    }
+
+    /// The no-hyphen host is accepted too, so an inter-process URL
+    /// canonicalization can't strand the control's tap.
+    @Test func parsesShoppingListRouteNoHyphen() throws {
+        let url = try #require(URL(string: "dod://shoppinglist"))
+        #expect(WidgetDeepLinkParser.parse(url) == .shoppingList)
+    }
+
+    /// Trailing slash is the same logical URL — accept it, mirroring the
+    /// `.saved` case's `URL.path` normalization.
+    @Test func parsesShoppingListRouteWithTrailingSlash() throws {
+        let url = try #require(URL(string: "dod://shopping-list/"))
+        #expect(WidgetDeepLinkParser.parse(url) == .shoppingList)
+    }
+
+    /// Case-insensitive scheme + host, same contract as the other routes.
+    @Test func shoppingListRouteIsCaseInsensitive() throws {
+        let url = try #require(URL(string: "Dod://Shopping-List"))
+        #expect(WidgetDeepLinkParser.parse(url) == .shoppingList)
+    }
+
+    /// Anything after the host is malformed — the control only ever emits the
+    /// bare URL. Reject so a hostile pasteboard URL can't piggy-back on it.
+    @Test func shoppingListRouteWithExtraPathIsRejected() throws {
+        let url = try #require(URL(string: "dod://shopping-list/foo"))
+        #expect(WidgetDeepLinkParser.parse(url) == nil)
+    }
 }

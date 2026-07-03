@@ -36,6 +36,34 @@ extension RootView {
                 tipDialogText = tip
                 showTipDialog = true
             }
+        case .shoppingList:
+            // DUT-480 — the iOS 18 Control Center control's `dod://` link path.
+            routeToShoppingList()
+        }
+    }
+
+    /// DUT-480 — switch to Saved (which hosts the Shopping List) and mint a
+    /// fresh token so the Saved tab's `SavedView` pushes the Shopping List
+    /// empty-first; a new UUID each time re-pushes on a repeat control tap.
+    /// Shared by `handle(widgetLink: .shoppingList)` (the `dod://` path) and by
+    /// `RootView`'s App Group pending-route reads (the Control Center path that
+    /// can't rely on a URL hand-off). Non-private so `RootView.swift`'s
+    /// scene-phase + cold-launch consumers can call it too.
+    func routeToShoppingList() {
+        selectedTab = .saved
+        savedShoppingListToken = UUID()
+    }
+
+    /// DUT-480 — read + clear the iOS 18 Control Center control's App Group
+    /// pending-route flag and, if the Shopping List was requested, route there.
+    /// The control's `AppIntent` can't reliably hand us a `dod://` URL, so it
+    /// sets `openAppWhenRun` + drops this flag instead; `RootView` drains it
+    /// both at cold launch (the `.task`) and on each `.active` transition (the
+    /// warm case). Take-once, so a stale flag can't re-trigger on a later
+    /// foreground.
+    func consumePendingControlRoute() {
+        if ControlRouteStore()?.takePending() == .shoppingList {
+            routeToShoppingList()
         }
     }
 

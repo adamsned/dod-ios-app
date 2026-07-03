@@ -113,6 +113,16 @@ public final class SavedViewModel {
         }
     }
 
+    /// DUT-487 — hydrate a recipe's ingredients before it feeds the Shopping
+    /// List, delegating to ``SavedDependencies/recipeWithIngredients(_:)``.
+    /// ``SavedView`` passes this to the pushed ``ShoppingListView`` so its
+    /// recipe picker fills each selected (possibly never-opened, empty-
+    /// ingredients) recipe before building rows. Exposed here because
+    /// `dependencies` is private to the view model.
+    public func recipeWithIngredients(_ recipe: Recipe) async -> Recipe {
+        await dependencies.recipeWithIngredients(recipe)
+    }
+
     /// Begin observing CloudKit remote-import signals so a recipe saved on
     /// another device appears on this one without a relaunch (DUT-6, the
     /// UI-refresh half). Idempotent — a second call while already subscribed

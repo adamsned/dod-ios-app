@@ -7,20 +7,21 @@ import SwiftUI
 ///
 /// Spec trace: AC-39.3 (add from multiple saved recipes — the bulk path),
 /// CL-85 decision 2 (a modal multi-select sheet over the Saved view-model's
-/// already-loaded recipes; "Build List" enabled at ≥1 selection; selection is
+/// already-loaded recipes; "Confirm" enabled at ≥1 selection; selection is
 /// ephemeral `@State`, discarded on cancel). The picker reuses the recipes the
 /// Saved tab has already fetched — no second network call (REG-23 / AC-39.12),
 /// so it is instant and works offline against the pinned saved-recipe cache.
 ///
-/// On "Build List" the selected `[Recipe]` is handed back via ``onBuild`` and
-/// the sheet dismisses; ``SavedView`` then constructs a
-/// `ShoppingListViewModel(recipes:)` (the T-680b convenience initializer) and
-/// pushes ``ShoppingListView`` (CL-85 decision 4).
+/// DUT-487 / T-906 — the picker now lives inside ``ShoppingListView`` (was
+/// presented builder-first from ``SavedView``). On "Confirm" the selected
+/// `[Recipe]` is handed back via ``onBuild`` and the sheet dismisses; the
+/// hosting ``ShoppingListView`` calls ``ShoppingListViewModel/add(recipes:)``
+/// so the same view fills / appends in place instead of pushing a new screen.
 struct ShoppingListBuilderSheet: View {
 
     let recipes: [Recipe]
     /// Called with the user's selected recipes (in `recipes` order) when the
-    /// user taps "Build List".
+    /// user taps "Confirm".
     let onBuild: ([Recipe]) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -39,7 +40,11 @@ struct ShoppingListBuilderSheet: View {
                             .accessibilityIdentifier("shopping-builder-cancel")
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Build List") { build() }
+                        // DUT-487 / T-906 — visible label is now "Confirm"; the
+                        // sheet dismisses back to the same ShoppingListView, which
+                        // populates / appends in place (the "Build List" action
+                        // itself moved to the list's empty state).
+                        Button("Confirm") { build() }
                             .disabled(selectedIDs.isEmpty)
                             .accessibilityIdentifier("shopping-builder-build")
                     }
@@ -69,10 +74,13 @@ struct ShoppingListBuilderSheet: View {
                     row(for: recipe)
                 }
             } header: {
-                Text("Pick recipes to combine")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .textCase(nil)
+                Text(
+                    "Pick the recipes you're shopping for. We'll merge their ingredients "
+                        + "into one list, sorted by store aisle so you can shop in one loop."
+                )
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .textCase(nil)
             }
         }
         .scrollContentBackground(.hidden)

@@ -41,7 +41,12 @@ public enum IngredientAisleClassifier {
     /// `frozen` / `beverages`) is the T-680b concern reconciled against CL-74.
     /// `Aisle` co-locates here per CL-80 rather than in `DODDomain`; T-681 /
     /// T-680b may hoist it as a mechanical move with no behavior change.
-    public enum Aisle: String, CaseIterable, Sendable {
+    ///
+    /// DUT-488: `Codable` is additive (raw-value String enum → the synthesized
+    /// Codable encodes/decodes the raw value) so the Shopping List persistence
+    /// snapshot can round-trip a row's classified aisle to App-Group JSON. Safe:
+    /// no behavior change for the widget telemetry / `aisleRaw` paths.
+    public enum Aisle: String, CaseIterable, Sendable, Codable {
         case produce
         case meat
         case dairy
