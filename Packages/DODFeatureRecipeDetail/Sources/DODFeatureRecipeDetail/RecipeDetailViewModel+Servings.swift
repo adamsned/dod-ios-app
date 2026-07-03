@@ -25,8 +25,15 @@ extension RecipeDetailViewModel {
     public func resetServingsToSourceIfFirstLoad() {
         guard !didSyncServingsToSource else { return }
         didSyncServingsToSource = true
-        guard sourceServings != Self.defaultServings else { return }
+        // DUT-471: record the baseline UNCONDITIONALLY — even when this first
+        // `.ready` carries the default yield (the list item hadn't hydrated a
+        // real `recipeYield` yet). Leaving `lastSyncedSourceServings` nil here
+        // permanently defeats the DUT-315 resync (its `guard let last` returns),
+        // so when the full detail later lands a real yield the stepper never
+        // syncs and ingredients silently scale at default/N. Pinning the
+        // baseline to the default makes that later real yield differ → resync.
         lastSyncedSourceServings = sourceServings
+        guard sourceServings != Self.defaultServings else { return }
         userServings = clampToRange(sourceServings)
     }
 

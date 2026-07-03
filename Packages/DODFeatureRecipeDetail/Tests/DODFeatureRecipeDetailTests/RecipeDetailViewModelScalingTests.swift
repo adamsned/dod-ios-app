@@ -49,6 +49,33 @@ import Testing
         #expect(viewModel.userServings == 8)
     }
 
+    /// DUT-471 — if the FIRST `.ready` fires before the yield hydrates (the
+    /// list-item path, sourceServings == default), the one-shot is spent but the
+    /// baseline must still be recorded, so the DUT-315 resync fires when the
+    /// real yield later lands. Without the fix, `lastSyncedSourceServings`
+    /// stayed nil, the resync deferred forever, and ingredients scaled at
+    /// default/N.
+    @Test func firstLoadAtDefaultYieldStillResyncsWhenRealYieldArrives() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 410,
+            withDetail: true,
+            servings: 8
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 410)
+
+        // First `.ready` before the detail loads — sourceServings is the default.
+        #expect(viewModel.sourceServings == RecipeDetailViewModel.defaultServings)
+        viewModel.resetServingsToSourceIfFirstLoad()  // spends the one-shot at the default
+
+        // Full detail lands the real yield; the resync must now sync the stepper.
+        await viewModel.onAppear()
+        #expect(viewModel.sourceServings == 8)
+        viewModel.resyncServingsIfSourceYieldChanged()
+        #expect(viewModel.userServings == 8)
+        #expect(viewModel.servingsScaleFactor == 1.0)
+    }
+
     @Test func setUserServingsClampsToRange() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
