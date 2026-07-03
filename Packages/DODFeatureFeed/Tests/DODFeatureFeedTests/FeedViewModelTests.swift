@@ -196,9 +196,39 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     /// DUT-313: optional hook fired at the top of `fetchPosts`, used to assert
     /// view-model state while a refresh fetch is in flight.
     var beforeFetch: (@Sendable () async -> Void)?
+    /// DUT-511: per-page gate. When a page has an entry, `fetchPosts(page:)`
+    /// suspends on it and signals `gateReached` so a test can deterministically
+    /// hold a `loadMore` mid-flight, run a `refresh` to completion, then
+    /// `openGate(page:)` to resume the held load and prove its post-await
+    /// generation guard drops the now-stale writes.
+    private var gates: [Int: CheckedContinuation<Void, Never>] = [:]
+    private var pendingGatePages: Set<Int> = []
+    var gateReached: (@Sendable (Int) -> Void)?
+
+    /// Arm a gate so the next `fetchPosts(page:)` for `page` suspends until
+    /// `openGate(page:)` is called.
+    func armGate(page: Int) {
+        pendingGatePages.insert(page)
+    }
+
+    /// Resume a held `fetchPosts(page:)`.
+    func openGate(page: Int) {
+        if let continuation = gates.removeValue(forKey: page) {
+            continuation.resume()
+        } else {
+            // The fetch hasn't reached the gate yet — disarm so it won't block.
+            pendingGatePages.remove(page)
+        }
+    }
 
     func fetchPosts(page: Int) async throws -> (items: [RecipeListItem], totalPages: Int) {
         await beforeFetch?()
+        if pendingGatePages.remove(page) != nil {
+            gateReached?(page)
+            await withCheckedContinuation { continuation in
+                gates[page] = continuation
+            }
+        }
         if shouldFail {
             throw URLError(.notConnectedToInternet)
         }

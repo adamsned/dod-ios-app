@@ -35,6 +35,16 @@ public final class FeedViewModel {
     private let dependencies: FeedDependencies
     private var currentPage: Int = 0
     private var reachedEnd: Bool = false
+    /// DUT-511: monotonic load token (same pattern as `SearchViewModel`'s
+    /// `searchGeneration`). `loadInitial` and `loadMore` each bump it at the
+    /// start and capture the value locally; after every `await` they re-check
+    /// `generation == loadGeneration` before committing `items`/`currentPage`/
+    /// `reachedEnd`/`loadState`. A `refresh()` starting a fresh `loadInitial`
+    /// supersedes an in-flight `loadMore`, whose post-await guard then fails so
+    /// it no-ops instead of clobbering the refreshed list with stale page data.
+    /// This is the ordering fix on top of DUT-382's `isLoading` single-flight
+    /// (which only gates `loadMoreIfNeeded`, not the unconditional `refresh`).
+    private var loadGeneration = 0
     /// Subscription handle for connectivity changes. `@ObservationIgnored`
     /// because no view observes it (a private lifecycle detail) — that also
     /// makes it a real stored property so `nonisolated(unsafe)` applies
@@ -220,6 +230,11 @@ public final class FeedViewModel {
     private var isLoading = false
 
     private func loadInitial(forceReplace: Bool = false) async {
+        // DUT-511: supersede any in-flight load (notably a `loadMore` running
+        // when a `refresh` starts). Bumped before the first `await` so a
+        // suspended `loadMore` resuming after us fails its own post-await guard.
+        loadGeneration &+= 1
+        let generation = loadGeneration
         isLoading = true
         defer { isLoading = false }
         // DUT-313: a pull-to-refresh on a populated grid must NOT blank the
@@ -238,7 +253,11 @@ public final class FeedViewModel {
         do {
             let page = try await dependencies.fetchPosts(page: 1)
             try await dependencies.cache(listItems: page.items)
-            items = try await dependencies.cachedListItems(forIDs: page.items.map(\.id))
+            let fetched = try await dependencies.cachedListItems(forIDs: page.items.map(\.id))
+            // DUT-511: a newer load (e.g. a second refresh) superseded us while
+            // we awaited — drop our writes rather than clobber the fresh list.
+            guard generation == loadGeneration else { return }
+            items = fetched
             currentPage = 1
             loadState = items.isEmpty ? .empty : .loaded
             // DUT-237: stop at the real last page (X-WP-TotalPages), not at the
@@ -253,6 +272,8 @@ public final class FeedViewModel {
             // Offline-with-cache (AC-1.6) vs first-launch-offline (AC-1.5):
             // attempt to hydrate from cache. If empty, treat as first launch.
             if !forceReplace, let hydrated = await hydratedFromCache(), !hydrated.isEmpty {
+                // DUT-511: bail if a newer load superseded this failed one.
+                guard generation == loadGeneration else { return }
                 items = hydrated
                 isOffline = true
                 loadState = .loaded
@@ -264,18 +285,29 @@ public final class FeedViewModel {
             // empty/first-launch-offline state. Surface offline status, but
             // leave items + `.loaded` intact.
             if forceReplace, !items.isEmpty {
-                isOffline = await !dependencies.isOnline()
+                let online = await dependencies.isOnline()
+                // DUT-511: bail if a newer load superseded this failed one.
+                guard generation == loadGeneration else { return }
+                isOffline = !online
                 loadState = .loaded
                 errorMessage = "Couldn't load recipes."
                 return
             }
-            isOffline = await !dependencies.isOnline()
+            let online = await dependencies.isOnline()
+            // DUT-511: bail if a newer load superseded this failed one.
+            guard generation == loadGeneration else { return }
+            isOffline = !online
             loadState = isOffline ? .firstLaunchOffline : .empty
             errorMessage = "Couldn't load recipes."
         }
     }
 
     private func loadMore() async {
+        // DUT-511: stamp this load so a `refresh`/`loadInitial` (or another
+        // `loadMore`) starting mid-flight supersedes it — the post-await guards
+        // below then drop this load's writes instead of clobbering page 1.
+        loadGeneration &+= 1
+        let generation = loadGeneration
         isLoading = true
         defer { isLoading = false }
         loadState = .loadingMore
@@ -286,13 +318,21 @@ public final class FeedViewModel {
             let ids = (items.map(\.id) + page.items.map(\.id)).reduce(into: [Int]()) { acc, id in
                 if !acc.contains(id) { acc.append(id) }
             }
-            items = try await dependencies.cachedListItems(forIDs: ids)
+            let fetched = try await dependencies.cachedListItems(forIDs: ids)
+            // DUT-511: a `refresh()` (or newer load) superseded this page while
+            // we awaited — drop these stale writes rather than clobber the fresh
+            // list / rewind `currentPage` to the stale page-2 cursor.
+            guard generation == loadGeneration else { return }
+            items = fetched
             currentPage = nextPage
             // DUT-237: stop at the real last page (X-WP-TotalPages).
             reachedEnd = currentPage >= page.totalPages
             loadState = .loaded
         } catch {
             DODLog.network.error("feed loadMore failed: \(String(describing: error))")
+            // DUT-511: a superseded failed load must not touch `loadState` — the
+            // newer load owns it now.
+            guard generation == loadGeneration else { return }
             // DUT-237 / DUT-223: a transient tail-pagination failure must NOT
             // latch `reachedEnd` — that permanently kills infinite scroll for
             // the session. Keep what we have; a later near-bottom appearance
