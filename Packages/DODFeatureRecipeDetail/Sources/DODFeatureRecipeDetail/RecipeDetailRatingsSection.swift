@@ -38,6 +38,9 @@ import SwiftUI
 public struct RecipeDetailRatingsSection: View {
 
     @Bindable public var viewModel: RecipeDetailViewModel
+    /// DUT-501 — opens the prefilled moderation `mailto:` when a comment is
+    /// reported. Internal (not private) so the `+PhaseD` row extension reaches it.
+    @Environment(\.openURL) var openURL
 
     /// US-44 / CL-138 / DUT-36 Phase c — drives the modal sheet
     /// presentation of ``ProfileEditView`` over the recipe when the
@@ -355,15 +358,15 @@ public struct RecipeDetailRatingsSection: View {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
         case .ready:
-            if viewModel.comments.isEmpty {
+            if viewModel.visibleComments.isEmpty {
                 Text("No comments yet. Be the first to share your tips.")
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.labelSecondary)
             } else {
                 LazyVStack(alignment: .leading, spacing: DODSpacing.md) {
                     // DUT-392: render threaded — replies nest indented beneath
-                    // the comment they answer instead of floating mid-thread.
-                    ForEach(CommentThreader.thread(viewModel.comments)) { threaded in
+                    // the comment they answer. DUT-501: reported/blocked filtered.
+                    ForEach(CommentThreader.thread(viewModel.visibleComments)) { threaded in
                         commentRow(for: threaded.comment)
                             .padding(.leading, threaded.isReply ? DODSpacing.lg : 0)
                     }
