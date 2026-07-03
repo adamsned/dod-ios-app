@@ -44,6 +44,16 @@ public struct RecipeDetailView: View {
     /// is a display-time transform only — stored recipe data is untouched.
     @AppStorage(TemperatureConverter.preferenceKey)
     var temperatureUnitRaw: String = ""
+    /// DUT-517 — the "Use Metric Units" preference, read from the same
+    /// `UserDefaults` key the Settings toggle writes
+    /// (`IngredientMetricConverter.preferenceKey`) via `@AppStorage` so a
+    /// change in Settings re-renders the ingredient list in the same frame.
+    /// When `true`, each ALREADY-SCALED ingredient line is mapped through
+    /// ``DODSupport/IngredientMetricConverter/metric(_:)`` at display time;
+    /// non-convertible lines pass through unchanged. Display-time transform
+    /// only — stored recipe data is untouched (AC-31.8-style).
+    @AppStorage(IngredientMetricConverter.preferenceKey)
+    var useMetricUnits: Bool = false
     @Environment(\.dismiss) private var dismiss
     /// T-804 — drives the iPad reading-column cap in `readyBody`. `.regular`
     /// (iPad) bounds the content below the hero to a centered column;
