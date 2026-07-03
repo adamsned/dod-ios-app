@@ -28,6 +28,12 @@ struct TabStack: View {
     /// in-app article-link taps (DUT-243, push semantics). Every tab gets a
     /// sink now so a link tapped in Saved/Search opens in place.
     @Binding var externalRoute: ExternalRoute?
+    /// DUT-480 — external trigger for the iOS 18 Control Center control's
+    /// `dod://shopping-list` deep link. Only the Saved tab consumes it (the
+    /// Shopping List lives under Saved); `RootView` mints a fresh `UUID` on each
+    /// control tap so a repeat tap re-pushes the empty list. Other tabs get the
+    /// inert constant `nil`.
+    @Binding var openShoppingListToken: UUID?
     /// DUT-250 — the per-tab navigation stack is now HOISTED into
     /// `RootView`-owned state and injected as a `@Binding`. Previously this
     /// was a local `@State private var path`, but on iPad the size-class flip
@@ -45,13 +51,15 @@ struct TabStack: View {
         dependencies: AppDependencies,
         path: Binding<[RecipeRoute]> = .constant([]),
         pendingDeepLink: Binding<WidgetDeepLink?> = .constant(nil),
-        externalRoute: Binding<ExternalRoute?> = .constant(nil)
+        externalRoute: Binding<ExternalRoute?> = .constant(nil),
+        openShoppingListToken: Binding<UUID?> = .constant(nil)
     ) {
         self.tab = tab
         self.dependencies = dependencies
         self._path = path
         self._pendingDeepLink = pendingDeepLink
         self._externalRoute = externalRoute
+        self._openShoppingListToken = openShoppingListToken
     }
 
     var body: some View {
@@ -126,6 +134,10 @@ struct TabStack: View {
         case .saved:
             SavedView(
                 viewModel: SavedViewModel(dependencies: dependencies.savedDependencies()),
+                // DUT-480 — the Control Center control's `dod://shopping-list`
+                // tap flows in through this token, opening the Shopping List
+                // empty-first.
+                openShoppingListToken: $openShoppingListToken,
                 onSelect: { recipe in path.append(.recipe(item: Self.listItem(from: recipe))) },
                 onSave: { recipe in
                     Task {
@@ -288,11 +300,12 @@ struct TabStack: View {
             // Already on Feed (RootView set the tab); just clear any push
             // stack so the user lands on the root list.
             path = []
-        case .saved, .tip:
-            // RootView routes `.saved` (Saved tab) + `.tip` (the DUT-457 dialog)
-            // directly and never sets `pendingDeepLink`, so these are unreachable
-            // here. Kept exhaustive so the compiler catches any future caller
-            // that does forward the link through here.
+        case .saved, .tip, .shoppingList:
+            // RootView routes `.saved` (Saved tab), `.tip` (the DUT-457 dialog),
+            // and `.shoppingList` (DUT-480, the Control Center control) directly
+            // and never sets `pendingDeepLink`, so these are unreachable here.
+            // Kept exhaustive so the compiler catches any future caller that
+            // does forward the link through here.
             break
         }
     }

@@ -36,6 +36,13 @@ extension RootView {
                 tipDialogText = tip
                 showTipDialog = true
             }
+        case .shoppingList:
+            // DUT-480 — the iOS 18 Control Center control. Switch to Saved
+            // (which hosts the Shopping List) and mint a fresh token so the
+            // Saved tab's `SavedView` pushes the Shopping List empty-first; a
+            // new UUID each time re-pushes on a repeat control tap.
+            selectedTab = .saved
+            savedShoppingListToken = UUID()
         }
     }
 

@@ -27,12 +27,22 @@ public struct SavedView: View {
     /// carries the saved recipes so its own picker can build / append in place.
     @State private var shoppingListEntry: ShoppingListSelection?
 
+    /// DUT-480 — external trigger for the iOS 18 Control Center control's
+    /// `dod://shopping-list` deep link. `RootView` mints a fresh `UUID` when the
+    /// control is tapped; each new value pushes the Shopping List empty-first
+    /// (same push the header cart does), even on a repeat tap. `nil`/unchanged
+    /// does nothing. Defaulted to a constant `nil` so the Saved-tab snapshot
+    /// tests and the other tabs' call sites are unaffected.
+    @Binding private var openShoppingListToken: UUID?
+
     public init(
         viewModel: SavedViewModel,
+        openShoppingListToken: Binding<UUID?> = .constant(nil),
         onSelect: @escaping (Recipe) -> Void,
         onSave: ((Recipe) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
+        _openShoppingListToken = openShoppingListToken
         self.onSelect = onSelect
         self.onSave = onSave
     }
@@ -53,6 +63,17 @@ public struct SavedView: View {
                     viewModel: ShoppingListViewModel(),
                     recipes: selection.recipes
                 )
+            }
+            // DUT-480 — the iOS 18 Control Center control's `dod://shopping-list`
+            // deep link. `.task(id:)` (not `.onChange`) so a token already set
+            // when this tab is first instantiated (cold launch straight from the
+            // control) is still consumed. Opens the Shopping List empty-first,
+            // carrying the saved recipes so its picker can build in place — the
+            // same push the header cart does.
+            .task(id: openShoppingListToken) {
+                guard openShoppingListToken != nil else { return }
+                shoppingListEntry = ShoppingListSelection(recipes: viewModel.recipes)
+                openShoppingListToken = nil
             }
             .task {
                 // DUT-6: subscribe to CloudKit remote-import signals (no-op
