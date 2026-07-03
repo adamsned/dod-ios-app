@@ -3177,4 +3177,16 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-906 — Shopping List restructure: open empty-first, Build List button, pick→Confirm populates in place, clearer copy (CL-300 / DUT-486, DUT-487)
+
+- **What:** Restructure the Shopping List (in `DODFeatureSaved`) so it opens **empty-first** to its own screen; the empty state has a primary **"Build List"** button that presents the recipe picker; the user selects recipes and taps **Confirm**; the picker dismisses back to the same list and the ingredients **populate in place** (not a pushed new screen); when populated an **"Add recipes"** `+` appends more. Also clearer picker + empty-state copy.
+  - **ViewModel:** `ShoppingListViewModel` gains `init()` (empty), `add(recipes:)` (appends exploded+aisle-classified rows, per-recipe rows stay distinct), and a shared `static rows(from:)` helper reused by `init(recipes:)` + `add(recipes:)`.
+  - **View:** `ShoppingListView` owns the picker (was `SavedView`'s builder-sheet-first path); `init(viewModel:recipes:)` with `recipes` default `[]` so it's constructible empty-first (unblocks the `dod://shopping-list` deep link, DUT-480). Empty-state "Build List" button (`accessibilityIdentifier` `shopping-list-build`) + populated "Add recipes" `+` (`shopping-list-add`) both present `ShoppingListBuilderSheet`; confirm → `viewModel.add(recipes:)`.
+  - **Sheet:** confirm label "Build List" → "Confirm" (keeps id `shopping-builder-build`); header + empty-state copy rewritten (clearer, no em dashes).
+  - **SavedView:** cart button pushes the list empty-first; removed the `isBuildingShoppingList` / `builtListRecipes` state.
+- **Files:** `DODFeatureSaved` `ShoppingListViewModel.swift`, `ShoppingListView.swift`, `ShoppingListBuilderSheet.swift`, `SavedView.swift`, + `ShoppingListViewModelTests.swift` (new `add(recipes:)` tests). L4: `ShoppingListViewSnapshotTests` (`test_shoppingList_light`, `test_shoppingList_dark`) re-recorded by CI (populated state gained the "Add recipes" `+`). Spec: `clarifications.md` (CL-300).
+- **AC:** US-19 (shopping list). Linear DUT-487 (parent DUT-486, Round 4); unblocks DUT-480. CL-300 canonical. **Est:** ~3 h. **Deps:** off main (after CL-298). Branch `feat/dut-487-shopping-list-restructure`. **Verification:** `swift build` + `swift test` (DODFeatureSaved, 39 tests incl. new append/classification/empty→populated) green; swift-format + SwiftLint `--strict` clean; new flow eyeballed. L4 baselines CI-recorded (local render drifts).
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
