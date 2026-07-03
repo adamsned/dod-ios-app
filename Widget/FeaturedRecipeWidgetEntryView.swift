@@ -20,15 +20,15 @@ struct FeaturedRecipeWidgetEntryView: View {
                     // T-768 / CL-165 (DUT-74) — large = hero-forward layout.
                     WidgetCard.FeaturedLarge(content: Self.content(from: recipe, mode: entry.content))
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel(Self.mediumAccessibilityLabel(for: recipe))
+                        .accessibilityLabel(Self.mediumAccessibilityLabel(for: recipe, mode: entry.content))
                 case .systemMedium:
                     WidgetCard.Medium(content: Self.content(from: recipe, mode: entry.content))
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel(Self.mediumAccessibilityLabel(for: recipe))
+                        .accessibilityLabel(Self.mediumAccessibilityLabel(for: recipe, mode: entry.content))
                 default:
                     WidgetCard.Small(content: Self.content(from: recipe, mode: entry.content))
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel(Self.smallAccessibilityLabel(for: recipe))
+                        .accessibilityLabel(Self.smallAccessibilityLabel(for: recipe, mode: entry.content))
                 }
             } else {
                 // DUT-504 — the empty state is mode-aware: in `.articles` mode
@@ -113,16 +113,31 @@ struct FeaturedRecipeWidgetEntryView: View {
         }
     }
 
-    static func smallAccessibilityLabel(for recipe: WidgetSnapshot.Entry) -> String {
-        if let totalTime = recipe.totalTimeDisplay {
-            "Today's recipe: \(recipe.title). \(totalTime)."
-        } else {
-            "Today's recipe: \(recipe.title)."
+    /// DUT-507 — the spoken prefix mirrors the visible `eyebrow(for:mode:)`
+    /// branch so VoiceOver says "Latest article" in `.articles` mode instead of
+    /// hardcoding "Today's recipe" (matching the lock-screen widget's approach).
+    static func spokenPrefix(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
+        switch mode {
+        case .auto:
+            return recipe.isArticle ? "Latest article" : "Latest recipe"
+        case .recipes:
+            return "Latest recipe"
+        case .articles:
+            return "Latest article"
         }
     }
 
-    static func mediumAccessibilityLabel(for recipe: WidgetSnapshot.Entry) -> String {
-        var parts = ["Today's recipe: \(recipe.title)"]
+    static func smallAccessibilityLabel(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
+        let prefix = Self.spokenPrefix(for: recipe, mode: mode)
+        if let totalTime = recipe.totalTimeDisplay {
+            return "\(prefix): \(recipe.title). \(totalTime)."
+        } else {
+            return "\(prefix): \(recipe.title)."
+        }
+    }
+
+    static func mediumAccessibilityLabel(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
+        var parts = ["\(Self.spokenPrefix(for: recipe, mode: mode)): \(recipe.title)"]
         if !recipe.excerpt.isEmpty { parts.append(recipe.excerpt) }
         if let totalTime = recipe.totalTimeDisplay { parts.append(totalTime) }
         return parts.joined(separator: ". ") + "."

@@ -71,6 +71,10 @@ public protocol SettingsDependencies: Sendable {
     /// In-place edit of one cook-log entry from the journal (note / rating /
     /// photo); never changes the cook count.
     func updateCookLog(_ entry: CookLogEntry) async throws
+    /// DUT-514 — delete one cook-log entry from the journal (cascades its photo).
+    /// Unlike an edit this DOES change the cook count, so the journal reloads its
+    /// stats after. Default no-op so previews / doubles stay source-compatible.
+    func deleteCookLog(id: UUID) async throws
 }
 
 extension SettingsDependencies {
@@ -80,4 +84,5 @@ extension SettingsDependencies {
     public func savedRecipeCount() async throws -> Int { 0 }
     public func userRatingCount() async throws -> Int { 0 }
     public func updateCookLog(_ entry: CookLogEntry) async throws {}
+    public func deleteCookLog(id: UUID) async throws {}
 }

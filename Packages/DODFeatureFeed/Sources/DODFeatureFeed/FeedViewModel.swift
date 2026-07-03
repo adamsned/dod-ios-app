@@ -198,6 +198,14 @@ public final class FeedViewModel {
         try? await dependencies.updateCookLog(entry)
     }
 
+    /// DUT-514 — delete a journal entry (cascades its photo file in the store).
+    /// Best-effort, mirroring `updateCook`. Unlike an edit this DOES change the
+    /// cook count, so the journal must reload its stats after — the view does that
+    /// by re-running its `load` closure once this returns.
+    public func deleteCook(_ entry: CookLogEntry) async {
+        try? await dependencies.deleteCookLog(id: entry.id)
+    }
+
     /// Pull-to-refresh (AC-1.4 + clears blocklist per AC-1.7).
     public func refresh() async {
         try? await dependencies.clearBlocklist()

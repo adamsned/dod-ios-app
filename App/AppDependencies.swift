@@ -356,7 +356,9 @@ final class AppDependencies {
             cookLogsLoad: { [store] in try await store.allCookLogs() },
             savedCountLoad: { [store] in try await store.savedRecipes().count },
             ratingCountLoad: { [store] in try await store.userRatingCount() },
-            cookLogWrite: { [store] entry in try await store.updateCookLog(entry) }
+            cookLogWrite: { [store] entry in try await store.updateCookLog(entry) },
+            // DUT-514 — delete cascades the entry's photo (RecipeStore.deleteCookLog).
+            cookLogDelete: { [store] id in try await store.deleteCookLog(id: id) }
         )
     }
 

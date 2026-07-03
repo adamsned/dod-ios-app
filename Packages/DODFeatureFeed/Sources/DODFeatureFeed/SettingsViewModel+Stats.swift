@@ -56,4 +56,9 @@ extension SettingsViewModel {
     public func updateProfileJournalEntry(_ entry: CookLogEntry) async {
         try? await cloudSyncDependency?.updateCookLog(entry)
     }
+
+    /// DUT-514 — delete a journal entry from that sheet (cascades its photo).
+    public func deleteProfileJournalEntry(_ entry: CookLogEntry) async {
+        try? await cloudSyncDependency?.deleteCookLog(id: entry.id)
+    }
 }

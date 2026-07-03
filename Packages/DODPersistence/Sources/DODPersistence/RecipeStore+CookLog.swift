@@ -56,7 +56,16 @@ extension RecipeStore {
         let descriptor = FetchDescriptor<CachedCookLogEntry>(
             predicate: #Predicate { $0.id == id }
         )
-        guard let row = try modelContext.fetch(descriptor).first else { return }
+        guard let row = try modelContext.fetch(descriptor).first else {
+            // DUT-515: the caller (CookJournalEntryView.save) writes the new photo
+            // JPEG to disk BEFORE calling us. If the row is gone (e.g. deleted out
+            // from under an open edit), the just-written file would orphan in
+            // Application Support — no row will ever reference its `photoLocalID`,
+            // so the DUT-338 cleanup below can't reach it. Delete it here,
+            // mirroring the DUT-423 dedup-branch cleanup in `logCook`.
+            if let photoID = entry.photoLocalID { CookPhotoStore().delete(id: photoID) }
+            return
+        }
         // DUT-338: if the photo was replaced or cleared, delete the previous
         // file so it doesn't orphan in Application Support (never OS-purged).
         // The new file, if any, is already on disk by the time we get here.

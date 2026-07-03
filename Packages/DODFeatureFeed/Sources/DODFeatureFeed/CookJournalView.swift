@@ -18,17 +18,24 @@ public struct CookJournalView: View {
     /// CL-273 — persist an entry's edited reflection / photo. Defaults to a no-op
     /// so existing previews / tests that only pass `load` keep compiling.
     private let update: (CookLogEntry) async -> Void
+    /// DUT-514 — delete an entry (cascades its photo in the store). Defaults to a
+    /// no-op so existing previews / tests that only pass `load` keep compiling.
+    private let delete: (CookLogEntry) async -> Void
     private let photoStore = CookPhotoStore()
     @State private var cooks: [CookLogEntry] = []
     @State private var loaded = false
+    /// DUT-514 — the entry the user is confirming a delete for (drives the alert).
+    @State private var pendingDelete: CookLogEntry?
     @Environment(\.dismiss) private var dismiss
 
     public init(
         load: @escaping () async -> [CookLogEntry],
-        update: @escaping (CookLogEntry) async -> Void = { _ in }
+        update: @escaping (CookLogEntry) async -> Void = { _ in },
+        delete: @escaping (CookLogEntry) async -> Void = { _ in }
     ) {
         self.load = load
         self.update = update
+        self.delete = delete
     }
 
     public var body: some View {
@@ -48,6 +55,23 @@ public struct CookJournalView: View {
                         .tint(DODColor.burntOrange)
                 }
             }
+            // DUT-514 — confirm before deleting: a cook counts toward rank, so a
+            // stray swipe/menu tap shouldn't wipe a memory silently.
+            .alert(
+                "Delete This Cook?",
+                isPresented: Binding(
+                    get: { pendingDelete != nil },
+                    set: { if !$0 { pendingDelete = nil } }
+                ),
+                presenting: pendingDelete
+            ) { entry in
+                Button("Delete", role: .destructive) {
+                    Task { await performDelete(entry) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { entry in
+                Text("This removes \"\(entry.recipeTitle)\" and its photo from your journal. This can't be undone.")
+            }
         }
         .task {
             if !loaded {
@@ -55,6 +79,14 @@ public struct CookJournalView: View {
                 loaded = true
             }
         }
+    }
+
+    /// DUT-514 — run the delete, then reload so the list AND the stats header
+    /// (total / streak / most-cooked, all derived from `cooks`) recompute.
+    private func performDelete(_ entry: CookLogEntry) async {
+        pendingDelete = nil
+        await delete(entry)
+        cooks = await load()
     }
 
     private var emptyState: some View {
@@ -87,12 +119,26 @@ public struct CookJournalView: View {
                         CookJournalEntryView(entry: cook) { updated in
                             await update(updated)
                             cooks = await load()
+                        } onDelete: {
+                            // DUT-514 — Delete from inside the open entry page.
+                            // No extra confirm: the entry view already confirms.
+                            await performDelete(cook)
                         }
                     } label: {
                         cookRow(cook)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("journal-row-\(cook.id.uuidString)")
+                    // DUT-514 — the journal is a ScrollView (not a List), so
+                    // `.swipeActions` isn't available here; a long-press context
+                    // menu + a VoiceOver action give an equivalent delete
+                    // affordance. Both route through the same confirm alert.
+                    .contextMenu {
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            pendingDelete = cook
+                        }
+                    }
+                    .accessibilityAction(named: "Delete") { pendingDelete = cook }
                 }
             }
             .padding(DODSpacing.md)
