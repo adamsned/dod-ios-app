@@ -155,6 +155,8 @@ public actor RecipeStore {
             try pinHeroImage(heroURLString: target.heroImageURLString, toRecipeID: recipe.id)
         } else if didBackfillSyncedSaved {
             target.isSaved = false
+            // DUT-512: mirror the explicit-unsave teardown (drop download + pins).
+            try tearDownUnsavedPins(target)
         }
 
         // US-12 / AC-12.1: keep the local ingredient index in sync.
@@ -173,8 +175,7 @@ public actor RecipeStore {
 
     // MARK: - Save / unsave (AC-5.1)
 
-    // `isSaved(id:)` lives in `RecipeStore+SyncedSaved.swift` (reads the synced
-    // set + the DUT-470 provisional local pins) to keep this file under the cap.
+    // `isSaved(id:)` lives in `RecipeStore+SyncedSaved.swift` (file_length cap).
 
     // US-5 / DUT-35 — `toggleSaved(id:)` + `markSaved(id:)` (incl. the DUT-215
     // unsave teardown) live in `RecipeStore+Saved.swift` (file_length cap).
@@ -396,5 +397,4 @@ public actor RecipeStore {
         )
     }
 }
-// `formatTime(seconds:)` moved to `TimeFormatting.swift` to keep this file
-// under the SwiftLint 400-line file_length cap (DUT-373/413 pushed it to 403).
+// `formatTime(seconds:)` moved to `TimeFormatting.swift` for the 400-line cap.

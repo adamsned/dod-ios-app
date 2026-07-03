@@ -19,17 +19,23 @@ extension RecipeStore {
             try pinHeroImage(heroURLString: row.heroImageURLString, toRecipeID: id)
         } else {
             try removeSyncedSaved(id: id)
-            // DUT-215: unsaving must also tear down the offline download + the
-            // image pins, else the CachedRecipe (downloadedAt still set) is never
-            // evicted (the predicate needs `downloadedAt == nil`) and the pinned
-            // hero bytes leak against the image budget forever — un-reclaimable
-            // by eviction OR the Settings "free up space" clear.
-            row.downloadedAt = nil
-            try unpinImages(forRecipeID: id)
+            try tearDownUnsavedPins(row)
         }
         try modelContext.save()
         try evictIfNeeded()
         return row.isSaved
+    }
+
+    /// DUT-215 / DUT-512: teardown an unsaved recipe's offline footprint. Must be
+    /// run whenever a recipe transitions saved → unsaved (explicit ``toggleSaved``
+    /// OR a cross-device unsave observed in ``mergeDetail``), else the
+    /// `CachedRecipe` (with `downloadedAt` still set) is never evicted (the
+    /// predicate needs `downloadedAt == nil`) and the pinned hero bytes leak
+    /// against the image budget forever — un-reclaimable by eviction OR the
+    /// Settings "free up space" clear. Callers own the `modelContext.save()`.
+    func tearDownUnsavedPins(_ row: CachedRecipe) throws {
+        row.downloadedAt = nil
+        try unpinImages(forRecipeID: row.id)
     }
 
     /// T-761 / CL-158 (DUT-67) — idempotently pin a recipe SAVED without
