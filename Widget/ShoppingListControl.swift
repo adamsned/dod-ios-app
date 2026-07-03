@@ -1,4 +1,5 @@
 import AppIntents
+import DODSupport
 import SwiftUI
 import WidgetKit
 
@@ -13,36 +14,45 @@ import WidgetKit
 // Control Center gallery), tap it, and confirm the app foregrounds straight to
 // the Shopping List. Verify on a device / iOS 18 sim.
 
+/// DUT-480 fix — the intent the Shopping List control runs when tapped.
+///
+/// Handing a `dod://` URL to the control via `OpenURLIntent` did NOT reliably
+/// launch the app at runtime (a custom URL scheme handed off from a Control
+/// isn't a dependable foregrounding mechanism), so the `onOpenURL` →
+/// ``WidgetDeepLinkParser`` path never ran. Instead this custom intent sets
+/// `openAppWhenRun = true` — the system foregrounds the app for us — and
+/// `perform()` drops a one-shot pending-route flag into the shared App Group
+/// via ``ControlRouteStore``. ``RootView`` reads + clears that flag on cold
+/// launch and on every `.active` transition and routes to the Shopping List.
+@available(iOS 18.0, *)
+struct OpenShoppingListIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open Shopping List"
+
+    // The system brings the app to the foreground when this intent runs; we
+    // don't (and can't reliably) do it ourselves from a Control.
+    static let openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult {
+        // Fire-and-forget: a nil store (unopenable App Group suite) just means
+        // the app foregrounds without the flag — no crash, no Shopping List.
+        ControlRouteStore()?.setPending(.shoppingList)
+        return .result()
+    }
+}
+
 /// Control Center / Lock Screen control (iOS 18) with a shopping-cart icon +
-/// "Shopping List" label. Tapping it opens the app to the `dod://shopping-list`
-/// deep link (DUT-480 / CL-301 / T-907).
-///
-/// The button's action is the system ``OpenURLIntent`` directly.
-/// `OpenURLIntent` conforms to `AppIntent`, so `ControlWidgetButton(action:)`
-/// accepts it, and the system foregrounds the app + delivers the URL through
-/// `RootView.onOpenURL` → `WidgetDeepLinkParser` → the Shopping List — the same
-/// path every other `dod://` widget link uses, no bespoke launch handling.
-///
-/// DUT-480 fix: the earlier custom `OpenShoppingListIntent` combined
-/// `openAppWhenRun = true` AND a `perform()` returning `.result(opensIntent:)`.
-/// That did nothing when tapped (the control never even opened the app); the
-/// two foregrounding mechanisms stacked on top of each other. Handing the URL
-/// intent straight to the button is the documented "open a URL" control shape.
+/// "Shopping List" label. Tapping it runs ``OpenShoppingListIntent`` — the
+/// system foregrounds the app and the intent leaves the pending-route flag
+/// ``RootView`` consumes to open the Shopping List (DUT-480 / CL-301 / T-907).
 @available(iOS 18.0, *)
 struct ShoppingListControl: ControlWidget {
     // Matches the `com.dutchovendaddy.DODApp.Widget.` kind prefix the other
     // widgets in this extension use (see FeaturedRecipeWidget etc.).
     static let kind = "com.dutchovendaddy.DODApp.Widget.ShoppingListControl"
 
-    // The deep link the control opens. A static, always-valid literal, so a
-    // `URL(string:)` failure is impossible; the `?? .init(string: "dod://")`
-    // fallback exists only to avoid a force-unwrap (swiftlint) and never runs.
-    private static let shoppingListURL =
-        URL(string: "dod://shopping-list") ?? URL(fileURLWithPath: "/")
-
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: Self.kind) {
-            ControlWidgetButton(action: OpenURLIntent(Self.shoppingListURL)) {
+            ControlWidgetButton(action: OpenShoppingListIntent()) {
                 Label("Shopping List", systemImage: "cart")
             }
         }

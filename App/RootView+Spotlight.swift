@@ -6,6 +6,13 @@ import SwiftUI
 
 extension RootView {
 
+    /// Re-index Spotlight on each foreground return so later-session saves stay
+    /// searchable without a cold launch; the launch `.active` is gated (DUT-12).
+    func reindexSpotlightOnForeground(_ newPhase: ScenePhase) {
+        guard newPhase == .active, didInitialSpotlightIndex else { return }
+        Task { await indexSpotlight() }
+    }
+
     /// (Re)index the suggested recipes into Spotlight (US-10 / DUT-12). Extracted
     /// here so `RootView` stays under the SwiftLint file_length / type_body_length
     /// caps.

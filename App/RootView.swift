@@ -89,7 +89,8 @@ struct RootView: View {
     @Environment(\.openURL) var systemOpenURL
     /// Foreground Spotlight refresh (DUT-12); see `reindexSpotlightOnForeground`.
     @Environment(\.scenePhase) private var scenePhase
-    @State private var didInitialSpotlightIndex = false
+    // Non-private for `RootView+Spotlight.swift`'s foreground-reindex guard.
+    @State var didInitialSpotlightIndex = false
     /// DUT-361: serializes `indexSpotlight()` so a foreground reindex can't race the
     /// cold-launch index (concurrent delete+index can interleave the domain). Not
     /// `private` so the `+Spotlight` extension file can read it.
@@ -133,6 +134,10 @@ struct RootView: View {
                 handle(intent: pending)
                 dispatcher.consume()
             }
+            // DUT-480 — cold launch straight from the iOS 18 Control Center
+            // control (app wasn't running) still drains the pending-route flag;
+            // the scene-phase `.active` read below covers the warm case.
+            consumePendingControlRoute()
             // Cold-launch index so DOD recipes are findable in Spotlight right
             // away; the foreground refresh below keeps it fresh (US-10 / DUT-12).
             await indexSpotlight()
@@ -159,7 +164,12 @@ struct RootView: View {
             else { return }
             handle(intent: .openRecipe(id: id))
         }
-        .onChange(of: scenePhase) { reindexSpotlightOnForeground($1) }
+        .onChange(of: scenePhase) {
+            reindexSpotlightOnForeground($1)
+            // DUT-480 — a Control Center tap set `openAppWhenRun`, so it
+            // foregrounds us here; drain the pending-route flag and route.
+            if $1 == .active { consumePendingControlRoute() }
+        }
         .onChange(of: dispatcher.pending) { _, newValue in
             guard let newValue else { return }
             handle(intent: newValue)
@@ -385,16 +395,6 @@ struct RootView: View {
     }
 }
 
-extension RootView {
-    /// Re-index Spotlight on each foreground return so later-session saves stay
-    /// searchable without a cold launch; the launch `.active` is gated (DUT-12).
-    func reindexSpotlightOnForeground(_ newPhase: ScenePhase) {
-        guard newPhase == .active, didInitialSpotlightIndex else { return }
-        Task { await indexSpotlight() }
-    }
-}
-
-// DOD-ART-2 / DUT-243 / DUT-246 / DUT-250 — in-app article-link routing
-// (`handleArticleLinkTap`, `openRecipeLink`, `routeIntoCurrentTab`,
-// `externalRouteBinding(for:)`) and the hoisted-path helper (`pathBinding(for:)`)
-// live in `RootView+LinkRouting.swift` so this file stays under `file_length`.
+// DOD-ART-2 / DUT-243 / DUT-246 / DUT-250 — the in-app article-link routing
+// helpers (`handleArticleLinkTap`, `openRecipeLink`, `routeIntoCurrentTab`,
+// `externalRouteBinding(for:)`, `pathBinding(for:)`) live in `RootView+LinkRouting.swift`.
