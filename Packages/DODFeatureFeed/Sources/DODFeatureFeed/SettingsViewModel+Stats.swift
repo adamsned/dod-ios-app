@@ -44,6 +44,11 @@ extension SettingsViewModel {
     static var streakCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.firstWeekday = 1
+        // DUT-528: pin the timezone explicitly (matches `CookJournalView.weekCalendar`)
+        // so week/month buckets never drift under an implicit device-timezone change.
+        // `TimeZone.current` keeps today's "a day = the user's local day" semantics
+        // while removing the accidental implicit dependency.
+        calendar.timeZone = TimeZone.current
         return calendar
     }
 
@@ -55,5 +60,10 @@ extension SettingsViewModel {
     /// In-place edit of a journal entry from that sheet (note / rating / photo).
     public func updateProfileJournalEntry(_ entry: CookLogEntry) async {
         try? await cloudSyncDependency?.updateCookLog(entry)
+    }
+
+    /// DUT-514 — delete a journal entry from that sheet (cascades its photo).
+    public func deleteProfileJournalEntry(_ entry: CookLogEntry) async {
+        try? await cloudSyncDependency?.deleteCookLog(id: entry.id)
     }
 }

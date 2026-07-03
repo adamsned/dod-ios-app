@@ -152,6 +152,41 @@ struct CategoryNameMatcherTests {
         #expect(result.map(\.id) == [334])
     }
 
+    @Test func embeddedTopicDoesNotMatchViaRuleFour() {
+        // DUT-508: rule (d) now requires whole-word/token containment, not raw
+        // substring. Topic "rice" (>= 4) must NOT match query "licorice" — even
+        // though "rice" is literally a substring of "licorice", it isn't a
+        // standalone token, so no `?categories=` fetch is fanned out.
+        let riceCategory = DODDomain.Category(
+            id: 5150,
+            name: "Rice Recipes",
+            slug: "rice-recipes",
+            count: 18
+        )
+        let result = CategoryNameMatcher.match(
+            query: "licorice",
+            in: [riceCategory]
+        )
+        #expect(result.isEmpty)
+    }
+
+    @Test func standaloneTopicTokenStillMatchesViaRuleFour() {
+        // DUT-508 regression guard: a real query token equal to the topic still
+        // matches. Topic "rice" appears as a standalone token in "rice pilaf" →
+        // rule (d) fires.
+        let riceCategory = DODDomain.Category(
+            id: 5150,
+            name: "Rice Recipes",
+            slug: "rice-recipes",
+            count: 18
+        )
+        let result = CategoryNameMatcher.match(
+            query: "rice pilaf",
+            in: [riceCategory]
+        )
+        #expect(result.map(\.id) == [5150])
+    }
+
     @Test func latestMatchesLatestRecipes() {
         // Special-category sanity: "latest" is the topic of
         // "Latest Recipes" → rule (b) fires.

@@ -74,6 +74,31 @@ import Testing
         #expect(viewModel.items.count == 40, "pagination must resume after a transient failure")
     }
 
+    @Test func severalLoadMorePagesStayDedupedAndOrdered() async throws {
+        // DUT-516: paging through several pages must preserve page order and
+        // never duplicate a row, even when a later page re-includes an id from
+        // an earlier page (WP pagination can shift/repeat items between fetches).
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = (1...20).map(Self.makeItem)
+        // Page 2 overlaps page 1 on id 20 (a duplicate the dedup must drop).
+        dependencies.pages[2] = (20...40).map(Self.makeItem)
+        // Page 3 overlaps page 2 on id 40.
+        dependencies.pages[3] = (40...60).map(Self.makeItem)
+        dependencies.totalPagesOverride = 3
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.items.map(\.id) == Array(1...20))
+
+        var last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)  // -> page 2
+        last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)  // -> page 3
+
+        // Exactly the union 1...60 in order, no duplicate for the overlapping ids.
+        #expect(viewModel.items.map(\.id) == Array(1...60))
+        #expect(Set(viewModel.items.map(\.id)).count == viewModel.items.count, "no duplicates")
+    }
+
     @Test func firstLaunchOfflineShowsEmptyState() async throws {
         let dependencies = FakeFeedDependencies()
         dependencies.shouldFail = true
@@ -161,6 +186,35 @@ import Testing
         #expect(viewModel.savedRecipeIDs == [1])
     }
 
+    // DUT-514 — deleting a journal entry routes through the store (records the id)
+    // AND removes the row, so the journal's reload (`cookLogs()`) recomputes stats
+    // off the shrunken list. This mirrors the `updateCook` path but, unlike an
+    // edit, it DOES change the cook count.
+    @Test func deleteCookRemovesEntryAndShrinksTheJournal() async throws {
+        let dependencies = FakeFeedDependencies()
+        let keep = Self.makeCook(recipeID: 1)
+        let remove = Self.makeCook(recipeID: 2)
+        dependencies.cooks = [keep, remove]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        #expect(await viewModel.cookLogs().count == 2)
+
+        await viewModel.deleteCook(remove)
+
+        #expect(dependencies.deletedCookLogIDs == [remove.id])  // routed to the store by id
+        let after = await viewModel.cookLogs()
+        #expect(after.map(\.id) == [keep.id])  // list reload reflects the delete → stats recompute
+    }
+
+    static func makeCook(recipeID: Int) -> CookLogEntry {
+        CookLogEntry(
+            id: UUID(),
+            recipeID: recipeID,
+            recipeTitle: "Recipe \(recipeID)",
+            cookedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
@@ -188,6 +242,8 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     /// exercised; `deletedCookPhotoIDs` records what the view model asked to purge.
     var logCookShouldFail: Bool = false
     var deletedCookPhotoIDs: [String] = []
+    /// DUT-514 — records the ids the view model asked to delete from the journal.
+    var deletedCookLogIDs: [UUID] = []
     /// DUT-237: override the reported `X-WP-TotalPages`. When nil, it derives
     /// from the highest page index that has data, so a short final page still
     /// ends pagination (matching the pre-DUT-237 `< 20` heuristic for tests
@@ -262,4 +318,10 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     }
     func cookLogs() async throws -> [CookLogEntry] { cooks }
     func deleteCookPhoto(id: String) async { deletedCookPhotoIDs.append(id) }
+    // DUT-514 — remove the row so a subsequent `cookLogs()` reflects the delete
+    // (lets a test assert both the recorded id AND the recomputed journal list).
+    func deleteCookLog(id: UUID) async throws {
+        deletedCookLogIDs.append(id)
+        cooks.removeAll { $0.id == id }
+    }
 }
