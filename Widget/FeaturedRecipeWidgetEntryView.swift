@@ -18,15 +18,15 @@ struct FeaturedRecipeWidgetEntryView: View {
                 switch family {
                 case .systemLarge:
                     // T-768 / CL-165 (DUT-74) — large = hero-forward layout.
-                    WidgetCard.FeaturedLarge(content: Self.content(from: recipe))
+                    WidgetCard.FeaturedLarge(content: Self.content(from: recipe, mode: entry.content))
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(Self.mediumAccessibilityLabel(for: recipe))
                 case .systemMedium:
-                    WidgetCard.Medium(content: Self.content(from: recipe))
+                    WidgetCard.Medium(content: Self.content(from: recipe, mode: entry.content))
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(Self.mediumAccessibilityLabel(for: recipe))
                 default:
-                    WidgetCard.Small(content: Self.content(from: recipe))
+                    WidgetCard.Small(content: Self.content(from: recipe, mode: entry.content))
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(Self.smallAccessibilityLabel(for: recipe))
                 }
@@ -54,7 +54,7 @@ struct FeaturedRecipeWidgetEntryView: View {
         return components.url
     }
 
-    static func content(from recipe: WidgetSnapshot.Entry) -> WidgetCard.Content {
+    static func content(from recipe: WidgetSnapshot.Entry, mode: LatestContent) -> WidgetCard.Content {
         // Resolve the bridged filename into a `file://` URL pointing at
         // the shared App Group container (spec.md AC-21.3). `AsyncImage`
         // against a `file://` URL is a local read — not a network fetch
@@ -71,9 +71,23 @@ struct FeaturedRecipeWidgetEntryView: View {
             excerpt: recipe.excerpt,
             heroImageURL: heroFileURL,
             totalTimeDisplay: recipe.totalTimeDisplay,
-            // DUT-460 — adaptive eyebrow (was hardcoded "New on DOD").
-            eyebrow: recipe.isArticle ? "Latest Article" : "Latest Recipe"
+            eyebrow: Self.eyebrow(for: recipe, mode: mode)
         )
+    }
+
+    /// DUT-460 / DUT-485 — the eyebrow copy. In `.auto` mode it stays adaptive,
+    /// keyed off the shown post's own kind (was hardcoded "New on DOD"). In the
+    /// explicit `.recipes` / `.articles` modes the user has fixed the surface,
+    /// so we key the eyebrow off the selected mode instead.
+    static func eyebrow(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
+        switch mode {
+        case .auto:
+            return recipe.isArticle ? "Latest Article" : "Latest Recipe"
+        case .recipes:
+            return "Latest Recipe"
+        case .articles:
+            return "Latest Article"
+        }
     }
 
     static func smallAccessibilityLabel(for recipe: WidgetSnapshot.Entry) -> String {

@@ -20,11 +20,12 @@ import WidgetKit
 /// populated entry → `dod://recipe/<id>` (existing US-9 parser case);
 /// tap on the empty-state placeholder → `dod://feed` (also existing).
 ///
-/// Configuration choice: `StaticConfiguration` (mirrors the two
-/// existing widgets) — no per-user parameters, the widget always shows
-/// the latest recipe.
+/// Configuration choice: `AppIntentConfiguration` (DUT-485 / T-905) sharing
+/// the home-screen widget's ``LatestWidgetConfigurationIntent`` so long-press →
+/// Edit Widget lets the user pick Auto / Recipes / Articles here too. Default
+/// `.auto` reproduces the prior always-latest behaviour.
 ///
-/// Spec trace: spec.md US-22, AC-22.1, AC-22.2, AC-22.3, AC-22.4.
+/// Spec trace: spec.md US-22, AC-22.1, AC-22.2, AC-22.3, AC-22.4; DUT-485 / T-905.
 struct LatestRecipeLockScreenWidget: Widget {
 
     /// Stable identifier WidgetKit uses to address this widget kind.
@@ -34,7 +35,15 @@ struct LatestRecipeLockScreenWidget: Widget {
     static let kind = "com.dutchovendaddy.DODApp.Widget.LatestRecipeLockScreen"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: Self.kind, provider: LatestRecipeLockScreenTimelineProvider()) { entry in
+        // DUT-485 / T-905 — `AppIntentConfiguration` (was `StaticConfiguration`)
+        // with the shared ``LatestWidgetConfigurationIntent``. `Self.kind` stays
+        // unchanged so installed widgets keep their identity; the migration
+        // defaults to `.auto`.
+        AppIntentConfiguration(
+            kind: Self.kind,
+            intent: LatestWidgetConfigurationIntent.self,
+            provider: LatestRecipeLockScreenTimelineProvider()
+        ) { entry in
             LatestRecipeLockScreenWidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
                     // Lock-screen rectangular widgets paint over a
@@ -46,15 +55,13 @@ struct LatestRecipeLockScreenWidget: Widget {
                     Color.clear
                 }
         }
-        .configurationDisplayName("Latest Recipe")
+        .configurationDisplayName("Latest")
         .description("See the latest Dutch Oven Daddy recipe on your Lock Screen.")
         // CL-37: `.accessoryRectangular` only. `.accessoryCircular`
         // (no good single-glyph payload for a recipe) and
         // `.accessoryInline` (shared rate-limited inline slot) are
         // explicitly out of scope.
         .supportedFamilies([.accessoryRectangular])
-        // The widget extension has no configurable parameters — no
-        // intent needed, same as the featured + saved widgets.
         .contentMarginsDisabled()
     }
 }

@@ -3165,4 +3165,16 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-905 — User-configurable "Latest" widget (Auto / Recipes / Articles) + rename "Latest Recipe" → "Latest" (CL-299 / DUT-486, DUT-485; resolves DUT-452)
+
+- **What:** Rename the "Latest Recipe" widget to **"Latest"** and make both the home-screen (`FeaturedRecipeWidget`) and lock-screen (`LatestRecipeLockScreenWidget`) variants user-configurable (Edit Widget) with **Auto / Recipes / Articles**.
+  - **Snapshot:** `WidgetSnapshot` gains additive optionals `latestRecipe: Entry?` + `latestArticle: Entry?` (synthesized Codable → missing keys nil, back-compat; version stays 1). New store `write(entries:latestRecipe:latestArticle:now:)`.
+  - **Publish (DUT-452 work):** `publishWidgetSnapshot` scans the feed top-down bounded to `maxClassificationScan = 10` via the existing `latestKindClassifier`, recording the first recipe + first article, early-exit when both found. Never throws; no classifier → prior behaviour.
+  - **Config:** new `Widget/LatestWidgetConfigurationIntent.swift` — `enum LatestContent: AppEnum { auto, recipes, articles }` + `LatestWidgetConfigurationIntent: WidgetConfigurationIntent` (`@Parameter default .auto`). Shared `LatestContent.entry(from:)` selection: auto → `entries.first`; recipes → `latestRecipe ?? entries.first`; articles → `latestArticle` (nil → placeholder).
+  - **Widgets:** `StaticConfiguration` → `AppIntentConfiguration`; `TimelineProvider` → `AppIntentTimelineProvider`; `configurationDisplayName` → "Latest"; `kind` strings unchanged (installs keep identity). Eyebrow: auto adaptive, recipes → "Latest Recipe", articles → "Latest Article".
+- **Files:** DODSupport `WidgetSnapshot.swift` (+ tests). DODFeatureFeed `FeedDependencies.swift` (bounded scan; + tests). Widget `LatestWidgetConfigurationIntent.swift` (new), `FeaturedRecipeWidget.swift` + `FeaturedRecipeTimelineProvider.swift` + `FeaturedRecipeWidgetEntryView.swift`, `LatestRecipeLockScreenWidget.swift` + `LatestRecipeLockScreenTimelineProvider.swift` + `LatestRecipeLockScreenWidgetEntryView.swift`. No App/ change (classifier already injected). Spec `clarifications.md` (CL-299).
+- **AC:** US-9 / US-22 (widgets). Linear DUT-485 (parent DUT-486, Round 4); resolves DUT-452 classification. CL-299 canonical. **Est:** ~5 h. **Deps:** off main (after CL-298). Branch `feat/dut-485-latest-widget-config`. **Verification:** DODSupport (511) + DODFeatureFeed (94) `swift test` green; swift-format + SwiftLint `--strict` clean; widget target compiles (`xcodebuild build -scheme DODAppWidget` SUCCEEDED). No L4 change. Live picker + per-mode behaviour best confirmed in an Xcode-signed run.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.

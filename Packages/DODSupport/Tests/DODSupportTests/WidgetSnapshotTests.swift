@@ -51,6 +51,71 @@ import Testing
         #expect(decoded.isArticle == false)
     }
 
+    // DUT-485 / T-905 — the "Latest" widget's latestRecipe / latestArticle
+    // fields round-trip through the store.
+    @Test func latestRecipeAndArticleRoundTrip() throws {
+        let defaults = try Self.freshDefaults()
+        let store = WidgetSnapshotStore(defaults: defaults, key: "test.latestSplit")
+        let entries = Self.sampleEntries(count: 3)
+        let recipe = entries[0]
+        let article = WidgetSnapshot.Entry(
+            id: 99,
+            title: "Best Dutch Oven Roundups",
+            excerpt: "An article, not a recipe.",
+            heroImageURL: nil,
+            canonicalURL: nil,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_500),
+            totalTimeDisplay: nil,
+            isArticle: true
+        )
+
+        try store.write(entries: entries, latestRecipe: recipe, latestArticle: article)
+
+        let read = try #require(store.read())
+        #expect(read.latestRecipe == recipe)
+        #expect(read.latestArticle == article)
+        #expect(read.latestArticle?.isArticle == true)
+        #expect(read.entries == entries)
+    }
+
+    // DUT-485 / T-905 — a payload written before latestRecipe/latestArticle
+    // existed decodes with both fields nil rather than throwing (back-compat).
+    @Test func snapshotDecodesLegacyPayloadWithoutLatestSplitFields() throws {
+        let defaults = try Self.freshDefaults()
+        let key = "test.preDUT485"
+        let legacyPayload: [String: Any] = [
+            "version": WidgetSnapshot.currentVersion,
+            "writtenAt": "2024-01-01T00:00:00Z",
+            "entries": [
+                [
+                    "id": 7,
+                    "title": "Legacy entry",
+                    "excerpt": "Excerpt",
+                    "publishedAt": "2024-01-01T00:00:00Z",
+                ]
+            ],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: legacyPayload)
+        defaults.set(data, forKey: key)
+        let store = WidgetSnapshotStore(defaults: defaults, key: key)
+
+        let read = try #require(store.read())
+        #expect(read.entries.first?.id == 7)
+        #expect(read.latestRecipe == nil)
+        #expect(read.latestArticle == nil)
+    }
+
+    // DUT-485 / T-905 — the legacy convenience overload defaults both split
+    // fields to nil so existing call sites keep behaving.
+    @Test func legacyWriteEntriesConvenienceLeavesLatestSplitNil() throws {
+        let defaults = try Self.freshDefaults()
+        let store = WidgetSnapshotStore(defaults: defaults, key: "test.legacyConvenience")
+        try store.write(entries: Self.sampleEntries(count: 2))
+        let read = try #require(store.read())
+        #expect(read.latestRecipe == nil)
+        #expect(read.latestArticle == nil)
+    }
+
     @Test func writeWithEntriesConvenienceCapsAtMaxEntries() throws {
         let defaults = try Self.freshDefaults()
         let store = WidgetSnapshotStore(defaults: defaults, key: "test.cap")

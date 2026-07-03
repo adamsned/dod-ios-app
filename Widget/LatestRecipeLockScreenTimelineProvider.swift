@@ -1,3 +1,4 @@
+import AppIntents
 import DODSupport
 import Foundation
 import WidgetKit
@@ -16,6 +17,11 @@ struct LatestRecipeLockScreenEntry: TimelineEntry {
 
     /// `nil` means show the placeholder (AC-22.4).
     let recipe: WidgetSnapshot.Entry?
+
+    /// DUT-485 / T-905 — the user-selected content mode, so the entry view can
+    /// render the right eyebrow even when the shown entry's own `isArticle`
+    /// flag doesn't reflect the chosen surface. Defaults to `.auto`.
+    var content: LatestContent = .auto
 
     /// WidgetKit gallery / redacted-preview entry. The gallery preview
     /// uses a representative populated state so the user can recognize
@@ -42,7 +48,12 @@ struct LatestRecipeLockScreenEntry: TimelineEntry {
 /// same `reloadAllTimelines()` preempt from the host app after every
 /// successful feed load (AC-9.3 already covers both widget kinds since
 /// `reloadAllTimelines` is bundle-scoped, not kind-scoped).
-struct LatestRecipeLockScreenTimelineProvider: TimelineProvider {
+///
+/// DUT-485 / T-905 — now an `AppIntentTimelineProvider` sharing the same
+/// ``LatestWidgetConfigurationIntent`` as the home-screen widget, so the
+/// lock-screen "Latest" widget is user-configurable (Auto / Recipes /
+/// Articles) too. Default `.auto` reproduces the prior behaviour.
+struct LatestRecipeLockScreenTimelineProvider: AppIntentTimelineProvider {
 
     /// Lazily-built reader. Initializer can fail if the App Group
     /// isn't provisioned (e.g. running the widget in a vanilla
@@ -60,39 +71,40 @@ struct LatestRecipeLockScreenTimelineProvider: TimelineProvider {
     private let refreshInterval: TimeInterval = 4 * 60 * 60
 
     func placeholder(in context: Context) -> LatestRecipeLockScreenEntry {
-        // T-391/T-392 follow-up: WidgetKit calls `placeholder(in:)` first
-        // for the gallery preview thumbnail — it does NOT necessarily call
-        // `getSnapshot(in:completion:)` before painting the thumbnail.
-        // Reading the snapshot synchronously here is cheap (UserDefaults
-        // plist load, single-digit ms) and gives the gallery the user's
-        // real latest recipe immediately (title + excerpt; hero image
-        // doesn't apply on lock-screen per CL-37). Fall back to the
-        // hardcoded brand placeholder only when the App Group is empty
-        // (first launch before the feed has loaded). AC-22.4.
-        let entry = currentEntry()
+        // No configuration in `placeholder(in:)` — read in `.auto`. Reading the
+        // snapshot synchronously here is cheap (UserDefaults plist load) and
+        // gives the gallery the user's real latest post (title + excerpt; hero
+        // image doesn't apply on lock-screen per CL-37). Fall back to the
+        // hardcoded brand placeholder only when the App Group is empty. AC-22.4.
+        let entry = currentEntry(for: .auto)
         return entry.recipe == nil ? .placeholder : entry
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (LatestRecipeLockScreenEntry) -> Void) {
+    func snapshot(
+        for configuration: LatestWidgetConfigurationIntent,
+        in context: Context
+    ) async -> LatestRecipeLockScreenEntry {
         // Mirror the `placeholder(in:)` path: prefer the live snapshot,
         // fall back to the hardcoded brand placeholder only when the
-        // App Group is empty. T-391.
-        let entry = currentEntry()
-        completion(entry.recipe == nil ? .placeholder : entry)
+        // selected mode yields nothing. T-391.
+        let entry = currentEntry(for: configuration.content)
+        return entry.recipe == nil ? .placeholder : entry
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<LatestRecipeLockScreenEntry>) -> Void) {
-        let entry = currentEntry()
+    func timeline(
+        for configuration: LatestWidgetConfigurationIntent,
+        in context: Context
+    ) async -> Timeline<LatestRecipeLockScreenEntry> {
+        let entry = currentEntry(for: configuration.content)
         let next = Date().addingTimeInterval(refreshInterval)
-        let timeline = Timeline(entries: [entry], policy: .after(next))
-        completion(timeline)
+        return Timeline(entries: [entry], policy: .after(next))
     }
 
     // MARK: - Private
 
-    private func currentEntry() -> LatestRecipeLockScreenEntry {
+    private func currentEntry(for content: LatestContent) -> LatestRecipeLockScreenEntry {
         let snapshot = store?.read()
-        let first = snapshot?.entries.first
-        return LatestRecipeLockScreenEntry(date: Date(), recipe: first)
+        let selected = content.entry(from: snapshot)
+        return LatestRecipeLockScreenEntry(date: Date(), recipe: selected, content: content)
     }
 }
