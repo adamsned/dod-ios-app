@@ -24,13 +24,20 @@ public struct CookTimer: Identifiable, Sendable, Equatable {
     /// The originally requested duration (seconds) — kept for display ("25:00")
     /// and for a future "restart" affordance, independent of elapsed time.
     public let duration: TimeInterval
+    /// DUT-495 — the recipe/rung this timer belongs to. `CookChooserFlow` owns a
+    /// single `CookTimerEngine` shared across every guided rung (DUT-484), so a
+    /// consumer scoped to one rung must filter `timers` by this to avoid showing
+    /// a bake started on a DIFFERENT rung (wrong dish + wrong deadline). `nil`
+    /// for timers not tied to a specific recipe.
+    public let recipeID: Int?
     public private(set) var state: State
 
-    public init(id: UUID, label: String, duration: TimeInterval, state: State) {
+    public init(id: UUID, label: String, duration: TimeInterval, state: State, recipeID: Int? = nil) {
         self.id = id
         self.label = label
         self.duration = duration
         self.state = state
+        self.recipeID = recipeID
     }
 
     /// Seconds left at `now`, clamped to `>= 0`. A running timer counts down to
