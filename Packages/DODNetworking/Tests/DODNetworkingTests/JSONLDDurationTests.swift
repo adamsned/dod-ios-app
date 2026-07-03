@@ -30,4 +30,17 @@ import Testing
         #expect(JSONLDRecipeParser.parseISO8601Duration(nil) == nil)
         #expect(JSONLDRecipeParser.parseISO8601Duration("PT0S") == nil)  // zero → nil
     }
+
+    /// DUT-518 — a giant digit run in untrusted scraped JSON-LD overflows the
+    /// `Int64` accumulator. Under trapping `*`/`+` that crashed; now it must
+    /// return nil (treated as "no duration") without trapping.
+    @Test func rejectsOverflowingDurationsWithoutCrashing() {
+        // Digit run itself exceeds Int64.max (`Int64(buffer)` fails first).
+        #expect(JSONLDRecipeParser.parseISO8601Duration("PT99999999999999999999H") == nil)
+        // Value fits Int64 but `value * multiplier` overflows.
+        #expect(JSONLDRecipeParser.parseISO8601Duration("PT9999999999999999H") == nil)
+        #expect(JSONLDRecipeParser.parseISO8601Duration("P9999999999999999D") == nil)
+        // Each part + its product fit, but the running sum overflows.
+        #expect(JSONLDRecipeParser.parseISO8601Duration("P100000000000000DT200000000000000H") == nil)
+    }
 }

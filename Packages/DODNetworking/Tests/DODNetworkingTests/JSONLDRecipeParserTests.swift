@@ -132,10 +132,22 @@ import Testing
 
     @Test func parsesServingsFromMultipleShapes() {
         #expect(JSONLDRecipeParser.parseServings(4) == 4)
+        #expect(JSONLDRecipeParser.parseServings(4.0) == 4)
         #expect(JSONLDRecipeParser.parseServings("8") == 8)
         #expect(JSONLDRecipeParser.parseServings("6 servings") == 6)
+        #expect(JSONLDRecipeParser.parseServings("4 servings") == 4)
         #expect(JSONLDRecipeParser.parseServings(["4"]) == 4)
         #expect(JSONLDRecipeParser.parseServings(nil) == nil)
+    }
+
+    /// DUT-518 — `recipeYield` arrives as an untrusted `Double` from scraped
+    /// JSON-LD. `Int(Double)` traps on out-of-range/non-finite values, so a
+    /// giant or infinite yield must return nil instead of crashing.
+    @Test func rejectsOutOfRangeDoubleServingsWithoutCrashing() {
+        #expect(JSONLDRecipeParser.parseServings(1e30) == nil)
+        #expect(JSONLDRecipeParser.parseServings(1e400) == nil)  // parses to .infinity
+        #expect(JSONLDRecipeParser.parseServings(Double.infinity) == nil)
+        #expect(JSONLDRecipeParser.parseServings(Double.nan) == nil)
     }
 }
 
