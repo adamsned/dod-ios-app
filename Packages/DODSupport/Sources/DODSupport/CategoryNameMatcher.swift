@@ -123,8 +123,44 @@ public enum CategoryNameMatcher {
         // DUT-317: gate rule 4 on the same minimum-length floor as rule 3
         // so a short topic token (e.g. a 3-char category topic) can't
         // substring-match an unrelated query and fan out a fetch.
-        if topic.count >= Self.substringOfTopicMinLength, query.contains(topic) {
+        // DUT-508: require whole-word containment — raw substring matching
+        // false-positives when a short topic is embedded in a larger word
+        // (topic "rice" inside query "licorice"). The topic must appear as a
+        // standalone token in the query (a query token equal to the topic still
+        // matches, e.g. "rice pilaf" → topic "rice").
+        if topic.count >= Self.substringOfTopicMinLength, containsWholeWord(topic, in: query) {
             return true
+        }
+        return false
+    }
+
+    /// True when `topic` appears inside `query` bounded by word boundaries —
+    /// i.e. it is not embedded in a larger alphanumeric run. Prevents the
+    /// embedded-substring false match ("rice" inside "licorice") while still
+    /// matching a real occurrence, including a multi-word topic phrase
+    /// ("side dish" inside "easy side dish ideas") and a single query token
+    /// ("rice" in "rice pilaf"). A character is a "boundary" when it isn't a
+    /// letter or number, so spaces and edges qualify but adjacent letters do
+    /// not.
+    private static func containsWholeWord(_ topic: String, in query: String) -> Bool {
+        var searchStart = query.startIndex
+        while let range = query.range(of: topic, range: searchStart..<query.endIndex) {
+            let leftIsBoundary: Bool
+            if range.lowerBound == query.startIndex {
+                leftIsBoundary = true
+            } else {
+                let before = query[query.index(before: range.lowerBound)]
+                leftIsBoundary = !before.isLetter && !before.isNumber
+            }
+            let rightIsBoundary: Bool
+            if range.upperBound == query.endIndex {
+                rightIsBoundary = true
+            } else {
+                let after = query[range.upperBound]
+                rightIsBoundary = !after.isLetter && !after.isNumber
+            }
+            if leftIsBoundary, rightIsBoundary { return true }
+            searchStart = query.index(after: range.lowerBound)
         }
         return false
     }

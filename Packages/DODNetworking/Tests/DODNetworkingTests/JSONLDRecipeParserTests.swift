@@ -227,6 +227,55 @@ import Testing
         #expect(recipe.nutrition?.calories == "210 kcal")
         #expect(recipe.video?.duration == .seconds(150))
     }
+
+    /// DUT-509: the parsed `Recipe` must carry the merged `RecipeListItem`'s
+    /// `categoryIDs` so `loadRelated(forCategoryID:)` has a category on the very
+    /// first parse — before the fix `mapRecipe` hard-coded `categoryIDs: []`, so
+    /// the related-recipes strip stayed empty until a later cache reconcile.
+    @Test func carriesListItemCategoryIDs() throws {
+        let listItem = RecipeListItem(
+            id: 42,
+            title: "Test Recipe",
+            excerpt: "Tasty.",
+            heroImage: nil,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            totalTimeDisplay: nil,
+            categoryIDs: [336, 1590]
+        )
+        let html = #"""
+            <script type="application/ld+json">
+            {"@context":"https://schema.org/","@type":"Recipe","name":"Skillet Corn",
+             "recipeIngredient":["2 cans corn"],
+             "recipeInstructions":[{"@type":"HowToStep","text":"Cook."}]}
+            </script>
+            """#
+
+        let recipe = try JSONLDRecipeParser.parse(
+            html: html,
+            merging: listItem,
+            canonicalURL: Self.canonical
+        )
+        #expect(recipe.categoryIDs == [336, 1590])
+    }
+
+    /// DUT-509: a `RecipeListItem` with no `categoryIDs` (nil) still yields an
+    /// empty array rather than crashing — the `?? []` fallback holds.
+    @Test func absentCategoryIDsDefaultToEmpty() throws {
+        let html = #"""
+            <script type="application/ld+json">
+            {"@context":"https://schema.org/","@type":"Recipe","name":"Skillet Corn",
+             "recipeIngredient":["2 cans corn"],
+             "recipeInstructions":[{"@type":"HowToStep","text":"Cook."}]}
+            </script>
+            """#
+
+        let recipe = try JSONLDRecipeParser.parse(
+            html: html,
+            merging: Self.listItem,
+            canonicalURL: Self.canonical
+        )
+        #expect(recipe.categoryIDs.isEmpty)
+    }
 }
 
 @Suite("JSONLDRecipeParser WPRM card fallback (DUT-42)") struct WPRMFallbackTests {

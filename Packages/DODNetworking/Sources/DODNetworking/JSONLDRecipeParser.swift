@@ -148,7 +148,7 @@ public enum JSONLDRecipeParser {
             canonicalURL: canonicalURL,
             heroImage: listItem.heroImage,
             heroImageLargeURL: nil,
-            categoryIDs: [],
+            categoryIDs: listItem.categoryIDs ?? [],
             publishedAt: listItem.publishedAt,
             ingredients: ingredients,
             instructions: instructions,
