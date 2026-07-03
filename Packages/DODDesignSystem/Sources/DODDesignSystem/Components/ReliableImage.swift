@@ -94,6 +94,45 @@ enum ReliableImageRetry {
     }
 }
 
+/// DUT-516: an in-flight coalescing map keyed by URL. Two concurrent callers for
+/// the same URL share ONE underlying `Task` (one network fetch + one off-main
+/// decode) instead of each issuing a separate request; the entry is removed with
+/// identity-checked cleanup when the task completes (mirrors `ImageLoader` in
+/// DODNetworking, re-implemented locally so DODDesignSystem takes no dependency
+/// on DODNetworking).
+///
+/// Generic over the produced value + the run closure so the coalescing logic is
+/// unit-testable without UIKit: the test drives it with a trivial value type and
+/// asserts N concurrent same-key calls trigger exactly ONE run.
+///
+/// The stored `Task` is unstructured, so an individual caller's cancellation
+/// (its `.task(id:)` being torn down when a cell recycles) does NOT cancel the
+/// shared task for the other callers still awaiting it (DUT-201-safe).
+actor InFlightCoalescer<Key: Hashable & Sendable, Value: Sendable> {
+
+    private var inFlight: [Key: Task<Value, Never>] = [:]
+
+    /// Diagnostic / test introspection: how many distinct keys are mid-flight.
+    var inFlightCount: Int { inFlight.count }
+
+    /// Return the value for `key`, sharing an in-flight task when one exists.
+    /// The first caller for a key starts `run`; concurrent callers await the
+    /// same task. `run` is invoked at most once per in-flight generation.
+    func value(for key: Key, run: @Sendable @escaping () async -> Value) async -> Value {
+        if let existing = inFlight[key] {
+            return await existing.value
+        }
+        let task = Task<Value, Never> { await run() }
+        inFlight[key] = task
+        let value = await task.value
+        // Identity-checked cleanup: only clear the slot if it still holds THIS
+        // task, so a newer task queued for the same key after we finished isn't
+        // clobbered (same guard as DODNetworking's `ImageLoader`).
+        if inFlight[key] == task { inFlight[key] = nil }
+        return value
+    }
+}
+
 #if canImport(UIKit)
 
 /// Shared in-memory cache of decoded recipe images, keyed by absolute URL.
@@ -156,12 +195,31 @@ final class ReliableImageLoader {
         return URLSession(configuration: configuration)
     }()
 
+    /// DUT-516: the shared result of one coalesced fetch+decode. `Sendable`
+    /// (`UIImage` is `Sendable`) so it crosses the coalescer actor cleanly.
+    /// `.cancelled` is preserved distinctly so a shared attempt that surfaced
+    /// `URLError(.cancelled)` leaves every caller's phase untouched (DUT-201),
+    /// exactly as the pre-coalescing loop did.
+    enum CoalescedOutcome: Sendable {
+        case image(UIImage)
+        case cancelled
+        case failed
+    }
+
+    /// DUT-516: process-wide in-flight coalescing keyed by URL. Two visible cells
+    /// with the same hero URL (or a cell reappearing mid-load) share ONE fetch +
+    /// decode instead of each issuing a separate request. Cancellation stays a
+    /// per-caller concern, so a recycled cell scrolling away never fails the load
+    /// for the other cells still sharing it (DUT-201-safe).
+    private nonisolated static let coalescer = InFlightCoalescer<URL, CoalescedOutcome>()
+
     func load(_ url: URL?) async {
         guard let url else {
             phase = .failure
             return
         }
-        // Cached decode -> instant, no flicker on scroll/reuse.
+        // Cached decode -> instant, no flicker on scroll/reuse. Short-circuits
+        // BEFORE coalescing so a cache hit never touches the shared map (DUT-516).
         if let cached = RecipeImageCache.shared.image(for: url) {
             phase = .success(Image(uiImage: cached))
             return
@@ -169,24 +227,50 @@ final class ReliableImageLoader {
         // New/uncached URL: show the placeholder while (re)loading so a reused
         // cell never flashes the previous recipe's photo.
         phase = .empty
+        // Recycled cell (DUT-201): the .task(id:) was cancelled — don't touch phase.
+        if Task.isCancelled { return }
+        // DUT-516: run the fetch+retry+decode through the coalescer so concurrent
+        // same-URL callers share one network task. The `run` closure is
+        // unstructured inside the coalescer, so THIS caller's cancellation never
+        // cancels the shared work for the others.
+        let outcome = await Self.coalescer.value(for: url) { await Self.fetchAndDecode(url) }
+        // Post-await cancellation re-check (DUT-201): a resumed-stale task must
+        // not overwrite the new URL's phase after the cell recycled.
+        if Task.isCancelled { return }
+        switch outcome {
+        case .image(let image):
+            RecipeImageCache.shared.insert(image, for: url)
+            phase = .success(Image(uiImage: image))
+        case .cancelled:
+            // The shared attempt surfaced URLError(.cancelled) — leave the phase
+            // alone; the next appearance reloads (DUT-201).
+            return
+        case .failed:
+            // Terminal failure (or exhausted retries): fall back to the offline
+            // disk provider, then fail (DUT-377). Per-caller, not shared.
+            await loadFromDiskOrFail(url)
+        }
+    }
+
+    /// DUT-516: the shared fetch+retry+decode body, run once per in-flight URL by
+    /// the coalescer. Preserves the DUT-520 retry policy: only a genuinely
+    /// transient blip retries once; a permanent error / decode failure is
+    /// terminal, and a `URLError(.cancelled)` is reported distinctly so a live
+    /// caller's phase is never flipped to failure (DUT-201).
+    private nonisolated static func fetchAndDecode(_ url: URL) async -> CoalescedOutcome {
         for _ in 0..<2 {
-            // Recycled cell (DUT-201): the .task(id:) was cancelled — don't touch phase.
-            if Task.isCancelled { return }
-            switch await Self.fetchOnce(url) {
+            switch await fetchOnce(url) {
             case .image(let image):
-                RecipeImageCache.shared.insert(image, for: url)
-                phase = .success(Image(uiImage: image))
-                return
+                return .image(image)
             case .cancelled:
-                return
+                return .cancelled
             case .failed:
-                await loadFromDiskOrFail(url)
-                return
+                return .failed
             case .retry:
                 continue
             }
         }
-        if !Task.isCancelled { await loadFromDiskOrFail(url) }
+        return .failed
     }
 
     /// DUT-377: the network gave up — fall back to the persisted image store
