@@ -152,8 +152,8 @@ public struct SettingsView: View {
                         + "Recipe Step Temperatures converts temperatures shown in the steps; "
                         + "\"Recipe Default\" shows them as written."
                 )
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
             }
             .listRowBackground(DODColor.surfaceElevated)
 
