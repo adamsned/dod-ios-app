@@ -119,6 +119,82 @@ import Testing
         )
     }
 
+    @Test func supersededHydrationReArmsAndLaterToggleReHydrates() async {
+        // DUT-505: the lazy hydration Task flips `filterSupportHydrated = true`
+        // up front, then bails if a newer search superseded it. Before the fix
+        // it bailed WITHOUT resetting the flag, leaving it `true` with empty
+        // caches — so a later toggle early-returned from the hydration kickoff
+        // and filtered against empty maps → spurious "No results". The flag must
+        // reset to `false` on the superseded path so a later toggle re-hydrates.
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["soup"] = [
+            Self.makeItem(1, title: "Beef Soup"),
+            Self.makeItem(2, title: "Chicken Soup"),
+        ]
+        dependencies.categoryMap = [1: [10], 2: [20]]
+
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        viewModel.query = "soup"
+        await viewModel.runImmediateSearch()
+
+        // Default search: support fetch skipped, caches empty, flag not yet set.
+        #expect(dependencies.categoryIDsCalls.isEmpty)
+        #expect(!viewModel.filterSupportHydrated)
+
+        // Toggle a category chip — this synchronously flips the coalescing flag
+        // and spawns the detached hydration Task (its awaits haven't resolved).
+        viewModel.filters.categoryID = 10
+        #expect(viewModel.filterSupportHydrated)
+
+        // Simulate a newer search superseding the in-flight hydration before it
+        // commits: bump the generation the Task captured.
+        viewModel.searchGeneration &+= 1
+
+        // The superseded Task must reset the flag back to `false` (DUT-505),
+        // NOT leave it stuck `true` with empty caches.
+        for _ in 0..<200 where viewModel.filterSupportHydrated {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(!viewModel.filterSupportHydrated, "Superseded hydration must re-arm the flag")
+        // Caches stayed empty (the superseded Task didn't write them).
+        #expect(viewModel.lastCategoryIDsByRecipe.isEmpty)
+
+        // A subsequent toggle must re-hydrate and narrow to the matching row —
+        // NOT spuriously empty by filtering against empty maps.
+        viewModel.filters.categoryID = 20
+        for _ in 0..<200 where viewModel.items.map(\.id) != [2] {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(viewModel.items.map(\.id) == [2], "Later toggle must re-hydrate and narrow, not go empty")
+        #expect(!dependencies.categoryIDsCalls.isEmpty, "Later toggle must re-run the support fetch")
+        #expect(viewModel.state == .results)
+    }
+
+    @Test func clearReArmsFilterSupportHydration() async {
+        // DUT-505 hygiene: clearing the search re-arms hydration.
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["soup"] = [Self.makeItem(1, title: "Beef Soup")]
+        dependencies.categoryMap = [1: [10]]
+
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        viewModel.query = "soup"
+        await viewModel.runImmediateSearch()
+        viewModel.filters.categoryID = 10
+        for _ in 0..<200 where !viewModel.filterSupportHydrated {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        #expect(viewModel.filterSupportHydrated)
+
+        viewModel.clear()
+        #expect(!viewModel.filterSupportHydrated, "clear() must re-arm hydration")
+    }
+
     // MARK: - Helpers
 
     static func makeItem(_ id: Int, title: String) -> RecipeListItem {
