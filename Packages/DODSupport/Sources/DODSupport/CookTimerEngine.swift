@@ -34,14 +34,15 @@ public final class CookTimerEngine {
     /// Returns the created timer (for the caller to track / surface). A
     /// non-positive duration is ignored (returns nil) — nothing to count down.
     @discardableResult
-    public func start(label: String, duration: TimeInterval) -> CookTimer? {
+    public func start(label: String, duration: TimeInterval, recipeID: Int? = nil) -> CookTimer? {
         guard duration > 0 else { return nil }
         let now = clock()
         let timer = CookTimer(
             id: makeID(),
             label: label,
             duration: duration,
-            state: .running(endDate: now.addingTimeInterval(duration))
+            state: .running(endDate: now.addingTimeInterval(duration)),
+            recipeID: recipeID
         )
         timers.append(timer)
         return timer
