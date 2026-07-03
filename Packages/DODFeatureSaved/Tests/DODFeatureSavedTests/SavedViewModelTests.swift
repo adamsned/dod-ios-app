@@ -197,6 +197,26 @@ import Testing
         #expect(condition(), "condition did not become true within \(timeout)")
     }
 
+    /// DUT-481 — the remote-change subscription must NOT keep the view model
+    /// alive after it's released. Before the fix, `guard let self` upgraded to a
+    /// strong reference held for the whole (never-ending) `for await`, so the
+    /// task pinned the VM forever and `deinit` could never run (VM → Task →
+    /// self → VM). With the per-iteration weak touch, dropping the last strong
+    /// reference must deinit the VM (which cancels the task).
+    @Test func startObservingDoesNotLeakTheViewModel() async {
+        let dependencies = FakeSavedDependencies()
+        weak var weakViewModel: SavedViewModel?
+        do {
+            let viewModel = SavedViewModel(dependencies: dependencies)
+            weakViewModel = viewModel
+            viewModel.startObserving()
+            // Let the observing task reach its `for await` suspension.
+            await Self.expectEventually { dependencies.remoteChangesCallCount > 0 }
+        }
+        await Self.expectEventually { weakViewModel == nil }
+        #expect(weakViewModel == nil, "SavedViewModel leaked past its last strong reference")
+    }
+
     static func makeRecipe(id: Int) -> Recipe {
         Recipe(
             id: id,
@@ -232,6 +252,9 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     /// CloudKit import landing, then asserts the view model re-fetched.
     private let remoteChangeStream: AsyncStream<Void>
     private let remoteChangeContinuation: AsyncStream<Void>.Continuation
+    /// Number of times ``remoteChanges()`` has been called — lets the DUT-481
+    /// leak test confirm the observing task actually started before release.
+    private(set) var remoteChangesCallCount = 0
 
     init() {
         (remoteChangeStream, remoteChangeContinuation) = AsyncStream.makeStream()
@@ -253,7 +276,8 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     func isOnline() async -> Bool { online }
 
     func remoteChanges() -> AsyncStream<Void> {
-        remoteChangeStream
+        remoteChangesCallCount += 1
+        return remoteChangeStream
     }
 
     /// Simulate one CloudKit remote-import signal reaching the view model.
