@@ -65,6 +65,5 @@ extension RecipeDetailViewModel {
     }
 
     /// Moderation contact — also the Guideline 1.2 "published contact" surface.
-    /// Confirm/replace with the real moderation inbox before release.
-    static var moderationContactEmail: String { "support@dutchovendaddy.com" }
+    static var moderationContactEmail: String { "daddy@dutchovendaddy.com" }
 }
