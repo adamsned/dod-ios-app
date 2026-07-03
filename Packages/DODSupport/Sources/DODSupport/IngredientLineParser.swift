@@ -5,17 +5,20 @@ import Foundation
 /// Produced by ``IngredientLineParser`` and consumed by
 /// ``IngredientAggregator``. A line with no recoverable leading quantity has
 /// all-`nil` numeric fields and is treated as unmergeable verbatim text.
-struct ParsedIngredientLine {
+/// Exposed `public` (DUT-517) so the imperial→metric converter in
+/// ``IngredientMetricConverter`` can reuse the same leading-quantity + unit
+/// scan the aggregator relies on, instead of replicating it.
+public struct ParsedIngredientLine {
     /// The verbatim input (the display text + classify source when no quantity
     /// was parsed).
-    let originalText: String
+    public let originalText: String
     /// Leading quantity, or `nil` when none was found.
-    let quantity: Double?
+    public let quantity: Double?
     /// Normalized singular unit (`"cup"`), or `nil`.
-    let unit: String?
+    public let unit: String?
     /// Whitespace-collapsed ingredient name (original case), or `nil` when no
     /// quantity/name structure was recoverable.
-    let name: String?
+    public let name: String?
 
     /// What the aisle classifier should look at: the parsed name when we have
     /// one, otherwise the whole original line.
@@ -31,10 +34,10 @@ struct ParsedIngredientLine {
 /// Spec trace: US-39 / AC-39.4 + AC-39.7 (the substrate ``IngredientAggregator``
 /// merges on). CL-70 + CL-80. The unit list + vulgar-fraction table mirror the
 /// CL-67 tokenizer regex and ``FractionRenderer`` so the parsers agree.
-enum IngredientLineParser {
+public enum IngredientLineParser {
 
     /// Parse a raw ingredient line.
-    static func parse(_ text: String) -> ParsedIngredientLine {
+    public static func parse(_ text: String) -> ParsedIngredientLine {
         let unparseable = ParsedIngredientLine(
             originalText: text,
             quantity: nil,

@@ -55,6 +55,14 @@ public struct CookModeView: View {
     @AppStorage(TemperatureConverter.preferenceKey)
     var temperatureUnitRaw: String = ""
 
+    /// DUT-517 — the same "Use Metric Units" preference Recipe Detail reads, so
+    /// the Cook Mode ingredient drawer shows the metric measurements the user
+    /// saw a tap earlier rather than reverting to the author's imperial units on
+    /// the one screen they cook from. Applied to the already-scaled line;
+    /// non-convertible lines pass through unchanged. Display-time transform only.
+    @AppStorage(IngredientMetricConverter.preferenceKey)
+    var useMetricUnits: Bool = false
+
     public init(
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
@@ -291,9 +299,10 @@ extension CookModeView {
     /// extension so the type body stays under the SwiftLint length cap.
     @ViewBuilder
     fileprivate func ingredientRow(for ingredient: RecipeIngredient) -> some View {
+        let scaled = FractionRenderer.scale(ingredient.text, by: ingredientScaleFactor)
         IngredientCheckRow(
             ingredient: ingredient,
-            displayText: FractionRenderer.scale(ingredient.text, by: ingredientScaleFactor),
+            displayText: useMetricUnits ? IngredientMetricConverter.metric(scaled) : scaled,
             isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
             onToggle: { viewModel.toggleIngredient(ingredient.id) }
         )

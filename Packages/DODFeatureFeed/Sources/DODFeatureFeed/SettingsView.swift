@@ -118,26 +118,18 @@ public struct SettingsView: View {
             // one titled section so the two unit-related controls sit
             // together instead of scattered across the page.
             Section {
-                // DUT-307 — the "Use Metric Units" flag persists but NO code
-                // reads it (whole-repo grep finds no consumer): a dead control
-                // that erodes trust. Disable it with a "Coming soon" caption
-                // until the ingredient-conversion consumer (DUT-43) lands. The
-                // stored property + `useMetricUnitsKey` are retained so the
-                // persisted preference survives for that work.
-                VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                    Toggle(isOn: useMetricUnitsBinding) {
-                        Text("Use Metric Units")
-                            .dodFont(DODType.body)
-                            .foregroundStyle(DODColor.label)
-                    }
-                    .disabled(true)
-                    .accessibilityIdentifier("settings-toggle-metric")
-
-                    Text("Coming soon")
-                        .dodFont(DODType.caption)
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .accessibilityIdentifier("settings-toggle-metric-coming-soon")
+                // DUT-517 — the "Use Metric Units" toggle now drives a live
+                // consumer: `IngredientMetricConverter` rewrites each scaled
+                // ingredient line to metric (grams / millilitres) at display
+                // time in Recipe Detail + the Cook Mode drawer. The former
+                // DUT-307 "Coming soon" gate (disabled toggle + caption) is
+                // removed now that the conversion path exists.
+                Toggle(isOn: useMetricUnitsBinding) {
+                    Text("Use Metric Units")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
                 }
+                .accessibilityIdentifier("settings-toggle-metric")
 
                 Picker(selection: temperaturePreferenceBinding) {
                     ForEach(TemperaturePreference.allCases, id: \.self) { value in
@@ -155,9 +147,13 @@ public struct SettingsView: View {
             } header: {
                 sectionHeader("Measurements & Units")
             } footer: {
-                Text("Converts temperatures shown in the steps. \"Recipe Default\" shows them as written.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                Text(
+                    "Use Metric Units converts ingredient measurements to metric (grams, milliliters). "
+                        + "Recipe Step Temperatures converts temperatures shown in the steps; "
+                        + "\"Recipe Default\" shows them as written."
+                )
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
             }
             .listRowBackground(DODColor.surfaceElevated)
 
