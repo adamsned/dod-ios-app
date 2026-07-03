@@ -223,4 +223,37 @@ struct SyncedSavedRecipeTests {
         _ = try await store.toggleSaved(id: 9)  // unsave empties the set
         #expect(try await store.hasAnySyncedSaved() == false)
     }
+
+    /// DUT-468 — a local save writes BOTH the synced row and the `isSaved` pin,
+    /// so it appears in both id sets. An import-delivered row (a raw
+    /// `SyncedSavedRecipe` insert with no `CachedRecipe`) appears only in the
+    /// synced set — the discriminator the launch backfill relies on to tell a
+    /// save made during the import wait from a genuinely remote save.
+    @Test("syncedSavedIDSet / locallyPinnedSavedIDSet distinguish local saves from imports")
+    func idSetsDistinguishLocalSaveFromImport() async throws {
+        let container = try RecipeStore.inMemoryContainer()
+        let store = RecipeStore(modelContainer: container)
+        #expect(try await store.syncedSavedIDSet().isEmpty)
+        #expect(try await store.locallyPinnedSavedIDSet().isEmpty)
+
+        // A local save: both sets carry the id.
+        try await store.cache(listItem: sampleListItem(id: 30, title: "Local Save"))
+        _ = try await store.toggleSaved(id: 30)
+        #expect(try await store.syncedSavedIDSet() == [30])
+        #expect(try await store.locallyPinnedSavedIDSet() == [30])
+
+        // An import-delivered row: a synced row with no local pin.
+        let setup = ModelContext(container)
+        setup.insert(
+            SyncedSavedRecipe(
+                id: 31,
+                title: "Imported From Another Device",
+                excerptText: "Excerpt",
+                canonicalURLString: "https://dutchovendaddy.com/31"
+            )
+        )
+        try setup.save()
+        #expect(try await store.syncedSavedIDSet() == [30, 31])
+        #expect(try await store.locallyPinnedSavedIDSet() == [30])  // 31 has no pin
+    }
 }
