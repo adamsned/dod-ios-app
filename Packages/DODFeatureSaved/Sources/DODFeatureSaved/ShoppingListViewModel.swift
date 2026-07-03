@@ -73,6 +73,14 @@ public final class ShoppingListViewModel {
         self.items = items
     }
 
+    /// Start empty (DUT-487 / T-906) — the list opens empty-first and fills in
+    /// place once the user picks recipes from the builder sheet. Delegates to
+    /// ``init(items:)`` with no rows so ``ShoppingListView`` can be constructed
+    /// before any recipe is chosen.
+    public convenience init() {
+        self.init(items: [])
+    }
+
     // MARK: - Derived render model
 
     /// `true` when there are no still-need rows to show (drives AC-39.1's
@@ -131,6 +139,15 @@ public final class ShoppingListViewModel {
         alreadyHaveIDs.insert(item.id)
         checkedIDs.remove(item.id)
     }
+
+    /// Append more recipes' ingredients to the list in place (DUT-487 / T-906).
+    /// Explodes + classifies each recipe's ingredients into per-recipe rows and
+    /// appends them, keeping every existing row. No de-dup — per-recipe rows are
+    /// intentional (CL-77), so adding a recipe already on the list stacks its
+    /// rows again. Backs the "Add recipes" affordance on the populated list.
+    public func add(recipes: [Recipe]) {
+        items.append(contentsOf: Self.rows(from: recipes))
+    }
 }
 
 // MARK: - Construction from recipes
@@ -142,7 +159,15 @@ extension ShoppingListViewModel {
     /// (CL-77 — no cross-recipe merge). This is the shape T-680c's production
     /// initializer reuses once the entry surfaces feed real recipes in.
     public convenience init(recipes: [Recipe]) {
-        let rows = recipes.flatMap { recipe in
+        self.init(items: Self.rows(from: recipes))
+    }
+
+    /// Explode `recipes` into per-recipe ``Item`` rows, each classified through
+    /// ``IngredientAisleClassifier`` (CL-77 — no cross-recipe merge). Shared by
+    /// ``init(recipes:)`` and ``add(recipes:)`` (DUT-487 / T-906) so the initial
+    /// build and later appends produce identical rows.
+    private static func rows(from recipes: [Recipe]) -> [Item] {
+        recipes.flatMap { recipe in
             recipe.ingredients.map { ingredient in
                 Item(
                     ingredientText: ingredient.text,
@@ -151,7 +176,6 @@ extension ShoppingListViewModel {
                 )
             }
         }
-        self.init(items: rows)
     }
 }
 

@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODDomain
 import DODSupport
 import SwiftUI
 
@@ -21,8 +22,21 @@ public struct ShoppingListView: View {
 
     @State private var viewModel: ShoppingListViewModel
 
-    public init(viewModel: ShoppingListViewModel) {
+    /// DUT-487 / T-906 — the recipe picker is now owned here (was
+    /// ``SavedView``'s builder-sheet-first path). Presented from the empty
+    /// state's "Build List" button and the populated "Add recipes" `+`; on
+    /// confirm the picked recipes append via ``ShoppingListViewModel/add(recipes:)``
+    /// so the same view fills / grows in place instead of pushing a new screen.
+    @State private var isPickingRecipes = false
+
+    /// The saved recipes the picker chooses from. Empty when the list opens
+    /// standalone (e.g. the `dod://shopping-list` deep link); ``SavedView``
+    /// keeps this fed so the Saved-tab entry can pick straight away.
+    private let recipes: [Recipe]
+
+    public init(viewModel: ShoppingListViewModel, recipes: [Recipe] = []) {
         _viewModel = State(initialValue: viewModel)
+        self.recipes = recipes
     }
 
     public var body: some View {
@@ -30,6 +44,30 @@ public struct ShoppingListView: View {
             .background(DODColor.surface)
             .navigationTitle("Shopping List")
             .toolbar { shareToolbar }
+            .toolbar { addToolbar }
+            .sheet(isPresented: $isPickingRecipes) {
+                ShoppingListBuilderSheet(recipes: recipes) { selected in
+                    viewModel.add(recipes: selected)
+                }
+            }
+    }
+
+    /// DUT-487 / T-906 — the populated-state "Add recipes" `+`. Opens the same
+    /// picker as the empty state; confirming appends the new recipes' rows
+    /// (AC-39.3). Hidden while empty (the empty state carries its own primary
+    /// "Build List" button).
+    @ToolbarContentBuilder
+    private var addToolbar: some ToolbarContent {
+        if !viewModel.isEmpty {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isPickingRecipes = true
+                } label: {
+                    Label("Add recipes", systemImage: "plus")
+                }
+                .accessibilityIdentifier("shopping-list-add")
+            }
+        }
     }
 
     /// AC-39.7 / CL-85 decision 3 — "Share via iMessage". A SwiftUI `ShareLink`
@@ -55,11 +93,18 @@ public struct ShoppingListView: View {
     @ViewBuilder
     private var content: some View {
         if viewModel.isEmpty {
+            // DUT-487 / T-906 — empty-first: the list opens empty and offers a
+            // primary "Build List" button that presents the recipe picker, so
+            // building a list is the obvious next step from right here.
             EmptyState(
                 systemImage: "cart",
                 title: "Your shopping list is empty",
-                message: "Tap a saved recipe and add its ingredients here"
+                message: "Build a list from your saved recipes and we'll sort everything by store aisle.",
+                action: .init(title: "Build List") {
+                    isPickingRecipes = true
+                }
             )
+            .accessibilityIdentifier("shopping-list-build")
         } else {
             list
                 .scrollContentBackground(.hidden)
@@ -195,6 +240,6 @@ private struct AisleHeader: View {
 
 #Preview("Shopping list — empty") {
     NavigationStack {
-        ShoppingListView(viewModel: ShoppingListViewModel(items: []))
+        ShoppingListView(viewModel: ShoppingListViewModel())
     }
 }
