@@ -74,6 +74,31 @@ import Testing
         #expect(viewModel.items.count == 40, "pagination must resume after a transient failure")
     }
 
+    @Test func severalLoadMorePagesStayDedupedAndOrdered() async throws {
+        // DUT-516: paging through several pages must preserve page order and
+        // never duplicate a row, even when a later page re-includes an id from
+        // an earlier page (WP pagination can shift/repeat items between fetches).
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = (1...20).map(Self.makeItem)
+        // Page 2 overlaps page 1 on id 20 (a duplicate the dedup must drop).
+        dependencies.pages[2] = (20...40).map(Self.makeItem)
+        // Page 3 overlaps page 2 on id 40.
+        dependencies.pages[3] = (40...60).map(Self.makeItem)
+        dependencies.totalPagesOverride = 3
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.items.map(\.id) == Array(1...20))
+
+        var last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)  // -> page 2
+        last = try #require(viewModel.items.last)
+        await viewModel.loadMoreIfNeeded(currentItem: last)  // -> page 3
+
+        // Exactly the union 1...60 in order, no duplicate for the overlapping ids.
+        #expect(viewModel.items.map(\.id) == Array(1...60))
+        #expect(Set(viewModel.items.map(\.id)).count == viewModel.items.count, "no duplicates")
+    }
+
     @Test func firstLaunchOfflineShowsEmptyState() async throws {
         let dependencies = FakeFeedDependencies()
         dependencies.shouldFail = true

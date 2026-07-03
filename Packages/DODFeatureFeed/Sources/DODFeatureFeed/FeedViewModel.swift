@@ -35,6 +35,13 @@ public final class FeedViewModel {
     private let dependencies: FeedDependencies
     private var currentPage: Int = 0
     private var reachedEnd: Bool = false
+    /// DUT-516: O(1) membership set mirroring `items` ids, so `loadMore` can
+    /// append only a page's genuinely-new items instead of rebuilding the whole
+    /// id list with an O(n²) `reduce`+`contains` and re-projecting every
+    /// accumulated row. Kept in lockstep with `items`: reset (via `resetItems`)
+    /// wherever `items` is replaced (`loadInitial` commit / cache hydrate) and
+    /// extended as `loadMore` appends.
+    private var seenIDs = Set<Int>()
     /// DUT-511: monotonic load token (same pattern as `SearchViewModel`'s
     /// `searchGeneration`). `loadInitial` and `loadMore` each bump it at the
     /// start and capture the value locally; after every `await` they re-check
@@ -231,6 +238,15 @@ public final class FeedViewModel {
 
     // MARK: - Private
 
+    /// DUT-516: replace `items` wholesale and rebuild the `seenIDs` membership
+    /// set in one step so the two never drift. Used by every path that resets
+    /// the feed (`loadInitial` commit, offline-cache hydrate); `loadMore`
+    /// appends instead (see below).
+    private func resetItems(_ newItems: [RecipeListItem]) {
+        items = newItems
+        seenIDs = Set(newItems.map(\.id))
+    }
+
     /// DUT-382: single in-flight latch shared by `loadInitial` + `loadMore` so
     /// `loadMoreIfNeeded` can't spawn a concurrent `loadMore` during a
     /// populated-grid pull-to-refresh (which keeps `loadState == .loaded` per
@@ -265,7 +281,7 @@ public final class FeedViewModel {
             // DUT-511: a newer load (e.g. a second refresh) superseded us while
             // we awaited — drop our writes rather than clobber the fresh list.
             guard generation == loadGeneration else { return }
-            items = fetched
+            resetItems(fetched)
             currentPage = 1
             loadState = items.isEmpty ? .empty : .loaded
             // DUT-237: stop at the real last page (X-WP-TotalPages), not at the
@@ -282,7 +298,7 @@ public final class FeedViewModel {
             if !forceReplace, let hydrated = await hydratedFromCache(), !hydrated.isEmpty {
                 // DUT-511: bail if a newer load superseded this failed one.
                 guard generation == loadGeneration else { return }
-                items = hydrated
+                resetItems(hydrated)
                 isOffline = true
                 loadState = .loaded
                 return
@@ -323,15 +339,18 @@ public final class FeedViewModel {
         do {
             let page = try await dependencies.fetchPosts(page: nextPage)
             try await dependencies.cache(listItems: page.items)
-            let ids = (items.map(\.id) + page.items.map(\.id)).reduce(into: [Int]()) { acc, id in
-                if !acc.contains(id) { acc.append(id) }
-            }
-            let fetched = try await dependencies.cachedListItems(forIDs: ids)
+            // DUT-516: fetch ONLY this page's ids (not the whole accumulated
+            // list) and append the not-yet-seen items in page order. The cache
+            // read can drop ids (blocklist filtering), so dedupe on the freshly
+            // cached page rather than on the raw page ids.
+            let fetched = try await dependencies.cachedListItems(forIDs: page.items.map(\.id))
             // DUT-511: a `refresh()` (or newer load) superseded this page while
             // we awaited — drop these stale writes rather than clobber the fresh
-            // list / rewind `currentPage` to the stale page-2 cursor.
+            // list / rewind `currentPage` to the stale page-2 cursor. Re-checked
+            // AFTER the awaits and before any mutation of `items`/`seenIDs`.
             guard generation == loadGeneration else { return }
-            items = fetched
+            let newItems = fetched.filter { seenIDs.insert($0.id).inserted }
+            items.append(contentsOf: newItems)
             currentPage = nextPage
             // DUT-237: stop at the real last page (X-WP-TotalPages).
             reachedEnd = currentPage >= page.totalPages
