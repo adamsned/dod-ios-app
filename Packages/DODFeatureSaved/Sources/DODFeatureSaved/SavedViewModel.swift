@@ -164,6 +164,18 @@ public final class SavedViewModel {
         loadState = recipes.isEmpty ? .empty : .loaded
     }
 
+    /// DUT-513 — drop a recipe's optimistic-unsave suppression the instant it is
+    /// re-saved, so an unsave→re-save within ``pendingRemovalTTL`` doesn't keep
+    /// the (now legitimately-saved) recipe hidden from the grid until the TTL
+    /// expires. Call this from the re-save surface (the Saved-tab card's own
+    /// Save toggle, and any external surface that re-saves a recipe the user
+    /// just unsaved here). Idempotent and safe for ids that were never pending.
+    /// Preserves the DUT-482 TTL bound — that still governs the genuine
+    /// write-in-flight case; this only clears the entry on a real re-save.
+    public func clearPendingRemoval(id: Int) {
+        pendingRemovals[id] = nil
+    }
+
     /// T-775 / DUT-81 — un-download from the Saved-tab context menu. Clears the
     /// "Downloaded" badge optimistically (mirrors ``optimisticallyRemove(id:)``)
     /// so the capsule disappears instantly, then routes the store write through
