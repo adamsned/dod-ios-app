@@ -6,6 +6,13 @@ public struct SavedView: View {
 
     @State private var viewModel: SavedViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// DUT-530 — the unified list/grid preference shared with Feed + Search via
+    /// the same `@AppStorage` key (set from Settings ▸ Customization). Saved was
+    /// hardcoded to the grid; it now branches like the other tabs. Default
+    /// `.gallery` keeps the existing 2-col grid byte-identical for users who
+    /// never toggle. Mirrors `FeedView`'s declaration.
+    @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
+        RecipeListLayout.gallery.rawValue
     public let onSelect: (Recipe) -> Void
     /// US-34 / AC-34.1 / AC-34.6 — long-press → state-aware Save/Unsave
     /// context menu wiring. See `FeedView.onSave`; this surface passes a
@@ -152,76 +159,131 @@ public struct SavedView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded:
+            // DUT-530 — branch on the unified list/grid preference (shared with
+            // Feed + Search via the same `@AppStorage` key). `.gallery` keeps the
+            // existing 2-col `LazyVGrid`; `.list` renders `RecipeCard.ListRow`s
+            // via `adaptiveListRows`, mirroring `FeedView.listContent`.
+            let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
             ScrollView {
-                LazyVGrid(
-                    columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
-                    spacing: DODSpacing.md
-                ) {
-                    ForEach(viewModel.recipes) { recipe in
-                        RecipeCard(
-                            title: recipe.title,
-                            excerpt: recipe.excerpt,
-                            heroImageURL: recipe.heroImage,
-                            // CL-255 — cook-time chip omitted (browse declutter);
-                            // time is on the recipe detail page + Search's filter.
-                            // T-774 / DUT-80 — badge the cards that are saved
-                            // AND downloaded for offline use.
-                            isDownloaded: viewModel.downloadedIDs.contains(recipe.id)
-                        )
-                        .recipeCardTap { onSelect(recipe) }
-                        // T-638 / CL-107 — stable test handle for the L5 E2E
-                        // `test_long_press_unsave_from_saved_tab` (long-presses
-                        // the card → asserts the context menu reads "Unsave"
-                        // not "Save" → taps Unsave → asserts the card is gone
-                        // within 0.5s, the frame-tight window that catches a
-                        // regression to non-optimistic removal — pins CL-104 /
-                        // T-635 + REG-21). The identifier is applied AFTER
-                        // `recipeCardTap` so it survives the
-                        // `accessibilityElement(children: .combine)` consolidation
-                        // that the tap modifier applies — the identifier
-                        // attaches to the combined accessibility element,
-                        // which is the element XCUITest queries via
-                        // `app.buttons.matching(identifier:)`.
-                        .accessibilityIdentifier("dod.saved.card")
-                        // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) —
-                        // every card in the Saved tab is by definition
-                        // saved (the source is `RecipeStore.savedRecipes()`),
-                        // so `isSaved: true` is a constant here. The
-                        // `onToggle` closure routes through the same
-                        // `onSave?(recipe)` path; `RecipeStore.toggleSaved`
-                        // flips in both directions, so tapping "Unsave"
-                        // correctly transitions the row to `isSaved == false`.
-                        .recipeCardContextMenu(
-                            isSaved: true,
-                            // T-775 / DUT-81 — surfaces "Remove Download" only
-                            // for the saved cards that are also downloaded.
-                            isDownloaded: viewModel.downloadedIDs.contains(recipe.id),
-                            onToggle: {
-                                // T-635 / CL-104 — optimistic local removal so
-                                // the card disappears instantly; the store toggle
-                                // bubbles through `TabStack.saveFromCard(...)`
-                                // without a completion callback, so without this
-                                // the row lingers until the next `.task` cycle
-                                // (tab switch). Order matters: UI first, then
-                                // persistence fires asynchronously.
-                                viewModel.optimisticallyRemove(id: recipe.id)
-                                onSave?(recipe)
-                            },
-                            onRemoveDownload: {
-                                // T-775 / DUT-81 — un-download clears the badge
-                                // optimistically (the card stays — un-download ≠
-                                // unsave). DUT-84 — but offline, removal would
-                                // strand the recipe, so route through
-                                // `requestRemoveDownload`, which confirms first
-                                // when there's no connection and removes
-                                // immediately when online.
-                                Task { await viewModel.requestRemoveDownload(id: recipe.id) }
-                            }
-                        )
+                Group {
+                    switch layout {
+                    case .gallery:
+                        galleryContent
+                    case .list:
+                        listContent
                     }
                 }
                 .padding(.horizontal, DODSpacing.md)
                 .padding(.vertical, DODSpacing.md)
+            }
+        }
+    }
+
+    /// DUT-530 — the existing 2-col `LazyVGrid` of `RecipeCard`s, unchanged
+    /// (only lifted out of `loadStateBody` so `.loaded` can branch on layout).
+    /// `.gallery` keeps the Saved grid byte-identical to the pre-DUT-530 render.
+    private var galleryContent: some View {
+        LazyVGrid(
+            columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+            spacing: DODSpacing.md
+        ) {
+            ForEach(viewModel.recipes) { recipe in
+                RecipeCard(
+                    title: recipe.title,
+                    excerpt: recipe.excerpt,
+                    heroImageURL: recipe.heroImage,
+                    // CL-255 — cook-time chip omitted (browse declutter);
+                    // time is on the recipe detail page + Search's filter.
+                    // T-774 / DUT-80 — badge the cards that are saved
+                    // AND downloaded for offline use.
+                    isDownloaded: viewModel.downloadedIDs.contains(recipe.id)
+                )
+                .recipeCardTap { onSelect(recipe) }
+                // T-638 / CL-107 — stable test handle for the L5 E2E
+                // `test_long_press_unsave_from_saved_tab` (long-presses
+                // the card → asserts the context menu reads "Unsave"
+                // not "Save" → taps Unsave → asserts the card is gone
+                // within 0.5s, the frame-tight window that catches a
+                // regression to non-optimistic removal — pins CL-104 /
+                // T-635 + REG-21). The identifier is applied AFTER
+                // `recipeCardTap` so it survives the
+                // `accessibilityElement(children: .combine)` consolidation
+                // that the tap modifier applies — the identifier
+                // attaches to the combined accessibility element,
+                // which is the element XCUITest queries via
+                // `app.buttons.matching(identifier:)`.
+                .accessibilityIdentifier("dod.saved.card")
+                // US-34 / AC-34.6 / CL-103 (T-634, 2026-05-29) —
+                // every card in the Saved tab is by definition
+                // saved (the source is `RecipeStore.savedRecipes()`),
+                // so `isSaved: true` is a constant here. The
+                // `onToggle` closure routes through the same
+                // `onSave?(recipe)` path; `RecipeStore.toggleSaved`
+                // flips in both directions, so tapping "Unsave"
+                // correctly transitions the row to `isSaved == false`.
+                .recipeCardContextMenu(
+                    isSaved: true,
+                    // T-775 / DUT-81 — surfaces "Remove Download" only
+                    // for the saved cards that are also downloaded.
+                    isDownloaded: viewModel.downloadedIDs.contains(recipe.id),
+                    onToggle: {
+                        // T-635 / CL-104 — optimistic local removal so
+                        // the card disappears instantly; the store toggle
+                        // bubbles through `TabStack.saveFromCard(...)`
+                        // without a completion callback, so without this
+                        // the row lingers until the next `.task` cycle
+                        // (tab switch). Order matters: UI first, then
+                        // persistence fires asynchronously.
+                        viewModel.optimisticallyRemove(id: recipe.id)
+                        onSave?(recipe)
+                    },
+                    onRemoveDownload: {
+                        // T-775 / DUT-81 — un-download clears the badge
+                        // optimistically (the card stays — un-download ≠
+                        // unsave). DUT-84 — but offline, removal would
+                        // strand the recipe, so route through
+                        // `requestRemoveDownload`, which confirms first
+                        // when there's no connection and removes
+                        // immediately when online.
+                        Task { await viewModel.requestRemoveDownload(id: recipe.id) }
+                    }
+                )
+            }
+        }
+    }
+
+    /// DUT-530 — the dense single-column variant, mirroring
+    /// `FeedView.listContent`: `adaptiveListRows` (iPad tiles the rows into a
+    /// multi-column grid, iPhone keeps the single-column stack) of
+    /// `RecipeCard.ListRow`s. Preserves Saved's context-menu args verbatim
+    /// (`isSaved: true`, the downloaded check, the optimistic-remove +
+    /// remove-download handlers) so long-press Save/Unsave + Remove Download
+    /// work identically to the gallery. The row carries the real `isDownloaded`
+    /// so the compact download glyph (DUT-530) matches the gallery card's badge.
+    private var listContent: some View {
+        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
+            ForEach(viewModel.recipes) { recipe in
+                RecipeCard.ListRow(
+                    title: recipe.title,
+                    excerpt: recipe.excerpt,
+                    heroImageURL: recipe.heroImage,
+                    // T-774 / DUT-80 — same "saved AND downloaded" badge the
+                    // gallery card shows, in the row's compact glyph form.
+                    isDownloaded: viewModel.downloadedIDs.contains(recipe.id)
+                )
+                .recipeCardTap { onSelect(recipe) }
+                .accessibilityIdentifier("dod.saved.card")
+                .recipeCardContextMenu(
+                    isSaved: true,
+                    isDownloaded: viewModel.downloadedIDs.contains(recipe.id),
+                    onToggle: {
+                        viewModel.optimisticallyRemove(id: recipe.id)
+                        onSave?(recipe)
+                    },
+                    onRemoveDownload: {
+                        Task { await viewModel.requestRemoveDownload(id: recipe.id) }
+                    }
+                )
             }
         }
     }
