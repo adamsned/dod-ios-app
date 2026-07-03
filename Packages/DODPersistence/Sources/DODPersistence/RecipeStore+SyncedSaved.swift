@@ -125,6 +125,29 @@ extension RecipeStore {
         return try !modelContext.fetch(descriptor).isEmpty
     }
 
+    /// DUT-468 — the id set of all synced saved-rows. The launch backfill
+    /// snapshots this BEFORE the import wait (the baseline) and re-reads it
+    /// after, so it can tell import-delivered rows apart from a local save made
+    /// during the wait. Unlike ``hasAnySyncedSaved()`` this can't be poisoned by
+    /// a single local save because the caller subtracts the baseline and the
+    /// locally-pinned ids (see ``locallyPinnedSavedIDSet()``).
+    public func syncedSavedIDSet() throws -> Set<Int> {
+        Set(try modelContext.fetch(FetchDescriptor<SyncedSavedRecipe>()).map(\.id))
+    }
+
+    /// DUT-468 — the id set of local `isSaved` pins. `toggleSaved` sets this
+    /// pin AND writes the synced row in one transaction, whereas a CloudKit
+    /// import inserts the synced row WITHOUT a pin (the pin is reconciled later
+    /// in `mergeDetail`). So "synced row present, no pin" marks an
+    /// import-delivered save — the signal the backfill uses to detect that a
+    /// ≥V5 device already owns the set.
+    public func locallyPinnedSavedIDSet() throws -> Set<Int> {
+        let descriptor = FetchDescriptor<CachedRecipe>(
+            predicate: #Predicate { $0.isSaved == true }
+        )
+        return Set(try modelContext.fetch(descriptor).map(\.id))
+    }
+
     #if DEBUG
     /// Test-only: simulate a pre-V5 legacy save — a local `isSaved` pin with NO
     /// synced row — to exercise the DUT-302 mergeDetail-before-backfill race.

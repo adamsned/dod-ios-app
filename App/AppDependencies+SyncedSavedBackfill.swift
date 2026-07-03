@@ -19,10 +19,13 @@ extension AppDependencies {
     /// - sync opted OUT → seed immediately (no remote set can conflict; if the
     ///   user opts in later, sync starts from the seeded set).
     /// - sync ON, container open → defer (off the bootstrap path) until the
-    ///   first FINISHED CloudKit import, then reconcile: a non-empty imported
-    ///   set means another ≥V5 device already owns the live set — its absence
-    ///   of an id IS the user's unsave, so skip seeding entirely. An empty
-    ///   imported set means this is the user's first ≥V5 device → seed.
+    ///   first SUCCEEDED CloudKit import (DUT-469: a failed import that merely
+    ///   ended imported nothing), then reconcile against rows the import
+    ///   DELIVERED (DUT-468: not merely "any synced row" — a save made during
+    ///   the wait writes a row too). If the import brought down remote saves,
+    ///   another ≥V5 device already owns the live set — a local-only pin's
+    ///   absence IS the user's unsave, so skip seeding. If it delivered nothing,
+    ///   this is the user's first ≥V5 device → seed.
     /// - sync ON but the container failed to open (local fallback) → skip this
     ///   launch entirely; anything seeded now would sync up when the mirror
     ///   engages later, reopening the resurrection hole. Self-heals next launch.
@@ -42,18 +45,39 @@ extension AppDependencies {
             return
         }
         guard !usedCloudKitFallback else { return }  // DUT-240: retry next launch
+        // DUT-468: snapshot the synced id set BEFORE the wait, on the bootstrap
+        // path, so the post-import reconcile can tell import-delivered rows from
+        // a save the user makes during the wait window. (Empty on a first-launch
+        // upgrader; non-empty only if a prior session left rows.)
+        let baseline = (try? await store.syncedSavedIDSet()) ?? []
         // DUT-240: don't block bootstrap on the import wait — first-run prompt
         // and deep-link drains run right after it.
-        Task { await backfillAfterFirstCloudKitImport(flagKey: key) }
+        Task { await backfillAfterFirstCloudKitImport(flagKey: key, baselineSyncedIDs: baseline) }
     }
 
     /// DUT-240 — wait for the first finished CloudKit import (bounded), then
     /// reconcile-or-seed. A timeout leaves the flag unset so the next launch
     /// retries with (hopefully) a live mirror.
-    private func backfillAfterFirstCloudKitImport(flagKey: String) async {
+    private func backfillAfterFirstCloudKitImport(
+        flagKey: String,
+        baselineSyncedIDs: Set<Int>
+    ) async {
         guard await Self.waitForFirstFinishedImport(timeoutSeconds: 20) else { return }
-        let remoteSetIsLive = (try? await store.hasAnySyncedSaved()) ?? false
-        if remoteSetIsLive {
+        // DUT-468: judge "another ≥V5 device owns the set" by rows the import
+        // DELIVERED, not by any synced row existing. A local save during the
+        // wait writes a synced row too and would otherwise poison this into
+        // skipping the seed — permanently stranding every legacy pin. An
+        // import-delivered save has a synced row but no local pin yet; a local
+        // save has both. So subtract the launch baseline and the pinned ids.
+        let current = (try? await store.syncedSavedIDSet()) ?? []
+        let pinned = (try? await store.locallyPinnedSavedIDSet()) ?? []
+        guard
+            Self.shouldSeedAfterImport(
+                baselineSyncedIDs: baselineSyncedIDs,
+                currentSyncedIDs: current,
+                locallyPinnedIDs: pinned
+            )
+        else {
             // Another ≥V5 device already seeded the shared set; a local pin with
             // no synced row is a cross-device unsave, not a legacy save. Mark
             // complete so mergeDetail reconciles the stale pins DOWN (DUT-302).
@@ -62,6 +86,24 @@ extension AppDependencies {
             return
         }
         await seedSyncedSaved(flagKey: flagKey)
+    }
+
+    /// DUT-468 — SEED (true) only when the import delivered NO remote rows;
+    /// otherwise the remote set is authoritative and local-only legacy pins are
+    /// cross-device unsaves that must not be re-seeded. A row present after the
+    /// import that is neither in the pre-import `baseline` nor locally pinned
+    /// arrived from a ≥V5 device (imports insert the synced row without a local
+    /// `isSaved` pin); a save made locally during the wait is excluded because
+    /// `toggleSaved` writes both the row and the pin.
+    nonisolated static func shouldSeedAfterImport(
+        baselineSyncedIDs: Set<Int>,
+        currentSyncedIDs: Set<Int>,
+        locallyPinnedIDs: Set<Int>
+    ) -> Bool {
+        currentSyncedIDs
+            .subtracting(baselineSyncedIDs)
+            .subtracting(locallyPinnedIDs)
+            .isEmpty
     }
 
     /// The original DUT-35 seed. On failure the flag stays unset so the next
@@ -100,7 +142,13 @@ extension AppDependencies {
                         NSPersistentCloudKitContainer.eventNotificationUserInfoKey
                     ] as? NSPersistentCloudKitContainer.Event,
                     event.type == .import,
-                    event.endDate != nil
+                    event.endDate != nil,
+                    // DUT-469: `endDate != nil` only means the import ENDED, not
+                    // that it succeeded. A failed import (no network, CK schema
+                    // error, throttle) carries `succeeded == false` and imported
+                    // NOTHING — treating it as "remote state has landed" would
+                    // seed stale pins and reopen the DUT-240 resurrection hole.
+                    event.succeeded
                 else { return }
                 continuation.yield(())
             }
