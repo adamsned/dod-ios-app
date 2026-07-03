@@ -90,6 +90,9 @@ public final class RecipeDetailViewModel {
     // thread + draft + in-flight flag after extraction (DUT-7). Public
     // read-only contract is unchanged — external callers still can't write.
     public internal(set) var comments: [RecipeComment] = []
+    /// DUT-501 — local report/block moderation for displayed comments (Guideline
+    /// 1.2). `var` (not injected via init) so tests can swap in an isolated store.
+    public var commentModeration = CommentModerationStore()
     public private(set) var commentsLoadState: CommentsLoadState = .idle
     /// Current selection in the `StarRatingInput` before the user taps
     /// "Submit rating". 0 means "no selection". `internal(set)` so the

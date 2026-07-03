@@ -40,6 +40,24 @@ extension RecipeDetailRatingsSection {
             isPendingModeration: comment.status != .approved,
             avatarOverride: ownCommentAvatarOverride(for: comment)
         )
+        // DUT-501 (Guideline 1.2) — report/block another user's comment. Report
+        // hides it locally at once and opens a prefilled moderation email;
+        // Block hides every comment from that author, app-wide.
+        .contextMenu {
+            if viewModel.canModerate(comment) {
+                Button {
+                    viewModel.reportComment(comment)
+                    if let url = viewModel.reportMailtoURL(for: comment) { openURL(url) }
+                } label: {
+                    Label("Report Comment", systemImage: "flag")
+                }
+                Button(role: .destructive) {
+                    viewModel.blockAuthor(of: comment)
+                } label: {
+                    Label("Block \(displayAuthor(for: comment))", systemImage: "hand.raised")
+                }
+            }
+        }
     }
 
     /// US-44 / CL-139 — return the override view if this row belongs to

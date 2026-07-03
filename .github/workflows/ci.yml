@@ -167,7 +167,16 @@ jobs:
                      DODPersistence DODFeatureFeed DODFeatureCategories \
                      DODFeatureSearch DODFeatureRecipeDetail DODFeatureSaved; do
             echo "::group::swift test — $pkg"
-            (cd "Packages/$pkg" && swift test --parallel)
+            if [ "$pkg" = "DODFeatureSearch" ]; then
+              # DODFeatureSearch intermittently aborts with signal 6 (SIGABRT)
+              # on exit under `swift test --parallel` on macos-15, even though
+              # every test passes — the parallel swift-testing harness crashes
+              # while tearing down. Run this one package serially to dodge the
+              # flake; all other packages keep --parallel.
+              (cd "Packages/$pkg" && swift test)
+            else
+              (cd "Packages/$pkg" && swift test --parallel)
+            fi
             echo "::endgroup::"
           done
 
