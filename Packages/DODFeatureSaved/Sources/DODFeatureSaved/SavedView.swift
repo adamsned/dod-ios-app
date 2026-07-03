@@ -61,7 +61,14 @@ public struct SavedView: View {
             .navigationDestination(item: $shoppingListEntry) { selection in
                 ShoppingListView(
                     viewModel: ShoppingListViewModel(),
-                    recipes: selection.recipes
+                    recipes: selection.recipes,
+                    // DUT-487 — hydrate each picked recipe's ingredients before
+                    // the Shopping List builds rows. Saved recipes often arrive
+                    // with empty `ingredients` (detail never fetched), which
+                    // produced ZERO rows; this fetches + parses + caches on demand.
+                    // Covers the deep-link path too — it drives this same
+                    // destination (`shoppingListEntry`).
+                    hydrate: { await viewModel.recipeWithIngredients($0) }
                 )
             }
             // DUT-480 — the iOS 18 Control Center control's `dod://shopping-list`

@@ -312,9 +312,9 @@ final class AppDependencies {
         return LiveSavedDependencies(
             store: store,
             imageLoader: imageLoader,
+            pageFetcher: pageFetcher,  // DUT-487 — hydrate ingredients for the shopping list
             remoteChangeStream: { SavedRemoteChangeBridge.makeStream() },
-            // DUT-84 — connectivity for the offline remove-download guard.
-            monitor: networkMonitor,
+            monitor: networkMonitor,  // DUT-84 — offline remove-download guard
             publishWidget: { await widgetPublisher.publish() }  // DUT-365 widget republish
         )
     }

@@ -34,9 +34,28 @@ public struct ShoppingListView: View {
     /// keeps this fed so the Saved-tab entry can pick straight away.
     private let recipes: [Recipe]
 
-    public init(viewModel: ShoppingListViewModel, recipes: [Recipe] = []) {
+    /// DUT-487 — hydrate a picked recipe's `ingredients` before building rows.
+    /// A saved recipe returned by `RecipeStore.savedRecipes()` often has EMPTY
+    /// `ingredients` until its detail has been fetched, so building straight
+    /// from the picker produced ZERO rows (the list stayed empty). ``SavedView``
+    /// passes `viewModel.recipeWithIngredients`, which fetches + parses + caches
+    /// the detail on demand. Defaults to identity so previews / tests / the
+    /// deep-link-without-deps path still compile (they just skip hydration).
+    private let hydrate: @Sendable (Recipe) async -> Recipe
+
+    /// DUT-487 — true while the confirm handler hydrates the picked recipes (a
+    /// network fetch per never-opened recipe), so a subtle progress overlay
+    /// covers the list and interaction is disabled until the rows are built.
+    @State private var isBuilding = false
+
+    public init(
+        viewModel: ShoppingListViewModel,
+        recipes: [Recipe] = [],
+        hydrate: @escaping @Sendable (Recipe) async -> Recipe = { $0 }
+    ) {
         _viewModel = State(initialValue: viewModel)
         self.recipes = recipes
+        self.hydrate = hydrate
     }
 
     public var body: some View {
@@ -47,9 +66,55 @@ public struct ShoppingListView: View {
             .toolbar { addToolbar }
             .sheet(isPresented: $isPickingRecipes) {
                 ShoppingListBuilderSheet(recipes: recipes) { selected in
-                    viewModel.add(recipes: selected)
+                    build(from: selected)
                 }
             }
+            // DUT-487 — while hydrating the picked recipes, dim + disable the
+            // list and float a spinner so the user sees the list is building
+            // (a never-opened recipe needs a detail fetch to get its ingredients).
+            .disabled(isBuilding)
+            .overlay {
+                if isBuilding {
+                    buildingOverlay
+                }
+            }
+    }
+
+    /// DUT-487 — subtle progress overlay shown while ``build(from:)`` hydrates
+    /// the picked recipes. Matches the app's scrim style (a translucent
+    /// `DODColor.surface` veil + a centered `ProgressView`).
+    private var buildingOverlay: some View {
+        ZStack {
+            DODColor.surface.opacity(0.6)
+            ProgressView()
+                .controlSize(.large)
+                .tint(DODColor.accent)
+        }
+        .ignoresSafeArea()
+        .accessibilityIdentifier("shopping-list-building")
+        .accessibilityLabel("Building shopping list")
+    }
+
+    /// DUT-487 — hydrate every picked recipe's ingredients (concurrently), then
+    /// append their rows. A saved recipe often arrives with empty `ingredients`
+    /// (detail never fetched), so hydrating first is what makes the list
+    /// actually populate. `isBuilding` gates the overlay for the fetch window.
+    private func build(from selected: [Recipe]) {
+        isBuilding = true
+        Task {
+            let hydrated = await withTaskGroup(of: Recipe.self) { group in
+                for recipe in selected {
+                    group.addTask { await hydrate(recipe) }
+                }
+                var out: [Recipe] = []
+                for await recipe in group {
+                    out.append(recipe)
+                }
+                return out
+            }
+            viewModel.add(recipes: hydrated)
+            isBuilding = false
+        }
     }
 
     /// DUT-487 / T-906 — the populated-state "Add recipes" `+`. Opens the same
