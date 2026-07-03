@@ -22,7 +22,10 @@ extension RecipeDetailViewModel {
         let wpError = (error as? WPClientError) ?? WPClientError.wrap(error)
         switch wpError {
         case .networkUnavailable:
-            return "You're offline — comment will need to wait."
+            // DUT-521: there is no comment outbox — an offline POST is dropped
+            // (only the draft text is retained). Don't imply a queued send;
+            // tell the user to reconnect and retry.
+            return "You're offline — reconnect and try again."
         case .timeout:
             return "The server took too long — try again."
         case .httpStatus(let code):
