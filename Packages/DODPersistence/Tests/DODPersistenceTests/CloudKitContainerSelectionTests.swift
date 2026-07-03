@@ -32,6 +32,18 @@ struct CloudKitContainerSelectionTests {
         #expect(RecipeStore.cloudKitSyncOptIn(in: defaults) == false)
     }
 
+    /// DUT-493 — the durable backfill-complete reader `RecipeStore` seeds its
+    /// in-memory flag from at construction (so the DUT-470 provisional union
+    /// doesn't open its pre-`bootstrap()` window for a completed-backfill user).
+    @Test func backfillDidCompleteReaderReflectsPersistedFlag() {
+        let defaults = Self.isolatedDefaults()
+        #expect(RecipeStore.backfillDidComplete(in: defaults) == false)  // absent → not complete
+        defaults.set(true, forKey: RecipeStore.didBackfillSyncedSavedKey)
+        #expect(RecipeStore.backfillDidComplete(in: defaults) == true)
+        defaults.set(false, forKey: RecipeStore.didBackfillSyncedSavedKey)
+        #expect(RecipeStore.backfillDidComplete(in: defaults) == false)
+    }
+
     @Test func optInReaderReflectsPersistedFlag() {
         let defaults = Self.isolatedDefaults()
         defaults.set(true, forKey: RecipeStore.cloudKitSyncOptInKey)

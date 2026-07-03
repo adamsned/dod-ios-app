@@ -33,7 +33,9 @@ extension AppDependencies {
     /// The one-shot `UserDefaults` flag is set only after a seed/reconcile
     /// actually completes, so every skipped/timed-out launch retries.
     func backfillSyncedSavedIfNeeded() async {
-        let key = "dod.cloudkit.didBackfillSyncedSavedV1"
+        // DUT-493: shared with `RecipeStore` (which seeds its in-memory flag from
+        // this same durable key at construction) so writer and reader can't drift.
+        let key = RecipeStore.didBackfillSyncedSavedKey
         guard !UserDefaults.standard.bool(forKey: key) else {
             // Already migrated on a prior launch — tell the store so mergeDetail
             // reconciles `isSaved` against the synced set authoritatively (DUT-302).

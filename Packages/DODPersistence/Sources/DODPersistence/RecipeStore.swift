@@ -26,7 +26,9 @@ public actor RecipeStore {
     /// Until then, ``mergeDetail`` must NOT clear a legacy local `isSaved` pin —
     /// the backfill (which selects `isSaved == true`) hasn't migrated it to the
     /// synced store yet, so clearing it would permanently lose an upgrader's save.
-    public internal(set) var didBackfillSyncedSaved = false
+    ///
+    /// DUT-493: seeded from the durable ``backfillDidComplete(in:)`` flag (skips the DUT-470 launch window).
+    public internal(set) var didBackfillSyncedSaved = RecipeStore.backfillDidComplete()
 
     // MARK: - List item cache
 
