@@ -10,7 +10,7 @@ import Testing
 /// the weak-handler lifecycle (register on begin, clear on end) makes a
 /// torn-down session a no-op — the behaviour the intents rely on.
 @MainActor
-@Suite("VoiceCommandBus dispatch (US-40)") struct VoiceCommandBusTests {
+@Suite("VoiceCommandBus dispatch (US-40)", .serialized) struct VoiceCommandBusTests {
 
     /// Records which handler method fired so each command can be asserted in
     /// isolation. Stands in for the live `CookModeViewModel`.
@@ -110,6 +110,33 @@ import Testing
 
         viewModel.endCookMode()
         #expect(VoiceCommandBus.shared.handler == nil)
+    }
+
+    /// DUT-510 — rapid `dispatch(_:)` calls must reach the handler in dispatch
+    /// order. The bus routes commands through a single-consumer FIFO
+    /// `AsyncStream`, so several commands fired back-to-back are delivered in
+    /// the exact order they were dispatched (the old per-command `Task` gave no
+    /// cross-task ordering guarantee).
+    @Test func dispatchDeliversCommandsInOrder() async {
+        let bus = VoiceCommandBus.shared
+        let spy = SpyHandler()
+        bus.handler = spy
+        defer { bus.handler = nil }
+
+        let dispatched: [VoiceCommand] = [.next, .previous, .repeat, .pause, .resume, .next]
+        for command in dispatched {
+            bus.dispatch(command)
+        }
+
+        // Drain: the single consumer task runs on the main actor too, so hand
+        // the actor back with a real suspension (not a tight `Task.yield()`
+        // spin, which can starve the consumer) until every command lands or a
+        // generous bound elapses.
+        for _ in 0..<200 where spy.calls.count < dispatched.count {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+
+        #expect(spy.calls == [.advance, .previous, .repeatStep, .pause, .resume, .advance])
     }
 
     /// A dispatched command after registration drives the real view model's

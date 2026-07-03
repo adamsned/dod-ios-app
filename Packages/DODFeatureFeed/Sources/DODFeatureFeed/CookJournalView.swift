@@ -143,11 +143,14 @@ public struct CookJournalView: View {
 
     private var statsHeader: some View {
         let total = CookLogStats.totalCooks(cooks)
-        // DUT-346: a fixed-firstWeekday Gregorian calendar (device timezone) so a
-        // locale's week-start (Sun vs Mon) can't bucket the same cook history into
-        // a different streak across devices.
+        // DUT-346: a fixed-firstWeekday Gregorian calendar so a locale's week-start
+        // (Sun vs Mon) can't bucket the same cook history into a different streak
+        // across devices.
+        // DUT-528: pin the timezone explicitly (matches `SettingsViewModel.streakCalendar`)
+        // so week/month buckets never drift under an implicit device-timezone change.
         var weekCalendar = Calendar(identifier: .gregorian)
         weekCalendar.firstWeekday = 1
+        weekCalendar.timeZone = TimeZone.current
         let streak = CookLogStats.currentWeeklyStreak(cooks, asOf: .now, calendar: weekCalendar)
         let mostCooked = CookLogStats.mostCooked(cooks)
         return HStack(spacing: DODSpacing.sm) {

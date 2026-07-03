@@ -57,16 +57,32 @@ public final class VoiceCommandBus {
     /// session alive.
     public weak var handler: (any VoiceCommandHandler)?
 
-    private init() {}
+    /// FIFO continuation every ``dispatch(_:)`` yields into. A single
+    /// long-lived consumer task drains the stream in order and calls
+    /// ``deliver(_:)``, so rapid commands can never execute out of order —
+    /// spawning a fresh `Task` per dispatch (the old approach) gave no
+    /// cross-task ordering guarantee (DUT-510).
+    private let continuation: AsyncStream<VoiceCommand>.Continuation
 
-    /// Called from `AppIntent.perform()`. Hops to the main actor (the intent
-    /// may run off it) and forwards to the registered handler, exactly like
-    /// ``DeepLinkDispatcher/dispatch(_:)``. A no-op when no session is
-    /// registered.
-    nonisolated public func dispatch(_ command: VoiceCommand) {
-        Task { @MainActor in
-            self.deliver(command)
+    private init() {
+        let (stream, continuation) = AsyncStream<VoiceCommand>.makeStream()
+        self.continuation = continuation
+        // Single-consumer drain: one task, in-order delivery. `handler` is
+        // read on the main actor inside `deliver`, preserving the weak /
+        // no-active-session no-op semantics.
+        Task { @MainActor [weak self] in
+            for await command in stream {
+                self?.deliver(command)
+            }
         }
+    }
+
+    /// Called from `AppIntent.perform()`. Yields the command onto the FIFO
+    /// stream (order-preserving) rather than spawning a per-command task, so
+    /// the single consumer delivers commands to the registered handler in
+    /// dispatch order. A no-op at delivery time when no session is registered.
+    nonisolated public func dispatch(_ command: VoiceCommand) {
+        continuation.yield(command)
     }
 
     /// Synchronous delivery seam — exercised directly by L1 tests so the
