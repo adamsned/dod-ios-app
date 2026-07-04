@@ -27,15 +27,11 @@ import Foundation
 ///    each ingredient as a `<h4 class="wprm-recipe-ingredient-group-name">`
 ///    group header), fall back to the group-name headers: with no line rows
 ///    present, the group names ARE the ingredients.
-/// 3. Instructions — collect every `<li class="wprm-recipe-instruction">` row,
-///    preferring the inner `<div class="wprm-recipe-instruction-text">` text
-///    and falling back to the whole row text. When the card carries NO
-///    instruction rows (the 7 Can Soup shape, DUT-538 — the author entered the
-///    steps as a numbered "How to Make" list in the post body instead of in the
-///    WPRM card), fall back to the page's Gutenberg numbered-step lists
-///    (`<ol class="…is-style-circle-number-list…">`), whose `<li>` rows carry
-///    the "Step N: …" text. This is the ONE place the parser looks outside the
-///    `wprm-recipe-container`, and only as a last resort.
+/// 3. Instructions — collect every `<li class="wprm-recipe-instruction">` row
+///    (inner `wprm-recipe-instruction-text`, else the whole row). When the card
+///    has NO instruction rows (7 Can Soup / DUT-538 — steps live as a numbered
+///    "How to Make" list in the post body), fall back to the page's Gutenberg
+///    `is-style-circle-number-list` rows — the one place we read outside the card.
 ///
 /// Not a general-purpose HTML parser — handles the narrow, well-formed shape
 /// WPRM produces. Robust to attribute re-ordering and extra whitespace; assumes
@@ -285,9 +281,14 @@ public enum WPRMRecipeCardParser {
                 break
             }
             let attributes = html[openStart.upperBound..<openEnd.lowerBound]
-            if let classToken,
-                !ArticleBodyExtractor.hasClassToken(attributes: attributes, token: classToken)
-            {
+            var skipTag = false
+            if let classToken {
+                skipTag = !ArticleBodyExtractor.hasClassToken(
+                    attributes: attributes,
+                    token: classToken
+                )
+            }
+            if skipTag {
                 cursor = openEnd.upperBound
                 continue
             }
