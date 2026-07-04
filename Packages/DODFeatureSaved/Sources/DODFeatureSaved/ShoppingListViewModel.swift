@@ -109,6 +109,31 @@ public final class ShoppingListViewModel {
         }
     }
 
+    /// DUT-534 — re-read the persisted snapshot so an EXTERNAL append (a
+    /// "Add to Shopping List" from Recipe Detail or a Feed/Search card, which
+    /// writes straight to ``ShoppingListStore`` via
+    /// ``ShoppingListStore/append(rows:)``) surfaces when the cook returns to
+    /// the list. ``ShoppingListView`` calls this on appear.
+    ///
+    /// **Lost-update guard.** Without this the VM keeps its init-time in-memory
+    /// snapshot; a later in-list mutation (`toggleChecked` / `markAlreadyHave` /
+    /// `clearAll`) persists that stale snapshot and CLOBBERS the external
+    /// append. Reloading first re-seats `items` / `checkedIDs` /
+    /// `alreadyHaveIDs` to the store's current state, so the next mutation
+    /// persists the MERGED set (existing rows + the external append), not a
+    /// stale one.
+    ///
+    /// No-op when `store` is nil (mock / preview / in-memory tests) — there's
+    /// nothing external to reconcile against. A store that has never been
+    /// written (``ShoppingListStore/load()`` returns nil) is left as-is rather
+    /// than blanked, so a freshly built in-memory list isn't wiped by an appear.
+    public func reloadFromStore() {
+        guard let snapshot = store?.load() else { return }
+        items = snapshot.items
+        checkedIDs = Set(snapshot.checkedIDs)
+        alreadyHaveIDs = Set(snapshot.alreadyHaveIDs)
+    }
+
     // MARK: - Derived render model
 
     /// `true` when there are no still-need rows to show (drives AC-39.1's
@@ -219,8 +244,11 @@ extension ShoppingListViewModel {
     /// Explode `recipes` into per-recipe ``Item`` rows, each classified through
     /// ``IngredientAisleClassifier`` (CL-77 — no cross-recipe merge). Shared by
     /// ``init(recipes:)`` and ``add(recipes:)`` (DUT-487 / T-906) so the initial
-    /// build and later appends produce identical rows.
-    private static func rows(from recipes: [Recipe]) -> [Item] {
+    /// build and later appends produce identical rows. DUT-534 — module-internal
+    /// (was `private`) so ``LiveShoppingListAppender`` builds the exact same rows
+    /// when appending from Recipe Detail / a card, rather than duplicating the
+    /// explode-and-classify logic.
+    static func rows(from recipes: [Recipe]) -> [Item] {
         recipes.flatMap { recipe in
             recipe.ingredients.map { ingredient in
                 Item(

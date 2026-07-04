@@ -91,6 +91,13 @@ public struct ShoppingListView: View {
             } message: {
                 Text("This removes every item. You can build a new list from your saved recipes.")
             }
+            // DUT-534 — re-read the persisted list on every appear so an
+            // EXTERNAL append (an "Add to Shopping List" from Recipe Detail or a
+            // Feed/Search card, which writes straight to `ShoppingListStore`)
+            // surfaces here, and the in-memory state matches the store BEFORE any
+            // in-list mutation persists — otherwise the next toggle/clear would
+            // persist a stale snapshot and clobber the external append.
+            .onAppear { viewModel.reloadFromStore() }
             // DUT-487 — while hydrating the picked recipes, dim + disable the
             // list and float a spinner so the user sees the list is building
             // (a never-opened recipe needs a detail fetch to get its ingredients).

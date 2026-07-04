@@ -153,6 +153,18 @@ public protocol RecipeDetailDependencies: Sendable {
     #if canImport(UIKit)
     var profilePhotoStoreForGate: (any ProfilePhotoStoring)? { get }
     #endif
+
+    // MARK: - Add to Shopping List (US-39 / DUT-534)
+
+    /// DUT-534 — append this recipe's ingredients to the Shopping List. Recipe
+    /// Detail carries a fully-loaded `recipe` (ingredients populated), so no
+    /// hydration happens here; the live wiring routes to
+    /// `DODFeatureSaved.LiveShoppingListAppender` (App-Group store), which this
+    /// package can't import directly — hence the seam. Returns the appended-row
+    /// count / `.couldntLoad` so the view model picks the Snackbar copy. Default
+    /// `.couldntLoad` so fakes that don't model the list keep compiling — the
+    /// default impl lives in the extension below.
+    func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
 }
 
 extension RecipeDetailDependencies {
@@ -175,6 +187,13 @@ extension RecipeDetailDependencies {
     /// bucket keep compiling. ``LiveRecipeDetailDependencies`` overrides to
     /// route to ``RecipeStore/upsertPendingComment(_:)``.
     public func cachePendingComment(_ comment: RecipeComment, postID: Int) async {}
+
+    /// DUT-534 — default `.couldntLoad` so fakes that don't model the Shopping
+    /// List keep compiling. ``LiveRecipeDetailDependencies`` overrides to route
+    /// to `DODFeatureSaved.LiveShoppingListAppender` via the App-wired closure.
+    public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
+        .couldntLoad
+    }
 
     // US-44 / CL-138 / DUT-36 Phase c profile-gate defaults
     // (`loadUserProfile()`, `profileStoreForGate`,
@@ -214,6 +233,14 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     let imageLoader: ImageLoader
     private let savedWidgetPublisher: SavedRecipesWidgetPublisher?
 
+    /// DUT-534 — the App-wired append seam. `LiveRecipeDetailDependencies` lives
+    /// in `DODFeatureRecipeDetail`, which does NOT depend on `DODFeatureSaved`
+    /// (where the appender + App-Group store are), so the App composition root
+    /// injects `LiveShoppingListAppender.addToShoppingList` as this closure. The
+    /// method below routes to it. `nil` (the default) means the seam isn't wired
+    /// (previews / terse tests) → the action reports `.couldntLoad`.
+    let appendToShoppingList: (@Sendable (Recipe) async -> AddToShoppingListResult)?
+
     #if canImport(UIKit)
     public init(
         client: WPRestClient,
@@ -226,7 +253,8 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         profileStore: (any ProfileStoring)? = nil,
         profilePhotoStore: (any ProfilePhotoStoring)? = nil,
         imageLoader: ImageLoader = ImageLoader(),
-        savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil
+        savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil,
+        appendToShoppingList: (@Sendable (Recipe) async -> AddToShoppingListResult)? = nil
     ) {
         self.client = client
         self.fetcher = fetcher
@@ -242,6 +270,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         // Group; callers can pass nil to disable the side effect for
         // unit-test wiring that doesn't care about widgets.
         self.savedWidgetPublisher = savedWidgetPublisher ?? SavedRecipesWidgetPublisher(store: store)
+        self.appendToShoppingList = appendToShoppingList
     }
     #else
     public init(
@@ -254,7 +283,8 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         guestIdentity: any GuestIdentityStoring,
         profileStore: (any ProfileStoring)? = nil,
         imageLoader: ImageLoader = ImageLoader(),
-        savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil
+        savedWidgetPublisher: SavedRecipesWidgetPublisher? = nil,
+        appendToShoppingList: (@Sendable (Recipe) async -> AddToShoppingListResult)? = nil
     ) {
         self.client = client
         self.fetcher = fetcher
@@ -266,6 +296,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         self.profileStore = profileStore
         self.imageLoader = imageLoader
         self.savedWidgetPublisher = savedWidgetPublisher ?? SavedRecipesWidgetPublisher(store: store)
+        self.appendToShoppingList = appendToShoppingList
     }
     #endif
 

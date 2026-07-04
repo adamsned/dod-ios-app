@@ -299,6 +299,21 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
         loadUserProfileCallCount += 1
         return profileToLoad
     }
+
+    // MARK: - Add to Shopping List (DUT-534)
+
+    /// Canned result for ``addToShoppingList(_:)``. Defaults to `.couldntLoad`
+    /// (matches the protocol default) so tests that don't exercise the append
+    /// keep passing; the DUT-534 test sets a `.added` result.
+    var addToShoppingListResult: AddToShoppingListResult = .couldntLoad
+    /// Recipes the fake was asked to append, so a test can assert the exact
+    /// (already-loaded) recipe was routed through the seam.
+    private(set) var addToShoppingListRecipes: [Recipe] = []
+
+    func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
+        addToShoppingListRecipes.append(recipe)
+        return addToShoppingListResult
+    }
 }
 
 /// Tiny fixture helpers shared across the recipe-detail test suites —

@@ -240,7 +240,8 @@ struct RootView: View {
                     pendingDeepLink: tab == .feed ? $pendingDeepLink : .constant(nil),
                     externalRoute: externalRouteBinding(for: tab),
                     // DUT-480 — only Saved consumes the Shopping List control token.
-                    openShoppingListToken: tab == .saved ? $savedShoppingListToken : .constant(nil)
+                    openShoppingListToken: tab == .saved ? $savedShoppingListToken : .constant(nil),
+                    openShoppingList: { routeToShoppingList() }  // DUT-534 snackbar "View"
                 )
                 .tabItem {
                     // T-660 / CL-65: bottom-tab `Label` reads `tabLabel`
@@ -304,7 +305,8 @@ struct RootView: View {
                 pendingDeepLink: selectedTab == .feed ? $pendingDeepLink : .constant(nil),
                 externalRoute: externalRouteBinding(for: selectedTab),
                 openShoppingListToken: selectedTab == .saved  // DUT-480 (Saved only)
-                    ? $savedShoppingListToken : .constant(nil)
+                    ? $savedShoppingListToken : .constant(nil),
+                openShoppingList: { routeToShoppingList() }  // DUT-534 snackbar "View"
             )
             .id(selectedTab)
         }

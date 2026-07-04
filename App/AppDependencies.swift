@@ -253,13 +253,12 @@ final class AppDependencies {
     }
 
     func recipeDetailDependencies() -> some RecipeDetailDependencies {
-        // US-44 / CL-138 / T-741 — thread the Phase a profile store
-        // and the Phase b photo store into recipe-detail so the
-        // Ratings & Reviews gate can (a) read `hasProfile` via
-        // `loadUserProfile()`, and (b) present `ProfileEditView` as a
-        // modal sheet over the recipe with the same photo flow the
-        // Settings entry path uses.
-        LiveRecipeDetailDependencies(
+        // US-44 / CL-138 / T-741 — thread the Phase a profile store + the Phase b
+        // photo store into recipe-detail so the Ratings & Reviews gate can read
+        // `hasProfile` via `loadUserProfile()` and present `ProfileEditView` as a
+        // modal sheet over the recipe with the same photo flow Settings uses.
+        let appender = shoppingListAppender()
+        return LiveRecipeDetailDependencies(
             client: restClient,
             fetcher: pageFetcher,
             store: store,
@@ -270,7 +269,9 @@ final class AppDependencies {
             profileStore: profileStore,
             profilePhotoStore: profilePhotoStore,
             imageLoader: imageLoader,
-            savedWidgetPublisher: savedWidgetPublisher()
+            savedWidgetPublisher: savedWidgetPublisher(),
+            // DUT-534 — "Add to Shopping List" seam (Detail recipe already loaded).
+            appendToShoppingList: { recipe in await appender.addToShoppingList(recipe) }
         )
     }
 
