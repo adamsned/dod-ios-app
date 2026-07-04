@@ -168,6 +168,17 @@ public final class SearchViewModel {
     /// `+T637`'s `surfaceLatestRecipes` can claim a generation too.
     var searchGeneration = 0
 
+    /// DUT-541: in-flight guard for card "Add to Shopping List". A rapid double
+    /// long-press fires two independent `Task { await addToShoppingList(item) }`
+    /// with no gate, and `ShoppingListStore.append` is additive (CL-77), so the
+    /// same recipe's ingredients would be appended twice. `addToShoppingList`
+    /// records an item's id here while its append is in flight and bails if the
+    /// SAME id is already in flight — blocking only the concurrent duplicate.
+    /// Different recipes are unaffected, and a deliberate re-add AFTER the first
+    /// completes still stacks (CL-77 preserved). Internal so `+ShoppingList`
+    /// reaches it; main-actor-isolated, so the `Set` access needs no locking.
+    var addingIDs = Set<Int>()
+
     public init(
         dependencies: SearchDependencies,
         recentSearches: RecentSearches = RecentSearches()

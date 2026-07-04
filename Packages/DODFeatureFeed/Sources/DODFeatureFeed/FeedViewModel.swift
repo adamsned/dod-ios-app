@@ -66,6 +66,10 @@ public final class FeedViewModel {
     /// `Sendable` and `deinit` fires exactly once, so the access is safe.
     @ObservationIgnored nonisolated(unsafe) private var connectivityTask: Task<Void, Never>?
 
+    /// DUT-541: per-item in-flight guard for card "Add to Shopping List" (see
+    /// `addToShoppingList(_:)` in `+ShoppingList`); main-actor-isolated.
+    var addingIDs = Set<Int>()
+
     private static let listKey = "home"
 
     public init(dependencies: FeedDependencies) {

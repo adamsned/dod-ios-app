@@ -331,8 +331,15 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     // both the result mapping AND that the card's identity flowed through.
     var shoppingListResult: AddToShoppingListResult = .couldntLoad
     var appendedRecipes: [Recipe] = []
+    /// DUT-541 — an optional gate so a test can hold an append IN FLIGHT while it
+    /// launches a second concurrent add of the same id, proving the view model's
+    /// in-flight guard drops the duplicate. `nil` (default) = append returns
+    /// immediately; set to an async closure to suspend inside `addToShoppingList`
+    /// after the recipe has been recorded.
+    var appendGate: (@Sendable () async -> Void)?
     func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
         appendedRecipes.append(recipe)
+        if let appendGate { await appendGate() }
         return shoppingListResult
     }
 }
