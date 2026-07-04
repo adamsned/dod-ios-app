@@ -141,10 +141,6 @@ struct TabStack: View {
         case .saved:
             SavedView(
                 viewModel: SavedViewModel(dependencies: dependencies.savedDependencies()),
-                // DUT-536 — the Saved header cart now selects the top-level
-                // Grocery List tab (single store-backed list) instead of pushing
-                // a Shopping List inside the Saved stack.
-                openShoppingList: openShoppingList,
                 onSelect: { recipe in path.append(.recipe(item: Self.listItem(from: recipe))) },
                 onSave: { recipe in
                     Task {
