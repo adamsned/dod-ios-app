@@ -80,6 +80,35 @@ struct InMemoryAppleAuthSessionStoreTests {
         try store.save(AppleAuthSession(userIdentifier: "a", email: relay))
         #expect(try #require(try store.load()).email == relay)
     }
+
+    /// DUT-506 — the store must NEVER persist an empty-id session: `userIdentifier`
+    /// is the primary key, and a `""` key makes `hasSession` true for a phantom
+    /// session and collides across users. `save` rejects it at the boundary.
+    @Test func saveRejectsEmptyUserIdentifier() throws {
+        let store = InMemoryAppleAuthSessionStore()
+        #expect(throws: AppleAuthError.emptyUserIdentifier) {
+            try store.save(AppleAuthSession(userIdentifier: ""))
+        }
+        #expect(try store.load() == nil)  // nothing persisted
+    }
+
+    /// DUT-506 — a whitespace-only id is just as invalid (it trims to empty).
+    @Test func saveRejectsWhitespaceUserIdentifier() throws {
+        let store = InMemoryAppleAuthSessionStore()
+        #expect(throws: AppleAuthError.emptyUserIdentifier) {
+            try store.save(AppleAuthSession(userIdentifier: "  \n\t "))
+        }
+        #expect(try store.load() == nil)
+    }
+
+    /// DUT-506 — even a pre-populated blank-id session (a legacy / corrupt row)
+    /// must never surface: `load` treats a blank id as no session at all.
+    @Test func loadFiltersBlankInitialSession() throws {
+        let store = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "   ")
+        )
+        #expect(try store.load() == nil)
+    }
 }
 
 // MARK: - Real Keychain (compile-only smoke; live test runs in XCUITest)
