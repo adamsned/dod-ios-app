@@ -11,7 +11,11 @@ import SwiftUI
 /// this screen in place for the full paged ``FirstCookoutView`` (mirrors
 /// ``DumpCakeFlow``). Reads ``GuidedCookout/path`` dynamically, so new rungs
 /// appear on the path for free.
-struct CookChooserFlow: View {
+///
+/// T-912 / DUT-551 (CL-306) — `public` so the app-level Cooking Tools hub
+/// (`App/CookingToolsHubView.swift`) can present the same roadmap the retired
+/// Feed "Cooking Tools" menu used for its "Your First Cookout" row.
+public struct CookChooserFlow: View {
 
     /// The progress-aware default (FeedView's `currentRung`) — the cook's
     /// current spot on the path. `nil` once every rung is cooked (a graduate).
@@ -20,6 +24,19 @@ struct CookChooserFlow: View {
     /// out of order still renders as done (the roadmap is freely tappable).
     var cookedRecipeIDs: Set<Int> = []
     let onLogCook: (CookLogEntry) -> Void
+
+    /// T-912 / DUT-551 (CL-306) — `public` initializer so the app-level Cooking
+    /// Tools hub can construct this outside the package (the Feed's own call
+    /// sites use the memberwise init, which stays available in-module).
+    public init(
+        recommended: GuidedCookout?,
+        cookedRecipeIDs: Set<Int> = [],
+        onLogCook: @escaping (CookLogEntry) -> Void
+    ) {
+        self.recommended = recommended
+        self.cookedRecipeIDs = cookedRecipeIDs
+        self.onLogCook = onLogCook
+    }
 
     @State private var selected: GuidedCookout?
     /// DUT-484: the guided path OWNS the bake-timer engine so a running
@@ -37,7 +54,7 @@ struct CookChooserFlow: View {
     @State private var loggedRecipeIDs: Set<Int> = []
     @Environment(\.dismiss) private var dismiss
 
-    var body: some View {
+    public var body: some View {
         if let selected {
             // CL-267 — `onBack` returns to the roadmap (clears the selection) so a
             // picked recipe isn't a dead end; the X still closes the whole sheet.

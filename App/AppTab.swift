@@ -2,23 +2,23 @@
 ///
 /// Case order is the **single source of truth** for the bottom tab-bar
 /// order. Reordering here changes what the user sees; see AC-16.1 / CL-25.
-/// The visual order is **Recipes → Saved → Search** — the Categories tab was
-/// folded into Search in T-800 (its browse list lives in the Search idle
-/// view now; CL-194 / DUT-113).
+/// The visual order is **Recipes → Saved → Cooking Tools → Search** — the
+/// Categories tab was folded into Search in T-800 (CL-194 / DUT-113), and the
+/// Grocery List + Settings tabs were retired in T-912 (CL-306 / DUT-551): the
+/// Shopping List folded into the new **Cooking Tools** hub and Settings moved
+/// to a header gear button.
 enum AppTab: Hashable, CaseIterable, Identifiable {
     case feed
     case saved
-    // DUT-536 — the Shopping List, promoted from a push inside the Saved tab to
-    // a first-class "Grocery List" tab (sits right after Saved, its natural
-    // sibling; the recipe-detail / Feed-card "Add to Shopping List" flows land
-    // here now). USER-FACING name is "Grocery List"; the code identifier stays
-    // `grocery` and every storage / deep-link key (`dod.shoppingList.v1`,
-    // `dod://shopping-list`) is UNCHANGED.
-    case grocery
-    // T-823 / DUT-187 — Settings promoted from the per-tab gear sheet to a
-    // first-class destination: a tab between Saved and Search on iPhone, a
-    // sidebar row on iPad.
-    case settings
+    // T-912 / DUT-551 (CL-306) — the **Cooking Tools** hub, a first-class
+    // destination that lists every utility in meal-making order (Your First
+    // Cookout → Shopping List → Heat Coach → Cook Mode → Cooking Journal → Buy
+    // BuzzyWaxx). It REPLACES the retired `.grocery` (Grocery List) tab — the
+    // Shopping List is now a pushed destination inside this hub — and the
+    // retired `.settings` tab (Settings moved to a header gear button). The
+    // storage / deep-link keys the old Grocery tab used (`dod.shoppingList.v1`,
+    // `dod://shopping-list`) are UNCHANGED; only the entry surface moved.
+    case cookingTools
     case search
 
     var id: Self { self }
@@ -49,11 +49,11 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         case .feed: "Recipes & Articles"
         case .search: "Search"
         case .saved: "Saved"
-        // DUT-536 — user-facing name is "Grocery List" (the underlying feature
-        // + persistence is still the "Shopping List"; only the surfaced label
-        // changed, per Ned).
-        case .grocery: "Grocery List"
-        case .settings: "Settings"
+        // T-912 / DUT-551 (CL-306) — the hub header + `DODScreenHeader` read the
+        // full "Cooking Tools"; the bottom-tab label is the shorter "Tools"
+        // (`tabLabel`) so it doesn't truncate the ~80pt tab slot (reuses the
+        // `.feed` split precedent).
+        case .cookingTools: "Cooking Tools"
         }
     }
 
@@ -76,11 +76,10 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         case .feed: "Recipes"
         case .search: "Search"
         case .saved: "Saved"
-        // DUT-536 — "Grocery List" is short enough (~11 chars) to fit the
-        // ~80pt tab-bar slot, so `tabLabel` matches `title` here (no split
-        // like `.feed`'s "Recipes" / "Recipes & Articles").
-        case .grocery: "Grocery List"
-        case .settings: "Settings"
+        // T-912 / DUT-551 (CL-306) — short "Tools" for the ~80pt tab slot;
+        // "Cooking Tools" (~13 chars) would truncate. The full name lives in
+        // `title` (the hub's `DODScreenHeader`), mirroring `.feed`'s split.
+        case .cookingTools: "Tools"
         }
     }
 
@@ -91,12 +90,12 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .feed: "house"
-        case .settings: "gearshape"
         case .search: "magnifyingglass"
-        // DUT-536 — `cart` (outline) unselected, `cart.fill` selected; SwiftUI's
-        // tab styling swaps to the filled variant automatically. Matches the
-        // "cart" glyph the Saved header + Shopping List empty state already use.
-        case .grocery: "cart"
+        // T-912 / DUT-551 (CL-306) — `frying.pan` (outline) unselected,
+        // `frying.pan.fill` selected; SwiftUI's tab styling swaps to the filled
+        // variant automatically. Matches the glyph the retired Cooking Tools
+        // menu used.
+        case .cookingTools: "frying.pan"
         // `bookmark` (outline) when unselected, `bookmark.fill` when
         // selected — SwiftUI's tab styling handles the swap. AC-16.2.
         // The in-recipe Save button in RecipeDetailView matches this
@@ -114,11 +113,11 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         case .feed: "feed"
         case .search: "search"
         case .saved: "saved"
-        // DUT-536 — telemetry name is the stable code identifier "grocery"
-        // (NOT the user-facing "Grocery List") so it slots into the §9 event
-        // allowlist as a plain token and stays comparable across renames.
-        case .grocery: "grocery"
-        case .settings: "settings"
+        // T-912 / DUT-551 (CL-306) — telemetry name is the stable code
+        // identifier "cooking_tools" (added to the constitution §9 allowlist).
+        // The retired `grocery` / `settings` tokens are historical (no longer
+        // emitted from the tab path).
+        case .cookingTools: "cooking_tools"
         }
     }
 }

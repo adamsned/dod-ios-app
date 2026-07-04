@@ -18,47 +18,11 @@ public struct FeedView: View {
     // DUT-534 Part 2 — internal (was `private`) so the card-list builders moved
     // to `FeedView+ShoppingList` can read the size class for adaptive layout.
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    /// System `openURL` (RootView's override). The Cooking Tools menu's "Buy
-    /// BuzzyWaxx Seasoning" item hands off to the browser — buzzywaxx.com isn't a
-    /// DOD recipe link, so RootView's override falls through to `.systemAction`.
-    @Environment(\.openURL) private var openURL
     /// US-38 / AC-38.2 / CL-64 (T-650, 2026-05-27) — shared with `SearchView`
     /// via the same `@AppStorage` key. Default `.gallery` preserves CC-9's
     /// 2-column grid byte-for-byte for users who never tap the toggle.
     @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
         RecipeListLayout.gallery.rawValue
-    /// DUT-183 — presents the guided "Your First Cookout" flow as a sheet.
-    @State private var showingFirstCookout = false
-    /// DUT-104 — presents the "I Made This" cook journal as a sheet.
-    @State private var showingJournal = false
-    /// DUT-190 — presents the "cook a dump cake" picker + coached flow as a sheet.
-    @State private var showingDumpCakeFlow = false
-    /// DUT-196 — presents the Dutch Oven Heat Coach as a sheet. Moved here from
-    /// Settings ▸ Tools so all cooking-help + cast-iron-care tools live together
-    /// in the Feed's "Cooking Tools" menu.
-    @State private var showingHeatCoach = false
-    /// DUT-236 — tapping the Cooking Tools callout presents the same tools as the
-    /// menu button (a SwiftUI `Menu` can't be opened programmatically).
-    @State private var showingCookingToolsDialog = false
-    /// DUT-200 — the Cooking Tools onboarding callout (the speech bubble under
-    /// the menu button); dismissible + persisted so it nudges once. Replaced the
-    /// First Cookout hero card (DUT-183) as the Feed's single onboarding nudge.
-    @AppStorage("dod.cookingToolsCalloutDismissed") private var cookingToolsCalloutDismissed = false
-    /// DUT-183 — the cook's current rung on the path (the next dish they haven't
-    /// cooked yet). Defaults to rung 1; recomputed from the cook journal so the
-    /// hero + flow follow the user up the ladder. nil once every rung is cooked.
-    @State private var currentRung: GuidedCookout? = .firstCookout
-    /// DUT-212 — `refreshCurrentRung` runs in a `.task` that races
-    /// `viewModel.onAppear`'s own `.task`; until it resolves, `currentRung` still
-    /// holds its rung-1 default. A returning cook who opens the chooser before the
-    /// refresh lands would otherwise be recommended rung 1 (wrong "START HERE").
-    /// This flag is false until the real rung is computed, so the chooser is
-    /// handed `nil` (→ falls through to the plain chooser) rather than a stale
-    /// rung-1 recommendation during the cold-launch window.
-    @State private var currentRungLoaded = false
-    /// DUT-381 — the cook's logged recipe ids, so the chooser roadmap can mark a
-    /// rung the user actually cooked as done even if they took it out of order.
-    @State private var cookedRecipeIDs: Set<Int> = []
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
@@ -72,34 +36,39 @@ public struct FeedView: View {
     /// success snackbar shows no "View" button (mirrors Recipe Detail's Part 1
     /// `openShoppingList` seam threaded through `TabStack`).
     public let openShoppingList: (() -> Void)?
+    /// T-912 / DUT-551 (CL-306) — opens the Settings sheet (Settings left the tab
+    /// bar; the Feed header trailing slot now hosts the gear). Optional so
+    /// existing callers (tests / previews) can omit it; nil renders no gear.
+    /// Production wires it through `TabStack` → `RootView.showSettingsSheet`.
+    public let onOpenSettings: (() -> Void)?
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
-        openShoppingList: (() -> Void)? = nil
+        openShoppingList: (() -> Void)? = nil,
+        onOpenSettings: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.openShoppingList = openShoppingList
+        self.onOpenSettings = onOpenSettings
     }
 
     public var body: some View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
-                // DUT-275 — the "Recipes & Articles" title + the Cooking Tools
+                // DUT-275 — the "Recipes & Articles" title + the header trailing
                 // button share one header row at the very top (the nav bar is
                 // hidden). With the button in the content row instead of the nav
                 // bar, NO nav-bar height is reserved, so this title sits at the
-                // exact same Y as every other tab's title (Search/Settings/Saved).
-                DODScreenHeader("Recipes & Articles") { cookingToolsMenu }
-                // DUT-275 — the onboarding callout floats ON TOP of the content
-                // (below the header row) as a dismissible popup, so it never
-                // pushes the pinned title/content down; its tail points up at the
-                // Cooking Tools button in the header row.
+                // exact same Y as every other tab's title. T-912 / DUT-551
+                // (CL-306) — the trailing slot now hosts the Settings gear (the
+                // old Cooking Tools menu + its onboarding callout are retired; the
+                // tools moved to the first-class Cooking Tools hub tab).
+                DODScreenHeader("Recipes & Articles") { settingsGear }
                 content
-                    .overlay(alignment: .top) { cookingToolsCalloutOverlay }
             }
             // Offline shifts the whole stack below the OfflineBanner overlay.
             .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
@@ -109,70 +78,12 @@ public struct FeedView: View {
         // anchored to the bottom (mirrors Recipe Detail's Part 1 host).
         .overlay(alignment: .bottom) { shoppingListSnackbar }
         .background(DODColor.surface)
-        // DUT-275 — nav bar hidden: the "Cooking Tools" menu (DUT-196) now lives
-        // in the pinned header row above (next to the title) instead of the nav
-        // bar, so no nav-bar height is reserved and the title sits at the same top
-        // Y as every other tab. Pushed detail screens keep their own nav bar.
+        // DUT-275 — nav bar hidden: the header button lives in the pinned header
+        // row above (next to the title) instead of the nav bar, so no nav-bar
+        // height is reserved and the title sits at the same top Y as every other
+        // tab. Pushed detail screens keep their own nav bar.
         .dodHidesNavBar()
-        .sheet(
-            isPresented: $showingFirstCookout,
-            onDismiss: { viewModel.cookoutFlowDidDismiss() },
-            content: {
-                // DUT-194 — start on the "pick what to cook" chooser (rungs + dump
-                // cakes), with the progress-aware rung recommended. A true beginner
-                // is dropped straight into coaching (CookChooserFlow.initialSelection).
-                CookChooserFlow(
-                    // DUT-212 — until the real rung is loaded, pass nil so the
-                    // chooser doesn't recommend a stale rung-1 for a returning cook.
-                    recommended: currentRungLoaded ? currentRung : nil,
-                    cookedRecipeIDs: cookedRecipeIDs,
-                    onLogCook: { logCookAndRefresh($0) }
-                )
-                // DUT-339 — defer any earned celebration until this sheet dismisses.
-                .onAppear { viewModel.cookoutFlowWillPresent() }
-            }
-        )
-        .sheet(isPresented: $showingJournal) { cookJournalSheet }
-        // DUT-323 — celebration: a logged cook that graduates the First Cookout
-        // path or bumps a rank fires the moment, once the cookout sheet closes.
-        .sheet(
-            item: Binding(
-                get: { viewModel.celebration },
-                set: { if $0 == nil { viewModel.dismissCelebration() } }
-            )
-        ) { celebration in
-            CookCelebrationView(celebration: celebration) { viewModel.dismissCelebration() }
-                .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $showingHeatCoach) {
-            NavigationStack { HeatCoachView() }
-        }
-        // DUT-236 — the Cooking Tools callout's tap target: the same tools the
-        // menu button lists, presented as a dialog (a `Menu` can't be opened
-        // programmatically).
-        .confirmationDialog(
-            "Cooking Tools",
-            isPresented: $showingCookingToolsDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Your First Cookout") { showingFirstCookout = true }
-            Button("Cooking Journal") { showingJournal = true }
-            Button("Dutch Oven Heat Coach") { showingHeatCoach = true }
-            Button("Buy BuzzyWaxx Seasoning") {
-                openCookingToolURL(SettingsViewModel.buyBuzzyWaxxURLString)
-            }
-        }
-        .sheet(
-            isPresented: $showingDumpCakeFlow,
-            onDismiss: { viewModel.cookoutFlowDidDismiss() },
-            content: {
-                DumpCakeFlow(onLogCook: { logCookAndRefresh($0) })
-                    // DUT-339 — defer any earned celebration until this sheet dismisses.
-                    .onAppear { viewModel.cookoutFlowWillPresent() }
-            }
-        )
         .task { await viewModel.onAppear() }
-        .task { await refreshCurrentRung() }
         // DUT-527 — `refreshAndAnnounce` runs the pull-to-refresh, then posts a
         // VoiceOver completion + result-count announcement (see FeedView+Helpers).
         .refreshable { await refreshAndAnnounce() }
@@ -180,76 +91,19 @@ public struct FeedView: View {
         .sensoryFeedback(.success, trigger: viewModel.refreshCount)
     }
 
-    /// DUT-183 — recompute the cook's current rung from the journal so the hero
-    /// card + the flow advance to the next un-cooked dish as they climb the path.
-    /// DUT-527 — `internal` (was `private`) so the helpers extracted to
-    /// `FeedView+Helpers.swift` (file-length relief) can still call it.
-    func refreshCurrentRung() async {
-        cookedRecipeIDs = Set((await viewModel.cookLogs()).map(\.recipeID))  // DUT-381
-        currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
-        currentRungLoaded = true  // DUT-212 — real rung now resolved; chooser may use it.
-    }
-
-    /// DUT-196 (the menu) + DUT-200 / T-834 (this refinement): one icon-only
-    /// `frying.pan.fill` toolbar button that gathers every cooking-help +
-    /// cast-iron-care entry point in one place. Each item carries a one-line
-    /// **description** of what it is + why it matters on the Dutch-oven learning
-    /// journey (a second `Text` in a menu `Button`'s label renders as the item's
-    /// subtitle). What the button *is* gets introduced by the dismissible
-    /// `CookingToolsCallout` speech bubble below it (which replaced the First
-    /// Cookout hero card). Each item triggers its existing sheet / browser
-    /// hand-off.
-    private var cookingToolsMenu: some View {
-        Menu {
-            Button {
-                showingFirstCookout = true
-            } label: {
-                Text("Your First Cookout")
-                Text("Your guided first win, coached start to finish.")
-                Image(systemName: "flame.fill")
+    /// T-912 / DUT-551 (CL-306) — the Settings gear in the Feed header trailing
+    /// slot. Settings left the tab bar; the gear opens it as a sheet via the
+    /// injected `onOpenSettings` closure (`RootView.showSettingsSheet`). Rendered
+    /// only when wired, so tests / previews that omit the closure show no gear.
+    @ViewBuilder
+    private var settingsGear: some View {
+        if let onOpenSettings {
+            Button(action: onOpenSettings) {
+                Image(systemName: "gearshape")
+                    .accessibilityLabel("Settings")
             }
-            .accessibilityIdentifier("cooking-tools-first-cookout")
-            Button {
-                showingJournal = true
-            } label: {
-                Text("Cooking Journal")
-                Text("Track every cook and build your streak.")
-                Image(systemName: "book.closed.fill")
-            }
-            .accessibilityIdentifier("cooking-tools-journal")
-            Button {
-                showingHeatCoach = true
-            } label: {
-                Text("Dutch Oven Heat Coach")
-                Text("Get the coals right for any temperature.")
-                Image(systemName: "thermometer.medium")
-            }
-            .accessibilityIdentifier("cooking-tools-heat-coach")
-            Button {
-                openCookingToolURL(SettingsViewModel.buyBuzzyWaxxURLString)
-            } label: {
-                Text("Buy BuzzyWaxx Seasoning")
-                Text("Season and protect your cast iron.")
-                Image(systemName: "bag.fill")
-            }
-            .accessibilityIdentifier("cooking-tools-buy-buzzywaxx")
-        } label: {
-            // Icon-only (`frying.pan.fill`); the "Cooking Tools" wording lives in
-            // the onboarding `CookingToolsCallout` speech bubble below the button
-            // instead of a nav-bar label, keeping the chrome to one clean button.
-            Image(systemName: "frying.pan.fill")
-                .accessibilityLabel("Cooking Tools")
-        }
-        .tint(DODColor.burntOrange)
-        .accessibilityIdentifier("feed-toolbar-cooking-tools")
-    }
-
-    /// Hand a Cooking Tools URL (the BuzzyWaxx storefront) to the browser. Built
-    /// with `if let` from the `String` constant so the repo's
-    /// `force_unwrapping`-as-error lint stays clean (mirrors the old `ShopSection`).
-    private func openCookingToolURL(_ string: String) {
-        if let url = URL(string: string) {
-            openURL(url)
+            .tint(DODColor.burntOrange)
+            .accessibilityIdentifier("feed-toolbar-settings")
         }
     }
 
@@ -302,36 +156,6 @@ public struct FeedView: View {
                 ProgressView()
                     .padding(.vertical, DODSpacing.lg)
             }
-        }
-    }
-
-    /// DUT-275 — the onboarding "Cooking Tools" speech bubble, rendered as a
-    /// floating overlay (a dismissible popup ON TOP of the content) so it never
-    /// shifts the pinned title or the grid down. Its upward trailing tail points
-    /// at the Cooking Tools button in the nav bar (DUT-200). Dismissible +
-    /// persisted; once dismissed the Feed is the clean pinned title + grid.
-    @ViewBuilder
-    private var cookingToolsCalloutOverlay: some View {
-        if !cookingToolsCalloutDismissed {
-            CookingToolsCallout(
-                onDismiss: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        cookingToolsCalloutDismissed = true
-                    }
-                },
-                // DUT-236 — "Tap here" now opens the Cooking Tools (presented as a
-                // dialog, since a Menu can't be opened programmatically) and
-                // dismisses the nudge, since the user engaged with it.
-                onActivate: {
-                    showingCookingToolsDialog = true
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        cookingToolsCalloutDismissed = true
-                    }
-                }
-            )
-            .padding(.horizontal, DODSpacing.md)
-            .padding(.top, DODSpacing.sm)
-            .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }
 

@@ -94,17 +94,21 @@ extension RootView {
         )
     }
 
-    /// DUT-536 — select the top-level Grocery List tab (was: switch to Saved +
-    /// mint a token that pushed the Shopping List inside it, DUT-480). The tab's
-    /// `GroceryTabRoot` always renders the persisted list, so simply selecting it
-    /// lands the user on the same store-backed Shopping List — no per-tap token
-    /// or push needed. Shared by `handle(widgetLink: .shoppingList)` (the
-    /// `dod://shopping-list` deep link), the DUT-534 snackbar "View" closure, and
-    /// `RootView`'s App-Group pending-route reads (the iOS 18 Control Center
-    /// control path that can't rely on a URL hand-off). Non-private so
+    /// T-912 / DUT-551 (CL-306) — select the Cooking Tools hub tab and mint a
+    /// fresh token that pushes the Shopping List onto the hub's NavigationStack.
+    /// The Shopping List folded into the hub (its own tab was retired), so
+    /// selecting the tab alone lands on the hub root, not the list — the token
+    /// (consumed by the hub's `.task(id:)`) does the push. Mirrors the retired
+    /// `savedShoppingListToken` pattern (CL-301) and preserves ALL four entry
+    /// points at once because they all funnel through here:
+    /// `handle(widgetLink: .shoppingList)` (the `dod://shopping-list` deep link),
+    /// the DUT-534 snackbar "View" closure, the Saved header cart, and the iOS 18
+    /// Control Center control (`consumePendingControlRoute`). A fresh UUID per
+    /// call re-pushes if the user is already on the hub. Non-private so
     /// `RootView.swift`'s scene-phase + cold-launch consumers can call it too.
     func routeToShoppingList() {
-        selectedTab = .grocery
+        selectedTab = .cookingTools
+        hubShoppingListToken = UUID()
     }
 
     /// DUT-480 — read + clear the iOS 18 Control Center control's App Group
@@ -129,10 +133,9 @@ extension RootView {
         case .feed: return $feedExternalRoute
         case .saved: return $savedExternalRoute
         case .search: return $searchExternalRoute
-        // DUT-536 — the Grocery List tab renders only the Shopping List (no
-        // article surface), so it keeps the inert constant like Settings.
-        case .grocery: return .constant(ExternalRouteQueue())
-        case .settings: return .constant(ExternalRouteQueue())
+        // T-912 / DUT-551 — the Cooking Tools hub renders no article surface, so
+        // it keeps the inert constant (as the retired Grocery/Settings tabs did).
+        case .cookingTools: return .constant(ExternalRouteQueue())
         }
     }
 
@@ -208,20 +211,18 @@ extension RootView {
         case .saved: savedExternalRoute.enqueue(.push(route))
         case .search: searchExternalRoute.enqueue(.push(route))
         // unreachable: linkRoutingDestination only ever yields feed/saved/search
-        // (it redirects settings + grocery — surfaces with no article stack — to
-        // feed).
-        case .settings, .grocery: break
+        // (it redirects the Cooking Tools hub — no article stack — to feed).
+        case .cookingTools: break
         }
     }
 
     /// DUT-462 / DUT-243 — which tab receives an in-app recipe route for a link
-    /// tapped from `originTab`. Settings + the DUT-536 Grocery List tab redirect
-    /// to Feed (neither renders an article surface with its own stack); every
-    /// other tab keeps its own stack. Pure, so it's unit-testable without a
-    /// SwiftUI host.
+    /// tapped from `originTab`. The T-912/DUT-551 Cooking Tools hub redirects to
+    /// Feed (it renders no article surface with its own stack); every other tab
+    /// keeps its own stack. Pure, so it's unit-testable without a SwiftUI host.
     nonisolated static func linkRoutingDestination(for originTab: AppTab) -> AppTab {
         switch originTab {
-        case .settings, .grocery: .feed
+        case .cookingTools: .feed
         default: originTab
         }
     }

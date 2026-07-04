@@ -105,6 +105,14 @@ struct RootView: View {
     /// Owned here (survives the iPad flip like `selectedTab`). Non-private for
     /// the `TabStack` construction sites.
     @State var commentModeration = CommentModerationStore()
+    /// T-912 / DUT-551 (CL-306) — Settings left the tab bar; it's presented as a
+    /// sheet from the Feed header gear (iPhone) / iPad sidebar Settings row.
+    @State var showSettingsSheet = false
+    /// T-912 / DUT-551 (CL-306) — the Cooking Tools hub's Shopping List reroute
+    /// token. `routeToShoppingList()` selects `.cookingTools` + mints a UUID; the
+    /// hub consumes it via `.task(id:)` and pushes the Shopping List. Owned here
+    /// (like `tabPaths`) so it survives the iPad flip. Mirrors CL-301's token.
+    @State var hubShoppingListToken: UUID?
     @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The system `openURL`, captured before RootView overrides it for its
@@ -211,6 +219,17 @@ struct RootView: View {
             onDismiss: presentCloudSyncPromptIfPending,
             content: { onboardingCover }
         )
+        // T-912 / DUT-551 (CL-306) — Settings sheet. The Feed header gear
+        // (iPhone) + iPad sidebar row both flip `showSettingsSheet`; the shared
+        // `settingsSheetViewModel()` helper wires the same dependency surface.
+        .sheet(isPresented: $showSettingsSheet) {
+            NavigationStack {
+                SettingsView(
+                    viewModel: dependencies.settingsSheetViewModel(),
+                    onClearImageCache: { try await dependencies.store.clearImageCache() }
+                )
+            }
+        }
         .alert("Turn On iCloud Sync?", isPresented: $showCloudSyncPrompt) {
             Button("Turn On Sync") {
                 // DUT-280 — both prompts answered; mark complete so they never re-run.
@@ -257,8 +276,12 @@ struct RootView: View {
                     path: pathBinding(for: tab),
                     pendingDeepLink: tab == .feed ? $pendingDeepLink : .constant(nil),
                     externalRoute: externalRouteBinding(for: tab),
-                    // DUT-534 snackbar "View" + DUT-536 Saved cart → Grocery tab.
+                    // T-912/DUT-551 — Shopping List entry points reroute to the
+                    // hub; the gear opens Settings; Cook Mode routes to Recipes.
                     openShoppingList: { routeToShoppingList() },
+                    onOpenSettings: { showSettingsSheet = true },
+                    onFindRecipe: { selectedTab = .feed },
+                    hubShoppingListToken: tab == .cookingTools ? $hubShoppingListToken : .constant(nil),
                     // DUT-546 — one shared moderation store across every recipe screen.
                     commentModeration: commentModeration
                 )
@@ -300,6 +323,16 @@ struct RootView: View {
                         Label(tab.title, systemImage: tab.systemImage)
                             .tag(tab)
                     }
+                    // T-912 / DUT-551 (CL-306) — Settings is an UNTAGGED sidebar
+                    // row on iPad (not a tab target, like `SidebarProfileRow`);
+                    // its Button opens the same sheet the iPhone gear does.
+                    Button {
+                        showSettingsSheet = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                            .foregroundStyle(DODColor.label)
+                    }
+                    .accessibilityIdentifier("sidebar-settings-row")
                 }
             }
             // T-784 / DUT-90 — no brand title in the sidebar. The Profile row
@@ -318,8 +351,10 @@ struct RootView: View {
                 path: pathBinding(for: selectedTab),
                 pendingDeepLink: selectedTab == .feed ? $pendingDeepLink : .constant(nil),
                 externalRoute: externalRouteBinding(for: selectedTab),
-                // DUT-534 snackbar "View" + DUT-536 Saved cart → Grocery tab.
+                // T-912/DUT-551 — Shopping List reroute + hub Cook Mode → Recipes.
                 openShoppingList: { routeToShoppingList() },
+                onFindRecipe: { selectedTab = .feed },
+                hubShoppingListToken: selectedTab == .cookingTools ? $hubShoppingListToken : .constant(nil),
                 // DUT-546 — one shared moderation store across every recipe screen.
                 commentModeration: commentModeration
             )

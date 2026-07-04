@@ -33,18 +33,20 @@ final class SmokeTests: XCTestCase {
     /// instead of a bottom tab bar (US-38 / DUT-89).
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
-    /// Wait until the first screen is interactive on either layout. Settings
-    /// is a first-class destination on both — an iPhone tab-bar button + an
-    /// iPad sidebar row (T-823 / DUT-187, promoted from the old per-tab gear)
-    /// — and it renders immediately on launch, so it stays the reliable
-    /// cross-device "app ready" signal (the iPhone-only tab bar is not). The
-    /// iPad sidebar `List` row can surface as a button / cell / static text
-    /// (the same reason `goToTab` probes all three), so probe each type
-    /// rather than assuming `buttons`.
+    /// Wait until the first screen is interactive on either layout. T-912 /
+    /// DUT-551 (CL-306) — Settings left the tab bar (it's a header gear on iPhone
+    /// / an untagged sidebar row on iPad now), so the reliable cross-device "app
+    /// ready" signal is the always-present Settings affordance: the iPhone gear
+    /// (`feed-toolbar-settings`, accessibility label "Settings") and the iPad
+    /// sidebar Settings row (`sidebar-settings-row`) both render immediately on
+    /// launch. Probe the id + the "Settings" label across element types (the
+    /// iPad sidebar row can surface as a button / cell / static text).
     @discardableResult
     private func waitForAppReady(timeout: TimeInterval = 12) -> Bool {
         func settingsVisible() -> Bool {
-            app.buttons["Settings"].exists
+            app.buttons["feed-toolbar-settings"].exists
+                || app.buttons["sidebar-settings-row"].exists
+                || app.buttons["Settings"].exists
                 || app.cells["Settings"].exists
                 || app.staticTexts["Settings"].exists
         }
@@ -55,11 +57,12 @@ final class SmokeTests: XCTestCase {
         return settingsVisible()
     }
 
-    /// Navigate to a top-level destination on either layout. `phoneLabel` is
+    /// Navigate to a top-level TAB destination on either layout. `phoneLabel` is
     /// the bottom-tab label (`AppTab.tabLabel`); `padTitle` is the sidebar row
     /// title (`AppTab.title`) — they differ for Recipes ("Recipes" vs
     /// "Recipes & Articles"). On iPad the sidebar `List` row can surface as a
-    /// button / cell / static text, so try each.
+    /// button / cell / static text, so try each. (Settings is NOT a tab since
+    /// T-912 / DUT-551 — use `openSettings()` for it.)
     private func goToTab(phoneLabel: String, padTitle: String) {
         guard isPad else {
             app.tabBars.firstMatch.buttons[phoneLabel].tap()
@@ -72,6 +75,22 @@ final class SmokeTests: XCTestCase {
             }
         }
         XCTFail("Could not find sidebar row '\(padTitle)' on iPad")
+    }
+
+    /// T-912 / DUT-551 (CL-306) — open the Settings sheet. Settings left the tab
+    /// bar: it's now a `gearshape` button in the Feed header on iPhone
+    /// (`feed-toolbar-settings`) and an untagged sidebar row on iPad
+    /// (`sidebar-settings-row`), both presenting `SettingsView` as a sheet.
+    private func openSettings() {
+        if isPad {
+            let row = app.buttons["sidebar-settings-row"]
+            if row.waitForExistence(timeout: 6) { row.tap(); return }
+            XCTFail("Could not find the iPad sidebar Settings row")
+        } else {
+            let gear = app.buttons["feed-toolbar-settings"]
+            if gear.waitForExistence(timeout: 6) { gear.tap(); return }
+            XCTFail("Could not find the Feed header Settings gear")
+        }
     }
 
     /// REG-1: app must launch without crashing even when no TelemetryDeck
@@ -92,12 +111,13 @@ final class SmokeTests: XCTestCase {
         try XCTSkipIf(isPad, "Bottom tabs are iPhone-only; iPad uses a sidebar.")
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 12))
-        // Tab order is Recipes → Saved → Grocery List → Settings → Search
-        // (Categories folded into Search in T-800 / CL-194; Grocery List added
-        // as a top-level tab in DUT-536). Iteration order here is purely "do
-        // they all open?"; the positional guard lives in
-        // `test_tabBarOrderMatchesSpec` below. Spec trace: AC-16.1, AC-16.6.
-        for tabName in ["Recipes", "Saved", "Grocery List", "Search"] {
+        // Tab order is Recipes → Saved → Tools → Search (Categories folded into
+        // Search in T-800 / CL-194; the Grocery List + Settings tabs retired in
+        // T-912 / CL-306 — the Shopping List folded into the new Cooking Tools
+        // hub tab, whose bottom-tab label is "Tools", and Settings moved to a
+        // header gear). Iteration order here is purely "do they all open?"; the
+        // positional guard lives in `test_tabBarOrderMatchesSpec`. Spec: AC-16.1.
+        for tabName in ["Recipes", "Saved", "Tools", "Search"] {
             let button = tabBar.buttons[tabName]
             XCTAssertTrue(button.exists, "Missing tab: \(tabName)")
             button.tap()
@@ -110,28 +130,28 @@ final class SmokeTests: XCTestCase {
     /// that reshuffles `AppTab.allCases` will fail this test loudly rather
     /// than silently changing the user-visible layout.
     ///
-    /// Asserts both directly (the button at index 1 is "Saved", the button
-    /// at index 2 is "Search") and behaviorally (tapping each lands on the
-    /// expected screen — Saved shows the empty-state title from AC-5.8 on
-    /// a fresh install; Search shows its search field placeholder).
+    /// Asserts both directly (the button at index 1 is "Saved", index 2 is
+    /// "Tools", index 3 is "Search") and behaviorally (tapping each lands on the
+    /// expected screen — Saved shows the empty-state title from AC-5.8 on a fresh
+    /// install; the Cooking Tools hub shows its header; Search shows its search
+    /// field placeholder).
     func test_tabBarOrderMatchesSpec() throws {
         try XCTSkipIf(isPad, "Bottom-tab order is an iPhone-only contract; iPad uses a sidebar (US-38 / DUT-89).")
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
         let tabButtons = tabBar.buttons.allElementsBoundByIndex
-        XCTAssertEqual(tabButtons.count, 5, "Expected exactly 5 top-level tabs")
+        XCTAssertEqual(tabButtons.count, 4, "Expected exactly 4 top-level tabs")
 
-        // Position-by-position (left → right). The labels here are what
-        // a real user sees on the tab bar, so they double as a readable
-        // record of the spec'd order. T-823 / DUT-187 inserted Settings
-        // between Saved and Search (promoted from the per-tab gear sheet);
-        // DUT-536 inserted the Grocery List tab right after Saved.
+        // Position-by-position (left → right). The labels here are what a real
+        // user sees on the tab bar, so they double as a readable record of the
+        // spec'd order. T-912 / DUT-551 (CL-306) retired the Grocery List +
+        // Settings tabs (Shopping List folded into the Cooking Tools hub, whose
+        // bottom-tab label is "Tools"; Settings moved to a header gear).
         XCTAssertEqual(tabButtons[0].label, "Recipes", "Tab 1 should be Recipes")
         XCTAssertEqual(tabButtons[1].label, "Saved", "Tab 2 should be Saved")
-        XCTAssertEqual(tabButtons[2].label, "Grocery List", "Tab 3 should be Grocery List")
-        XCTAssertEqual(tabButtons[3].label, "Settings", "Tab 4 should be Settings")
-        XCTAssertEqual(tabButtons[4].label, "Search", "Tab 5 should be Search")
+        XCTAssertEqual(tabButtons[2].label, "Tools", "Tab 3 should be Cooking Tools (label 'Tools')")
+        XCTAssertEqual(tabButtons[3].label, "Search", "Tab 4 should be Search")
 
         // Behavioral check: tapping the second tab actually lands on Saved,
         // not on a mislabeled screen. AC-5.8 empty-state title is the
@@ -142,24 +162,25 @@ final class SmokeTests: XCTestCase {
             "Second tab should land on the Saved screen (empty state visible on fresh install)"
         )
 
-        // DUT-536 — the third tab is the Grocery List. On a fresh install the
-        // list is empty, so its empty-state title is the "we're really on the
-        // Grocery List tab" signal.
+        // T-912 / DUT-551 — the third tab is the Cooking Tools hub. Its
+        // `DODScreenHeader("Cooking Tools")` is the "we're really on the hub"
+        // signal (the retired Grocery tab landed straight on the Shopping List;
+        // the hub lists the Shopping List as a row instead).
         tabButtons[2].tap()
         XCTAssertTrue(
-            app.staticTexts["Your shopping list is empty"].waitForExistence(timeout: 6),
-            "Third tab should land on the Grocery List screen (empty state visible on fresh install)"
+            app.staticTexts["Cooking Tools"].waitForExistence(timeout: 6),
+            "Third tab should land on the Cooking Tools hub (its header is visible)"
         )
 
-        // Behavioral check: fifth tab is Search. SearchView uses a
+        // Behavioral check: fourth tab is Search. SearchView uses a
         // plain `TextField` (not `.searchable`) with the placeholder
         // "Search Recipes", so the search input shows up under
         // `app.textFields`, not `app.searchFields`.
-        tabButtons[4].tap()
+        tabButtons[3].tap()
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 6),
-            "Fifth tab should land on the Search screen (Search Recipes field visible)"
+            "Fourth tab should land on the Search screen (Search Recipes field visible)"
         )
     }
 
@@ -332,12 +353,11 @@ final class SmokeTests: XCTestCase {
     /// test wall-clock should stay under 5s — AC-T2 pyramid level for
     /// "screen-existence + button-existence" assertions.
     func test_settingsPageHasNoDebugTestButton() {
-        // Settings is a first-class destination on both layouts since
-        // T-823 / DUT-187 — an iPhone tab + an iPad sidebar row, promoted
-        // from the old per-tab gear sheet. Reach it the device-agnostic way
-        // (`goToTab` taps the tab bar on iPhone, the sidebar row on iPad).
+        // T-912 / DUT-551 (CL-306) — Settings left the tab bar; it's a Feed
+        // header gear (iPhone) / an untagged sidebar row (iPad) that presents
+        // SettingsView as a sheet. `openSettings()` taps the right one per device.
         XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
-        goToTab(phoneLabel: "Settings", padTitle: "Settings")
+        openSettings()
 
         // Positive signal: the notifications toggle from US-36 / AC-36.1.
         // The `Toggle`'s label text "When New Recipes Drop" surfaces as the
@@ -439,38 +459,34 @@ final class SmokeTests: XCTestCase {
         )
     }
 
-    /// DUT-196: the cooking-help + cast-iron-care entry points are consolidated
-    /// into a single "Cooking Tools" menu (`frying.pan.fill`) on the Feed
-    /// toolbar — Your First Cookout + Cooking Journal fold in from their own
-    /// buttons, and Heat Coach + the BuzzyWaxx shop row move OFF the Settings
-    /// page. The BuzzyWaxx URL itself stays pinned by the L1
-    /// `SettingsViewModelTests.buyBuzzyWaxxURLPointsAtTheShopifyStorefront`. This
-    /// smoke test guards the contract XCUITest can: the menu button is on the
-    /// Feed and opens a menu surfacing the tools that left Settings.
-    func test_feedCookingToolsMenuConsolidatesTools() {
+    /// T-912 / DUT-551 (CL-306): the retired Feed "Cooking Tools" menu is now a
+    /// first-class **Cooking Tools hub** tab that lists every utility in
+    /// meal-making order. This smoke test guards the contract XCUITest can: the
+    /// hub tab opens its page and surfaces the keystone tool rows (Your First
+    /// Cookout, Shopping List, Buy BuzzyWaxx). iPhone-only (the hub is a
+    /// bottom-tab; iPad reaches it via the sidebar, covered by the reachability
+    /// tests). The BuzzyWaxx URL itself stays pinned by the L1
+    /// `SettingsViewModelTests.buyBuzzyWaxxURLPointsAtTheShopifyStorefront`.
+    func test_cookingToolsHubListsTools() throws {
+        try XCTSkipIf(isPad, "The Cooking Tools hub is a bottom-tab; iPad reaches it via the sidebar.")
         XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
 
-        // The Feed is the default screen (iPhone tab / iPad detail); the Cooking
-        // Tools menu lives on its trailing toolbar edge.
-        let menuButton = app.buttons["feed-toolbar-cooking-tools"]
-        XCTAssertTrue(
-            menuButton.waitForExistence(timeout: 8),
-            "Feed should expose the Cooking Tools menu button (DUT-196)"
-        )
-        menuButton.tap()
+        // Open the Cooking Tools hub (bottom-tab label is "Tools").
+        app.tabBars.firstMatch.buttons["Tools"].tap()
 
-        // The menu opens with the four consolidated tools (SwiftUI Menu items
-        // surface as buttons). Match by accessibilityIdentifier, not visible
-        // label: T-834 gave each item a description subtitle, so the a11y label
-        // is now "Title, subtitle…" — the stable id is the reliable hook. Check
-        // the BuzzyWaxx entry (moved off Settings) + the keystone First Cookout.
+        // The hub renders its `DODScreenHeader("Cooking Tools")` + the tool rows,
+        // each with a stable accessibilityIdentifier. Check the keystone rows.
         XCTAssertTrue(
-            app.buttons["cooking-tools-buy-buzzywaxx"].waitForExistence(timeout: 4),
-            "Cooking Tools menu should include the Buy BuzzyWaxx entry (moved off Settings)"
+            app.buttons["hub-first-cookout"].waitForExistence(timeout: 8),
+            "Cooking Tools hub should list Your First Cookout"
         )
         XCTAssertTrue(
-            app.buttons["cooking-tools-first-cookout"].exists,
-            "Cooking Tools menu should include Your First Cookout"
+            app.buttons["hub-shopping-list"].exists,
+            "Cooking Tools hub should list the Shopping List (folded in from the retired tab)"
+        )
+        XCTAssertTrue(
+            app.buttons["hub-buy-buzzywaxx"].exists,
+            "Cooking Tools hub should list Buy BuzzyWaxx"
         )
     }
 
@@ -491,7 +507,7 @@ final class SmokeTests: XCTestCase {
         // destination on both since T-823 / DUT-187 (promoted from the old
         // per-tab gear), so reach it via the shared tab/sidebar helper.
         XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
-        goToTab(phoneLabel: "Settings", padTitle: "Settings")
+        openSettings()
 
         // The Account section header (US-46) sits at the top of Settings.
         XCTAssertTrue(
