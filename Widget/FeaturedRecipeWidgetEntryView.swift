@@ -107,7 +107,12 @@ struct FeaturedRecipeWidgetEntryView: View {
         case .auto:
             return recipe.isArticle ? "Latest Article" : "Latest Recipe"
         case .recipes:
-            return "Latest Recipe"
+            // DUT-567 — the `.recipes` fallback (`latestRecipe ?? entries.first`)
+            // can resolve to an article when the split scan didn't classify a
+            // recipe (legacy payload / no classifier). Key the eyebrow off the
+            // resolved entry's own kind so an article is never mislabeled
+            // "Latest Recipe."
+            return recipe.isArticle ? "Latest Article" : "Latest Recipe"
         case .articles:
             return "Latest Article"
         }
