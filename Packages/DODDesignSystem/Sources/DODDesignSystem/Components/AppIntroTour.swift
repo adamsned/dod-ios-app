@@ -173,8 +173,10 @@ public struct AppIntroTour: View {
                 .foregroundStyle(DODColor.cream)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DODSpacing.md)
+                // CL-304 / DUT-537: the CTA is a button, so it takes the pill
+                // tier (`Capsule`), not the card-tier `DODRadius.standard`.
                 .background(
-                    RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                    Capsule(style: .continuous)
                         .fill(DODColor.accent)
                 )
         }
