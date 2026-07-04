@@ -208,7 +208,8 @@ extension SearchViewModel {
         // rescue banner just because the title tier was thin.
         await computeDidYouMean(
             itemCount: filtered.count + ingredientItems.count,
-            trimmed: trimmed
+            trimmed: trimmed,
+            generation: generation
         )
 
         // DUT-254: the `recipe_searched` event fires on FINALIZED searches only
@@ -226,12 +227,20 @@ extension SearchViewModel {
     /// cached-titles fetch is wrapped in `try?` so a cold cache fall-
     /// through degrades to `nil` (engine returns nil on an empty pool,
     /// same outcome).
-    func computeDidYouMean(itemCount: Int, trimmed: String) async {
+    func computeDidYouMean(itemCount: Int, trimmed: String, generation: Int) async {
         guard itemCount < Self.didYouMeanThreshold, !trimmed.isEmpty else {
+            // DUT-568: a newer search can supersede us before we reach this
+            // write; re-check the generation so an older pass doesn't clear a
+            // fresh banner (mirrors the H1 guard at +T643:178 / +T637:98).
+            guard generation == searchGeneration else { return }
             didYouMean = nil
             return
         }
         let cachedTitles = (try? await dependencies.cachedRecipeTitles()) ?? []
+        // DUT-568: re-check after the async cached-titles fetch — a newer
+        // search that bumped the generation during that await must not have its
+        // banner clobbered by this older pass's suggestion.
+        guard generation == searchGeneration else { return }
         didYouMean = SearchSuggestionEngine.suggest(
             query: trimmed,
             cachedTitles: cachedTitles
