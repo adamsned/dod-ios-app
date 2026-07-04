@@ -78,7 +78,7 @@ struct CookTimeRangeSheet: View {
     // MARK: - Header
 
     private var header: some View {
-        Text("Cook time")
+        Text("Cook Time")
             .dodFont(DODType.heading)
             .foregroundStyle(DODColor.label)
             .frame(maxWidth: .infinity, alignment: .center)

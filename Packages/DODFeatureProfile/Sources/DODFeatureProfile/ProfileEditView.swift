@@ -260,7 +260,7 @@ public struct ProfileEditView: View {
         // `handleClear()` + `dismiss()` directly without consulting
         // `isDirty` or setting `showLeaveConfirmation`).
         .confirmationDialog(
-            "You have unsaved changes",
+            "You Have Unsaved Changes",
             isPresented: $showLeaveConfirmation,
             titleVisibility: .visible
         ) {

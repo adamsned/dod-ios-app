@@ -48,7 +48,7 @@ extension SearchView {
     @ViewBuilder
     private func ingredientSection(layout: RecipeListLayout) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            Text("Recipes using \u{201C}\(ingredientSectionTerm)\u{201D}")
+            Text("Recipes Using \u{201C}\(ingredientSectionTerm)\u{201D}")
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
                 .accessibilityAddTraits(.isHeader)
