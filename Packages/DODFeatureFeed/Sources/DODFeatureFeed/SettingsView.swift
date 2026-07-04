@@ -49,11 +49,16 @@ public struct SettingsView: View {
     /// nil. Production callers (composition root, FeedView's gear icon)
     /// always pass a non-nil closure.
     public let onClearImageCache: (() async throws -> Int)?
+    /// DUT-572 — hides the top Profile section when true. Injected from RootView's
+    /// real device size class because this sheet always reports `.compact` on iPad
+    /// (see ``ProfileSettingsSection``); hides on iPad, shows on iPhone.
+    private let hidesProfile: Bool
 
     public init(
         viewModel: SettingsViewModel? = nil,
         onClearImageCache: (() async throws -> Int)? = nil,
-        settingsDependencies: (any SettingsDependencies)? = nil
+        settingsDependencies: (any SettingsDependencies)? = nil,
+        hidesProfile: Bool = false
     ) {
         // Construct a default view-model when none is injected,
         // honoring the optional `settingsDependencies` so the iCloud
@@ -63,6 +68,7 @@ public struct SettingsView: View {
         let resolved = viewModel ?? SettingsViewModel(dependencies: settingsDependencies)
         _viewModel = State(initialValue: resolved)
         self.onClearImageCache = onClearImageCache
+        self.hidesProfile = hidesProfile
     }
 
     public var body: some View {
@@ -124,12 +130,15 @@ public struct SettingsView: View {
             // + display name + email row when one does. Tap pushes
             // `ProfileEditView`.
             // T-783 / DUT-89 — hidden on iPad (Profile lives in the
-            // sidebar via SidebarProfileRow); kept on iPhone.
+            // sidebar via SidebarProfileRow); kept on iPhone. DUT-572 — the
+            // hide signal is now injected (`hidesProfile`) from RootView's real
+            // device size class, because a sheet reports `.compact` on iPad and
+            // the section could never see regular width on its own.
             // DUT-238 — account + sign-in (Sign in with Apple, Sign Out, Delete)
             // all live inside the Profile flow now (tap the Profile row →
             // `ProfileEditView`). The former standalone Settings ▸ Account section
             // (US-46) was redundant with that and is removed.
-            ProfileSettingsSection(viewModel: viewModel)
+            ProfileSettingsSection(viewModel: viewModel, hidesProfile: hidesProfile)
 
             // T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`.
 
