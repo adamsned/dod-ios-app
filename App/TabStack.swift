@@ -67,6 +67,11 @@ struct TabStack: View {
     /// mints it (from the per-recipe nudge); the hub consumes it via `.task(id:)`
     /// and presents Heat Coach. Inert for other tabs.
     @Binding var hubHeatCoachToken: UUID?
+    /// DUT-461 (revised) — the Cooking Tip token, owned by `RootView` and bound
+    /// only into the Cooking Tools tab. The Cooking Tip widget tap mints it; the
+    /// hub consumes it via `.task(id:)` to pop to its root so the tip banner shows.
+    /// Inert for other tabs.
+    @Binding var hubTipToken: UUID?
     /// DUT-546 (gap 3) — the single app-level ``CommentModerationStore`` owned
     /// by `RootView`, injected into every `RecipeDetailViewModel` this stack
     /// builds so a block applied on one recipe screen hides that author on an
@@ -97,6 +102,7 @@ struct TabStack: View {
         openHeatCoach: @escaping () -> Void = {},
         hubShoppingListToken: Binding<UUID?> = .constant(nil),
         hubHeatCoachToken: Binding<UUID?> = .constant(nil),
+        hubTipToken: Binding<UUID?> = .constant(nil),
         commentModeration: CommentModerationStore = CommentModerationStore()
     ) {
         self.tab = tab
@@ -110,6 +116,7 @@ struct TabStack: View {
         self.openHeatCoach = openHeatCoach
         self._hubShoppingListToken = hubShoppingListToken
         self._hubHeatCoachToken = hubHeatCoachToken
+        self._hubTipToken = hubTipToken
         self.commentModeration = commentModeration
     }
 
@@ -233,6 +240,7 @@ struct TabStack: View {
                 dependencies: dependencies,
                 shoppingListToken: $hubShoppingListToken,
                 heatCoachToken: $hubHeatCoachToken,
+                tipToken: $hubTipToken,
                 onFindRecipe: onFindRecipe
             )
         }
