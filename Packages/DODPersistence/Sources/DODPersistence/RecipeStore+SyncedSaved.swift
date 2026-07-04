@@ -190,6 +190,43 @@ extension RecipeStore {
         return try modelContext.fetch(descriptor)
     }
 
+    /// The Saved tab's set: read the synced source of truth (newest save first),
+    /// unioned with any pre-backfill provisional local pins (DUT-470). Full
+    /// detail (ingredients/instructions) is NOT synced — a recipe saved on
+    /// another device hydrates from the network on first detail open.
+    public func savedRecipes() throws -> [Recipe] {
+        try savedRecipesWithSavedAt().map(\.recipe)
+    }
+
+    /// DUT-513: the same saved set as ``savedRecipes()`` but paired with each
+    /// recipe's synced `savedAt`. ``SavedViewModel`` needs the save timestamp —
+    /// not just the recipe — to tell a re-save apart from an in-flight optimistic
+    /// unsave: an id STILL returned whose `savedAt` is NEWER than the moment the
+    /// user tapped Unsave was genuinely re-saved (from Feed/Search/Category/detail
+    /// — every re-save writes a fresh `SyncedSavedRecipe` with `savedAt = .now`),
+    /// so its optimistic-removal suppression drops immediately instead of holding
+    /// until the DUT-482 TTL elapses. An id whose `savedAt` predates the unsave is
+    /// the DUT-370 not-yet-committed write and stays suppressed. Provisional
+    /// legacy pins (DUT-470) carry no synced save time, so they surface with
+    /// `.distantPast` — never mistaken for a fresh re-save.
+    public func savedRecipesWithSavedAt() throws -> [(recipe: Recipe, savedAt: Date)] {
+        let descriptor = FetchDescriptor<SyncedSavedRecipe>(
+            sortBy: [SortDescriptor(\.savedAt, order: .reverse)]
+        )
+        var seen = Set<Int>()  // DUT-378: dedup CloudKit-duplicate rows by id
+        var result: [(recipe: Recipe, savedAt: Date)] = []
+        for row in try modelContext.fetch(descriptor) where seen.insert(row.id).inserted {
+            result.append((Self.toDomain(row), row.savedAt))
+        }
+        // DUT-470: pre-backfill, union the local legacy `isSaved` pins so the
+        // Saved tab isn't empty (display-only, local-only → no resurrection risk;
+        // empty once backfill reconciles). No synced save time → `.distantPast`.
+        for pin in try provisionalSavedPins() where seen.insert(pin.id).inserted {
+            result.append((Self.toDomain(pin), .distantPast))
+        }
+        return result
+    }
+
     #if DEBUG
     /// Test-only: simulate a pre-V5 legacy save — a local `isSaved` pin with NO
     /// synced row — to exercise the DUT-302 mergeDetail-before-backfill race.

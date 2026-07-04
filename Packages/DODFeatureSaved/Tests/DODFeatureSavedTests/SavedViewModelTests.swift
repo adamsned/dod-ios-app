@@ -149,39 +149,51 @@ import Testing
     }
 
     @Test func reSaveWithinTTLClearsSuppressionAndShowsRecipe() async throws {
-        // DUT-513: unsaving then RE-saving a recipe WITHIN the TTL window must
-        // drop the suppression immediately (via `clearPendingRemoval`) so the
-        // re-saved card reappears on the next refresh — before the fix nothing
-        // cleared `pendingRemovals[id]` on re-save, so the recipe stayed hidden
-        // until the TTL elapsed.
+        // DUT-513 (the REAL fix): unsaving then RE-saving a recipe WITHIN the TTL
+        // window must surface the re-saved card on the next refresh — driven by
+        // the PRODUCTION seam, NOT a manual `clearPendingRemoval` call (PR #392's
+        // test called that directly and proved nothing about production). Every
+        // re-save surface (Feed/Search/Category/detail) writes a fresh
+        // `SyncedSavedRecipe` with `savedAt = .now`; the view model reads that
+        // through `savedRecipesWithSavedAt()` and, seeing a `savedAt` newer than
+        // the unsave, drops the suppression on its own.
         let dependencies = FakeSavedDependencies()
         dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
         let viewModel = SavedViewModel(dependencies: dependencies)
-        viewModel.pendingRemovalTTL = .seconds(5)  // long window: prove it's the clear, not the TTL
+        viewModel.pendingRemovalTTL = .seconds(5)  // long window: prove it's the re-save, not the TTL
         await viewModel.refresh()
 
         viewModel.optimisticallyRemove(id: 2)  // user unsaves 2…
         #expect(viewModel.recipes.map(\.id) == [1])  // suppressed immediately
 
-        // …then re-saves 2 (from Feed/Search/detail); the store returns it again.
-        viewModel.clearPendingRemoval(id: 2)
-        await viewModel.refresh()  // refresh WITHIN the TTL window
-        #expect(viewModel.recipes.map(\.id) == [1, 2], "Re-saved 2 must reappear within the TTL")
+        // …then re-saves 2 from another surface. The store now returns 2 with a
+        // save timestamp AFTER the unsave — exactly what `toggleSaved` writes on
+        // a fresh save. NO manual clearPendingRemoval; the refresh path detects it.
+        dependencies.savedAtByID[2] = Date()  // .now ≫ the unsave's markedDate
+        await viewModel.refresh()  // refresh WELL WITHIN the TTL window
+        #expect(
+            viewModel.recipes.map(\.id) == [1, 2],
+            "Re-saved 2 must reappear within the TTL, driven by the store's savedAt (no manual clear)"
+        )
     }
 
-    @Test func genuineUnsaveStillSuppressedAfterClearForDifferentID() async {
-        // DUT-513 guard: clearing a re-save for one id must NOT lift the
-        // suppression of a still-in-flight unsave for a different id.
+    @Test func genuineInFlightUnsaveStaysSuppressedWithinTTL() async {
+        // DUT-513 guard: an id the store STILL returns because the unsave write
+        // hasn't committed (its `savedAt` predates the unsave tap — NOT a
+        // re-save) must stay suppressed within the TTL. This is the DUT-370 case,
+        // and the store-timestamp re-save check must not lift it.
         let dependencies = FakeSavedDependencies()
         dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        // id 2's synced save is OLD (predates the unsave the test performs next).
+        dependencies.savedAtByID[2] = Date(timeIntervalSince1970: 1_600_000_000)
         let viewModel = SavedViewModel(dependencies: dependencies)
         await viewModel.refresh()
 
         viewModel.optimisticallyRemove(id: 2)  // genuine unsave, write still in flight
-        viewModel.clearPendingRemoval(id: 1)  // unrelated id (no-op)
-        // The store still returns 2 (write not yet committed) → stays suppressed.
+        // The store still returns 2 with its OLD savedAt (write not yet committed)
+        // → not a re-save → stays suppressed.
         await viewModel.refresh()
-        #expect(viewModel.recipes.map(\.id) == [1], "Genuine unsave still suppressed within TTL")
+        #expect(viewModel.recipes.map(\.id) == [1], "In-flight unsave stays suppressed within TTL")
     }
 
     // DUT-6 — the Saved tab must re-fetch when CloudKit imports a recipe
@@ -301,6 +313,11 @@ import Testing
 
 final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     var recipes: [Recipe] = []
+    /// DUT-513 — per-id synced `savedAt`, driving ``savedRecipesWithSavedAt()``.
+    /// A test simulates a re-save by stamping an id's save time newer than the
+    /// unsave, then asserts the card reappears without a manual clear. Ids absent
+    /// here surface with `.distantPast` (never read as a fresh re-save).
+    var savedAtByID: [Int: Date] = [:]
     var shouldFail = false
     /// T-774 / DUT-80 — the set ``downloadedRecipeIDs()`` returns, so a test can
     /// assert the view model hydrates `downloadedIDs` for the Saved-tab badge.
@@ -332,6 +349,12 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
         savedRecipesCallCount += 1
         if shouldFail { throw URLError(.unknown) }
         return recipes
+    }
+
+    func savedRecipesWithSavedAt() async throws -> [(recipe: Recipe, savedAt: Date)] {
+        savedRecipesCallCount += 1
+        if shouldFail { throw URLError(.unknown) }
+        return recipes.map { ($0, savedAtByID[$0.id] ?? .distantPast) }
     }
 
     func downloadedRecipeIDs() async throws -> Set<Int> { downloadedIDs }
