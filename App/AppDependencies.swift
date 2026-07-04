@@ -84,9 +84,10 @@ final class AppDependencies {
                 )
                 self.modelContainer = result.container
                 fellBackToLocal = result.usedCloudKitFallback
-                // Surfaced for a future telemetry consumer (kept out of
-                // `AnalyticsEvent` here).
-                _ = result.recoveredFromMigrationFailure
+                // DUT-552: surface the destructive recovery (was `_ =`) as a log.
+                if result.recoveredFromMigrationFailure {
+                    DODLog.persistence.error("SwiftData store unopenable; moved aside + opened FRESH.")
+                }
             }
         } catch {
             // DUT-525: reached only if even the fresh-store recovery threw — a
