@@ -172,7 +172,7 @@ extension CookJournalEntryView {
 
     private var reflectionSection: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text("Your reflection")
+            Text("Your Reflection")
                 .dodFont(DODType.bodyEmphasized)
                 .foregroundStyle(DODColor.label)
             ZStack(alignment: .topLeading) {
