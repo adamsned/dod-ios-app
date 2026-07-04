@@ -259,7 +259,7 @@ public struct FirstCookoutView: View {
             Image(systemName: "party.popper.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(DODColor.burntOrange)
-            Text("You did it.")
+            Text("You Did It.")
                 .dodFont(DODType.displayMedium)
                 .foregroundStyle(DODColor.label)
             Text(cookout.celebrationMessage)

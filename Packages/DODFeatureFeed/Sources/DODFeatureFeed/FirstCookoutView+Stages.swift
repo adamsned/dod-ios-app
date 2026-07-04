@@ -216,7 +216,7 @@ extension FirstCookoutView {
                 Text(bakeStepAwayText)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
-                Button("Cancel timer") {
+                Button("Cancel Timer") {
                     timerEngine.cancel(active.id)
                     Task { await notifier.cancelBakeDone() }
                 }
@@ -227,7 +227,7 @@ extension FirstCookoutView {
             $0.state == .finished && $0.recipeID == cookout.recipeID
         }) {
             VStack(spacing: DODSpacing.xxs) {
-                Text("Timer's up!")
+                Text("Timer's Up!")
                     .dodFont(DODType.heading)
                     .foregroundStyle(DODColor.burntOrange)
                 Text(goCheckText)
@@ -281,7 +281,7 @@ extension FirstCookoutView {
                 .tint(DODColor.burntOrange)
                 // DUT-203 — clear ALL photo state so a Retake-then-Done can't save
                 // the discarded photo, and re-picking the same asset re-fires onChange.
-                Button("Retake or choose another") {
+                Button("Retake or Choose Another") {
                     cookPhoto = nil
                     cookPhotoData = nil
                     cookPhotoItem = nil
@@ -307,14 +307,14 @@ extension FirstCookoutView {
             Button {
                 showingCamera = true
             } label: {
-                Label("Take a photo", systemImage: "camera.fill")
+                Label("Take a Photo", systemImage: "camera.fill")
             }
             .dodProminentButton()
             .tint(DODColor.burntOrange)
         }
         #endif
         PhotosPicker(selection: $cookPhotoItem, matching: .images) {
-            Label("Choose from library", systemImage: "photo.on.rectangle")
+            Label("Choose from Library", systemImage: "photo.on.rectangle")
         }
         .dodBorderedButton()
         .tint(DODColor.burntOrange)

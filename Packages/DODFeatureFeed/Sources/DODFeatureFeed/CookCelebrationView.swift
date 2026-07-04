@@ -76,7 +76,7 @@ struct CookCelebrationView: View {
     private var title: String {
         switch celebration {
         case .rankUp(let rank): return "You're a \(rank.title)"
-        case .graduatedFirstCookout: return "You're a Dutch oven cook"
+        case .graduatedFirstCookout: return "You're a Dutch Oven Cook"
         }
     }
 
@@ -97,8 +97,8 @@ struct CookCelebrationView: View {
 
     private var buttonTitle: String {
         switch celebration {
-        case .rankUp: return "Keep cooking"
-        case .graduatedFirstCookout: return "What's next"
+        case .rankUp: return "Keep Cooking"
+        case .graduatedFirstCookout: return "What's Next"
         }
     }
 }

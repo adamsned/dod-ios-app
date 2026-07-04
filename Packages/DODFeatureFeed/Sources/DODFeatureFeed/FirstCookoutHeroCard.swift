@@ -42,14 +42,14 @@ struct FirstCookoutHeroCard: View {
                 .foregroundStyle(DODColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Button(action: onStart) {
-                Text("Let's cook")
+                Text("Let's Cook")
                     .frame(maxWidth: .infinity)
             }
             .dodProminentButton()
             .tint(DODColor.burntOrange)
             .padding(.top, DODSpacing.xxs)
             Button(action: onCookDumpCake) {
-                Text("Or cook a dump cake")
+                Text("Or Cook a Dump Cake")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.burntOrange)
                     .frame(maxWidth: .infinity)

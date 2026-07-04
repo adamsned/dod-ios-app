@@ -21,8 +21,8 @@ extension HeatCoachView {
         VStack(alignment: .leading, spacing: DODSpacing.md) {
             sectionHeader("Start Here")
 
-            labeledRow("Oven size") {
-                Picker("Oven size", selection: $ovenDiameterInches) {
+            labeledRow("Oven Size") {
+                Picker("Oven Size", selection: $ovenDiameterInches) {
                     ForEach(HeatCoachModel.ovenSizes, id: \.self) { size in
                         Text("\(size)\"").tag(size)
                     }
@@ -32,7 +32,7 @@ extension HeatCoachView {
                 .accessibilityIdentifier("heat-coach-oven-size")
             }
 
-            labeledRow("Cooking style") {
+            labeledRow("Cooking Style") {
                 accentSelector(
                     selection: $style,
                     options: [(.even, "Even"), (.baking, "Baking")],
@@ -95,7 +95,7 @@ extension HeatCoachView {
                 .accessibilityIdentifier("heat-coach-elevation")
             }
 
-            labeledRow("Air temperature") {
+            labeledRow("Air Temperature") {
                 accentSelector(
                     selection: $ambient,
                     options: [(.hot, "Hot"), (.mild, "Mild"), (.cold, "Cold")],
@@ -104,7 +104,7 @@ extension HeatCoachView {
             }
 
             Toggle(isOn: $windy) {
-                Text("Windy day")
+                Text("Windy Day")
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.label)
             }
@@ -115,7 +115,7 @@ extension HeatCoachView {
             if !notes.isEmpty {
                 Divider().overlay(DODColor.surfaceDivider)
                 VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                    Text("What changes")
+                    Text("What Changes")
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)
                     ForEach(notes, id: \.self) { note in
