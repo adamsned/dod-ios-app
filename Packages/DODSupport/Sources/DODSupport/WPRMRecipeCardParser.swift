@@ -286,7 +286,8 @@ public enum WPRMRecipeCardParser {
             }
             let attributes = html[openStart.upperBound..<openEnd.lowerBound]
             if let classToken,
-                !ArticleBodyExtractor.hasClassToken(attributes: attributes, token: classToken) {
+                !ArticleBodyExtractor.hasClassToken(attributes: attributes, token: classToken)
+            {
                 cursor = openEnd.upperBound
                 continue
             }

@@ -92,7 +92,8 @@ extension RecipeDetailViewModel {
         // "How to Make" steps) and route to the recipe path. Genuine articles
         // (no card) fall through to the article-body extraction below.
         if WPRMRecipeCardParser.hasRecipeCard(html: html),
-            let cardRecipe = recipeFromWPRMCard(html: html) {
+            let cardRecipe = recipeFromWPRMCard(html: html)
+        {
             try? await dependencies.mergeDetail(cardRecipe)
             recipe = cardRecipe
             loadState = .ready
