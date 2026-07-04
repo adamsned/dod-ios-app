@@ -281,14 +281,10 @@ public enum WPRMRecipeCardParser {
                 break
             }
             let attributes = html[openStart.upperBound..<openEnd.lowerBound]
-            var skipTag = false
-            if let classToken {
-                skipTag = !ArticleBodyExtractor.hasClassToken(
-                    attributes: attributes,
-                    token: classToken
-                )
+            let skipTag = classToken.map {
+                !ArticleBodyExtractor.hasClassToken(attributes: attributes, token: $0)
             }
-            if skipTag {
+            if skipTag == true {
                 cursor = openEnd.upperBound
                 continue
             }
