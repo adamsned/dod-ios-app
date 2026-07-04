@@ -339,6 +339,10 @@ final class FakeLiveActivityController: CookLiveActivityController {
     private(set) var startedAttributes: CookActivityAttributes?
     private(set) var lastInitialState: CookActivityAttributes.ContentState?
     private(set) var lastUpdateState: CookActivityAttributes.ContentState?
+    /// DUT-492: when true, `start` records the call but leaves `isActive == false`
+    /// — simulating an ActivityKit quota/authorization failure so tests can
+    /// assert the view model does NOT claim `liveActivityStepKey` for a dead card.
+    var startShouldFail = false
 
     func start(
         attributes: CookActivityAttributes,
@@ -347,7 +351,7 @@ final class FakeLiveActivityController: CookLiveActivityController {
         startCallCount += 1
         startedAttributes = attributes
         lastInitialState = initialState
-        isActive = true
+        isActive = !startShouldFail
     }
 
     func update(state: CookActivityAttributes.ContentState) {

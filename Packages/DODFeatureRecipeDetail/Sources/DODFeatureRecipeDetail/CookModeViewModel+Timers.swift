@@ -91,10 +91,16 @@ extension CookModeViewModel {
             // no-stale-card guarantee.
             if let key = liveActivityStepKey, stepTimers[key]?.state == .completed {
                 if !liveActivityShowingCompleted {
+                    // DUT-490 / DUT-491: push a first-class "done" state — renders
+                    // "Done" (not "Paused") and, via `isCompleted`, gets a
+                    // far-future stale date so this single push outlives the
+                    // linger instead of dimming after ~15s. Per-tick re-push
+                    // suppression stays (the flag below).
                     updateTimerLiveActivity(
                         remainingSeconds: 0,
                         stepText: stepText(forStep: key),
-                        isPaused: true
+                        isPaused: true,
+                        isCompleted: true
                     )
                     liveActivityShowingCompleted = true
                 }
@@ -111,6 +117,12 @@ extension CookModeViewModel {
             // A different (or no) timer was driving the card — (re)start so its
             // step text + total match the timer now in charge.
             startTimerLiveActivity(stepText: text, totalSeconds: timer.totalSeconds)
+            // DUT-492: only claim the key once the activity actually started. A
+            // failed `start` (ActivityKit quota / authorization) leaves the card
+            // dead; claiming the key anyway made `liveActivityStepKey ==
+            // soonest.key` true on the next tick, so `start` was never retried.
+            // Guarding on `isActive` lets the next tick re-attempt the start.
+            guard hasLiveActivity else { return }
             liveActivityStepKey = soonest.key
         }
         updateTimerLiveActivity(remainingSeconds: timer.remaining(at: now), stepText: text, isPaused: false)

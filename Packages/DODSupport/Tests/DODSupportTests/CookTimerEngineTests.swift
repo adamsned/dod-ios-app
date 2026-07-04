@@ -104,6 +104,38 @@ struct CookTimerEngineTests {
         #expect(finishedLabels == ["Toast"])
     }
 
+    /// DUT-210 — `onFinished` is a client closure that may re-enter the engine
+    /// (`clearFinished`/`cancel`/`start`) and mutate `timers`. `refresh` must
+    /// snapshot the finished timers and fire callbacks AFTER the loop, so a
+    /// reentrant mutation can't invalidate the indices being iterated (trap /
+    /// skipped completion). Two timers finish in the SAME tick and the callback
+    /// re-enters on the FIRST one — the pre-fix code would index a mutated array
+    /// on the second iteration.
+    @Test func onFinishedFiringForEveryTimerSurvivesReentrantMutation() {
+        let clock = TestClock()
+        let engine = makeEngine(clock)
+        var finishedLabels: [String] = []
+        engine.onFinished = { timer in
+            finishedLabels.append(timer.label)
+            // Reentrant mutation of the live collection mid-completion: drop all
+            // finished timers AND start a brand-new one. Under the pre-fix
+            // mid-loop fire this corrupts iteration.
+            engine.clearFinished()
+            engine.start(label: "Reentrant-\(timer.label)", duration: 300)
+        }
+        engine.start(label: "First", duration: 60)
+        engine.start(label: "Second", duration: 60)
+
+        clock.advance(61)  // both elapse in the same tick
+        engine.refresh()
+
+        // Both completions fire exactly once — none trapped or skipped.
+        #expect(finishedLabels.sorted() == ["First", "Second"])
+        // The reentrant starts survived; the finished ones were cleared.
+        #expect(engine.timers.map(\.label).sorted() == ["Reentrant-First", "Reentrant-Second"])
+        #expect(engine.timers.allSatisfy { $0.isRunning })
+    }
+
     @Test func soonestFinishingPicksTheNearestRunningTimer() {
         let clock = TestClock()
         let engine = makeEngine(clock)
