@@ -39,32 +39,53 @@ extension RecipeCard {
         public let totalTimeDisplay: String?
         /// Active search query (DUT-10) — see ``RecipeCard/highlightQuery``.
         public let highlightQuery: String?
+        /// DUT-530 — when true, a compact download glyph sits beside the title
+        /// so the list layout matches the gallery card's "Downloaded" badge
+        /// (``RecipeCard/isDownloaded``). Defaults `false`, so every existing
+        /// call site (Feed/Search) and their L4 baselines render byte-identical;
+        /// only the Saved tab's list rows pass the real downloaded state.
+        public let isDownloaded: Bool
 
         public init(
             title: String,
             excerpt: String,
             heroImageURL: URL?,
             totalTimeDisplay: String? = nil,
-            highlightQuery: String? = nil
+            highlightQuery: String? = nil,
+            isDownloaded: Bool = false
         ) {
             self.title = title
             self.excerpt = excerpt
             self.heroImageURL = heroImageURL
             self.totalTimeDisplay = totalTimeDisplay
             self.highlightQuery = highlightQuery
+            self.isDownloaded = isDownloaded
         }
 
         public var body: some View {
             HStack(alignment: .center, spacing: DODSpacing.sm) {
                 thumbnail
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                    RecipeCard.titleText(title, highlightQuery: highlightQuery)
-                        .dodFont(DODType.heading)
-                        .foregroundStyle(DODColor.label)
-                        // DUT-527 — allow 2 title lines on compact (iPhone) too,
-                        // matching the gallery card, so larger Dynamic Type sizes
-                        // no longer truncate recipe names to "Veget…".
-                        .lineLimit(2)
+                    HStack(alignment: .firstTextBaseline, spacing: DODSpacing.xxs) {
+                        RecipeCard.titleText(title, highlightQuery: highlightQuery)
+                            .dodFont(DODType.heading)
+                            .foregroundStyle(DODColor.label)
+                            // DUT-527 — allow 2 title lines on compact (iPhone) too,
+                            // matching the gallery card, so larger Dynamic Type sizes
+                            // no longer truncate recipe names to "Veget…".
+                            .lineLimit(2)
+                        // DUT-530 — compact downloaded indicator. The gallery card's
+                        // full "Downloaded" capsule (``RecipeCard/downloadedBadge``)
+                        // doesn't fit the dense row, so a small accent glyph beside
+                        // the title carries the same status; only the Saved tab
+                        // passes `isDownloaded: true` (Feed/Search default `false`,
+                        // so their baselines are unchanged).
+                        if isDownloaded {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .foregroundStyle(DODColor.accent)
+                                .accessibilityLabel("Downloaded")
+                        }
+                    }
                     Text(excerpt)
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)

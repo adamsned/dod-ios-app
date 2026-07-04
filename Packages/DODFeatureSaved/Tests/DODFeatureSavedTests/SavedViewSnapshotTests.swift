@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import DODDesignSystem
 import DODDomain
 import SnapshotTesting
 import SwiftUI
@@ -19,6 +20,17 @@ final class SavedViewSnapshotTests: XCTestCase {
     override func setUp() {
         super.setUp()
         isRecording = false
+        // DUT-530 — ensure each test sees the default `.gallery` layout; the
+        // list-layout tests below override the key and `tearDown` resets it, so
+        // the existing grid baselines stay `.gallery`.
+        UserDefaults.standard.removeObject(forKey: RecipeListLayout.storageKey)
+    }
+
+    override func tearDown() {
+        // DUT-530 — reset so a per-test list override doesn't leak into the
+        // grid-layout baselines (which assume `.gallery`).
+        UserDefaults.standard.removeObject(forKey: RecipeListLayout.storageKey)
+        super.tearDown()
     }
 
     @MainActor
@@ -57,6 +69,36 @@ final class SavedViewSnapshotTests: XCTestCase {
         assertSnapshot(
             of: view,
             as: .image(layout: .fixed(width: 390, height: 1_600), traits: Self.darkAX5Traits()),
+            record: .missing
+        )
+    }
+
+    // MARK: - DUT-530 — list-layout baselines (local-only, not CI-gated)
+
+    @MainActor
+    func test_loadedSaved_listLayout_light_defaultDynamicType() async {
+        UserDefaults.standard.set(
+            RecipeListLayout.list.rawValue,
+            forKey: RecipeListLayout.storageKey
+        )
+        let view = await Self.makeHostedSaved()
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .missing
+        )
+    }
+
+    @MainActor
+    func test_loadedSaved_listLayout_dark_defaultDynamicType() async {
+        UserDefaults.standard.set(
+            RecipeListLayout.list.rawValue,
+            forKey: RecipeListLayout.storageKey
+        )
+        let view = await Self.makeHostedSaved()
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.darkTraits()),
             record: .missing
         )
     }
