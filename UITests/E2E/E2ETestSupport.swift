@@ -36,7 +36,10 @@ enum E2ETestSupport {
     /// recipe-card `Button` natively). Order tracks `AppTab.allCases` per
     /// AC-16.6; if that order shifts, the L3 smoke `test_tabBarOrderMatchesSpec`
     /// blocks it before we get here.
-    static let tabLabels: Set<String> = ["Recipes", "Saved", "Grocery List", "Settings", "Search"]
+    /// T-912 / DUT-551 (CL-306) — the Grocery List + Settings tabs retired (the
+    /// Shopping List folded into the Cooking Tools hub, whose bottom-tab label is
+    /// "Tools"; Settings moved to a header gear). Four tabs now.
+    static let tabLabels: Set<String> = ["Recipes", "Saved", "Tools", "Search"]
 }
 
 extension XCUIApplication {

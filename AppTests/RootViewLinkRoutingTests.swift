@@ -4,9 +4,9 @@ import XCTest
 
 /// DUT-462 / DUT-243 — an in-app recipe link routes into the stack of the tab
 /// it was tapped from (captured at tap time, before the async resolve), except
-/// Settings, which has no article surface and redirects to Feed. The tab
-/// capture-before-await itself is a view-layer ordering guarantee; this pins the
-/// pure destination rule that the router drives off.
+/// the Cooking Tools hub, which has no article surface and redirects to Feed.
+/// The tab capture-before-await itself is a view-layer ordering guarantee; this
+/// pins the pure destination rule that the router drives off.
 final class RootViewLinkRoutingTests: XCTestCase {
 
     func testLinkStaysInTheTabItWasTappedFrom() {
@@ -15,16 +15,10 @@ final class RootViewLinkRoutingTests: XCTestCase {
         XCTAssertEqual(RootView.linkRoutingDestination(for: .search), .search)
     }
 
-    func testSettingsLinkRedirectsToFeed() {
-        // Settings renders no article surface, so a link tapped there routes to
-        // Feed rather than dead-ending.
-        XCTAssertEqual(RootView.linkRoutingDestination(for: .settings), .feed)
-    }
-
-    func testGroceryLinkRedirectsToFeed() {
-        // DUT-536 — the Grocery List tab renders only the Shopping List (no
-        // article surface / recipe stack), so a link routes to Feed like
-        // Settings rather than dead-ending.
-        XCTAssertEqual(RootView.linkRoutingDestination(for: .grocery), .feed)
+    func testCookingToolsLinkRedirectsToFeed() {
+        // T-912 / DUT-551 (CL-306) — the Cooking Tools hub renders no article
+        // surface / recipe stack, so a link tapped there routes to Feed rather
+        // than dead-ending (as the retired Grocery/Settings tabs did).
+        XCTAssertEqual(RootView.linkRoutingDestination(for: .cookingTools), .feed)
     }
 }

@@ -16,14 +16,6 @@ extension FeedView {
         )
     }
 
-    /// Log a completed cook then re-derive the current rung.
-    func logCookAndRefresh(_ entry: CookLogEntry) {
-        Task {
-            await viewModel.logCook(entry)
-            await refreshCurrentRung()
-        }
-    }
-
     /// DUT-527 — pull-to-refresh, then announce completion. Keeps the
     /// `.refreshable` call site in `FeedView` a one-liner (struct-body cap).
     func refreshAndAnnounce() async {

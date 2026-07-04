@@ -35,13 +35,27 @@ struct TabStack: View {
     /// this tab was unmounted still fires once the tab mounts (DUT-463 /
     /// DUT-319), with stale routes discarded at drain.
     @Binding var externalRoute: ExternalRouteQueue
-    /// DUT-534 / DUT-536 — routes the Shopping List entry points to the
-    /// top-level Grocery List tab (`RootView.routeToShoppingList()` selects
-    /// `.grocery`). Backs Recipe Detail's + the Feed/Search cards' "Added to your
-    /// Shopping List" snackbar "View" action AND the Saved header cart. Threaded
-    /// from `RootView` so this App view never reaches into the deep-link plumbing
-    /// directly. Defaults to a no-op for terse call sites.
+    /// DUT-534 / T-912 (DUT-551) — routes the Shopping List entry points to the
+    /// Cooking Tools hub (`RootView.routeToShoppingList()` selects `.cookingTools`
+    /// + mints the hub Shopping List token). Backs Recipe Detail's + the
+    /// Feed/Search cards' "Added to your Shopping List" snackbar "View" action AND
+    /// the Saved header cart. Threaded from `RootView` so this App view never
+    /// reaches into the deep-link plumbing directly. Defaults to a no-op.
     let openShoppingList: () -> Void
+    /// T-912 / DUT-551 (CL-306) — iPhone Settings gear. The Feed header's
+    /// trailing `gearshape` button calls this to open the Settings sheet
+    /// (`RootView.showSettingsSheet`). Threaded from `RootView` like
+    /// `openShoppingList`; defaults to a no-op for terse call sites.
+    let onOpenSettings: () -> Void
+    /// T-912 / DUT-551 (CL-306) — the Cook Mode hub row routes here to pick a
+    /// recipe to cook (Cook Mode can't launch without a recipe). Selects the
+    /// Recipes tab. Threaded from `RootView`; defaults to a no-op.
+    let onFindRecipe: () -> Void
+    /// T-912 / DUT-551 (CL-306) — the Shopping List reroute token, owned by
+    /// `RootView` and bound only into the Cooking Tools tab (all four Shopping
+    /// List entry points mint it via `routeToShoppingList()`). The hub consumes
+    /// it via `.task(id:)` and pushes the Shopping List. Inert for other tabs.
+    @Binding var hubShoppingListToken: UUID?
     /// DUT-546 (gap 3) — the single app-level ``CommentModerationStore`` owned
     /// by `RootView`, injected into every `RecipeDetailViewModel` this stack
     /// builds so a block applied on one recipe screen hides that author on an
@@ -67,6 +81,9 @@ struct TabStack: View {
         pendingDeepLink: Binding<WidgetDeepLink?> = .constant(nil),
         externalRoute: Binding<ExternalRouteQueue> = .constant(ExternalRouteQueue()),
         openShoppingList: @escaping () -> Void = {},
+        onOpenSettings: @escaping () -> Void = {},
+        onFindRecipe: @escaping () -> Void = {},
+        hubShoppingListToken: Binding<UUID?> = .constant(nil),
         commentModeration: CommentModerationStore = CommentModerationStore()
     ) {
         self.tab = tab
@@ -75,6 +92,9 @@ struct TabStack: View {
         self._pendingDeepLink = pendingDeepLink
         self._externalRoute = externalRoute
         self.openShoppingList = openShoppingList
+        self.onOpenSettings = onOpenSettings
+        self.onFindRecipe = onFindRecipe
+        self._hubShoppingListToken = hubShoppingListToken
         self.commentModeration = commentModeration
     }
 
@@ -144,7 +164,10 @@ struct TabStack: View {
                 },
                 // DUT-534 Part 2 — the card snackbar's "View" opens the Shopping
                 // List, same closure Recipe Detail's Part 1 snackbar routes to.
-                openShoppingList: openShoppingList
+                openShoppingList: openShoppingList,
+                // T-912 / DUT-551 (CL-306) — the Feed header trailing slot now
+                // hosts the Settings gear (the old Cooking Tools menu is retired).
+                onOpenSettings: onOpenSettings
             )
         case .search:
             SearchView(
@@ -184,54 +207,19 @@ struct TabStack: View {
                     }
                 }
             )
-        case .grocery:
-            // DUT-536 — the top-level Grocery List tab renders the Shopping List
-            // directly, opened to the persisted list. `GroceryTabRoot` composes
-            // the same deps `SavedView` threads into `ShoppingListView` (the
-            // saved-recipe picker source + the `recipeWithIngredients` hydration
-            // seam); the list itself is the shared, store-backed
-            // `ShoppingListViewModel` so it reads the SAME App-Group store as the
-            // Saved-hosted entry and the Recipe-Detail / card append flows.
-            GroceryTabRoot(dependencies: dependencies)
-        case .settings:
-            // T-823 / DUT-187 — Settings is now a first-class destination
-            // (iPhone tab / iPad sidebar row) rendered inside the tab's own
-            // NavigationStack, replacing the per-tab gear sheet.
-            SettingsView(
-                viewModel: settingsTabViewModel,
-                onClearImageCache: { try await dependencies.store.clearImageCache() }
+        case .cookingTools:
+            // T-912 / DUT-551 (CL-306) — the Cooking Tools hub. Replaces the
+            // retired Grocery List tab (the Shopping List is now a pushed row
+            // inside the hub, reached via `hubShoppingListToken`) and the retired
+            // Settings tab (Settings moved to a header gear). Renders every
+            // utility in meal-making order; the Shopping List still reads the
+            // SAME App-Group store via `GroceryTabRoot`.
+            CookingToolsHubView(
+                dependencies: dependencies,
+                shoppingListToken: $hubShoppingListToken,
+                onFindRecipe: onFindRecipe
             )
         }
-    }
-
-    /// T-823 / DUT-187 — builds the `SettingsViewModel` for the Settings tab.
-    /// Settings is now a first-class destination (iPhone tab between Saved and
-    /// Search / iPad sidebar row) instead of the per-tab gear sheet, but the
-    /// dependency surface is exactly what the old `SettingsToolbarModifier`
-    /// (DUT-26) wired: the iCloud-Sync seam, Clear-Cache closure (passed at the
-    /// `SettingsView` call site), notification-auth seam, the AVFoundation
-    /// voice previewer, and the Keychain profile + photo stores.
-    private var settingsTabViewModel: SettingsViewModel {
-        #if canImport(UIKit)
-        SettingsViewModel(
-            dependencies: dependencies.settingsDependencies(),
-            voicePreviewer: SystemVoicePreviewer(),
-            profileStore: dependencies.profileStore,
-            profilePhotoStore: dependencies.profilePhotoStore,
-            requestNotificationAuthorization: {
-                await dependencies.notificationService.requestAuthorization()
-            }
-        )
-        #else
-        SettingsViewModel(
-            dependencies: dependencies.settingsDependencies(),
-            voicePreviewer: SystemVoicePreviewer(),
-            profileStore: dependencies.profileStore,
-            requestNotificationAuthorization: {
-                await dependencies.notificationService.requestAuthorization()
-            }
-        )
-        #endif
     }
 
     @ViewBuilder
@@ -355,11 +343,11 @@ struct TabStack: View {
             path = []
         case .saved, .tip, .shoppingList:
             // RootView routes `.saved` (Saved tab), `.tip` (the DUT-457 dialog),
-            // and `.shoppingList` (DUT-480 Control Center control → DUT-536 now
-            // selects the top-level Grocery List tab) directly and never sets
-            // `pendingDeepLink`, so these are unreachable here.
-            // Kept exhaustive so the compiler catches any future caller that
-            // does forward the link through here.
+            // and `.shoppingList` (DUT-480 Control Center control → T-912/DUT-551
+            // now selects the Cooking Tools tab + mints the hub Shopping List
+            // token) directly and never sets `pendingDeepLink`, so these are
+            // unreachable here. Kept exhaustive so the compiler catches any future
+            // caller that does forward the link through here.
             break
         }
     }

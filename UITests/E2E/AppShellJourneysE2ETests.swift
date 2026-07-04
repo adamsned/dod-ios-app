@@ -13,15 +13,17 @@ final class AppShellJourneysE2ETests: XCTestCase {
         app = XCUIApplication()
     }
 
-    /// Settings tab → change the App Appearance picker to "Cocoa" → leave to
-    /// another tab and return → the selection persisted (US-32). Appearance is
-    /// an enabled picker (unlike the "Coming soon" metric toggle).
+    /// Settings gear → change the App Appearance picker to "Cocoa" → dismiss the
+    /// sheet and reopen it → the selection persisted (US-32). Appearance is an
+    /// enabled picker (unlike the "Coming soon" metric toggle). T-912 / DUT-551
+    /// (CL-306) — Settings left the tab bar; it's a Feed header gear that
+    /// presents SettingsView as a sheet.
     func test_settings_appearance_picker_persists_selection() {
         app.launchForE2E()
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "tab bar should appear")
 
-        tabBar.buttons["Settings"].tap()
+        app.buttons["feed-toolbar-settings"].tap()
 
         let picker = app.otherElements["settings-picker-appearance"]
             .firstMatch
@@ -31,7 +33,7 @@ final class AppShellJourneysE2ETests: XCTestCase {
         let target = appearancePicker.exists ? appearancePicker : picker
         XCTAssertTrue(
             target.waitForExistence(timeout: 8),
-            "the Settings screen should expose the App Appearance picker"
+            "the Settings sheet should expose the App Appearance picker"
         )
         target.tap()
 
@@ -40,19 +42,20 @@ final class AppShellJourneysE2ETests: XCTestCase {
         XCTAssertTrue(cocoa.waitForExistence(timeout: 5), "the appearance picker should offer 'Cocoa'")
         cocoa.tap()
 
-        // Round-trip through another tab and back; the selection persists.
-        tabBar.buttons["Recipes"].tap()
+        // Dismiss the Settings sheet (swipe down) and reopen it; the selection
+        // persists (`@AppStorage`-backed).
+        app.swipeDown(velocity: .fast)
         XCTAssertTrue(
             app.buttons.matching(identifier: "dod.feed.card").firstMatch.waitForExistence(timeout: 10),
-            "feed should render after leaving Settings"
+            "feed should render after dismissing the Settings sheet"
         )
-        tabBar.buttons["Settings"].tap()
+        app.buttons["feed-toolbar-settings"].tap()
         XCTAssertTrue(
             app.staticTexts["Cocoa"].waitForExistence(timeout: 8)
                 || app.buttons.matching(identifier: "settings-picker-appearance").firstMatch.waitForExistence(
                     timeout: 8
                 ),
-            "returning to Settings should show the persisted 'Cocoa' appearance selection"
+            "reopening Settings should show the persisted 'Cocoa' appearance selection"
         )
     }
 
@@ -81,11 +84,12 @@ final class AppShellJourneysE2ETests: XCTestCase {
         save.tap()
         XCTAssertTrue(app.buttons["Unsave recipe"].waitForExistence(timeout: 8), "Save should flip to Unsave")
 
-        // Saved tab → Make Shopping List. DUT-536 — the cart now selects the
-        // top-level Grocery List tab (single store-backed list) instead of
-        // pushing inside the Saved stack. The cart is a small (~23pt) header
-        // icon; tap its center coordinate so the hit-point resolves even under
-        // simulator load (label taps occasionally miss on iOS 26).
+        // Saved tab → Make Shopping List. T-912 / DUT-551 (CL-306) — the cart now
+        // selects the Cooking Tools hub tab AND mints a token that PUSHES the
+        // Shopping List onto the hub's stack (the Grocery tab retired; the list
+        // folded into the hub). The cart is a small (~23pt) header icon; tap its
+        // center coordinate so the hit-point resolves even under simulator load
+        // (label taps occasionally miss on iOS 26).
         tabBar.buttons["Saved"].tap()
         let makeList = app.buttons["saved-make-shopping-list"]
         XCTAssertTrue(
@@ -93,12 +97,13 @@ final class AppShellJourneysE2ETests: XCTestCase {
             "the Saved tab should expose 'Make Shopping List' once a recipe is saved"
         )
         makeList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        // DUT-536 — landing on the Grocery List tab, the (empty) list offers its
-        // primary "Build List" empty-state button, which presents the picker.
+        // T-912 / DUT-551 — the reroute pushes the (empty) Shopping List onto the
+        // Cooking Tools hub stack, which offers its primary "Build List"
+        // empty-state button, which presents the picker.
         let openBuilder = app.buttons["shopping-list-build"]
         XCTAssertTrue(
             openBuilder.waitForExistence(timeout: 8),
-            "the Grocery List tab should present the empty-state 'Build List' button"
+            "the Shopping List (pushed onto the hub) should present the empty-state 'Build List' button"
         )
         openBuilder.tap()
         let buildButton = app.buttons["shopping-builder-build"]
@@ -128,9 +133,10 @@ final class AppShellJourneysE2ETests: XCTestCase {
         )
     }
 
-    /// Cross-tab navigation integrity: all five tabs are reachable, and a
-    /// detail pushed on the Recipes stack survives a tab round-trip (tab swap
-    /// is not a pop).
+    /// Cross-tab navigation integrity: all four tabs are reachable, and a detail
+    /// pushed on the Recipes stack survives a tab round-trip (tab swap is not a
+    /// pop). T-912 / DUT-551 (CL-306) — four tabs now (Recipes / Saved / Tools /
+    /// Search); Settings is a header gear, not a tab.
     func test_cross_tab_navigation_integrity() {
         app.launchForE2E()
         let tabBar = app.tabBars.firstMatch
@@ -149,10 +155,10 @@ final class AppShellJourneysE2ETests: XCTestCase {
             app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 8),
             "the Saved tab should show its empty state on a fresh launch"
         )
-        tabBar.buttons["Settings"].tap()
+        tabBar.buttons["Tools"].tap()
         XCTAssertTrue(
-            app.staticTexts["Settings"].waitForExistence(timeout: 8),
-            "the Settings tab should render its header"
+            app.staticTexts["Cooking Tools"].waitForExistence(timeout: 8),
+            "the Cooking Tools hub tab should render its header"
         )
         tabBar.buttons["Search"].tap()
         XCTAssertTrue(

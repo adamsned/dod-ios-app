@@ -43,15 +43,13 @@ final class TabBarSnapshotTests: XCTestCase {
     func test_tabBar_savedSelected_light_iPhone13() {
         assertTabBarSnapshot(selected: .saved, device: .iPhone13)
     }
-    // DUT-536 — the new Grocery List tab.
-    func test_tabBar_grocerySelected_light_iPhone13() {
-        assertTabBarSnapshot(selected: .grocery, device: .iPhone13)
+    // T-912 / DUT-551 (CL-306) — the new Cooking Tools hub tab (replaces the
+    // retired Grocery List + Settings tabs).
+    func test_tabBar_cookingToolsSelected_light_iPhone13() {
+        assertTabBarSnapshot(selected: .cookingTools, device: .iPhone13)
     }
     func test_tabBar_searchSelected_light_iPhone13() {
         assertTabBarSnapshot(selected: .search, device: .iPhone13)
-    }
-    func test_tabBar_settingsSelected_light_iPhone13() {
-        assertTabBarSnapshot(selected: .settings, device: .iPhone13)
     }
 
     // MARK: - iPad 12.9"
@@ -62,15 +60,12 @@ final class TabBarSnapshotTests: XCTestCase {
     func test_tabBar_savedSelected_light_iPad129() {
         assertTabBarSnapshot(selected: .saved, device: .iPad129)
     }
-    // DUT-536 — the new Grocery List tab.
-    func test_tabBar_grocerySelected_light_iPad129() {
-        assertTabBarSnapshot(selected: .grocery, device: .iPad129)
+    // T-912 / DUT-551 (CL-306) — the new Cooking Tools hub tab.
+    func test_tabBar_cookingToolsSelected_light_iPad129() {
+        assertTabBarSnapshot(selected: .cookingTools, device: .iPad129)
     }
     func test_tabBar_searchSelected_light_iPad129() {
         assertTabBarSnapshot(selected: .search, device: .iPad129)
-    }
-    func test_tabBar_settingsSelected_light_iPad129() {
-        assertTabBarSnapshot(selected: .settings, device: .iPad129)
     }
 
     /// Records on missing so the very first run lays down baselines
@@ -126,14 +121,16 @@ final class TabBarSnapshotTests: XCTestCase {
 private struct TabBarFixture: View {
 
     enum Tab: Hashable, CaseIterable {
-        case feed, saved, grocery, settings, search
+        case feed, saved, cookingTools, search
 
         var title: String {
             switch self {
             case .feed: "Recipes"
             case .saved: "Saved"
-            case .grocery: "Grocery List"
-            case .settings: "Settings"
+            // T-912 / DUT-551 (CL-306) — the bottom-tab label is "Tools" (the
+            // full "Cooking Tools" lives in the hub header), mirroring the
+            // real `AppTab.tabLabel` split.
+            case .cookingTools: "Tools"
             case .search: "Search"
             }
         }
@@ -142,8 +139,7 @@ private struct TabBarFixture: View {
             switch self {
             case .feed: "house"
             case .saved: "bookmark"
-            case .grocery: "cart"
-            case .settings: "gearshape"
+            case .cookingTools: "frying.pan"
             case .search: "magnifyingglass"
             }
         }

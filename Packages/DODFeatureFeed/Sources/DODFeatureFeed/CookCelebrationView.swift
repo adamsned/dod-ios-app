@@ -19,15 +19,22 @@ public enum CookCelebration: Equatable, Identifiable, Sendable {
     }
 }
 
-/// The celebration sheet, presented from `FeedView` when `FeedViewModel.celebration`
-/// is set — the moment that makes the transformation *felt* instead of a silent
-/// journal increment.
-struct CookCelebrationView: View {
+/// The celebration sheet, presented when `FeedViewModel.celebration` is set —
+/// the moment that makes the transformation *felt* instead of a silent journal
+/// increment. T-912 / DUT-551 (CL-306) — `public` so the app-level Cooking Tools
+/// hub, which now presents "Your First Cookout" (the flow that logs the cook
+/// and earns the celebration), can render it too.
+public struct CookCelebrationView: View {
 
     let celebration: CookCelebration
     let onDismiss: () -> Void
 
-    var body: some View {
+    public init(celebration: CookCelebration, onDismiss: @escaping () -> Void) {
+        self.celebration = celebration
+        self.onDismiss = onDismiss
+    }
+
+    public var body: some View {
         VStack(spacing: DODSpacing.md) {
             Spacer()
             Text(emoji)
