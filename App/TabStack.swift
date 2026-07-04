@@ -56,16 +56,11 @@ struct TabStack: View {
     /// `.cookingTools` + mints the hub Heat Coach token. Threaded from `RootView`
     /// like `openShoppingList`; defaults to a no-op.
     let openHeatCoach: () -> Void
-    /// T-912 / DUT-551 (CL-306) — the Shopping List reroute token, owned by
-    /// `RootView` and bound only into the Cooking Tools tab (all four Shopping
-    /// List entry points mint it via `routeToShoppingList()`). The hub consumes
-    /// it via `.task(id:)` and pushes the Shopping List. Inert for other tabs.
-    @Binding var hubShoppingListToken: UUID?
-    /// T-912 / DUT-551 (CL-306) — the Heat Coach reroute token, owned by
-    /// `RootView` and bound only into the Cooking Tools tab. `routeToHeatCoach()`
-    /// mints it (from the per-recipe nudge); the hub consumes it via `.task(id:)`
-    /// and presents Heat Coach. Inert for other tabs.
-    @Binding var hubHeatCoachToken: UUID?
+    /// DUT-560 — the UNIFIED hub-tool reroute request, owned by `RootView` and
+    /// bound only into the Cooking Tools tab (every tool entry point mints it via
+    /// `route(toHubTool:)`). The hub consumes it via `.task(id:)` and opens the
+    /// tool. Inert for other tabs.
+    @Binding var hubPendingTool: HubToolRoute?
     /// DUT-461 (revised) — the Cooking Tip token, owned by `RootView` and bound
     /// only into the Cooking Tools tab. The Cooking Tip widget tap mints it; the
     /// hub consumes it via `.task(id:)` to pop to its root so the tip banner shows.
@@ -94,8 +89,7 @@ struct TabStack: View {
         onOpenSettings: @escaping () -> Void = {},
         onFindRecipe: @escaping () -> Void = {},
         openHeatCoach: @escaping () -> Void = {},
-        hubShoppingListToken: Binding<UUID?> = .constant(nil),
-        hubHeatCoachToken: Binding<UUID?> = .constant(nil),
+        hubPendingTool: Binding<HubToolRoute?> = .constant(nil),
         hubTipToken: Binding<UUID?> = .constant(nil),
         commentModeration: CommentModerationStore = CommentModerationStore()
     ) {
@@ -108,8 +102,7 @@ struct TabStack: View {
         self.onOpenSettings = onOpenSettings
         self.onFindRecipe = onFindRecipe
         self.openHeatCoach = openHeatCoach
-        self._hubShoppingListToken = hubShoppingListToken
-        self._hubHeatCoachToken = hubHeatCoachToken
+        self._hubPendingTool = hubPendingTool
         self._hubTipToken = hubTipToken
         self.commentModeration = commentModeration
     }
@@ -238,14 +231,13 @@ struct TabStack: View {
         case .cookingTools:
             // T-912 / DUT-551 (CL-306) — the Cooking Tools hub. Replaces the
             // retired Grocery List tab (the Shopping List is now a pushed row
-            // inside the hub, reached via `hubShoppingListToken`) and the retired
+            // inside the hub, reached via `hubPendingTool`) and the retired
             // Settings tab (Settings moved to a header gear). Renders every
             // utility in meal-making order; the Shopping List still reads the
             // SAME App-Group store via `GroceryTabRoot`.
             CookingToolsHubView(
                 dependencies: dependencies,
-                shoppingListToken: $hubShoppingListToken,
-                heatCoachToken: $hubHeatCoachToken,
+                pendingTool: $hubPendingTool,
                 tipToken: $hubTipToken,
                 onFindRecipe: onFindRecipe,
                 onOpenSettings: onOpenSettings  // DUT-551 (CL-306) — header gear

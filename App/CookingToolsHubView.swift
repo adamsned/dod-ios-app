@@ -13,6 +13,27 @@ enum HubDestination: Hashable {
     case shoppingList
 }
 
+/// DUT-560 — the cooking tools the hub can be routed to open. `buyBuzzyWaxx` is
+/// deliberately NOT here: it opens a store URL (handled in `RootView`), not a
+/// hub tool. Drives ``HubToolRoute``.
+enum HubTool: Equatable {
+    case shoppingList
+    case heatCoach
+    case cookingJournal
+    case firstCookout
+    case cookMode
+}
+
+/// DUT-560 — one unified reroute request replacing the per-tool tokens
+/// (`hubShoppingListToken` / `hubHeatCoachToken`). `RootView` mints a fresh
+/// `id` per request so a repeat of the same tool still re-fires; the hub
+/// consumes it via `.task(id:)`. All six control-driven tools (plus the deep
+/// link, snackbar, cart, and recipe nudge) funnel through this one path.
+struct HubToolRoute: Equatable {
+    let id: UUID
+    let tool: HubTool
+}
+
 /// T-912 / DUT-551 (CL-306) — the **Cooking Tools** hub: a first-class tab that
 /// lists every utility a cook reaches for, **in meal-making order** (shop →
 /// heat → cook → after). It replaces the retired standalone "Cooking Tools"
@@ -29,21 +50,15 @@ struct CookingToolsHubView: View {
 
     let dependencies: AppDependencies
 
-    /// T-912 / DUT-551 — the Shopping List reroute token. `RootView` mints a
-    /// fresh UUID when any Shopping List entry point fires (`dod://shopping-list`
-    /// deep link, the iOS 18 Control Center control, the recipe/card snackbar
-    /// "View", the Saved header cart) and selects this tab; the hub consumes the
-    /// token via `.task(id:)` (not `.onChange`, so a cold-launch Control Center
-    /// token still fires) and pushes `.shoppingList`. Mirrors the old
-    /// `openShoppingListToken` pattern the Saved tab used (CL-301).
-    @Binding var shoppingListToken: UUID?
-
-    /// T-912 / DUT-551 — the Heat Coach reroute token. `RootView` mints a fresh
-    /// UUID when the per-recipe Heat Coach nudge (Recipe Detail) fires and selects
-    /// this tab; the hub consumes it via `.task(id:)` (not `.onChange`, so a token
-    /// already set when the tab mounts still fires) and presents Heat Coach as a
-    /// sheet — reusing the same `showingHeatCoach` state the hub's row #3 drives.
-    @Binding var heatCoachToken: UUID?
+    /// DUT-560 — the unified hub-tool reroute request (replaces the per-tool
+    /// `shoppingListToken` / `heatCoachToken`). `RootView` mints a fresh
+    /// `HubToolRoute` when ANY hub tool entry point fires — the `dod://` deep
+    /// link, the iOS 18 configurable Control Center control, the recipe/card
+    /// snackbar "View", the Saved header cart, the per-recipe Heat Coach nudge —
+    /// and selects this tab; the hub consumes it via `.task(id:)` (not
+    /// `.onChange`, so a cold-launch Control Center request still fires) and
+    /// opens the tool. Mirrors the old `openShoppingListToken` pattern (CL-301).
+    @Binding var pendingTool: HubToolRoute?
 
     /// DUT-461 (revised) — the Cooking Tip token. The lock-screen Cooking Tip
     /// widget's tap mints it; the hub consumes it via `.task(id:)` and pops to its
@@ -91,15 +106,13 @@ struct CookingToolsHubView: View {
 
     init(
         dependencies: AppDependencies,
-        shoppingListToken: Binding<UUID?> = .constant(nil),
-        heatCoachToken: Binding<UUID?> = .constant(nil),
+        pendingTool: Binding<HubToolRoute?> = .constant(nil),
         tipToken: Binding<UUID?> = .constant(nil),
         onFindRecipe: @escaping () -> Void = {},
         onOpenSettings: (() -> Void)? = nil
     ) {
         self.dependencies = dependencies
-        self._shoppingListToken = shoppingListToken
-        self._heatCoachToken = heatCoachToken
+        self._pendingTool = pendingTool
         self._tipToken = tipToken
         self.onFindRecipe = onFindRecipe
         self.onOpenSettings = onOpenSettings
@@ -130,23 +143,27 @@ struct CookingToolsHubView: View {
                 }
             }
         }
-        // Consume the Shopping List reroute token. `.task(id:)` (not `.onChange`)
-        // so a token already set when this tab first mounts — a cold-launch
-        // Control Center tap, or the deep link that selected the tab before the
-        // hub rendered — still pushes the list. A nil token is a no-op.
-        .task(id: shoppingListToken) {
-            guard shoppingListToken != nil else { return }
-            if path.last != .shoppingList { path.append(.shoppingList) }
-            shoppingListToken = nil
-        }
-        // T-912 / DUT-551 — consume the Heat Coach reroute token (the per-recipe
-        // nudge). `.task(id:)` (not `.onChange`) so a token already set when this
-        // tab first mounts still presents. Reuses the same `showingHeatCoach`
-        // sheet the hub's row #3 drives. A nil token is a no-op.
-        .task(id: heatCoachToken) {
-            guard heatCoachToken != nil else { return }
-            showingHeatCoach = true
-            heatCoachToken = nil
+        // DUT-560 — consume the unified hub-tool reroute request. `.task(id:)`
+        // (not `.onChange`) so a request already set when this tab first mounts —
+        // a cold-launch Control Center tap, or the deep link that selected the
+        // tab before the hub rendered — still opens the tool. A nil request is a
+        // no-op. The Shopping List branch PRESERVES the exact crash-fixed push
+        // (guarded so a repeat request doesn't double-stack the list).
+        .task(id: pendingTool) {
+            guard let pendingTool else { return }
+            switch pendingTool.tool {
+            case .shoppingList:
+                if path.last != .shoppingList { path.append(.shoppingList) }
+            case .heatCoach:
+                showingHeatCoach = true
+            case .cookingJournal:
+                showingJournal = true
+            case .firstCookout:
+                showingFirstCookout = true
+            case .cookMode:
+                showingCookModeExplainer = true
+            }
+            self.pendingTool = nil
         }
         // DUT-461 (revised) — the Cooking Tip widget's tap mints `tipToken`; pop the
         // hub to its root so the persistent tip banner at the top is visible (the

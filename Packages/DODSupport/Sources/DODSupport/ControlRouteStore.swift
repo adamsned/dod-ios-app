@@ -18,8 +18,17 @@ public struct ControlRouteStore: @unchecked Sendable {
 
     /// The routes a control can request. Only the Shopping List today; raw
     /// values are the persisted tokens (stable across binary versions).
+    ///
+    /// DUT-560 — the configurable iOS 18 Control Center control lets the user
+    /// pick which of the six cooking tools it opens, so every tool has a stable
+    /// token here.
     public enum Route: String, Sendable {
         case shoppingList = "shopping-list"
+        case heatCoach = "heat-coach"
+        case cookingJournal = "journal"
+        case firstCookout = "first-cookout"
+        case cookMode = "cook-mode"
+        case buyBuzzyWaxx = "buzzywaxx"
     }
 
     private let defaults: UserDefaults

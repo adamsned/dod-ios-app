@@ -103,15 +103,11 @@ struct RootView: View {
     /// T-912 / DUT-551 (CL-306) — Settings left the tab bar; it's presented as a
     /// sheet from the Feed header gear (iPhone) / iPad sidebar Settings row.
     @State var showSettingsSheet = false
-    /// T-912 / DUT-551 (CL-306) — the hub's Shopping List reroute token.
-    /// `routeToShoppingList()` selects `.cookingTools` + mints a UUID; the hub
-    /// pushes the Shopping List via `.task(id:)`. Owned here so it survives the
-    /// iPad flip. Mirrors CL-301's token.
-    @State var hubShoppingListToken: UUID?
-    /// T-912 / DUT-551 (CL-306) — the hub's Heat Coach token. `routeToHeatCoach()`
-    /// (the per-recipe nudge) mints it; the hub presents Heat Coach via `.task(id:)`.
-    /// Owned here (like `hubShoppingListToken`) so it survives the iPad flip.
-    @State var hubHeatCoachToken: UUID?
+    /// DUT-560 — the hub's UNIFIED tool reroute request (replaces the per-tool
+    /// `hubShoppingListToken` / `hubHeatCoachToken`). `route(toHubTool:)` selects
+    /// `.cookingTools` + mints a fresh `HubToolRoute`; the hub opens the tool via
+    /// `.task(id:)`. Owned here so it survives the iPad flip. Mirrors CL-301.
+    @State var hubPendingTool: HubToolRoute?
     /// DUT-461 (revised) — the hub's Cooking Tip token. The Cooking Tip widget's
     /// `dod://tip/<index>` tap mints it (via `handle(widgetLink: .tip)`); the hub
     /// consumes it via `.task(id:)` to pop to its root so the persistent tip banner
@@ -279,8 +275,7 @@ struct RootView: View {
                     onFindRecipe: { selectedTab = .feed },
                     // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                     openHeatCoach: { routeToHeatCoach() },
-                    hubShoppingListToken: tab == .cookingTools ? $hubShoppingListToken : .constant(nil),
-                    hubHeatCoachToken: tab == .cookingTools ? $hubHeatCoachToken : .constant(nil),
+                    hubPendingTool: tab == .cookingTools ? $hubPendingTool : .constant(nil),
                     hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
                     // DUT-546 — one shared moderation store across every recipe screen.
                     commentModeration: commentModeration
@@ -356,8 +351,7 @@ struct RootView: View {
                 onFindRecipe: { selectedTab = .feed },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                 openHeatCoach: { routeToHeatCoach() },
-                hubShoppingListToken: selectedTab == .cookingTools ? $hubShoppingListToken : .constant(nil),
-                hubHeatCoachToken: selectedTab == .cookingTools ? $hubHeatCoachToken : .constant(nil),
+                hubPendingTool: selectedTab == .cookingTools ? $hubPendingTool : .constant(nil),
                 hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
                 // DUT-546 — one shared moderation store across every recipe screen.
                 commentModeration: commentModeration
