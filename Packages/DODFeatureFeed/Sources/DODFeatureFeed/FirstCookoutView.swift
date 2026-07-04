@@ -30,6 +30,18 @@ public struct FirstCookoutView: View {
     /// DUT-297 — schedules the "bake is done" notification so the guided timer
     /// reaches the cook even when they "step away" (background the app).
     let notifier: any BakeTimerNotifying
+    /// DUT-548 — the set of rung recipeIDs already logged, OWNED by the host
+    /// (`CookChooserFlow`) so it survives a "Back to the path" → re-enter cycle
+    /// (which tears this view down + rebuilds it with a fresh `hasLoggedCook`).
+    /// Aligns with DUT-484/547's per-recipe keying on the shared engine: the log
+    /// guard is now keyed by `cookout.recipeID`, not a per-view boolean. `nil`
+    /// in unwired hosts (DumpCakeFlow / previews / standalone) → the legacy
+    /// per-view `hasLoggedCook` guard.
+    @Binding var loggedRecipeIDs: Set<Int>
+    /// DUT-209 — the off-main celebration-photo writer. Injected so the atomic
+    /// full-resolution JPEG write no longer hitches the main thread right before
+    /// "Done" dismisses, and so tests can assert it runs off-main.
+    let photoWriter: any CookPhotoWriting
 
     @Environment(\.openURL) var openURL
     @Environment(\.dismiss) var dismiss
@@ -61,7 +73,9 @@ public struct FirstCookoutView: View {
     @State var cookPhotoData: Data?
     @State var showingCamera = false
     /// Guards against double-logging if the user taps Done more than once.
-    @State private var hasLoggedCook = false
+    /// Internal (not private) so the `logCookIfNeeded` logic moved to
+    /// `FirstCookoutView+Logging.swift` (file-length relief) can read it.
+    @State var hasLoggedCook = false
     /// DUT-312 — humane copy when the celebration photo fails to persist to
     /// disk. Surfaced via the snackbar overlay so the hero first-cook photo
     /// failure isn't silently swallowed; the cook itself still logs. Internal
@@ -79,13 +93,22 @@ public struct FirstCookoutView: View {
         onLogCook: ((CookLogEntry) -> Void)? = nil,
         onBack: (() -> Void)? = nil,
         notifier: any BakeTimerNotifying = SystemBakeTimerNotifier(),
-        timerEngine: CookTimerEngine? = nil
+        timerEngine: CookTimerEngine? = nil,
+        loggedRecipeIDs: Binding<Set<Int>>? = nil,
+        photoWriter: any CookPhotoWriting = SystemCookPhotoWriter()
     ) {
         self.cookout = cookout
         self.recipeBaseURL = recipeBaseURL
         self.onLogCook = onLogCook
         self.onBack = onBack
         self.notifier = notifier
+        self.photoWriter = photoWriter
+        // DUT-548: adopt the host-owned "already logged" set when provided (so a
+        // logged cook survives a Back → re-enter cycle); otherwise a throwaway
+        // constant binding — the per-view `hasLoggedCook` still guards a single
+        // lifecycle for the unwired hosts (DumpCakeFlow / previews) that can't
+        // re-enter the same rung anyway.
+        _loggedRecipeIDs = loggedRecipeIDs ?? .constant([])
         // DUT-484: adopt the host-owned engine when provided (so a bake timer
         // survives a Back → re-enter cycle); otherwise own a fresh one. On
         // re-creation `State(initialValue:)` re-adopts the SAME injected
@@ -174,25 +197,6 @@ public struct FirstCookoutView: View {
         .onDisappear {
             if index >= lastIndex { logCookIfNeeded() }
         }
-    }
-
-    /// Advances the timer engine ~1×/s while the flow is on screen so the bake
-    /// countdown ticks down and finishes. A cheap no-op when no timer runs.
-    private func runTimerTick() async {
-        while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(1))
-            timerEngine.refresh()
-        }
-    }
-
-    private func loadPhoto(_ item: PhotosPickerItem?) async {
-        guard let item, let data = try? await item.loadTransferable(type: Data.self) else { return }
-        cookPhotoData = data
-        #if canImport(UIKit)
-        if let uiImage = UIImage(data: data) {
-            cookPhoto = Image(uiImage: uiImage)
-        }
-        #endif
     }
 
     // MARK: - Screens
@@ -324,47 +328,6 @@ public struct FirstCookoutView: View {
         if index == 0 { return "Let's Cook" }
         if index >= lastIndex { return "Done" }
         return "Next"
-    }
-
-    /// Log the completed cook exactly once (DUT-104) — fired on "Done" so the
-    /// journal records "I made the lasagna today", feeding streaks/stats.
-    private func logCookIfNeeded() {
-        guard !hasLoggedCook else { return }
-        hasLoggedCook = true
-        // Persist the celebrate photo to disk (DUT-104); the entry keeps only the
-        // lightweight filename, not the bytes.
-        // DUT-312 — don't swallow a disk-write failure on the hero first cook.
-        // Surface a humane snackbar (mirrors the saveError pattern) while still
-        // logging the cook photo-less so the "I did it" moment isn't lost.
-        var photoID: String?
-        if let photoData = cookPhotoData {
-            do {
-                photoID = try CookPhotoStore().save(photoData)
-            } catch {
-                photoSaveError = "Your cook is logged, but we couldn't save the photo. Try again from your journal."
-            }
-        }
-        // DUT-324 — carry the written reflection through as the cook's note.
-        let trimmedReflection = reflection.trimmingCharacters(in: .whitespacesAndNewlines)
-        onLogCook?(
-            CookLogEntry(
-                id: UUID(),
-                recipeID: cookout.recipeID,
-                recipeTitle: cookout.dishTitle,
-                cookedAt: .now,
-                note: trimmedReflection.isEmpty ? nil : trimmedReflection,
-                photoLocalID: photoID
-            )
-        )
-    }
-
-    func stageIcon(_ stage: GuidedCookout.Stage) -> String {
-        switch stage {
-        case .gather: return "checklist"
-        case .fire: return "flame.fill"
-        case .cook: return "frying.pan.fill"
-        case .celebrate: return "party.popper.fill"
-        }
     }
 }
 

@@ -11,31 +11,6 @@ import UIKit
 /// extracted here so the main flow file stays under the SwiftLint length caps.
 extension FirstCookoutView {
 
-    // MARK: Campfire-aware copy (DUT-192) — dish-agnostic phrasing for the
-    // capstone; "Take It to the Campfire" only reads well as a title.
-
-    var sharePreviewTitle: String {
-        cookout.isCampfire ? "My campfire cook" : "My \(cookout.dishTitle)"
-    }
-
-    var recipeLinkLabel: String {
-        cookout.isCampfire ? "Open the heat & coals guide" : "Open the \(cookout.dishTitle) recipe"
-    }
-
-    var bakeTimerLabel: String {
-        cookout.isCampfire ? "Campfire cook" : "\(cookout.dishTitle) bake"
-    }
-
-    var bakeStepAwayText: String {
-        cookout.isCampfire
-            ? "Your cook is going, you can step away"
-            : "\(cookout.dishTitle) bake, you can step away"
-    }
-
-    var goCheckText: String {
-        cookout.isCampfire ? "Go check your Dutch oven." : "Go check your \(cookout.dishTitle)."
-    }
-
     // MARK: Swipe paging (DUT-197)
 
     /// Advance/retreat the flow on a horizontally-dominant swipe past a ~50pt
@@ -233,6 +208,15 @@ extension FirstCookoutView {
                 Text(goCheckText)
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.label)
+                // DUT-255 — clear the finished state so the card falls back to the
+                // else branch (the start button) and the cook can time the rest of
+                // the bake. Scoped to THIS rung's recipeID so a shared-engine
+                // sibling rung's timer (DUT-484) is left untouched.
+                Button("Start Another Timer") {
+                    timerEngine.clearFinished(for: cookout.recipeID)
+                }
+                .foregroundStyle(DODColor.labelSecondary)
+                .accessibilityIdentifier("first-cookout-clear-timer")
             }
             .padding(.top, DODSpacing.xs)
             // DUT-401 — announce the silent finished swap (DUT-297 covers only
@@ -271,7 +255,7 @@ extension FirstCookoutView {
                     .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
                 ShareLink(
                     item: photo,
-                    subject: Text("My first Dutch oven cook"),
+                    subject: Text(shareSubject),  // DUT-211 — first-rung-aware, not always "first"
                     message: Text(shareCaption),
                     preview: SharePreview(sharePreviewTitle, image: photo)
                 ) {

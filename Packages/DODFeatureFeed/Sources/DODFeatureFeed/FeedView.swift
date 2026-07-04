@@ -48,6 +48,14 @@ public struct FeedView: View {
     /// cooked yet). Defaults to rung 1; recomputed from the cook journal so the
     /// hero + flow follow the user up the ladder. nil once every rung is cooked.
     @State private var currentRung: GuidedCookout? = .firstCookout
+    /// DUT-212 — `refreshCurrentRung` runs in a `.task` that races
+    /// `viewModel.onAppear`'s own `.task`; until it resolves, `currentRung` still
+    /// holds its rung-1 default. A returning cook who opens the chooser before the
+    /// refresh lands would otherwise be recommended rung 1 (wrong "START HERE").
+    /// This flag is false until the real rung is computed, so the chooser is
+    /// handed `nil` (→ falls through to the plain chooser) rather than a stale
+    /// rung-1 recommendation during the cold-launch window.
+    @State private var currentRungLoaded = false
     /// DUT-381 — the cook's logged recipe ids, so the chooser roadmap can mark a
     /// rung the user actually cooked as done even if they took it out of order.
     @State private var cookedRecipeIDs: Set<Int> = []
@@ -114,7 +122,9 @@ public struct FeedView: View {
                 // cakes), with the progress-aware rung recommended. A true beginner
                 // is dropped straight into coaching (CookChooserFlow.initialSelection).
                 CookChooserFlow(
-                    recommended: currentRung,
+                    // DUT-212 — until the real rung is loaded, pass nil so the
+                    // chooser doesn't recommend a stale rung-1 for a returning cook.
+                    recommended: currentRungLoaded ? currentRung : nil,
                     cookedRecipeIDs: cookedRecipeIDs,
                     onLogCook: { logCookAndRefresh($0) }
                 )
@@ -177,6 +187,7 @@ public struct FeedView: View {
     func refreshCurrentRung() async {
         cookedRecipeIDs = Set((await viewModel.cookLogs()).map(\.recipeID))  // DUT-381
         currentRung = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
+        currentRungLoaded = true  // DUT-212 — real rung now resolved; chooser may use it.
     }
 
     /// DUT-196 (the menu) + DUT-200 / T-834 (this refinement): one icon-only
