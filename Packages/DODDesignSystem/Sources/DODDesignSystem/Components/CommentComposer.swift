@@ -56,7 +56,7 @@ public struct CommentComposer: View {
     }
 
     private var header: some View {
-        Text("Write a comment")
+        Text("Write a Comment")
             .dodFont(DODType.displayMedium)
             .foregroundStyle(DODColor.label)
             .accessibilityAddTraits(.isHeader)
@@ -64,7 +64,7 @@ public struct CommentComposer: View {
 
     private var ratingRow: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text("Rate (optional)")
+            Text("Rate (Optional)")
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
             StarRatingInput(value: $rating, starSize: 32, isSubmitting: isSubmitting)
