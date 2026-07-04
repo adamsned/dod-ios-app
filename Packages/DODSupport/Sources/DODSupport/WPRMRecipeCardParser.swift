@@ -143,19 +143,20 @@ public enum WPRMRecipeCardParser {
     /// all groups header-only) uses the group-name headers AS the ingredients.
     /// DUT-550 extends that per-group: a card MIXING normal line rows with a
     /// header-only group would otherwise drop the header-only group's ingredient
-    /// (neither a line row nor eligible for the all-or-nothing fallback). We now
-    /// keep both — line rows first, then the header-only group names — so no
-    /// ingredient is lost across mixed group shapes. Groups that DO carry line
-    /// rows keep their `<h4>` name dropped: it's a section label, already
-    /// represented by its rows.
+    /// (neither a line row nor eligible for the all-or-nothing fallback). We keep
+    /// both — line rows and header-only group names — so no ingredient is lost
+    /// across mixed group shapes. Groups that DO carry line rows keep their
+    /// `<h4>` name dropped: it's a section label, already represented by its rows.
+    ///
+    /// DUT-557: the emission is a SINGLE document-order pass over the ingredient
+    /// groups (see ``ingredientsInDocumentOrder(in:)``) so a header-only group
+    /// that precedes a line-row group is emitted IN PLACE, not appended after the
+    /// rows. The pre-DUT-557 `rows + headerOnlyGroupNames` concatenation scanned
+    /// the two shapes separately and so moved a leading header-only ingredient to
+    /// the end. Cards with no grouped structure (bare `<ul>` rows — the common
+    /// shape) fall through to a flat line-row scan, unchanged.
     static func parseIngredients(in card: String) -> [String] {
-        let rows = collectElementTexts(
-            in: card,
-            tag: "li",
-            classToken: ingredientRowToken,
-            transform: ingredientRowText
-        )
-        return rows + headerOnlyGroupNames(in: card)
+        ingredientsInDocumentOrder(in: card)
     }
 
     /// Plain-text one ingredient `<li>` body, first dropping the leading

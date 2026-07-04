@@ -160,6 +160,74 @@ struct ArticlePathClassificationTests {
         #expect(dependencies.markedFailedIDs.isEmpty)
     }
 
+    @Test func cardOnlyRecipeWithNoRecipeNodeRecoversRecipeNotArticle() async throws {
+        // DUT-555: a GENUINE recipe whose structured data lives ONLY in the WPRM
+        // card — the page has NO `@type: Recipe` JSON-LD node
+        // (`hasRecipeJSONLD == false`, older post / schema output disabled). The
+        // JSON-LD parse fails, and DUT-544 gated the whole card path on the
+        // recipe-subject signal, so this shape dumped as an article. The DUT-555
+        // fallback recovers it: the card yields BOTH ingredients AND steps (from
+        // the "How to Make" region), so it takes the recipe path.
+        let dependencies = FakeRecipeDetailDependencies()
+        // parseJSONLD throws (parsedRecipe nil) and the page has no Recipe node.
+        dependencies.hasRecipeJSONLDResult = false
+        dependencies.htmlToReturn = """
+            <html><body>
+            <div class="entry-content">
+            <h2 class="wp-block-heading">How to Make It</h2>
+            <ol class="is-style-circle-number-list"><li>Step 1: Dump every can in.</li></ol>
+            <ol class="is-style-circle-number-list"><li>Step 2: Simmer 15 minutes.</li></ol>
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">black beans</span></li>
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">sweet corn</span></li>
+            </ul>
+            </div>
+            </div>
+            </body></html>
+            """
+        dependencies.articleBodyToExtract = "this should not be reached"
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 31)
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .ready)
+        #expect(viewModel.recipe?.kind == .recipe)
+        #expect(viewModel.recipe?.ingredients.contains { $0.text == "black beans" } == true)
+        #expect(viewModel.recipe?.instructions.isEmpty == false)
+        #expect(dependencies.markedFailedIDs.isEmpty)
+    }
+
+    @Test func roundUpWithEmbeddedCardLackingBothListsStillClassifiesAsArticle() async throws {
+        // DUT-555 must not re-break DUT-544: a round-up ARTICLE (no Recipe node)
+        // that embeds a WPRM card which does NOT carry BOTH a full ingredient
+        // list AND recovered steps as the page subject — here the card has
+        // ingredients but no steps (no "How to Make" region / instruction rows) —
+        // stays on the article-body path with its prose PRESERVED.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.hasRecipeJSONLDResult = false
+        dependencies.htmlToReturn = """
+            <html><body>
+            <div class="entry-content">
+            <p>The 15 best dump cake recipes, ranked.</p>
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">cherry pie filling</span></li>
+            </ul>
+            </div>
+            </div>
+            </body></html>
+            """
+        dependencies.articleBodyToExtract = "The 15 best dump cake recipes, ranked. Start with cherry..."
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 37)
+        await viewModel.onAppear()
+        if case .article(let article) = viewModel.loadState {
+            #expect(article.kind == .article)
+            #expect(article.articleBodyHTML == "The 15 best dump cake recipes, ranked. Start with cherry...")
+            #expect(article.id == 37)
+        } else {
+            Issue.record("Round-up whose card lacks both lists should stay .article, got \(viewModel.loadState)")
+        }
+    }
+
     // MARK: - Helper
 
     private func makeViewModel(

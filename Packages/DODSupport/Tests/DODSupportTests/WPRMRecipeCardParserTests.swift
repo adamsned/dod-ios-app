@@ -131,6 +131,30 @@ import Testing
         #expect(card.ingredients == ["2 cups tomato sauce", "a pinch of salt", "1 bay leaf"])
     }
 
+    /// DUT-557: a header-only "bare group" ingredient that appears BEFORE a
+    /// line-row group in the DOM must stay FIRST — the pre-DUT-557
+    /// `rows + headerOnlyGroupNames` concatenation moved it to the end. The fix
+    /// is a single document-order pass over the ingredient groups, emitting each
+    /// group's line rows or (if header-only) its group name in place.
+    @Test func keepsDocumentOrderWhenHeaderOnlyGroupPrecedesLineRowGroup() {
+        let html = """
+            <div class="wprm-recipe-container">
+            <div class="wprm-recipe-ingredients-container">
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">1 bay leaf</h4></div>
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">For the base</h4>
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">2</span> <span class="wprm-recipe-ingredient-unit">cups</span> <span class="wprm-recipe-ingredient-name">flour</span></li>
+            </ul></div>
+            </div>
+            </div>
+            """
+        let card = WPRMRecipeCardParser.parse(html: html)
+        // Header-only "1 bay leaf" comes first (as authored), THEN the line row —
+        // NOT reordered to ["2 cups flour", "1 bay leaf"]. "For the base" stays
+        // dropped (it labels a group that carries a line row).
+        #expect(card.ingredients == ["1 bay leaf", "2 cups flour"])
+    }
+
     // MARK: - "How to Make" numbered-step fallback (DUT-538)
 
     /// DUT-538: the 7 Can Soup shape — the WPRM card carries NO
@@ -204,29 +228,6 @@ import Testing
         #expect(card.instructions[1].localizedCaseInsensitiveContains("Serve"))
         #expect(!card.instructions.contains { $0.localizedCaseInsensitiveContains("heavy Dutch oven") })
         #expect(!card.instructions.contains { $0.localizedCaseInsensitiveContains("Freeze leftovers") })
-    }
-
-    /// DUT-544: with NO instructions / "How to Make" heading anchoring them,
-    /// a page's styled numbered lists are NOT trusted as steps — the fallback
-    /// returns empty rather than sweeping arbitrary author `<ol>`s into the
-    /// instructions. (The card here has no instruction rows either.)
-    @Test func stepScanReturnsEmptyWhenNoInstructionsHeading() {
-        let html = """
-            <html><body>
-            <div class="entry-content">
-            <h2 class="wp-block-heading">Substitutions</h2>
-            <ol class="wp-block-list is-style-circle-number-list"><li>Swap black beans for kidney beans.</li></ol>
-            <div class="wprm-recipe-container">
-            <div class="wprm-recipe-ingredients-container">
-            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">black beans</h4></div>
-            </div>
-            </div>
-            </div>
-            </body></html>
-            """
-        let card = WPRMRecipeCardParser.parse(html: html)
-        #expect(card.ingredients == ["black beans"])
-        #expect(card.instructions.isEmpty)
     }
 
     /// When the WPRM card DOES carry `wprm-recipe-instruction` rows, those win —

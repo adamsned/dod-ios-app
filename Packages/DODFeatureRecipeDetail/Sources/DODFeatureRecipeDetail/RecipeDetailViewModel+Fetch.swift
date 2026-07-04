@@ -110,6 +110,26 @@ extension RecipeDetailViewModel {
             await loadRelated(forCategoryID: cardRecipe.categoryIDs.first)
             return
         }
+        // DUT-555: restore the card-only-recipe safety net DUT-544 dropped. When
+        // the page's SUBJECT is NOT a recipe (no `@type: Recipe` JSON-LD node),
+        // DUT-544 gated the whole card path on `isRecipeSubject`, which made the
+        // above branch dead against real HTML (`hasRecipeJSONLD` and `parseJSONLD`
+        // share the same extraction, so a true `isRecipeSubject` implies the parse
+        // already succeeded). But a genuine recipe whose structured data lives
+        // ONLY in the WPRM card — older posts, WPRM with JSON-LD schema output
+        // disabled, theme/plugin variants — has NO Recipe node and would dump as
+        // an article. Recover it from the card, but ONLY when the card yields BOTH
+        // non-empty ingredients AND recovered steps: that both-lists signal
+        // distinguishes a real card-only recipe from a round-up's embedded card
+        // (which has a card but the ARTICLE is the page's subject), which is
+        // routed to the article-body path below — preserving DUT-544.
+        if !isRecipeSubject, let cardRecipe = cardOnlyRecipe(html: html) {
+            try? await dependencies.mergeDetail(cardRecipe)
+            recipe = cardRecipe
+            loadState = .ready
+            await loadRelated(forCategoryID: cardRecipe.categoryIDs.first)
+            return
+        }
         let body = dependencies.extractArticleBody(html: html)
         guard !body.isEmpty else {
             try? await dependencies.markJSONLDFailed(id: listItem.id)
@@ -151,7 +171,33 @@ extension RecipeDetailViewModel {
         guard !card.ingredients.isEmpty || !card.instructions.isEmpty else {
             return nil
         }
-        return Recipe(
+        return recipe(fromCard: card)
+    }
+
+    /// DUT-555: build a `.recipe`-kind `Recipe` from the WPRM card for the
+    /// card-only-recipe shape (no `@type: Recipe` JSON-LD node), but ONLY when
+    /// the card yields BOTH non-empty ingredients AND recovered steps. That
+    /// stricter both-lists gate — vs. ``recipeFromWPRMCard(html:)``'s
+    /// either-list gate — is what separates a genuine card-only recipe from a
+    /// round-up ARTICLE that merely embeds a WPRM card: the round-up's card
+    /// rarely carries both a full ingredient list AND recovered steps as the
+    /// page's subject, so it stays on the article-body path. Returns nil when
+    /// either list is empty.
+    func cardOnlyRecipe(html: String) -> Recipe? {
+        let card = WPRMRecipeCardParser.parse(html: html)
+        guard !card.ingredients.isEmpty, !card.instructions.isEmpty else {
+            return nil
+        }
+        return recipe(fromCard: card)
+    }
+
+    /// Shared builder: map a parsed ``WPRMRecipeCardParser/Card`` onto a
+    /// `.recipe`-kind `Recipe`, sourcing list fields (id / title / image / dates)
+    /// from `listItem` and detail fields from the card. Times / nutrition / video
+    /// stay nil — the card-only path is reached only when the JSON-LD that
+    /// carries them was unavailable.
+    func recipe(fromCard card: WPRMRecipeCardParser.Card) -> Recipe {
+        Recipe(
             id: listItem.id,
             slug: canonicalURL.lastPathComponent,
             title: listItem.title,

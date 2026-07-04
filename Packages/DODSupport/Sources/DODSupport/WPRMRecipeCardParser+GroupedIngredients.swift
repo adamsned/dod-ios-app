@@ -11,6 +11,48 @@ extension WPRMRecipeCardParser {
     /// group-name header plus, when present, its `<ul>` of line rows).
     static let ingredientGroupToken = "wprm-recipe-ingredient-group"
 
+    /// DUT-557: collect ingredient lines in a SINGLE document-order pass over the
+    /// card's `wprm-recipe-ingredient-group` `<div>`s, emitting — for each group,
+    /// in the order the groups appear — either that group's `<li>` line rows OR
+    /// (when the group is header-only) its group name. This replaces the
+    /// pre-DUT-557 `rows + headerOnlyGroupNames` concatenation, which scanned the
+    /// two shapes separately and so moved a header-only group that PRECEDES a
+    /// line-row group to the end of the list.
+    ///
+    /// When the card has NO grouped structure at all (bare
+    /// `<ul class="wprm-recipe-ingredients">` rows — the common shape), fall back
+    /// to a flat line-row scan so the ordinary case is unchanged.
+    static func ingredientsInDocumentOrder(in card: String) -> [String] {
+        let groups = collectElementInners(in: card, tag: "div", classToken: ingredientGroupToken)
+        guard !groups.isEmpty else {
+            return collectElementTexts(
+                in: card,
+                tag: "li",
+                classToken: ingredientRowToken,
+                transform: ingredientRowText
+            )
+        }
+        return groups.flatMap(ingredientsInGroup)
+    }
+
+    /// The ingredient lines contributed by ONE `wprm-recipe-ingredient-group`
+    /// `<div>` body: its `<li class="wprm-recipe-ingredient">` line rows when it
+    /// has any, otherwise its header-only group name (the per-group DUT-42
+    /// quirk). A group that carries line rows keeps its `<h4>` name dropped — it's
+    /// a section label, already represented by its rows.
+    static func ingredientsInGroup(_ groupInner: String) -> [String] {
+        let rows = collectElementTexts(
+            in: groupInner,
+            tag: "li",
+            classToken: ingredientRowToken,
+            transform: ingredientRowText
+        )
+        if !rows.isEmpty {
+            return rows
+        }
+        return groupNameIfHeaderOnly(groupInner).map { [$0] } ?? []
+    }
+
     /// Collect the group names of HEADER-ONLY ingredient groups — a
     /// `wprm-recipe-ingredient-group` `<div>` carrying a
     /// `wprm-recipe-ingredient-group-name` `<h4>` but NO
@@ -21,7 +63,9 @@ extension WPRMRecipeCardParser {
     ///
     /// Order-preserving across the groups it emits. Empty when the card has no
     /// grouped structure (bare `<ul>` rows — the common shape) or when every
-    /// group already carries line rows.
+    /// group already carries line rows. Retained for callers/tests that probe the
+    /// header-only slice directly; the primary ingredient path is
+    /// ``ingredientsInDocumentOrder(in:)`` (DUT-557).
     static func headerOnlyGroupNames(in card: String) -> [String] {
         collectElementInners(in: card, tag: "div", classToken: ingredientGroupToken)
             .compactMap(groupNameIfHeaderOnly)
