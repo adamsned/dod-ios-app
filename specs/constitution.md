@@ -169,6 +169,17 @@ The test pyramid has **five** layers. Every PR must keep L1–L4 green; L5 runs 
 - **Force-unwraps:** banned outside of tests and `IBOutlet`-style scenarios that don't exist in SwiftUI. Use `guard`/`if let`.
 - **TODOs:** must include a date and an owner, or they get removed in review.
 
+### 10.1 Visual consistency — corner radius (two-tier rule, CL-304)
+
+The app's roundness is a **two-tier** system. Every rounded element must fall into one tier — never a one-off literal.
+
+- **Pill tier → `Capsule`:** all buttons (`dodProminentButton` / `dodBorderedButton`, and any custom-styled button background), chips, tags, segmented toggles, and small tappable pills render as a full `Capsule`. **Buttons are pills, not rounded rectangles.**
+- **Card tier → `DODRadius.standard`:** cards, list cells, containers, sheets, callouts, dialog cards, and thumbnails use `DODRadius.standard`. That token is **calibrated to match the live iOS `.insetGrouped` list-cell radius** (the Settings-tab reference). Apple changes this radius across major iOS releases — iOS 26 "Liquid Glass" made it notably rounder — so **re-measure and re-pin `standard` per major iOS; never assume a fixed number.** `DODRadius.inner` scales concentrically (`inner ≈ standard − nesting padding`) for content nested inside a card.
+- **Exempt:** `Circle` (avatars, step dots), shapes already `Capsule`, and `cornerRadius: 0` skeleton placeholders (CL-288) stay as-is.
+- **Never hard-code radius literals** and never reuse `DODSpacing` values for rounding — always `DODRadius.*` (cards) or `Capsule` (pills).
+
+This applies to **every new feature by every contributor**, including any AI assistant working in this repo on either developer's machine. New UI that introduces a rounded button, card, or cell must use the correct tier from the start. Supersedes the pre-CL-304 "everything at `DODRadius.standard` (12pt)" convention (CL-288 / CL-289); the codebase migration to this rule is tracked separately (see the re-sweep task in `tasks.md`).
+
 ## 11. Git & review process
 
 - **Branches:** `main` is protected. Feature branches: `feat/<slug>`, fixes: `fix/<slug>`, spec changes: `spec/<slug>`.
