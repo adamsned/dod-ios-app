@@ -155,4 +155,14 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
     }
 
     func isOnline() async -> Bool { online }
+
+    // DUT-534 Part 2 — the Shopping List append seam. `shoppingListResult`
+    // stubs what the appender returns; `appendedRecipes` records the (minimal,
+    // list-item-derived) recipes the view model handed over.
+    var shoppingListResult: AddToShoppingListResult = .couldntLoad
+    var appendedRecipes: [Recipe] = []
+    func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
+        appendedRecipes.append(recipe)
+        return shoppingListResult
+    }
 }

@@ -51,6 +51,15 @@ public protocol FeedDependencies: Sendable {
     /// reach it. Default no-op so existing test conformers keep compiling; the
     /// live wiring routes to ``CookPhotoStore/delete(id:)``.
     func deleteCookPhoto(id: String) async
+
+    /// DUT-534 Part 2 — append a recipe's ingredients to the Shopping List from a
+    /// Feed card's long-press "Add to Shopping List". The App composition root
+    /// wires the shared `LiveShoppingListAppender`, which hydrates the
+    /// (ingredient-empty, card-sourced) recipe's ingredients before appending.
+    /// Default `.couldntLoad` so existing fake conformers keep compiling and
+    /// previews / tests that don't wire it degrade gracefully rather than
+    /// claiming a row landed.
+    func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
 }
 
 extension FeedDependencies {
@@ -61,6 +70,7 @@ extension FeedDependencies {
     public func updateCookLog(_ entry: CookLogEntry) async throws {}
     public func deleteCookLog(id: UUID) async throws {}
     public func deleteCookPhoto(id: String) async {}
+    public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult { .couldntLoad }
 }
 
 /// Production wiring. Constructed by the app composition root (T-140).
@@ -102,6 +112,14 @@ public struct LiveFeedDependencies: FeedDependencies {
     /// Bounding the scan caps the per-publish fetch cost.
     static let maxClassificationScan = 10
 
+    /// DUT-534 Part 2 — the App-wired Shopping List append seam. Routes a
+    /// card's minimal (ingredient-empty) recipe to the shared
+    /// `LiveShoppingListAppender`, which hydrates + appends. Optional so call
+    /// sites that don't build shopping lists can omit it; `nil` reports
+    /// `.couldntLoad`.
+    public typealias ShoppingListAppendHook =
+        @Sendable (Recipe) async -> AddToShoppingListResult
+
     let client: WPRestClient
     let store: RecipeStore
     let monitor: NetworkMonitor
@@ -109,6 +127,7 @@ public struct LiveFeedDependencies: FeedDependencies {
     private let widgetReload: WidgetReloadHook?
     private let imagePrefetcher: ImagePrefetcher?
     private let latestKindClassifier: LatestKindClassifier?
+    private let shoppingListAppend: ShoppingListAppendHook?
 
     public init(
         client: WPRestClient,
@@ -117,7 +136,8 @@ public struct LiveFeedDependencies: FeedDependencies {
         widgetStore: WidgetSnapshotStore? = WidgetSnapshotStore(),
         widgetReload: WidgetReloadHook? = nil,
         imagePrefetcher: ImagePrefetcher? = nil,
-        latestKindClassifier: LatestKindClassifier? = nil
+        latestKindClassifier: LatestKindClassifier? = nil,
+        shoppingListAppend: ShoppingListAppendHook? = nil
     ) {
         self.client = client
         self.store = store
@@ -126,6 +146,15 @@ public struct LiveFeedDependencies: FeedDependencies {
         self.widgetReload = widgetReload
         self.imagePrefetcher = imagePrefetcher
         self.latestKindClassifier = latestKindClassifier
+        self.shoppingListAppend = shoppingListAppend
+    }
+
+    /// DUT-534 Part 2 — route to the App-wired appender, or `.couldntLoad` when
+    /// none is wired (previews / terse tests) so the UI never claims a row
+    /// landed when nothing was persisted.
+    public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
+        guard let shoppingListAppend else { return .couldntLoad }
+        return await shoppingListAppend(recipe)
     }
 
     public func fetchPosts(page: Int) async throws -> (items: [RecipeListItem], totalPages: Int) {

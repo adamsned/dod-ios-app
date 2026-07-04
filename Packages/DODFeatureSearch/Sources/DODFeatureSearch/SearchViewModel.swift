@@ -102,6 +102,11 @@ public final class SearchViewModel {
     public internal(set) var ingredientItems: [RecipeListItem] = []
     /// T-765 / CL-162 — saved recipe ids for the card menu (see `SearchViewModel+SavedState`).
     public internal(set) var savedRecipeIDs: Set<Int> = []
+    /// DUT-534 Part 2 — Shopping List snackbar copy + optional trailing action
+    /// title ("View"), driven by `SearchViewModel+ShoppingList`, rendered by
+    /// `SearchView`. `nil` message hides the snackbar.
+    public internal(set) var shoppingListSnackbarMessage: String?
+    public internal(set) var shoppingListSnackbarActionTitle: String?
     /// Last user-typed query that produced `items` (so filter changes re-merge
     /// without a network call). `internal(set)` for the T-637 extension write.
     public internal(set) var lastQuery: String = ""
@@ -152,7 +157,9 @@ public final class SearchViewModel {
     let recents: RecentSearches
     /// Autocomplete debounce (DUT-10: tightened 300 -> 150ms). Public so tests control timing.
     public var debounceMilliseconds: Int = 150
-    private var debounceTask: Task<Void, Never>?
+    // DUT-534 Part 2 — internal (was `private`) so `+Recents.clearRecentSearches`
+    // (moved there for file-length relief) can cancel the in-flight debounce.
+    var debounceTask: Task<Void, Never>?
     /// H1 (SDET 2026-06-28): monotonic search-generation token. Bumped at the
     /// start of every `performSearch()`; async completions (the finalize hop +
     /// the lazy filter / cook-time hydration tasks) capture it and bail if a
@@ -230,24 +237,6 @@ public final class SearchViewModel {
     /// Spec trace: US-29 / AC-29.2 (Clear All affordance), CL-49.2
     /// (single-source-of-truth routing through the view-model), CL-66
     /// (in-flight cancellation closes the race).
-    public func clearRecentSearches() {
-        debounceTask?.cancel()
-        recents.clear()
-        recentSearches = recents.recent()
-    }
-
-    /// Remove a single term from the persisted recent-searches store
-    /// (case-insensitive match per `RecentSearches.remove(_:)`) and
-    /// refresh the view-bound `recentSearches` array so the FlowLayout
-    /// re-renders without the dropped pill on the next observation tick.
-    ///
-    /// Spec trace: US-33 / AC-33.3 (per-term context-menu Clear),
-    /// CL-57 (recents-store mutations route through the view-model).
-    public func removeRecentSearch(_ query: String) {
-        recents.remove(query)
-        recentSearches = recents.recent()
-    }
-
     /// Load categories so the chip menu and the empty-state suggestions can
     /// render. Idempotent — fetches once per session unless explicitly
     /// refreshed.
