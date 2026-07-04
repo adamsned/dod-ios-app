@@ -69,18 +69,18 @@ extension RootView {
     }
 
     /// The external-route sink for one tab. Feed/Saved/Search each own a
-    /// sink so both layouts (phone tabs + iPad split detail) can hand every
-    /// `TabStack` its own; Settings renders no article surface, so it keeps
-    /// the inert constant.
-    func externalRouteBinding(for tab: AppTab) -> Binding<ExternalRoute?> {
+    /// FIFO queue so both layouts (phone tabs + iPad split detail) can hand
+    /// every `TabStack` its own; Settings renders no article surface, so it
+    /// keeps the inert constant.
+    func externalRouteBinding(for tab: AppTab) -> Binding<ExternalRouteQueue> {
         switch tab {
         case .feed: return $feedExternalRoute
         case .saved: return $savedExternalRoute
         case .search: return $searchExternalRoute
         // DUT-536 — the Grocery List tab renders only the Shopping List (no
         // article surface), so it keeps the inert constant like Settings.
-        case .grocery: return .constant(nil)
-        case .settings: return .constant(nil)
+        case .grocery: return .constant(ExternalRouteQueue())
+        case .settings: return .constant(ExternalRouteQueue())
         }
     }
 
@@ -152,9 +152,9 @@ extension RootView {
         // the user to Feed; every other tab keeps its own stack.
         if destination != originTab { selectedTab = destination }
         switch destination {
-        case .feed: feedExternalRoute = .push(route)
-        case .saved: savedExternalRoute = .push(route)
-        case .search: searchExternalRoute = .push(route)
+        case .feed: feedExternalRoute.enqueue(.push(route))
+        case .saved: savedExternalRoute.enqueue(.push(route))
+        case .search: searchExternalRoute.enqueue(.push(route))
         // unreachable: linkRoutingDestination only ever yields feed/saved/search
         // (it redirects settings + grocery — surfaces with no article stack — to
         // feed).
