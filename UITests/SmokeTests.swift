@@ -92,11 +92,12 @@ final class SmokeTests: XCTestCase {
         try XCTSkipIf(isPad, "Bottom tabs are iPhone-only; iPad uses a sidebar.")
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 12))
-        // Tab order post-T-800 is Recipes → Saved → Search (the Categories
-        // tab was folded into Search — CL-194). Iteration order here is
-        // purely "do all three open?"; the positional guard lives in
+        // Tab order is Recipes → Saved → Grocery List → Settings → Search
+        // (Categories folded into Search in T-800 / CL-194; Grocery List added
+        // as a top-level tab in DUT-536). Iteration order here is purely "do
+        // they all open?"; the positional guard lives in
         // `test_tabBarOrderMatchesSpec` below. Spec trace: AC-16.1, AC-16.6.
-        for tabName in ["Recipes", "Saved", "Search"] {
+        for tabName in ["Recipes", "Saved", "Grocery List", "Search"] {
             let button = tabBar.buttons[tabName]
             XCTAssertTrue(button.exists, "Missing tab: \(tabName)")
             button.tap()
@@ -119,16 +120,18 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
         let tabButtons = tabBar.buttons.allElementsBoundByIndex
-        XCTAssertEqual(tabButtons.count, 4, "Expected exactly 4 top-level tabs")
+        XCTAssertEqual(tabButtons.count, 5, "Expected exactly 5 top-level tabs")
 
         // Position-by-position (left → right). The labels here are what
         // a real user sees on the tab bar, so they double as a readable
         // record of the spec'd order. T-823 / DUT-187 inserted Settings
-        // between Saved and Search (promoted from the per-tab gear sheet).
+        // between Saved and Search (promoted from the per-tab gear sheet);
+        // DUT-536 inserted the Grocery List tab right after Saved.
         XCTAssertEqual(tabButtons[0].label, "Recipes", "Tab 1 should be Recipes")
         XCTAssertEqual(tabButtons[1].label, "Saved", "Tab 2 should be Saved")
-        XCTAssertEqual(tabButtons[2].label, "Settings", "Tab 3 should be Settings")
-        XCTAssertEqual(tabButtons[3].label, "Search", "Tab 4 should be Search")
+        XCTAssertEqual(tabButtons[2].label, "Grocery List", "Tab 3 should be Grocery List")
+        XCTAssertEqual(tabButtons[3].label, "Settings", "Tab 4 should be Settings")
+        XCTAssertEqual(tabButtons[4].label, "Search", "Tab 5 should be Search")
 
         // Behavioral check: tapping the second tab actually lands on Saved,
         // not on a mislabeled screen. AC-5.8 empty-state title is the
@@ -139,15 +142,24 @@ final class SmokeTests: XCTestCase {
             "Second tab should land on the Saved screen (empty state visible on fresh install)"
         )
 
-        // Behavioral check: fourth tab is Search. SearchView uses a
+        // DUT-536 — the third tab is the Grocery List. On a fresh install the
+        // list is empty, so its empty-state title is the "we're really on the
+        // Grocery List tab" signal.
+        tabButtons[2].tap()
+        XCTAssertTrue(
+            app.staticTexts["Your shopping list is empty"].waitForExistence(timeout: 6),
+            "Third tab should land on the Grocery List screen (empty state visible on fresh install)"
+        )
+
+        // Behavioral check: fifth tab is Search. SearchView uses a
         // plain `TextField` (not `.searchable`) with the placeholder
         // "Search Recipes", so the search input shows up under
         // `app.textFields`, not `app.searchFields`.
-        tabButtons[3].tap()
+        tabButtons[4].tap()
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 6),
-            "Fourth tab should land on the Search screen (Search Recipes field visible)"
+            "Fifth tab should land on the Search screen (Search Recipes field visible)"
         )
     }
 

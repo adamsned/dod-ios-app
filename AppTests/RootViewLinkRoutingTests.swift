@@ -20,4 +20,11 @@ final class RootViewLinkRoutingTests: XCTestCase {
         // Feed rather than dead-ending.
         XCTAssertEqual(RootView.linkRoutingDestination(for: .settings), .feed)
     }
+
+    func testGroceryLinkRedirectsToFeed() {
+        // DUT-536 — the Grocery List tab renders only the Shopping List (no
+        // article surface / recipe stack), so a link routes to Feed like
+        // Settings rather than dead-ending.
+        XCTAssertEqual(RootView.linkRoutingDestination(for: .grocery), .feed)
+    }
 }

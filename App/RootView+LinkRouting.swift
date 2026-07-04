@@ -42,16 +42,17 @@ extension RootView {
         }
     }
 
-    /// DUT-480 — switch to Saved (which hosts the Shopping List) and mint a
-    /// fresh token so the Saved tab's `SavedView` pushes the Shopping List
-    /// empty-first; a new UUID each time re-pushes on a repeat control tap.
-    /// Shared by `handle(widgetLink: .shoppingList)` (the `dod://` path) and by
-    /// `RootView`'s App Group pending-route reads (the Control Center path that
-    /// can't rely on a URL hand-off). Non-private so `RootView.swift`'s
-    /// scene-phase + cold-launch consumers can call it too.
+    /// DUT-536 — select the top-level Grocery List tab (was: switch to Saved +
+    /// mint a token that pushed the Shopping List inside it, DUT-480). The tab's
+    /// `GroceryTabRoot` always renders the persisted list, so simply selecting it
+    /// lands the user on the same store-backed Shopping List — no per-tap token
+    /// or push needed. Shared by `handle(widgetLink: .shoppingList)` (the
+    /// `dod://shopping-list` deep link), the DUT-534 snackbar "View" closure, and
+    /// `RootView`'s App-Group pending-route reads (the iOS 18 Control Center
+    /// control path that can't rely on a URL hand-off). Non-private so
+    /// `RootView.swift`'s scene-phase + cold-launch consumers can call it too.
     func routeToShoppingList() {
-        selectedTab = .saved
-        savedShoppingListToken = UUID()
+        selectedTab = .grocery
     }
 
     /// DUT-480 — read + clear the iOS 18 Control Center control's App Group
@@ -76,6 +77,9 @@ extension RootView {
         case .feed: return $feedExternalRoute
         case .saved: return $savedExternalRoute
         case .search: return $searchExternalRoute
+        // DUT-536 — the Grocery List tab renders only the Shopping List (no
+        // article surface), so it keeps the inert constant like Settings.
+        case .grocery: return .constant(nil)
         case .settings: return .constant(nil)
         }
     }
@@ -151,15 +155,22 @@ extension RootView {
         case .feed: feedExternalRoute = .push(route)
         case .saved: savedExternalRoute = .push(route)
         case .search: searchExternalRoute = .push(route)
-        case .settings: break  // unreachable: linkRoutingDestination never yields .settings
+        // unreachable: linkRoutingDestination only ever yields feed/saved/search
+        // (it redirects settings + grocery — surfaces with no article stack — to
+        // feed).
+        case .settings, .grocery: break
         }
     }
 
     /// DUT-462 / DUT-243 — which tab receives an in-app recipe route for a link
-    /// tapped from `originTab`. Settings redirects to Feed (no article surface);
-    /// every other tab keeps its own stack. Pure, so it's unit-testable without
-    /// a SwiftUI host.
+    /// tapped from `originTab`. Settings + the DUT-536 Grocery List tab redirect
+    /// to Feed (neither renders an article surface with its own stack); every
+    /// other tab keeps its own stack. Pure, so it's unit-testable without a
+    /// SwiftUI host.
     nonisolated static func linkRoutingDestination(for originTab: AppTab) -> AppTab {
-        originTab == .settings ? .feed : originTab
+        switch originTab {
+        case .settings, .grocery: .feed
+        default: originTab
+        }
     }
 }

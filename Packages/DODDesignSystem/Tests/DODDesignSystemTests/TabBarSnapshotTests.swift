@@ -43,6 +43,10 @@ final class TabBarSnapshotTests: XCTestCase {
     func test_tabBar_savedSelected_light_iPhone13() {
         assertTabBarSnapshot(selected: .saved, device: .iPhone13)
     }
+    // DUT-536 — the new Grocery List tab.
+    func test_tabBar_grocerySelected_light_iPhone13() {
+        assertTabBarSnapshot(selected: .grocery, device: .iPhone13)
+    }
     func test_tabBar_searchSelected_light_iPhone13() {
         assertTabBarSnapshot(selected: .search, device: .iPhone13)
     }
@@ -57,6 +61,10 @@ final class TabBarSnapshotTests: XCTestCase {
     }
     func test_tabBar_savedSelected_light_iPad129() {
         assertTabBarSnapshot(selected: .saved, device: .iPad129)
+    }
+    // DUT-536 — the new Grocery List tab.
+    func test_tabBar_grocerySelected_light_iPad129() {
+        assertTabBarSnapshot(selected: .grocery, device: .iPad129)
     }
     func test_tabBar_searchSelected_light_iPad129() {
         assertTabBarSnapshot(selected: .search, device: .iPad129)
@@ -118,12 +126,13 @@ final class TabBarSnapshotTests: XCTestCase {
 private struct TabBarFixture: View {
 
     enum Tab: Hashable, CaseIterable {
-        case feed, saved, settings, search
+        case feed, saved, grocery, settings, search
 
         var title: String {
             switch self {
             case .feed: "Recipes"
             case .saved: "Saved"
+            case .grocery: "Grocery List"
             case .settings: "Settings"
             case .search: "Search"
             }
@@ -133,6 +142,7 @@ private struct TabBarFixture: View {
             switch self {
             case .feed: "house"
             case .saved: "bookmark"
+            case .grocery: "cart"
             case .settings: "gearshape"
             case .search: "magnifyingglass"
             }

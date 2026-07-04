@@ -81,9 +81,11 @@ final class AppShellJourneysE2ETests: XCTestCase {
         save.tap()
         XCTAssertTrue(app.buttons["Unsave recipe"].waitForExistence(timeout: 8), "Save should flip to Unsave")
 
-        // Saved tab → Make Shopping List. The cart button is a small (~23pt)
-        // header icon; tap its center coordinate so the hit-point resolves
-        // even under simulator load (label taps occasionally miss on iOS 26).
+        // Saved tab → Make Shopping List. DUT-536 — the cart now selects the
+        // top-level Grocery List tab (single store-backed list) instead of
+        // pushing inside the Saved stack. The cart is a small (~23pt) header
+        // icon; tap its center coordinate so the hit-point resolves even under
+        // simulator load (label taps occasionally miss on iOS 26).
         tabBar.buttons["Saved"].tap()
         let makeList = app.buttons["saved-make-shopping-list"]
         XCTAssertTrue(
@@ -91,6 +93,14 @@ final class AppShellJourneysE2ETests: XCTestCase {
             "the Saved tab should expose 'Make Shopping List' once a recipe is saved"
         )
         makeList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        // DUT-536 — landing on the Grocery List tab, the (empty) list offers its
+        // primary "Build List" empty-state button, which presents the picker.
+        let openBuilder = app.buttons["shopping-list-build"]
+        XCTAssertTrue(
+            openBuilder.waitForExistence(timeout: 8),
+            "the Grocery List tab should present the empty-state 'Build List' button"
+        )
+        openBuilder.tap()
         let buildButton = app.buttons["shopping-builder-build"]
         XCTAssertTrue(
             buildButton.waitForExistence(timeout: 8),
