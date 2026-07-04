@@ -16,8 +16,17 @@ struct CookNowCTA: View {
                 Image(systemName: "frying.pan.fill")
                     .font(.title3)
                     .accessibilityHidden(true)
-                Text("Cook Now")
-                    .dodFont(DODType.bodyEmphasized)
+                // DUT-572 / CL-312 — renamed "Cook Now" → "Cook Mode" with a
+                // subtitle in a leading VStack so the CTA reads as an editorial
+                // entry point, not a bare button. Title Case control label
+                // (§10.2); sentence-case subtitle.
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Cook Mode")
+                        .dodFont(DODType.bodyEmphasized)
+                    Text("Step by step spoken instructions")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.cream.opacity(0.85))
+                }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.subheadline)
@@ -35,7 +44,7 @@ struct CookNowCTA: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Cook Now")
+        .accessibilityLabel("Cook Mode")
         .accessibilityHint("Opens a hands-free cooking surface with step-by-step instructions.")
         .accessibilityAddTraits(.isButton)
         .padding(.horizontal, DODSpacing.md)

@@ -50,21 +50,29 @@ struct ArticleDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                RecipeDetailHero(
-                    url: recipe.heroImageLargeURL ?? recipe.heroImage,
-                    title: recipe.title
-                )
+        // DUT-572 / CL-312 — `RecipeDetailHero` now ignores the top safe area
+        // (full-bleed) and reads its `topInset` from the parent. Read the real
+        // inset here and pass it in so the article hero renders identically.
+        GeometryReader { geo in
+            let topInset = geo.safeAreaInsets.top
+            ScrollView {
+                VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                    RecipeDetailHero(
+                        url: recipe.heroImageLargeURL ?? recipe.heroImage,
+                        title: recipe.title,
+                        topInset: topInset
+                    )
 
-                VStack(alignment: .leading, spacing: DODSpacing.md) {
-                    publishedDateCaption
-                    articleBody
+                    VStack(alignment: .leading, spacing: DODSpacing.md) {
+                        publishedDateCaption
+                        articleBody
+                    }
+                    .padding(.horizontal, DODSpacing.md)
+                    .padding(.bottom, DODSpacing.xl)
+                    .readableContentColumn(horizontalSizeClass)
                 }
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.bottom, DODSpacing.xl)
-                .readableContentColumn(horizontalSizeClass)
             }
+            .coordinateSpace(name: "recipeScroll")
         }
         .background(DODColor.surface)
     }
