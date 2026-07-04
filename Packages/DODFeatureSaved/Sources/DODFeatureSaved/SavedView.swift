@@ -117,14 +117,14 @@ public struct SavedView: View {
         case .empty:
             EmptyState(
                 systemImage: "bookmark",
-                title: "No saved recipes yet",
+                title: "No Saved Recipes Yet",
                 message: "Tap the bookmark on any recipe to find it again later."
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .error:
             EmptyState(
                 systemImage: "exclamationmark.triangle",
-                title: "Couldn't load saved recipes",
+                title: "Couldn't Load Saved Recipes",
                 message: "Try again in a moment.",
                 action: .init(title: "Retry") {
                     Task { await viewModel.refresh() }

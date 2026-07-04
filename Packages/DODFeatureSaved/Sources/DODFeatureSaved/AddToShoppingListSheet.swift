@@ -75,7 +75,7 @@ public struct AddToShoppingListSheet: View {
     /// "Add N items" — live-updating with the selected count; singular-aware.
     private var confirmTitle: String {
         let count = selection.selectedCount
-        return count == 1 ? "Add 1 item" : "Add \(count) items"
+        return count == 1 ? "Add 1 Item" : "Add \(count) Items"
     }
 
     @ViewBuilder
@@ -85,7 +85,7 @@ public struct AddToShoppingListSheet: View {
             // recipe, so this is normally unreachable.
             EmptyState(
                 systemImage: "cart",
-                title: "No ingredients",
+                title: "No Ingredients",
                 message: "This recipe doesn't list any ingredients to add."
             )
         } else {

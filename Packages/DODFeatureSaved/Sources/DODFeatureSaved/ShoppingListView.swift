@@ -84,7 +84,7 @@ public struct ShoppingListView: View {
                 isPresented: $isConfirmingClear,
                 titleVisibility: .visible
             ) {
-                Button("Clear list", role: .destructive) {
+                Button("Clear List", role: .destructive) {
                     viewModel.clearAll()
                 }
                 Button("Cancel", role: .cancel) {}
@@ -157,7 +157,7 @@ public struct ShoppingListView: View {
                 Button {
                     isPickingRecipes = true
                 } label: {
-                    Label("Add recipes", systemImage: "plus")
+                    Label("Add Recipes", systemImage: "plus")
                 }
                 .accessibilityIdentifier("shopping-list-add")
             }
@@ -176,7 +176,7 @@ public struct ShoppingListView: View {
                 Button(role: .destructive) {
                     isConfirmingClear = true
                 } label: {
-                    Label("Clear list", systemImage: "trash")
+                    Label("Clear List", systemImage: "trash")
                 }
                 .accessibilityIdentifier("shopping-list-clear")
                 .accessibilityLabel("Clear shopping list")
@@ -212,7 +212,7 @@ public struct ShoppingListView: View {
             // building a list is the obvious next step from right here.
             EmptyState(
                 systemImage: "cart",
-                title: "Your shopping list is empty",
+                title: "Your Shopping List Is Empty",
                 message: "Build a list from your saved recipes and we'll sort everything by store aisle.",
                 action: .init(title: "Build List") {
                     isPickingRecipes = true

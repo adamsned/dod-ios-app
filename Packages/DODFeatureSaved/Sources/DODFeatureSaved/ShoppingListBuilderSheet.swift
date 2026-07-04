@@ -59,7 +59,7 @@ struct ShoppingListBuilderSheet: View {
             // recipes, so this is normally unreachable.
             EmptyState(
                 systemImage: "bookmark",
-                title: "No saved recipes",
+                title: "No Saved Recipes",
                 message: "Save a recipe first, then build a shopping list from it."
             )
         } else {
