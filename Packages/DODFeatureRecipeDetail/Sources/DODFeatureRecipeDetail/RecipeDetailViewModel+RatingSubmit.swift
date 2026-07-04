@@ -64,8 +64,21 @@ extension RecipeDetailViewModel {
     ///
     /// (`>= 1` rather than `> 0`: `RecipeRating.count` is a rating tally, not a
     /// collection, so SwiftLint's `empty_count` rule doesn't apply here.)
+    ///
+    /// DUT-545: a refresh must never *shrink* a good cached aggregate. When a
+    /// rating POST succeeds but its follow-up summary GET hard-fails,
+    /// `WPRMRatingsClient.postRating` degrades to a SYNTHETIC `count == 1`
+    /// aggregate built from the single star we just submitted (DUT-305). If we
+    /// adopted it, a real "4.2★ (500)" would be overwritten — and CACHED — as
+    /// "5.0 (1)", persisting across relaunch. So an aggregate is only adopted
+    /// when its count is at least the existing count: a real subsequent GET
+    /// carries the full tally (501 ≥ 500) and is adopted; the synthetic `1` is
+    /// rejected. A shrinking refresh keeps the existing average/count but still
+    /// carries the user's own just-submitted `userRating` forward (the vote is
+    /// never lost) — and is NOT re-cached, so the good aggregate stays put.
     func applyRatingRefresh(_ fresh: RecipeRating) async {
-        if fresh.count >= 1 {
+        let existingCount = ratingSummary?.count ?? 0
+        if fresh.count >= 1, fresh.count >= existingCount {
             let merged = RecipeRating(
                 recipeID: fresh.recipeID,
                 average: fresh.average,
@@ -78,6 +91,19 @@ extension RecipeDetailViewModel {
             )
             ratingSummary = merged
             await dependencies.cacheRatingSummary(merged)
+        } else if fresh.count >= 1, let existing = ratingSummary {
+            // DUT-545: a smaller/synthetic refresh (e.g. the count==1 fallback
+            // after a failed summary GET) must NOT shrink the good aggregate.
+            // Keep the existing average/count, but still let the user's own
+            // just-submitted vote update. Don't re-cache — the good aggregate
+            // already on disk stays authoritative.
+            guard let freshVote = fresh.userRating, freshVote != existing.userRating else { return }
+            ratingSummary = RecipeRating(
+                recipeID: existing.recipeID,
+                average: existing.average,
+                count: existing.count,
+                userRating: freshVote
+            )
         } else if ratingSummary == nil {
             // First load, no cache, empty-or-failed refresh — show/cache 0/0.
             ratingSummary = fresh
