@@ -19,7 +19,7 @@ public struct RelatedRecipesStrip: View {
             EmptyView()
         } else {
             VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                Text("Related recipes")
+                Text("Related Recipes")
                     .dodFont(DODType.heading)
                     .foregroundStyle(DODColor.label)
                     .padding(.horizontal, DODSpacing.md)

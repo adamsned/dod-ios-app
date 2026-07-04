@@ -60,7 +60,7 @@ public struct RatingsProfileGate: View {
                 .foregroundStyle(DODColor.accent)
                 .accessibilityHidden(true)
 
-            Text("Set up your profile")
+            Text("Set Up Your Profile")
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
 

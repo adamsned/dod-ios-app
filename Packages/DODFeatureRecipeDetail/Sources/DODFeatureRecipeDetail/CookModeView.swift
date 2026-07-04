@@ -293,7 +293,7 @@ public struct CookModeView: View {
 
     private var primaryButtonLabel: String {
         if viewModel.isFinished { return "Finish" }
-        return viewModel.isOnLastStep ? "Done cooking" : "Next"
+        return viewModel.isOnLastStep ? "Done Cooking" : "Next"
     }
 
     private var primaryButtonSymbol: String {
