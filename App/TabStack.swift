@@ -27,7 +27,14 @@ struct TabStack: View {
     /// App Intents / Spotlight deep links (US-10, replace semantics) and
     /// in-app article-link taps (DUT-243, push semantics). Every tab gets a
     /// sink now so a link tapped in Saved/Search opens in place.
-    @Binding var externalRoute: ExternalRoute?
+    ///
+    /// DUT-463 / DUT-464 / DUT-319 — a FIFO ``ExternalRouteQueue`` (was a
+    /// single-slot `ExternalRoute?`): it holds every enqueued route so a
+    /// second one landing before the first is consumed isn't dropped
+    /// (DUT-464), and it's drained on *appear* so a route that arrived while
+    /// this tab was unmounted still fires once the tab mounts (DUT-463 /
+    /// DUT-319), with stale routes discarded at drain.
+    @Binding var externalRoute: ExternalRouteQueue
     /// DUT-534 / DUT-536 — routes the Shopping List entry points to the
     /// top-level Grocery List tab (`RootView.routeToShoppingList()` selects
     /// `.grocery`). Backs Recipe Detail's + the Feed/Search cards' "Added to your
@@ -35,6 +42,12 @@ struct TabStack: View {
     /// from `RootView` so this App view never reaches into the deep-link plumbing
     /// directly. Defaults to a no-op for terse call sites.
     let openShoppingList: () -> Void
+    /// DUT-546 (gap 3) — the single app-level ``CommentModerationStore`` owned
+    /// by `RootView`, injected into every `RecipeDetailViewModel` this stack
+    /// builds so a block applied on one recipe screen hides that author on an
+    /// already-open second recipe screen live (shared `@Observable` set),
+    /// instead of each detail VM reading its own private `UserDefaults` copy.
+    let commentModeration: CommentModerationStore
     /// DUT-250 — the per-tab navigation stack is now HOISTED into
     /// `RootView`-owned state and injected as a `@Binding`. Previously this
     /// was a local `@State private var path`, but on iPad the size-class flip
@@ -52,8 +65,9 @@ struct TabStack: View {
         dependencies: AppDependencies,
         path: Binding<[RecipeRoute]> = .constant([]),
         pendingDeepLink: Binding<WidgetDeepLink?> = .constant(nil),
-        externalRoute: Binding<ExternalRoute?> = .constant(nil),
-        openShoppingList: @escaping () -> Void = {}
+        externalRoute: Binding<ExternalRouteQueue> = .constant(ExternalRouteQueue()),
+        openShoppingList: @escaping () -> Void = {},
+        commentModeration: CommentModerationStore = CommentModerationStore()
     ) {
         self.tab = tab
         self.dependencies = dependencies
@@ -61,6 +75,7 @@ struct TabStack: View {
         self._pendingDeepLink = pendingDeepLink
         self._externalRoute = externalRoute
         self.openShoppingList = openShoppingList
+        self.commentModeration = commentModeration
     }
 
     var body: some View {
@@ -76,21 +91,38 @@ struct TabStack: View {
             await consume(link: link)
         }
         .task(id: externalRoute) {
-            // External route sink. `.task(id:)` (not `.onChange`) so a route
-            // already non-nil when this tab is first instantiated — iPad
+            // External route sink. `.task(id:)` (not `.onChange`) so a queue
+            // already non-empty when this tab is first instantiated — iPad
             // switching to the Feed tab, or a cold-launch intent — is still
-            // consumed; `.onChange` only fires on a live transition (DUT-352).
-            guard let route = externalRoute else { return }
+            // drained; `.onChange` only fires on a live transition (DUT-352).
+            //
+            // DUT-463 / DUT-464 / DUT-319 — drain EVERY queued route (was a
+            // single-slot read). Because `.task(id:)` re-runs when the tab
+            // (re)mounts, a route enqueued while this tab was unmounted is
+            // delivered the moment it appears rather than sitting stuck; the
+            // queue drops routes older than `staleAfter` so a long-stale one
+            // never silently replaces the user's stack.
+            consumeExternalRoutes()
+        }
+    }
+
+    /// DUT-463 / DUT-464 / DUT-319 — drain the tab's external-route queue,
+    /// applying each pending route to `path` in arrival order. `replaceStack`
+    /// (deep links) resets the stack so Back lands on the tab root (DUT-310);
+    /// `push` (in-app link taps) appends so Back returns to the article
+    /// (DUT-243). Draining clears the queue and drops stale routes, so a route
+    /// that resolved while this tab was unmounted fires on mount without a
+    /// minutes-later surprise, and two routes landing within a frame are both
+    /// delivered rather than one overwriting the other.
+    private func consumeExternalRoutes() {
+        guard !externalRoute.isEmpty else { return }
+        for route in externalRoute.drain() {
             switch route {
             case .replaceStack(let destination):
-                // DUT-310: deep links replace, so Back returns to the tab root.
                 path = [destination]
             case .push(let destination):
-                // DUT-243: in-app link taps append, so Back returns to the
-                // article the user was reading.
                 path.append(destination)
             }
-            externalRoute = nil
         }
     }
 
@@ -217,7 +249,10 @@ struct TabStack: View {
                 viewModel: RecipeDetailViewModel(
                     listItem: item,
                     canonicalURL: canonical,
-                    dependencies: dependencies.recipeDetailDependencies()
+                    dependencies: dependencies.recipeDetailDependencies(),
+                    // DUT-546 — inject the shared store so a block on one open
+                    // recipe screen live-hides that author on another.
+                    commentModeration: commentModeration
                 ),
                 onSelectRelated: { related in path.append(.recipe(item: related)) },
                 autoStartCookMode: autoStartCookMode,
