@@ -171,7 +171,8 @@ struct CookTimeRangeSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, DODSpacing.sm)
                     .background(
-                        RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                        // CL-304 / DUT-537 — button tier: tappable CTA → Capsule pill.
+                        Capsule(style: .continuous)
                             .fill(DODColor.castIronBrown)
                     )
             }

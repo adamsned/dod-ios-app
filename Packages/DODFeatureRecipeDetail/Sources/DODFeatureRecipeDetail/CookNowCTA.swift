@@ -28,7 +28,8 @@ struct CookNowCTA: View {
             .padding(.vertical, DODSpacing.sm)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                // CL-304 / DUT-537 — button tier: tappable CTA → Capsule pill.
+                Capsule(style: .continuous)
                     .fill(DODColor.accent)
                     .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 3)
             )

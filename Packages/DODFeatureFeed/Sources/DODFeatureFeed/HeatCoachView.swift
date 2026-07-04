@@ -156,7 +156,9 @@ public struct HeatCoachView: View {
                     .padding(.vertical, DODSpacing.xs)
                     .foregroundStyle(isSelected ? DODColor.labelOnAccent : DODColor.label)
                     .background(
-                        RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
+                        // CL-304 / DUT-537 — segmented-pill control: the selected
+                        // segment is a Capsule nested inside the Capsule track below.
+                        Capsule(style: .continuous)
                             .fill(isSelected ? DODColor.accent : Color.clear)
                     )
                     .contentShape(Rectangle())
@@ -166,11 +168,12 @@ public struct HeatCoachView: View {
         }
         .padding(DODSpacing.xxs)
         .background(
-            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+            // CL-304 / DUT-537 — segmented-pill control track → Capsule pill.
+            Capsule(style: .continuous)
                 .fill(DODColor.surface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+            Capsule(style: .continuous)
                 .strokeBorder(DODColor.surfaceDivider, lineWidth: 1)
         )
         .accessibilityIdentifier(accessibilityID)
