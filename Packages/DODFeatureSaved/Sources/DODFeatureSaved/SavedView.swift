@@ -27,37 +27,23 @@ public struct SavedView: View {
     /// (used by Feed/Categories/Search per their respective TODO markers).
     public let onSave: ((Recipe) -> Void)?
 
-    /// DUT-536 — the "Make Shopping List" cart now SELECTS the top-level Grocery
-    /// List tab (via `RootView.routeToShoppingList()`) instead of pushing the
-    /// Shopping List inside the Saved stack. This keeps the cart as a convenient
-    /// shortcut from Saved while guaranteeing a SINGLE, store-backed list surface
-    /// (the Grocery List tab's `ShoppingListViewModel`) — no second, divergent
-    /// in-Saved list instance. Defaults to a no-op so the Saved-tab snapshot
-    /// tests + previews (which don't wire the closure) are unaffected.
-    ///
-    /// Earlier (DUT-487 / T-906) the cart pushed an empty ``ShoppingListView``
-    /// onto the Saved stack; DUT-536 removed that push path in favor of the tab.
-    private let openShoppingList: () -> Void
-
     public init(
         viewModel: SavedViewModel,
-        openShoppingList: @escaping () -> Void = {},
         onSelect: @escaping (Recipe) -> Void,
         onSave: ((Recipe) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
-        self.openShoppingList = openShoppingList
         self.onSelect = onSelect
         self.onSave = onSave
     }
 
     public var body: some View {
-        // DUT-275 — the "Saved" title + cart are a pinned header row (nav bar
-        // hidden), so the title sits at the same Y as every other tab in every
-        // state. (No native `.navigationTitle` — dodges the iOS 26 large-title bug.)
+        // DUT-275 — the "Saved" title is a pinned header row (nav bar hidden), so
+        // it sits at the same Y as every other tab in every state. (No native
+        // `.navigationTitle` — dodges the iOS 26 large-title bug.)
         content
             .background(DODColor.surface)
-            // DUT-275 — nav bar hidden; the cart lives in the header row above.
+            // DUT-275 — nav bar hidden; the pinned header lives above.
             .dodHidesNavBar()
             .task {
                 // DUT-6: subscribe to CloudKit remote-import signals (no-op
@@ -82,28 +68,14 @@ public struct SavedView: View {
 
     @ViewBuilder
     private var content: some View {
-        // DUT-275 — the "Saved" title + its cart button share one header row at
-        // the very top (nav bar hidden), so the title sits at the same Y as every
-        // other tab in every state. The grid scrolls beneath the pinned title.
+        // DUT-275 — the "Saved" title is pinned at the very top (nav bar hidden),
+        // so it sits at the same Y as every other tab in every state. The grid
+        // scrolls beneath the pinned title. DUT-536 — the "Make Shopping List"
+        // cart that used to sit on this row was removed now that the top-level
+        // Grocery List tab is the single store-backed list surface, so this is a
+        // title-only header matching Search/Settings.
         VStack(spacing: 0) {
-            DODScreenHeader("Saved") {
-                // AC-39.3 / CL-85 — the "Make Shopping List" cart, in the header
-                // row (was a nav-bar toolbar item). Only in `.loaded` (nothing to
-                // build a list from otherwise), mirroring the hide-when-empty rule.
-                // DUT-536 — now selects the top-level Grocery List tab instead of
-                // pushing a Shopping List inside the Saved stack, so there's a
-                // single store-backed list surface.
-                if viewModel.loadState == .loaded {
-                    Button {
-                        openShoppingList()
-                    } label: {
-                        Image(systemName: "cart")
-                            .accessibilityLabel("Make Shopping List")
-                    }
-                    .tint(DODColor.burntOrange)
-                    .accessibilityIdentifier("saved-make-shopping-list")
-                }
-            }
+            DODScreenHeader("Saved")
             loadStateBody
         }
     }
