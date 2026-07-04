@@ -31,12 +31,14 @@ extension RootView {
             // of `TabStack.consume` silently dropping the tap.
             selectedTab = .feed
             handle(intent: .openRecipe(id: id))
-        case .tip(let index):
-            // DUT-457 — show the full tip (widget truncated it) in a dialog.
-            if let tip = CookingTip.tip(atIndex: index) {
-                tipDialogText = tip
-                showTipDialog = true
-            }
+        case .tip:
+            // DUT-461 (revised) — the Cooking Tip widget now opens the Cooking Tools
+            // hub, where the tip lives as a persistent top banner, instead of a popup.
+            // Select the tab + mint the token so the hub pops to its root and the
+            // banner is visible. The index is no longer needed: the banner shows
+            // today's tip, the same daily rotation the widget uses.
+            selectedTab = .cookingTools
+            hubTipToken = UUID()
         case .shoppingList:
             // DUT-480 — the iOS 18 Control Center control's `dod://` link path.
             routeToShoppingList()

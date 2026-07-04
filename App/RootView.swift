@@ -64,11 +64,6 @@ struct RootView: View {
     /// Widget deep link (spec.md US-9 AC-9.2). Feed tab consumes via .task(id:).
     /// Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)` can set it.
     @State var pendingDeepLink: WidgetDeepLink?
-    /// DUT-457 — the Cooking Tip widget's `dod://tip/<index>` tap shows the full
-    /// tip in a dialog. Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)`
-    /// can set them.
-    @State var showTipDialog = false
-    @State var tipDialogText = ""
     /// DUT-549 — a deep link / notification whose recipe fails BOTH cache and
     /// network resolution surfaces this transient snackbar instead of dumping
     /// the user on a blank Feed. Set by `handle(intent:)`; the overlay +
@@ -117,6 +112,11 @@ struct RootView: View {
     /// (the per-recipe nudge) mints it; the hub presents Heat Coach via `.task(id:)`.
     /// Owned here (like `hubShoppingListToken`) so it survives the iPad flip.
     @State var hubHeatCoachToken: UUID?
+    /// DUT-461 (revised) — the hub's Cooking Tip token. The Cooking Tip widget's
+    /// `dod://tip/<index>` tap mints it (via `handle(widgetLink: .tip)`); the hub
+    /// consumes it via `.task(id:)` to pop to its root so the persistent tip banner
+    /// at the top is visible. Owned here so it survives the iPad flip.
+    @State var hubTipToken: UUID?
     @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The system `openURL`, captured before RootView overrides it for its
@@ -248,13 +248,6 @@ struct RootView: View {
                     + "Takes effect next time you open the app — change it anytime in Settings."
             )
         }
-        // DUT-457 / DUT-461 — the Cooking Tip widget opens the full tip in a
-        // styled card (matching the Cooking Tools callout), not a system alert.
-        // Overlay lives in `RootView+TipDialog.swift` (file_length).
-        .overlay {
-            if showTipDialog { cookingTipOverlay }
-        }
-        .animation(.easeInOut(duration: 0.2), value: showTipDialog)
         // DUT-549 — transient "couldn't open that recipe" toast for a failed
         // deep-link resolve (modifier + copy in `RootView+LinkRouting.swift`).
         .modifier(DeepLinkErrorSnackbar(message: $deepLinkErrorMessage))
@@ -288,6 +281,7 @@ struct RootView: View {
                     openHeatCoach: { routeToHeatCoach() },
                     hubShoppingListToken: tab == .cookingTools ? $hubShoppingListToken : .constant(nil),
                     hubHeatCoachToken: tab == .cookingTools ? $hubHeatCoachToken : .constant(nil),
+                    hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
                     // DUT-546 — one shared moderation store across every recipe screen.
                     commentModeration: commentModeration
                 )
@@ -364,6 +358,7 @@ struct RootView: View {
                 openHeatCoach: { routeToHeatCoach() },
                 hubShoppingListToken: selectedTab == .cookingTools ? $hubShoppingListToken : .constant(nil),
                 hubHeatCoachToken: selectedTab == .cookingTools ? $hubHeatCoachToken : .constant(nil),
+                hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
                 // DUT-546 — one shared moderation store across every recipe screen.
                 commentModeration: commentModeration
             )

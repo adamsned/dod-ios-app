@@ -45,6 +45,13 @@ struct CookingToolsHubView: View {
     /// sheet — reusing the same `showingHeatCoach` state the hub's row #3 drives.
     @Binding var heatCoachToken: UUID?
 
+    /// DUT-461 (revised) — the Cooking Tip token. The lock-screen Cooking Tip
+    /// widget's tap mints it; the hub consumes it via `.task(id:)` and pops to its
+    /// root so the persistent tip banner at the top is visible (the user may have
+    /// been pushed into the Shopping List). Owned by `RootView` so it survives the
+    /// iPad flip.
+    @Binding var tipToken: UUID?
+
     /// The hub tab's own navigation stack (Shopping List pushes onto it).
     @State private var path: [HubDestination] = []
     /// Presents the "Your First Cookout" roadmap (`CookChooserFlow`).
@@ -77,11 +84,13 @@ struct CookingToolsHubView: View {
         dependencies: AppDependencies,
         shoppingListToken: Binding<UUID?> = .constant(nil),
         heatCoachToken: Binding<UUID?> = .constant(nil),
+        tipToken: Binding<UUID?> = .constant(nil),
         onFindRecipe: @escaping () -> Void = {}
     ) {
         self.dependencies = dependencies
         self._shoppingListToken = shoppingListToken
         self._heatCoachToken = heatCoachToken
+        self._tipToken = tipToken
         self.onFindRecipe = onFindRecipe
         _feedViewModel = State(
             initialValue: FeedViewModel(dependencies: dependencies.feedDependencies())
@@ -92,6 +101,7 @@ struct CookingToolsHubView: View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 DODScreenHeader("Cooking Tools")
+                tipBanner
                 toolList
             }
             .background(DODColor.surface)
@@ -122,6 +132,15 @@ struct CookingToolsHubView: View {
             guard heatCoachToken != nil else { return }
             showingHeatCoach = true
             heatCoachToken = nil
+        }
+        // DUT-461 (revised) — the Cooking Tip widget's tap mints `tipToken`; pop the
+        // hub to its root so the persistent tip banner at the top is visible (the
+        // user may have been pushed into the Shopping List). `.task(id:)` so a token
+        // set before the tab mounts still fires. A nil token is a no-op.
+        .task(id: tipToken) {
+            guard tipToken != nil else { return }
+            path.removeAll()
+            tipToken = nil
         }
         .onAppear { Telemetry.shared.send(.screenView(name: "cooking_tools")) }
         .sheet(
