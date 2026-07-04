@@ -78,6 +78,41 @@ public enum TemperatureConverter {
         return output
     }
 
+    // MARK: - Temperature extraction
+
+    /// Extracts every explicit-unit temperature in `text` and returns their
+    /// magnitudes **in Fahrenheit** — Celsius matches are converted to °F with
+    /// the same cooking-friendly rounding as ``converting(_:to:)`` (nearest
+    /// 5°F). Fahrenheit matches keep their integer magnitude.
+    ///
+    /// Reuses the same explicit-unit scanner as ``converting(_:to:)`` (a number
+    /// followed by a `°F` / `°C` / `degrees …` / spelled-out scale signal), so
+    /// it inherits the same "leave bare numbers alone" contract — `bake at 350`
+    /// yields no value, avoiding false positives on times / quantities / counts.
+    /// Ranges contribute *both* ends (e.g. `350-375°F` → `[350, 375]`).
+    ///
+    /// Order follows the source text; callers that want a single oven
+    /// temperature typically take the `max`. Returns an empty array when the
+    /// text carries no detectable explicit-unit temperature.
+    ///
+    /// Used by ``RecipeHeatProfile`` to derive a recipe's oven temperature from
+    /// its free-text steps without a UI or feature-package dependency.
+    public static func fahrenheitValues(in text: String) -> [Int] {
+        scan(text).flatMap { match -> [Int] in
+            match.values.map { value in
+                switch match.scale {
+                case .fahrenheit:
+                    // Already Fahrenheit — round to a whole degree; sources are
+                    // integers in practice, this just drops any decimal look.
+                    return Int(value.magnitude.rounded())
+                case .celsius:
+                    // Convert C→F with the shared nearest-5°F rounding.
+                    return convert(value.magnitude, to: .fahrenheit)
+                }
+            }
+        }
+    }
+
     // MARK: - Shared preference contract
 
     /// Canonical `UserDefaults` key for the recipe-step temperature display
