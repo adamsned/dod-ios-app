@@ -3218,4 +3218,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-910 — Corner-radius re-sweep: two-tier (pill buttons + insetGrouped-matched cards) for iOS 26 (CL-304 / DUT-537)
+
+- **What:** Migrate all existing UI to the CL-304 two-tier rule. `DODRadius.standard` 12 → **20** (calibrated to the live iOS 26 `.insetGrouped` corner, measured ~19.3pt via a superellipse fit vs reference rects); `DODRadius.inner` 8 → **15** (concentric). Both button helpers `dodProminentButton`/`dodBorderedButton` `.roundedRectangle → .capsule`. Custom button backgrounds → `Capsule`: `CookNowCTA`, `RatingsProfileGate` CTA, `CookTimeRangeSheet` Apply, `HeatCoachView` accentSelector segmented pill, `AppIntroTour` + `GuestIdentitySheet` CTAs. Cards/cells/thumbnails/inputs stay `DODRadius.standard` (follow the bumped token). Fixed the stale `CornerRadius.swift` doc.
+- **Files:** DODDesignSystem `CornerRadius.swift`, `ButtonShape.swift`, `AppIntroTour.swift`, `GuestIdentitySheet.swift`; DODFeatureRecipeDetail `CookNowCTA.swift`, `RatingsProfileGate.swift`; DODFeatureSearch `CookTimeRangeSheet.swift`; DODFeatureFeed `HeatCoachView.swift`. L4: all 95 DODDesignSystem baselines re-recorded by CI (global radius change).
+- **AC:** design consistency. Linear DUT-537. CL-304 canonical. Built in two parallel streams (tokens + custom buttons). **Verification:** DODDesignSystem + touched packages `swift build`; swiftlint + swift-format `--strict` clean; DODApp + DODAppWidget compile; L4 baselines CI-recorded.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
