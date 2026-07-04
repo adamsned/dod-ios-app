@@ -28,6 +28,13 @@ struct CookChooserFlow: View {
     /// lost the timer and, on restart, re-scheduled the bake-done alert to a
     /// wrong full-length deadline.
     @State private var timerEngine = CookTimerEngine()
+    /// DUT-548: the guided path OWNS the "already logged" set (keyed by rung
+    /// recipeID, matching DUT-547) so a first cook already logged on a rung isn't
+    /// logged a SECOND time after "Back to the path" → re-enter (which rebuilds
+    /// `FirstCookoutView` with a fresh per-view `hasLoggedCook`). Without this the
+    /// only backstop was the persistence ±3s dedup, which a minutes-apart
+    /// re-enter sails past → an inflated cook count + a false rank-up.
+    @State private var loggedRecipeIDs: Set<Int> = []
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -38,7 +45,8 @@ struct CookChooserFlow: View {
                 cookout: selected,
                 onLogCook: onLogCook,
                 onBack: { self.selected = nil },
-                timerEngine: timerEngine
+                timerEngine: timerEngine,
+                loggedRecipeIDs: $loggedRecipeIDs  // DUT-548 — dedup across re-enter.
             )
         } else {
             // DUT-235 — always show the chooser first (no auto-jump into a dish);

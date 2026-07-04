@@ -66,6 +66,15 @@ public final class CookTimerEngine {
         timers.removeAll { $0.state == .finished }
     }
 
+    /// DUT-255 — drop only the finished timers belonging to `recipeID`. The
+    /// guided path shares ONE engine across every rung (DUT-484 / DUT-547), so a
+    /// per-rung "clear Timer's Up!" affordance must not tear down a sibling
+    /// rung's finished (or still-running) bake. A `nil` recipeID clears the
+    /// finished timers not tied to any recipe.
+    public func clearFinished(for recipeID: Int?) {
+        timers.removeAll { $0.state == .finished && $0.recipeID == recipeID }
+    }
+
     public var hasActiveTimers: Bool {
         timers.contains { $0.isRunning }
     }
