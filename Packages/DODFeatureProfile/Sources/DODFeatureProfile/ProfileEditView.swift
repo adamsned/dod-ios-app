@@ -70,6 +70,12 @@ public struct ProfileEditView: View {
     /// Rank + counts + journal link). Nil for previews / snapshots / the
     /// new-profile setup flow → the section is hidden.
     let statsHooks: ProfileStatsHooks?
+    /// DUT-565 — composition-root seam for extra local-state clears that live in
+    /// sibling feature packages (recent searches in DODFeatureSearch, comment
+    /// moderation in DODFeatureRecipeDetail). Run as part of `teardown` on BOTH
+    /// Sign Out and Delete (the `Bool` is `revoke`). Nil off the teardown path —
+    /// keeps DODFeatureProfile free of a dependency edge onto those packages.
+    let extraTeardown: (@MainActor (Bool) async -> Void)?
 
     @State var displayName: String = ""
     @State var email: String = ""
@@ -167,7 +173,8 @@ public struct ProfileEditView: View {
         sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
         revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
             ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil,
-        statsHooks: ProfileStatsHooks? = nil
+        statsHooks: ProfileStatsHooks? = nil,
+        extraTeardown: (@MainActor (Bool) async -> Void)? = nil
     ) {
         self.store = store
         self.existingProfile = existingProfile
@@ -176,6 +183,7 @@ public struct ProfileEditView: View {
         self.sessionStore = sessionStore
         self.revoker = revoker
         self.statsHooks = statsHooks
+        self.extraTeardown = extraTeardown
         // DUT-416 — existing profile opens in view mode; new-profile setup edits.
         _isEditing = State(initialValue: existingProfile == nil)
     }
@@ -187,7 +195,8 @@ public struct ProfileEditView: View {
         sessionStore: any AppleAuthSessionStoring = KeychainAppleAuthSessionStore(),
         revoker: (any SiwaRevoking)? = SiwaRevokeConfig.production.isConfigured
             ? SiwaRevokeClient(config: SiwaRevokeConfig.production) : nil,
-        statsHooks: ProfileStatsHooks? = nil
+        statsHooks: ProfileStatsHooks? = nil,
+        extraTeardown: (@MainActor (Bool) async -> Void)? = nil
     ) {
         self.store = store
         self.existingProfile = existingProfile
@@ -195,18 +204,9 @@ public struct ProfileEditView: View {
         self.sessionStore = sessionStore
         self.revoker = revoker
         self.statsHooks = statsHooks
+        self.extraTeardown = extraTeardown
         // DUT-416 — existing profile opens in view mode; new-profile setup edits.
         _isEditing = State(initialValue: existingProfile == nil)
-    }
-    #endif
-
-    #if canImport(UIKit)
-    /// Identifiable wrapper around the picked image so we can drive a
-    /// `.sheet(item:)` presentation by the image itself (rather than a
-    /// `Bool` + a separate optional state variable).
-    struct CropCandidate: Identifiable {
-        let id = UUID()
-        let image: UIImage
     }
     #endif
 

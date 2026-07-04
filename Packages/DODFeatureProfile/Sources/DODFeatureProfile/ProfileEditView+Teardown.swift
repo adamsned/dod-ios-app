@@ -47,7 +47,8 @@ extension ProfileEditView {
                 sessionStore: sessionStore,
                 guestIdentity: KeychainGuestIdentityStore(),
                 revoker: revoker,
-                googleTeardown: googleTeardown
+                googleTeardown: googleTeardown,
+                extraTeardown: extraTeardown
             )
             await onProfileChanged()
             dismiss()
@@ -68,7 +69,8 @@ extension ProfileEditView {
         sessionStore: any AppleAuthSessionStoring,
         guestIdentity: any GuestIdentityStoring,
         revoker: (any SiwaRevoking)?,
-        googleTeardown: (@Sendable (Bool) async -> Void)? = nil
+        googleTeardown: (@Sendable (Bool) async -> Void)? = nil,
+        extraTeardown: (@MainActor (Bool) async -> Void)? = nil
     ) async throws {
         // DUT-367: distinguish "no session" from "the Keychain READ failed." A bare
         // `try?` collapsed both to nil, so a transient Keychain error during Delete
@@ -106,6 +108,14 @@ extension ProfileEditView {
         // DUT-296: clear/revoke the GoogleSignIn SDK's own OAuth tokens — they
         // live in a separate Keychain row the app's clears never touch.
         await googleTeardown?(revoke)
+        // DUT-565: clear cross-package local state the profile teardown can't
+        // reach directly — recent searches (raw query strings) + comment
+        // moderation (blocked authors / hidden comment IDs). Injected by the App
+        // composition root (which owns those stores) so DODFeatureProfile keeps
+        // no dependency edge onto Search / RecipeDetail. Best-effort like the
+        // other seams, and applied on BOTH Sign Out and Delete — matching the
+        // guest-identity "don't prefill for the NEXT user" treatment above.
+        await extraTeardown?(revoke)
         // Surface a profile-clear failure to the UI, but only after everything
         // else (revoke included) has run.
         if let profileError { throw profileError }

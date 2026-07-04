@@ -224,7 +224,9 @@ struct RootView: View {
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView(
-                    viewModel: dependencies.settingsSheetViewModel(),
+                    viewModel: dependencies.settingsSheetViewModel(
+                        accountTeardownExtras: accountTeardownExtras
+                    ),
                     onClearImageCache: { try await dependencies.store.clearImageCache() }
                 )
             }
@@ -310,7 +312,8 @@ struct RootView: View {
                 Section {
                     SidebarProfileRow(
                         profileStore: dependencies.profileStore,
-                        profilePhotoStore: dependencies.profilePhotoStore
+                        profilePhotoStore: dependencies.profilePhotoStore,
+                        accountTeardownExtras: accountTeardownExtras
                     )
                 }
                 Section {

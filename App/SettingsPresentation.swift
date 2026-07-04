@@ -18,7 +18,9 @@ extension AppDependencies {
     /// Build the `SettingsViewModel` the Settings sheet renders. Preserves the
     /// `#if canImport(UIKit)` branch verbatim from the old `TabStack`
     /// construction (the macOS test slice omits the `profilePhotoStore` arg).
-    func settingsSheetViewModel() -> SettingsViewModel {
+    func settingsSheetViewModel(
+        accountTeardownExtras: (@MainActor (Bool) async -> Void)? = nil
+    ) -> SettingsViewModel {
         #if canImport(UIKit)
         SettingsViewModel(
             dependencies: settingsDependencies(),
@@ -27,7 +29,8 @@ extension AppDependencies {
             profilePhotoStore: profilePhotoStore,
             requestNotificationAuthorization: {
                 await self.notificationService.requestAuthorization()
-            }
+            },
+            accountTeardownExtras: accountTeardownExtras
         )
         #else
         SettingsViewModel(
@@ -36,7 +39,8 @@ extension AppDependencies {
             profileStore: profileStore,
             requestNotificationAuthorization: {
                 await self.notificationService.requestAuthorization()
-            }
+            },
+            accountTeardownExtras: accountTeardownExtras
         )
         #endif
     }
