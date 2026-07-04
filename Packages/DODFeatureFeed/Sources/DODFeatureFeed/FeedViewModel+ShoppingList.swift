@@ -19,6 +19,15 @@ extension FeedViewModel {
     /// - `.couldntLoad` (offline / unfetchable / no ingredients) → the fallback
     ///   "Couldn't load ingredients — open the recipe to add." with no action.
     public func addToShoppingList(_ item: RecipeListItem) async {
+        // DUT-541 in-flight guard: a rapid double long-press fires two
+        // independent Tasks; skip the second concurrent add of the SAME recipe
+        // while one is still in flight (the appender's append is additive by
+        // CL-77, so a concurrent duplicate would double-stack the ingredients).
+        // A deliberate re-add AFTER this one completes is still allowed.
+        guard !addingIDs.contains(item.id) else { return }
+        addingIDs.insert(item.id)
+        defer { addingIDs.remove(item.id) }
+
         let result = await dependencies.addToShoppingList(Recipe(listItem: item))
         showShoppingListSnackbar(for: result)
     }

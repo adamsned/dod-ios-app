@@ -86,4 +86,99 @@ struct SearchViewModelShoppingListTests {
         #expect(viewModel.shoppingListSnackbarMessage == nil)
         #expect(viewModel.shoppingListSnackbarActionTitle == nil)
     }
+
+    // DUT-541 — a rapid double long-press fires two independent add Tasks for the
+    // same card. The in-flight guard must drop the second concurrent add so the
+    // additive appender (CL-77) runs exactly ONCE; a deliberate re-add AFTER the
+    // first completes must still stack.
+
+    @Test("Two concurrent adds of the same id append only once (in-flight guard)")
+    func concurrentDoubleAddAppendsOnce() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.shoppingListResult = .added(count: 3)
+        let gate = AsyncGate()
+        dependencies.appendGate = { await gate.wait() }
+        let viewModel = Self.makeViewModel(dependencies)
+        let item = Self.makeItem(42)
+
+        async let first: Void = viewModel.addToShoppingList(item)
+        await gate.waitUntilWaiting()
+        await viewModel.addToShoppingList(item)  // guard drops this one immediately
+        await gate.open()
+        await first
+
+        #expect(dependencies.appendedRecipes.count == 1)
+        #expect(dependencies.appendedRecipes.first?.id == 42)
+    }
+
+    @Test("A sequential re-add after completion still appends again (CL-77)")
+    func sequentialReAddStacks() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.shoppingListResult = .added(count: 3)
+        let viewModel = Self.makeViewModel(dependencies)
+        let item = Self.makeItem(42)
+
+        await viewModel.addToShoppingList(item)
+        await viewModel.addToShoppingList(item)  // first fully completed → allowed
+
+        #expect(dependencies.appendedRecipes.count == 2)
+    }
+
+    @Test("Concurrent adds of DIFFERENT ids each append (guard is per-item)")
+    func concurrentDifferentIDsBothAppend() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.shoppingListResult = .added(count: 3)
+        let gate = AsyncGate()
+        dependencies.appendGate = { await gate.wait() }
+        let viewModel = Self.makeViewModel(dependencies)
+
+        async let first: Void = viewModel.addToShoppingList(Self.makeItem(1))
+        async let second: Void = viewModel.addToShoppingList(Self.makeItem(2))
+        await gate.waitUntilWaiting(count: 2)
+        await gate.open()
+        _ = await (first, second)
+
+        #expect(dependencies.appendedRecipes.count == 2)
+        #expect(Set(dependencies.appendedRecipes.map(\.id)) == [1, 2])
+    }
+}
+
+/// DUT-541 test helper — a one-shot gate a fake appender parks on, so a test can
+/// hold N appends in flight and prove the view model's in-flight guard behavior.
+/// `wait()` suspends callers until `open()`; `waitUntilWaiting()` lets the test
+/// deterministically observe that the expected number of callers have parked
+/// before it races the next add in.
+actor AsyncGate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var waiterCount = 0
+    private var arrivalWaiters: [(target: Int, continuation: CheckedContinuation<Void, Never>)] = []
+
+    func wait() async {
+        if isOpen { return }
+        waiterCount += 1
+        resolveArrivals()
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        let pending = waiters
+        waiters.removeAll()
+        for continuation in pending { continuation.resume() }
+    }
+
+    /// Suspend until at least `count` callers have entered `wait()`.
+    func waitUntilWaiting(count: Int = 1) async {
+        if waiterCount >= count { return }
+        await withCheckedContinuation { continuation in
+            arrivalWaiters.append((target: count, continuation: continuation))
+        }
+    }
+
+    private func resolveArrivals() {
+        let ready = arrivalWaiters.filter { waiterCount >= $0.target }
+        arrivalWaiters.removeAll { waiterCount >= $0.target }
+        for entry in ready { entry.continuation.resume() }
+    }
 }

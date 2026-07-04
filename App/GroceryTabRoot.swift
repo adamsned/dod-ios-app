@@ -32,6 +32,14 @@ struct GroceryTabRoot: View {
     /// exact seam ``SavedView`` uses) and refreshed on appear.
     @State private var savedViewModel: SavedViewModel
 
+    /// DUT-541: the store-backed Shopping List view model. Held in `@State` and
+    /// built ONCE in `init` (mirroring `savedViewModel`) so it isn't rebuilt on
+    /// every `body` re-render. Constructing it inline in `body` spun up a
+    /// throwaway VM each render — each running a `ShoppingListStore.load()`
+    /// decode — of which only the first was ever kept by `ShoppingListView`'s
+    /// `State(initialValue:)`. Same behavior, no per-render rebuild + reload.
+    @State private var listViewModel = ShoppingListViewModel()
+
     init(dependencies: AppDependencies) {
         _savedViewModel = State(
             initialValue: SavedViewModel(dependencies: dependencies.savedDependencies())
@@ -44,8 +52,9 @@ struct GroceryTabRoot: View {
             // from the App-Group `ShoppingListStore` so the tab opens straight
             // to the cook's saved list (DUT-488). `.onAppear`'s
             // `reloadFromStore()` (inside `ShoppingListView`, DUT-534) keeps it
-            // consistent with any external append.
-            viewModel: ShoppingListViewModel(),
+            // consistent with any external append. Hoisted into `@State`
+            // (DUT-541) so it's built once, not rebuilt+reloaded per render.
+            viewModel: listViewModel,
             // The saved recipes feed the in-list picker; refreshed below.
             recipes: savedViewModel.recipes,
             // DUT-487 — hydrate a picked recipe's ingredients before building
