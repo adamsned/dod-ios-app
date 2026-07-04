@@ -139,8 +139,11 @@ public struct FirstCookoutView: View {
         .task {
             // DUT-297: if the bake finishes while we're on screen, drop the
             // pending notification — the cook is already looking at "Timer's up!".
-            timerEngine.onFinished = { _ in
-                Task { await notifier.cancelBakeDone() }
+            // DUT-547: cancel only the FINISHED timer's own per-recipe alert (via
+            // its `recipeID`), never a sibling rung's still-pending bake — the
+            // shared engine (DUT-484) can have another rung's bake queued.
+            timerEngine.onFinished = { timer in
+                Task { await notifier.cancelBakeDone(for: timer.recipeID) }
             }
             await runTimerTick()
         }

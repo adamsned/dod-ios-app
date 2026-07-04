@@ -218,7 +218,7 @@ extension FirstCookoutView {
                     .foregroundStyle(DODColor.labelSecondary)
                 Button("Cancel Timer") {
                     timerEngine.cancel(active.id)
-                    Task { await notifier.cancelBakeDone() }
+                    Task { await notifier.cancelBakeDone(for: active.recipeID) }  // DUT-547: this rung only.
                 }
                 .foregroundStyle(DODColor.labelSecondary)
             }
@@ -245,8 +245,8 @@ extension FirstCookoutView {
                 let duration = Double(cookout.bakeMinutes) * 60
                 timerEngine.start(label: bakeTimerLabel, duration: duration, recipeID: cookout.recipeID)
                 // DUT-297: schedule the deadline alert so "you can step away" holds
-                // even backgrounded (the tick loop is foreground-only).
-                Task { await notifier.scheduleBakeDone(after: duration) }
+                // backgrounded (tick loop is foreground-only). DUT-547: keyed per rung.
+                Task { await notifier.scheduleBakeDone(after: duration, recipeID: cookout.recipeID) }
             }
             .dodProminentButton()
             .tint(DODColor.burntOrange)
