@@ -88,6 +88,20 @@ public struct RecipeDetailView: View {
     /// model can surface the confirming Snackbar. `nil` (previews / hosts that
     /// don't wire the list) falls back to the DUT-534 immediate add-all.
     public let addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)?
+    /// T-912 / DUT-551 (CL-306) — the per-recipe Heat Coach nudge's "Open Heat
+    /// Coach" tap. The App composition root passes a closure that selects the
+    /// Cooking Tools hub tab and mints a hub token; the feature package stays free
+    /// of any App / tab-selection import. `nil` (the default) hides the whole
+    /// nudge — used by previews / hosts that don't wire hub routing (same seam as
+    /// `openShoppingList`).
+    public let openHeatCoach: (() -> Void)?
+    /// T-912 / DUT-551 (CL-306) — builds the Heat Coach surface presented as a
+    /// sheet OVER Cook Mode's full-screen cover (a tab switch would be invisible
+    /// under the cover). The `HeatCoachView` lives in `DODFeatureFeed`, which this
+    /// package must not import, so the App composition root injects a type-erased
+    /// `AnyView` builder. Forwarded down to `CookModeView`. `nil` (previews /
+    /// unwired hosts) hides the Cook Mode shortcut.
+    public let heatCoachSheet: (() -> AnyView)?
 
     /// DUT-535 — the recipe whose ingredient-selection sheet is presented.
     /// Non-nil drives the `.sheet(item:)`; set when the toolbar `cart.badge.plus`
@@ -100,13 +114,17 @@ public struct RecipeDetailView: View {
         onSelectRelated: @escaping (RecipeListItem) -> Void,
         autoStartCookMode: Bool = false,
         openShoppingList: (() -> Void)? = nil,
-        addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)? = nil
+        addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)? = nil,
+        openHeatCoach: (() -> Void)? = nil,
+        heatCoachSheet: (() -> AnyView)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         _pendingAutoCookMode = State(initialValue: autoStartCookMode)
         self.onSelectRelated = onSelectRelated
         self.openShoppingList = openShoppingList
         self.addToShoppingListSheet = addToShoppingListSheet
+        self.openHeatCoach = openHeatCoach
+        self.heatCoachSheet = heatCoachSheet
     }
 
     public var body: some View {
@@ -175,7 +193,12 @@ public struct RecipeDetailView: View {
                 // entry; the VM writes it through the dependency seam.
                 onLogCook: { entry in
                     Task { await viewModel.logCook(entry) }
-                }
+                },
+                // T-912 / DUT-551 — forward the Heat Coach sheet builder so a
+                // heat-related Cook Mode step can present Heat Coach OVER the
+                // cover (a tab switch would be invisible under the full-screen
+                // cover). Nil when the host doesn't wire hub routing.
+                heatCoachSheet: heatCoachSheet
             )
         }
     }
@@ -225,6 +248,7 @@ public struct RecipeDetailView: View {
                             RecipeDetailMetaPills(items: metaPillItems)
                             servingsScaler
                             cookNowSection
+                            heatCoachNudge
                             excerptText
                             RecipeDetailQuickJump(items: quickJumpItems(proxy: proxy))
                             if let video = viewModel.recipe?.video {

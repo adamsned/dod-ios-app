@@ -111,6 +111,17 @@ extension RootView {
         hubShoppingListToken = UUID()
     }
 
+    /// T-912 / DUT-551 (CL-306) — select the Cooking Tools hub tab and mint a
+    /// fresh token that presents Heat Coach (the hub's row #3 sheet). The
+    /// per-recipe Heat Coach nudge (Recipe Detail) taps this to point the cook at
+    /// the always-available hub tool rather than opening a one-off copy. Mirrors
+    /// `routeToShoppingList()` — a fresh UUID per call re-presents if the user is
+    /// already on the hub; the hub consumes it via `.task(id:)`.
+    func routeToHeatCoach() {
+        selectedTab = .cookingTools
+        hubHeatCoachToken = UUID()
+    }
+
     /// DUT-480 — read + clear the iOS 18 Control Center control's App Group
     /// pending-route flag and, if the Shopping List was requested, route there.
     /// The control's `AppIntent` can't reliably hand us a `dod://` URL, so it

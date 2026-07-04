@@ -39,6 +39,12 @@ public struct CookModeView: View {
     /// DUT-326 — drives the "Add to Cooking Journal" capture sheet on the
     /// Done card.
     @State var isJournalLogPresented: Bool = false
+    /// T-912 / DUT-551 (CL-306) — drives the Heat Coach sheet presented OVER
+    /// Cook Mode's full-screen cover from a heat-related step's shortcut. Cook
+    /// Mode is a `.fullScreenCover`, so a tab switch would be invisible under it;
+    /// a `.sheet` layers on top instead. `internal` so `CookModeView+StepBody`
+    /// can flip it. Only shown when `heatCoachSheet != nil`.
+    @State var isHeatCoachPresented: Bool = false
     /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
     /// screen, regardless of which step is shown, so a running timer on a step
     /// you've navigated away from still counts down + completes.
@@ -51,6 +57,15 @@ public struct CookModeView: View {
     /// default) hides the CTA entirely — previews and hosts that don't wire
     /// persistence stay unaffected.
     public let onLogCook: ((CookLogEntry) -> Void)?
+    /// T-912 / DUT-551 (CL-306) — builds the Heat Coach surface for the
+    /// heat-step shortcut. Presented as a `.sheet` OVER this full-screen cover
+    /// (see `isHeatCoachPresented`). The `HeatCoachView` lives in
+    /// `DODFeatureFeed`, which this package must not import, so the host injects
+    /// a type-erased `AnyView` builder. `nil` (the default) hides the shortcut on
+    /// every step — previews and hosts that don't wire hub routing stay
+    /// unaffected (same seam as `onLogCook`). `internal` (not `private`) so
+    /// `CookModeView+StepBody.swift` can gate the shortcut on it.
+    let heatCoachSheet: (() -> AnyView)?
     /// Scale factor inherited from the host detail screen so the drawer
     /// ingredient rows agree with the scaled list the user just left. AC-7.5
     /// + US-31 carry-over.
@@ -79,7 +94,8 @@ public struct CookModeView: View {
         initialCheckedIngredients: Set<UUID>,
         ingredientScaleFactor: Double = 1.0,
         onClose: @escaping (Set<UUID>) -> Void,
-        onLogCook: ((CookLogEntry) -> Void)? = nil
+        onLogCook: ((CookLogEntry) -> Void)? = nil,
+        heatCoachSheet: (() -> AnyView)? = nil
     ) {
         _viewModel = State(
             initialValue: CookModeViewModel(
@@ -90,6 +106,7 @@ public struct CookModeView: View {
         self.ingredientScaleFactor = ingredientScaleFactor
         self.onClose = onClose
         self.onLogCook = onLogCook
+        self.heatCoachSheet = heatCoachSheet
     }
 
     public var body: some View {
@@ -116,6 +133,15 @@ public struct CookModeView: View {
             // package's CookJournalEntryView, which this package can't import).
             CookModeJournalLogSheet(recipe: viewModel.recipe) { entry in
                 onLogCook?(entry)
+            }
+        }
+        // T-912 / DUT-551 — Heat Coach, presented as a sheet OVER this
+        // full-screen cover from a heat-related step's shortcut (a tab switch
+        // would be invisible under the cover). The host-injected builder returns
+        // an `AnyView` (the `HeatCoachView` type lives in `DODFeatureFeed`).
+        .sheet(isPresented: $isHeatCoachPresented) {
+            if let heatCoachSheet {
+                heatCoachSheet()
             }
         }
         // DUT-328 — one-time "this may sound robotic, get a better voice" prompt

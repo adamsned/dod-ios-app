@@ -51,11 +51,22 @@ struct TabStack: View {
     /// recipe to cook (Cook Mode can't launch without a recipe). Selects the
     /// Recipes tab. Threaded from `RootView`; defaults to a no-op.
     let onFindRecipe: () -> Void
+    /// T-912 / DUT-551 (CL-306) — the per-recipe Heat Coach nudge (Recipe Detail)
+    /// and the Cook Mode heat-step shortcut both point at the always-available
+    /// hub Heat Coach. This closure (`RootView.routeToHeatCoach()`) selects
+    /// `.cookingTools` + mints the hub Heat Coach token. Threaded from `RootView`
+    /// like `openShoppingList`; defaults to a no-op.
+    let openHeatCoach: () -> Void
     /// T-912 / DUT-551 (CL-306) — the Shopping List reroute token, owned by
     /// `RootView` and bound only into the Cooking Tools tab (all four Shopping
     /// List entry points mint it via `routeToShoppingList()`). The hub consumes
     /// it via `.task(id:)` and pushes the Shopping List. Inert for other tabs.
     @Binding var hubShoppingListToken: UUID?
+    /// T-912 / DUT-551 (CL-306) — the Heat Coach reroute token, owned by
+    /// `RootView` and bound only into the Cooking Tools tab. `routeToHeatCoach()`
+    /// mints it (from the per-recipe nudge); the hub consumes it via `.task(id:)`
+    /// and presents Heat Coach. Inert for other tabs.
+    @Binding var hubHeatCoachToken: UUID?
     /// DUT-546 (gap 3) — the single app-level ``CommentModerationStore`` owned
     /// by `RootView`, injected into every `RecipeDetailViewModel` this stack
     /// builds so a block applied on one recipe screen hides that author on an
@@ -83,7 +94,9 @@ struct TabStack: View {
         openShoppingList: @escaping () -> Void = {},
         onOpenSettings: @escaping () -> Void = {},
         onFindRecipe: @escaping () -> Void = {},
+        openHeatCoach: @escaping () -> Void = {},
         hubShoppingListToken: Binding<UUID?> = .constant(nil),
+        hubHeatCoachToken: Binding<UUID?> = .constant(nil),
         commentModeration: CommentModerationStore = CommentModerationStore()
     ) {
         self.tab = tab
@@ -94,7 +107,9 @@ struct TabStack: View {
         self.openShoppingList = openShoppingList
         self.onOpenSettings = onOpenSettings
         self.onFindRecipe = onFindRecipe
+        self.openHeatCoach = openHeatCoach
         self._hubShoppingListToken = hubShoppingListToken
+        self._hubHeatCoachToken = hubHeatCoachToken
         self.commentModeration = commentModeration
     }
 
@@ -217,6 +232,7 @@ struct TabStack: View {
             CookingToolsHubView(
                 dependencies: dependencies,
                 shoppingListToken: $hubShoppingListToken,
+                heatCoachToken: $hubHeatCoachToken,
                 onFindRecipe: onFindRecipe
             )
         }
@@ -245,7 +261,13 @@ struct TabStack: View {
                 // DUT-535 — present the ingredient-selection sheet on "Add to
                 // Shopping List" (pick which ingredients), replacing the DUT-534
                 // immediate add-all.
-                addToShoppingListSheet: dependencies.addToShoppingListSheetBuilder()
+                addToShoppingListSheet: dependencies.addToShoppingListSheetBuilder(),
+                // T-912 / DUT-551 — the per-recipe Heat Coach nudge routes to the
+                // hub tool; the Cook Mode heat-step shortcut presents Heat Coach
+                // as a sheet over the full-screen cover (a tab switch would be
+                // invisible beneath it).
+                openHeatCoach: openHeatCoach,
+                heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) }
             )
             .onAppear {
                 Telemetry.shared.send(.screenView(name: "recipe_detail"))
