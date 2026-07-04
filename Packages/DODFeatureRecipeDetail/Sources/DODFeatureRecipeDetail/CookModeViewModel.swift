@@ -224,16 +224,27 @@ public final class CookModeViewModel {
     }
 
     /// Push a new per-second state to the in-flight activity (AC-11.2).
-    public func updateTimerLiveActivity(remainingSeconds: Int, stepText: String, isPaused: Bool) {
+    ///
+    /// DUT-490 / DUT-491: `isCompleted` marks the DUT-354 buzzer linger — a done
+    /// (00:00) timer, not a paused one. It renders "Done" (not "Paused") and the
+    /// controller stamps a far-future stale date so the single completed push
+    /// outlives the linger instead of dimming after ~15s.
+    public func updateTimerLiveActivity(
+        remainingSeconds: Int,
+        stepText: String,
+        isPaused: Bool,
+        isCompleted: Bool = false
+    ) {
         guard liveActivity.isActive else { return }
         let state = CookActivityAttributes.ContentState(
             remainingSeconds: max(remainingSeconds, 0),
             stepText: stepText,
             isPaused: isPaused,
             // DUT-218: running → a live deadline (self-ticking countdown);
-            // paused → nil so the views show the frozen snapshot.
+            // paused / completed → nil so the views show the frozen snapshot.
             endDate: isPaused
-                ? nil : Date(timeIntervalSinceNow: TimeInterval(max(remainingSeconds, 0)))
+                ? nil : Date(timeIntervalSinceNow: TimeInterval(max(remainingSeconds, 0))),
+            isCompleted: isCompleted
         )
         liveActivity.update(state: state)
     }

@@ -53,6 +53,20 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     }
 
     #if os(iOS)
+    deinit {
+        // DUT-474: if this controller is torn down while still holding an
+        // activity (e.g. the hosting scene is destroyed in iPad App Exposé, which
+        // doesn't reliably deliver `onDisappear` → `endCookMode`), drop its id
+        // from the live registry WITHOUT ending it. The card lingers, but the
+        // next controller construction now sees it as an orphan (its id is no
+        // longer registered by any live controller) and reconciles it away —
+        // whereas the old once-per-process flag could never end an in-process
+        // orphan. `deinit` is nonisolated; the registry is lock-guarded.
+        if #available(iOS 16.1, *), let id = registeredActivityID {
+            CookLiveActivityOrphanRegistry.shared.unregister(id)
+        }
+    }
+
     @available(iOS 16.1, *)
     private var activity: Activity<CookActivityAttributes>? {
         // Erased through Any storage so we don't have to leak the iOS-only
@@ -62,6 +76,12 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     }
 
     private var activityStorage: Any?
+
+    /// DUT-474: the id of the activity this controller is currently driving, kept
+    /// out of the availability-gated `activity` computed property so `deinit`
+    /// (nonisolated, and it can't touch `@available` stored state through the
+    /// computed accessor) can unregister it. Mirrors `activity?.id`.
+    private var registeredActivityID: String?
     #endif
 
     public var isActive: Bool {
@@ -93,6 +113,10 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
                 pushType: nil
             )
             activity = started
+            // DUT-474: register the live id so the next controller's reconcile
+            // treats it as owned (not an orphan) while this controller lives.
+            registeredActivityID = started.id
+            CookLiveActivityOrphanRegistry.shared.register(started.id)
         } catch {
             // Most failures here are quota / authorization related. Log path
             // would go through DODSupport.Logger in a follow-up; for now we
@@ -118,29 +142,21 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     }
 
     #if os(iOS)
-    /// DUT-431 — reconcile once per PROCESS, not per controller instance.
-    /// `SystemCookLiveActivityController()` is a default init parameter of
-    /// `CookModeViewModel`, which SwiftUI re-constructs (and discards via
-    /// `@State`) every time the presenting detail view re-renders under the
-    /// Cook Mode cover — an instance-scoped reconcile ended the activity the
-    /// INSTALLED controller was legitimately driving, killing the Lock-Screen
-    /// timer mid-countdown. True orphans only exist at process launch.
-    private static var didReconcileOrphans = false
-
-    /// DUT-309 — ActivityKit Live Activities outlive app termination: a card
-    /// requested before a kill persists on the Lock Screen / Dynamic Island
-    /// across the relaunch. This fresh controller holds no in-memory handle for
-    /// it (the handle lived in the dead process), so it can neither update nor
-    /// end it — a stale cook timer lingers with no way to dismiss it from the
-    /// app. Runs once per process (DUT-431): end any activity left over from a
-    /// PREVIOUS process so the Lock Screen matches reality.
+    /// DUT-309 / DUT-474 — ActivityKit Live Activities outlive both app
+    /// termination AND scene teardown: a card requested before a process kill (or
+    /// held by a controller whose scene was destroyed) persists on the Lock
+    /// Screen / Dynamic Island with no live in-memory handle able to update or
+    /// end it. Runs on EVERY construction: end any activity whose id is not held
+    /// by a currently-live controller (the ``CookLiveActivityOrphanRegistry``), so
+    /// both a cross-process orphan (DUT-309) and an in-process scene orphan
+    /// (DUT-474) are cleaned up. The registry membership check means the installed
+    /// controller's own card is spared (DUT-431 no-kill guarantee).
     @available(iOS 16.1, *)
     private func reconcileOrphans() {
-        guard !Self.didReconcileOrphans else { return }
-        Self.didReconcileOrphans = true
-        guard activity == nil else { return }
-        for orphan in Activity<CookActivityAttributes>.activities {
-            Self.pushEndOrphan(orphan)
+        let existing = Activity<CookActivityAttributes>.activities
+        let byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for orphanID in CookLiveActivityOrphanRegistry.shared.orphanIDs(amongExisting: existing.map(\.id)) {
+            if let orphan = byID[orphanID] { Self.pushEndOrphan(orphan) }
         }
     }
 
@@ -156,6 +172,13 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     private func endExistingActivity() {
         guard let activity else { return }
         self.activity = nil
+        // DUT-474: this controller no longer owns the id — drop it from the
+        // registry so a later reconcile doesn't treat the (ending) activity as
+        // still-owned.
+        if let id = registeredActivityID {
+            CookLiveActivityOrphanRegistry.shared.unregister(id)
+            registeredActivityID = nil
+        }
         let finalContent = ActivityContent(state: activity.content.state, staleDate: nil)
         Self.pushEnd(activity: activity, content: finalContent)
     }
@@ -197,11 +220,17 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
 
     @available(iOS 16.1, *)
     private func staleDate(for state: CookActivityAttributes.ContentState) -> Date {
-        // Mark the activity stale a couple of ticks after the countdown
-        // is expected to hit zero. iOS will keep the card on the Lock
-        // Screen briefly after the system considers it stale; the slack
-        // keeps the buzzer moment from being preempted.
-        Date().addingTimeInterval(TimeInterval(max(state.remainingSeconds, 0) + 15))
+        // DUT-490: the DUT-354 completed-linger is pushed exactly once (per-tick
+        // re-pushes are suppressed while it lingers), so its stale date is never
+        // refreshed — a `now + 15s` stamp would dim the card after ~15s. Give the
+        // single "done" push a far-future stale date so it stays full-brightness
+        // until the cook leaves Cook Mode (which ends it).
+        if state.isCompleted { return .distantFuture }
+        // Mark a running/paused activity stale a couple of ticks after the
+        // countdown is expected to hit zero. iOS keeps the card on the Lock
+        // Screen briefly after it's considered stale; the slack keeps the buzzer
+        // moment from being preempted.
+        return Date().addingTimeInterval(TimeInterval(max(state.remainingSeconds, 0) + 15))
     }
     #endif
 }

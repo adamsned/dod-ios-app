@@ -24,6 +24,9 @@ public struct CookActivityLockScreenView: View {
     /// `Text(timerInterval:)` (ticks on the Lock Screen even when the app is
     /// backgrounded); `nil` (snapshots / paused) → the static `remainingSeconds`.
     public let endDate: Date?
+    /// DUT-490 / DUT-491: the DUT-354 buzzer linger — a done (not paused) timer.
+    /// When set, the status pill reads "Done" instead of "Paused".
+    public let isCompleted: Bool
 
     public init(
         recipeTitle: String,
@@ -31,7 +34,8 @@ public struct CookActivityLockScreenView: View {
         remainingSeconds: Int,
         totalSeconds: Int,
         isPaused: Bool,
-        endDate: Date? = nil
+        endDate: Date? = nil,
+        isCompleted: Bool = false
     ) {
         self.recipeTitle = recipeTitle
         self.stepText = stepText
@@ -39,6 +43,7 @@ public struct CookActivityLockScreenView: View {
         self.totalSeconds = totalSeconds
         self.isPaused = isPaused
         self.endDate = endDate
+        self.isCompleted = isCompleted
     }
 
     public var body: some View {
@@ -51,7 +56,12 @@ public struct CookActivityLockScreenView: View {
                     .foregroundStyle(DODColor.labelSecondary)
                     .lineLimit(1)
                 Spacer()
-                if isPaused {
+                if isCompleted {
+                    // DUT-491: the DUT-354 buzzer moment is "Done", not "Paused".
+                    Text("Done")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.accent)
+                } else if isPaused {
                     Text("Paused")
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)
@@ -70,7 +80,8 @@ public struct CookActivityLockScreenView: View {
                     progress: progress,
                     isPaused: isPaused,
                     countdown: countdownText,
-                    showsRing: !isSelfTicking
+                    showsRing: !isSelfTicking,
+                    isCompleted: isCompleted
                 )
                 .frame(width: 88, height: 88)
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
@@ -141,12 +152,23 @@ public struct CookActivityProgressArc: View {
     /// self-update, so showing it then means a visibly frozen fill against a
     /// live numeral. The base circle stays as the numeral's frame.
     public let showsRing: Bool
+    /// DUT-491: a completed (buzzer) timer is technically `isPaused == true`, but
+    /// its full ring should read as "done" (accent) rather than the muted paused
+    /// treatment.
+    public let isCompleted: Bool
 
-    public init(progress: Double, isPaused: Bool, countdown: Text, showsRing: Bool = true) {
+    public init(
+        progress: Double,
+        isPaused: Bool,
+        countdown: Text,
+        showsRing: Bool = true,
+        isCompleted: Bool = false
+    ) {
         self.progress = progress
         self.isPaused = isPaused
         self.countdown = countdown
         self.showsRing = showsRing
+        self.isCompleted = isCompleted
     }
 
     public var body: some View {
@@ -167,7 +189,9 @@ public struct CookActivityProgressArc: View {
     }
 
     private var arcColor: Color {
-        isPaused ? DODColor.labelSecondary : DODColor.accent
+        // DUT-491: a completed timer keeps the accent fill (done, not muted).
+        if isCompleted { return DODColor.accent }
+        return isPaused ? DODColor.labelSecondary : DODColor.accent
     }
 }
 

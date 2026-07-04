@@ -65,6 +65,23 @@ final class CookLiveActivitySnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: .image(layout: .fixed(width: 360, height: 140)))
     }
 
+    /// DUT-490 / DUT-491 — the DUT-354 buzzer linger: a completed (not paused)
+    /// timer. The status pill reads "Done" (not "Paused") and the ring is full in
+    /// the accent tint.
+    func test_lockScreen_completed() {
+        let view = CookActivityLockScreenView(
+            recipeTitle: "Skillet Cornbread",
+            stepText: "Bake until edges are golden.",
+            remainingSeconds: 0,
+            totalSeconds: 1_200,
+            isPaused: true,
+            endDate: nil,
+            isCompleted: true
+        )
+        .frame(width: 360, height: 140)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 360, height: 140)))
+    }
+
     func test_dynamicIsland_compactLeading() {
         let view = CookActivityCompactLeadingView()
             .frame(width: 30, height: 30)

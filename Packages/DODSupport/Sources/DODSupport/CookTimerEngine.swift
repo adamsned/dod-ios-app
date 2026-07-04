@@ -83,12 +83,24 @@ public final class CookTimerEngine {
     /// Advance any running timer that has elapsed to `.finished`, firing
     /// ``onFinished`` exactly once for each newly-finished timer. Idempotent: a
     /// timer already `.finished` is not re-fired. Called on each wall-clock tick.
+    ///
+    /// DUT-210: the finished timers are collected into a local snapshot while
+    /// mutating `timers`, and `onFinished` is invoked only AFTER the loop —
+    /// never mid-iteration. `onFinished` is a client-supplied closure that may
+    /// re-enter the engine (`start`/`cancel`/`clearFinished`) and mutate
+    /// `timers`; firing after the loop means such a reentrant mutation can't
+    /// invalidate the indices being iterated (out-of-bounds trap / skipped
+    /// completion). Callbacks also observe a fully-consistent `timers`.
     public func refresh() {
         let now = clock()
+        var justFinished: [CookTimer] = []
         for index in timers.indices {
             guard timers[index].isRunning, timers[index].hasElapsed(at: now) else { continue }
             timers[index] = timers[index].finishedTimer()
-            onFinished?(timers[index])
+            justFinished.append(timers[index])
+        }
+        for timer in justFinished {
+            onFinished?(timer)
         }
     }
 

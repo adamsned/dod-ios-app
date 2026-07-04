@@ -33,17 +33,42 @@ public struct CookActivityAttributes: Codable, Hashable, Sendable {
         /// `nil` while paused or for a non-live render (snapshots) → the views
         /// fall back to the static `remainingSeconds` snapshot.
         public var endDate: Date?
+        /// DUT-490 / DUT-491: first-class "done" flag for the DUT-354 buzzer
+        /// linger. When set, the card is a completed timer (00:00) rather than a
+        /// paused one: the view renders "Done" (not "Paused") and the controller
+        /// stamps a far-future stale date so the single completed push outlives
+        /// the linger instead of dimming after ~15s. Defaults to `false` and
+        /// decodes to `false` for older payloads (Codable back-compat).
+        public var isCompleted: Bool
 
         public init(
             remainingSeconds: Int,
             stepText: String,
             isPaused: Bool,
-            endDate: Date? = nil
+            endDate: Date? = nil,
+            isCompleted: Bool = false
         ) {
             self.remainingSeconds = remainingSeconds
             self.stepText = stepText
             self.isPaused = isPaused
             self.endDate = endDate
+            self.isCompleted = isCompleted
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case remainingSeconds, stepText, isPaused, endDate, isCompleted
+        }
+
+        /// DUT-490 / DUT-491: tolerate payloads encoded before `isCompleted`
+        /// existed — a card in flight across an app update decodes with
+        /// `isCompleted == false` rather than failing the whole state.
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            remainingSeconds = try container.decode(Int.self, forKey: .remainingSeconds)
+            stepText = try container.decode(String.self, forKey: .stepText)
+            isPaused = try container.decode(Bool.self, forKey: .isPaused)
+            endDate = try container.decodeIfPresent(Date.self, forKey: .endDate)
+            isCompleted = try container.decodeIfPresent(Bool.self, forKey: .isCompleted) ?? false
         }
     }
 
