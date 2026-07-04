@@ -54,16 +54,6 @@ public struct SavedView: View {
                 viewModel.startObserving()
                 await viewModel.refresh()
             }
-            // DUT-84 — confirm before removing a download while offline. The
-            // context-menu "Remove Download" routes through `requestRemoveDownload`,
-            // which sets `pendingOfflineRemoveDownloadID` when there's no network.
-            .offlineRemoveDownloadAlert(
-                isPresented: Binding(
-                    get: { viewModel.pendingOfflineRemoveDownloadID != nil },
-                    set: { if !$0 { viewModel.cancelPendingRemoveDownload() } }
-                ),
-                onRemove: { Task { await viewModel.confirmPendingRemoveDownload() } }
-            )
     }
 
     @ViewBuilder
@@ -185,11 +175,10 @@ public struct SavedView: View {
                     onRemoveDownload: {
                         // T-775 / DUT-81 — un-download clears the badge
                         // optimistically (the card stays — un-download ≠
-                        // unsave). DUT-84 — but offline, removal would
-                        // strand the recipe, so route through
-                        // `requestRemoveDownload`, which confirms first
-                        // when there's no connection and removes
-                        // immediately when online.
+                        // unsave). DUT-229 — removal is instant online OR
+                        // offline: it only clears the pin, leaving the saved
+                        // recipe fully openable offline, so nothing is
+                        // stranded and no confirmation is needed.
                         Task { await viewModel.requestRemoveDownload(id: recipe.id) }
                     }
                 )

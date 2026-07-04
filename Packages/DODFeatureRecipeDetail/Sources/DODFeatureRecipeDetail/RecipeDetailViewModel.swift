@@ -60,9 +60,6 @@ public final class RecipeDetailViewModel {
     /// closure so the view model stays free of any SwiftUI / DesignSystem
     /// dependency. Cleared alongside ``snackbarMessage`` in ``dismissSnackbar()``.
     public internal(set) var snackbarActionTitle: String?
-    /// DUT-84 — drives the offline remove-download confirmation: set by
-    /// ``toggleDownload()`` when offline, presented by ``RecipeDetailView``.
-    public internal(set) var showOfflineRemoveDownloadWarning: Bool = false
     /// T-732 / CL-129 / AC-4.12: rich blocks for the recipe's narrative
     /// blurb (the prose preceding the WPRM recipe card). Populated by the
     /// fetch path. T-733 / CL-130: capped to 1-2 paragraphs via the
