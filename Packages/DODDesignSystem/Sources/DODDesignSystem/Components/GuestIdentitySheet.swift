@@ -32,7 +32,7 @@ public struct GuestIdentitySheet: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: DODSpacing.lg) {
             VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                Text("Tell us who you are")
+                Text("Tell Us Who You Are")
                     .dodFont(DODType.displayMedium)
                     .foregroundStyle(DODColor.label)
                     .accessibilityAddTraits(.isHeader)
@@ -47,7 +47,7 @@ public struct GuestIdentitySheet: View {
             }
 
             VStack(alignment: .leading, spacing: DODSpacing.md) {
-                field(title: "Display name", text: $displayName, kind: .name)
+                field(title: "Display Name", text: $displayName, kind: .name)
                     .accessibilityHint("1 to 40 characters")
                 field(title: "Email", text: $email, kind: .email)
             }
