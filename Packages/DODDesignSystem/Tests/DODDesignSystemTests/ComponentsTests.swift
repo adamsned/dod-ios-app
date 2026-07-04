@@ -46,6 +46,62 @@ import Testing
         #expect(withUndo.action?.title == "Undo")
     }
 
+    /// DUT-230 — a plain (host-driven) snackbar owns no auto-dismiss.
+    @Test func snackbarWithoutHandlerHasNoAutoDismiss() {
+        let plain = Snackbar(message: "Saved.")
+        #expect(plain.onAutoDismiss == nil)
+    }
+
+    /// DUT-230 — with a handler, the countdown fires exactly once after the
+    /// full delay elapses (asserted via an injected clock, not a real sleep).
+    @MainActor
+    @Test func snackbarAutoDismissFiresAfterFullDelay() async {
+        let clock = FakeSleepClock()
+        var fired = 0
+        await Snackbar.runAutoDismiss(
+            delay: .seconds(4),
+            sleep: clock.sleep,
+            onAutoDismiss: { fired += 1 }
+        )
+        #expect(clock.lastRequestedDelay == .seconds(4))
+        #expect(fired == 1)
+    }
+
+    /// DUT-230 — the core bug: a message-to-message replacement must RESTART
+    /// the countdown, so the new message shows for its full duration and the
+    /// replaced message's countdown never dismisses it early.
+    ///
+    /// `.task(id: message)` cancels the in-flight countdown on replacement;
+    /// here we model that by throwing `CancellationError` from the first
+    /// countdown's sleep, then running a fresh countdown for the new message.
+    /// The first must NOT fire (its remaining time is discarded); the second
+    /// must wait its own full delay and fire once.
+    @MainActor
+    @Test func snackbarAutoDismissRestartsOnMessageReplacement() async {
+        var firstMessageDismissed = false
+        var secondMessageDismissed = false
+
+        // First message's countdown — cancelled mid-wait by the replacement.
+        let cancelled = FakeSleepClock(throwing: CancellationError())
+        await Snackbar.runAutoDismiss(
+            delay: .seconds(4),
+            sleep: cancelled.sleep,
+            onAutoDismiss: { firstMessageDismissed = true }
+        )
+        #expect(firstMessageDismissed == false)  // replaced → never dismissed.
+
+        // Second (replacement) message's countdown — a fresh full-duration
+        // wait that completes and fires exactly once.
+        let fresh = FakeSleepClock()
+        await Snackbar.runAutoDismiss(
+            delay: .seconds(4),
+            sleep: fresh.sleep,
+            onAutoDismiss: { secondMessageDismissed = true }
+        )
+        #expect(fresh.lastRequestedDelay == .seconds(4))  // full duration, not leftover.
+        #expect(secondMessageDismissed == true)
+    }
+
     @Test func recipeCardConstructsWithAllInputs() {
         let card = RecipeCard(
             title: "Title",
@@ -238,5 +294,23 @@ import Testing
         let add = { addCount += 1 }
         add()
         #expect(addCount == 1)
+    }
+}
+
+/// DUT-230 — a deterministic stand-in for `Task.sleep` used to drive the
+/// snackbar auto-dismiss countdown without a real wait. Records the requested
+/// delay and either returns immediately (the countdown completes) or throws
+/// (modeling `.task(id:)` cancelling the countdown on a message replacement).
+private final class FakeSleepClock: @unchecked Sendable {
+    private(set) var lastRequestedDelay: Duration?
+    private let error: Error?
+
+    init(throwing error: Error? = nil) {
+        self.error = error
+    }
+
+    @Sendable func sleep(_ delay: Duration) async throws {
+        lastRequestedDelay = delay
+        if let error { throw error }
     }
 }
