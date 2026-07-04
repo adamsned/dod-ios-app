@@ -26,15 +26,14 @@ import WidgetKit
 final class AppDependencies {
 
     let store: RecipeStore
-    /// Built once per process from the persisted opt-in flag (DUT-6) and
-    /// never swapped — SwiftData can't hot-swap a container's CloudKit
-    /// configuration mid-flight, so the flag is re-read at the next launch
-    /// instead. `let`, not `var`, to make that immutability enforced.
+    /// Built once per process from the persisted opt-in flag (DUT-6) and never
+    /// swapped — SwiftData can't hot-swap a container's CloudKit config mid-flight,
+    /// so the flag is re-read next launch. `let` makes that immutability enforced.
     let modelContainer: ModelContainer
 
-    /// On-device local-notification service (US-42 / T-631). Long-lived —
-    /// owns the authorization request the Settings toggle drives and the
-    /// scheduling the (DEBUG) test affordance fires. No APNs / no server.
+    /// On-device local-notification service (US-42 / T-631). Long-lived — owns the
+    /// authorization request the Settings toggle drives and the scheduling the
+    /// (DEBUG) test affordance fires. No APNs / no server.
     let notificationService: NotificationService
 
     let restClient: WPRestClient  // internal for +ShoppingList searchDeps (DUT-534)
@@ -44,26 +43,30 @@ final class AppDependencies {
     private let commentsClient: WPCommentsClient
     private let ratingsClient: WPRMRatingsClient
     private let guestIdentityStore: any GuestIdentityStoring
-    /// US-44 (T-739) — Keychain profile store. Phase b (T-740) — wired
-    /// with the photo store so `clear()` also deletes the on-disk JPG.
+    /// US-44 (T-739) — Keychain profile store. Phase b (T-740) — wired with the
+    /// photo store so `clear()` also deletes the on-disk JPG.
     let profileStore: KeychainProfileStore
-    /// US-44 Phase b (T-740) — Documents JPG (512×512 @ 0.85). `nil` if
-    /// Documents is unavailable; photo flow falls back to the initial-
-    /// letter avatar. Per CL-137 / AC-44.9.
+    /// US-44 Phase b (T-740) — Documents JPG (512×512 @ 0.85). `nil` if Documents
+    /// is unavailable; photo flow falls back to the initial-letter avatar. Per
+    /// CL-137 / AC-44.9.
     let profilePhotoStore: ProfilePhotoStore?
 
-    /// Diagnostic observer for the SwiftData ↔ CloudKit mirror (round-12
-    /// backlog bug — "CloudKit recipe sync doesn't work"). Started from
-    /// `bootstrap()` only when the iCloud-Sync opt-in is on.
+    /// Diagnostic observer for the SwiftData ↔ CloudKit mirror (round-12 backlog
+    /// bug — "CloudKit recipe sync doesn't work"). Started from `bootstrap()` only
+    /// when the iCloud-Sync opt-in is on.
     private let cloudKitDiagnostics = CloudKitSyncDiagnostics()
 
     /// `true` when the persisted opt-in flag was ON but the CloudKit-backed
-    /// `.private` container failed to open at launch, so the DOD-CRASH-1
-    /// safety net (DUT-6) degraded to a plain local container. Sync stays
-    /// dormant (local data intact) until the underlying CloudKit problem is
-    /// fixed and the app relaunches. Internal (not private) so the
-    /// `+SyncedSavedBackfill.swift` extension can gate the DUT-240 seed on it.
+    /// `.private` container failed to open at launch, so the DOD-CRASH-1 safety
+    /// net (DUT-6) degraded to a plain local container. Sync stays dormant (local
+    /// data intact) until the CloudKit problem is fixed and the app relaunches.
+    /// Internal so `+SyncedSavedBackfill.swift` can gate the DUT-240 seed on it.
     let usedCloudKitFallback: Bool
+
+    /// DUT-494 — synced saved-id baseline captured SYNCHRONOUSLY in `init` (pre run
+    /// loop, pre-import) so the async CloudKit import can't fold device B's rows in
+    /// and poison the seed. See `backfillSyncedSavedIfNeeded`.
+    let processStartSyncedIDs: Set<Int>
 
     init() {
         var fellBackToLocal = false
@@ -91,6 +94,8 @@ final class AppDependencies {
             fatalError("SwiftData migration failed: \(error)")
         }
         self.usedCloudKitFallback = fellBackToLocal
+        // DUT-494: anchor the synced-saved baseline synchronously, pre run loop.
+        self.processStartSyncedIDs = (try? RecipeStore.syncedSavedIDSet(in: modelContainer)) ?? []
         self.store = RecipeStore(modelContainer: modelContainer)
         // T-610: shared HTTPClient (canned stub in E2E) — see AppDependencies+E2E.
         let httpClient = Self.makeHTTPClient()
@@ -275,16 +280,15 @@ final class AppDependencies {
         )
     }
 
-    /// Build a fully-wired saved-recipes widget publisher: the store, the
-    /// WidgetKit reload hook (the `kind` is pinned by spec.md AC-17.6 — it must
-    /// match the widget's `kind`), and the hero-image prefetcher that bridges
-    /// saved-recipe photos into the App Group container so the widget renders
-    /// them (T-770 / CL-167 / DUT-76). Both the recipe-detail save path
-    /// (above) and the card long-press save path (`TabStack.saveFromCard`) use
-    /// this, so the prefetch runs regardless of where the save originates. The
-    /// prefetch closure mirrors the feed's (`feedDependencies()` above): route
-    /// hero URLs through `ImageLoader` + `RecipeStore.cacheImage`, which writes
-    /// the bridge file via `WidgetImageBridge`.
+    /// Build a fully-wired saved-recipes widget publisher: the store, the WidgetKit
+    /// reload hook (the `kind` is pinned by spec.md AC-17.6 — it must match the
+    /// widget's `kind`), and the hero-image prefetcher that bridges saved-recipe
+    /// photos into the App Group container so the widget renders them (T-770 /
+    /// CL-167 / DUT-76). Both the recipe-detail save path (above) and the card
+    /// long-press save path (`TabStack.saveFromCard`) use this. The prefetch closure
+    /// mirrors the feed's (`feedDependencies()` above): route hero URLs through
+    /// `ImageLoader` + `RecipeStore.cacheImage`, which writes the bridge file via
+    /// `WidgetImageBridge`.
     func savedWidgetPublisher() -> SavedRecipesWidgetPublisher {
         // DUT-453 — reload all kinds so the lock-screen Saved count refreshes too.
         let reload: SavedRecipesWidgetPublisher.ReloadHook = { WidgetCenter.shared.reloadAllTimelines() }
@@ -300,12 +304,11 @@ final class AppDependencies {
     }
 
     func savedDependencies() -> some SavedDependencies {
-        // DUT-6 (UI-refresh half): feed the Saved view model a stream of
-        // CloudKit remote-import signals so a recipe saved on another device
-        // appears here without a relaunch. The stream is built in the App
-        // target (the only place CloudKit + Core Data are linked) from
-        // `NotificationCenter`; the `DODFeatureSaved` package consumes it
-        // abstractly through the `SavedDependencies.remoteChanges()` seam.
+        // DUT-6 (UI-refresh half): feed the Saved view model a stream of CloudKit
+        // remote-import signals so a recipe saved on another device appears here
+        // without a relaunch. The stream is built in the App target (the only place
+        // CloudKit + Core Data are linked) from `NotificationCenter`; `DODFeatureSaved`
+        // consumes it abstractly through the `SavedDependencies.remoteChanges()` seam.
         let widgetPublisher = savedWidgetPublisher()
         return LiveSavedDependencies(
             store: store,
@@ -317,26 +320,23 @@ final class AppDependencies {
         )
     }
 
-    /// US-41 / AC-41.3 (T-703) + DUT-6. Build the Settings dependency
-    /// surface for the iCloud Sync toggle. Its single job is to **persist
-    /// the opt-in flag** — `RecipeStore.cloudKitSyncOptInKey` is the single
-    /// source of truth, read at the *next* launch by
-    /// `RecipeStore.productionContainer(defaults:)` to decide whether to
-    /// build a CloudKit-backed or a plain local container.
+    /// US-41 / AC-41.3 (T-703) + DUT-6. Build the Settings dependency surface for
+    /// the iCloud Sync toggle. Its single job is to **persist the opt-in flag** —
+    /// `RecipeStore.cloudKitSyncOptInKey` is the single source of truth, read at the
+    /// *next* launch by `RecipeStore.productionContainer(defaults:)` to decide
+    /// whether to build a CloudKit-backed or a plain local container.
     ///
-    /// **Why no mid-session container rebuild (the DUT-6 fix).** The
-    /// pre-DUT-6 code rebuilt the `ModelContainer` here and reassigned
-    /// `self.modelContainer`. That re-wired *nothing*: SwiftData binds a
-    /// container (and the `@ModelActor` `RecipeStore` built from it) once
-    /// per process and can't hot-swap the `cloudKitDatabase` configuration
-    /// mid-flight, the live `RecipeStore` was never rebuilt, and the app
-    /// injects no `ModelContainer` into the SwiftUI environment — so the
-    /// reassignment only added a transient second
-    /// `NSPersistentCloudKitContainer` (a DOD-CRASH-1 risk surface) while
-    /// the running store kept its old configuration. Sync therefore only
-    /// ever engaged on the next cold launch anyway. We make that honest:
-    /// write the flag, let the view-model tell the user a relaunch applies
-    /// it, and build the right container deterministically at launch.
+    /// **Why no mid-session container rebuild (the DUT-6 fix).** The pre-DUT-6 code
+    /// rebuilt the `ModelContainer` here and reassigned `self.modelContainer`. That
+    /// re-wired *nothing*: SwiftData binds a container (and the `@ModelActor`
+    /// `RecipeStore` built from it) once per process and can't hot-swap the
+    /// `cloudKitDatabase` config mid-flight, the live `RecipeStore` was never
+    /// rebuilt, and the app injects no `ModelContainer` into the SwiftUI environment
+    /// — so the reassignment only added a transient second
+    /// `NSPersistentCloudKitContainer` (a DOD-CRASH-1 risk surface) while the running
+    /// store kept its old config. Sync therefore only ever engaged on the next cold
+    /// launch anyway. We make that honest: write the flag, let the view-model tell
+    /// the user a relaunch applies it, and build the right container at launch.
     func settingsDependencies() -> some SettingsDependencies {
         let diagnostics = cloudKitDiagnostics
         return LiveSettingsDependencies(

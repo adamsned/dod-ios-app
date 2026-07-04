@@ -21,6 +21,14 @@ public actor RecipeStore {
     /// image blobs at most once per launch.
     var didBackfillImageByteCounts = false
 
+    #if DEBUG
+    /// DUT-473 test seam: when set, ``logCook`` throws this instead of saving,
+    /// so a test can drive the failed-save rollback deterministically. Per-actor
+    /// (not a global static) so parallel test suites can't observe each other's
+    /// failpoint. No effect in release builds.
+    var cookLogSaveFailpointError: Error?
+    #endif
+
     /// DUT-302: flips true once `AppDependencies.bootstrap` confirms the one-time
     /// SyncedSaved backfill has completed (via ``markSyncedSavedBackfillComplete()``).
     /// Until then, ``mergeDetail`` must NOT clear a legacy local `isSaved` pin —
