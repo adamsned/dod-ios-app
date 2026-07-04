@@ -28,6 +28,25 @@ public struct CookJournalView: View {
     @State private var pendingDelete: CookLogEntry?
     @Environment(\.dismiss) private var dismiss
 
+    /// DUT-272 — the three mutually exclusive states the body renders. Split out
+    /// as a pure function so the load-order gating is unit-testable without a live
+    /// SwiftUI hierarchy: the empty state is only reachable once a load has
+    /// genuinely resolved (`loaded == true`) AND returned nothing.
+    enum ContentState: Equatable {
+        case loading
+        case empty
+        case list
+    }
+
+    static func contentState(loaded: Bool, isEmpty: Bool) -> ContentState {
+        guard loaded else { return .loading }
+        return isEmpty ? .empty : .list
+    }
+
+    /// DUT-232 — VoiceOver label for a journal photo thumbnail. Static so it's
+    /// assertable in tests without rendering the view.
+    static let photoThumbnailAccessibilityLabel = "Photo of this cook"
+
     public init(
         load: @escaping () async -> [CookLogEntry],
         update: @escaping (CookLogEntry) async -> Void = { _ in },
@@ -41,9 +60,19 @@ public struct CookJournalView: View {
     public var body: some View {
         NavigationStack {
             Group {
-                if cooks.isEmpty {
+                // DUT-272 — `cooks` starts `[]` and is filled asynchronously by
+                // the `.task` loader, so gating the empty state on `cooks.isEmpty`
+                // alone flashed "No Cooks Logged Yet" on open for users who DO have
+                // cooks. Gate on `loaded` too (see `contentState`): show a spinner
+                // until a load has genuinely returned, so the empty state only
+                // appears once we know the journal is really empty.
+                switch Self.contentState(loaded: loaded, isEmpty: cooks.isEmpty) {
+                case .loading:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .empty:
                     emptyState
-                } else {
+                case .list:
                     journalList
                 }
             }
@@ -266,6 +295,8 @@ public struct CookJournalView: View {
                 .scaledToFill()
                 .frame(width: 56, height: 56)
                 .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
+                // DUT-232 — VoiceOver otherwise announces a generic "image".
+                .accessibilityLabel(Text(Self.photoThumbnailAccessibilityLabel))
         } else {
             RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
                 .fill(DODColor.burntOrange.opacity(0.15))
@@ -274,6 +305,9 @@ public struct CookJournalView: View {
                     Image(systemName: "flame.fill")
                         .foregroundStyle(DODColor.burntOrange)
                 )
+                // DUT-232 — the flame is a decorative placeholder for a missing
+                // photo; hide it so VoiceOver doesn't stop on a meaningless glyph.
+                .accessibilityHidden(true)
         }
     }
 

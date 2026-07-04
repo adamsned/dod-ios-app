@@ -16,11 +16,11 @@ extension FirstCookoutView {
     /// Advance/retreat the flow on a horizontally-dominant swipe past a ~50pt
     /// threshold; vertical scrolls (handled by the ScrollView) are left alone.
     func handleSwipe(_ translation: CGSize) {
-        let dx = translation.width
-        guard abs(dx) > abs(translation.height), abs(dx) > 50 else { return }
-        if dx < 0, index < lastIndex {
+        let deltaX = translation.width
+        guard abs(deltaX) > abs(translation.height), abs(deltaX) > 50 else { return }
+        if deltaX < 0, index < lastIndex {
             withAnimation(.easeInOut(duration: 0.25)) { index += 1 }
-        } else if dx > 0, index > 0 {
+        } else if deltaX > 0, index > 0 {
             withAnimation(.easeInOut(duration: 0.25)) { index -= 1 }
         }
     }
@@ -253,6 +253,8 @@ extension FirstCookoutView {
                     .scaledToFit()
                     .frame(maxHeight: 220)
                     .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
+                    // DUT-232 — VoiceOver otherwise lands on a bare "image" element.
+                    .accessibilityLabel(Text(cookPhotoAccessibilityLabel))
                 ShareLink(
                     item: photo,
                     subject: Text(shareSubject),  // DUT-211 — first-rung-aware, not always "first"
