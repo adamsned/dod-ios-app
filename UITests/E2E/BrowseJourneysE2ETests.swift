@@ -88,7 +88,7 @@ final class BrowseJourneysE2ETests: XCTestCase {
         // Scroll down to the related strip. Its sibling card carries the
         // dod.related.card identifier added for T-610 (a combined a11y element,
         // so query any element type, not just buttons).
-        let relatedHeader = app.staticTexts["Related recipes"]
+        let relatedHeader = app.staticTexts["Related Recipes"]
         let relatedCard = app.descendants(matching: .any)
             .matching(identifier: "dod.related.card").firstMatch
         for _ in 0..<10 where !relatedCard.exists {

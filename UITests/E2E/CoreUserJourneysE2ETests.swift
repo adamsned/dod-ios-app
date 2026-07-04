@@ -681,7 +681,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
     /// eventually move the full walk out of L3 only.
     ///
     /// Some recipes have only one step — in that case the journey ends at
-    /// "Done cooking" instead of "Step 2 of M" and the exit still succeeds.
+    /// "Done Cooking" instead of "Step 2 of M" and the exit still succeeds.
     /// We pick the second recipe row (a robust heuristic that lands on a
     /// multi-step recipe in practice; the L3 version uses the same trick).
     func test_cook_mode_walks_two_steps_then_exits() {
@@ -717,7 +717,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         )
 
         // Try to advance to Step 2. If the recipe only has 1 step, the
-        // "Next" button is labeled "Done cooking" instead, and tapping it
+        // "Next" button is labeled "Done Cooking" instead, and tapping it
         // exits — we then re-assert detail. Both code paths end at the
         // same end-state.
         let nextButton = app.buttons["Next"]
