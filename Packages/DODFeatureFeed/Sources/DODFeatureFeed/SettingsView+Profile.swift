@@ -2,10 +2,6 @@ import DODDesignSystem
 import DODFeatureProfile
 import SwiftUI
 
-#if canImport(UIKit)
-import UIKit  // T-783 / DUT-89 — UIDevice.userInterfaceIdiom (see ProfileSettingsSection)
-#endif
-
 // US-44 Phase b (T-740) — Profile row at the top of Settings.
 //
 // Extracted from `SettingsView.swift` so that file stays under the
@@ -102,37 +98,29 @@ struct ProfileSettingsRow: View {
 }
 
 /// T-783 / DUT-89 — wraps the Settings Profile section so it can be hidden on
-/// iPad, where the Profile lives in the sidebar (``SidebarProfileRow``). The
-/// `horizontalSizeClass` — the SAME signal `RootView` uses to choose the shell —
-/// is the gate (DUT-299): hide only in a REGULAR-width window (iPadSplit, where
-/// the sidebar's `SidebarProfileRow` is present). A COMPACT window (iPhone OR an
-/// iPad multitasking / Slide Over pane) has no sidebar, so the Settings Profile
-/// row is the only entry point there and must show.
+/// iPad, where the Profile lives in the sidebar (``SidebarProfileRow``).
+///
+/// DUT-572 — the hide decision is now INJECTED (`hidesProfile`) rather than read
+/// from this view's own `horizontalSizeClass`. SettingsView is presented as a
+/// `.sheet`, and a sheet on iPad reports `.compact` horizontalSizeClass, so an
+/// in-sheet size-class read could never see the regular width and the Profile row
+/// never hid on iPad. `RootView` (which reads the TRUE device size class) passes
+/// `hidesProfile: horizontalSizeClass == .regular`, so the row hides exactly on
+/// iPad (where `SidebarProfileRow` is present) and shows on iPhone / a compact
+/// iPad multitasking pane (the only entry point there).
 struct ProfileSettingsSection: View {
 
     @Bindable var viewModel: SettingsViewModel
-    #if canImport(UIKit)
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
+    /// Injected from `RootView`'s real device size class (see type doc). When
+    /// true the section renders nothing (Profile lives in the sidebar on iPad).
+    let hidesProfile: Bool
 
     var body: some View {
-        if !hidesProfileSection {
+        if !hidesProfile {
             Section {
                 ProfileSettingsRow(viewModel: viewModel)
             }
             .listRowBackground(DODColor.surfaceElevated)
         }
-    }
-
-    private var hidesProfileSection: Bool {
-        // DUT-299: hide only when the sidebar (SidebarProfileRow) is actually
-        // present — a regular-width window. In compact width (iPhone OR an iPad
-        // multitasking / Slide Over pane) RootView shows phoneTabs with no
-        // sidebar, so this Profile row is the ONLY way to reach the editor.
-        #if canImport(UIKit)
-        horizontalSizeClass == .regular
-        #else
-        false
-        #endif
     }
 }

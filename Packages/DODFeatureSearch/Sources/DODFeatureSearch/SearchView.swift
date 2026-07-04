@@ -58,7 +58,9 @@ public struct SearchView: View {
             // Recipes / Saved / Settings instead of a native white nav title.
             // DUT-551 (CL-306) — Settings gear in the trailing slot when wired.
             DODScreenHeader("Search") {
-                if let onOpenSettings {
+                // DUT-572 — gear only in compact width (iPhone); iPad's sidebar
+                // already has a Settings row, so it's redundant in regular width.
+                if let onOpenSettings, horizontalSizeClass == .compact {
                     DODHeaderGearButton { onOpenSettings() }
                 }
             }

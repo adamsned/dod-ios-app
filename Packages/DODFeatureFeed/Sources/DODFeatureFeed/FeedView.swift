@@ -99,7 +99,10 @@ public struct FeedView: View {
     /// Saved / Cooking Tools / Search headers exactly.
     @ViewBuilder
     private var settingsGear: some View {
-        if let onOpenSettings {
+        // DUT-572 — gear only in compact width (iPhone). On iPad (regular width)
+        // the sidebar already hosts a Settings row, so the per-header gear is
+        // redundant; gating to compact hides it there while iPhone is unchanged.
+        if let onOpenSettings, horizontalSizeClass == .compact {
             // Feed keeps its long-standing `feed-toolbar-settings` id (the
             // SmokeTests + AppShell E2E journeys query it), set directly on the
             // button via the component's param — not an ambiguous outer override.
