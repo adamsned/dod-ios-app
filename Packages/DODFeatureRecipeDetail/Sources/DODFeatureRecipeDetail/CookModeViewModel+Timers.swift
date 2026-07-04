@@ -114,6 +114,11 @@ extension CookModeViewModel {
         liveActivityShowingCompleted = false  // DUT-354: a running timer drives the card again
         let text = stepText(forStep: soonest.key)
         if liveActivityStepKey != soonest.key {
+            // DUT-558: Live Activities are permanently unavailable (disabled in
+            // Settings / over quota). Don't churn `start` (→ auth-check +
+            // `endExistingActivity` no-op) every ~1s. The latch is cleared on
+            // scene-activate via `revalidateLiveActivityAvailability()`.
+            if liveActivityUnavailable { return }
             // A different (or no) timer was driving the card — (re)start so its
             // step text + total match the timer now in charge.
             startTimerLiveActivity(stepText: text, totalSeconds: timer.totalSeconds)
@@ -122,7 +127,15 @@ extension CookModeViewModel {
             // dead; claiming the key anyway made `liveActivityStepKey ==
             // soonest.key` true on the next tick, so `start` was never retried.
             // Guarding on `isActive` lets the next tick re-attempt the start.
-            guard hasLiveActivity else { return }
+            guard hasLiveActivity else {
+                // DUT-558: distinguish a permanent "activities unavailable" from a
+                // transient start failure. Only latch (and stop retrying) when the
+                // controller reports activities are disabled/over quota; a genuine
+                // transient failure leaves the latch clear so DUT-492's next-tick
+                // retry still fires.
+                if !areLiveActivitiesEnabled { liveActivityUnavailable = true }
+                return
+            }
             liveActivityStepKey = soonest.key
         }
         updateTimerLiveActivity(remainingSeconds: timer.remaining(at: now), stepText: text, isPaused: false)

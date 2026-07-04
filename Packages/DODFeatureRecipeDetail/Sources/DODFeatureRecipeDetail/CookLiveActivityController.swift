@@ -20,6 +20,13 @@ public protocol CookLiveActivityController: AnyObject {
     /// assert the start/stop toggle without inspecting ActivityKit itself.
     var isActive: Bool { get }
 
+    /// DUT-558: whether ActivityKit will accept a `start` at all right now —
+    /// mirrors `ActivityAuthorizationInfo().areActivitiesEnabled`. False means
+    /// Live Activities are disabled in Settings or over quota, so a failed
+    /// `start` is PERMANENT (not transient) and the view model must stop
+    /// re-attempting it every tick. Rechecked on scene-activate.
+    var areActivitiesEnabled: Bool { get }
+
     /// Begin a new Live Activity for the supplied recipe + step text +
     /// duration. Idempotent: if one is already running, end it and start
     /// fresh so the user sees the new step's countdown.
@@ -88,6 +95,17 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
         #if os(iOS)
         if #available(iOS 16.1, *) {
             return activity != nil
+        }
+        return false
+        #else
+        return false
+        #endif
+    }
+
+    public var areActivitiesEnabled: Bool {
+        #if os(iOS)
+        if #available(iOS 16.1, *) {
+            return ActivityAuthorizationInfo().areActivitiesEnabled
         }
         return false
         #else
