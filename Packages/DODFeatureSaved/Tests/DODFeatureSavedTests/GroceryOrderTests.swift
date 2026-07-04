@@ -5,22 +5,29 @@ import Testing
 
 @testable import DODFeatureSaved
 
-/// L1 coverage for the "Order on Instacart" wiring on the Shopping List
-/// (DUT-532): the still-need subset feeding the CTA (must match the Share
-/// subset), the end-to-end map → link flow through a fake
-/// ``InstacartShoppingListLinking``, and the config gate.
+/// L1 coverage for the "Order ingredients" grocery-ordering wiring on the
+/// Shopping List (DUT-532): the still-need subset feeding the CTA (must match
+/// the Share subset), the end-to-end map → link flow through a fake
+/// ``GroceryOrderLinking`` for each provider, and the config / provider gate
+/// that drives whether the CTA renders nothing, a single button, or a menu.
 @MainActor
-@Suite("Order on Instacart (DUT-532)")
-struct InstacartOrderTests {
+@Suite("Order ingredients (DUT-532)")
+struct GroceryOrderTests {
 
     /// Records the last `createLink` call + returns a canned URL, so a VM-level
     /// test drives the CTA flow without the network.
-    private final class FakeLinking: InstacartShoppingListLinking, @unchecked Sendable {
+    private final class FakeLinking: GroceryOrderLinking, @unchecked Sendable {
+        var lastProvider: GroceryProvider?
         var lastTitle: String?
-        var lastLineItems: [InstacartLineItem] = []
+        var lastLineItems: [GroceryLineItem] = []
         let url: URL
         init(url: URL) { self.url = url }
-        func createLink(title: String, lineItems: [InstacartLineItem]) async throws -> URL {
+        func createLink(
+            provider: GroceryProvider,
+            title: String,
+            lineItems: [GroceryLineItem]
+        ) async throws -> URL {
+            lastProvider = provider
             lastTitle = title
             lastLineItems = lineItems
             return url
@@ -42,7 +49,7 @@ struct InstacartOrderTests {
         #expect(ShoppingListFormatter.stillNeedLines(viewModel) == ["2 limes"])
     }
 
-    // MARK: - Map → link flow
+    // MARK: - Map → link flow (per provider)
 
     @Test func createsLinkFromStillNeedLinesWithMappedItems() async throws {
         let linkURL = try #require(URL(string: "https://instacart.com/store/x"))
@@ -56,13 +63,15 @@ struct InstacartOrderTests {
                 store: nil
             )
         )
-        let lineItems = InstacartLineItemMapper.lineItems(from: lines)
+        let lineItems = GroceryLineItemMapper.lineItems(from: lines)
         let url = try await fake.createLink(
-            title: InstacartLineItemMapper.defaultTitle,
+            provider: .walmartPlus,
+            title: GroceryLineItemMapper.defaultTitle,
             lineItems: lineItems
         )
 
         #expect(url.absoluteString == "https://instacart.com/store/x")
+        #expect(fake.lastProvider == .walmartPlus)
         #expect(fake.lastTitle == "Dutch Oven Daddy Shopping List")
         #expect(fake.lastLineItems.count == 2)
         #expect(fake.lastLineItems[0].name == "chicken thighs")
@@ -71,18 +80,37 @@ struct InstacartOrderTests {
         #expect(fake.lastLineItems[1].quantity == 2)
     }
 
-    // MARK: - Config gate (drives whether the CTA is shown)
+    // MARK: - CTA gate (drives whether / how the CTA renders)
 
-    @Test func ctaHiddenWhenConfigNotConfigured() {
-        // Production default is the dormant placeholder — the CTA's gate is off,
-        // so the button never renders (production ships dormant).
-        #expect(InstacartConfig.production.isConfigured == false)
+    @Test func ctaHiddenWhenUnconfigured() {
+        // Production default is the dormant placeholder — no providers enabled,
+        // so the CTA never renders (production ships dormant).
+        #expect(GroceryOrderConfig.production.enabledProviders.isEmpty)
     }
 
-    @Test func ctaGateOnForRealEndpoint() {
-        #expect(
-            InstacartConfig(endpointURLString: "https://worker.example.workers.dev").isConfigured
+    @Test func ctaHiddenWhenConfiguredButNoProviders() {
+        let config = GroceryOrderConfig(endpointURLString: "https://worker.example.workers.dev")
+        #expect(config.enabledProviders.isEmpty)
+    }
+
+    @Test func ctaShowsSingleButtonForOneProvider() {
+        // One enabled provider → the toolbar takes the single-button path.
+        let config = GroceryOrderConfig(
+            endpointURLString: "https://worker.example.workers.dev",
+            providers: [.instacart]
         )
+        #expect(config.enabledProviders.count == 1)
+        #expect(config.enabledProviders == [.instacart])
+    }
+
+    @Test func ctaShowsMenuForMultipleProviders() {
+        // Two enabled providers → the toolbar takes the menu path.
+        let config = GroceryOrderConfig(
+            endpointURLString: "https://worker.example.workers.dev",
+            providers: [.instacart, .walmartPlus]
+        )
+        #expect(config.enabledProviders.count == 2)
+        #expect(config.enabledProviders == [.instacart, .walmartPlus])
     }
 
     // MARK: - Fixtures

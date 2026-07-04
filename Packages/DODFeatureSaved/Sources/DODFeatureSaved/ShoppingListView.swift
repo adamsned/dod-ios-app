@@ -56,35 +56,34 @@ public struct ShoppingListView: View {
     /// confirms first.
     @State private var isConfirmingClear = false
 
-    // DUT-532 — the "Order on Instacart" client + config gate (the CTA lives in
-    // `ShoppingListView+Instacart.swift`). `instacartConfig.isConfigured` gates
-    // the CTA: unconfigured (the production default until the Worker is stood up
-    // + the IDP key provisioned) hides it, so this ships DORMANT — mirroring the
-    // SiwA revoke client shipping ahead of its Worker. Non-private so that
-    // extension can read them (Swift `private` is file-scoped).
-    let instacartConfig: InstacartConfig
-    let instacart: any InstacartShoppingListLinking
-    /// True while the Instacart link is being created (a Worker → IDP round-trip);
-    /// swaps the CTA for a spinner + blocks re-tap.
-    @State var isCreatingInstacartLink = false
-    /// Raised on an Instacart hand-off failure; drives the failure alert. The
+    // DUT-532 — the grocery-ordering client + config gate (the CTA lives in
+    // `ShoppingListView+GroceryOrder.swift`). `groceryConfig.enabledProviders`
+    // gates the CTA: unconfigured (the production default) yields an empty set
+    // that hides it, so this ships DORMANT — mirroring the SiwA revoke client
+    // shipping ahead of its Worker. Non-private so the extension can read them.
+    let groceryConfig: GroceryOrderConfig
+    let grocery: any GroceryOrderLinking
+    /// True while a grocery link is being created (a Worker round-trip); swaps
+    /// the CTA for a spinner + blocks re-tap.
+    @State var isCreatingGroceryLink = false
+    /// Raised on a grocery-order hand-off failure; drives the failure alert. The
     /// list is never mutated on failure.
-    @State var instacartFailed = false
+    @State var groceryOrderFailed = false
     @Environment(\.openURL) var openURL
 
     public init(
         viewModel: ShoppingListViewModel,
         recipes: [Recipe] = [],
         hydrate: @escaping @Sendable (Recipe) async -> Recipe = { $0 },
-        instacartConfig: InstacartConfig = .fromInfoPlist(),
-        instacart: (any InstacartShoppingListLinking)? = nil
+        groceryConfig: GroceryOrderConfig = .fromInfoPlist(),
+        grocery: (any GroceryOrderLinking)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.recipes = recipes
         self.hydrate = hydrate
-        self.instacartConfig = instacartConfig
-        // Default to the production client bound to `instacartConfig`; tests inject a fake.
-        self.instacart = instacart ?? InstacartShoppingListClient(config: instacartConfig)
+        self.groceryConfig = groceryConfig
+        // Default to the production client bound to `groceryConfig`; tests inject a fake.
+        self.grocery = grocery ?? GroceryOrderClient(config: groceryConfig)
     }
 
     public var body: some View {
@@ -92,7 +91,7 @@ public struct ShoppingListView: View {
             .background(DODColor.surface)
             .navigationTitle("Shopping List")
             .toolbar { shareToolbar }
-            .toolbar { instacartToolbar }
+            .toolbar { groceryOrderToolbar }
             .toolbar { addToolbar }
             .toolbar { clearToolbar }
             .sheet(isPresented: $isPickingRecipes) {
@@ -115,16 +114,17 @@ public struct ShoppingListView: View {
             } message: {
                 Text("This removes every item. You can build a new list from your saved recipes.")
             }
-            // DUT-532 — surface an Instacart hand-off failure (Worker / IDP
-            // error, offline, or a malformed response) without leaving the CTA
-            // spinning. Non-destructive; the list is untouched, they can retry.
+            // DUT-532 — surface a grocery-order hand-off failure (Worker /
+            // provider error, offline, or a malformed response) without leaving
+            // the CTA spinning. Non-destructive; the list is untouched, they can
+            // retry.
             .alert(
-                "Couldn't open Instacart",
-                isPresented: $instacartFailed
+                "Couldn't create your order",
+                isPresented: $groceryOrderFailed
             ) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("We couldn't create your Instacart order right now. Please try again in a moment.")
+                Text("We couldn't create your grocery order right now. Please try again in a moment.")
             }
             // DUT-487 — while hydrating the picked recipes, dim + disable the
             // list and float a spinner so the user sees the list is building

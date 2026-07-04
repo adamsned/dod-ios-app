@@ -3,13 +3,14 @@ import Testing
 
 @testable import DODNetworking
 
-/// L1 coverage for the still-need-line → Instacart line-item mapping (DUT-532).
+/// L1 coverage for the still-need-line → grocery line-item mapping (DUT-532).
 /// Pins the parse-and-map contract: quantity-only, quantity+unit, unparseable
-/// fallback to raw text, verbatim `display_text`, and empty-line skipping.
-struct InstacartLineItemMapperTests {
+/// fallback to raw text, verbatim `display_text`, and empty-line skipping. The
+/// mapping is provider-agnostic — the same items feed Instacart or Walmart+.
+struct GroceryLineItemMapperTests {
 
     @Test func mapsQuantityAndName() throws {
-        let items = InstacartLineItemMapper.lineItems(from: ["2 limes"])
+        let items = GroceryLineItemMapper.lineItems(from: ["2 limes"])
         let item = try #require(items.first)
         #expect(item.name == "limes")
         #expect(item.quantity == 2)
@@ -18,7 +19,7 @@ struct InstacartLineItemMapperTests {
     }
 
     @Test func mapsQuantityUnitAndName() throws {
-        let items = InstacartLineItemMapper.lineItems(from: ["1 lb chicken thighs"])
+        let items = GroceryLineItemMapper.lineItems(from: ["1 lb chicken thighs"])
         let item = try #require(items.first)
         #expect(item.name == "chicken thighs")
         #expect(item.quantity == 1)
@@ -28,7 +29,7 @@ struct InstacartLineItemMapperTests {
     }
 
     @Test func fallsBackToRawTextForUnparseableLine() throws {
-        let items = InstacartLineItemMapper.lineItems(from: ["black pepper to taste"])
+        let items = GroceryLineItemMapper.lineItems(from: ["black pepper to taste"])
         let item = try #require(items.first)
         // No leading quantity → parser yields nil name; the mapper falls back to
         // the raw line so nothing is dropped.
@@ -39,13 +40,13 @@ struct InstacartLineItemMapperTests {
     }
 
     @Test func skipsEmptyAndWhitespaceLines() {
-        let items = InstacartLineItemMapper.lineItems(from: ["", "   ", "\n", "2 limes"])
+        let items = GroceryLineItemMapper.lineItems(from: ["", "   ", "\n", "2 limes"])
         #expect(items.count == 1)
         #expect(items.first?.name == "limes")
     }
 
     @Test func mapsMultipleLinesInOrder() {
-        let items = InstacartLineItemMapper.lineItems(from: [
+        let items = GroceryLineItemMapper.lineItems(from: [
             "3 lb beef chuck roast",
             "1 yellow onion, quartered",
             "salt to taste",
@@ -59,6 +60,6 @@ struct InstacartLineItemMapperTests {
     }
 
     @Test func defaultTitleIsBranded() {
-        #expect(InstacartLineItemMapper.defaultTitle == "Dutch Oven Daddy Shopping List")
+        #expect(GroceryLineItemMapper.defaultTitle == "Dutch Oven Daddy Shopping List")
     }
 }

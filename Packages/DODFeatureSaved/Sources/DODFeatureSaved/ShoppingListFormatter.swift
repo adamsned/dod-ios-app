@@ -58,10 +58,10 @@ public enum ShoppingListFormatter {
 
     /// DUT-532 — the still-need subset as raw ingredient lines, in the SAME
     /// filter shape ``shareText(_:includeChecked:)`` uses: `visibleItems` (drops
-    /// "I already have this") minus checked rows. Feeds the "Order on Instacart"
-    /// line-item mapping so what's ordered exactly matches what's shared. Pure —
-    /// no I/O (AC-39.12: the shopping-list build/persist paths make zero network
-    /// calls; the network is scoped to the opt-in Instacart CTA only).
+    /// "I already have this") minus checked rows. Feeds the "Order ingredients"
+    /// grocery line-item mapping so what's ordered exactly matches what's shared.
+    /// Pure — no I/O (AC-39.12: the shopping-list build/persist paths make zero
+    /// network calls; the network is scoped to the opt-in grocery-order CTA only).
     @MainActor
     public static func stillNeedLines(_ viewModel: ShoppingListViewModel) -> [String] {
         viewModel.visibleItems
