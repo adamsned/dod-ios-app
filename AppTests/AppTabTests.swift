@@ -20,10 +20,11 @@ final class AppTabTests: XCTestCase {
     func test_allCasesOrderMatchesSpec() {
         XCTAssertEqual(
             AppTab.allCases,
-            [.feed, .saved, .settings, .search],
+            [.feed, .saved, .grocery, .settings, .search],
             "Bottom tab bar order is the single source of truth in AppTab.allCases. "
                 + "Changing the order here is a user-visible product change — update the "
-                + "spec (US-16 / AC-16.1) before touching this test."
+                + "spec (US-16 / AC-16.1) before touching this test. DUT-536 inserted "
+                + "Grocery List right after Saved."
         )
     }
 
@@ -45,6 +46,9 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.feed.systemImage, "house")
         XCTAssertEqual(AppTab.search.systemImage, "magnifyingglass")
         XCTAssertEqual(AppTab.settings.systemImage, "gearshape")
+        // DUT-536 — the Grocery List tab uses `cart` (SwiftUI swaps to
+        // `cart.fill` on selection), matching the Saved header + list glyphs.
+        XCTAssertEqual(AppTab.grocery.systemImage, "cart")
     }
 
     /// AC-16.4: telemetry names are **stable across the visual change**
@@ -57,6 +61,9 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.saved.telemetryName, "saved")
         XCTAssertEqual(AppTab.search.telemetryName, "search")
         XCTAssertEqual(AppTab.settings.telemetryName, "settings")
+        // DUT-536 — telemetry token is the code identifier "grocery" (not the
+        // user-facing "Grocery List"), so it slots into the §9 allowlist plainly.
+        XCTAssertEqual(AppTab.grocery.telemetryName, "grocery")
     }
 
     /// `title` is the **screen-header** string. US-37 / AC-37.1 (T-640)
@@ -71,6 +78,9 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.saved.title, "Saved")
         XCTAssertEqual(AppTab.search.title, "Search")
         XCTAssertEqual(AppTab.settings.title, "Settings")
+        // DUT-536 — user-facing "Grocery List" (the underlying feature +
+        // persistence stay the "Shopping List"; only the label changed).
+        XCTAssertEqual(AppTab.grocery.title, "Grocery List")
     }
 
     /// AC-16.1 / CL-65 (T-660): the feed tab's bottom-tab label is the short
@@ -83,5 +93,7 @@ final class AppTabTests: XCTestCase {
         XCTAssertEqual(AppTab.saved.tabLabel, "Saved")
         XCTAssertEqual(AppTab.search.tabLabel, "Search")
         XCTAssertEqual(AppTab.settings.tabLabel, "Settings")
+        // DUT-536 — "Grocery List" fits the ~80pt slot, so tabLabel == title.
+        XCTAssertEqual(AppTab.grocery.tabLabel, "Grocery List")
     }
 }

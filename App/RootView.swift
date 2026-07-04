@@ -76,10 +76,6 @@ struct RootView: View {
     @State var feedExternalRoute: ExternalRoute?
     @State var savedExternalRoute: ExternalRoute?
     @State var searchExternalRoute: ExternalRoute?
-    /// DUT-480 — the iOS 18 Control Center control's `dod://shopping-list` tap.
-    /// A fresh `UUID` per tap drives `SavedView` to open the Shopping List
-    /// empty-first (re-pushes on repeat). Non-private for `+LinkRouting`.
-    @State var savedShoppingListToken: UUID?
     /// DUT-250 — per-tab navigation stacks, hoisted out of `TabStack`'s local
     /// `@State` into `RootView` so they SURVIVE the iPad size-class flip. `body`
     /// swaps structurally different trees at the `.regular` boundary —
@@ -239,9 +235,8 @@ struct RootView: View {
                     path: pathBinding(for: tab),
                     pendingDeepLink: tab == .feed ? $pendingDeepLink : .constant(nil),
                     externalRoute: externalRouteBinding(for: tab),
-                    // DUT-480 — only Saved consumes the Shopping List control token.
-                    openShoppingListToken: tab == .saved ? $savedShoppingListToken : .constant(nil),
-                    openShoppingList: { routeToShoppingList() }  // DUT-534 snackbar "View"
+                    // DUT-534 snackbar "View" + DUT-536 Saved cart → Grocery tab.
+                    openShoppingList: { routeToShoppingList() }
                 )
                 .tabItem {
                     // T-660 / CL-65: bottom-tab `Label` reads `tabLabel`
@@ -304,9 +299,8 @@ struct RootView: View {
                 path: pathBinding(for: selectedTab),
                 pendingDeepLink: selectedTab == .feed ? $pendingDeepLink : .constant(nil),
                 externalRoute: externalRouteBinding(for: selectedTab),
-                openShoppingListToken: selectedTab == .saved  // DUT-480 (Saved only)
-                    ? $savedShoppingListToken : .constant(nil),
-                openShoppingList: { routeToShoppingList() }  // DUT-534 snackbar "View"
+                // DUT-534 snackbar "View" + DUT-536 Saved cart → Grocery tab.
+                openShoppingList: { routeToShoppingList() }
             )
             .id(selectedTab)
         }
