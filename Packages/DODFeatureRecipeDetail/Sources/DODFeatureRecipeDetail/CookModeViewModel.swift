@@ -72,6 +72,12 @@ public final class CookModeViewModel {
     /// while it lingers. Cleared when a running timer takes the card over or the
     /// activity ends.
     var liveActivityShowingCompleted = false
+    /// DUT-558: latched true once a `startTimerLiveActivity` attempt fails while
+    /// the controller reports Live Activities are unavailable (disabled in
+    /// Settings / over quota). While set, `reconcileLiveActivity` stops
+    /// re-attempting the start every ~1s tick (DUT-492 kept retrying forever).
+    /// Recheck on scene-activate via `revalidateLiveActivityAvailability()`.
+    var liveActivityUnavailable = false
 
     public init(
         recipe: Recipe,
@@ -146,6 +152,7 @@ public final class CookModeViewModel {
         stepTimers.removeAll()
         liveActivityStepKey = nil
         liveActivityShowingCompleted = false  // DUT-354
+        liveActivityUnavailable = false  // DUT-558: a re-entry starts clean
         // AC-7.6 / AC-40.1 — stop any in-flight utterance and release the
         // ducked audio session so the user's music returns to full volume
         // the moment they leave Cook Mode.
@@ -199,6 +206,22 @@ public final class CookModeViewModel {
     /// surface.
     public var hasLiveActivity: Bool {
         liveActivity.isActive
+    }
+
+    /// DUT-558: whether ActivityKit will accept a `start` right now. Bridges the
+    /// controller's `areActivitiesEnabled` (private `liveActivity` is not visible
+    /// to the `+Timers` extension) so `reconcileLiveActivity` can tell a permanent
+    /// "activities unavailable" apart from a transient start failure.
+    var areLiveActivitiesEnabled: Bool {
+        liveActivity.areActivitiesEnabled
+    }
+
+    /// DUT-558: clear the "activities unavailable" latch so the next timer tick
+    /// re-attempts the Live Activity start. Call on scene-activate — the user may
+    /// have just toggled Live Activities back on in Settings. A no-op when the
+    /// latch was never set.
+    public func revalidateLiveActivityAvailability() {
+        liveActivityUnavailable = false
     }
 
     /// Begin a Live Activity for the supplied countdown. Called by

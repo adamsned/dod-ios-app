@@ -123,6 +123,57 @@ struct CookModeTimerTests {
         #expect(vm.liveActivityStepKey == 0)  // now claimed
     }
 
+    /// DUT-558 — when Live Activities are permanently UNAVAILABLE (disabled in
+    /// Settings / over quota → `areActivitiesEnabled == false`), a failed start
+    /// must NOT be re-attempted every ~1s tick (DUT-492 retried forever, churning
+    /// `endExistingActivity`). The first tick attempts once, latches
+    /// "unavailable", and subsequent ticks skip the start entirely.
+    @Test func startIsNotReattemptedEveryTickWhenActivitiesUnavailable() {
+        let spy = FakeLiveActivityController()
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1, liveActivity: spy)
+
+        // Permanently unavailable: start fails AND the auth check reports disabled.
+        spy.startShouldFail = true
+        spy.areActivitiesEnabled = false
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 120, now: t0)
+
+        #expect(spy.startCallCount == 1)  // attempted exactly once
+        #expect(vm.liveActivityStepKey == nil)  // never claimed a dead card
+
+        // Many more ticks — the start must NOT be re-attempted while unavailable.
+        vm.tickTimers(now: t0.addingTimeInterval(1))
+        vm.tickTimers(now: t0.addingTimeInterval(2))
+        vm.tickTimers(now: t0.addingTimeInterval(3))
+        #expect(spy.startCallCount == 1)  // DUT-558: still just the one attempt
+
+        // Scene-activate revalidation + activities re-enabled → start retried once.
+        spy.startShouldFail = false
+        spy.areActivitiesEnabled = true
+        vm.revalidateLiveActivityAvailability()
+        vm.tickTimers(now: t0.addingTimeInterval(4))
+        #expect(spy.startCallCount == 2)  // retried after the latch cleared
+        #expect(vm.liveActivityStepKey == 0)
+    }
+
+    /// DUT-558 companion / DUT-492 guard — a genuinely TRANSIENT start failure
+    /// (activities still enabled, e.g. a momentary quota hiccup) must NOT latch
+    /// "unavailable": the very next tick retries with no revalidation needed.
+    @Test func transientStartFailureStillRetriesWithoutRevalidation() {
+        let spy = FakeLiveActivityController()
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1, liveActivity: spy)
+
+        spy.startShouldFail = true
+        spy.areActivitiesEnabled = true  // still enabled → the failure is transient
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 120, now: t0)
+        #expect(spy.startCallCount == 1)
+
+        // No revalidation call — the next tick alone must retry (DUT-492).
+        spy.startShouldFail = false
+        vm.tickTimers(now: t0.addingTimeInterval(1))
+        #expect(spy.startCallCount == 2)  // retried
+        #expect(vm.liveActivityStepKey == 0)
+    }
+
     /// DUT-354 — resetting a completed timer (→ .idle) dismisses the lingering
     /// buzzer card, preserving DUT-294's no-stale-card guarantee.
     @Test func resettingACompletedTimerEndsTheLingeringCard() {

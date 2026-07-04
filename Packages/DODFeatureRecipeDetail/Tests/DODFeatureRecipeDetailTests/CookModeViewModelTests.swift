@@ -343,6 +343,11 @@ final class FakeLiveActivityController: CookLiveActivityController {
     /// — simulating an ActivityKit quota/authorization failure so tests can
     /// assert the view model does NOT claim `liveActivityStepKey` for a dead card.
     var startShouldFail = false
+    /// DUT-558: mirrors `ActivityAuthorizationInfo().areActivitiesEnabled`. Set
+    /// false to simulate Live Activities being disabled / over quota so the view
+    /// model latches "unavailable" and stops retrying the start every tick.
+    /// Defaults true so existing transient-failure tests keep retrying.
+    var areActivitiesEnabled: Bool = true
 
     func start(
         attributes: CookActivityAttributes,

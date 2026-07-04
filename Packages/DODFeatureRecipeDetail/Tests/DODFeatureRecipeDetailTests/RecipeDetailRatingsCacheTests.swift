@@ -106,6 +106,10 @@ import Testing
         )
         #expect(viewModel.ratingSummary?.count == 500)
 
+        // DUT-553: the synthetic fallback is now identified by SHAPE (count == 1,
+        // userRating == the just-submitted vote), not count magnitude. In the real
+        // flow `submitRating` sets `pendingUserRating` before `applyRatingRefresh`.
+        viewModel.pendingUserRating = 5
         // The synthetic post-failure fallback: count == 1, average == stars,
         // carrying the vote the user just cast.
         await viewModel.applyRatingRefresh(
@@ -153,5 +157,71 @@ import Testing
         #expect(viewModel.ratingSummary?.userRating == 5)
         // The real, larger aggregate WAS cached.
         #expect(dependencies.cachedRatingByRecipe[504]?.count == 501)
+    }
+
+    /// DUT-553: a genuine authoritative summary GET (userRating == nil) with a
+    /// SMALLER-but-correct tally — a moderation / spam purge dropped ratings
+    /// (500/4.2 → 480/4.5) — must be adopted and CACHED, updating the aggregate
+    /// DOWNWARD. DUT-545's count-magnitude guard wrongly discarded it, sticking
+    /// the stale 500/4.2 on screen and in cache forever.
+    @Test func authoritativeCountDecreaseUpdatesDisplayedAndCachedAggregate() async {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.cachedRatingByRecipe[505] = RecipeRating(
+            recipeID: 505,
+            average: 4.2,
+            count: 500,
+            userRating: nil
+        )
+        let viewModel = RecipeDetailViewModelTests.makeViewModel(
+            dependencies: dependencies,
+            listItemID: 505
+        )
+        await viewModel.applyRatingRefresh(
+            RecipeRating(recipeID: 505, average: 4.2, count: 500, userRating: nil)
+        )
+        #expect(viewModel.ratingSummary?.count == 500)
+
+        // The authoritative GET after a purge: fewer ratings, higher average, and
+        // — as the public WPRM summary always is — userRating == nil.
+        await viewModel.applyRatingRefresh(
+            RecipeRating(recipeID: 505, average: 4.5, count: 480, userRating: nil)
+        )
+
+        // The smaller-but-correct aggregate is adopted (self-heals downward)...
+        #expect(viewModel.ratingSummary?.count == 480)
+        #expect(viewModel.ratingSummary?.average == 4.5)
+        // ...on screen AND in the cache.
+        #expect(dependencies.cachedRatingByRecipe[505]?.count == 480)
+        #expect(dependencies.cachedRatingByRecipe[505]?.average == 4.5)
+    }
+
+    /// DUT-553: an authoritative count decrease must still carry the device's
+    /// remembered vote forward — the nil-bearing public GET falls back to the
+    /// cached userRating (DUT-216 / DUT-305), so shrinking the tally never erases
+    /// "You rated this N stars".
+    @Test func authoritativeCountDecreaseCarriesTheUsersVoteForward() async {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.cachedRatingByRecipe[506] = RecipeRating(
+            recipeID: 506,
+            average: 4.2,
+            count: 500,
+            userRating: 5
+        )
+        let viewModel = RecipeDetailViewModelTests.makeViewModel(
+            dependencies: dependencies,
+            listItemID: 506
+        )
+        await viewModel.applyRatingRefresh(
+            RecipeRating(recipeID: 506, average: 4.2, count: 500, userRating: 5)
+        )
+
+        await viewModel.applyRatingRefresh(
+            RecipeRating(recipeID: 506, average: 4.5, count: 480, userRating: nil)
+        )
+
+        #expect(viewModel.ratingSummary?.count == 480)
+        // The remembered vote survives the shrink + the nil-bearing GET.
+        #expect(viewModel.ratingSummary?.userRating == 5)
+        #expect(dependencies.cachedRatingByRecipe[506]?.userRating == 5)
     }
 }
