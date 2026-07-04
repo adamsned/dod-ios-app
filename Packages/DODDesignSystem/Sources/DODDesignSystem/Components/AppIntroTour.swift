@@ -44,8 +44,16 @@ public struct AppIntroTour: View {
         self.onFinish = onFinish
     }
 
-    private var isFirst: Bool { index <= 0 }
-    private var isLast: Bool { index >= pages.count - 1 }
+    private var isFirst: Bool { Self.isFirst(index: index) }
+    private var isLast: Bool { Self.isLast(index: index, pageCount: pages.count) }
+
+    /// The "Previous" button is disabled (and — via DUT-564 — accessibility-hidden)
+    /// on the first slide. Pulled out as a pure function so the end-slide nav-hiding
+    /// contract is unit-testable without a ViewInspector dependency.
+    static func isFirst(index: Int) -> Bool { index <= 0 }
+
+    /// The "Next" button is disabled (and accessibility-hidden) on the last slide.
+    static func isLast(index: Int, pageCount: Int) -> Bool { index >= pageCount - 1 }
 
     public var body: some View {
         if pages.isEmpty {
@@ -164,6 +172,11 @@ public struct AppIntroTour: View {
         .disabled(disabled)
         // Keep the slot so the dots + CTA stay put; just hide it at the ends.
         .opacity(disabled ? 0 : 1)
+        // DUT-564: a `.disabled` Button stays in the accessibility tree, so a
+        // fully-transparent end-slide nav button gets read as "Previous/Next,
+        // dimmed, button". Drop it from the a11y tree when it's hidden (mirrors
+        // the placeholder's `.accessibilityHidden(true)` above).
+        .accessibilityHidden(disabled)
     }
 
     private var ctaButton: some View {
