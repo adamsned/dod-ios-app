@@ -66,6 +66,23 @@ public enum AppleAuthError: Error, Equatable {
     /// A row was present but its bytes were not valid UTF-8 — should be
     /// impossible since we only ever write strings, guarded against corruption.
     case decodingFailed
+
+    /// DUT-506 — a save was attempted with an empty / whitespace-only
+    /// `userIdentifier`. The identifier is the session's primary key; an empty
+    /// one makes `hasSession` true for a phantom session and collides across
+    /// users (every empty id compares equal), so the store rejects it at the
+    /// boundary rather than persisting a `""`-keyed row.
+    case emptyUserIdentifier
+}
+
+/// DUT-506 — the shared "is this a real, stable identifier?" test used to reject
+/// an empty / whitespace-only `userIdentifier` at every boundary (the session
+/// store save/load and the ``AppleProfileSignIn`` entry point). Mirrors the
+/// `GIDSignInProvider` guard (`!identifier.isEmpty`) on the Google side (DUT-285).
+extension String {
+    public var isBlankAppleIdentifier: Bool {
+        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 /// Read/write the on-device Apple auth session. Two implementations:
@@ -136,6 +153,11 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
         guard let userIdentifier = try readString(account: Self.userIdentifierAccount) else {
             return nil
         }
+        // DUT-506 — a blank id must never surface as a "valid" session even if a
+        // legacy / corrupt row wrote one: treat it as no session at all.
+        guard !userIdentifier.isBlankAppleIdentifier else {
+            return nil
+        }
         return AppleAuthSession(
             userIdentifier: userIdentifier,
             displayName: try readString(account: Self.displayNameAccount),
@@ -145,6 +167,12 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
     }
 
     public func save(_ session: AppleAuthSession) throws {
+        // DUT-506 — reject a blank primary key at the boundary so the store can
+        // NEVER surface a `""`-keyed session, even if a future caller forgets the
+        // upstream guard (defense in depth for the empty-id sign-in bug).
+        guard !session.userIdentifier.isBlankAppleIdentifier else {
+            throw AppleAuthError.emptyUserIdentifier
+        }
         try writeString(session.userIdentifier, account: Self.userIdentifierAccount)
         try writeOptional(session.displayName, account: Self.displayNameAccount)
         try writeOptional(session.email, account: Self.emailAccount)
@@ -269,12 +297,21 @@ public final class InMemoryAppleAuthSessionStore: AppleAuthSessionStoring, @unch
     public func load() throws -> AppleAuthSession? {
         lock.lock()
         defer { lock.unlock() }
+        // DUT-506 — mirror the Keychain store: a blank id is never a session.
+        guard let stored, !stored.userIdentifier.isBlankAppleIdentifier else {
+            return nil
+        }
         return stored
     }
 
     public func save(_ session: AppleAuthSession) throws {
         lock.lock()
         defer { lock.unlock() }
+        // DUT-506 — reject a blank primary key at the boundary, exactly like the
+        // Keychain store, so the fake enforces the same invariant in tests.
+        guard !session.userIdentifier.isBlankAppleIdentifier else {
+            throw AppleAuthError.emptyUserIdentifier
+        }
         // Match the Keychain store's exact-persist contract: a nil name/email
         // is stored as nil (the in-memory value type already captures this).
         stored = session

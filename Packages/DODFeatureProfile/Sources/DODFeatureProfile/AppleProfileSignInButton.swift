@@ -38,6 +38,13 @@ public struct AppleProfileSignInButton: View {
             // Capture the credential fields up front (the credential isn't
             // Sendable) before hopping onto the sign-in task.
             let userIdentifier = credential.user
+            // DUT-506: an empty / whitespace-only `credential.user` is not a real
+            // sign-in — persisting it makes `hasSession` true for a phantom session
+            // and collides across users in the resolver. Bail before running
+            // `apply` / `onComplete` (which would flip `hasSession`), matching the
+            // Google side where `GIDSignInProvider` drops an empty id to a silent
+            // `.failed` no-op (DUT-285) rather than surfacing an error.
+            guard !userIdentifier.isBlankAppleIdentifier else { return }
             let displayName = AppleCredentialResolver.displayName(from: credential.fullName)
             let email = credential.email
             let authorizationCode = credential.authorizationCode.flatMap {

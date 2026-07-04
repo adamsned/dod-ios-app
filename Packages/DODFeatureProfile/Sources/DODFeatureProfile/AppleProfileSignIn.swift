@@ -62,6 +62,17 @@ public struct AppleProfileSignIn: Sendable {
         email: String?,
         authorizationCode: String?
     ) async -> Outcome {
+        // DUT-506: an empty / whitespace-only identifier is NOT a valid sign-in —
+        // it would persist a phantom `""`-keyed session (making `hasSession` true)
+        // and make `AppleCredentialResolver.resolve` treat every empty-id user as
+        // the "same" user (`"" == ""`), bleeding name/email/refreshToken across
+        // people. Bail BEFORE resolve/revoke/save so none of that runs (and so the
+        // DUT-503 revoke never fires on a `""` id). Mirrors the GIDSignInProvider
+        // guard on the Google side (DUT-285), which drops an empty id to `.failed`.
+        guard !userIdentifier.isBlankAppleIdentifier else {
+            return Outcome(displayName: nil, email: nil, profileSaved: false)
+        }
+
         // 1. Session — resolve (carrying first-auth name/email forward for the
         //    same user) + persist immediately, exactly like applySignIn.
         let existingSession = try? sessionStore.load()
