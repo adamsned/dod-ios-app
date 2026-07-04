@@ -305,11 +305,14 @@ import Testing
             merging: Self.listItem,
             canonicalURL: Self.canonical
         )
-        #expect(!recipe.ingredients.isEmpty, "7 Can Soup should recover ingredients from the WPRM card")
-        let texts = recipe.ingredients.map(\.text)
-        #expect(texts.contains { $0.localizedCaseInsensitiveContains("black beans") })
-        #expect(texts.contains { $0.localizedCaseInsensitiveContains("corn") })
-        #expect(texts.contains { $0.localizedCaseInsensitiveContains("pinto beans") })
+        let texts = recipe.ingredients.map(\.text).joined(separator: "|").lowercased()
+        #expect(texts.contains("black beans") && texts.contains("corn") && texts.contains("pinto beans"))
+        // DUT-538: the WPRM card has no `wprm-recipe-instruction` rows — the
+        // steps live in the post body's "How to Make" numbered-step lists, and
+        // the fallback recovers all 4 (per-step text covered by the DODSupport
+        // WPRMRecipeCardParser unit tests) rather than dumping the article body.
+        #expect(recipe.instructions.map(\.step) == [1, 2, 3, 4], "should recover 4 How-to-Make steps")
+        #expect(recipe.instructions.first?.text.localizedCaseInsensitiveContains("Open and Dump") == true)
         // The JSON-LD times/yield/nutrition still parse normally — the fallback
         // is per-field and does not disturb the fields JSON-LD did provide.
         #expect(recipe.totalTime == .seconds(20 * 60))

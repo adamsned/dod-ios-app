@@ -43,15 +43,15 @@ extension RecipeDetailViewModel {
                 merging: listItem,
                 canonicalURL: canonicalURL
             )
-            // DUT-185: WP Recipe Maker now renders steps client-side and redacts
-            // them from every scrapable source (JSON-LD, server HTML, the WPRM
-            // REST API), so some recipes (e.g. Dutch Oven 7 Can Soup) parse with
-            // an EMPTY instruction list — the recipe layout would show a blank
-            // Instructions section. The steps still live in the post's
-            // "How to Make" body, so fall back to the article-body path (which
-            // renders the full post) rather than a step-less recipe. A recipe
-            // that DOES parse instructions is unchanged.
-            guard !parsed.instructions.isEmpty else {
+            // DUT-538 (supersedes DUT-185): the WPRM-card parser now recovers
+            // the "How to Make" numbered steps from the post body when the card
+            // itself carries no `wprm-recipe-instruction` rows (the 7 Can Soup
+            // shape), so `parsed.instructions` is normally non-empty here and we
+            // render the structured recipe. Only when a parse STILL yields no
+            // instructions AND the page has NO WPRM recipe card do we fall back
+            // to the article-body path — a page that DOES ship a recipe card is
+            // a recipe, not an article, and must never dump the whole blog body.
+            guard !parsed.instructions.isEmpty || WPRMRecipeCardParser.hasRecipeCard(html: html) else {
                 await classifyAsArticleOrFail(html: html)
                 return
             }
@@ -86,6 +86,19 @@ extension RecipeDetailViewModel {
     /// through to the terminal `.unavailable` path with the same snackbar
     /// + auto-pop behavior the pre-T-640 implementation surfaced.
     func classifyAsArticleOrFail(html: String) async {
+        // DUT-538: presence of a WPRM recipe card means this is a RECIPE, not
+        // an article — never dump the whole blog body for a page that ships a
+        // structured card. Build the recipe from the card (ingredients +
+        // "How to Make" steps) and route to the recipe path. Genuine articles
+        // (no card) fall through to the article-body extraction below.
+        if WPRMRecipeCardParser.hasRecipeCard(html: html),
+            let cardRecipe = recipeFromWPRMCard(html: html) {
+            try? await dependencies.mergeDetail(cardRecipe)
+            recipe = cardRecipe
+            loadState = .ready
+            await loadRelated(forCategoryID: cardRecipe.categoryIDs.first)
+            return
+        }
         let body = dependencies.extractArticleBody(html: html)
         guard !body.isEmpty else {
             try? await dependencies.markJSONLDFailed(id: listItem.id)
@@ -112,6 +125,36 @@ extension RecipeDetailViewModel {
         try? await dependencies.mergeDetail(article)
         recipe = article
         loadState = .article(article)
+    }
+
+    /// DUT-538: build a `.recipe`-kind `Recipe` straight from the WPRM card
+    /// when the JSON-LD parse threw (or came back thin) but the page ships a
+    /// structured recipe card. Returns nil when the card recovers NEITHER an
+    /// ingredient NOR an instruction — a genuinely empty card offers nothing to
+    /// render, so the caller falls through to the article-body path. List
+    /// fields (id / title / image / dates) come from `listItem`; detail fields
+    /// from the card. Times / nutrition / video stay nil — the card-only path
+    /// is reached only when the JSON-LD that carries them was unavailable.
+    func recipeFromWPRMCard(html: String) -> Recipe? {
+        let card = WPRMRecipeCardParser.parse(html: html)
+        guard !card.ingredients.isEmpty || !card.instructions.isEmpty else {
+            return nil
+        }
+        return Recipe(
+            id: listItem.id,
+            slug: canonicalURL.lastPathComponent,
+            title: listItem.title,
+            excerpt: listItem.excerpt,
+            canonicalURL: canonicalURL,
+            heroImage: listItem.heroImage,
+            heroImageLargeURL: nil,
+            categoryIDs: listItem.categoryIDs ?? [],
+            publishedAt: listItem.publishedAt,
+            ingredients: card.ingredients.map { RecipeIngredient(text: $0) },
+            instructions: card.instructions.enumerated().map { index, text in
+                RecipeInstruction(step: index + 1, text: text)
+            }
+        )
     }
 
     /// DUT-185: cache-hit dispatch for `.recipe`-kind posts. A recipe cached
