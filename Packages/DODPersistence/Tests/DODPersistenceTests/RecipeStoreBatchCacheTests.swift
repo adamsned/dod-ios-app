@@ -57,4 +57,28 @@ struct RecipeStoreBatchCacheTests {
 
         #expect(await store.evictIfNeededCallCount == 3)
     }
+
+    /// DUT-556 — a batch containing the same `id` twice must yield EXACTLY ONE
+    /// `CachedRecipe` row. `CachedRecipe.id` has no `@Attribute(.unique)` (dropped
+    /// for CloudKit / DOD-CRASH-1) and the DUT-257 batch path has no per-item
+    /// save, so without the pre-loop dedup a second insert could slip through if
+    /// SwiftData's fetch doesn't surface the still-pending in-loop insert. The
+    /// dedup keeps the LAST occurrence, so the winning row carries its title.
+    @Test func duplicateIDWithinOneBatchYieldsExactlyOneRow() async throws {
+        let store = try await makeStore()
+
+        try await store.cache(listItems: [
+            makeListItem(id: 42, title: "First"),
+            makeListItem(id: 42, title: "Last"),
+        ])
+
+        // Exactly one row for the duplicated id (was a risk of two before the fix).
+        let rowCount = try await store.cachedRowCount(id: 42)
+        #expect(rowCount == 1)
+
+        // Last-write-wins: the second occurrence's title is the one persisted.
+        let items = try await store.listItems(forIDs: [42])
+        #expect(items.count == 1)
+        #expect(items.first?.title == "Last")
+    }
 }

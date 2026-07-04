@@ -1,3 +1,4 @@
+import CoreData
 import Foundation
 import SwiftData
 import Testing
@@ -7,22 +8,46 @@ import Testing
 /// DUT-525 — a failed opt-out SwiftData migration on the launch path used to
 /// rethrow straight into `AppDependencies.init`'s `fatalError`, an
 /// un-recoverable synchronous launch crash-loop with no user escape. The fix
-/// wraps the container open in `buildWithMigrationRecovery(build:recover:)`:
-/// on a thrown migration error it moves the corrupt store aside and opens a
-/// FRESH one, flagging `recoveredFromMigrationFailure`. These pin that seam by
-/// injection (a real corrupt on-disk migration can't be forced hermetically),
-/// so a failed migration RECOVERS to a working store instead of trapping.
+/// wraps the container open in `buildWithMigrationRecovery(defaults:build:recover:)`:
+/// on a genuine migration/corruption error it moves the corrupt store aside and
+/// opens a FRESH one, flagging `recoveredFromMigrationFailure`. These pin that
+/// seam by injection (a real corrupt on-disk migration can't be forced
+/// hermetically), so a failed migration RECOVERS to a working store instead of
+/// trapping.
+///
+/// DUT-552 — the seam must ONLY reset on a genuinely unrecoverable error, and
+/// gate any other (assumed-transient) reset behind a consecutive-failed-open
+/// counter, so a single transient open failure never wipes real user data. The
+/// `TransientDoesNotResetTests` suite below pins that regression fix; these
+/// DUT-525 tests use a genuine corruption error so the recovery path still runs
+/// on the first failure.
 @Suite("Migration recovery (DUT-525)")
 struct MigrationRecoveryTests {
 
-    struct MigrationFailed: Error {}
+    /// A genuinely unrecoverable Core Data migration error — classified as
+    /// unrecoverable, so recovery fires on the FIRST failure (DUT-552).
+    static func corruptionError() -> NSError {
+        NSError(
+            domain: NSCocoaErrorDomain,
+            code: 134_100,  // NSPersistentStoreIncompatibleVersionHashError
+            userInfo: nil
+        )
+    }
+
+    private func freshDefaults() -> UserDefaults {
+        let name = "dut525.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name) ?? .standard
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
 
     @Test func failedMigrationRecoversToAFreshStore() throws {
         let freshContainer = try RecipeStore.inMemoryContainer()
         var recoverCalled = false
 
         let result = try RecipeStore.buildWithMigrationRecovery(
-            build: { throw MigrationFailed() },
+            defaults: freshDefaults(),
+            build: { throw Self.corruptionError() },
             recover: { _ in
                 recoverCalled = true
                 return freshContainer
@@ -40,7 +65,8 @@ struct MigrationRecoveryTests {
         let freshContainer = try RecipeStore.inMemoryContainer()
 
         let result = try RecipeStore.buildWithMigrationRecovery(
-            build: { throw MigrationFailed() },
+            defaults: freshDefaults(),
+            build: { throw Self.corruptionError() },
             recover: { _ in freshContainer }
         )
 
@@ -68,6 +94,7 @@ struct MigrationRecoveryTests {
         let primaryContainer = try RecipeStore.inMemoryContainer()
 
         let result = try RecipeStore.buildWithMigrationRecovery(
+            defaults: freshDefaults(),
             build: {
                 RecipeStore.ContainerBuildResult(
                     container: primaryContainer,
@@ -92,7 +119,8 @@ struct MigrationRecoveryTests {
 
         #expect(throws: RecoveryAlsoFailed.self) {
             _ = try RecipeStore.buildWithMigrationRecovery(
-                build: { throw MigrationFailed() },
+                defaults: freshDefaults(),
+                build: { throw Self.corruptionError() },
                 recover: { _ in throw RecoveryAlsoFailed() }
             )
         }

@@ -49,8 +49,9 @@ public actor RecipeStore {
     }
 
     /// DUT-257 — pure insert/update body (no per-call save/evict) shared by both
-    /// cache entry points, so the bulk path can save + evict once (below).
-    private func upsert(listItem: RecipeListItem) throws {
+    /// cache entry points, so the bulk path can save + evict once. Non-private so
+    /// the bulk `cache(listItems:)` path in `RecipeStore+ListCache.swift` reuses it.
+    func upsert(listItem: RecipeListItem) throws {
         let existing = try fetchRecipe(id: listItem.id)
         if let existing {
             existing.title = listItem.title
@@ -100,17 +101,9 @@ public actor RecipeStore {
         }
     }
 
-    /// Bulk cache a list response so list screens can hydrate offline (AC-1.6).
-    /// DUT-257 — upsert every row, then `save()` + `evictIfNeeded()` EXACTLY
-    /// ONCE (the prior `cache(listItem:)` loop ran N saves + N LRU fetch+sorts).
-    public func cache(listItems: [RecipeListItem]) throws {
-        guard !listItems.isEmpty else { return }
-        for item in listItems {
-            try upsert(listItem: item)
-        }
-        try modelContext.save()
-        try evictIfNeeded()
-    }
+    // DUT-257 bulk `cache(listItems:)` (+ DUT-556 intra-batch dedup) lives in
+    // `RecipeStore+ListCache.swift` to keep this file under the 400-line
+    // file_length cap.
 
     // MARK: - Detail merge after JSON-LD parse
 
