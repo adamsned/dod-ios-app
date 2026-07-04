@@ -85,6 +85,25 @@ public final class SystemSpeechSynthesizer: NSObject, SpeechSynthesizing {
         }
     }
 
+    /// DUT-273 — the resolved voice is **session-invariant**: with no user
+    /// gender/voice preference (CL-279) it depends only on `languageCode`, which
+    /// `VoiceReader` captures once at init and passes on every utterance. So the
+    /// full `speechVoices()` enumerate + map + `VoiceSelector` sort was being
+    /// redone on the main actor for EVERY spoken step, hitching Voice Mode.
+    /// Memoize per `languageCode` and compute the catalog work at most once per
+    /// distinct language. `?? "<default>"` keys the `nil`-language case so it
+    /// caches too. Invalidated only if the process ever needs a fresh catalog
+    /// (voices installed mid-session are picked up on the next distinct code).
+    private var resolvedVoiceCache: [String: AVSpeechSynthesisVoice?] = [:]
+
+    /// DUT-273 — injectable catalog source so the L1 suite can count how many
+    /// times the (expensive) enumeration actually runs across repeated
+    /// utterances, proving the memoization. Production reads the real
+    /// `AVSpeechSynthesisVoice.speechVoices()`.
+    var voicesProvider: () -> [AVSpeechSynthesisVoice] = {
+        AVSpeechSynthesisVoice.speechVoices()
+    }
+
     public override init() {
         super.init()
         synthesizer.delegate = self
@@ -111,7 +130,21 @@ public final class SystemSpeechSynthesizer: NSObject, SpeechSynthesizing {
     /// preference). Returns `nil` only when neither the quality-aware selector
     /// NOR the legacy `(language:)` initializer produces a voice, in which case
     /// the synthesizer uses the platform default (the original CL-79 fallback).
-    private func resolveVoice(languageCode: String?) -> AVSpeechSynthesisVoice? {
+    func resolveVoice(languageCode: String?) -> AVSpeechSynthesisVoice? {
+        // DUT-273 — memoize per language. `speak(...)` runs on every step, but
+        // the resolved voice only changes when the language does (no user voice
+        // preference — CL-279), so cache the whole enumerate+map+sort result.
+        let cacheKey = languageCode ?? "<default>"
+        if let cached = resolvedVoiceCache[cacheKey] {
+            return cached
+        }
+        let resolved = computeVoice(languageCode: languageCode)
+        resolvedVoiceCache[cacheKey] = resolved
+        return resolved
+    }
+
+    /// DUT-273 — the actual (expensive) catalog work `resolveVoice` memoizes.
+    private func computeVoice(languageCode: String?) -> AVSpeechSynthesisVoice? {
         // Keep the REAL voice objects: we pick the best one by identifier, then
         // return that exact instance. Earlier this re-resolved the pick via
         // `AVSpeechSynthesisVoice(identifier:)`, but that initializer returns nil
@@ -119,7 +152,7 @@ public final class SystemSpeechSynthesizer: NSObject, SpeechSynthesizing {
         // — so a correctly-picked natural voice (e.g. Evan Enhanced) silently
         // fell through to the compact `(language:)` default (Samantha). Looking
         // the pick up in the array we just enumerated can't fail that way.
-        let voices = AVSpeechSynthesisVoice.speechVoices()
+        let voices = voicesProvider()
         let descriptors = voices.map(Self.descriptor(for:))
 
         if let identifier = VoiceSelector.bestVoiceIdentifier(

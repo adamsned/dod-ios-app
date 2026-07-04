@@ -46,52 +46,53 @@ final class AppDependencies {
     /// US-44 (T-739) — Keychain profile store. Phase b (T-740) — wired with the
     /// photo store so `clear()` also deletes the on-disk JPG.
     let profileStore: KeychainProfileStore
-    /// US-44 Phase b (T-740) — Documents JPG (512×512 @ 0.85). `nil` if Documents
-    /// is unavailable; photo flow falls back to the initial-letter avatar. Per
-    /// CL-137 / AC-44.9.
+    /// US-44 Phase b (T-740) — Documents JPG (512×512 @ 0.85). `nil` if
+    /// unavailable; photo flow falls back to the initial-letter avatar (CL-137).
     let profilePhotoStore: ProfilePhotoStore?
 
     /// Diagnostic observer for the SwiftData ↔ CloudKit mirror (round-12 backlog
-    /// bug — "CloudKit recipe sync doesn't work"). Started from `bootstrap()` only
-    /// when the iCloud-Sync opt-in is on.
+    /// bug). Started from `bootstrap()` only when the iCloud-Sync opt-in is on.
     private let cloudKitDiagnostics = CloudKitSyncDiagnostics()
 
-    /// `true` when the persisted opt-in flag was ON but the CloudKit-backed
-    /// `.private` container failed to open at launch, so the DOD-CRASH-1 safety
-    /// net (DUT-6) degraded to a plain local container. Sync stays dormant (local
-    /// data intact) until the CloudKit problem is fixed and the app relaunches.
-    /// Internal so `+SyncedSavedBackfill.swift` can gate the DUT-240 seed on it.
+    /// `true` when the opt-in flag was ON but the CloudKit `.private` container
+    /// failed to open at launch, so the DOD-CRASH-1 net (DUT-6) degraded to a
+    /// plain local container. Sync stays dormant (local data intact) until the
+    /// CloudKit problem is fixed. Internal so `+SyncedSavedBackfill.swift` can
+    /// gate the DUT-240 seed on it.
     let usedCloudKitFallback: Bool
 
-    /// DUT-494 — synced saved-id baseline captured SYNCHRONOUSLY in `init` (pre run
-    /// loop, pre-import) so the async CloudKit import can't fold device B's rows in
-    /// and poison the seed. See `backfillSyncedSavedIfNeeded`.
+    /// DUT-494 — synced saved-id baseline captured SYNCHRONOUSLY in `init` (pre
+    /// run loop / import) so the async CloudKit import can't poison the seed.
     let processStartSyncedIDs: Set<Int>
 
     init() {
         var fellBackToLocal = false
         do {
             // L3 isolation hook (`-DODUseInMemoryStore`) + T-610 hermetic E2E
-            // both use a clean in-memory store so nothing persists across runs
-            // on a shared CI simulator. Never used in production.
+            // use a clean in-memory store so nothing persists across CI runs.
             if Self.useInMemoryStore() {
                 self.modelContainer = try RecipeStore.inMemoryContainer()
             } else {
-                // DUT-6: build the container for the persisted opt-in flag WITH
-                // the DOD-CRASH-1 safety net — if the CloudKit `.private` open
-                // throws, `productionContainer(defaults:)` falls back to a plain
-                // local container so the app launches instead of crash-looping
-                // (build 3). A plain opt-out open failure is a real migration
-                // error and surfaces via the `fatalError` below (MIGRATION rule 4).
-                let result = try RecipeStore.productionContainer(defaults: .standard)
+                // DUT-6: fall back to a plain local container if the CloudKit
+                // `.private` open throws. DUT-525: also wrap in the
+                // migration-recovery seam — a failed V-chain migration /
+                // corruption on a POPULATED opt-out store used to rethrow into
+                // the `fatalError` below (a launch crash-loop); now the corrupt
+                // store is moved aside and a fresh one opened (working-but-empty).
+                let result = try RecipeStore.productionContainerRecoveringFromMigrationFailure(
+                    defaults: .standard
+                )
                 self.modelContainer = result.container
                 fellBackToLocal = result.usedCloudKitFallback
+                // Surfaced for a future telemetry consumer (kept out of
+                // `AnalyticsEvent` here).
+                _ = result.recoveredFromMigrationFailure
             }
         } catch {
-            // Schema migration failure must surface to the user (MIGRATION.md
-            // discipline rule 4). For v1 we crash early so the issue is
-            // unambiguous in TestFlight feedback.
-            fatalError("SwiftData migration failed: \(error)")
+            // DUT-525: reached only if even the fresh-store recovery threw — a
+            // vanishingly-rare last resort now, not the old every-failed-
+            // migration crash-loop.
+            fatalError("SwiftData migration failed and recovery could not open a fresh store: \(error)")
         }
         self.usedCloudKitFallback = fellBackToLocal
         // DUT-494: anchor the synced-saved baseline synchronously, pre run loop.
@@ -103,13 +104,10 @@ final class AppDependencies {
         self.pageFetcher = RecipePageFetcher(httpClient: httpClient)
         self.imageLoader = ImageLoader(httpClient: httpClient)
         self.networkMonitor = NetworkMonitor.shared
-        // US-13/14/15 integration: the comments + ratings + guest-identity
-        // clients are constructed alongside the rest of the long-lived
-        // services and handed to `LiveRecipeDetailDependencies` on demand.
-        // DUT-23: pass the app-identity key (Info.plist `DODCommentAPIKey`,
-        // injected at archive time from the DOD_COMMENT_API_KEY CI secret) so
-        // the comment POST carries `X-DOD-App-Key` and WordPress allows the
-        // app's anonymous comments. nil/empty in dev + PR builds.
+        // US-13/14/15: comments + ratings + guest-identity clients handed to
+        // `LiveRecipeDetailDependencies` on demand. DUT-23: pass the app-identity
+        // key (Info.plist `DODCommentAPIKey`, injected at archive time) so the
+        // comment POST carries `X-DOD-App-Key`. nil/empty in dev + PR builds.
         self.commentsClient = WPCommentsClient(
             httpClient: httpClient,
             appKey: Bundle.main.object(forInfoDictionaryKey: "DODCommentAPIKey") as? String
