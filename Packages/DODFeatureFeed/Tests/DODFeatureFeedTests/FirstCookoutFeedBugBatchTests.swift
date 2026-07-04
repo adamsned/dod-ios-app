@@ -116,7 +116,9 @@ struct FirstCookoutFeedBugBatchTests {
         let recommendedBeforeLoad = loadedFlag ? currentRungBeforeLoad : nil
         #expect(recommendedBeforeLoad == nil, "must not recommend the stale rung-1 default before load")
         // With nil recommended, no rung is falsely marked the current "start here".
-        #expect(CookChooserFlow.nodeState(index: 0, recommended: recommendedBeforeLoad, cookedRecipeIDs: cooked) == .done)
+        #expect(
+            CookChooserFlow.nodeState(index: 0, recommended: recommendedBeforeLoad, cookedRecipeIDs: cooked) == .done
+        )
 
         // After load: the real rung is used, and rung 2 is the current one.
         let recommendedAfterLoad: GuidedCookout? = true ? realRung : nil
@@ -201,13 +203,15 @@ private final class MovableClock: @unchecked Sendable {
 
     var now: () -> Date {
         { [self] in
-            lock.lock(); defer { lock.unlock() }
+            lock.lock()
+            defer { lock.unlock() }
             return current
         }
     }
 
     func advance(by seconds: TimeInterval) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         current = current.addingTimeInterval(seconds)
     }
 }
