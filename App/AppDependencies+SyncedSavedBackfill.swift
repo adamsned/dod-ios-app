@@ -47,11 +47,15 @@ extension AppDependencies {
             return
         }
         guard !usedCloudKitFallback else { return }  // DUT-240: retry next launch
-        // DUT-468: snapshot the synced id set BEFORE the wait, on the bootstrap
-        // path, so the post-import reconcile can tell import-delivered rows from
-        // a save the user makes during the wait window. (Empty on a first-launch
-        // upgrader; non-empty only if a prior session left rows.)
-        let baseline = (try? await store.syncedSavedIDSet()) ?? []
+        // DUT-468/DUT-494: use the baseline captured in `init` — synchronously,
+        // before the run loop resumed and before the async CloudKit import could
+        // deliver. Reading it here (post-`.task`) races a fast/warm import that
+        // would fold device B's rows into the baseline, so the post-import
+        // `current − baseline` provenance math would subtract out the very
+        // import evidence it needs and mis-seed stale legacy pins. Anchoring in
+        // `init` closes that window: on a first-launch upgrader this is empty; a
+        // pre-baseline import now correctly shows up as `current − baseline`.
+        let baseline = processStartSyncedIDs
         // DUT-240: don't block bootstrap on the import wait — first-run prompt
         // and deep-link drains run right after it.
         Task { await backfillAfterFirstCloudKitImport(flagKey: key, baselineSyncedIDs: baseline) }
