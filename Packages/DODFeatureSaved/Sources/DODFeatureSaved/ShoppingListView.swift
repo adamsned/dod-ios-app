@@ -263,7 +263,12 @@ public struct ShoppingListView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("shopping-list-row-toggle")
-            .accessibilityLabel(checked ? "Mark as still need" : "Mark as already have")
+            // DUT-231 — the leading circle CHECKS a row off (strikethrough,
+            // row stays visible); it is NOT the "already have" affordance (that
+            // is the trailing swipe → `markAlreadyHave`, which removes the row).
+            // Label it for its real behavior and reflect the current state, so
+            // VoiceOver users can tell check-off from swipe-to-remove.
+            .accessibilityLabel(Self.checkOffLabel(checked: checked))
 
             VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                 Text(item.ingredientText)
@@ -289,7 +294,10 @@ public struct ShoppingListView: View {
         // swipe action REMOVES the row (markAlreadyHave). Without this a
         // VoiceOver shopper has no way to check a row off — their only action
         // deletes it. Re-expose the core AC-39.5 check-off as a custom action.
-        .accessibilityAction(named: checked ? "Mark as still need" : "Mark as already have") {
+        // DUT-231 — this action mirrors the leading toggle (check-off, not
+        // "already have"), so it uses the same state-reflecting Check/Uncheck
+        // wording; "already have" stays reserved for the trailing swipe.
+        .accessibilityAction(named: Self.checkOffLabel(checked: checked)) {
             viewModel.toggleChecked(item)
         }
         // AC-39.5 / CL-82 — the trailing "I already have this" affordance.
@@ -306,6 +314,15 @@ public struct ShoppingListView: View {
     /// AC-39.11 — `"<ingredient text>, <aisle>, from <recipe title>"`.
     private func accessibilityLabel(for item: ShoppingListViewModel.Item) -> String {
         "\(item.ingredientText), \(AisleHeader.displayName(item.aisle)), from \(item.recipeTitle)"
+    }
+
+    /// DUT-231 — VoiceOver label for the leading check-off toggle (and its
+    /// mirrored custom action). Reflects the row's CURRENT checked state and
+    /// names the toggle's real behavior (check-off / strikethrough), leaving
+    /// "already have" exclusively to the trailing swipe (`markAlreadyHave`).
+    /// `internal` so it is unit-tested directly for both states.
+    static func checkOffLabel(checked: Bool) -> String {
+        checked ? "Uncheck" : "Check off"
     }
 }
 
