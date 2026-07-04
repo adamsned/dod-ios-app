@@ -166,6 +166,7 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-picker-temperature")
+                .tint(DODColor.burntOrange)
             } header: {
                 sectionHeader("Measurements & Units")
             } footer: {

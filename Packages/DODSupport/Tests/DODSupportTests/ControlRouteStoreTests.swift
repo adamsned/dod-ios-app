@@ -29,4 +29,22 @@ import Testing
         let store = try makeStore()
         #expect(store.takePending() == nil)
     }
+
+    /// DUT-560 — every configurable-control tool round-trips through the flag,
+    /// and each raw token stays stable across binary versions.
+    @Test(arguments: [
+        (ControlRouteStore.Route.shoppingList, "shopping-list"),
+        (.heatCoach, "heat-coach"),
+        (.cookingJournal, "journal"),
+        (.firstCookout, "first-cookout"),
+        (.cookMode, "cook-mode"),
+        (.buyBuzzyWaxx, "buzzywaxx"),
+    ])
+    func routeRoundTrips(route: ControlRouteStore.Route, rawValue: String) throws {
+        #expect(route.rawValue == rawValue)
+        let store = try makeStore()
+        store.setPending(route)
+        #expect(store.takePending() == route)
+        #expect(store.takePending() == nil)
+    }
 }

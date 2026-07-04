@@ -18,8 +18,9 @@ import WidgetKit
 /// shipped in CL-165; `.accessoryCircular` shipped as a Saved shortcut per
 /// CL-168.)
 ///
-/// DUT-480 — plus the iOS 18-only ``ShoppingListControl`` Control Center /
-/// Lock Screen control, registered conditionally (see `controls` below).
+/// DUT-560 — plus the iOS 18-only configurable ``CookingToolControl`` Control
+/// Center / Lock Screen control (user picks which cooking tool it opens),
+/// registered conditionally (see below).
 ///
 /// Spec trace: US-9, US-17 (AC-17.1), US-22 (AC-22.1, AC-22.7); DUT-454,
 /// DUT-459, DUT-480.
@@ -33,14 +34,14 @@ struct DODAppWidgetBundle: WidgetBundle {
         LatestRecipeLockScreenWidget()
         SavedLockScreenWidget()
         CookingTipWidget()
-        // DUT-480 — the Control Center / Lock Screen control is iOS 18+ only
-        // (`ControlWidget` is unavailable on the iOS 17 deployment target). The
-        // `@WidgetBundleBuilder` supports `buildLimitedAvailability`, so an inline
-        // `if #available` is the documented way to conditionally include a
-        // control; on iOS 17 it simply contributes nothing and the five widgets
-        // above still register unconditionally.
+        // DUT-560 (was DUT-480) — the configurable Control Center / Lock Screen
+        // control is iOS 18+ only (`ControlWidget` is unavailable on the iOS 17
+        // deployment target). The `@WidgetBundleBuilder` supports
+        // `buildLimitedAvailability`, so an inline `if #available` is the
+        // documented way to conditionally include a control; on iOS 17 it simply
+        // contributes nothing and the five widgets above still register.
         if #available(iOS 18.0, *) {
-            ShoppingListControl()
+            CookingToolControl()
         }
     }
 }

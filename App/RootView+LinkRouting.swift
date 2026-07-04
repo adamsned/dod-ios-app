@@ -1,5 +1,6 @@
 import DODAnalytics
 import DODDesignSystem
+import DODFeatureFeed
 import DODSupport
 import SwiftUI
 
@@ -97,43 +98,50 @@ extension RootView {
     }
 
     /// T-912 / DUT-551 (CL-306) — select the Cooking Tools hub tab and mint a
-    /// fresh token that pushes the Shopping List onto the hub's NavigationStack.
-    /// The Shopping List folded into the hub (its own tab was retired), so
-    /// selecting the tab alone lands on the hub root, not the list — the token
-    /// (consumed by the hub's `.task(id:)`) does the push. Mirrors the retired
-    /// `savedShoppingListToken` pattern (CL-301) and preserves ALL four entry
-    /// points at once because they all funnel through here:
-    /// `handle(widgetLink: .shoppingList)` (the `dod://shopping-list` deep link),
-    /// the DUT-534 snackbar "View" closure, the Saved header cart, and the iOS 18
-    /// Control Center control (`consumePendingControlRoute`). A fresh UUID per
-    /// call re-pushes if the user is already on the hub. Non-private so
+    /// DUT-560 — select the Cooking Tools hub tab and mint a fresh unified
+    /// `HubToolRoute` so the hub opens `tool` via its `.task(id:)`. The single
+    /// path every hub-tool routing funnels through (the `dod://` deep link, the
+    /// snackbar "View", the Saved cart, the recipe Heat Coach nudge, and the
+    /// iOS 18 configurable Control Center control). A fresh UUID per call
+    /// re-fires if the user is already on the hub. Non-private so
     /// `RootView.swift`'s scene-phase + cold-launch consumers can call it too.
-    func routeToShoppingList() {
+    func route(toHubTool tool: HubTool) {
         selectedTab = .cookingTools
-        hubShoppingListToken = UUID()
+        hubPendingTool = HubToolRoute(id: UUID(), tool: tool)
     }
 
-    /// T-912 / DUT-551 (CL-306) — select the Cooking Tools hub tab and mint a
-    /// fresh token that presents Heat Coach (the hub's row #3 sheet). The
-    /// per-recipe Heat Coach nudge (Recipe Detail) taps this to point the cook at
-    /// the always-available hub tool rather than opening a one-off copy. Mirrors
-    /// `routeToShoppingList()` — a fresh UUID per call re-presents if the user is
-    /// already on the hub; the hub consumes it via `.task(id:)`.
-    func routeToHeatCoach() {
-        selectedTab = .cookingTools
-        hubHeatCoachToken = UUID()
-    }
+    /// T-912 / DUT-551 (CL-306) — route to the Shopping List (folded into the
+    /// hub). Kept as a named function because many callers tap it directly: the
+    /// `dod://shopping-list` deep link, the DUT-534 snackbar "View" closure, the
+    /// Saved header cart, and the Control Center control. Delegates to the
+    /// unified `route(toHubTool:)`.
+    func routeToShoppingList() { route(toHubTool: .shoppingList) }
 
-    /// DUT-480 — read + clear the iOS 18 Control Center control's App Group
-    /// pending-route flag and, if the Shopping List was requested, route there.
-    /// The control's `AppIntent` can't reliably hand us a `dod://` URL, so it
-    /// sets `openAppWhenRun` + drops this flag instead; `RootView` drains it
-    /// both at cold launch (the `.task`) and on each `.active` transition (the
-    /// warm case). Take-once, so a stale flag can't re-trigger on a later
-    /// foreground.
+    /// T-912 / DUT-551 (CL-306) — route to Heat Coach (the hub's row #3 sheet).
+    /// The per-recipe Heat Coach nudge (Recipe Detail) taps this. Kept as a named
+    /// function for its callers; delegates to the unified `route(toHubTool:)`.
+    func routeToHeatCoach() { route(toHubTool: .heatCoach) }
+
+    /// DUT-560 (was DUT-480) — read + clear the iOS 18 Control Center control's
+    /// App Group pending-route flag and route to whichever cooking tool it
+    /// requested. The control's `AppIntent` can't reliably hand us a `dod://`
+    /// URL, so it sets `openAppWhenRun` + drops this flag instead; `RootView`
+    /// drains it both at cold launch (the `.task`) and on each `.active`
+    /// transition (the warm case). Take-once, so a stale flag can't re-trigger.
+    /// `buyBuzzyWaxx` opens the store URL; every other tool routes through the
+    /// hub. A `nil` (nothing pending) is a no-op.
     func consumePendingControlRoute() {
-        if ControlRouteStore()?.takePending() == .shoppingList {
-            routeToShoppingList()
+        guard let route = ControlRouteStore()?.takePending() else { return }
+        switch route {
+        case .shoppingList: routeToShoppingList()
+        case .heatCoach: routeToHeatCoach()
+        case .cookingJournal: self.route(toHubTool: .cookingJournal)
+        case .firstCookout: self.route(toHubTool: .firstCookout)
+        case .cookMode: self.route(toHubTool: .cookMode)
+        case .buyBuzzyWaxx:
+            if let url = URL(string: SettingsViewModel.buyBuzzyWaxxURLString) {
+                systemOpenURL(url)
+            }
         }
     }
 
