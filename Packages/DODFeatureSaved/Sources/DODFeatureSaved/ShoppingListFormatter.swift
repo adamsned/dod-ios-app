@@ -56,6 +56,19 @@ public enum ShoppingListFormatter {
         return shareText(for: rows)
     }
 
+    /// DUT-532 — the still-need subset as raw ingredient lines, in the SAME
+    /// filter shape ``shareText(_:includeChecked:)`` uses: `visibleItems` (drops
+    /// "I already have this") minus checked rows. Feeds the "Order on Instacart"
+    /// line-item mapping so what's ordered exactly matches what's shared. Pure —
+    /// no I/O (AC-39.12: the shopping-list build/persist paths make zero network
+    /// calls; the network is scoped to the opt-in Instacart CTA only).
+    @MainActor
+    public static func stillNeedLines(_ viewModel: ShoppingListViewModel) -> [String] {
+        viewModel.visibleItems
+            .filter { !viewModel.isChecked($0) }
+            .map(\.ingredientText)
+    }
+
     /// Pure value-level overload — builds the share text from explicit rows so
     /// tests can assert against it without an `@Observable` instance. The rows
     /// are assumed to already be filtered to the share subset.

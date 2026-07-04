@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODDomain
+import DODNetworking
 import DODSupport
 import SwiftUI
 
@@ -20,7 +21,8 @@ import SwiftUI
 /// lands with T-680c.
 public struct ShoppingListView: View {
 
-    @State private var viewModel: ShoppingListViewModel
+    // Non-private so the DUT-532 CTA extension can read the still-need rows.
+    @State var viewModel: ShoppingListViewModel
 
     /// DUT-487 / T-906 — the recipe picker is now owned here (was
     /// ``SavedView``'s builder-sheet-first path). Presented from the empty
@@ -54,14 +56,35 @@ public struct ShoppingListView: View {
     /// confirms first.
     @State private var isConfirmingClear = false
 
+    // DUT-532 — the "Order on Instacart" client + config gate (the CTA lives in
+    // `ShoppingListView+Instacart.swift`). `instacartConfig.isConfigured` gates
+    // the CTA: unconfigured (the production default until the Worker is stood up
+    // + the IDP key provisioned) hides it, so this ships DORMANT — mirroring the
+    // SiwA revoke client shipping ahead of its Worker. Non-private so that
+    // extension can read them (Swift `private` is file-scoped).
+    let instacartConfig: InstacartConfig
+    let instacart: any InstacartShoppingListLinking
+    /// True while the Instacart link is being created (a Worker → IDP round-trip);
+    /// swaps the CTA for a spinner + blocks re-tap.
+    @State var isCreatingInstacartLink = false
+    /// Raised on an Instacart hand-off failure; drives the failure alert. The
+    /// list is never mutated on failure.
+    @State var instacartFailed = false
+    @Environment(\.openURL) var openURL
+
     public init(
         viewModel: ShoppingListViewModel,
         recipes: [Recipe] = [],
-        hydrate: @escaping @Sendable (Recipe) async -> Recipe = { $0 }
+        hydrate: @escaping @Sendable (Recipe) async -> Recipe = { $0 },
+        instacartConfig: InstacartConfig = .fromInfoPlist(),
+        instacart: (any InstacartShoppingListLinking)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.recipes = recipes
         self.hydrate = hydrate
+        self.instacartConfig = instacartConfig
+        // Default to the production client bound to `instacartConfig`; tests inject a fake.
+        self.instacart = instacart ?? InstacartShoppingListClient(config: instacartConfig)
     }
 
     public var body: some View {
@@ -69,6 +92,7 @@ public struct ShoppingListView: View {
             .background(DODColor.surface)
             .navigationTitle("Shopping List")
             .toolbar { shareToolbar }
+            .toolbar { instacartToolbar }
             .toolbar { addToolbar }
             .toolbar { clearToolbar }
             .sheet(isPresented: $isPickingRecipes) {
@@ -90,6 +114,17 @@ public struct ShoppingListView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This removes every item. You can build a new list from your saved recipes.")
+            }
+            // DUT-532 — surface an Instacart hand-off failure (Worker / IDP
+            // error, offline, or a malformed response) without leaving the CTA
+            // spinning. Non-destructive; the list is untouched, they can retry.
+            .alert(
+                "Couldn't open Instacart",
+                isPresented: $instacartFailed
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("We couldn't create your Instacart order right now. Please try again in a moment.")
             }
             // DUT-487 — while hydrating the picked recipes, dim + disable the
             // list and float a spinner so the user sees the list is building
