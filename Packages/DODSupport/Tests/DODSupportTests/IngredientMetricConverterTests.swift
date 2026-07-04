@@ -8,8 +8,10 @@ import Testing
 /// Every expectation pins a user-facing contract: a convertible imperial
 /// measurement is rewritten to metric (grams / millilitres, rolling up to
 /// kilograms / litres past 1000) with cooking-friendly rounding — nearest 5
-/// below 100, nearest 25 at or above 100 — while already-metric units,
-/// count/descriptive units, and non-parseable lines pass through byte for byte.
+/// below 100, nearest 10 at or above 100, and a one-decimal fallback for a tiny
+/// measure that would otherwise round to a whole 0 (DUT-533) — while
+/// already-metric units, count/descriptive units, and non-parseable lines pass
+/// through byte for byte.
 ///
 /// The converter runs on the ALREADY-SCALED line, so the composition tests
 /// scale first (via ``FractionRenderer``) and then convert, matching the render
@@ -20,8 +22,13 @@ struct IngredientMetricConverterTests {
     // MARK: - Volume → millilitres
 
     @Test func cupToMilliliters() {
-        // 1 × 240 = 240 ml → nearest 25 → 250.
-        #expect(IngredientMetricConverter.metric("1 cup flour") == "250 ml flour")
+        // 1 × 240 = 240 ml → nearest 10 (>= 100) → 240 (no longer inflated to 250).
+        #expect(IngredientMetricConverter.metric("1 cup flour") == "240 ml flour")
+    }
+
+    @Test func twoCupsToMilliliters() {
+        // 2 × 240 = 480 ml → nearest 10 (>= 100) → 480.
+        #expect(IngredientMetricConverter.metric("2 cups milk") == "480 ml milk")
     }
 
     @Test func tablespoonToMilliliters() {
@@ -35,8 +42,8 @@ struct IngredientMetricConverterTests {
     }
 
     @Test func pintToMilliliters() {
-        // 1 × 475 = 475 ml → nearest 25 → 475.
-        #expect(IngredientMetricConverter.metric("1 pint cream") == "475 ml cream")
+        // 1 × 475 = 475 ml → nearest 10 (>= 100) → 480.
+        #expect(IngredientMetricConverter.metric("1 pint cream") == "480 ml cream")
     }
 
     @Test func quartToMilliliters() {
@@ -52,8 +59,8 @@ struct IngredientMetricConverterTests {
     }
 
     @Test func ounceToGrams() {
-        // 4 × 28 = 112 g → nearest 25 (>= 100) → 112/25 = 4.48 → 4 → 100.
-        #expect(IngredientMetricConverter.metric("4 ounces cheese") == "100 g cheese")
+        // 4 × 28 = 112 g → nearest 10 (>= 100) → 112/10 = 11.2 → 11 → 110.
+        #expect(IngredientMetricConverter.metric("4 ounces cheese") == "110 g cheese")
     }
 
     @Test func singleOunceRoundsToNearestFive() {
@@ -64,13 +71,32 @@ struct IngredientMetricConverterTests {
     // MARK: - Mixed / fraction quantities
 
     @Test func mixedNumberCups() {
-        // "1 1/2 cups" → 1.5 × 240 = 360 ml → nearest 25 → 360/25 = 14.4 → 14 → 350.
-        #expect(IngredientMetricConverter.metric("1 1/2 cups milk") == "350 ml milk")
+        // "1 1/2 cups" → 1.5 × 240 = 360 ml → nearest 10 (>= 100) → 360.
+        #expect(IngredientMetricConverter.metric("1 1/2 cups milk") == "360 ml milk")
     }
 
     @Test func vulgarFractionCup() {
-        // "½ cup" → 0.5 × 240 = 120 ml → nearest 25 → 120/25 = 4.8 → 5 → 125.
-        #expect(IngredientMetricConverter.metric("½ cup sugar") == "125 ml sugar")
+        // "½ cup" → 0.5 × 240 = 120 ml → nearest 10 (>= 100) → 120.
+        #expect(IngredientMetricConverter.metric("½ cup sugar") == "120 ml sugar")
+    }
+
+    // MARK: - Sub-half-teaspoon: never "0 ml" (DUT-533)
+
+    @Test func quarterTeaspoonKeepsOneDecimal() {
+        // "1/4 teaspoon" → 0.25 × 5 = 1.25 ml → whole-round would be 0, so fall
+        // back to one decimal → "1.3 ml" (never "0 ml").
+        #expect(IngredientMetricConverter.metric("1/4 teaspoon salt") == "1.3 ml salt")
+    }
+
+    @Test func eighthTeaspoonKeepsOneDecimal() {
+        // "1/8 teaspoon" → 0.125 × 5 = 0.625 ml → whole-round would be 0, so fall
+        // back to one decimal → "0.6 ml" (never "0 ml").
+        #expect(IngredientMetricConverter.metric("1/8 teaspoon baking soda") == "0.6 ml baking soda")
+    }
+
+    @Test func halfTeaspoonRoundsToWholeFive() {
+        // "1/2 teaspoon" → 0.5 × 5 = 2.5 ml → nearest 5 → 5 (already non-zero).
+        #expect(IngredientMetricConverter.metric("1/2 teaspoon vanilla") == "5 ml vanilla")
     }
 
     // MARK: - Rollover to litres / kilograms
@@ -139,10 +165,9 @@ struct IngredientMetricConverterTests {
     // MARK: - Scale-then-convert composition (render-path order)
 
     @Test func scaleThenConvertCup() {
-        // "1 cup" scaled ×2 → "2 cups" → 2 × 240 = 480 ml → nearest 25 →
-        // 480/25 = 19.2 → 19 → 475.
+        // "1 cup" scaled ×2 → "2 cups" → 2 × 240 = 480 ml → nearest 10 → 480.
         let scaled = FractionRenderer.scale("1 cup flour", by: 2)
-        #expect(IngredientMetricConverter.metric(scaled) == "475 ml flour")
+        #expect(IngredientMetricConverter.metric(scaled) == "480 ml flour")
     }
 
     @Test func scaleThenConvertRollsToLiters() {
