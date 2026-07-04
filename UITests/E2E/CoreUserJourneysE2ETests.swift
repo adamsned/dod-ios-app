@@ -87,16 +87,12 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8), "Tab bar should appear")
 
-        // Switch to Search tab. Index 2 matches the AC-16.6 contract
-        // (Recipes / Saved / Search — the Categories tab was removed in
-        // T-800). `tabBar.buttons["Search"]` is the equivalent name-based
-        // lookup but the iOS 26 sim occasionally reports a `{-1, -1}` hit
-        // point for tab buttons queried by label when the simulator process
-        // is under load; index-based lookup avoids that quirk and matches the
-        // `SmokeTests.test_tabBarOrderMatchesSpec` pattern.
-        let tabButtons = tabBar.buttons.allElementsBoundByIndex
-        XCTAssertEqual(tabButtons.count, 3, "Expected exactly 3 top-level tabs")
-        tabButtons[2].tap()
+        // Switch to Search tab. Name-based lookup is the canonical pattern
+        // (matches AppShellJourneysE2ETests / BrowseJourneysE2ETests /
+        // DeterministicJourneysE2ETests) and is index-stable across tab-set
+        // changes — DUT-536 inserted the Grocery List tab, shifting Search
+        // from positional index 2 to 4, so positional taps are brittle.
+        tabBar.buttons["Search"].tap()
 
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
@@ -394,8 +390,9 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8), "Tab bar should appear")
 
-        // Switch to Search tab (index 3 per AC-16.6).
-        tabBar.buttons.allElementsBoundByIndex[3].tap()
+        // Switch to Search tab (name-based — index-stable across the DUT-536
+        // 4→5 tab-set change that added the Grocery List tab).
+        tabBar.buttons["Search"].tap()
 
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
@@ -422,7 +419,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
-        tabBar.buttons.allElementsBoundByIndex[3].tap()
+        tabBar.buttons["Search"].tap()
 
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
@@ -457,7 +454,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
-        tabBar.buttons.allElementsBoundByIndex[3].tap()
+        tabBar.buttons["Search"].tap()
 
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
@@ -591,7 +588,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
-        tabBar.buttons.allElementsBoundByIndex[3].tap()
+        tabBar.buttons["Search"].tap()
 
         // Wait for `loadCategoriesIfNeeded()` to populate
         // `topCategorySuggestions` so the Try pills render. The pill we

@@ -35,8 +35,9 @@ extension WidgetDeepLink {
         case .tip:
             .cookingTip
         case .shoppingList:
-            // DUT-480 — the Control Center control's tap. It belongs to the
-            // Saved surface (the Shopping List lives under the Saved tab).
+            // DUT-480 — the Control Center control's tap. DUT-536 promoted the
+            // Shopping List out of the Saved tab into the top-level Grocery
+            // List tab; the widget surface it maps to stays `.saved`.
             .saved
         }
     }
