@@ -52,18 +52,21 @@ struct CookingToolsHubView: View {
     /// iPad flip.
     @Binding var tipToken: UUID?
 
+    // The hub's navigation + sheet-presentation state is `internal` (not
+    // `private`) so the tool cards extracted to `CookingToolsHubView+ToolCards.swift`
+    // (SwiftLint `type_body_length` relief) can drive it across the file boundary.
     /// The hub tab's own navigation stack (Shopping List pushes onto it).
-    @State private var path: [HubDestination] = []
+    @State var path: [HubDestination] = []
     /// Presents the "Your First Cookout" roadmap (`CookChooserFlow`).
-    @State private var showingFirstCookout = false
+    @State var showingFirstCookout = false
     /// Presents the Dutch Oven Heat Coach.
-    @State private var showingHeatCoach = false
+    @State var showingHeatCoach = false
     /// Presents the "I Made This" Cooking Journal.
-    @State private var showingJournal = false
+    @State var showingJournal = false
     /// Cook Mode needs a recipe, so its row is an explainer sheet whose CTA
     /// routes the user to the Recipes tab to pick something to cook (never
     /// constructs Cook Mode with a nil `Recipe`).
-    @State private var showingCookModeExplainer = false
+    @State var showingCookModeExplainer = false
 
     /// Reused so "Your First Cookout" + the Cooking Journal log/read through the
     /// same store the Feed tab does. Built once from `feedDependencies()` (the
@@ -75,6 +78,12 @@ struct CookingToolsHubView: View {
     /// reaches into tab selection directly.
     let onFindRecipe: () -> Void
 
+    /// DUT-551 (CL-306) — opens the Settings sheet from the hub header's trailing
+    /// gear (Settings left the tab bar; the gear now lives on every main tab).
+    /// Optional so tests / previews that omit it show no gear; production wires
+    /// it through `TabStack` → `RootView.showSettingsSheet`.
+    let onOpenSettings: (() -> Void)?
+
     /// System `openURL` (RootView's override). The "Buy BuzzyWaxx" row hands off
     /// to the browser; buzzywaxx.com isn't a DOD recipe link, so the override
     /// falls through to `.systemAction`.
@@ -85,13 +94,15 @@ struct CookingToolsHubView: View {
         shoppingListToken: Binding<UUID?> = .constant(nil),
         heatCoachToken: Binding<UUID?> = .constant(nil),
         tipToken: Binding<UUID?> = .constant(nil),
-        onFindRecipe: @escaping () -> Void = {}
+        onFindRecipe: @escaping () -> Void = {},
+        onOpenSettings: (() -> Void)? = nil
     ) {
         self.dependencies = dependencies
         self._shoppingListToken = shoppingListToken
         self._heatCoachToken = heatCoachToken
         self._tipToken = tipToken
         self.onFindRecipe = onFindRecipe
+        self.onOpenSettings = onOpenSettings
         _feedViewModel = State(
             initialValue: FeedViewModel(dependencies: dependencies.feedDependencies())
         )
@@ -100,7 +111,11 @@ struct CookingToolsHubView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                DODScreenHeader("Cooking Tools")
+                DODScreenHeader("Cooking Tools") {
+                    if let onOpenSettings {
+                        DODHeaderGearButton { onOpenSettings() }
+                    }
+                }
                 tipBanner
                 toolList
             }
@@ -188,109 +203,9 @@ struct CookingToolsHubView: View {
 
     // MARK: - The tool list
 
-    /// The six tools, in meal-making order (shop → heat → cook → after). Each
-    /// row: an icon in a tinted circle + a Title-Case title + a sentence-case
-    /// description of what it does and why it matters + a chevron. insetGrouped
-    /// `List` matching the Settings / Shopping List treatment.
-    private var toolList: some View {
-        List {
-            Section {
-                toolRow(
-                    icon: "flame.fill",
-                    title: "Your First Cookout",
-                    description: "New to Dutch oven cooking? Get coached through a whole cook, "
-                        + "start to finish.",
-                    accessibilityID: "hub-first-cookout"
-                ) { showingFirstCookout = true }
-
-                toolRow(
-                    icon: "cart.fill",
-                    title: "Shopping List",
-                    description: "Turn the recipes you're making into one aisle-sorted list, "
-                        + "so you shop in a single loop.",
-                    accessibilityID: "hub-shopping-list"
-                ) {
-                    if path.last != .shoppingList { path.append(.shoppingList) }
-                }
-
-                toolRow(
-                    icon: "thermometer.medium",
-                    title: "Heat Coach",
-                    description: "Figure out how many coals your oven needs for any temperature, "
-                        + "then adjust by feel.",
-                    accessibilityID: "hub-heat-coach"
-                ) { showingHeatCoach = true }
-
-                toolRow(
-                    icon: "flame.circle.fill",
-                    title: "Cook Mode",
-                    description: "Cook any recipe hands-free, one step at a time, with timers "
-                        + "and voice. Open a recipe and tap Cook Now to start.",
-                    accessibilityID: "hub-cook-mode"
-                ) { showingCookModeExplainer = true }
-
-                toolRow(
-                    icon: "book.closed.fill",
-                    title: "Cooking Journal",
-                    description: "Log every cook with a photo and notes, and build your streak.",
-                    accessibilityID: "hub-journal"
-                ) { showingJournal = true }
-
-                toolRow(
-                    icon: "bag.fill",
-                    title: "Buy BuzzyWaxx",
-                    description: "Season and protect your cast iron with the wax we swear by.",
-                    accessibilityID: "hub-buy-buzzywaxx"
-                ) { openToolURL(SettingsViewModel.buyBuzzyWaxxURLString) }
-            } header: {
-                Text("Everything you need, in the order you'll use it.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .textCase(nil)
-                    .padding(.bottom, DODSpacing.xxs)
-            }
-        }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(DODColor.surface)
-    }
-
-    /// One hub tool row: tinted-circle icon + Title-Case title + sentence-case
-    /// description + chevron, as a full-width plain button.
-    private func toolRow(
-        icon: String,
-        title: String,
-        description: String,
-        accessibilityID: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: DODSpacing.md) {
-                Image(systemName: icon)
-                    .font(.body)
-                    .foregroundStyle(DODColor.burntOrange)
-                    .frame(width: 40, height: 40)
-                    .background(DODColor.burntOrange.opacity(0.12), in: Circle())
-                VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                    Text(title)
-                        .dodFont(DODType.heading)
-                        .foregroundStyle(DODColor.label)
-                    Text(description)
-                        .dodFont(DODType.caption)
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: DODSpacing.sm)
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-            .padding(.vertical, DODSpacing.xxs)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(accessibilityID)
-    }
+    // The six tool cards + the `toolCard` builder live in
+    // `CookingToolsHubView+ToolCards.swift` so this host type stays under the
+    // SwiftLint `type_body_length` cap (mirrors the `+TipBanner.swift` split).
 
     /// Cook Mode can't launch without a recipe, so this row's sheet explains the
     /// flow and routes the user to the Recipes tab to pick something to cook.
@@ -338,8 +253,10 @@ struct CookingToolsHubView: View {
 
     /// Hand a tool URL (the BuzzyWaxx storefront) to the browser. Built with
     /// `if let` from the `String` constant so the repo's `force_unwrapping`
-    /// lint stays clean (mirrors the retired Feed menu's helper).
-    private func openToolURL(_ string: String) {
+    /// lint stays clean (mirrors the retired Feed menu's helper). `internal` (not
+    /// `private`) so the `+ToolCards.swift` extension's Buy BuzzyWaxx card can
+    /// reach it across the file boundary.
+    func openToolURL(_ string: String) {
         if let url = URL(string: string) {
             openURL(url)
         }

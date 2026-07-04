@@ -26,15 +26,22 @@ public struct SavedView: View {
     /// the case here) and "Save" + `bookmark.fill` when `isSaved: false`
     /// (used by Feed/Categories/Search per their respective TODO markers).
     public let onSave: ((Recipe) -> Void)?
+    /// DUT-551 (CL-306) — opens the Settings sheet from the header's trailing
+    /// gear (Settings left the tab bar; the gear now lives on every main tab).
+    /// Optional + default nil so existing callers / previews / snapshots show no
+    /// gear and stay unaffected. Production wires it through `TabStack`.
+    public let onOpenSettings: (() -> Void)?
 
     public init(
         viewModel: SavedViewModel,
         onSelect: @escaping (Recipe) -> Void,
-        onSave: ((Recipe) -> Void)? = nil
+        onSave: ((Recipe) -> Void)? = nil,
+        onOpenSettings: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
+        self.onOpenSettings = onOpenSettings
     }
 
     public var body: some View {
@@ -65,7 +72,12 @@ public struct SavedView: View {
         // Grocery List tab is the single store-backed list surface, so this is a
         // title-only header matching Search/Settings.
         VStack(spacing: 0) {
-            DODScreenHeader("Saved")
+            // DUT-551 (CL-306) — Settings gear in the trailing slot when wired.
+            DODScreenHeader("Saved") {
+                if let onOpenSettings {
+                    DODHeaderGearButton { onOpenSettings() }
+                }
+            }
             loadStateBody
         }
     }

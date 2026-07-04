@@ -22,6 +22,9 @@ struct LayoutSettingPicker: View {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
         }
+        // DUT-551 (CL-306) — brand-orange menu value + chevron (was the default
+        // system blue), matching the App Appearance picker above it.
+        .tint(DODColor.burntOrange)
         .accessibilityIdentifier("settings-picker-layout")
     }
 

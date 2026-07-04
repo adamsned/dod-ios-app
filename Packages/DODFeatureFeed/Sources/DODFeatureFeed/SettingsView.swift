@@ -36,6 +36,9 @@ public struct SettingsView: View {
     // `internal` (not `private`) so the `Binding` wrappers in
     // `SettingsView+Bindings.swift` reach it across the file boundary (DUT-307).
     @State var viewModel: SettingsViewModel
+    /// DUT-551 (CL-306) — Settings is a sheet; the in-content `DODScreenHeader`
+    /// was replaced by a nav-bar back button that dismisses the sheet.
+    @Environment(\.dismiss) private var dismiss
     /// DUT-529 — when Reduce Motion is on, the cache-clear snackbar crossfades in
     /// (opacity only) instead of sliding up from the bottom edge (constitution §7).
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -64,15 +67,28 @@ public struct SettingsView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // T-843 / DUT-261 — shared `DODScreenHeader` (large, left-aligned,
-            // `DODColor.label`) instead of a centered inline `.navigationTitle`,
-            // so the Settings header matches Recipes / Saved / Search.
-            DODScreenHeader("Settings")
             content
         }
         .background(DODColor.surface)
-        // DUT-275 — nav bar hidden; the title pins at the top (header above).
-        .dodHidesNavBar()
+        // DUT-551 (CL-306) — Settings is now a pushed-feeling sheet: an inline
+        // nav title + a leading back button (below) that dismisses it, replacing
+        // the big in-content `DODScreenHeader`. The sheet's nav bar shows (no
+        // `dodHidesNavBar()`).
+        .navigationTitle("Settings")
+        .dodInlineNavTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                // `.cancellationAction` (not `.topBarLeading`) is cross-platform,
+                // so this compiles on the macOS L1 `swift test` for this package.
+                Button {
+                    dismiss()
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                }
+                .tint(DODColor.burntOrange)
+                .accessibilityIdentifier("settings-back")
+            }
+        }
         // T-756 / CL-153 (DUT-62 bug 2) — give the Settings surface its OWN live
         // color scheme. `preferredColorScheme` applied on `RootView` does NOT
         // propagate into an already-presented sheet (the "only updates on reopen"
@@ -209,6 +225,9 @@ public struct SettingsView: View {
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                 }
+                // DUT-551 (CL-306) — brand-orange menu value + chevron (was the
+                // default system blue).
+                .tint(DODColor.burntOrange)
                 .accessibilityIdentifier("settings-picker-appearance")
                 LayoutSettingPicker()
 

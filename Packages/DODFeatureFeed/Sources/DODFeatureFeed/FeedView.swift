@@ -95,15 +95,16 @@ public struct FeedView: View {
     /// slot. Settings left the tab bar; the gear opens it as a sheet via the
     /// injected `onOpenSettings` closure (`RootView.showSettingsSheet`). Rendered
     /// only when wired, so tests / previews that omit the closure show no gear.
+    /// Uses the shared, bigger ``DODHeaderGearButton`` so the gear matches the
+    /// Saved / Cooking Tools / Search headers exactly.
     @ViewBuilder
     private var settingsGear: some View {
         if let onOpenSettings {
-            Button(action: onOpenSettings) {
-                Image(systemName: "gearshape")
-                    .accessibilityLabel("Settings")
-            }
-            .tint(DODColor.burntOrange)
-            .accessibilityIdentifier("feed-toolbar-settings")
+            // Keep the Feed's own stable `feed-toolbar-settings` id (the
+            // SmokeTests + AppShell E2E journeys query it); the outer identifier
+            // overrides the shared component's default `header-settings-gear`.
+            DODHeaderGearButton { onOpenSettings() }
+                .accessibilityIdentifier("feed-toolbar-settings")
         }
     }
 
