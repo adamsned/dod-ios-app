@@ -125,8 +125,10 @@ public struct GuestIdentitySheet: View {
                 .foregroundStyle(canContinue ? DODColor.cream : DODColor.label)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DODSpacing.md)
+                // CL-304 / DUT-537: this is a button, so it takes the pill tier
+                // (`Capsule`), not the card-tier `DODRadius.standard`.
                 .background(
-                    RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                    Capsule(style: .continuous)
                         .fill(canContinue ? DODColor.accent : DODColor.labelSecondary.opacity(0.5))
                 )
         }
