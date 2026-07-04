@@ -348,6 +348,10 @@ struct RootView: View {
                 externalRoute: externalRouteBinding(for: selectedTab),
                 // T-912/DUT-551 — Shopping List reroute + hub Cook Mode → Recipes.
                 openShoppingList: { routeToShoppingList() },
+                // DUT-563 — wire the header gear on iPad too (the phone branch
+                // already does). Without this the detail `TabStack` took the
+                // default no-op `{}`, so the rendered gear was a dead button.
+                onOpenSettings: { showSettingsSheet = true },
                 onFindRecipe: { selectedTab = .feed },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                 openHeatCoach: { routeToHeatCoach() },
