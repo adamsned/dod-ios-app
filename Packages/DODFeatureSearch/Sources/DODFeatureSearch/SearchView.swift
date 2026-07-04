@@ -29,19 +29,26 @@ public struct SearchView: View {
     /// success snackbar shows no "View" button (mirrors Recipe Detail's Part 1
     /// `openShoppingList` seam threaded through `TabStack`).
     public let openShoppingList: (() -> Void)?
+    /// DUT-551 (CL-306) — opens the Settings sheet from the header's trailing
+    /// gear (Settings left the tab bar; the gear now lives on every main tab).
+    /// Optional + default nil so existing callers / previews / snapshots show no
+    /// gear and stay unaffected. Production wires it through `TabStack`.
+    public let onOpenSettings: (() -> Void)?
 
     public init(
         viewModel: SearchViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
         onSelectCategory: @escaping (DODDomain.Category) -> Void = { _ in },
-        openShoppingList: (() -> Void)? = nil
+        openShoppingList: (() -> Void)? = nil,
+        onOpenSettings: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.onSelectCategory = onSelectCategory
         self.openShoppingList = openShoppingList
+        self.onOpenSettings = onOpenSettings
     }
 
     public var body: some View {
@@ -49,7 +56,12 @@ public struct SearchView: View {
             // T-843 / DUT-261 — shared `DODScreenHeader` (large, left-aligned,
             // `DODColor.label`), pinned above the search field, so Search matches
             // Recipes / Saved / Settings instead of a native white nav title.
-            DODScreenHeader("Search")
+            // DUT-551 (CL-306) — Settings gear in the trailing slot when wired.
+            DODScreenHeader("Search") {
+                if let onOpenSettings {
+                    DODHeaderGearButton { onOpenSettings() }
+                }
+            }
             // US-3 / AC-3.5 amendment / CL-126 / REG-32 (T-648, 2026-05-30):
             // the inline `searchField` `HStack`-with-`RoundedRectangle` is
             // replaced by the shared `DODSearchField` so this bar and the

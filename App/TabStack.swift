@@ -213,7 +213,8 @@ struct TabStack: View {
                 onSelectCategory: { category in path.append(.category(category)) },
                 // DUT-534 Part 2 — the card snackbar's "View" opens the Shopping
                 // List, same closure Recipe Detail's Part 1 snackbar routes to.
-                openShoppingList: openShoppingList
+                openShoppingList: openShoppingList,
+                onOpenSettings: onOpenSettings  // DUT-551 (CL-306) — header gear
             )
         case .saved:
             SavedView(
@@ -227,7 +228,8 @@ struct TabStack: View {
                             publisher: dependencies.savedWidgetPublisher()
                         )
                     }
-                }
+                },
+                onOpenSettings: onOpenSettings  // DUT-551 (CL-306) — header gear
             )
         case .cookingTools:
             // T-912 / DUT-551 (CL-306) — the Cooking Tools hub. Replaces the
@@ -241,7 +243,8 @@ struct TabStack: View {
                 shoppingListToken: $hubShoppingListToken,
                 heatCoachToken: $hubHeatCoachToken,
                 tipToken: $hubTipToken,
-                onFindRecipe: onFindRecipe
+                onFindRecipe: onFindRecipe,
+                onOpenSettings: onOpenSettings  // DUT-551 (CL-306) — header gear
             )
         }
     }
