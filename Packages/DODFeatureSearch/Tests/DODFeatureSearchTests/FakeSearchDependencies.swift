@@ -145,8 +145,19 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         return recentlyViewedSet
     }
 
+    /// DUT-568 — an optional gate so a test can hold the "did you mean?"
+    /// cached-titles fetch IN FLIGHT while it bumps the search generation,
+    /// proving an older `computeDidYouMean` continuation re-checks the
+    /// generation and does NOT clobber a newer search's banner. `nil`
+    /// (default) = the fetch returns immediately; set to an async closure to
+    /// suspend inside `cachedRecipeTitles()` before the fixture is returned.
+    var cachedTitlesGate: (@Sendable () async -> Void)?
+
     /// CL-127 (T-649): returns the pre-seeded cached-titles fixture.
-    func cachedRecipeTitles() async throws -> [String] { cachedTitlesArray }
+    func cachedRecipeTitles() async throws -> [String] {
+        if let cachedTitlesGate { await cachedTitlesGate() }
+        return cachedTitlesArray
+    }
 
     func allCategories() async throws -> [DODDomain.Category] { categories }
 

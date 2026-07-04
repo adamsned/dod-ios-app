@@ -81,6 +81,70 @@ import Testing
         #expect(viewModel.items.isEmpty)
     }
 
+    /// DUT-568 Finding A: `computeDidYouMean` `await`s the cached-titles fetch
+    /// AFTER the last generation check. A newer search that bumps the generation
+    /// during that await must not have its banner clobbered by the older pass's
+    /// suggestion. Reproduced with the `cachedTitlesGate` seam: the older
+    /// continuation is held inside the fetch while the generation is bumped, then
+    /// resumed — it must re-check `generation == searchGeneration` and bail.
+    @Test func staleDidYouMeanDoesNotOverwriteNewerBanner() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.cachedTitlesArray = ["Cast Iron Skillet Nachos"]
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+
+        // A newer search has already set the banner and owns this generation.
+        viewModel.didYouMean = "brisket"
+        let newerGeneration = viewModel.searchGeneration
+
+        // The older "naxxos" pass runs one generation behind and is held inside
+        // the cached-titles fetch; while suspended, assert the newer banner is
+        // still intact, then release it.
+        let gate = SearchGate()
+        dependencies.cachedTitlesGate = { await gate.wait() }
+
+        let stalePass = Task { @MainActor in
+            await viewModel.computeDidYouMean(
+                itemCount: 1,
+                trimmed: "naxxos",
+                generation: newerGeneration - 1
+            )
+        }
+        // Spin until the stale pass has parked inside the gated fetch.
+        while await !gate.isWaiting { await Task.yield() }
+        #expect(viewModel.didYouMean == "brisket", "Newer banner intact mid-await")
+        await gate.release()
+        await stalePass.value
+
+        #expect(
+            viewModel.didYouMean == "brisket",
+            "Stale computeDidYouMean re-checks the generation and bails"
+        )
+    }
+
+    /// DUT-568 Finding B: backspacing to a `< 2`-char query resets to idle and
+    /// must clear `didYouMean` for parity with `clear()` (previously stranded).
+    @Test func backspacingToShortQueryClearsDidYouMean() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["naxxos"] = [Self.makeItem(1, title: "Naxxos")]
+        dependencies.cachedTitlesArray = ["Cast Iron Skillet Nachos"]
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+
+        viewModel.query = "naxxos"
+        await viewModel.runImmediateSearch()
+        #expect(viewModel.didYouMean == "nachos", "Sparse result seeds the banner")
+
+        // Backspace down to a single character → the short-query idle branch.
+        viewModel.query = "n"
+        #expect(viewModel.state == .idle, "Short query resets to idle")
+        #expect(viewModel.didYouMean == nil, "Idle reset clears the rescue banner")
+    }
+
     static func makeItem(_ id: Int, title: String) -> RecipeListItem {
         RecipeListItem(
             id: id,
@@ -97,5 +161,27 @@ import Testing
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
         return RecentSearches(defaults: defaults, storageKey: "recents")
+    }
+}
+
+/// DUT-568: a one-shot async gate. A caller `await`s `wait()`, parking until
+/// the test calls `release()`; `isWaiting` lets the test spin until the caller
+/// has actually parked so the "newer search bumps generation mid-await" window
+/// is deterministic rather than timing-dependent.
+private actor SearchGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var released = false
+    private(set) var isWaiting = false
+
+    func wait() async {
+        if released { return }
+        isWaiting = true
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func release() {
+        released = true
+        continuation?.resume()
+        continuation = nil
     }
 }

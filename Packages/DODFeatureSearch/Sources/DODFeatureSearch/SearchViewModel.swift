@@ -267,12 +267,12 @@ public final class SearchViewModel {
         debounceTask?.cancel()
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else {
-            // DUT-221: bump the generation so an earlier ≥2-char search still in
-            // flight bails rather than repainting over the reset-to-idle screen.
+            // DUT-221: bump the generation so an earlier ≥2-char search in flight bails.
             searchGeneration &+= 1
             items = []
             ingredientItems = []  // DUT-11: don't strand a stale tier.
             state = .idle
+            didYouMean = nil  // DUT-568: parity with clear() — wipe the rescue banner.
             filterSupportHydrated = false  // DUT-505: re-arm lazy filter-support hydration.
             return
         }
