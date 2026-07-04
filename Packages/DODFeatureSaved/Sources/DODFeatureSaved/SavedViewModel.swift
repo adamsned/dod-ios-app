@@ -48,6 +48,16 @@ public final class SavedViewModel {
     /// enough that a synced recipe appears effectively immediately.
     static let remoteChangeDebounce: Duration = .milliseconds(300)
 
+    /// One optimistic-unsave suppression: WHEN the user tapped Unsave, on both
+    /// clocks. ``markedAt`` (monotonic) drives the DUT-482 TTL; ``markedDate``
+    /// (wall clock) is compared against the store's synced `savedAt` in
+    /// ``refresh()`` to spot a re-save (DUT-513) — the store timestamps are
+    /// `Date`s, so the comparison needs a wall-clock marker.
+    struct PendingRemoval {
+        let markedAt: ContinuousClock.Instant
+        let markedDate: Date
+    }
+
     /// DUT-370: ids optimistically removed by an Unsave tap whose store write
     /// hasn't committed yet, each stamped with WHEN it was marked. `refresh()`
     /// suppresses these from the fetched set until the store stops returning
@@ -60,7 +70,12 @@ public final class SavedViewModel {
     /// it in the fetch set, kept it suppressed, and hid it from the Saved tab
     /// for the rest of the session. Past the TTL a still-returned id is treated
     /// as a genuine re-save and shown again.
-    @ObservationIgnored private var pendingRemovals: [Int: ContinuousClock.Instant] = [:]
+    ///
+    /// DUT-513: within the TTL, a re-save is now caught the instant it happens —
+    /// `refresh()` drops the entry as soon as the store reports the id with a
+    /// `savedAt` newer than ``PendingRemoval/markedDate`` — instead of waiting
+    /// the full TTL out.
+    @ObservationIgnored private var pendingRemovals: [Int: PendingRemoval] = [:]
 
     /// DUT-482: how long an optimistic unsave stays suppressed before a
     /// still-present id is read as a re-save. Comfortably exceeds the store
@@ -84,16 +99,29 @@ public final class SavedViewModel {
         // true first load (mirrors FeedViewModel's DUT-313 fix).
         if recipes.isEmpty { loadState = .loading }
         do {
-            var fetched = try await dependencies.savedRecipes()
-            // DUT-370/482: keep suppressing only ids whose unsave write is still
-            // in flight — within the TTL AND still returned by the store. Drop
-            // the rest: an id the store no longer returns has committed; one
-            // that outlives the TTL while STILL returned was re-saved from
-            // another surface, so it must reappear (the old code kept it
-            // suppressed forever, hiding a re-saved recipe all session).
+            let fetchedWithSavedAt = try await dependencies.savedRecipesWithSavedAt()
+            // Newest synced `savedAt` per id, for the DUT-513 re-save check below.
+            var savedAtByID: [Int: Date] = [:]
+            for entry in fetchedWithSavedAt {
+                savedAtByID[entry.recipe.id] = max(
+                    savedAtByID[entry.recipe.id] ?? .distantPast, entry.savedAt)
+            }
+            var fetched = fetchedWithSavedAt.map(\.recipe)
+            // Keep suppressing only ids whose unsave is genuinely still in flight.
+            // Drop an entry when ANY of:
+            //   • the store no longer returns the id — the unsave write committed;
+            //   • DUT-482: the TTL elapsed while the id is still returned;
+            //   • DUT-513: the id is returned with a `savedAt` NEWER than when the
+            //     user tapped Unsave — a real re-save (from any surface that
+            //     writes a fresh `SyncedSavedRecipe`), so show it again at once
+            //     rather than holding it hidden for the rest of the TTL.
+            // Otherwise (returned, within TTL, save time predates the unsave) it
+            // is the DUT-370 not-yet-committed write and stays suppressed.
             let now = ContinuousClock.now
-            pendingRemovals = pendingRemovals.filter { id, markedAt in
-                now - markedAt < pendingRemovalTTL && fetched.contains { $0.id == id }
+            pendingRemovals = pendingRemovals.filter { id, pending in
+                guard let savedAt = savedAtByID[id] else { return false }
+                guard now - pending.markedAt < pendingRemovalTTL else { return false }
+                return savedAt <= pending.markedDate
             }
             fetched.removeAll { pendingRemovals.keys.contains($0.id) }
             recipes = fetched
@@ -169,19 +197,24 @@ public final class SavedViewModel {
     /// `refresh()` reconciles on next appear if the store write somehow
     /// failed. T-635 / CL-104.
     public func optimisticallyRemove(id: Int) {
-        pendingRemovals[id] = ContinuousClock.now  // DUT-370/482: suppress until commit, bounded by TTL
+        // DUT-370/482: suppress until commit, bounded by the TTL. DUT-513: stamp
+        // the wall-clock time too so `refresh()` can compare it against the
+        // store's synced `savedAt` and lift the suppression the moment a re-save
+        // lands.
+        pendingRemovals[id] = PendingRemoval(markedAt: .now, markedDate: .now)
         recipes.removeAll { $0.id == id }
         loadState = recipes.isEmpty ? .empty : .loaded
     }
 
-    /// DUT-513 — drop a recipe's optimistic-unsave suppression the instant it is
-    /// re-saved, so an unsave→re-save within ``pendingRemovalTTL`` doesn't keep
-    /// the (now legitimately-saved) recipe hidden from the grid until the TTL
-    /// expires. Call this from the re-save surface (the Saved-tab card's own
-    /// Save toggle, and any external surface that re-saves a recipe the user
-    /// just unsaved here). Idempotent and safe for ids that were never pending.
-    /// Preserves the DUT-482 TTL bound — that still governs the genuine
-    /// write-in-flight case; this only clears the entry on a real re-save.
+    /// DUT-513 — manually drop a recipe's optimistic-unsave suppression. The
+    /// production re-save path no longer relies on this: ``refresh()`` clears
+    /// the suppression automatically the moment the store reports the id with a
+    /// `savedAt` newer than the unsave (see ``savedRecipesWithSavedAt()``), so a
+    /// re-save from ANY surface (Feed/Search/Category/detail) surfaces the card
+    /// without an explicit clear call — the previous PR-#392 attempt wired this
+    /// only into tests and left the bug live. Kept as an idempotent escape hatch
+    /// (safe for ids that were never pending); it does not bypass the DUT-482 TTL
+    /// for a genuine in-flight unsave, which the store-timestamp check governs.
     public func clearPendingRemoval(id: Int) {
         pendingRemovals[id] = nil
     }

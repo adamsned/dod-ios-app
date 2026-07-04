@@ -5,6 +5,18 @@ import Foundation
 
 public protocol SavedDependencies: Sendable {
     func savedRecipes() async throws -> [Recipe]
+
+    /// DUT-513 — the saved set paired with each recipe's `savedAt`. ``SavedViewModel``
+    /// uses the timestamp in ``SavedViewModel/refresh()`` to distinguish a
+    /// genuine re-save (savedAt NEWER than the optimistic-unsave marker → drop
+    /// the suppression at once so the re-saved card reappears immediately,
+    /// regardless of which surface — Feed/Search/Category/detail — re-saved it)
+    /// from a not-yet-committed unsave write (savedAt predates the marker →
+    /// stay suppressed, preserving DUT-370/482). Default bridges from
+    /// ``savedRecipes()`` with `.distantPast` so fake conformers that don't
+    /// model save time keep compiling and simply never see a "re-save"; the live
+    /// wiring routes to ``RecipeStore/savedRecipesWithSavedAt()``.
+    func savedRecipesWithSavedAt() async throws -> [(recipe: Recipe, savedAt: Date)]
     /// T-774 / DUT-80 — the id set of recipes explicitly downloaded for offline
     /// use (`CachedRecipe.downloadedAt != nil`), so the Saved tab can render a
     /// "Downloaded" badge on the saved cards that are also downloaded. Default
@@ -73,6 +85,14 @@ public protocol SavedDependencies: Sendable {
 extension SavedDependencies {
     public func remoteChanges() -> AsyncStream<Void> {
         AsyncStream { $0.finish() }
+    }
+
+    /// Default (DUT-513): bridge from ``savedRecipes()`` stamping every recipe
+    /// `.distantPast`, so a fake that doesn't model save time compiles and its
+    /// recipes are never read as a fresh re-save. The live wiring overrides this
+    /// with the real synced `savedAt`.
+    public func savedRecipesWithSavedAt() async throws -> [(recipe: Recipe, savedAt: Date)] {
+        try await savedRecipes().map { ($0, .distantPast) }
     }
 
     /// Default no-op (see ``publishSavedWidget()``); live wiring republishes the
@@ -152,6 +172,10 @@ public struct LiveSavedDependencies: SavedDependencies {
 
     public func savedRecipes() async throws -> [Recipe] {
         try await store.savedRecipes()
+    }
+
+    public func savedRecipesWithSavedAt() async throws -> [(recipe: Recipe, savedAt: Date)] {
+        try await store.savedRecipesWithSavedAt()
     }
 
     public func downloadedRecipeIDs() async throws -> Set<Int> {
