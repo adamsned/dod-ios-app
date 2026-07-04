@@ -92,6 +92,35 @@ public struct ShoppingListStore: @unchecked Sendable {
         defaults.set(data, forKey: key)
     }
 
+    /// DUT-534 — append `rows` to the persisted list in one atomic load →
+    /// append → save, preserving the existing checked / already-have sets.
+    ///
+    /// This is the store-side seam ``LiveShoppingListAppender`` uses to add a
+    /// recipe's ingredients from Recipe Detail / a card WITHOUT going through a
+    /// ``ShoppingListViewModel`` (those surfaces don't host the list). Reading
+    /// the current snapshot first (rather than blindly overwriting) is what
+    /// makes an external append additive: it keeps every row the cook already
+    /// had, and re-persists the checked / already-have ids untouched so a
+    /// half-shopped list isn't reset by an append.
+    ///
+    /// No-op-safe: an empty `rows` still round-trips the snapshot (harmless);
+    /// callers gate on a non-empty build. Never throws — encode/decode failures
+    /// are swallowed exactly like ``save(items:checked:alreadyHave:)`` /
+    /// ``load()``.
+    ///
+    /// - Parameter rows: the freshly built per-recipe rows to append (CL-77 —
+    ///   appended AS-IS, no cross-row merge, consistent with
+    ///   ``ShoppingListViewModel/add(recipes:)``).
+    public func append(rows: [ShoppingListViewModel.Item]) {
+        let current = load()
+        let merged = (current?.items ?? []) + rows
+        save(
+            items: merged,
+            checked: Set(current?.checkedIDs ?? []),
+            alreadyHave: Set(current?.alreadyHaveIDs ?? [])
+        )
+    }
+
     /// Test helper: drop the persisted list.
     public func clear() {
         defaults.removeObject(forKey: key)

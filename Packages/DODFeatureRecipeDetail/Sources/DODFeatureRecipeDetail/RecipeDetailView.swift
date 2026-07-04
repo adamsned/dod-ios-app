@@ -64,15 +64,24 @@ public struct RecipeDetailView: View {
     /// `internal` (not `private`) so the `+Blurb` extension can read it.
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     public let onSelectRelated: (RecipeListItem) -> Void
+    /// DUT-534 — the "View" action on the "Added to your Shopping List"
+    /// Snackbar routes here. The App composition root passes a closure that
+    /// opens `dod://shopping-list` (switch to Saved + push the list); the
+    /// feature package stays free of any App / deep-link import. `nil` (the
+    /// default) hides the View action — used by previews / hosts that don't
+    /// wire routing.
+    public let openShoppingList: (() -> Void)?
 
     public init(
         viewModel: RecipeDetailViewModel,
         onSelectRelated: @escaping (RecipeListItem) -> Void,
-        autoStartCookMode: Bool = false
+        autoStartCookMode: Bool = false,
+        openShoppingList: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         _pendingAutoCookMode = State(initialValue: autoStartCookMode)
         self.onSelectRelated = onSelectRelated
+        self.openShoppingList = openShoppingList
     }
 
     public var body: some View {
@@ -288,68 +297,6 @@ public struct RecipeDetailView: View {
                 withAnimation { proxy.scrollTo(SectionAnchor.instructions, anchor: .top) }
             },
         ]
-    }
-
-    // MARK: - Toolbars
-
-    @ToolbarContentBuilder
-    private var toolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            HStack(spacing: DODSpacing.md) {
-                // Save haptic is wired via `.sensoryFeedback(.success, trigger:
-                // viewModel.isSaved)` on the body — no manual generator here.
-                Button {
-                    Task { await viewModel.toggleSaved() }
-                } label: {
-                    Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
-                        .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
-                }
-                .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
-
-                // US-35 / AC-35.1 — explicit download for offline use, now a
-                // toggle (T-775 / DUT-81, supersedes CL-61's always-outline +
-                // "Already downloaded" re-tap snackbar). Downloaded → filled
-                // burnt-orange glyph; tapping removes the download. Not
-                // downloaded → outline glyph; tapping downloads. Sits between
-                // Save (AC-4.7) and Share (AC-4.8).
-                Button {
-                    Task { await viewModel.toggleDownload() }
-                } label: {
-                    Image(
-                        systemName: viewModel.isDownloaded
-                            ? "square.and.arrow.down.fill"
-                            : "square.and.arrow.down"
-                    )
-                    .foregroundStyle(viewModel.isDownloaded ? DODColor.burntOrange : DODColor.label)
-                }
-                .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
-
-                ShareLink(item: viewModel.canonicalURL) {
-                    Image(systemName: "square.and.arrow.up")
-                        .foregroundStyle(DODColor.label)
-                }
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        Task { await viewModel.didShare() }
-                    }
-                )
-                .accessibilityLabel("Share recipe")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var snackbar: some View {
-        if let message = viewModel.snackbarMessage {
-            Snackbar(message: message)
-                .id(message)  // DUT-419: a new message restarts the auto-dismiss timer
-                .padding(.bottom, DODSpacing.md)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .task {
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
-                    viewModel.dismissSnackbar()
-                }
-        }
     }
 }
 

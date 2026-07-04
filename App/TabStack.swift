@@ -34,6 +34,12 @@ struct TabStack: View {
     /// control tap so a repeat tap re-pushes the empty list. Other tabs get the
     /// inert constant `nil`.
     @Binding var openShoppingListToken: UUID?
+    /// DUT-534 — routes the "View" action on Recipe Detail's "Added to your
+    /// Shopping List" Snackbar to the list (`RootView.routeToShoppingList()` —
+    /// switch to Saved + push the list). Threaded from `RootView` so this App
+    /// view never reaches into the deep-link plumbing directly. Defaults to a
+    /// no-op for terse call sites.
+    let openShoppingList: () -> Void
     /// DUT-250 — the per-tab navigation stack is now HOISTED into
     /// `RootView`-owned state and injected as a `@Binding`. Previously this
     /// was a local `@State private var path`, but on iPad the size-class flip
@@ -52,7 +58,8 @@ struct TabStack: View {
         path: Binding<[RecipeRoute]> = .constant([]),
         pendingDeepLink: Binding<WidgetDeepLink?> = .constant(nil),
         externalRoute: Binding<ExternalRoute?> = .constant(nil),
-        openShoppingListToken: Binding<UUID?> = .constant(nil)
+        openShoppingListToken: Binding<UUID?> = .constant(nil),
+        openShoppingList: @escaping () -> Void = {}
     ) {
         self.tab = tab
         self.dependencies = dependencies
@@ -60,6 +67,7 @@ struct TabStack: View {
         self._pendingDeepLink = pendingDeepLink
         self._externalRoute = externalRoute
         self._openShoppingListToken = openShoppingListToken
+        self.openShoppingList = openShoppingList
     }
 
     var body: some View {
@@ -204,7 +212,9 @@ struct TabStack: View {
                     dependencies: dependencies.recipeDetailDependencies()
                 ),
                 onSelectRelated: { related in path.append(.recipe(item: related)) },
-                autoStartCookMode: autoStartCookMode
+                autoStartCookMode: autoStartCookMode,
+                // DUT-534 — the Snackbar "View" action opens the Shopping List.
+                openShoppingList: openShoppingList
             )
             .onAppear {
                 Telemetry.shared.send(.screenView(name: "recipe_detail"))

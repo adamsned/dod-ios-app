@@ -54,6 +54,12 @@ public final class RecipeDetailViewModel {
     public internal(set) var isDownloaded: Bool = false
     public private(set) var checkedIngredientIDs: Set<UUID> = []
     public internal(set) var snackbarMessage: String?
+    /// DUT-534 — when non-nil, the current snackbar carries a trailing action
+    /// button with this title (e.g. "View" → open the Shopping List). The view
+    /// builds the `Snackbar.Action` from this + its injected `openShoppingList`
+    /// closure so the view model stays free of any SwiftUI / DesignSystem
+    /// dependency. Cleared alongside ``snackbarMessage`` in ``dismissSnackbar()``.
+    public internal(set) var snackbarActionTitle: String?
     /// DUT-84 — drives the offline remove-download confirmation: set by
     /// ``toggleDownload()`` when offline, presented by ``RecipeDetailView``.
     public internal(set) var showOfflineRemoveDownloadWarning: Bool = false
@@ -383,6 +389,7 @@ public final class RecipeDetailViewModel {
 
     public func dismissSnackbar() {
         snackbarMessage = nil
+        snackbarActionTitle = nil  // DUT-534 — clear any trailing action too
     }
 
     // Fetch + JSON-LD + article-classification helpers live in
