@@ -30,8 +30,10 @@ extension RecipeDetailViewModel {
     }
 
     /// Map an ``AddToShoppingListResult`` onto the Snackbar copy + optional
-    /// action. Pure state mutation — the view renders it.
-    private func showAddToShoppingListSnackbar(for result: AddToShoppingListResult) {
+    /// action. Pure state mutation — the view renders it. DUT-535 — `internal`
+    /// (was `private`) so ``RecipeDetailView`` calls it from the selection
+    /// sheet's completion after the chosen subset is appended.
+    func showAddToShoppingListSnackbar(for result: AddToShoppingListResult) {
         switch result {
         case .added(let count):
             snackbarMessage = Self.addedMessage(count: count)

@@ -222,7 +222,11 @@ struct TabStack: View {
                 onSelectRelated: { related in path.append(.recipe(item: related)) },
                 autoStartCookMode: autoStartCookMode,
                 // DUT-534 — the Snackbar "View" action opens the Shopping List.
-                openShoppingList: openShoppingList
+                openShoppingList: openShoppingList,
+                // DUT-535 — present the ingredient-selection sheet on "Add to
+                // Shopping List" (pick which ingredients), replacing the DUT-534
+                // immediate add-all.
+                addToShoppingListSheet: dependencies.addToShoppingListSheetBuilder()
             )
             .onAppear {
                 Telemetry.shared.send(.screenView(name: "recipe_detail"))

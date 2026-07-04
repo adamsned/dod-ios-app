@@ -33,6 +33,21 @@ public protocol ShoppingListAppender: Sendable {
     ///   appended rows, or ``AddToShoppingListResult/couldntLoad`` when the
     ///   recipe has no ingredients and none could be fetched.
     func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
+
+    /// DUT-535 — append a caller-chosen SUBSET of pre-built ingredient rows to
+    /// the Shopping List (the ingredient-selection sheet path).
+    ///
+    /// Unlike ``addToShoppingList(_:)``, which explodes + classifies a whole
+    /// recipe, this appends `rows` verbatim — the ``AddToShoppingListSheet`` has
+    /// already built the candidate rows via ``ShoppingListViewModel/rows(from:)``
+    /// and the user has deselected some. No hydration (the rows already carry
+    /// their ingredient text + aisle), no re-classification, no merge (CL-77 —
+    /// appended AS-IS, consistent with ``addToShoppingList(_:)``).
+    ///
+    /// - Returns ``AddToShoppingListResult/added(count:)`` with `rows.count`, or
+    ///   ``AddToShoppingListResult/couldntLoad`` when `rows` is empty or no
+    ///   App-Group store is available (never a false "added").
+    func addToShoppingList(rows: [ShoppingListViewModel.Item]) async -> AddToShoppingListResult
 }
 
 /// The production ``ShoppingListAppender`` (DUT-534).
@@ -90,6 +105,19 @@ public struct LiveShoppingListAppender: ShoppingListAppender {
         // user isn't told the row landed when it didn't.
         guard let store else { return .couldntLoad }
 
+        store.append(rows: rows)
+        return .added(count: rows.count)
+    }
+
+    /// DUT-535 — append a caller-selected subset of pre-built rows. The sheet
+    /// built the candidates through ``ShoppingListViewModel/rows(from:)`` (same
+    /// explode-and-classify as the whole-recipe path), so here we only persist
+    /// the chosen rows — no hydrate, no re-classify. An empty selection (all
+    /// deselected, which the sheet's disabled-at-zero confirm normally prevents)
+    /// or a missing store reports `.couldntLoad` rather than a false "added 0".
+    public func addToShoppingList(rows: [ShoppingListViewModel.Item]) async -> AddToShoppingListResult {
+        guard !rows.isEmpty else { return .couldntLoad }
+        guard let store else { return .couldntLoad }
         store.append(rows: rows)
         return .added(count: rows.count)
     }

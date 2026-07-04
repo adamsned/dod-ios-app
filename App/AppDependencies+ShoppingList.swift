@@ -2,6 +2,7 @@ import DODDomain
 import DODFeatureSaved
 import DODFeatureSearch
 import Foundation
+import SwiftUI
 
 // DUT-534 — the "Add to Shopping List from any recipe" composition, split out
 // of `AppDependencies.swift` to keep that file under the SwiftLint 400-line
@@ -9,6 +10,11 @@ import Foundation
 // too, since it's now Shopping-List-wired (same append seam Detail + Feed use).
 
 extension AppDependencies {
+
+    /// DUT-535 — the ingredient-selection-sheet builder's type: given the tapped
+    /// recipe + a result completion, return the `AnyView`-erased sheet.
+    typealias AddToShoppingListSheetBuilder =
+        (Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView
 
     /// The production ``ShoppingListAppender`` (DUT-534). Composes the same
     /// ingredient-hydration path the Saved-tab picker uses
@@ -34,5 +40,28 @@ extension AppDependencies {
             monitor: networkMonitor,
             shoppingListAppend: { recipe in await appender.addToShoppingList(recipe) }
         )
+    }
+
+    /// DUT-535 — the ingredient-selection-sheet builder handed to
+    /// ``RecipeDetailView``. The sheet type (``AddToShoppingListSheet``) lives in
+    /// `DODFeatureSaved`, which `DODFeatureRecipeDetail` must not import, so the
+    /// App wires this `AnyView`-erased closure. It builds a sheet over the tapped
+    /// recipe, routing the confirmed subset through the appender's
+    /// ``ShoppingListAppender/addToShoppingList(rows:)`` and reporting the result
+    /// back so Recipe Detail shows its "Added N ingredients" Snackbar. Detail's
+    /// recipe already carries ingredients, so the candidate rows build without a
+    /// fetch.
+    @MainActor
+    func addToShoppingListSheetBuilder() -> AddToShoppingListSheetBuilder {
+        let appender = shoppingListAppender()
+        return { recipe, onComplete in
+            AnyView(
+                AddToShoppingListSheet(
+                    recipe: recipe,
+                    appender: appender,
+                    onComplete: onComplete
+                )
+            )
+        }
     }
 }
