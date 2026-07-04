@@ -228,4 +228,38 @@ import Testing
         #expect(TemperatureConverter.resolvedUnit(fromRawValue: "kelvin") == nil)
         #expect(TemperatureConverter.resolvedUnit(fromRawValue: nil) == nil)
     }
+
+    // MARK: - fahrenheitValues (DUT-551 Stream D — recipe heat extraction)
+
+    @Test func fahrenheitValuesExtractsSingleFahrenheit() {
+        // An explicit °F magnitude is returned as-is.
+        #expect(TemperatureConverter.fahrenheitValues(in: "Preheat the oven to 350°F.") == [350])
+    }
+
+    @Test func fahrenheitValuesReturnsAllTemperaturesInOrder() {
+        // Multiple temps across the text all come back, source order — the
+        // caller takes the max as the primary oven temp.
+        let text = "Sear at 450°F, then finish at 375°F."
+        let values = TemperatureConverter.fahrenheitValues(in: text)
+        #expect(values == [450, 375])
+        #expect(values.max() == 450)
+    }
+
+    @Test func fahrenheitValuesReturnsBothEndsOfARange() {
+        // A range contributes both ends; the high end is the max.
+        let values = TemperatureConverter.fahrenheitValues(in: "Bake at 350-375°F.")
+        #expect(values == [350, 375])
+        #expect(values.max() == 375)
+    }
+
+    @Test func fahrenheitValuesConvertsCelsiusToFahrenheit() {
+        // 175°C → 347°F → rounded to the nearest 5°F = 345.
+        #expect(TemperatureConverter.fahrenheitValues(in: "Heat to 175°C.") == [345])
+    }
+
+    @Test func fahrenheitValuesReturnsEmptyForNoTemperature() {
+        // Bare numbers (no scale signal) are not temperatures — none extracted.
+        #expect(TemperatureConverter.fahrenheitValues(in: "Bake at 350 for 30 minutes.").isEmpty)
+        #expect(TemperatureConverter.fahrenheitValues(in: "Stir in 2 cups of flour.").isEmpty)
+    }
 }
