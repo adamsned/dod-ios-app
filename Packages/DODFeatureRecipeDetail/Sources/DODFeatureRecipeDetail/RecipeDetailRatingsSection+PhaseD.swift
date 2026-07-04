@@ -46,18 +46,45 @@ extension RecipeDetailRatingsSection {
         .contextMenu {
             if viewModel.canModerate(comment) {
                 Button {
-                    viewModel.reportComment(comment)
-                    if let url = viewModel.reportMailtoURL(for: comment) { openURL(url) }
+                    reportAndOpenMail(for: comment)
                 } label: {
                     Label("Report Comment", systemImage: "flag")
                 }
                 Button(role: .destructive) {
                     viewModel.blockAuthor(of: comment)
                 } label: {
-                    Label("Block \(displayAuthor(for: comment))", systemImage: "hand.raised")
+                    Label(blockLabel(for: comment), systemImage: "hand.raised")
                 }
             }
         }
+    }
+
+    /// DUT-546 gap 2 — report the comment (hide it locally), then open the
+    /// prefilled moderation `mailto:` and check the open outcome. On a device
+    /// with no mail account `openURL`'s completion reports `accepted == false`;
+    /// we route that back through the view model so it surfaces the published
+    /// contact address as a fallback instead of leaving the user believing the
+    /// report was sent. If the URL couldn't even be built we treat it as a
+    /// failed send for the same reason.
+    func reportAndOpenMail(for comment: RecipeComment) {
+        viewModel.reportComment(comment)
+        guard let url = viewModel.reportMailtoURL(for: comment) else {
+            viewModel.acknowledgeReport(of: comment, mailtoOpened: false)
+            return
+        }
+        openURL(url) { accepted in
+            viewModel.acknowledgeReport(of: comment, mailtoOpened: accepted)
+        }
+    }
+
+    /// DUT-546 gap 1 — a blank-name (Anonymous) row can't be name-blocked, so
+    /// the destructive action hides just that comment; relabel it "Hide
+    /// Comment" so the button describes what actually happens rather than
+    /// promising an inert "Block Anonymous".
+    func blockLabel(for comment: RecipeComment) -> String {
+        CommentModerationStore.isAnonymous(author: comment.authorName)
+            ? "Hide Comment"
+            : "Block \(displayAuthor(for: comment))"
     }
 
     /// US-44 / CL-139 — return the override view if this row belongs to
