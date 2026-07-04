@@ -29,6 +29,24 @@ import Testing
         #expect(result == "snowman ☃")
     }
 
+    // DUT-550: WordPress/WPRM emits the NAMED form of common recipe entities
+    // (`&frac12;` in "1½ cups", `&deg;` in oven temps). These must decode to
+    // their glyphs, not pass through raw into the ingredient-amount field.
+    @Test func decodesNamedVulgarFractionEntities() {
+        let result = HTMLSanitizer.plainText(from: "1&frac12; cups flour, &frac14; cup sugar, &frac34; tsp salt")
+        #expect(result == "1½ cups flour, ¼ cup sugar, ¾ tsp salt")
+    }
+
+    @Test func decodesThirdsAndEighthsFractionEntities() {
+        let result = HTMLSanitizer.plainText(from: "&frac13; &frac23; &frac18; &frac38; &frac58; &frac78;")
+        #expect(result == "⅓ ⅔ ⅛ ⅜ ⅝ ⅞")
+    }
+
+    @Test func decodesDegreeAndMathEntities() {
+        let result = HTMLSanitizer.plainText(from: "Bake at 350&deg;F. Use a 9&times;13 pan. Serves 4&divide;2.")
+        #expect(result == "Bake at 350°F. Use a 9×13 pan. Serves 4÷2.")
+    }
+
     @Test func collapsesWhitespace() {
         let result = HTMLSanitizer.plainText(from: "  one    two\n\nthree  ")
         #expect(result == "one two three")

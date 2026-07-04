@@ -22,11 +22,14 @@ import Foundation
 /// 2. Ingredients — collect every `<li class="wprm-recipe-ingredient">` row,
 ///    dropping its leading `<span class="wprm-checkbox-container">` subtree (a
 ///    screen-reader checkbox glyph that must not leak into the text), then
-///    plain-texting the amount / unit / name / notes spans that remain. When a
-///    card has NO line rows at all (the 7 Can Soup shape — the author entered
-///    each ingredient as a `<h4 class="wprm-recipe-ingredient-group-name">`
-///    group header), fall back to the group-name headers: with no line rows
-///    present, the group names ARE the ingredients.
+///    plain-texting the amount / unit / name / notes spans that remain. Then
+///    append the group name of every HEADER-ONLY ingredient group (a
+///    `wprm-recipe-ingredient-group` `<div>` with a
+///    `<h4 class="wprm-recipe-ingredient-group-name">` but no line-row `<li>`):
+///    with no line rows of its own, that group name IS the ingredient (the 7
+///    Can Soup shape — all groups header-only — and, per DUT-550, cards that MIX
+///    line-row groups with header-only groups, so no ingredient is dropped).
+///    Groups that carry line rows keep their name dropped (it's a label).
 /// 3. Instructions — collect every `<li class="wprm-recipe-instruction">` row
 ///    (inner `wprm-recipe-instruction-text`, else the whole row). When the card
 ///    has NO instruction rows (7 Can Soup / DUT-538 — steps live as a numbered
@@ -131,9 +134,20 @@ public enum WPRMRecipeCardParser {
 
     // MARK: - Ingredients
 
-    /// Collect ingredient lines. Prefer `<li class="wprm-recipe-ingredient">`
-    /// line rows; when the card has none, fall back to
-    /// `<h4 class="wprm-recipe-ingredient-group-name">` group headers.
+    /// Collect ingredient lines: every `<li class="wprm-recipe-ingredient">`
+    /// line row PLUS the group name of every HEADER-ONLY ingredient group (a
+    /// `wprm-recipe-ingredient-group` `<div>` with a group-name `<h4>` but no
+    /// line-row `<li>`).
+    ///
+    /// DUT-42 established that a card with ZERO line rows (the 7 Can Soup shape,
+    /// all groups header-only) uses the group-name headers AS the ingredients.
+    /// DUT-550 extends that per-group: a card MIXING normal line rows with a
+    /// header-only group would otherwise drop the header-only group's ingredient
+    /// (neither a line row nor eligible for the all-or-nothing fallback). We now
+    /// keep both — line rows first, then the header-only group names — so no
+    /// ingredient is lost across mixed group shapes. Groups that DO carry line
+    /// rows keep their `<h4>` name dropped: it's a section label, already
+    /// represented by its rows.
     static func parseIngredients(in card: String) -> [String] {
         let rows = collectElementTexts(
             in: card,
@@ -141,15 +155,7 @@ public enum WPRMRecipeCardParser {
             classToken: ingredientRowToken,
             transform: ingredientRowText
         )
-        if !rows.isEmpty {
-            return rows
-        }
-        return collectElementTexts(
-            in: card,
-            tag: "h4",
-            classToken: ingredientGroupNameToken,
-            transform: HTMLSanitizer.plainText(from:)
-        )
+        return rows + headerOnlyGroupNames(in: card)
     }
 
     /// Plain-text one ingredient `<li>` body, first dropping the leading

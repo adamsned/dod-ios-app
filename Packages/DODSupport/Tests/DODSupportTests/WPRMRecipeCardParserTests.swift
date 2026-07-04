@@ -105,6 +105,32 @@ import Testing
         #expect(card.ingredients == ["2 cups tomato sauce"])
     }
 
+    /// DUT-550: a card MIXING a normal line-row group with a HEADER-ONLY group
+    /// (the DUT-42 per-group quirk — an ingredient authored as a bare group
+    /// name with no `<li>` row) must keep BOTH. Before the fix the header-only
+    /// group's ingredient was dropped: it was neither a line row nor eligible
+    /// for the all-or-nothing group-name fallback (which only fired when the
+    /// WHOLE card had zero line rows). The line-row group's `<h4>` label
+    /// ("For the sauce") stays dropped — it's a section label, not an ingredient.
+    @Test func keepsHeaderOnlyGroupIngredientWhenOtherGroupsHaveLineRows() {
+        let html = """
+            <div class="wprm-recipe-container">
+            <div class="wprm-recipe-ingredients-container">
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">For the sauce</h4>
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">2</span> <span class="wprm-recipe-ingredient-unit">cups</span> <span class="wprm-recipe-ingredient-name">tomato sauce</span></li>
+            </ul></div>
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">a pinch of salt</h4></div>
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">1 bay leaf</h4></div>
+            </div>
+            </div>
+            """
+        let card = WPRMRecipeCardParser.parse(html: html)
+        // Line row first, then the two header-only group ingredients — the
+        // "For the sauce" label (a group that HAS a line row) stays dropped.
+        #expect(card.ingredients == ["2 cups tomato sauce", "a pinch of salt", "1 bay leaf"])
+    }
+
     // MARK: - "How to Make" numbered-step fallback (DUT-538)
 
     /// DUT-538: the 7 Can Soup shape — the WPRM card carries NO

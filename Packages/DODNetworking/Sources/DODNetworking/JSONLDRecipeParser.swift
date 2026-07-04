@@ -321,8 +321,14 @@ public enum JSONLDRecipeParser {
         let dict: [String: Any]?
         if let object = raw as? [String: Any] {
             dict = object
-        } else if let array = raw as? [[String: Any]] {
-            dict = array.first
+        } else if let array = raw as? [Any] {
+            // DUT-214: `raw as? [[String: Any]]` succeeds only when EVERY element
+            // is a dictionary, so a `video` array mixing a `VideoObject` dict with
+            // any non-dict element (a stray `"#video"` graph reference, a
+            // heterogeneous `@graph` ref) failed the whole-array cast and silently
+            // dropped the video. Cast to `[Any]` and recover the first dictionary
+            // element, skipping non-dictionaries.
+            dict = array.compactMap { $0 as? [String: Any] }.first
         } else {
             dict = nil
         }
