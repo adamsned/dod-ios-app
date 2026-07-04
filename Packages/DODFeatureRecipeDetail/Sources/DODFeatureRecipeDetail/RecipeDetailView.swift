@@ -157,8 +157,6 @@ public struct RecipeDetailView: View {
         .onChange(of: viewModel.recipe?.servings) { _, _ in
             viewModel.resyncServingsIfSourceYieldChanged()
         }
-        // DUT-84 — offline guard on the toolbar download toggle's remove path.
-        .modifier(OfflineRemoveDownloadWarningModifier(viewModel: viewModel))
     }
 
     @ViewBuilder

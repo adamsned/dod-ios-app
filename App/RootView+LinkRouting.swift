@@ -1,4 +1,5 @@
 import DODAnalytics
+import DODDesignSystem
 import DODSupport
 import SwiftUI
 
@@ -42,6 +43,57 @@ extension RootView {
         }
     }
 
+    /// Routes a parsed `DeepLinkIntent` into tab + path state (US-10). Moved
+    /// here from `RootView.swift` (file_length cap); `handle(widgetLink:)` above
+    /// calls it, and it drives the DUT-549 failed-resolve recovery.
+    func handle(intent: DeepLinkIntent) {
+        switch intent {
+        case .openSaved:
+            selectedTab = .saved
+        case .openRecipe(let id):
+            selectedTab = .feed
+            Task { @MainActor in
+                applyDeepLinkResolve(await resolveRecipeRoute(id: id, autoStartCookMode: false))
+            }
+        case .startCookMode(let recipeID):
+            selectedTab = .feed
+            Task { @MainActor in
+                applyDeepLinkResolve(await resolveRecipeRoute(id: recipeID, autoStartCookMode: true))
+            }
+        }
+    }
+
+    /// DUT-549 — apply the outcome of a deep-link resolve. A resolved route
+    /// replaces the Feed stack (DUT-310, Back → tab root); a nil resolve (deleted
+    /// post, or offline with no cache) surfaces the ``deepLinkFailedMessage``
+    /// toast instead of leaving the user on the blank Feed the tab already
+    /// switched to. Routed through the pure ``RecipeRouteResolver/outcome(for:)``
+    /// so the route-vs-error decision is unit-testable without a SwiftUI host.
+    private func applyDeepLinkResolve(_ route: RecipeRoute?) {
+        switch RecipeRouteResolver.outcome(for: route) {
+        case .route(let resolved):
+            feedExternalRoute.enqueue(.replaceStack(resolved))
+        case .failed:
+            deepLinkErrorMessage = Self.deepLinkFailedMessage
+        }
+    }
+
+    /// Resolve a deep-link recipe/post id into a route, fetching on a cache miss
+    /// (T-632 / REG-20 / CL-101). Cache-hit (widget / Spotlight) stays
+    /// network-free; cache-miss (notification — brand-new post) fetches by id so
+    /// its `canonicalURL` is known, then routes to recipe-detail, which
+    /// classifies recipe-vs-article via its JSON-LD fetch path (AC-4.11 /
+    /// AC-37.2). The policy lives in ``RecipeRouteResolver`` so it is
+    /// unit-testable without a SwiftUI host; this supplies the two live I/O edges.
+    func resolveRecipeRoute(id: Int, autoStartCookMode: Bool) async -> RecipeRoute? {
+        await RecipeRouteResolver.resolve(
+            id: id,
+            autoStartCookMode: autoStartCookMode,
+            cachedLookup: { try await dependencies.store.recipeWithoutTouching(id: $0) },
+            fetch: { try await dependencies.fetchListItem(forPostID: $0) }
+        )
+    }
+
     /// DUT-536 — select the top-level Grocery List tab (was: switch to Saved +
     /// mint a token that pushed the Shopping List inside it, DUT-480). The tab's
     /// `GroceryTabRoot` always renders the persisted list, so simply selecting it
@@ -69,18 +121,18 @@ extension RootView {
     }
 
     /// The external-route sink for one tab. Feed/Saved/Search each own a
-    /// sink so both layouts (phone tabs + iPad split detail) can hand every
-    /// `TabStack` its own; Settings renders no article surface, so it keeps
-    /// the inert constant.
-    func externalRouteBinding(for tab: AppTab) -> Binding<ExternalRoute?> {
+    /// FIFO queue so both layouts (phone tabs + iPad split detail) can hand
+    /// every `TabStack` its own; Settings renders no article surface, so it
+    /// keeps the inert constant.
+    func externalRouteBinding(for tab: AppTab) -> Binding<ExternalRouteQueue> {
         switch tab {
         case .feed: return $feedExternalRoute
         case .saved: return $savedExternalRoute
         case .search: return $searchExternalRoute
         // DUT-536 — the Grocery List tab renders only the Shopping List (no
         // article surface), so it keeps the inert constant like Settings.
-        case .grocery: return .constant(nil)
-        case .settings: return .constant(nil)
+        case .grocery: return .constant(ExternalRouteQueue())
+        case .settings: return .constant(ExternalRouteQueue())
         }
     }
 
@@ -152,9 +204,9 @@ extension RootView {
         // the user to Feed; every other tab keeps its own stack.
         if destination != originTab { selectedTab = destination }
         switch destination {
-        case .feed: feedExternalRoute = .push(route)
-        case .saved: savedExternalRoute = .push(route)
-        case .search: searchExternalRoute = .push(route)
+        case .feed: feedExternalRoute.enqueue(.push(route))
+        case .saved: savedExternalRoute.enqueue(.push(route))
+        case .search: searchExternalRoute.enqueue(.push(route))
         // unreachable: linkRoutingDestination only ever yields feed/saved/search
         // (it redirects settings + grocery — surfaces with no article stack — to
         // feed).
@@ -172,5 +224,38 @@ extension RootView {
         case .settings, .grocery: .feed
         default: originTab
         }
+    }
+
+    /// DUT-549 — the copy shown when a deep link / notification recipe fails to
+    /// resolve (deleted post, or offline with no cache). Plain, non-blaming, and
+    /// consistent with the app's other transient snackbars.
+    static let deepLinkFailedMessage = "Couldn't open that recipe. It may no longer be available."
+}
+
+/// DUT-549 — presents ``RootView/deepLinkErrorMessage`` as a bottom snackbar
+/// that auto-dismisses, so a failed deep-link resolve gives the user feedback
+/// instead of a silent blank Feed. Mirrors the Settings/Feed snackbar overlay
+/// pattern (keyed by message so a new message restarts the timer). Extracted as
+/// a `ViewModifier` in this file to keep `RootView.swift` under the file-length
+/// cap.
+struct DeepLinkErrorSnackbar: ViewModifier {
+    @Binding var message: String?
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .bottom) {
+            if let message {
+                Snackbar(message: message)
+                    .id(message)
+                    .padding(.bottom, DODSpacing.md)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onTapGesture { self.message = nil }
+                    .task {
+                        try? await Task.sleep(nanoseconds: 4_000_000_000)
+                        self.message = nil
+                    }
+                    .accessibilityIdentifier("deep-link-error-snackbar")
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: message)
     }
 }

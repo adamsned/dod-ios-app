@@ -21,7 +21,8 @@ struct CookActivityWidget: Widget {
                 remainingSeconds: context.state.remainingSeconds,
                 totalSeconds: context.attributes.totalSeconds,
                 isPaused: context.state.isPaused,
-                endDate: context.state.endDate
+                endDate: context.state.endDate,
+                isCompleted: context.state.isCompleted
             )
             .padding(.horizontal, DODSpacing.sm)
             .padding(.vertical, DODSpacing.xs)
@@ -47,7 +48,8 @@ struct CookActivityWidget: Widget {
                         remainingSeconds: context.state.remainingSeconds,
                         totalSeconds: context.attributes.totalSeconds,
                         isPaused: context.state.isPaused,
-                        endDate: context.state.endDate
+                        endDate: context.state.endDate,
+                        isCompleted: context.state.isCompleted
                     )
                 }
             } compactLeading: {

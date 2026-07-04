@@ -82,4 +82,22 @@ enum RecipeRouteResolver {
             return nil
         }
     }
+
+    /// DUT-549 — the caller-facing outcome of a resolve: a route to push, or an
+    /// explicit failure the caller must surface. Splitting the `nil`-means-failed
+    /// convention into a named case lets the routing layer (`RootView`) show a
+    /// "couldn't open that recipe" toast instead of silently dumping the user on
+    /// a blank Feed, and keeps that decision unit-testable without a SwiftUI host.
+    enum DeepLinkResolveOutcome: Equatable {
+        case route(RecipeRoute)
+        case failed
+    }
+
+    /// Map a resolved (possibly `nil`) route to a ``DeepLinkResolveOutcome``. A
+    /// `nil` route — the id is neither cached nor fetchable — becomes `.failed`
+    /// so the caller surfaces feedback (DUT-549) rather than a dead tap.
+    static func outcome(for route: RecipeRoute?) -> DeepLinkResolveOutcome {
+        guard let route else { return .failed }
+        return .route(route)
+    }
 }

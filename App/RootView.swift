@@ -3,6 +3,7 @@ import DODAnalytics
 import DODDesignSystem
 import DODFeatureFeed
 import DODFeatureProfile
+import DODFeatureRecipeDetail
 import DODSupport
 import SwiftUI
 
@@ -68,14 +69,25 @@ struct RootView: View {
     /// can set them.
     @State var showTipDialog = false
     @State var tipDialogText = ""
+    /// DUT-549 — a deep link / notification whose recipe fails BOTH cache and
+    /// network resolution surfaces this transient snackbar instead of dumping
+    /// the user on a blank Feed. Set by `handle(intent:)`; the overlay +
+    /// `deepLinkFailedMessage` copy live in `RootView+LinkRouting.swift`.
+    @State var deepLinkErrorMessage: String?
     // Per-tab external-route sinks. Feed carries deep links (App Intents /
     // Spotlight, spec.md US-10, replace semantics) AND in-app link taps;
     // Saved + Search exist so an article link tapped there opens in place
     // instead of yanking the user to Feed (DUT-243, push semantics).
     // Non-private so the `+LinkRouting.swift` extension can write them.
-    @State var feedExternalRoute: ExternalRoute?
-    @State var savedExternalRoute: ExternalRoute?
-    @State var searchExternalRoute: ExternalRoute?
+    //
+    // DUT-463 / DUT-464 / DUT-319 — these were single-slot `ExternalRoute?`
+    // mailboxes that dropped routes (a second one overwrote the first; one
+    // resolved while the tab was unmounted sat stuck, then wiped the stack
+    // later). Now a FIFO ``ExternalRouteQueue`` per tab holds every enqueued
+    // route and `TabStack` drains it on appear + on change, dropping stale ones.
+    @State var feedExternalRoute = ExternalRouteQueue()
+    @State var savedExternalRoute = ExternalRouteQueue()
+    @State var searchExternalRoute = ExternalRouteQueue()
     /// DUT-250 — per-tab navigation stacks, hoisted out of `TabStack`'s local
     /// `@State` into `RootView` so they SURVIVE the iPad size-class flip. `body`
     /// swaps structurally different trees at the `.regular` boundary —
@@ -86,6 +98,13 @@ struct RootView: View {
     /// slot via `pathBinding(for:)`. `.id(selectedTab)` on the iPad detail is
     /// kept (resets the TabStack's *other* @State). Non-private for the ext.
     @State var tabPaths: [AppTab: [RecipeRoute]] = [:]
+    /// DUT-546 (gap 3) — ONE app-level moderation store injected into every
+    /// `RecipeDetailViewModel` (via `TabStack`), so a block on one open recipe
+    /// screen updates an already-open second one live (the `@Observable` set is
+    /// process-wide) instead of each screen reading its own `UserDefaults` copy.
+    /// Owned here (survives the iPad flip like `selectedTab`). Non-private for
+    /// the `TabStack` construction sites.
+    @State var commentModeration = CommentModerationStore()
     @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The system `openURL`, captured before RootView overrides it for its
@@ -214,6 +233,9 @@ struct RootView: View {
             if showTipDialog { cookingTipOverlay }
         }
         .animation(.easeInOut(duration: 0.2), value: showTipDialog)
+        // DUT-549 — transient "couldn't open that recipe" toast for a failed
+        // deep-link resolve (modifier + copy in `RootView+LinkRouting.swift`).
+        .modifier(DeepLinkErrorSnackbar(message: $deepLinkErrorMessage))
         // Intercept in-app link taps (DOD-ART-2): a dutchovendaddy.com recipe
         // link inside a rendered article opens the recipe in-app instead of
         // bouncing to Safari. Set on the whole tree so it reaches the article
@@ -236,7 +258,9 @@ struct RootView: View {
                     pendingDeepLink: tab == .feed ? $pendingDeepLink : .constant(nil),
                     externalRoute: externalRouteBinding(for: tab),
                     // DUT-534 snackbar "View" + DUT-536 Saved cart → Grocery tab.
-                    openShoppingList: { routeToShoppingList() }
+                    openShoppingList: { routeToShoppingList() },
+                    // DUT-546 — one shared moderation store across every recipe screen.
+                    commentModeration: commentModeration
                 )
                 .tabItem {
                     // T-660 / CL-65: bottom-tab `Label` reads `tabLabel`
@@ -252,12 +276,7 @@ struct RootView: View {
         }
         .tint(DODColor.accent)
         .sensoryFeedback(.selection, trigger: selectedTab)
-        .onChange(of: selectedTab) { _, newValue in
-            Telemetry.shared.send(.screenView(name: newValue.telemetryName))
-        }
-        .onAppear {
-            Telemetry.shared.send(.screenView(name: AppTab.feed.telemetryName))
-        }
+        .modifier(ScreenViewTracking(selectedTab: selectedTab))
     }
 
     private var iPadSplit: some View {
@@ -300,72 +319,21 @@ struct RootView: View {
                 pendingDeepLink: selectedTab == .feed ? $pendingDeepLink : .constant(nil),
                 externalRoute: externalRouteBinding(for: selectedTab),
                 // DUT-534 snackbar "View" + DUT-536 Saved cart → Grocery tab.
-                openShoppingList: { routeToShoppingList() }
+                openShoppingList: { routeToShoppingList() },
+                // DUT-546 — one shared moderation store across every recipe screen.
+                commentModeration: commentModeration
             )
             .id(selectedTab)
         }
         .tint(DODColor.accent)
-        .onChange(of: selectedTab) { _, newValue in
-            Telemetry.shared.send(.screenView(name: newValue.telemetryName))
-        }
-        .onAppear {
-            // DUT-318 — emit the launch screen_view on iPad too (phoneTabs already
-            // does; iPadSplit previously only had .onChange, so the first screen
-            // was never reported).
-            Telemetry.shared.send(.screenView(name: selectedTab.telemetryName))
-        }
+        .modifier(ScreenViewTracking(selectedTab: selectedTab))
     }
 
     // MARK: - Deep-link routing
     //
-    // `handle(widgetLink:)` lives in `RootView+LinkRouting.swift` (keeps this
-    // file under the SwiftLint `file_length` cap).
-
-    /// Routes a parsed `DeepLinkIntent` into tab + path state (US-10).
-    /// Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)` can call it.
-    func handle(intent: DeepLinkIntent) {
-        switch intent {
-        case .openSaved:
-            selectedTab = .saved
-        case .openRecipe(let id):
-            selectedTab = .feed
-            Task { @MainActor in
-                guard let route = await resolveRecipeRoute(id: id, autoStartCookMode: false) else {
-                    return
-                }
-                // DUT-310 — deep links replace the stack (Back → tab root).
-                feedExternalRoute = .replaceStack(route)
-            }
-        case .startCookMode(let recipeID):
-            selectedTab = .feed
-            Task { @MainActor in
-                guard
-                    let route = await resolveRecipeRoute(
-                        id: recipeID,
-                        autoStartCookMode: true
-                    )
-                else { return }
-                feedExternalRoute = .replaceStack(route)
-            }
-        }
-    }
-
-    /// Resolve a deep-link recipe/post id into a route, fetching on a cache
-    /// miss (T-632 / REG-20 / CL-101). Cache-hit (widget / Spotlight) stays
-    /// network-free; cache-miss (notification — the post is brand-new and
-    /// never cached) fetches the post by id so its `canonicalURL` is known,
-    /// then routes to recipe-detail, which classifies recipe-vs-article via
-    /// its existing JSON-LD fetch path (AC-4.11 / AC-37.2). The policy lives
-    /// in ``RecipeRouteResolver`` so it is unit-testable without a SwiftUI
-    /// host; this method just supplies the two live I/O edges.
-    private func resolveRecipeRoute(id: Int, autoStartCookMode: Bool) async -> RecipeRoute? {
-        await RecipeRouteResolver.resolve(
-            id: id,
-            autoStartCookMode: autoStartCookMode,
-            cachedLookup: { try await dependencies.store.recipeWithoutTouching(id: $0) },
-            fetch: { try await dependencies.fetchListItem(forPostID: $0) }
-        )
-    }
+    // `handle(widgetLink:)`, `handle(intent:)`, and `resolveRecipeRoute(id:…)`
+    // live in `RootView+LinkRouting.swift` (keeps this file under the SwiftLint
+    // `file_length` cap).
 
     // MARK: - Appearance (US-36 AC-36.2)
 

@@ -152,6 +152,27 @@ final class RecipeRouteResolverTests: XCTestCase {
         XCTAssertNil(route, "an unresolvable id must return nil (ignore the deep link)")
     }
 
+    /// DUT-549 AC: a failed resolve (the id is neither cached nor fetchable)
+    /// maps to `.failed`, NOT a silent nil the router drops. This is the seam
+    /// `RootView.applyDeepLinkResolve` reads to surface a "couldn't open that
+    /// recipe" toast instead of dumping the user on a blank Feed.
+    func test_deepLinkOutcome_nilRoute_isFailed() {
+        XCTAssertEqual(RecipeRouteResolver.outcome(for: nil), .failed)
+    }
+
+    /// DUT-549 AC: a resolved route maps to `.route`, so the router pushes it
+    /// (and shows no error). Pairs with the failure case above to pin the whole
+    /// route-vs-error decision the toast recovery hangs off.
+    func test_deepLinkOutcome_resolvedRoute_isRoute() {
+        let item = sampleListItem(
+            id: 21238,
+            title: "Garlic Butter Skillet Corn",
+            canonical: "https://www.dutchovendaddy.com/garlic-butter-skillet-corn/"
+        )
+        let route = RecipeRoute.recipe(item: item, autoStartCookMode: false)
+        XCTAssertEqual(RecipeRouteResolver.outcome(for: route), .route(route))
+    }
+
     /// AC: `autoStartCookMode` is forwarded into the resolved route (the
     /// StartCookModeIntent deep-link path, US-10) on the fetch-on-miss
     /// branch too.

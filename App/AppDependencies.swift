@@ -124,6 +124,7 @@ final class AppDependencies {
         self.profilePhotoStore = resolvedPhotoStore
         self.profileStore = KeychainProfileStore(photoStore: resolvedPhotoStore)
         self.notificationService = NotificationService()
+        Self.installBridgedEvictionHook { WidgetCenter.shared.reloadAllTimelines() }  // DUT-475: pre-UI
     }
 
     /// Called once from `@main` at app launch.
@@ -131,7 +132,6 @@ final class AppDependencies {
         await networkMonitor.start()
         // DUT-377: ReliableImage offline disk fallback (saved/downloaded heroes).
         ReliableImageConfig.setOfflineDataProvider { [store] url in try? await store.image(url: url) }
-        RecipeStore.onBridgedImagesEvicted = { WidgetCenter.shared.reloadAllTimelines() }
         // TelemetryDeck app ID lives in DODApp.xcconfig (gitignored per
         // constitution §9). For v1 we read from Info.plist; if unset we
         // skip telemetry rather than fail launch.
