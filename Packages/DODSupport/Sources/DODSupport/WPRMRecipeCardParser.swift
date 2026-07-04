@@ -30,8 +30,11 @@ import Foundation
 /// 3. Instructions — collect every `<li class="wprm-recipe-instruction">` row
 ///    (inner `wprm-recipe-instruction-text`, else the whole row). When the card
 ///    has NO instruction rows (7 Can Soup / DUT-538 — steps live as a numbered
-///    "How to Make" list in the post body), fall back to the page's Gutenberg
-///    `is-style-circle-number-list` rows — the one place we read outside the card.
+///    "How to Make" list in the post body), fall back to the Gutenberg
+///    `is-style-circle-number-list` rows found within the post's instructions /
+///    "How to Make" region only (DUT-544 — scoped to the region between the
+///    instructions `<h2>` and the next section so an unrelated author-styled
+///    numbered list can't be injected as steps).
 ///
 /// Not a general-purpose HTML parser — handles the narrow, well-formed shape
 /// WPRM produces. Robust to attribute re-ordering and extra whitespace; assumes
@@ -223,25 +226,6 @@ public enum WPRMRecipeCardParser {
             return cardRows
         }
         return parseNumberedStepList(in: page)
-    }
-
-    /// DUT-538 fallback: collect step text from every
-    /// `<ol class="…is-style-circle-number-list…">` in the page. WPRM renders
-    /// the "How to Make" steps as one such `<ol>` per step (each holding a
-    /// single `<li>`), so flattening the `<li>` rows across all matching lists
-    /// yields the ordered steps. Class-token matched so it ignores the page's
-    /// other `<ol>`s (table of contents, comment list) that use different
-    /// classes.
-    static func parseNumberedStepList(in page: String) -> [String] {
-        collectElementInners(in: page, tag: "ol", classToken: numberedStepListToken)
-            .flatMap { listInner in
-                collectElementTexts(
-                    in: listInner,
-                    tag: "li",
-                    classToken: nil,
-                    transform: HTMLSanitizer.plainText(from:)
-                )
-            }
     }
 
     /// Plain-text one instruction `<li>` body: prefer the inner
