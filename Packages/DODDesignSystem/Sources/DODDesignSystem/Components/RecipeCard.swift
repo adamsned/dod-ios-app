@@ -280,11 +280,19 @@ extension View {
     ///
     /// Composes alongside `recipeCardTap` without eating the tap gesture
     /// (`.contextMenu` is gesture-distinct from `.onTapGesture`).
+    ///
+    /// **DUT-534 Part 2 — opt-in "Add to Shopping List".** When
+    /// `onAddToShoppingList` is supplied, a third item (cart-plus glyph) appends
+    /// the card's recipe ingredients to the Shopping List. It is opt-in so this
+    /// shared helper (which serves Feed, Search, Categories, and Saved) only
+    /// grows the item on the two surfaces that pass it (Feed + Search); the other
+    /// two pass `nil`, so the item doesn't render and they're unaffected.
     public func recipeCardContextMenu(
         isSaved: Bool,
         isDownloaded: Bool = false,
         onToggle: @escaping () -> Void,
-        onRemoveDownload: (() -> Void)? = nil
+        onRemoveDownload: (() -> Void)? = nil,
+        onAddToShoppingList: (() -> Void)? = nil
     ) -> some View {
         self.contextMenu {
             Button(action: onToggle) {
@@ -298,6 +306,12 @@ extension View {
                     Label("Remove Download", systemImage: "square.and.arrow.down.badge.xmark")
                 }
                 .tint(DODColor.burntOrange)
+            }
+            if let onAddToShoppingList {
+                Button(action: onAddToShoppingList) {
+                    Label("Add to Shopping List", systemImage: "cart.badge.plus")
+                }
+                .accessibilityIdentifier("dod.card.addToShoppingList")
             }
         }
     }

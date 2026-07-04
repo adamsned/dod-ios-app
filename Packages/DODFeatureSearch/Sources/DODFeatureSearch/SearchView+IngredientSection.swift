@@ -88,10 +88,14 @@ extension SearchView {
                     heroImageURL: item.heroImage
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
-                    viewModel.applyOptimisticSaveToggle(id: item.id)
-                    onSave?(item)
-                }
+                .recipeCardContextMenu(
+                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
+                    onToggle: {
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item)
+                    },
+                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
+                )
                 .accessibilityIdentifier("dod.search.ingredientCard")
             }
         }
@@ -109,10 +113,14 @@ extension SearchView {
                     heroImageURL: item.heroImage
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
-                    viewModel.applyOptimisticSaveToggle(id: item.id)
-                    onSave?(item)
-                }
+                .recipeCardContextMenu(
+                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
+                    onToggle: {
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item)
+                    },
+                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
+                )
                 .accessibilityIdentifier("dod.search.ingredientCard")
             }
         }

@@ -15,7 +15,9 @@ public struct FeedView: View {
     // mirroring how `SearchView`'s `@State var viewModel` is promoted for the
     // same cross-file-extension reason.
     @State var viewModel: FeedViewModel
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // DUT-534 Part 2 — internal (was `private`) so the card-list builders moved
+    // to `FeedView+ShoppingList` can read the size class for adaptive layout.
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     /// System `openURL` (RootView's override). The Cooking Tools menu's "Buy
     /// BuzzyWaxx Seasoning" item hands off to the browser — buzzywaxx.com isn't a
     /// DOD recipe link, so RootView's override falls through to `.systemAction`.
@@ -56,15 +58,23 @@ public struct FeedView: View {
     /// no-op; production callers (TabStack) always pass a non-nil closure
     /// that routes through `RecipeStore.toggleSaved` per CL-59.
     public let onSave: ((RecipeListItem) -> Void)?
+    /// DUT-534 Part 2 — the Shopping List snackbar's "View" action opens the
+    /// Shopping List (`dod://shopping-list`). Optional so existing callers
+    /// (tests / previews) can omit it; when nil the append still works but the
+    /// success snackbar shows no "View" button (mirrors Recipe Detail's Part 1
+    /// `openShoppingList` seam threaded through `TabStack`).
+    public let openShoppingList: (() -> Void)?
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
-        onSave: ((RecipeListItem) -> Void)? = nil
+        onSave: ((RecipeListItem) -> Void)? = nil,
+        openShoppingList: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
+        self.openShoppingList = openShoppingList
     }
 
     public var body: some View {
@@ -87,6 +97,9 @@ public struct FeedView: View {
             .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
             OfflineBanner(isOffline: viewModel.isOffline)
         }
+        // DUT-534 Part 2 — the "Add to Shopping List" confirmation snackbar,
+        // anchored to the bottom (mirrors Recipe Detail's Part 1 host).
+        .overlay(alignment: .bottom) { shoppingListSnackbar }
         .background(DODColor.surface)
         // DUT-275 — nav bar hidden: the "Cooking Tools" menu (DUT-196) now lives
         // in the pinned header row above (next to the title) instead of the nav
@@ -308,64 +321,6 @@ public struct FeedView: View {
             .padding(.horizontal, DODSpacing.md)
             .padding(.top, DODSpacing.sm)
             .transition(.opacity.combined(with: .move(edge: .top)))
-        }
-    }
-
-    /// US-38 / AC-38.3 — the existing 2-col `LazyVGrid` rendering. Body
-    /// byte-identical to the pre-T-650 `list` implementation; CC-9's grid
-    /// contract is preserved unchanged.
-    private var galleryContent: some View {
-        LazyVGrid(columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: DODSpacing.md) {
-            ForEach(viewModel.items) { item in
-                FeedRow(item: item)
-                    .recipeCardTap { onSelect(item) }
-                    // T-765 / CL-162 (DUT-71) — state-aware Save/Unsave from the
-                    // viewmodel-owned saved-id set; optimistic flip on toggle.
-                    .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
-                        viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item)
-                    }
-                    // Stable L3 handle: `app.buttons.matching(identifier:)`
-                    // targets feed recipe cards directly, so XCUITest can't
-                    // accidentally tap a nav-bar toolbar button (the layout
-                    // toggle / Settings gear) that the old "buttons NOT IN
-                    // tab labels" query swept up. Mirrors `dod.saved.card`.
-                    // Non-visual — does not affect L4 snapshots.
-                    .accessibilityIdentifier("dod.feed.card")
-                    .task {
-                        await viewModel.loadMoreIfNeeded(currentItem: item)
-                    }
-            }
-        }
-    }
-
-    /// US-38 / AC-38.4 — the new denser single-column variant. Composes
-    /// the same `recipeCardTap` + `recipeCardContextMenu` modifiers as
-    /// the gallery so tap-to-open + long-press-Save/Unsave (AC-34.1 /
-    /// AC-34.6) work identically on both layouts.
-    private var listContent: some View {
-        // T-782 / DUT-88 — iPad tiles the dense rows into a multi-column grid;
-        // iPhone (compact) keeps the exact single-column LazyVStack.
-        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
-            ForEach(viewModel.items) { item in
-                // CL-254 (feed declutter) — no cook-time chip on the Recipes
-                // feed (noise); `totalTimeDisplay` omitted (defaults to nil).
-                // Time still shows on Search + the recipe detail page.
-                RecipeCard.ListRow(
-                    title: item.title,
-                    excerpt: item.excerpt,
-                    heroImageURL: item.heroImage
-                )
-                .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
-                    viewModel.applyOptimisticSaveToggle(id: item.id)
-                    onSave?(item)
-                }
-                .accessibilityIdentifier("dod.feed.card")
-                .task {
-                    await viewModel.loadMoreIfNeeded(currentItem: item)
-                }
-            }
         }
     }
 

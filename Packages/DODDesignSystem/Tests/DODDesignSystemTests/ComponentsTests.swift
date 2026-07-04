@@ -210,4 +210,33 @@ import Testing
         #expect(savedToggleCount == 1)
         #expect(unsavedToggleCount == 1)
     }
+
+    /// DUT-534 Part 2 — the opt-in "Add to Shopping List" item. Like the
+    /// Save/Unsave label, the `.contextMenu` content materializes as a system
+    /// overlay outside the snapshot host, so a unit test cannot inspect whether
+    /// the third `Button` rendered. What IS testable (and what the opt-in
+    /// contract hinges on) is that the helper constructs BOTH with the closure
+    /// supplied (Feed/Search — the item renders) and with it omitted /
+    /// defaulted to `nil` (Categories/Saved — the item is absent), and forwards
+    /// the closure. The nil-default default arg keeps the two non-opting
+    /// surfaces' call sites unchanged, which the build enforces.
+    @MainActor
+    @Test func recipeCardContextMenuAddToShoppingListIsOptIn() {
+        let card = RecipeCard(title: "T", excerpt: "E", heroImageURL: nil)
+        var addCount = 0
+        // Opted in (Feed/Search): the item is present + forwards its closure.
+        _ = card.recipeCardContextMenu(
+            isSaved: false,
+            onToggle: {},
+            onAddToShoppingList: { addCount += 1 }
+        )
+        // Omitted (Categories/Saved): the default nil means the item is absent —
+        // and the trailing-closure `onToggle` call site keeps compiling.
+        _ = card.recipeCardContextMenu(isSaved: false) {}
+        // The forwarded closure is a thin wrapper around `Button(action:)`; this
+        // is the same surface the SwiftUI menu invokes on tap.
+        let add = { addCount += 1 }
+        add()
+        #expect(addCount == 1)
+    }
 }

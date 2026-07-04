@@ -37,10 +37,10 @@ final class AppDependencies {
     /// scheduling the (DEBUG) test affordance fires. No APNs / no server.
     let notificationService: NotificationService
 
-    private let restClient: WPRestClient
+    let restClient: WPRestClient  // internal for +ShoppingList searchDeps (DUT-534)
     let pageFetcher: RecipePageFetcher  // internal for +WidgetClassifier (DUT-460)
     private let imageLoader: ImageLoader
-    private let networkMonitor: NetworkMonitor
+    let networkMonitor: NetworkMonitor  // internal for +ShoppingList searchDeps (DUT-534)
     private let commentsClient: WPCommentsClient
     private let ratingsClient: WPRMRatingsClient
     private let guestIdentityStore: any GuestIdentityStoring
@@ -234,22 +234,22 @@ final class AppDependencies {
                 try? await cacheStore.cacheImage(url: url, bytes: bytes)
             }
         }
+        // DUT-534 Part 2 — same append seam Recipe Detail (Part 1) + Search use;
+        // the appender hydrates the ingredient-empty card recipe before appending.
+        let appender = shoppingListAppender()
         return LiveFeedDependencies(
             client: restClient,
             store: store,
             monitor: networkMonitor,
             widgetReload: reload,
             imagePrefetcher: prefetch,
-            latestKindClassifier: makeLatestKindClassifier()  // DUT-460 adaptive eyebrow
+            latestKindClassifier: makeLatestKindClassifier(),  // DUT-460 adaptive eyebrow
+            shoppingListAppend: { recipe in await appender.addToShoppingList(recipe) }
         )
     }
 
     func categoriesDependencies() -> some CategoriesDependencies {
         LiveCategoriesDependencies(client: restClient, store: store)
-    }
-
-    func searchDependencies() -> some SearchDependencies {
-        LiveSearchDependencies(client: restClient, store: store, monitor: networkMonitor)
     }
 
     func recipeDetailDependencies() -> some RecipeDetailDependencies {

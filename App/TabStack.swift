@@ -116,7 +116,10 @@ struct TabStack: View {
                             publisher: dependencies.savedWidgetPublisher()
                         )
                     }
-                }
+                },
+                // DUT-534 Part 2 — the card snackbar's "View" opens the Shopping
+                // List, same closure Recipe Detail's Part 1 snackbar routes to.
+                openShoppingList: openShoppingList
             )
         case .search:
             SearchView(
@@ -137,7 +140,10 @@ struct TabStack: View {
                 // `CategoryRecipesView`. Since T-800 (CL-194 / DUT-113)
                 // removed the Categories tab, this is now the only entry
                 // point into the category-browse → recipes flow.
-                onSelectCategory: { category in path.append(.category(category)) }
+                onSelectCategory: { category in path.append(.category(category)) },
+                // DUT-534 Part 2 — the card snackbar's "View" opens the Shopping
+                // List, same closure Recipe Detail's Part 1 snackbar routes to.
+                openShoppingList: openShoppingList
             )
         case .saved:
             SavedView(

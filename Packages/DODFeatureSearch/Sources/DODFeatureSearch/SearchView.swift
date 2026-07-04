@@ -23,17 +23,25 @@ public struct SearchView: View {
     /// T-799 / CL-193 — browse-category tap → host pushes the category's
     /// recipes. Defaulted no-op; `TabStack` wires `path.append(.category)`.
     public let onSelectCategory: (DODDomain.Category) -> Void
+    /// DUT-534 Part 2 — the Shopping List snackbar's "View" action opens the
+    /// Shopping List (`dod://shopping-list`). Optional so existing callers
+    /// (tests / previews) can omit it; when nil the append still works but the
+    /// success snackbar shows no "View" button (mirrors Recipe Detail's Part 1
+    /// `openShoppingList` seam threaded through `TabStack`).
+    public let openShoppingList: (() -> Void)?
 
     public init(
         viewModel: SearchViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
-        onSelectCategory: @escaping (DODDomain.Category) -> Void = { _ in }
+        onSelectCategory: @escaping (DODDomain.Category) -> Void = { _ in },
+        openShoppingList: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.onSelectCategory = onSelectCategory
+        self.openShoppingList = openShoppingList
     }
 
     public var body: some View {
@@ -94,6 +102,9 @@ public struct SearchView: View {
         .onChange(of: viewModel.state) { _, newState in
             announceSearchState(newState)
         }
+        // DUT-534 Part 2 — the "Add to Shopping List" confirmation snackbar,
+        // anchored to the bottom (mirrors Recipe Detail's Part 1 host).
+        .overlay(alignment: .bottom) { shoppingListSnackbar }
         .background(DODColor.surface)
         // DUT-275 — nav bar hidden so the title pins at the very top, at the same
         // Y as every other tab (the title is the `DODScreenHeader` above).
@@ -128,6 +139,38 @@ public struct SearchView: View {
     /// brace-spacing rule.
     private var shouldShowDidYouMeanBanner: Bool {
         viewModel.state == .results || viewModel.state == .noResults
+    }
+
+    /// DUT-534 Part 2 — the bottom "Add to Shopping List" confirmation snackbar.
+    /// Present only while the view model set a message; a `.task` auto-dismisses
+    /// it after a few seconds (mirrors Recipe Detail's Part 1 snackbar, DUT-419).
+    /// `internal` so the `+IngredientSection` extension can host it too — but the
+    /// overlay is attached once on the shared `body`, so this is read here only.
+    @ViewBuilder
+    var shoppingListSnackbar: some View {
+        if let message = viewModel.shoppingListSnackbarMessage {
+            Snackbar(message: message, action: shoppingListSnackbarAction)
+                .id(message)  // a new message restarts the auto-dismiss timer
+                .padding(.bottom, DODSpacing.md)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    viewModel.dismissShoppingListSnackbar()
+                }
+        }
+    }
+
+    /// The optional trailing snackbar action. Present only on a successful
+    /// append (the view model set a title) AND when the host wired
+    /// `openShoppingList`. Tapping it dismisses the toast and opens the list.
+    private var shoppingListSnackbarAction: Snackbar.Action? {
+        guard let title = viewModel.shoppingListSnackbarActionTitle,
+            let openShoppingList
+        else { return nil }
+        return Snackbar.Action(title: title) {
+            viewModel.dismissShoppingListSnackbar()
+            openShoppingList()
+        }
     }
 
     /// US-12 amendment / US-29 amendment / CL-127 (T-649): the
@@ -265,10 +308,16 @@ public struct SearchView: View {
                     highlightQuery: viewModel.query
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
-                    viewModel.applyOptimisticSaveToggle(id: item.id)
-                    onSave?(item)
-                }
+                .recipeCardContextMenu(
+                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
+                    onToggle: {
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item)
+                    },
+                    // DUT-534 Part 2 — Search opts into the shared helper's
+                    // "Add to Shopping List" item (Categories/Saved don't).
+                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
+                )
                 // T-737 / L5: stable handle mirroring `dod.feed.card`.
                 .accessibilityIdentifier("dod.search.card")
             }
@@ -293,10 +342,14 @@ public struct SearchView: View {
                     highlightQuery: viewModel.query
                 )
                 .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
-                    viewModel.applyOptimisticSaveToggle(id: item.id)
-                    onSave?(item)
-                }
+                .recipeCardContextMenu(
+                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
+                    onToggle: {
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item)
+                    },
+                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
+                )
                 .accessibilityIdentifier("dod.search.card")
             }
         }

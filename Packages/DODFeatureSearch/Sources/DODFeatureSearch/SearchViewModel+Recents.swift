@@ -27,4 +27,25 @@ extension SearchViewModel {
         // equals one finalized search, not one per debounced keystroke.
         Task { await sendSearchTelemetry(trimmed: trimmed) }
     }
+
+    /// Clear every persisted recent search (the "Clear All" affordance) and
+    /// refresh the view-bound array. Cancels any in-flight debounce so a
+    /// mid-type search can't repopulate a just-cleared list.
+    public func clearRecentSearches() {
+        debounceTask?.cancel()
+        recents.clear()
+        recentSearches = recents.recent()
+    }
+
+    /// Remove a single term from the persisted recent-searches store
+    /// (case-insensitive match per `RecentSearches.remove(_:)`) and
+    /// refresh the view-bound `recentSearches` array so the FlowLayout
+    /// re-renders without the dropped pill on the next observation tick.
+    ///
+    /// Spec trace: US-33 / AC-33.3 (per-term context-menu Clear),
+    /// CL-57 (recents-store mutations route through the view-model).
+    public func removeRecentSearch(_ query: String) {
+        recents.remove(query)
+        recentSearches = recents.recent()
+    }
 }

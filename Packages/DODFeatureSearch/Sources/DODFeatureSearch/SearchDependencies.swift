@@ -96,10 +96,18 @@ public protocol SearchDependencies: Sendable {
     /// T-765 / CL-162 (DUT-71) — saved recipe id set for the card long-press
     /// Save/Unsave label. Default `[]` keeps existing fake conformers compiling.
     func savedRecipeIDs() async throws -> Set<Int>
+    /// DUT-534 Part 2 — append a recipe's ingredients to the Shopping List from a
+    /// Search card's long-press "Add to Shopping List". The App composition root
+    /// wires the shared `LiveShoppingListAppender`, which hydrates the
+    /// (ingredient-empty, card-sourced) recipe before appending. Default
+    /// `.couldntLoad` keeps existing fake conformers compiling and degrades
+    /// gracefully when unwired.
+    func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
 }
 
 extension SearchDependencies {
     public func savedRecipeIDs() async throws -> Set<Int> { [] }
+    public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult { .couldntLoad }
 }
 
 public struct LiveSearchDependencies: SearchDependencies {
@@ -113,17 +121,34 @@ public struct LiveSearchDependencies: SearchDependencies {
     /// shape, so the default keeps the existing call site at
     /// `App/AppDependencies.swift` byte-identical (no wiring change).
     let fetcher: RecipePageFetcher
+    /// DUT-534 Part 2 — the App-wired Shopping List append seam. Routes a card's
+    /// minimal (ingredient-empty) recipe to the shared `LiveShoppingListAppender`,
+    /// which hydrates + appends. Optional so call sites that don't build shopping
+    /// lists can omit it; `nil` reports `.couldntLoad`.
+    public typealias ShoppingListAppendHook =
+        @Sendable (Recipe) async -> AddToShoppingListResult
+    private let shoppingListAppend: ShoppingListAppendHook?
 
     public init(
         client: WPRestClient,
         store: RecipeStore,
         monitor: NetworkMonitor,
-        fetcher: RecipePageFetcher = RecipePageFetcher()
+        fetcher: RecipePageFetcher = RecipePageFetcher(),
+        shoppingListAppend: ShoppingListAppendHook? = nil
     ) {
         self.client = client
         self.store = store
         self.monitor = monitor
         self.fetcher = fetcher
+        self.shoppingListAppend = shoppingListAppend
+    }
+
+    /// DUT-534 Part 2 — route to the App-wired appender, or `.couldntLoad` when
+    /// none is wired (previews / terse tests) so the UI never claims a row
+    /// landed when nothing was persisted.
+    public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
+        guard let shoppingListAppend else { return .couldntLoad }
+        return await shoppingListAppend(recipe)
     }
 
     public func search(query: String) async throws -> [RecipeListItem] {

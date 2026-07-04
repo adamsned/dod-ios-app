@@ -324,4 +324,15 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
         deletedCookLogIDs.append(id)
         cooks.removeAll { $0.id == id }
     }
+
+    // DUT-534 Part 2 — the Shopping List append seam. `shoppingListResult`
+    // stubs what the appender returns; `appendedRecipes` records the (minimal,
+    // list-item-derived) recipes the view model handed over, so a test can prove
+    // both the result mapping AND that the card's identity flowed through.
+    var shoppingListResult: AddToShoppingListResult = .couldntLoad
+    var appendedRecipes: [Recipe] = []
+    func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
+        appendedRecipes.append(recipe)
+        return shoppingListResult
+    }
 }

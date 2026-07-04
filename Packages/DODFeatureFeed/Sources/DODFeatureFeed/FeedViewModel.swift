@@ -32,7 +32,14 @@ public final class FeedViewModel {
     /// a long-press toggle so the menu is correct on re-open.
     public private(set) var savedRecipeIDs: Set<Int> = []
 
-    private let dependencies: FeedDependencies
+    /// DUT-534 Part 2 — Shopping List snackbar copy + optional trailing action
+    /// title ("View"), driven by `FeedViewModel+ShoppingList`, rendered by
+    /// `FeedView`. `nil` message hides the snackbar.
+    public internal(set) var shoppingListSnackbarMessage: String?
+    public internal(set) var shoppingListSnackbarActionTitle: String?
+
+    // DUT-534 Part 2 — internal (was `private`) so `+ShoppingList` reaches it.
+    let dependencies: FeedDependencies
     private var currentPage: Int = 0
     private var reachedEnd: Bool = false
     /// DUT-516: O(1) membership set mirroring `items` ids, so `loadMore` can
