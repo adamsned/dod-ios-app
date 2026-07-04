@@ -311,7 +311,10 @@ public struct ShoppingListView: View {
 
 // MARK: - Inline aisle section header (T-680c hoists this to a DesignSystem primitive)
 
-private struct AisleHeader: View {
+// DUT-535 — `internal` (was `private`) so `AddToShoppingListSheet` reuses the
+// same aisle display-name + glyph mapping, keeping the selection sheet's section
+// headers identical to the Shopping List's.
+struct AisleHeader: View {
     let aisle: IngredientAisleClassifier.Aisle
 
     var body: some View {

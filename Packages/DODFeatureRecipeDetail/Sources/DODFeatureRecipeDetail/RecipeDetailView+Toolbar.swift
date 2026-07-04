@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODDomain
 import SwiftUI
 
 // The recipe-detail top-bar actions + the bottom Snackbar, split out of
@@ -24,13 +25,16 @@ extension RecipeDetailView {
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
 
-                // US-39 / DUT-534 — "Add to Shopping List" from ANY recipe (not
-                // just saved). Detail's `recipe` is already loaded, so this
-                // appends its ingredients straight to the App-Group list and
-                // shows a confirming Snackbar with a "View" action. Sits between
-                // Save (AC-4.7) and Download (AC-35.1).
+                // US-39 / DUT-534 / DUT-535 — "Add to Shopping List" from ANY
+                // recipe (not just saved). DUT-535: tapping now PRESENTS the
+                // ingredient-selection sheet (pick which ingredients to add)
+                // rather than adding all immediately. Detail's `recipe` is
+                // already loaded (ingredients populated), so no hydration is
+                // needed. When the sheet seam isn't wired (previews / terse
+                // hosts) it falls back to DUT-534's immediate add-all. Sits
+                // between Save (AC-4.7) and Download (AC-35.1).
                 Button {
-                    Task { await viewModel.addToShoppingList() }
+                    presentAddToShoppingList()
                 } label: {
                     Image(systemName: "cart.badge.plus")
                         .foregroundStyle(DODColor.label)
@@ -68,6 +72,23 @@ extension RecipeDetailView {
                 )
                 .accessibilityLabel("Share recipe")
             }
+        }
+    }
+
+    // MARK: - Add to Shopping List (DUT-535)
+
+    /// Handle the `cart.badge.plus` tap. DUT-535 — present the ingredient-
+    /// selection sheet for the loaded recipe when the sheet seam is wired
+    /// (production). When it isn't (previews / terse hosts that only wired the
+    /// DUT-534 immediate-add closure), fall back to the immediate add-all so the
+    /// action still works. Guarded on `recipe != nil` (the button is disabled
+    /// when nil, but guard defensively).
+    private func presentAddToShoppingList() {
+        guard let recipe = viewModel.recipe else { return }
+        if addToShoppingListSheet != nil {
+            recipeForShoppingListSheet = SheetRecipe(recipe: recipe)
+        } else {
+            Task { await viewModel.addToShoppingList() }
         }
     }
 

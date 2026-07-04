@@ -83,6 +83,71 @@ struct ShoppingListAppenderTests {
         #expect(store.load()?.items.count == 4)  // 2 + 2, no merge
     }
 
+    // MARK: - Subset append (DUT-535 — the selection sheet path)
+
+    /// ``addToShoppingList(rows:)`` appends EXACTLY the given rows and reports
+    /// their count — no re-classify, no hydrate.
+    @Test func subsetAppendAppendsGivenRowsAndReportsCount() async {
+        let store = Self.freshStore()
+        let appender = LiveShoppingListAppender(store: store)
+
+        let rows = ShoppingListViewModel.rows(
+            from: [Self.recipe(id: 1, ingredients: ["milk", "eggs", "flour"])]
+        )
+        // Simulate a deselection: only two of the three candidate rows.
+        let chosen = Array(rows.prefix(2))
+        let result = await appender.addToShoppingList(rows: chosen)
+
+        #expect(result == .added(count: 2))
+        let saved = store.load()
+        #expect(saved?.items.count == 2)
+        #expect(saved?.items.map(\.ingredientText) == ["milk", "eggs"])
+    }
+
+    /// An empty selection reports `.couldntLoad` and writes nothing (the sheet's
+    /// disabled-at-zero confirm normally prevents this, but the seam is safe).
+    @Test func subsetAppendWithNoRowsReportsCouldntLoad() async {
+        let store = Self.freshStore()
+        let appender = LiveShoppingListAppender(store: store)
+        let result = await appender.addToShoppingList(rows: [])
+        #expect(result == .couldntLoad)
+        #expect(store.load() == nil)
+    }
+
+    /// A nil store (no App Group) reports `.couldntLoad`, never a crash.
+    @Test func subsetAppendWithNilStoreReportsCouldntLoad() async {
+        let appender = LiveShoppingListAppender(store: nil)
+        let rows = ShoppingListViewModel.rows(
+            from: [Self.recipe(id: 1, ingredients: ["salt"])]
+        )
+        let result = await appender.addToShoppingList(rows: rows)
+        #expect(result == .couldntLoad)
+    }
+
+    /// The subset append PRESERVES the existing checked / already-have sets, the
+    /// same way the whole-recipe append does — a half-shopped list isn't reset.
+    @Test func subsetAppendPreservesCheckedAndAlreadyHave() async {
+        let store = Self.freshStore()
+
+        let seed = ShoppingListViewModel.rows(
+            from: [Self.recipe(id: 1, ingredients: ["milk", "eggs"])]
+        )
+        let checked: Set<UUID> = [seed[0].id]
+        let alreadyHave: Set<UUID> = [seed[1].id]
+        store.save(items: seed, checked: checked, alreadyHave: alreadyHave)
+
+        let appender = LiveShoppingListAppender(store: store)
+        let more = ShoppingListViewModel.rows(
+            from: [Self.recipe(id: 2, ingredients: ["flour"])]
+        )
+        _ = await appender.addToShoppingList(rows: more)
+
+        let snapshot = store.load()
+        #expect(snapshot?.items.count == 3)
+        #expect(Set(snapshot?.checkedIDs ?? []) == checked)
+        #expect(Set(snapshot?.alreadyHaveIDs ?? []) == alreadyHave)
+    }
+
     // MARK: - Store append: preserves checked / already-have, survives reload
 
     /// ``ShoppingListStore/append(rows:)`` appends onto an existing list and

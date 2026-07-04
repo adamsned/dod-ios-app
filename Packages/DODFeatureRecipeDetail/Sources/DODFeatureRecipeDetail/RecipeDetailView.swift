@@ -15,6 +15,15 @@ public struct RecipeDetailView: View {
         case instructions
     }
 
+    /// DUT-535 — a fresh-identity wrapper for the recipe driving the
+    /// ingredient-selection `.sheet(item:)`. A per-presentation `UUID` id (not
+    /// the recipe's own id) so re-tapping "Add to Shopping List" for the same
+    /// recipe re-presents the sheet.
+    struct SheetRecipe: Identifiable {
+        let id = UUID()
+        let recipe: Recipe
+    }
+
     // `internal` (default) access so the `RecipeDetailView+Blurb.swift`
     // extension can read `viewModel` + `isBlurbExpanded` to render the
     // expand/collapse blurb surface (Swift extensions don't see
@@ -71,17 +80,33 @@ public struct RecipeDetailView: View {
     /// default) hides the View action — used by previews / hosts that don't
     /// wire routing.
     public let openShoppingList: (() -> Void)?
+    /// DUT-535 — builds the ingredient-selection sheet for the tapped recipe.
+    /// The sheet type (``AddToShoppingListSheet``) lives in `DODFeatureSaved`,
+    /// which this package must not import, so the App composition root injects a
+    /// closure that constructs it (type-erased to `AnyView`). It's handed the
+    /// recipe + a completion that reports the append result back so the view
+    /// model can surface the confirming Snackbar. `nil` (previews / hosts that
+    /// don't wire the list) falls back to the DUT-534 immediate add-all.
+    public let addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)?
+
+    /// DUT-535 — the recipe whose ingredient-selection sheet is presented.
+    /// Non-nil drives the `.sheet(item:)`; set when the toolbar `cart.badge.plus`
+    /// is tapped, cleared on dismiss. `internal` (not `private`) so the
+    /// `RecipeDetailView+Toolbar.swift` extension can present it.
+    @State var recipeForShoppingListSheet: SheetRecipe?
 
     public init(
         viewModel: RecipeDetailViewModel,
         onSelectRelated: @escaping (RecipeListItem) -> Void,
         autoStartCookMode: Bool = false,
-        openShoppingList: (() -> Void)? = nil
+        openShoppingList: (() -> Void)? = nil,
+        addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         _pendingAutoCookMode = State(initialValue: autoStartCookMode)
         self.onSelectRelated = onSelectRelated
         self.openShoppingList = openShoppingList
+        self.addToShoppingListSheet = addToShoppingListSheet
     }
 
     public var body: some View {
@@ -109,6 +134,16 @@ public struct RecipeDetailView: View {
             cookModeCover
         }
         #endif
+        // DUT-535 — the ingredient-selection sheet. Presented when the toolbar
+        // `cart.badge.plus` is tapped (see `RecipeDetailView+Toolbar.swift`),
+        // built by the App-injected `addToShoppingListSheet` closure (the sheet
+        // type lives in `DODFeatureSaved`). On the sheet's "Add N items" the
+        // completion routes the result to the view model for the Snackbar.
+        .sheet(item: $recipeForShoppingListSheet) { wrapper in
+            addToShoppingListSheet?(wrapper.recipe) { result in
+                viewModel.showAddToShoppingListSnackbar(for: result)
+            }
+        }
         .task {
             await viewModel.onAppear()
             isOfflineSnapshot = await viewModel.isOffline
