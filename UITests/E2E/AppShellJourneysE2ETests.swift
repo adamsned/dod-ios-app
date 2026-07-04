@@ -128,7 +128,7 @@ final class AppShellJourneysE2ETests: XCTestCase {
         )
     }
 
-    /// Cross-tab navigation integrity: all four tabs are reachable, and a
+    /// Cross-tab navigation integrity: all five tabs are reachable, and a
     /// detail pushed on the Recipes stack survives a tab round-trip (tab swap
     /// is not a pop).
     func test_cross_tab_navigation_integrity() {

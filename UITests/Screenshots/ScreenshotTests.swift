@@ -388,7 +388,7 @@ final class ScreenshotTests: XCTestCase {
             "All categories", "Any time", "Recently viewed",
             "Search filters", "Clear",
         ]
-        let tabLabels: Set<String> = ["Recipes", "Categories", "Saved", "Search"]
+        let tabLabels: Set<String> = ["Recipes", "Saved", "Grocery List", "Settings", "Search"]
         let exclude = tabLabels.union(filterChrome)
         let resultButtons = app.buttons.matching(
             NSPredicate(format: "NOT (label IN %@) AND NOT (label BEGINSWITH 'Try')", Array(exclude))

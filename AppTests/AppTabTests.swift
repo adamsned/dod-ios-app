@@ -12,8 +12,9 @@ import XCTest
 final class AppTabTests: XCTestCase {
 
     /// AC-16.1 / CL-25 / CL-194 / CL-217: bottom tab-bar order is **Recipes →
-    /// Saved → Settings → Search** (Categories folded into Search in T-800;
-    /// Settings promoted from the per-tab gear sheet to a tab in T-823).
+    /// Saved → Grocery List → Settings → Search** (Categories folded into
+    /// Search in T-800; Settings promoted from the per-tab gear sheet to a tab
+    /// in T-823; Grocery List inserted after Saved in DUT-536).
     /// `AppTab.allCases` is the single source of truth for that order
     /// (RootView's phoneTabs iterates it directly), so asserting on the
     /// enum is the cheapest possible regression guard.
