@@ -99,6 +99,32 @@ struct IngredientMetricConverterTests {
         #expect(IngredientMetricConverter.metric("1/2 teaspoon vanilla") == "5 ml vanilla")
     }
 
+    // MARK: - Micro-amounts below one-decimal resolution: never "0 ml"/"0 g" (DUT-540)
+
+    @Test func microFractionTeaspoonShowsTraceMarker() {
+        // "1/200 teaspoon" → 0.005 × 5 = 0.025 ml. Whole-round is 0 AND one
+        // decimal (0.025 → "0.0" → trimmed "0") would still read as nothing, so
+        // show the honest "<0.1 ml" trace marker — never a false "0 ml".
+        let result = IngredientMetricConverter.metric("1/200 teaspoon xanthan")
+        #expect(result != "0 ml xanthan")
+        #expect(result == "<0.1 ml xanthan")
+    }
+
+    @Test func rawTinyDecimalTeaspoonShowsTraceMarker() {
+        // "0.008 teaspoon" → 0.008 × 5 = 0.04 ml (< 0.05), same trace path.
+        let result = IngredientMetricConverter.metric("0.008 teaspoon lecithin")
+        #expect(result != "0 ml lecithin")
+        #expect(result == "<0.1 ml lecithin")
+    }
+
+    @Test func microFractionPoundShowsTraceMarkerGrams() {
+        // "1/400 pound" → 0.0025 × 450 = 1.125 g... use a smaller fraction to
+        // drop below 0.05 g: "1/20000 pound" → 0.00005 × 450 = 0.0225 g → "<0.1 g".
+        let result = IngredientMetricConverter.metric("1/20000 pound saffron")
+        #expect(result != "0 g saffron")
+        #expect(result == "<0.1 g saffron")
+    }
+
     // MARK: - Rollover to litres / kilograms
 
     @Test func millilitersRollUpToLiters() {

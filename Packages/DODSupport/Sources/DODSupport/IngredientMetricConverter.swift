@@ -35,7 +35,10 @@ import Foundation
 /// A very small measure that would round to a whole `0` (any true magnitude
 /// under 2.5 ml/g, e.g. `1/4 teaspoon` → 1.25 ml) is instead shown to one
 /// decimal place (`"1.3 ml"`, trailing `.0` trimmed) so a real positive amount
-/// is never rendered as `"0 ml"` / `"0 g"`.
+/// is never rendered as `"0 ml"` / `"0 g"`. A trace micro-amount below even one
+/// decimal's resolution (magnitude < 0.05, e.g. `1/200 teaspoon` → 0.025 ml,
+/// where one decimal would still collapse to `"0"`) reads as `"<0.1 ml"` /
+/// `"<0.1 g"` — an honest "less than a tenth", never a false `"0 ml"` (DUT-540).
 ///
 /// Spec trace: DUT-517 (ingredient metric half of the unit toggle, US-32
 /// AC-32.4) — the deferred other half of DUT-47 / DUT-307.
@@ -91,7 +94,15 @@ public enum IngredientMetricConverter {
         // 1/4 tsp → 1.25 ml), fall back to one decimal place so the true amount
         // is shown accurately (1.25 → "1.3 ml", trailing ".0" trimmed).
         if rounded == 0 {
-            return "\(trimDecimal(magnitude)) \(dimension.baseSymbol)"
+            let oneDecimal = trimDecimal(magnitude)
+            // Even one decimal collapses to "0" for a true micro-amount (any
+            // magnitude < 0.05, e.g. 1/200 tsp → 0.025 ml). Rendering "0.0 ml"
+            // would still read as nothing, so show an honest "less than a tenth"
+            // trace marker instead of a false zero (DUT-540).
+            if oneDecimal == "0" {
+                return "<0.1 \(dimension.baseSymbol)"
+            }
+            return "\(oneDecimal) \(dimension.baseSymbol)"
         }
         return "\(formatInteger(rounded)) \(dimension.baseSymbol)"
     }
