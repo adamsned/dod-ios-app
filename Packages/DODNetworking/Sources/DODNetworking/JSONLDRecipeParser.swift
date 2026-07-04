@@ -139,6 +139,10 @@ public enum JSONLDRecipeParser {
         let servings = parseServings(jsonLD["recipeYield"])
         let nutrition = mapNutrition(jsonLD["nutrition"])
         let video = mapVideo(jsonLD["video"])
+        let recipeCategory = mapStringOrArray(jsonLD["recipeCategory"])
+        let recipeCuisine = mapStringOrArray(jsonLD["recipeCuisine"])
+        let suitableForDiet = mapStringOrArray(jsonLD["suitableForDiet"])
+        let author = mapAuthorName(jsonLD["author"])
 
         return Recipe(
             id: listItem.id,
@@ -157,7 +161,11 @@ public enum JSONLDRecipeParser {
             totalTime: total,
             servings: servings,
             nutrition: nutrition,
-            video: video
+            video: video,
+            recipeCategory: recipeCategory,
+            recipeCuisine: recipeCuisine,
+            suitableForDiet: suitableForDiet,
+            author: author
         )
     }
 
@@ -290,20 +298,6 @@ public enum JSONLDRecipeParser {
         case "S" where inTimePart: return 1
         default: return nil
         }
-    }
-
-    /// `recipeYield` may be a number, a string, or an array of strings.
-    static func parseServings(_ raw: Any?) -> Int? {
-        if let int = raw as? Int { return int }
-        if let double = raw as? Double {
-            // DUT-518: `Int(Double)` traps on out-of-range or non-finite input
-            // (e.g. `recipeYield: 1e30` or `1e400`). Guard the range before
-            // converting so untrusted scraped values return nil, not a crash.
-            return Int(exactly: double.rounded())
-        }
-        if let string = raw as? String { return Int(string) ?? Int(string.split(separator: " ").first ?? "") }
-        if let array = raw as? [String], let first = array.first { return Int(first) }
-        return nil
     }
 
     static func mapNutrition(_ raw: Any?) -> RecipeNutrition? {
