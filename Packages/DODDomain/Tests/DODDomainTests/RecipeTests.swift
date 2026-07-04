@@ -28,6 +28,53 @@ import Testing
         #expect(decoded == original)
     }
 
+    /// DUT-572 / CL-310: old on-disk payloads predate the four editorial keys
+    /// (recipeCategory / recipeCuisine / suitableForDiet / author). They must
+    /// decode cleanly with `[]` / nil defaults (mirrors the pre-`kind` posture).
+    @Test func backCompatDecodeWithoutEditorialKeys() throws {
+        let json = """
+            {
+              "id": 5,
+              "slug": "old",
+              "title": "Old Cached Recipe",
+              "excerpt": "Pre-DUT-572 blob.",
+              "canonicalURL": "https://www.dutchovendaddy.com/old/",
+              "categoryIDs": [],
+              "publishedAt": 700000000,
+              "ingredients": [],
+              "instructions": []
+            }
+            """
+        let decoded = try JSONDecoder().decode(Recipe.self, from: Data(json.utf8))
+        #expect(decoded.recipeCategory.isEmpty)
+        #expect(decoded.recipeCuisine.isEmpty)
+        #expect(decoded.suitableForDiet.isEmpty)
+        #expect(decoded.author == nil)
+    }
+
+    /// Encode → decode preserves the four editorial fields.
+    @Test func editorialFieldsRoundTrip() throws {
+        let original = Recipe(
+            id: 8,
+            slug: "skillet-corn",
+            title: "Garlic Butter Skillet Corn",
+            excerpt: "An easy side dish.",
+            canonicalURL: Self.baseURL,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            recipeCategory: ["Side Dish"],
+            recipeCuisine: ["American"],
+            suitableForDiet: ["https://schema.org/LowFatDiet"],
+            author: "Chef Ned"
+        )
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Recipe.self, from: encoded)
+        #expect(decoded == original)
+        #expect(decoded.recipeCategory == ["Side Dish"])
+        #expect(decoded.recipeCuisine == ["American"])
+        #expect(decoded.suitableForDiet == ["https://schema.org/LowFatDiet"])
+        #expect(decoded.author == "Chef Ned")
+    }
+
     @Test func hasDetailFalseWhenIngredientsAndInstructionsEmpty() {
         let recipe = Self.makeRecipe(id: 1)
         #expect(!recipe.hasDetail)

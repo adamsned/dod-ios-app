@@ -385,7 +385,11 @@ public actor RecipeStore {
             nutrition: nutrition,
             video: video,
             kind: kind,
-            articleBodyHTML: row.articleBodyHTML
+            articleBodyHTML: row.articleBodyHTML,
+            recipeCategory: row.recipeCategory,
+            recipeCuisine: row.recipeCuisine,
+            suitableForDiet: row.suitableForDiet,
+            author: row.author
         )
     }
 }

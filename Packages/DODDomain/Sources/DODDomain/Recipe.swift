@@ -54,6 +54,19 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
     /// recipe content lives in `ingredients` + `instructions`.
     public let articleBodyHTML: String?
 
+    // MARK: - Editorial info fields (DUT-572 / CL-310)
+
+    /// Course(s) from JSON-LD `recipeCategory` (e.g. "Dessert"). Empty when absent.
+    public let recipeCategory: [String]
+    /// Cuisine(s) from JSON-LD `recipeCuisine` (e.g. "Italian"). Empty when absent.
+    public let recipeCuisine: [String]
+    /// Diet(s) from JSON-LD `suitableForDiet`. Values may be schema.org URLs
+    /// (e.g. `https://schema.org/LowFatDiet`) stored raw; prettifying is the UI's job.
+    /// Empty when absent.
+    public let suitableForDiet: [String]
+    /// Author name from JSON-LD `author` (Person/Organization). Nil when absent.
+    public let author: String?
+
     public init(
         id: Int,
         slug: String,
@@ -73,7 +86,11 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         nutrition: RecipeNutrition? = nil,
         video: RecipeVideo? = nil,
         kind: PostKind = .recipe,
-        articleBodyHTML: String? = nil
+        articleBodyHTML: String? = nil,
+        recipeCategory: [String] = [],
+        recipeCuisine: [String] = [],
+        suitableForDiet: [String] = [],
+        author: String? = nil
     ) {
         self.id = id
         self.slug = slug
@@ -94,6 +111,10 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.video = video
         self.kind = kind
         self.articleBodyHTML = articleBodyHTML
+        self.recipeCategory = recipeCategory
+        self.recipeCuisine = recipeCuisine
+        self.suitableForDiet = suitableForDiet
+        self.author = author
     }
 
     // MARK: - Codable (back-compat for older payloads pre-kind)
@@ -107,6 +128,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         case categoryIDs, publishedAt, ingredients, instructions
         case prepTime, cookTime, totalTime, servings, nutrition, video
         case kind, articleBodyHTML
+        case recipeCategory, recipeCuisine, suitableForDiet, author
     }
 
     public init(from decoder: Decoder) throws {
@@ -133,6 +155,12 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         // by definition.
         self.kind = try container.decodeIfPresent(PostKind.self, forKey: .kind) ?? .recipe
         self.articleBodyHTML = try container.decodeIfPresent(String.self, forKey: .articleBodyHTML)
+        // DUT-572 / CL-310: back-compat — older payloads predate these keys.
+        // Arrays default to empty, author to nil.
+        self.recipeCategory = try container.decodeIfPresent([String].self, forKey: .recipeCategory) ?? []
+        self.recipeCuisine = try container.decodeIfPresent([String].self, forKey: .recipeCuisine) ?? []
+        self.suitableForDiet = try container.decodeIfPresent([String].self, forKey: .suitableForDiet) ?? []
+        self.author = try container.decodeIfPresent(String.self, forKey: .author)
     }
 }
 
