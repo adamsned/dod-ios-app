@@ -180,6 +180,17 @@ The app's roundness is a **two-tier** system. Every rounded element must fall in
 
 This applies to **every new feature by every contributor**, including any AI assistant working in this repo on either developer's machine. New UI that introduces a rounded button, card, or cell must use the correct tier from the start. Supersedes the pre-CL-304 "everything at `DODRadius.standard` (12pt)" convention (CL-288 / CL-289); the codebase migration to this rule is tracked separately (see the re-sweep task in `tasks.md`).
 
+### 10.2 Copy consistency — Title Case for controls + headings (CL-305)
+
+User-facing **controls and headings use headline-style Title Case**; **body copy stays sentence case**. Codifies the long-standing "Title Case per T-750" convention.
+
+- **Title Case (headline style) — apply to:** button / CTA labels, tab / toolbar / menu / context-menu labels, section headers, navigation & screen titles, list-row labels, and prominent headings — **empty-state titles, alert / confirmation-dialog titles, card titles, sheet titles**.
+- **Headline style:** capitalize the first + last word and all major words; keep **small words lowercase** — articles (`a`, `an`, `the`), coordinating conjunctions (`and`, `or`, `but`, `nor`), and short prepositions (`of`, `to`, `in`, `on`, `for`, `at`, `by`, `up`, `as`) — **unless** they are the first or last word. (Verbs like `Is`/`Be`/`Are` stay capitalized — they're not small words.) e.g. "Add Your Name and Photo", "Cook by Feel", "Your Shopping List Is Empty".
+- **Sentence case — leave as-is:** body text, descriptions, subtitles, captions, footers, coaching/instruction sentences, empty-state **message** bodies, alert **message** bodies, snackbar/toast sentences, placeholder/helper text.
+- **Exempt (don't touch):** all-caps eyebrows ("LATEST RECIPE", "COOKING TIP"), question-form strings ("What are we cooking?"), WordPress/dynamic content (recipe & article titles, category names, ingredient text — shown as authored), and accessibility labels/hints (natural language). Proper nouns / brand names / acronyms keep their canonical casing ("BuzzyWaxx", "iCloud", "DOD").
+
+This applies to **every new feature by every contributor** (both developers + any AI assistant). New user-facing controls/headings must be Title Case from the start. The migration of existing copy is tracked separately (see the Title-Case sweep task in `tasks.md`).
+
 ## 11. Git & review process
 
 - **Branches:** `main` is protected. Feature branches: `feat/<slug>`, fixes: `fix/<slug>`, spec changes: `spec/<slug>`.
