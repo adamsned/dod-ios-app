@@ -66,12 +66,12 @@ struct ArticlePathClassificationTests {
         #expect(dependencies.markedFailedIDs.isEmpty)
     }
 
-    @Test func parsedRecipeWithEmptyInstructionsFallsBackToArticleBody() async throws {
-        // DUT-185: WP Recipe Maker now renders steps client-side and redacts
-        // them from the recipe's structured data, so `parseJSONLD` SUCCEEDS but
-        // returns a recipe with EMPTY instructions (e.g. Dutch Oven 7 Can Soup).
-        // Rather than render a step-less recipe, the view model falls back to
-        // the article-body path — where the post's "How to Make" steps live.
+    @Test func parsedRecipeWithEmptyInstructionsAndNoCardFallsBackToArticleBody() async throws {
+        // DUT-185 (as narrowed by DUT-538): a recipe that parses with EMPTY
+        // instructions falls back to the article-body path ONLY when the page
+        // ships NO WPRM recipe card. `htmlToReturn` defaults to `<html></html>`
+        // (no card), so `hasRecipeCard` is false and the step-less recipe still
+        // routes to `.article` — the genuine-article case is preserved.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 17, withDetail: false)
         dependencies.articleBodyToExtract = "How to Make. Step 1: Open and dump."
@@ -81,8 +81,25 @@ struct ArticlePathClassificationTests {
             #expect(article.kind == .article)
             #expect(article.articleBodyHTML == "How to Make. Step 1: Open and dump.")
         } else {
-            Issue.record("Step-less recipe should fall back to .article, got \(viewModel.loadState)")
+            Issue.record("Step-less recipe with no card should fall back to .article, got \(viewModel.loadState)")
         }
+    }
+
+    @Test func emptyInstructionsWithWPRMCardStaysRecipeNotArticle() async throws {
+        // DUT-538: the 7 Can Soup regression. `parseJSONLD` SUCCEEDS but the
+        // recipe has empty instructions (the WPRM card had no instruction rows);
+        // however the page ships a `wprm-recipe-container`. Presence of the card
+        // means this is a RECIPE — it must NOT be reclassified as an article
+        // that dumps the whole blog body. It stays `.ready` with kind `.recipe`.
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 19, withDetail: false)
+        dependencies.htmlToReturn = "<html><body><div class=\"wprm-recipe-container\"></div></body></html>"
+        dependencies.articleBodyToExtract = "this should not be reached"
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 19)
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .ready)
+        #expect(viewModel.recipe?.kind == .recipe)
+        #expect(dependencies.markedFailedIDs.isEmpty)
     }
 
     // MARK: - Helper

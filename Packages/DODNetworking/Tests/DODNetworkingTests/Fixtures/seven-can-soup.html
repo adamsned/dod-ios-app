@@ -12,10 +12,17 @@
   group header (it has no <li class="wprm-recipe-ingredient"> line rows at all).
   The WPRM fallback recovers the ingredients from those group headers.
 
-  Note: the live 7 Can Soup card genuinely has NO instruction rows in its WPRM
-  markup, so instructions stay empty for THIS page (faithful to reality). The
-  standard line-row + instruction-row shapes are covered by the unit tests in
-  DODSupport (WPRMRecipeCardParserTests) and by the synthetic standard-card
+  DUT-538: the live 7 Can Soup WPRM card carries NO instruction rows in its
+  markup — the author put the steps in the post body's "How to Make" section as
+  Gutenberg numbered-step lists (<ol class="wp-block-list is-style-circle-number-list">,
+  one <ol> per step). Pre-fix, the empty card-instruction list caused the page
+  to be reclassified as an ARTICLE (the whole blog body dumped). The WPRM
+  fallback now recovers these 4 steps from the numbered-step lists, and the
+  page renders as a structured recipe. The <ol> markup below is the real
+  captured shape (recipe 3921, 2026-07-03).
+
+  The standard line-row + instruction-row shapes are covered by the unit tests
+  in DODSupport (WPRMRecipeCardParserTests) and by the synthetic standard-card
   golden assertion in JSONLDRecipeParserTests.
 -->
 <html lang="en-US">
@@ -45,6 +52,23 @@
 <body>
 <div class="entry-content">
 <p>This Dutch Oven 7 Can Soup uses simple pantry staples for a budget friendly dinner ready in 20 minutes.</p>
+<h2 id="how-to-make-dutch-oven-7-can-soup">How to Make Dutch Oven 7 Can Soup</h2>
+<div class="wp-block-columns is-layout-flex wp-container-core-columns-is-layout-1">
+<div class="wp-block-column is-layout-flow wp-block-column-is-layout-flow">
+<ol start="1" class="wp-block-list is-style-circle-number-list"><li><strong>Step 1: Open and Dump.</strong> Open all seven cans and pour everything into the Dutch oven. Do not drain any of the cans: the liquid forms your soup broth.</li></ol>
+</div></div>
+<div class="wp-block-columns is-layout-flex wp-container-core-columns-is-layout-2">
+<div class="wp-block-column is-layout-flow wp-block-column-is-layout-flow">
+<ol start="2" class="wp-block-list is-style-circle-number-list"><li><strong>Step 2: Season.</strong> Add the taco seasoning packet and stir everything together until well combined.</li></ol>
+</div></div>
+<div class="wp-block-columns is-layout-flex wp-container-core-columns-is-layout-3">
+<div class="wp-block-column is-layout-flow wp-block-column-is-layout-flow">
+<ol start="3" class="wp-block-list is-style-circle-number-list"><li><strong>Step 3: Simmer.</strong> Bring the soup to a boil over medium-high heat, then reduce and let it simmer for 10-15 minutes. The Dutch oven&rsquo;s even heat melds all those flavors together.</li></ol>
+</div></div>
+<div class="wp-block-columns is-layout-flex wp-container-core-columns-is-layout-4">
+<div class="wp-block-column is-layout-flow wp-block-column-is-layout-flow">
+<ol start="4" class="wp-block-list is-style-circle-number-list"><li><strong>Step 4: Serve.</strong> Ladle into bowls, pile on your favorite toppings, and serve with sweet cornbread.</li></ol>
+</div></div>
 <div id="recipe"></div>
 <div id="wprm-recipe-container-3921" class="wprm-recipe-container" data-recipe-id="3921" data-servings="10">
 <div class="wprm-recipe wprm-recipe-template-custom-template">

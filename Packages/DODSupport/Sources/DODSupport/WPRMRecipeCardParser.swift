@@ -27,9 +27,11 @@ import Foundation
 ///    each ingredient as a `<h4 class="wprm-recipe-ingredient-group-name">`
 ///    group header), fall back to the group-name headers: with no line rows
 ///    present, the group names ARE the ingredients.
-/// 3. Instructions — collect every `<li class="wprm-recipe-instruction">` row,
-///    preferring the inner `<div class="wprm-recipe-instruction-text">` text
-///    and falling back to the whole row text.
+/// 3. Instructions — collect every `<li class="wprm-recipe-instruction">` row
+///    (inner `wprm-recipe-instruction-text`, else the whole row). When the card
+///    has NO instruction rows (7 Can Soup / DUT-538 — steps live as a numbered
+///    "How to Make" list in the post body), fall back to the page's Gutenberg
+///    `is-style-circle-number-list` rows — the one place we read outside the card.
 ///
 /// Not a general-purpose HTML parser — handles the narrow, well-formed shape
 /// WPRM produces. Robust to attribute re-ordering and extra whitespace; assumes
@@ -60,6 +62,11 @@ public enum WPRMRecipeCardParser {
     static let instructionRowToken = "wprm-recipe-instruction"
     /// Class token on the inner text wrapper of an instruction row.
     static let instructionTextToken = "wprm-recipe-instruction-text"
+    /// Class token on the Gutenberg numbered-step `<ol>` WPRM renders into the
+    /// post body's "How to Make" section (DUT-538). Used as the instruction
+    /// fallback when the WPRM card itself carries no `wprm-recipe-instruction`
+    /// rows — the steps live here as `<li>` "Step N: …" rows instead.
+    static let numberedStepListToken = "is-style-circle-number-list"
     /// Class token on the checkbox span that prefixes an ingredient row; its
     /// subtree carries a screen-reader ballot-box glyph (`&#9634;`) and is
     /// dropped before the row text is extracted.
@@ -77,8 +84,16 @@ public enum WPRMRecipeCardParser {
         }
         return Card(
             ingredients: parseIngredients(in: card),
-            instructions: parseInstructions(in: card)
+            instructions: parseInstructions(in: card, page: html)
         )
+    }
+
+    /// Whether the page carries a WP Recipe Maker card
+    /// (`<div class="wprm-recipe-container">`). DUT-538: a page WITH a WPRM
+    /// card is a recipe — even if a first parse came back thin — and must not
+    /// be reclassified as an article that dumps the whole blog body.
+    public static func hasRecipeCard(html: String) -> Bool {
+        sliceRecipeContainer(in: html) != nil
     }
 
     // MARK: - Container slice
@@ -187,14 +202,46 @@ public enum WPRMRecipeCardParser {
     // MARK: - Instructions
 
     /// Collect instruction lines from `<li class="wprm-recipe-instruction">`
-    /// rows, preferring the inner `wprm-recipe-instruction-text` wrapper.
-    static func parseInstructions(in card: String) -> [String] {
-        collectElementTexts(
+    /// rows, preferring the inner `wprm-recipe-instruction-text` wrapper. When
+    /// the card carries NO instruction rows (DUT-538 — the 7 Can Soup shape,
+    /// where the steps live in the post body's "How to Make" numbered list
+    /// rather than in the WPRM card), fall back to the page's Gutenberg
+    /// numbered-step lists.
+    ///
+    /// - Parameters:
+    ///   - card: the sliced `wprm-recipe-container` body (searched first).
+    ///   - page: the full rendered page (searched only for the fallback, since
+    ///     the "How to Make" list sits OUTSIDE the recipe card).
+    static func parseInstructions(in card: String, page: String) -> [String] {
+        let cardRows = collectElementTexts(
             in: card,
             tag: "li",
             classToken: instructionRowToken,
             transform: instructionRowText
         )
+        if !cardRows.isEmpty {
+            return cardRows
+        }
+        return parseNumberedStepList(in: page)
+    }
+
+    /// DUT-538 fallback: collect step text from every
+    /// `<ol class="…is-style-circle-number-list…">` in the page. WPRM renders
+    /// the "How to Make" steps as one such `<ol>` per step (each holding a
+    /// single `<li>`), so flattening the `<li>` rows across all matching lists
+    /// yields the ordered steps. Class-token matched so it ignores the page's
+    /// other `<ol>`s (table of contents, comment list) that use different
+    /// classes.
+    static func parseNumberedStepList(in page: String) -> [String] {
+        collectElementInners(in: page, tag: "ol", classToken: numberedStepListToken)
+            .flatMap { listInner in
+                collectElementTexts(
+                    in: listInner,
+                    tag: "li",
+                    classToken: nil,
+                    transform: HTMLSanitizer.plainText(from:)
+                )
+            }
     }
 
     /// Plain-text one instruction `<li>` body: prefer the inner
@@ -211,13 +258,66 @@ public enum WPRMRecipeCardParser {
 
     /// Walk `html` collecting the transformed inner text of every
     /// `<tag …>…</tag>` whose `class=` contains `classToken`, depth-tracking
-    /// `<tag>` nesting. Blank results (after `transform`) are dropped.
+    /// `<tag>` nesting. Blank results (after `transform`) are dropped. Pass a
+    /// nil `classToken` to collect EVERY `<tag>` regardless of class (used to
+    /// pull every `<li>` out of an already class-scoped `<ol>`).
     static func collectElementTexts(
         in html: String,
         tag: String,
-        classToken: String,
+        classToken: String?,
         transform: (String) -> String
     ) -> [String] {
+        var results: [String] = []
+        var cursor = html.startIndex
+        let openMarker = "<\(tag)"
+        let closeMarker = "</\(tag)>"
+        while cursor < html.endIndex {
+            guard
+                let openStart = html.range(of: openMarker, options: .caseInsensitive, range: cursor..<html.endIndex)
+            else {
+                break
+            }
+            guard let openEnd = html.range(of: ">", range: openStart.upperBound..<html.endIndex) else {
+                break
+            }
+            let attributes = html[openStart.upperBound..<openEnd.lowerBound]
+            let skipTag = classToken.map {
+                !ArticleBodyExtractor.hasClassToken(attributes: attributes, token: $0)
+            }
+            if skipTag == true {
+                cursor = openEnd.upperBound
+                continue
+            }
+            guard
+                let inner = ArticleBodyExtractor.sliceUntilMatchingClose(
+                    in: html,
+                    openTag: openMarker,
+                    closeTag: closeMarker,
+                    bodyStart: openEnd.upperBound
+                )
+            else {
+                cursor = openEnd.upperBound
+                continue
+            }
+            let text = transform(inner)
+            if !text.isEmpty {
+                results.append(text)
+            }
+            // Advance past this element's matching close so nested same-tag
+            // children aren't re-collected as separate rows.
+            cursor = html.index(openEnd.upperBound, offsetBy: inner.count)
+            if let closeRange = html.range(of: closeMarker, range: cursor..<html.endIndex) {
+                cursor = closeRange.upperBound
+            }
+        }
+        return results
+    }
+
+    /// Collect the raw (untransformed) inner body of every `<tag …>…</tag>` in
+    /// `html` whose `class=` contains `classToken`, depth-tracking `<tag>`
+    /// nesting. Order-preserving. Used to gather the `<ol>` step lists before
+    /// their `<li>` rows are extracted.
+    static func collectElementInners(in html: String, tag: String, classToken: String) -> [String] {
         var results: [String] = []
         var cursor = html.startIndex
         let openMarker = "<\(tag)"
@@ -247,12 +347,7 @@ public enum WPRMRecipeCardParser {
                 cursor = openEnd.upperBound
                 continue
             }
-            let text = transform(inner)
-            if !text.isEmpty {
-                results.append(text)
-            }
-            // Advance past this element's matching close so nested same-tag
-            // children aren't re-collected as separate rows.
+            results.append(inner)
             cursor = html.index(openEnd.upperBound, offsetBy: inner.count)
             if let closeRange = html.range(of: closeMarker, range: cursor..<html.endIndex) {
                 cursor = closeRange.upperBound

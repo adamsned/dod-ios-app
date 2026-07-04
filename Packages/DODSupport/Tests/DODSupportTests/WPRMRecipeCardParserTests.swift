@@ -105,6 +105,69 @@ import Testing
         #expect(card.ingredients == ["2 cups tomato sauce"])
     }
 
+    // MARK: - "How to Make" numbered-step fallback (DUT-538)
+
+    /// DUT-538: the 7 Can Soup shape — the WPRM card carries NO
+    /// `wprm-recipe-instruction` rows, so the steps are recovered from the post
+    /// body's Gutenberg numbered-step lists
+    /// (`<ol class="…is-style-circle-number-list…">`, one `<ol>` per step). The
+    /// lists sit OUTSIDE the recipe card, so the parser is handed the whole
+    /// page. Other `<ol>`s (a table of contents, the comment list) use
+    /// different classes and are ignored.
+    @Test func recoversInstructionsFromNumberedStepListWhenCardHasNoRows() {
+        let html = """
+            <html><body>
+            <div class="entry-content">
+            <ol class="wp-block-list toc-list"><li><a href="#how">How to Make</a></li></ol>
+            <ol start="1" class="wp-block-list is-style-circle-number-list"><li><strong>Step 1: Open and Dump.</strong> Pour every can into the Dutch oven.</li></ol>
+            <ol start="2" class="wp-block-list is-style-circle-number-list"><li><strong>Step 2: Season.</strong> Add the taco seasoning packet and stir.</li></ol>
+            <ol start="3" class="wp-block-list is-style-circle-number-list"><li><strong>Step 3: Simmer.</strong> Bring to a boil, then simmer 10-15 minutes.</li></ol>
+            <ol start="4" class="wp-block-list is-style-circle-number-list"><li><strong>Step 4: Serve.</strong> Ladle into bowls and top.</li></ol>
+            <div class="wprm-recipe-container">
+            <div class="wprm-recipe-ingredients-container">
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">black beans</h4></div>
+            </div>
+            </div>
+            <ol class="comment-list"><li>a reader comment</li></ol>
+            </div>
+            </body></html>
+            """
+        let card = WPRMRecipeCardParser.parse(html: html)
+        #expect(card.ingredients == ["black beans"])
+        #expect(card.instructions.count == 4)
+        #expect(card.instructions[0].localizedCaseInsensitiveContains("Open and Dump"))
+        #expect(card.instructions[3].localizedCaseInsensitiveContains("Serve"))
+        // The table-of-contents `<ol>` and the comment `<ol>` must NOT leak in.
+        #expect(!card.instructions.contains { $0.localizedCaseInsensitiveContains("reader comment") })
+    }
+
+    /// When the WPRM card DOES carry `wprm-recipe-instruction` rows, those win —
+    /// the numbered-step-list fallback is not consulted, so a page that happens
+    /// to also have circle-number lists elsewhere doesn't double up.
+    @Test func prefersCardInstructionRowsOverNumberedStepList() {
+        let html = """
+            <html><body>
+            <ol class="wp-block-list is-style-circle-number-list"><li>Do not use this stray list.</li></ol>
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-instructions">
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Heat the Dutch oven.</span></div></li>
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Add the beef.</span></div></li>
+            </ul>
+            </div>
+            </body></html>
+            """
+        let card = WPRMRecipeCardParser.parse(html: html)
+        #expect(card.instructions == ["Heat the Dutch oven.", "Add the beef."])
+    }
+
+    /// `hasRecipeCard` reports card presence (DUT-538): a page with a WPRM
+    /// container is a recipe (never reclassified as an article-body dump); a
+    /// page without one is not.
+    @Test func hasRecipeCardDetectsContainer() {
+        #expect(WPRMRecipeCardParser.hasRecipeCard(html: "<div class=\"wprm-recipe-container\"></div>"))
+        #expect(!WPRMRecipeCardParser.hasRecipeCard(html: "<html><body><p>just an article</p></body></html>"))
+    }
+
     // MARK: - Entity decoding + whitespace
 
     /// HTML entities in row text are decoded and whitespace collapsed, matching
