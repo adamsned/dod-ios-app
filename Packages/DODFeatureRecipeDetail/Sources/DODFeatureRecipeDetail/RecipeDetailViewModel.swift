@@ -96,9 +96,8 @@ public final class RecipeDetailViewModel {
     // thread + draft + in-flight flag after extraction (DUT-7). Public
     // read-only contract is unchanged — external callers still can't write.
     public internal(set) var comments: [RecipeComment] = []
-    /// DUT-501 — local report/block moderation for displayed comments (Guideline
-    /// 1.2). `var` (not injected via init) so tests can swap in an isolated store.
-    public var commentModeration = CommentModerationStore()
+    /// DUT-501 report/block moderation; DUT-546 gap 3 injectable to share one store across screens.
+    public var commentModeration: CommentModerationStore
     public private(set) var commentsLoadState: CommentsLoadState = .idle
     /// Current selection in the `StarRatingInput` before the user taps
     /// "Submit rating". 0 means "no selection". `internal(set)` so the
@@ -152,11 +151,13 @@ public final class RecipeDetailViewModel {
     public init(
         listItem: RecipeListItem,
         canonicalURL: URL,
-        dependencies: RecipeDetailDependencies
+        dependencies: RecipeDetailDependencies,
+        commentModeration: CommentModerationStore = CommentModerationStore()  // DUT-546 gap 3
     ) {
         self.listItem = listItem
         self.canonicalURL = canonicalURL
         self.dependencies = dependencies
+        self.commentModeration = commentModeration
     }
 
     public func onAppear() async {
