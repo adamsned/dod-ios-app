@@ -100,11 +100,10 @@ public struct FeedView: View {
     @ViewBuilder
     private var settingsGear: some View {
         if let onOpenSettings {
-            // Keep the Feed's own stable `feed-toolbar-settings` id (the
-            // SmokeTests + AppShell E2E journeys query it); the outer identifier
-            // overrides the shared component's default `header-settings-gear`.
-            DODHeaderGearButton { onOpenSettings() }
-                .accessibilityIdentifier("feed-toolbar-settings")
+            // Feed keeps its long-standing `feed-toolbar-settings` id (the
+            // SmokeTests + AppShell E2E journeys query it), set directly on the
+            // button via the component's param — not an ambiguous outer override.
+            DODHeaderGearButton(accessibilityID: "feed-toolbar-settings") { onOpenSettings() }
         }
     }
 

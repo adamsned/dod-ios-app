@@ -7,9 +7,15 @@ import SwiftUI
 /// reads as a first-class header affordance on every tab identically.
 public struct DODHeaderGearButton: View {
 
+    private let accessibilityID: String
     private let action: () -> Void
 
-    public init(action: @escaping () -> Void) {
+    /// `accessibilityID` defaults to the shared `header-settings-gear`, but the
+    /// Feed passes its long-standing `feed-toolbar-settings` id (the SmokeTests +
+    /// AppShell E2E journeys query it) so the identifier is set directly on the
+    /// button, not layered on as an ambiguous outer override.
+    public init(accessibilityID: String = "header-settings-gear", action: @escaping () -> Void) {
+        self.accessibilityID = accessibilityID
         self.action = action
     }
 
@@ -20,6 +26,6 @@ public struct DODHeaderGearButton: View {
                 .accessibilityLabel("Settings")
         }
         .tint(DODColor.burntOrange)
-        .accessibilityIdentifier("header-settings-gear")
+        .accessibilityIdentifier(accessibilityID)
     }
 }
