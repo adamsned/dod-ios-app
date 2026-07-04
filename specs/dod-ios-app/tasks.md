@@ -3210,4 +3210,12 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 
 ---
 
+### T-909 — Category recipe list respects the unified list/grid toggle (CL-303 / DUT-531)
+
+- **What:** `CategoryRecipesView` (DODFeatureCategories) branches its `.loaded/.loadingMore` collection on the shared `@AppStorage(RecipeListLayout.storageKey)` — `.gallery` = existing `LazyVGrid` + `RecipeCard`, `.list` = `adaptiveListRows` + `RecipeCard.ListRow`. Shared `decorate(_:item:)` applies tap / save context-menu (`isSaved` + optimistic toggle) / `dod.category.card` a11y id / `loadMoreIfNeeded` pagination to both. No downloaded badge (categories don't track downloads). Last grid-only recipe surface (sweep-confirmed).
+- **Files:** DODFeatureCategories `CategoryRecipesView.swift`. Spec `clarifications.md` (CL-303).
+- **AC:** browse consistency. Linear DUT-531 (follow-up DUT-530). CL-303 canonical. **Est:** ~45 min. **Deps:** off main (after DUT-530). Branch `feat/dut-531-category-listgrid`. **Verification:** DODFeatureCategories `swift build` + `swift test` (4) green; swiftlint + swift-format `--strict` clean; DODApp compiles.
+
+---
+
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
