@@ -26,45 +26,35 @@ extension RootView {
         do {
             let payloads = try await RecipeEntityQuery.suggestedPayloads()
             let store = AppIntentEnvironment.store
-            var items: [CSSearchableItem] = []
-            items.reserveCapacity(payloads.count)
-            for payload in payloads {
-                let entity = RecipeEntity(payload: payload)
-                let set = entity.attributeSet
-                // DUT-412 — CoreSpotlight only renders LOCAL thumbnails. Attach the
-                // cached hero bytes when we already have them on disk (non-touching
-                // read, no LRU promotion); skip oversized blobs and never fetch over
-                // the network during indexing. Leaves the thumbnail nil otherwise.
-                set.thumbnailData = await cachedThumbnailBytes(for: payload.heroImage, store: store)
-                items.append(
-                    CSSearchableItem(
-                        uniqueIdentifier: "dod.recipe.\(payload.id)",
-                        domainIdentifier: "com.dutchovendaddy.DODApp.recipes",
-                        attributeSet: set
-                    )
-                )
-            }
+            let index = CSSearchableIndex.default()
             // DUT-308: drop the whole recipe domain before each (re)index so an
             // unsaved/cleared recipe doesn't linger in Spotlight (was upsert-only).
-            let index = CSSearchableIndex.default()
             try await index.deleteSearchableItems(withDomainIdentifiers: [
-                "com.dutchovendaddy.DODApp.recipes"
+                SpotlightIndexer.recipeDomainIdentifier
             ])
-            try await index.indexSearchableItems(items)
+            // DUT-467 — index in bounded batches with DOWNSAMPLED thumbnails so we
+            // never materialize all ~60 full-res hero JPEGs at once. The indexer
+            // handles the downsample + batching; here we only wire the seams.
+            let indexer = SpotlightIndexer(
+                cachedHeroBytes: { payload in
+                    await Self.cachedThumbnailBytes(for: payload.heroImage, store: store)
+                },
+                indexBatch: { batch in try await index.indexSearchableItems(batch) }
+            )
+            try await indexer.index(payloads: payloads)
         } catch {
             DODLog.app.error("spotlight index failed: \(String(describing: error))")
         }
     }
 
     /// DUT-412 — the cached hero bytes for a Spotlight thumbnail, or nil when the
-    /// image isn't cached, is too large (> 1MB), or there's no store yet.
-    /// CoreSpotlight never fetches remote thumbnails, so we only ever attach LOCAL
-    /// bytes and never touch the network during indexing.
-    private func cachedThumbnailBytes(for heroImage: URL?, store: RecipeStore?) async -> Data? {
+    /// image isn't cached or there's no store yet. CoreSpotlight never fetches
+    /// remote thumbnails, so we only ever attach LOCAL bytes and never touch the
+    /// network during indexing. DUT-467 — no size guard here: `SpotlightIndexer`
+    /// downsamples every blob to a small thumbnail, so a large original is bounded
+    /// rather than skipped.
+    static func cachedThumbnailBytes(for heroImage: URL?, store: RecipeStore?) async -> Data? {
         guard let heroImage, let store else { return nil }
-        guard let bytes = try? await store.imageBytesWithoutTouching(url: heroImage) else {
-            return nil
-        }
-        return bytes.count <= 1_000_000 ? bytes : nil
+        return try? await store.imageBytesWithoutTouching(url: heroImage)
     }
 }

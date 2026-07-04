@@ -14,6 +14,15 @@ extension FirstCookoutView {
         cookout.isCampfire ? "My campfire cook" : "My \(cookout.dishTitle)"
     }
 
+    /// DUT-232 — VoiceOver label for the finished-cook photo on the celebrate
+    /// stage. Without it VoiceOver lands on a bare "image". Campfire-aware so it
+    /// doesn't read a dish title the capstone doesn't have.
+    var cookPhotoAccessibilityLabel: String {
+        cookout.isCampfire
+            ? "Photo of your finished campfire cook"
+            : "Photo of your finished \(cookout.dishTitle)"
+    }
+
     var recipeLinkLabel: String {
         cookout.isCampfire ? "Open the heat & coals guide" : "Open the \(cookout.dishTitle) recipe"
     }
