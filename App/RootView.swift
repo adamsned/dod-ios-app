@@ -227,7 +227,12 @@ struct RootView: View {
                     viewModel: dependencies.settingsSheetViewModel(
                         accountTeardownExtras: accountTeardownExtras
                     ),
-                    onClearImageCache: { try await dependencies.store.clearImageCache() }
+                    onClearImageCache: { try await dependencies.store.clearImageCache() },
+                    // DUT-572 — hide the Profile row on iPad. This reads RootView's
+                    // TRUE device size class (the same signal that selects iPadSplit
+                    // vs phoneTabs); the sheet itself always reports `.compact`, so
+                    // the flag must be resolved here and injected.
+                    hidesProfile: horizontalSizeClass == .regular
                 )
             }
         }

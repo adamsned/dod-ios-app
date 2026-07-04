@@ -74,6 +74,20 @@ public final class CachedRecipe {
     /// is optional with a default of nil.
     public var articleBodyHTML: String?
 
+    /// DUT-572 / CL-310: editorial info fields for the redesigned recipe page —
+    /// Course (`recipeCategory`), Cuisine (`recipeCuisine`), Diet
+    /// (`suitableForDiet`), and Author. Populated by
+    /// `RecipeStore.applyParsedDetailFields(_:_:)` from the parsed `Recipe`.
+    /// CloudKit-safe additive columns: the arrays default to `[]` and `author`
+    /// is optional, so — exactly like `articleBodyHTML` above — they add no
+    /// migration-blocking non-optional attribute. Their presence bumps the
+    /// `CachedRecipe` schema fingerprint, so they ship under `SchemaV7` with a
+    /// paired lightweight V6 -> V7 migration stage.
+    public var recipeCategory: [String] = []
+    public var recipeCuisine: [String] = []
+    public var suitableForDiet: [String] = []
+    public var author: String?
+
     public init(
         id: Int,
         slug: String,
@@ -89,7 +103,11 @@ public final class CachedRecipe {
         jsonLDParsedAt: Date? = nil,
         jsonLDFailedAt: Date? = nil,
         downloadedAt: Date? = nil,
-        articleBodyHTML: String? = nil
+        articleBodyHTML: String? = nil,
+        recipeCategory: [String] = [],
+        recipeCuisine: [String] = [],
+        suitableForDiet: [String] = [],
+        author: String? = nil
     ) {
         self.id = id
         self.slug = slug
@@ -106,5 +124,9 @@ public final class CachedRecipe {
         self.jsonLDFailedAt = jsonLDFailedAt
         self.downloadedAt = downloadedAt
         self.articleBodyHTML = articleBodyHTML
+        self.recipeCategory = recipeCategory
+        self.recipeCuisine = recipeCuisine
+        self.suitableForDiet = suitableForDiet
+        self.author = author
     }
 }

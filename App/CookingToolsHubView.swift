@@ -104,6 +104,11 @@ struct CookingToolsHubView: View {
     /// falls through to `.systemAction`.
     @Environment(\.openURL) private var openURL
 
+    /// DUT-572 — gates the header Settings gear to compact width (iPhone). On iPad
+    /// (regular width) the sidebar already hosts a Settings row, so the gear is
+    /// redundant here.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     init(
         dependencies: AppDependencies,
         pendingTool: Binding<HubToolRoute?> = .constant(nil),
@@ -125,7 +130,9 @@ struct CookingToolsHubView: View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 DODScreenHeader("Cooking Tools") {
-                    if let onOpenSettings {
+                    // DUT-572 — gear only in compact width (iPhone); iPad's sidebar
+                    // already has a Settings row, so it's redundant in regular width.
+                    if let onOpenSettings, horizontalSizeClass == .compact {
                         DODHeaderGearButton { onOpenSettings() }
                     }
                 }
