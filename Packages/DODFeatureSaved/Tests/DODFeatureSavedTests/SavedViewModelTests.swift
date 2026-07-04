@@ -173,7 +173,8 @@ import Testing
         await viewModel.refresh()  // refresh WELL WITHIN the TTL window
         #expect(
             viewModel.recipes.map(\.id) == [1, 2],
-            "Re-saved 2 must reappear within the TTL, driven by the store's savedAt (no manual clear)")
+            "Re-saved 2 must reappear within the TTL, driven by the store's savedAt (no manual clear)"
+        )
     }
 
     @Test func genuineInFlightUnsaveStaysSuppressedWithinTTL() async {

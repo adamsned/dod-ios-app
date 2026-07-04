@@ -104,7 +104,9 @@ public final class SavedViewModel {
             var savedAtByID: [Int: Date] = [:]
             for entry in fetchedWithSavedAt {
                 savedAtByID[entry.recipe.id] = max(
-                    savedAtByID[entry.recipe.id] ?? .distantPast, entry.savedAt)
+                    savedAtByID[entry.recipe.id] ?? .distantPast,
+                    entry.savedAt
+                )
             }
             var fetched = fetchedWithSavedAt.map(\.recipe)
             // Keep suppressing only ids whose unsave is genuinely still in flight.
