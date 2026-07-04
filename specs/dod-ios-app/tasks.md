@@ -3224,6 +3224,13 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 - **Files:** DODDesignSystem `CornerRadius.swift`, `ButtonShape.swift`, `AppIntroTour.swift`, `GuestIdentitySheet.swift`; DODFeatureRecipeDetail `CookNowCTA.swift`, `RatingsProfileGate.swift`; DODFeatureSearch `CookTimeRangeSheet.swift`; DODFeatureFeed `HeatCoachView.swift`. L4: all 95 DODDesignSystem baselines re-recorded by CI (global radius change).
 - **AC:** design consistency. Linear DUT-537. CL-304 canonical. Built in two parallel streams (tokens + custom buttons). **Verification:** DODDesignSystem + touched packages `swift build`; swiftlint + swift-format `--strict` clean; DODApp + DODAppWidget compile; L4 baselines CI-recorded.
 
+### T-911 — Title Case sweep: re-case existing controls + headings to headline style (CL-305 / DUT-543) — NOT STARTED (runs on Spencer's go)
+
+- **What:** Migrate existing user-facing copy to the CL-305 rule (constitution §10.2): controls + headings → headline-style Title Case (small words lowercase unless first/last; verbs stay capitalized); body/messages/placeholders stay sentence case. Copy-only, no logic. **Rule is locked; this build is deferred until Spencer says go.**
+- **Inventory (Explore agent, 2026-07-04):** ~108 strings need re-casing (~258 control/heading strings scanned, ~150 already correct). By area: App 2, DODDesignSystem 11, DODFeatureFeed 34, DODFeatureRecipeDetail 36, DODFeatureProfile 7, DODFeatureSaved 8, DODFeatureSearch 9, Widget 1; LiveActivity/DODAnalytics/DODCookActivity/DODDomain/DODPersistence/DODSupport 0. **CAVEAT:** the inventory over-flags `.accessibilityLabel` strings (role "Label") which the rule EXEMPTS — filter those out. Also verify "iCloud" casing, social handles/tags, "Sign in with Google/Apple" brand casing, interpolated literals, and computed `.capitalized`/`.uppercased()` titles a literal grep misses.
+- **Order (small→large, test each batch):** App → DODDesignSystem → Profile/Saved/Search → Feed → RecipeDetail.
+- **AC:** copy consistency (extends T-750). Linear DUT-543. CL-305 canonical. **Verification (when built):** per package `swift build` + `swift test` green; swiftlint + swift-format `--strict` clean; re-record any affected DODDesignSystem L4 baselines via the CI dance (feature-package snapshots are local-only).
+
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
