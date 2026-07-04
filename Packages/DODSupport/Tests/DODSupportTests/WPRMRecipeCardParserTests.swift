@@ -105,6 +105,32 @@ import Testing
         #expect(card.ingredients == ["2 cups tomato sauce"])
     }
 
+    /// DUT-550: a card MIXING a normal line-row group with a HEADER-ONLY group
+    /// (the DUT-42 per-group quirk — an ingredient authored as a bare group
+    /// name with no `<li>` row) must keep BOTH. Before the fix the header-only
+    /// group's ingredient was dropped: it was neither a line row nor eligible
+    /// for the all-or-nothing group-name fallback (which only fired when the
+    /// WHOLE card had zero line rows). The line-row group's `<h4>` label
+    /// ("For the sauce") stays dropped — it's a section label, not an ingredient.
+    @Test func keepsHeaderOnlyGroupIngredientWhenOtherGroupsHaveLineRows() {
+        let html = """
+            <div class="wprm-recipe-container">
+            <div class="wprm-recipe-ingredients-container">
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">For the sauce</h4>
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">2</span> <span class="wprm-recipe-ingredient-unit">cups</span> <span class="wprm-recipe-ingredient-name">tomato sauce</span></li>
+            </ul></div>
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">a pinch of salt</h4></div>
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">1 bay leaf</h4></div>
+            </div>
+            </div>
+            """
+        let card = WPRMRecipeCardParser.parse(html: html)
+        // Line row first, then the two header-only group ingredients — the
+        // "For the sauce" label (a group that HAS a line row) stays dropped.
+        #expect(card.ingredients == ["2 cups tomato sauce", "a pinch of salt", "1 bay leaf"])
+    }
+
     // MARK: - "How to Make" numbered-step fallback (DUT-538)
 
     /// DUT-538: the 7 Can Soup shape — the WPRM card carries NO
@@ -112,17 +138,21 @@ import Testing
     /// body's Gutenberg numbered-step lists
     /// (`<ol class="…is-style-circle-number-list…">`, one `<ol>` per step). The
     /// lists sit OUTSIDE the recipe card, so the parser is handed the whole
-    /// page. Other `<ol>`s (a table of contents, the comment list) use
-    /// different classes and are ignored.
+    /// page. DUT-544: the scan is now confined to the "How to Make" region (the
+    /// `<h2>` … next-`<h2>` slice), so the steps are anchored to their heading.
+    /// Other `<ol>`s (a table of contents, the comment list) sit outside the
+    /// region and are ignored.
     @Test func recoversInstructionsFromNumberedStepListWhenCardHasNoRows() {
         let html = """
             <html><body>
             <div class="entry-content">
             <ol class="wp-block-list toc-list"><li><a href="#how">How to Make</a></li></ol>
+            <h2 id="how-to-make" class="wp-block-heading">How to Make Dutch Oven 7 Can Soup</h2>
             <ol start="1" class="wp-block-list is-style-circle-number-list"><li><strong>Step 1: Open and Dump.</strong> Pour every can into the Dutch oven.</li></ol>
             <ol start="2" class="wp-block-list is-style-circle-number-list"><li><strong>Step 2: Season.</strong> Add the taco seasoning packet and stir.</li></ol>
             <ol start="3" class="wp-block-list is-style-circle-number-list"><li><strong>Step 3: Simmer.</strong> Bring to a boil, then simmer 10-15 minutes.</li></ol>
             <ol start="4" class="wp-block-list is-style-circle-number-list"><li><strong>Step 4: Serve.</strong> Ladle into bowls and top.</li></ol>
+            <h2 class="wp-block-heading">7 Can Soup Variations</h2>
             <div class="wprm-recipe-container">
             <div class="wprm-recipe-ingredients-container">
             <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">black beans</h4></div>
@@ -139,6 +169,64 @@ import Testing
         #expect(card.instructions[3].localizedCaseInsensitiveContains("Serve"))
         // The table-of-contents `<ol>` and the comment `<ol>` must NOT leak in.
         #expect(!card.instructions.contains { $0.localizedCaseInsensitiveContains("reader comment") })
+    }
+
+    // MARK: - Step-region scoping (DUT-544)
+
+    /// DUT-544: an author-styled `is-style-circle-number-list` `<ol>` that lives
+    /// OUTSIDE the instructions region — here a "Tips" list under a later `<h2>`
+    /// that reuses the same Gutenberg block style — must NOT be injected as a
+    /// step. Only the numbered lists inside the "How to Make" … next-`<h2>`
+    /// slice are collected. This is the over-classification the DUT-538
+    /// page-wide scan caused.
+    @Test func stepScanIgnoresStyledListOutsideInstructionsRegion() {
+        let html = """
+            <html><body>
+            <div class="entry-content">
+            <h2 class="wp-block-heading">How to Make This Soup</h2>
+            <ol class="wp-block-list is-style-circle-number-list"><li><strong>Step 1: Open and Dump.</strong> Pour every can in.</li></ol>
+            <ol class="wp-block-list is-style-circle-number-list"><li><strong>Step 2: Serve.</strong> Ladle into bowls.</li></ol>
+            <h2 class="wp-block-heading">Expert Tips</h2>
+            <ol class="wp-block-list is-style-circle-number-list"><li>Use a heavy Dutch oven for even heat.</li></ol>
+            <ol class="wp-block-list is-style-circle-number-list"><li>Freeze leftovers in single portions.</li></ol>
+            <div class="wprm-recipe-container">
+            <div class="wprm-recipe-ingredients-container">
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">black beans</h4></div>
+            </div>
+            </div>
+            </div>
+            </body></html>
+            """
+        let card = WPRMRecipeCardParser.parse(html: html)
+        // Only the two steps under "How to Make …" — NOT the two "Tips" rows.
+        #expect(card.instructions.count == 2)
+        #expect(card.instructions[0].localizedCaseInsensitiveContains("Open and Dump"))
+        #expect(card.instructions[1].localizedCaseInsensitiveContains("Serve"))
+        #expect(!card.instructions.contains { $0.localizedCaseInsensitiveContains("heavy Dutch oven") })
+        #expect(!card.instructions.contains { $0.localizedCaseInsensitiveContains("Freeze leftovers") })
+    }
+
+    /// DUT-544: with NO instructions / "How to Make" heading anchoring them,
+    /// a page's styled numbered lists are NOT trusted as steps — the fallback
+    /// returns empty rather than sweeping arbitrary author `<ol>`s into the
+    /// instructions. (The card here has no instruction rows either.)
+    @Test func stepScanReturnsEmptyWhenNoInstructionsHeading() {
+        let html = """
+            <html><body>
+            <div class="entry-content">
+            <h2 class="wp-block-heading">Substitutions</h2>
+            <ol class="wp-block-list is-style-circle-number-list"><li>Swap black beans for kidney beans.</li></ol>
+            <div class="wprm-recipe-container">
+            <div class="wprm-recipe-ingredients-container">
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">black beans</h4></div>
+            </div>
+            </div>
+            </div>
+            </body></html>
+            """
+        let card = WPRMRecipeCardParser.parse(html: html)
+        #expect(card.ingredients == ["black beans"])
+        #expect(card.instructions.isEmpty)
     }
 
     /// When the WPRM card DOES carry `wprm-recipe-instruction` rows, those win —

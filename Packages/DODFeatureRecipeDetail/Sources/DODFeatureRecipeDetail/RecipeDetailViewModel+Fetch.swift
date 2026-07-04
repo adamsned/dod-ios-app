@@ -43,15 +43,22 @@ extension RecipeDetailViewModel {
                 merging: listItem,
                 canonicalURL: canonicalURL
             )
-            // DUT-538 (supersedes DUT-185): the WPRM-card parser now recovers
-            // the "How to Make" numbered steps from the post body when the card
+            // DUT-538 (supersedes DUT-185): the WPRM-card parser recovers the
+            // "How to Make" numbered steps from the post body when the card
             // itself carries no `wprm-recipe-instruction` rows (the 7 Can Soup
             // shape), so `parsed.instructions` is normally non-empty here and we
-            // render the structured recipe. Only when a parse STILL yields no
-            // instructions AND the page has NO WPRM recipe card do we fall back
-            // to the article-body path — a page that DOES ship a recipe card is
-            // a recipe, not an article, and must never dump the whole blog body.
-            guard !parsed.instructions.isEmpty || WPRMRecipeCardParser.hasRecipeCard(html: html) else {
+            // render the structured recipe.
+            //
+            // DUT-544: when a parse STILL yields no instructions, route to the
+            // recipe path only if the page's SUBJECT is a recipe — i.e. its
+            // JSON-LD actually carries a `@type: Recipe` node. Mere presence of
+            // a `wprm-recipe-container` is NOT enough: a round-up / guide ARTICLE
+            // that embeds (or links) a WPRM card has a card but no Recipe node,
+            // and forcing it onto the recipe path dumps the card in place of the
+            // whole article body. 7 Can Soup keeps the recipe path — it HAS the
+            // Recipe node (only its `recipeIngredient`/`recipeInstructions` are
+            // empty).
+            guard !parsed.instructions.isEmpty || dependencies.hasRecipeJSONLD(html: html) else {
                 await classifyAsArticleOrFail(html: html)
                 return
             }
@@ -86,13 +93,17 @@ extension RecipeDetailViewModel {
     /// through to the terminal `.unavailable` path with the same snackbar
     /// + auto-pop behavior the pre-T-640 implementation surfaced.
     func classifyAsArticleOrFail(html: String) async {
-        // DUT-538: presence of a WPRM recipe card means this is a RECIPE, not
-        // an article — never dump the whole blog body for a page that ships a
-        // structured card. Build the recipe from the card (ingredients +
-        // "How to Make" steps) and route to the recipe path. Genuine articles
-        // (no card) fall through to the article-body extraction below.
-        let hasCard = WPRMRecipeCardParser.hasRecipeCard(html: html)
-        if hasCard, let cardRecipe = recipeFromWPRMCard(html: html) {
+        // DUT-544 (amends DUT-538): only build a recipe from the WPRM card when
+        // the page's SUBJECT is a recipe — its JSON-LD carries a `@type: Recipe`
+        // node. DUT-538 keyed off mere card presence, which over-classifies: a
+        // round-up / guide ARTICLE that embeds (or links) a WPRM card has a card
+        // but NO Recipe node (validated 2026-07-04 against the dump-cake /
+        // memorial-day / dutch-oven round-ups), so forcing the card path dumped
+        // the card in place of the whole article body. Requiring the Recipe node
+        // preserves DUT-538 for 7 Can Soup (it HAS the node) while routing the
+        // round-ups to the article-body extraction below.
+        let isRecipeSubject = dependencies.hasRecipeJSONLD(html: html)
+        if isRecipeSubject, let cardRecipe = recipeFromWPRMCard(html: html) {
             try? await dependencies.mergeDetail(cardRecipe)
             recipe = cardRecipe
             loadState = .ready

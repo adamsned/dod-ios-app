@@ -22,16 +22,22 @@ import Foundation
 /// 2. Ingredients — collect every `<li class="wprm-recipe-ingredient">` row,
 ///    dropping its leading `<span class="wprm-checkbox-container">` subtree (a
 ///    screen-reader checkbox glyph that must not leak into the text), then
-///    plain-texting the amount / unit / name / notes spans that remain. When a
-///    card has NO line rows at all (the 7 Can Soup shape — the author entered
-///    each ingredient as a `<h4 class="wprm-recipe-ingredient-group-name">`
-///    group header), fall back to the group-name headers: with no line rows
-///    present, the group names ARE the ingredients.
+///    plain-texting the amount / unit / name / notes spans that remain. Then
+///    append the group name of every HEADER-ONLY ingredient group (a
+///    `wprm-recipe-ingredient-group` `<div>` with a
+///    `<h4 class="wprm-recipe-ingredient-group-name">` but no line-row `<li>`):
+///    with no line rows of its own, that group name IS the ingredient (the 7
+///    Can Soup shape — all groups header-only — and, per DUT-550, cards that MIX
+///    line-row groups with header-only groups, so no ingredient is dropped).
+///    Groups that carry line rows keep their name dropped (it's a label).
 /// 3. Instructions — collect every `<li class="wprm-recipe-instruction">` row
 ///    (inner `wprm-recipe-instruction-text`, else the whole row). When the card
 ///    has NO instruction rows (7 Can Soup / DUT-538 — steps live as a numbered
-///    "How to Make" list in the post body), fall back to the page's Gutenberg
-///    `is-style-circle-number-list` rows — the one place we read outside the card.
+///    "How to Make" list in the post body), fall back to the Gutenberg
+///    `is-style-circle-number-list` rows found within the post's instructions /
+///    "How to Make" region only (DUT-544 — scoped to the region between the
+///    instructions `<h2>` and the next section so an unrelated author-styled
+///    numbered list can't be injected as steps).
 ///
 /// Not a general-purpose HTML parser — handles the narrow, well-formed shape
 /// WPRM produces. Robust to attribute re-ordering and extra whitespace; assumes
@@ -128,9 +134,20 @@ public enum WPRMRecipeCardParser {
 
     // MARK: - Ingredients
 
-    /// Collect ingredient lines. Prefer `<li class="wprm-recipe-ingredient">`
-    /// line rows; when the card has none, fall back to
-    /// `<h4 class="wprm-recipe-ingredient-group-name">` group headers.
+    /// Collect ingredient lines: every `<li class="wprm-recipe-ingredient">`
+    /// line row PLUS the group name of every HEADER-ONLY ingredient group (a
+    /// `wprm-recipe-ingredient-group` `<div>` with a group-name `<h4>` but no
+    /// line-row `<li>`).
+    ///
+    /// DUT-42 established that a card with ZERO line rows (the 7 Can Soup shape,
+    /// all groups header-only) uses the group-name headers AS the ingredients.
+    /// DUT-550 extends that per-group: a card MIXING normal line rows with a
+    /// header-only group would otherwise drop the header-only group's ingredient
+    /// (neither a line row nor eligible for the all-or-nothing fallback). We now
+    /// keep both — line rows first, then the header-only group names — so no
+    /// ingredient is lost across mixed group shapes. Groups that DO carry line
+    /// rows keep their `<h4>` name dropped: it's a section label, already
+    /// represented by its rows.
     static func parseIngredients(in card: String) -> [String] {
         let rows = collectElementTexts(
             in: card,
@@ -138,15 +155,7 @@ public enum WPRMRecipeCardParser {
             classToken: ingredientRowToken,
             transform: ingredientRowText
         )
-        if !rows.isEmpty {
-            return rows
-        }
-        return collectElementTexts(
-            in: card,
-            tag: "h4",
-            classToken: ingredientGroupNameToken,
-            transform: HTMLSanitizer.plainText(from:)
-        )
+        return rows + headerOnlyGroupNames(in: card)
     }
 
     /// Plain-text one ingredient `<li>` body, first dropping the leading
@@ -223,25 +232,6 @@ public enum WPRMRecipeCardParser {
             return cardRows
         }
         return parseNumberedStepList(in: page)
-    }
-
-    /// DUT-538 fallback: collect step text from every
-    /// `<ol class="…is-style-circle-number-list…">` in the page. WPRM renders
-    /// the "How to Make" steps as one such `<ol>` per step (each holding a
-    /// single `<li>`), so flattening the `<li>` rows across all matching lists
-    /// yields the ordered steps. Class-token matched so it ignores the page's
-    /// other `<ol>`s (table of contents, comment list) that use different
-    /// classes.
-    static func parseNumberedStepList(in page: String) -> [String] {
-        collectElementInners(in: page, tag: "ol", classToken: numberedStepListToken)
-            .flatMap { listInner in
-                collectElementTexts(
-                    in: listInner,
-                    tag: "li",
-                    classToken: nil,
-                    transform: HTMLSanitizer.plainText(from:)
-                )
-            }
     }
 
     /// Plain-text one instruction `<li>` body: prefer the inner

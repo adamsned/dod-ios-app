@@ -54,6 +54,15 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     /// it empty (the legacy behavior).
     var articleBodyToExtract: String = ""
 
+    /// DUT-544: canned recipe-SUBJECT signal returned by
+    /// `hasRecipeJSONLD(html:)`. Decoupled from `htmlToReturn` because the
+    /// fake's HTML is synthetic — tests set this to model a genuine recipe
+    /// page (`true`, a `@type: Recipe` node present) vs. a round-up ARTICLE
+    /// that merely embeds a WPRM card (`false`, Article/ItemList JSON-LD).
+    /// Defaults to `true` so a successfully-parsed `parsedRecipe` (which in
+    /// production implies a Recipe node existed) keeps the recipe path.
+    var hasRecipeJSONLDResult = true
+
     // MARK: - Comments + ratings test surface
 
     /// Pre-loaded rating summary returned from the network. Defaults to a
@@ -140,6 +149,11 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     /// drive the desired branch.
     func extractArticleBody(html: String) -> String {
         articleBodyToExtract
+    }
+
+    /// DUT-544: return the canned recipe-subject signal, independent of `html`.
+    func hasRecipeJSONLD(html: String) -> Bool {
+        hasRecipeJSONLDResult
     }
 
     func relatedRecipes(forCategoryID: Int) async throws -> [RecipeListItem] { related }

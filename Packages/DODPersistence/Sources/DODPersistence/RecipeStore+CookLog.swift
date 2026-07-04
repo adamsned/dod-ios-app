@@ -12,6 +12,14 @@ import SwiftData
 /// store logic of their own.
 extension RecipeStore {
 
+    #if DEBUG
+    /// DUT-473 test-only: arm/disarm the ``logCook`` save failpoint on THIS
+    /// actor instance (see ``cookLogSaveFailpointError``).
+    func setCookLogSaveFailpointForTesting(_ error: Error?) {
+        cookLogSaveFailpointError = error
+    }
+    #endif
+
     /// Append one cook to the private journal.
     public func logCook(_ entry: CookLogEntry) throws {
         // DUT-345: idempotency. A double-tap / retry mints a fresh `id` (UUID) each
@@ -30,18 +38,35 @@ extension RecipeStore {
             if let photoID = entry.photoLocalID { CookPhotoStore().delete(id: photoID) }
             return
         }
-        modelContext.insert(
-            CachedCookLogEntry(
-                id: entry.id,
-                recipeID: entry.recipeID,
-                recipeTitle: entry.recipeTitle,
-                cookedAt: entry.cookedAt,
-                note: entry.note,
-                personalRating: entry.personalRating,
-                photoLocalID: entry.photoLocalID
-            )
+        let inserted = CachedCookLogEntry(
+            id: entry.id,
+            recipeID: entry.recipeID,
+            recipeTitle: entry.recipeTitle,
+            cookedAt: entry.cookedAt,
+            note: entry.note,
+            personalRating: entry.personalRating,
+            photoLocalID: entry.photoLocalID
         )
-        try modelContext.save()
+        modelContext.insert(inserted)
+        do {
+            #if DEBUG
+            if let error = cookLogSaveFailpointError { throw error }  // DUT-473 test seam
+            #endif
+            try modelContext.save()
+        } catch {
+            // DUT-473: `save()` threw AFTER the insert. The `@ModelActor`'s
+            // context is long-lived with autosave OFF, so the still-pending row
+            // would ride along on the NEXT successful `save()` from any other
+            // store write (`cache(listItem:)`, `toggleSaved`) — a phantom cook
+            // whose `photoLocalID` points at a JPEG the caller (FeedViewModel /
+            // RecipeDetailViewModel+CookLog, per DUT-208) deletes on this throw.
+            // Roll the insert back and delete our just-written photo too, so a
+            // failed log leaves neither a ghost row nor an orphaned file —
+            // mirroring the DUT-423 dedup-skip cleanup above.
+            modelContext.delete(inserted)
+            if let photoID = entry.photoLocalID { CookPhotoStore().delete(id: photoID) }
+            throw error
+        }
     }
 
     /// Update one journal entry's editable, personal fields (reflection note /

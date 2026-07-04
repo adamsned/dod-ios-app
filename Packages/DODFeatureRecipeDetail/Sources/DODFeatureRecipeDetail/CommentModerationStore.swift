@@ -41,11 +41,30 @@ public final class CommentModerationStore {
     }
 
     /// Block an author by normalized display name — hides all their comments.
-    public func block(author name: String) {
+    ///
+    /// DUT-546 gap 1: returns `false` (and inserts nothing) when the name
+    /// resolves to the empty "Anonymous" key, so a blank-name author can't be
+    /// name-blocked (it would collateral-block every other blank-name comment
+    /// too, and the caller has no visible author to attribute the block to).
+    /// The view model falls back to ``hide(commentID:)`` for that row so the
+    /// "Block Anonymous" affordance still hides the offending comment instead
+    /// of silently no-op'ing. Returning the outcome lets the caller give
+    /// feedback rather than assume success.
+    @discardableResult
+    public func block(author name: String) -> Bool {
         let key = Self.authorKey(name)
-        guard !key.isEmpty else { return }
+        guard !key.isEmpty else { return false }
         blockedAuthors.insert(key)
         defaults.set(Array(blockedAuthors), forKey: Self.blockedKey)
+        return true
+    }
+
+    /// DUT-546 gap 1 — `true` when a display name is blank/whitespace and thus
+    /// resolves to the "Anonymous" fallback, i.e. can't be name-blocked. The
+    /// view layer uses this to relabel/route the block affordance for
+    /// anonymous rows (block-by-comment-id instead of block-by-name).
+    public static func isAnonymous(author name: String) -> Bool {
+        authorKey(name).isEmpty
     }
 
     /// Hide a specific reported comment locally (immediate; the report itself is

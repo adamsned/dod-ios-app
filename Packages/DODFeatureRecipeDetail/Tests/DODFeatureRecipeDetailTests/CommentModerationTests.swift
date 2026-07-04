@@ -64,6 +64,23 @@ struct CommentModerationTests {
         #expect(second.isVisible(comment(id: 1, author: "Troll")) == false)
     }
 
+    // DUT-546 gap 1 — a blank-name author can't be name-blocked (it would
+    // collateral-block every other Anonymous author). `block(author:)` reports
+    // the no-op via its return so the caller can fall back to hiding the row.
+    @Test func blockingABlankNameAuthorReportsItCannotBlockByName() {
+        let store = CommentModerationStore(defaults: isolatedDefaults())
+        #expect(store.block(author: "   ") == false)
+        #expect(store.blockedAuthors.isEmpty)
+        #expect(store.block(author: "Real Name"))  // non-blank blocks + persists
+        #expect(store.isVisible(comment(id: 1, author: "Real Name")) == false)
+    }
+
+    @Test func isAnonymousDetectsBlankNames() {
+        #expect(CommentModerationStore.isAnonymous(author: ""))
+        #expect(CommentModerationStore.isAnonymous(author: "  \n "))
+        #expect(CommentModerationStore.isAnonymous(author: "Ann") == false)
+    }
+
     // MARK: - View model
 
     @Test func visibleCommentsFilterOutReportedAndBlocked() {
@@ -88,6 +105,80 @@ struct CommentModerationTests {
         #expect(string.hasPrefix("mailto:"))
         #expect(string.contains(RecipeDetailViewModel.moderationContactEmail))
         #expect(string.contains("42"))  // comment id carried into the report
+    }
+
+    // DUT-546 gap 1 — tapping "Block Anonymous" on a blank-name row must NOT be
+    // a silent no-op. It falls back to hiding that specific comment (like
+    // Report) and surfaces feedback, and the hidden state persists across a
+    // store reload over the same defaults (relaunch-equivalent).
+    @Test func blockingAnAnonymousCommentHidesItAndPersists() {
+        let defaults = isolatedDefaults()
+        let viewModel = makeViewModel()
+        viewModel.commentModeration = CommentModerationStore(defaults: defaults)
+        let anon = comment(id: 7, author: "   ")  // blank → "Anonymous"
+        viewModel.comments = [anon, comment(id: 8, author: "Someone")]
+
+        #expect(viewModel.snackbarMessage == nil)
+        viewModel.blockAuthor(of: anon)  // the inert-before-DUT-546 path
+
+        // Observable state changed — not a silent no-op.
+        #expect(viewModel.snackbarMessage != nil)
+        #expect(viewModel.visibleComments.map(\.id) == [8])
+        // Persists: a fresh store over the same defaults still hides it.
+        let reloaded = CommentModerationStore(defaults: defaults)
+        #expect(reloaded.isVisible(anon) == false)
+    }
+
+    // DUT-546 gap 1 — a named author blocks by name (all their comments) and
+    // surfaces confirmation feedback.
+    @Test func blockingANamedAuthorConfirmsViaSnackbar() {
+        let viewModel = makeViewModel()
+        viewModel.commentModeration = CommentModerationStore(defaults: isolatedDefaults())
+        viewModel.comments = [comment(id: 1, author: "Troll"), comment(id: 2, author: "Troll")]
+
+        viewModel.blockAuthor(of: comment(id: 1, author: "Troll"))
+        #expect(viewModel.snackbarMessage?.contains("Troll") == true)
+        #expect(viewModel.visibleComments.isEmpty)  // both Troll rows gone
+    }
+
+    // DUT-546 gap 2 — a report whose mailto could not be opened (no mail
+    // account) surfaces the published contact address as a fallback so the
+    // report is still actionable; a successful open confirms instead. Neither
+    // path is silent.
+    @Test func reportAcknowledgementSurfacesFallbackWhenMailFails() {
+        let viewModel = makeViewModel()
+        let flagged = comment(id: 42, author: "Bad Actor")
+
+        viewModel.acknowledgeReport(of: flagged, mailtoOpened: false)
+        #expect(viewModel.snackbarMessage?.contains(RecipeDetailViewModel.moderationContactEmail) == true)
+        #expect(viewModel.snackbarMessage?.contains("42") == true)
+
+        viewModel.acknowledgeReport(of: flagged, mailtoOpened: true)
+        #expect(viewModel.snackbarMessage?.contains("Reported") == true)
+    }
+
+    // DUT-546 gap 3 — two view models sharing ONE injected store: blocking on
+    // screen A immediately hides the author on already-open screen B (the
+    // @Observable set is authoritative process-wide, not per-view-model).
+    @Test func sharedStorePropagatesBlockAcrossTwoViewModels() {
+        let shared = CommentModerationStore(defaults: isolatedDefaults())
+        let screenA = RecipeDetailViewModel(
+            listItem: RecipeDetailTestFixtures.makeListItem(id: 1),
+            canonicalURL: URL(filePath: "/"),
+            dependencies: FakeRecipeDetailDependencies(),
+            commentModeration: shared
+        )
+        let screenB = RecipeDetailViewModel(
+            listItem: RecipeDetailTestFixtures.makeListItem(id: 2),
+            canonicalURL: URL(filePath: "/"),
+            dependencies: FakeRecipeDetailDependencies(),
+            commentModeration: shared
+        )
+        screenB.comments = [comment(id: 1, author: "Troll")]
+        #expect(screenB.visibleComments.count == 1)
+
+        screenA.blockAuthor(of: comment(id: 9, author: "Troll"))  // block on A
+        #expect(screenB.visibleComments.isEmpty)  // reflected on B, no reload
     }
 
     @Test func canModerateAnotherUsersComment() {

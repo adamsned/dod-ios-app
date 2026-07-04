@@ -26,10 +26,44 @@ extension RecipeDetailViewModel {
         commentModeration.hide(commentID: comment.id)
     }
 
+    /// DUT-546 gap 2 — call after the view attempts to open the report
+    /// `mailto:`. `mailtoOpened == false` means the device has no mail account
+    /// (or otherwise refused the URL), so the report never reached moderation
+    /// even though the row is already hidden. Surface a fallback that hands the
+    /// user the published contact address so they can still report, and note
+    /// the comment id so the operator can act (Guideline 1.2 expects reports to
+    /// be actionable, not just locally hidden). On success we confirm the
+    /// report landed so the affordance isn't a silent success either.
+    public func acknowledgeReport(of comment: RecipeComment, mailtoOpened: Bool) {
+        if mailtoOpened {
+            snackbarMessage = "Reported. Thanks — we'll review it."
+        } else {
+            snackbarMessage = """
+                No mail app is set up. Email \(Self.moderationContactEmail) \
+                to report comment #\(comment.id).
+                """
+        }
+    }
+
     /// Block a comment's author: hides every comment from that display name,
     /// app-wide and across relaunches.
+    ///
+    /// DUT-546 gap 1 — blank-name ("Anonymous") authors can't be name-blocked
+    /// (see ``CommentModerationStore/block(author:)``). Rather than silently
+    /// no-op the "Block Anonymous" affordance for exactly the low-accountability
+    /// authors most likely to post objectionable content, fall back to hiding
+    /// that specific comment by id (same mechanism as Report) so the offending
+    /// row actually disappears. Either way the user gets snackbar feedback —
+    /// no moderation action is a silent no-op.
     public func blockAuthor(of comment: RecipeComment) {
-        commentModeration.block(author: comment.authorName)
+        if commentModeration.block(author: comment.authorName) {
+            snackbarMessage = "Blocked \(comment.authorName). Their comments are now hidden."
+        } else {
+            // Anonymous / blank-name row — hide this comment instead of
+            // name-blocking every other anonymous author.
+            commentModeration.hide(commentID: comment.id)
+            snackbarMessage = "Comment hidden."
+        }
     }
 
     /// Prefilled `mailto:` the row opens on Report so the flagged content

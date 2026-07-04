@@ -189,6 +189,126 @@ struct AppleProfileSignInTests {
         #expect(revoker.revokedTokens.isEmpty)
         #expect((try? sessionStore.load())?.refreshToken == "rt-a")  // carried forward
     }
+
+    /// DUT-506 — an EMPTY `userIdentifier` is not a valid sign-in: no session is
+    /// persisted (so `hasSession` stays false), no profile is written, and the
+    /// outcome reports nothing saved. Mirrors the Google side (DUT-285), which
+    /// drops an empty id before any session is created.
+    @Test func emptyUserIdentifier_persistsNothing() async {
+        let sessionStore = InMemoryAppleAuthSessionStore()
+        let profileStore = InMemoryProfileStore()
+        let signIn = AppleProfileSignIn(
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            revoker: nil
+        )
+
+        let outcome = await signIn.apply(
+            userIdentifier: "",
+            displayName: "Ned Adams",
+            email: "ned@example.com",
+            authorizationCode: nil
+        )
+
+        #expect((try? sessionStore.load()) == nil)  // no phantom `""` session
+        #expect(await profileStore.load() == nil)
+        #expect(outcome.profileSaved == false)
+        #expect(outcome.displayName == nil)
+        #expect(outcome.email == nil)
+    }
+
+    /// DUT-506 — a WHITESPACE-only id is just as invalid (it trims to empty), and
+    /// is rejected on the same no-op path.
+    @Test func whitespaceUserIdentifier_persistsNothing() async {
+        let sessionStore = InMemoryAppleAuthSessionStore()
+        let profileStore = InMemoryProfileStore()
+        let signIn = AppleProfileSignIn(
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            revoker: nil
+        )
+
+        let outcome = await signIn.apply(
+            userIdentifier: "  \n\t ",
+            displayName: "Ned Adams",
+            email: "ned@example.com",
+            authorizationCode: nil
+        )
+
+        #expect((try? sessionStore.load()) == nil)
+        #expect(await profileStore.load() == nil)
+        #expect(outcome.profileSaved == false)
+    }
+
+    /// DUT-506 composes with DUT-503: an empty-id sign-in is rejected BEFORE any
+    /// revoke runs, so a different user's on-file token is left untouched (an empty
+    /// id is a non-event, not a "different user" that would trigger a revoke).
+    @Test func emptyUserIdentifier_doesNotRevokeExistingToken() async {
+        let sessionStore = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "user-a", refreshToken: "rt-a")
+        )
+        let profileStore = InMemoryProfileStore()
+        let revoker = SpyRevoker(sessionStore: sessionStore)
+        let signIn = AppleProfileSignIn(
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            revoker: revoker
+        )
+
+        _ = await signIn.apply(
+            userIdentifier: "",
+            displayName: nil,
+            email: nil,
+            authorizationCode: nil
+        )
+
+        // No revoke fired, and User A's session is left intact.
+        #expect(revoker.revokedTokens.isEmpty)
+        #expect((try? sessionStore.load())?.userIdentifier == "user-a")
+    }
+
+    /// DUT-472 / DUT-503 — a revoke FAILURE must not block the new sign-in: the
+    /// different user's session is still persisted (best-effort revoke, same error
+    /// posture as the Google path).
+    @Test func revokeFailure_stillCompletesSignIn() async {
+        let sessionStore = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "user-a", refreshToken: "rt-a")
+        )
+        let profileStore = InMemoryProfileStore()
+        let revoker = FailingRevoker()
+        let signIn = AppleProfileSignIn(
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            revoker: revoker
+        )
+
+        let outcome = await signIn.apply(
+            userIdentifier: "user-b",
+            displayName: "Ned",
+            email: "ned@example.com",
+            authorizationCode: nil
+        )
+
+        // The revoke was attempted (best-effort) but threw...
+        #expect(revoker.revokeAttempted)
+        // ...and the new sign-in still completed: User B's session + profile persist.
+        #expect((try? sessionStore.load())?.userIdentifier == "user-b")
+        #expect(outcome.profileSaved == true)
+    }
+}
+
+/// A revoker whose `revoke` always throws, to prove a revoke failure doesn't block
+/// the overwriting sign-in (best-effort revoke posture).
+private final class FailingRevoker: SiwaRevoking, @unchecked Sendable {
+    private(set) var revokeAttempted = false
+    private struct RevokeFailed: Error {}
+
+    func exchange(authorizationCode: String) async throws -> String { "rt" }
+
+    func revoke(refreshToken: String) async throws {
+        revokeAttempted = true
+        throw RevokeFailed()
+    }
 }
 
 /// Records revoked tokens and captures the on-file session's user at revoke time,

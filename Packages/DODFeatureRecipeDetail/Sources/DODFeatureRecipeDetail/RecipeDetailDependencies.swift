@@ -17,6 +17,13 @@ public protocol RecipeDetailDependencies: Sendable {
     func cachedRecipe(id: Int) async throws -> Recipe?
     func fetchHTML(for url: URL) async throws -> String
     func parseJSONLD(html: String, merging: RecipeListItem, canonicalURL: URL) throws -> Recipe
+    /// DUT-544: whether the page's JSON-LD carries a `@type: Recipe` node — the
+    /// "this page's SUBJECT is a recipe" signal used to gate the recipe path so
+    /// a round-up ARTICLE that merely embeds a WPRM card isn't mis-rendered as a
+    /// bare recipe. Default routes to
+    /// ``DODNetworking/JSONLDRecipeParser/hasRecipeJSONLD(html:)``; tests
+    /// override to model recipe vs. article pages.
+    func hasRecipeJSONLD(html: String) -> Bool
     /// US-37 / CL-63 / AC-37.2 (T-640) + DOD-ART-1: extract the article body
     /// **HTML** from the rendered page. Called by the view model when
     /// `parseJSONLD(...)` throws — non-empty result classifies the post
@@ -209,6 +216,13 @@ extension RecipeDetailDependencies {
     /// (or empty string to exercise the unavailable fallback).
     public func extractArticleBody(html: String) -> String {
         ArticleBodyExtractor.extractContentHTML(html: html)
+    }
+
+    /// DUT-544 — default routes to the JSON-LD parser's recipe-node detection
+    /// so production callers get the real subject signal. Tests override to
+    /// model a recipe page (`true`) vs. a round-up article (`false`).
+    public func hasRecipeJSONLD(html: String) -> Bool {
+        JSONLDRecipeParser.hasRecipeJSONLD(html: html)
     }
 }
 

@@ -56,8 +56,12 @@ export default {
       }
       return json({ error: "not_found" }, 404)
     } catch (err) {
-      // Never leak key material / internals to the client.
-      return json({ error: "server_error", detail: String((err as Error).message) }, 500)
+      // Never leak key material / internals to the client. The exception can
+      // carry WebCrypto/atob diagnostics over the .p8 (APPLE_PRIVATE_KEY), so
+      // log it server-side (visible in `wrangler tail`) and return a generic
+      // body only. (DUT-258)
+      console.error("siwa-revoke server_error", err)
+      return json({ error: "server_error" }, 500)
     }
   },
 }

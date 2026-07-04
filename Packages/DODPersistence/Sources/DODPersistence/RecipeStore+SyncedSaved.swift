@@ -149,6 +149,24 @@ extension RecipeStore {
         Set(try modelContext.fetch(FetchDescriptor<SyncedSavedRecipe>()).map(\.id))
     }
 
+    /// DUT-494 — the synced saved-id baseline, read SYNCHRONOUSLY from a fresh
+    /// throwaway `ModelContext` so the composition root can anchor it in
+    /// `AppDependencies.init` — immediately after the container opens and BEFORE
+    /// the run loop resumes, so `NSPersistentCloudKitContainer`'s async import
+    /// engine cannot merge remote rows into the store first. The actor-isolated
+    /// ``syncedSavedIDSet()`` can only run later (from `RootView`'s `.task`), by
+    /// which point a fast/warm CloudKit import may already have folded device
+    /// B's rows into the set — poisoning the `current − baseline` provenance math
+    /// into skipping the import evidence and mis-seeding stale legacy pins. This
+    /// `nonisolated` reader is the poison-proof anchor: same container, its own
+    /// short-lived context, no dependency on the `@ModelActor`'s executor.
+    public nonisolated static func syncedSavedIDSet(
+        in container: ModelContainer
+    ) throws -> Set<Int> {
+        let context = ModelContext(container)
+        return Set(try context.fetch(FetchDescriptor<SyncedSavedRecipe>()).map(\.id))
+    }
+
     /// DUT-468 — the id set of local `isSaved` pins. `toggleSaved` sets this
     /// pin AND writes the synced row in one transaction, whereas a CloudKit
     /// import inserts the synced row WITHOUT a pin (the pin is reconciled later
