@@ -17,31 +17,40 @@ public actor RecipeStore {
     public static let imageBudgetBytes: Int = 200 * 1_024 * 1_024
 
     /// DUT-242: flips true after the first ``backfillImageByteCountsIfNeeded()``
-    /// of the process, so the one-time `byteCount` backfill faults pre-existing
-    /// image blobs at most once per launch.
+    /// so the one-time `byteCount` backfill faults image blobs once per launch.
     var didBackfillImageByteCounts = false
 
     #if DEBUG
-    /// DUT-473 test seam: when set, ``logCook`` throws this instead of saving,
-    /// so a test can drive the failed-save rollback deterministically. Per-actor
-    /// (not a global static) so parallel test suites can't observe each other's
-    /// failpoint. No effect in release builds.
+    /// DUT-473 test seam: when set, ``logCook`` throws this instead of saving so
+    /// a test can drive the failed-save rollback. Per-actor (not a global
+    /// static) so parallel suites can't observe each other's failpoint.
     var cookLogSaveFailpointError: Error?
     #endif
 
     /// DUT-302: flips true once `AppDependencies.bootstrap` confirms the one-time
-    /// SyncedSaved backfill has completed (via ``markSyncedSavedBackfillComplete()``).
-    /// Until then, ``mergeDetail`` must NOT clear a legacy local `isSaved` pin —
-    /// the backfill (which selects `isSaved == true`) hasn't migrated it to the
-    /// synced store yet, so clearing it would permanently lose an upgrader's save.
-    ///
-    /// DUT-493: seeded from the durable ``backfillDidComplete(in:)`` flag (skips the DUT-470 launch window).
+    /// SyncedSaved backfill completed. Until then, ``mergeDetail`` must NOT clear
+    /// a legacy local `isSaved` pin — the backfill (selecting `isSaved == true`)
+    /// hasn't migrated it to the synced store yet, so clearing it would
+    /// permanently lose an upgrader's save. DUT-493: seeded from the durable
+    /// ``backfillDidComplete(in:)`` flag (skips the DUT-470 launch window).
     public internal(set) var didBackfillSyncedSaved = RecipeStore.backfillDidComplete()
+
+    /// DUT-257 — test-only spy: ``evictIfNeeded()`` invocation count (proves a
+    /// bulk ``cache(listItems:)`` evicts once, not per item). Not for production.
+    var evictIfNeededCallCount = 0
 
     // MARK: - List item cache
 
     /// Insert-or-update a list item. Sets `lastViewedAt` so LRU sees it as fresh.
     public func cache(listItem: RecipeListItem) throws {
+        try upsert(listItem: listItem)
+        try modelContext.save()
+        try evictIfNeeded()
+    }
+
+    /// DUT-257 — pure insert/update body (no per-call save/evict) shared by both
+    /// cache entry points, so the bulk path can save + evict once (below).
+    private func upsert(listItem: RecipeListItem) throws {
         let existing = try fetchRecipe(id: listItem.id)
         if let existing {
             existing.title = listItem.title
@@ -89,15 +98,18 @@ public actor RecipeStore {
                 )
             )
         }
-        try modelContext.save()
-        try evictIfNeeded()
     }
 
     /// Bulk cache a list response so list screens can hydrate offline (AC-1.6).
+    /// DUT-257 — upsert every row, then `save()` + `evictIfNeeded()` EXACTLY
+    /// ONCE (the prior `cache(listItem:)` loop ran N saves + N LRU fetch+sorts).
     public func cache(listItems: [RecipeListItem]) throws {
+        guard !listItems.isEmpty else { return }
         for item in listItems {
-            try cache(listItem: item)
+            try upsert(listItem: item)
         }
+        try modelContext.save()
+        try evictIfNeeded()
     }
 
     // MARK: - Detail merge after JSON-LD parse
@@ -287,19 +299,15 @@ public actor RecipeStore {
 
     // MARK: - Eviction policies (T-074)
     //
-    // Image cache + image-eviction lives in `RecipeStore+ImageCache.swift`
-    // — extracted there to keep this actor body under SwiftLint's
-    // `type_body_length` cap once the US-21 widget image bridge wiring
-    // landed. Cap is enforced because actors that grow without
-    // restraint become hard to reason about for cross-actor calls.
+    // Image cache + image-eviction lives in `RecipeStore+ImageCache.swift` —
+    // extracted there to keep this actor body under the `type_body_length` cap.
 
-    /// Trim unsaved AND non-downloaded CachedRecipes to ``unsavedLRUCap``
-    /// by oldest `lastViewedAt`. Saved recipes are never evicted (NFR-1).
-    /// Explicitly-downloaded recipes (US-35 / AC-35.5) are also pinned —
-    /// the predicate requires both flags clear before a row is eligible
-    /// for eviction, so a user who downloads a recipe for a camping trip
-    /// keeps it on-device even if they never save it.
+    /// Trim unsaved AND non-downloaded CachedRecipes to ``unsavedLRUCap`` by
+    /// oldest `lastViewedAt`. Saved recipes are never evicted (NFR-1);
+    /// explicitly-downloaded recipes (US-35 / AC-35.5) are also pinned — the
+    /// predicate requires both flags clear before a row is eligible.
     public func evictIfNeeded() throws {
+        evictIfNeededCallCount += 1  // DUT-257 test spy; never read in production.
         let descriptor = FetchDescriptor<CachedRecipe>(
             predicate: #Predicate { $0.isSaved == false && $0.downloadedAt == nil },
             sortBy: [SortDescriptor(\.lastViewedAt, order: .forward)]

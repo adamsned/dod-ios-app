@@ -105,6 +105,22 @@ extension RecipeStore {
         /// `.private` open threw, so we fell back to a plain local
         /// container. `false` on the normal opt-in or opt-out paths.
         public let usedCloudKitFallback: Bool
+        /// DUT-525 — `true` when the primary container open threw (a failed
+        /// V-chain migration or on-disk corruption) and we recovered by moving
+        /// the corrupt store aside and opening a FRESH one, so the user lands in
+        /// a working-but-empty app instead of a launch crash-loop. `false` on
+        /// the normal path.
+        public let recoveredFromMigrationFailure: Bool
+
+        public init(
+            container: ModelContainer,
+            usedCloudKitFallback: Bool,
+            recoveredFromMigrationFailure: Bool = false
+        ) {
+            self.container = container
+            self.usedCloudKitFallback = usedCloudKitFallback
+            self.recoveredFromMigrationFailure = recoveredFromMigrationFailure
+        }
     }
 
     /// Build the production container for the *current persisted opt-in
@@ -208,7 +224,10 @@ extension RecipeStore {
     /// explicit (not cosmetic): SwiftData's default `.automatic` auto-enables
     /// CloudKit whenever the app's iCloud entitlement is present, so the
     /// explicit `.none` is what keeps these six models genuinely on-device.
-    private static func localCacheConfiguration(inMemory: Bool) -> ModelConfiguration {
+    ///
+    /// DUT-525 — non-private so `RecipeStore+MigrationRecovery.swift` can build
+    /// the fresh recovery container with the same local layout.
+    static func localCacheConfiguration(inMemory: Bool) -> ModelConfiguration {
         ModelConfiguration(
             schema: Schema(SchemaV6.localModels),
             isStoredInMemoryOnly: inMemory,
@@ -222,7 +241,10 @@ extension RecipeStore {
     /// is true (the opt-in path); `.none` otherwise — the opt-out path, the
     /// DOD-CRASH-1 fallback, and every in-memory test. This is the ONLY store
     /// that ever leaves the device (DUT-35 / DUT-6).
-    private static func syncedSavedConfiguration(
+    ///
+    /// DUT-525 — non-private so `RecipeStore+MigrationRecovery.swift` can build
+    /// the fresh recovery container's synced store.
+    static func syncedSavedConfiguration(
         inMemory: Bool,
         cloudKit: Bool
     ) -> ModelConfiguration {
