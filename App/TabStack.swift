@@ -42,10 +42,9 @@ struct TabStack: View {
     /// the Saved header cart. Threaded from `RootView` so this App view never
     /// reaches into the deep-link plumbing directly. Defaults to a no-op.
     let openShoppingList: () -> Void
-    /// T-912 / DUT-551 (CL-306) — iPhone Settings gear. The Feed header's
-    /// trailing `gearshape` button calls this to open the Settings sheet
-    /// (`RootView.showSettingsSheet`). Threaded from `RootView` like
-    /// `openShoppingList`; defaults to a no-op for terse call sites.
+    /// T-912 / DUT-551 (CL-306) — the header Settings gear (on every main tab)
+    /// calls this to open the Settings sheet (`RootView.showSettingsSheet`).
+    /// Threaded from `RootView` like `openShoppingList`; defaults to a no-op.
     let onOpenSettings: () -> Void
     /// T-912 / DUT-551 (CL-306) — the Cook Mode hub row routes here to pick a
     /// recipe to cook (Cook Mode can't launch without a recipe). Selects the
@@ -72,22 +71,17 @@ struct TabStack: View {
     /// hub consumes it via `.task(id:)` to pop to its root so the tip banner shows.
     /// Inert for other tabs.
     @Binding var hubTipToken: UUID?
-    /// DUT-546 (gap 3) — the single app-level ``CommentModerationStore`` owned
-    /// by `RootView`, injected into every `RecipeDetailViewModel` this stack
-    /// builds so a block applied on one recipe screen hides that author on an
-    /// already-open second recipe screen live (shared `@Observable` set),
-    /// instead of each detail VM reading its own private `UserDefaults` copy.
+    /// DUT-546 (gap 3) — the single app-level ``CommentModerationStore`` owned by
+    /// `RootView`, injected into every `RecipeDetailViewModel` this stack builds so
+    /// a block applied on one recipe screen hides that author on an already-open
+    /// second one live (shared `@Observable` set), not per-VM `UserDefaults` copies.
     let commentModeration: CommentModerationStore
-    /// DUT-250 — the per-tab navigation stack is now HOISTED into
-    /// `RootView`-owned state and injected as a `@Binding`. Previously this
-    /// was a local `@State private var path`, but on iPad the size-class flip
-    /// (Slide Over / Split View / Stage Manager resize) swaps `RootView`'s
-    /// `iPadSplit` (one detail `TabStack`, keyed `.id(selectedTab)`) for
-    /// `phoneTabs` (four `TabStack`s) — two structurally different trees. The
-    /// TabStack identities differ across the boundary, so SwiftUI tore down
-    /// the old TabStack and its local `path`, dropping any pushed detail back
-    /// to the tab root. Hoisting the path to `RootView` (which itself survives
-    /// the flip, like `selectedTab`) keeps the pushed stack alive.
+    /// DUT-250 — the per-tab navigation stack is HOISTED into `RootView`-owned
+    /// state and injected as a `@Binding` (was local `@State`). On iPad the
+    /// size-class flip swaps `iPadSplit` (one keyed detail `TabStack`) for
+    /// `phoneTabs` (four `TabStack`s); the differing identities tore down the old
+    /// TabStack + its local `path`, dropping any pushed detail. Hoisting to
+    /// `RootView` (which survives the flip) keeps the pushed stack alive.
     @Binding var path: [RecipeRoute]
 
     init(
@@ -121,11 +115,21 @@ struct TabStack: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            rootContent
-                .navigationDestination(for: RecipeRoute.self) { route in
-                    destination(for: route)
+        Group {
+            if tab == .cookingTools {
+                // DUT-551 crash fix — the hub owns its OWN `NavigationStack`; wrapping
+                // it in TabStack's too doubly-nested them, crashing when the Shopping
+                // List (with its title + toolbars) pushed onto the inner stack. Render
+                // it bare (it needs no `RecipeRoute` destination).
+                rootContent
+            } else {
+                NavigationStack(path: $path) {
+                    rootContent
+                        .navigationDestination(for: RecipeRoute.self) { route in
+                            destination(for: route)
+                        }
                 }
+            }
         }
         .task(id: pendingDeepLink) {
             // Widget deep link (only Feed consumes).
