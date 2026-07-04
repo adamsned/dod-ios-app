@@ -65,20 +65,47 @@ extension RecipeDetailViewModel {
     /// (`>= 1` rather than `> 0`: `RecipeRating.count` is a rating tally, not a
     /// collection, so SwiftLint's `empty_count` rule doesn't apply here.)
     ///
-    /// DUT-545: a refresh must never *shrink* a good cached aggregate. When a
-    /// rating POST succeeds but its follow-up summary GET hard-fails,
-    /// `WPRMRatingsClient.postRating` degrades to a SYNTHETIC `count == 1`
-    /// aggregate built from the single star we just submitted (DUT-305). If we
-    /// adopted it, a real "4.2★ (500)" would be overwritten — and CACHED — as
-    /// "5.0 (1)", persisting across relaunch. So an aggregate is only adopted
-    /// when its count is at least the existing count: a real subsequent GET
-    /// carries the full tally (501 ≥ 500) and is adopted; the synthetic `1` is
-    /// rejected. A shrinking refresh keeps the existing average/count but still
-    /// carries the user's own just-submitted `userRating` forward (the vote is
-    /// never lost) — and is NOT re-cached, so the good aggregate stays put.
+    /// DUT-545 / DUT-553: a refresh must never *shrink* a good cached aggregate
+    /// when — and ONLY when — the incoming refresh is the SYNTHETIC post-submit
+    /// fallback. When a rating POST succeeds but its follow-up summary GET
+    /// hard-fails, `WPRMRatingsClient.postRating` degrades to a synthetic
+    /// aggregate built from the single star we just submitted (DUT-305): it
+    /// always has `count == 1` AND a non-nil `userRating` equal to the vote we
+    /// just cast (`pendingUserRating`). If we adopted it, a real "4.2★ (500)"
+    /// would be overwritten — and CACHED — as "5.0 (1)", persisting across
+    /// relaunch.
+    ///
+    /// DUT-545 originally rejected shrinks by COUNT MAGNITUDE (`fresh.count >=
+    /// existingCount`). That over-rejected: a genuine authoritative summary GET
+    /// with a smaller-but-correct tally (moderation / spam purge, e.g. 500/4.2 →
+    /// 480/4.5) was discarded and the stale aggregate stuck forever (DUT-553).
+    /// So distinguish the synthetic fallback EXPLICITLY by its shape instead:
+    /// reject a shrink only when the refresh IS that synthetic shape; let a
+    /// genuine authoritative GET (`userRating == nil`, any count) update the
+    /// aggregate — including DOWNWARD.
     func applyRatingRefresh(_ fresh: RecipeRating) async {
         let existingCount = ratingSummary?.count ?? 0
-        if fresh.count >= 1, fresh.count >= existingCount {
+        // The synthetic post-submit fallback (DUT-305): count == 1 with a
+        // non-nil userRating equal to the vote we just cast. This is the ONLY
+        // shape allowed to be rejected for shrinking a real aggregate.
+        let isSyntheticFallback =
+            fresh.count == 1 && fresh.userRating != nil && fresh.userRating == pendingUserRating
+        if isSyntheticFallback, fresh.count < existingCount, let existing = ratingSummary {
+            // DUT-545: the synthetic fallback must NOT shrink the good aggregate.
+            // Keep the existing average/count, but still let the user's own
+            // just-submitted vote update. Don't re-cache — the good aggregate
+            // already on disk stays authoritative.
+            guard let freshVote = fresh.userRating, freshVote != existing.userRating else { return }
+            ratingSummary = RecipeRating(
+                recipeID: existing.recipeID,
+                average: existing.average,
+                count: existing.count,
+                userRating: freshVote
+            )
+        } else if fresh.count >= 1 {
+            // A real aggregate (authoritative GET, or a real post-submit tally).
+            // DUT-553: adopt it even when it shrinks — a genuine moderation/spam
+            // purge must self-heal downward.
             let merged = RecipeRating(
                 recipeID: fresh.recipeID,
                 average: fresh.average,
@@ -91,19 +118,6 @@ extension RecipeDetailViewModel {
             )
             ratingSummary = merged
             await dependencies.cacheRatingSummary(merged)
-        } else if fresh.count >= 1, let existing = ratingSummary {
-            // DUT-545: a smaller/synthetic refresh (e.g. the count==1 fallback
-            // after a failed summary GET) must NOT shrink the good aggregate.
-            // Keep the existing average/count, but still let the user's own
-            // just-submitted vote update. Don't re-cache — the good aggregate
-            // already on disk stays authoritative.
-            guard let freshVote = fresh.userRating, freshVote != existing.userRating else { return }
-            ratingSummary = RecipeRating(
-                recipeID: existing.recipeID,
-                average: existing.average,
-                count: existing.count,
-                userRating: freshVote
-            )
         } else if ratingSummary == nil {
             // First load, no cache, empty-or-failed refresh — show/cache 0/0.
             ratingSummary = fresh
