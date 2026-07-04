@@ -6,6 +6,10 @@ public struct CategoryRecipesView: View {
 
     @State private var viewModel: CategoryRecipesViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // DUT-531 — the unified list/grid preference shared with Feed / Saved /
+    // Search (Settings ▸ Customization). Category browsing branches on it too.
+    @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
+        RecipeListLayout.gallery.rawValue
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
     /// `FeedView.onSave` for the contract; same shape applied to category
@@ -51,13 +55,28 @@ public struct CategoryRecipesView: View {
                 message: "Try a different category."
             )
         case .loaded, .loadingMore:
+            // DUT-531 — `.gallery` keeps the 2-col `LazyVGrid` of `RecipeCard`;
+            // `.list` renders `RecipeCard.ListRow`s via `adaptiveListRows`,
+            // mirroring `FeedView` / `SavedView`.
+            let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
             ScrollView {
-                LazyVGrid(
-                    columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
-                    spacing: DODSpacing.md
-                ) {
-                    ForEach(viewModel.items) { item in
-                        recipeRow(item)
+                Group {
+                    switch layout {
+                    case .gallery:
+                        LazyVGrid(
+                            columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+                            spacing: DODSpacing.md
+                        ) {
+                            ForEach(viewModel.items) { item in
+                                recipeCard(item)
+                            }
+                        }
+                    case .list:
+                        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
+                            ForEach(viewModel.items) { item in
+                                recipeListRow(item)
+                            }
+                        }
                     }
                 }
                 .padding(DODSpacing.md)
@@ -70,24 +89,44 @@ public struct CategoryRecipesView: View {
         }
     }
 
-    private func recipeRow(_ item: RecipeListItem) -> some View {
-        // CL-255 — cook-time chip omitted (browse declutter); time is on the
-        // recipe detail page + Search's time filter.
-        RecipeCard(
-            title: item.title,
-            excerpt: item.excerpt,
-            heroImageURL: item.heroImage
+    // CL-255 — cook-time chip omitted (browse declutter); time is on the
+    // recipe detail page + Search's time filter.
+    private func recipeCard(_ item: RecipeListItem) -> some View {
+        decorate(
+            RecipeCard(
+                title: item.title,
+                excerpt: item.excerpt,
+                heroImageURL: item.heroImage
+            ),
+            item
         )
-        .recipeCardTap { onSelect(item) }
-        // T-765 / CL-162 (DUT-71) — state-aware Save/Unsave from the
-        // viewmodel-owned saved-id set; optimistic flip on toggle.
-        .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
-            viewModel.applyOptimisticSaveToggle(id: item.id)
-            onSave?(item)
-        }
-        // T-610 — stable L5 handle for the category → recipe journey.
-        // Mirrors `dod.feed.card` / `dod.search.card`.
-        .accessibilityIdentifier("dod.category.card")
-        .task { await viewModel.loadMoreIfNeeded(currentItem: item) }
+    }
+
+    private func recipeListRow(_ item: RecipeListItem) -> some View {
+        decorate(
+            RecipeCard.ListRow(
+                title: item.title,
+                excerpt: item.excerpt,
+                heroImageURL: item.heroImage
+            ),
+            item
+        )
+    }
+
+    // DUT-531 — the gallery card + list row share the same tap / save
+    // context-menu / accessibility id / pagination trigger.
+    private func decorate(_ card: some View, _ item: RecipeListItem) -> some View {
+        card
+            .recipeCardTap { onSelect(item) }
+            // T-765 / CL-162 (DUT-71) — state-aware Save/Unsave from the
+            // viewmodel-owned saved-id set; optimistic flip on toggle.
+            .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
+                viewModel.applyOptimisticSaveToggle(id: item.id)
+                onSave?(item)
+            }
+            // T-610 — stable L5 handle for the category → recipe journey.
+            // Mirrors `dod.feed.card` / `dod.search.card`.
+            .accessibilityIdentifier("dod.category.card")
+            .task { await viewModel.loadMoreIfNeeded(currentItem: item) }
     }
 }
