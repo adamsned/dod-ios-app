@@ -128,6 +128,25 @@ public enum HTMLSanitizer {
         "lsquo": "\u{2018}",
         "rdquo": "\u{201D}",
         "ldquo": "\u{201C}",
+        // DUT-550: WordPress/WPRM frequently emits the NAMED form of common
+        // recipe entities (`&frac12;` in "1½ cups", `&deg;` in oven temps).
+        // Their numeric forms (`&#189;`, `&#xBD;`) already decode, but the
+        // named forms passed through raw into the highest-visibility field
+        // (ingredient amounts). Decode the vulgar fractions + degree/math signs.
+        "frac12": "½",
+        "frac14": "¼",
+        "frac34": "¾",
+        "frac13": "⅓",
+        "frac23": "⅔",
+        "frac18": "⅛",
+        "frac38": "⅜",
+        "frac58": "⅝",
+        "frac78": "⅞",
+        "deg": "°",
+        "times": "×",
+        "divide": "÷",
+        "middot": "·",
+        "frasl": "⁄",
     ]
 
     /// DUT-466 (mirrors DUT-394 in `HTMLEntityDecoder`) — WP REST bodies
