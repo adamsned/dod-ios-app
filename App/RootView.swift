@@ -108,11 +108,15 @@ struct RootView: View {
     /// T-912 / DUT-551 (CL-306) — Settings left the tab bar; it's presented as a
     /// sheet from the Feed header gear (iPhone) / iPad sidebar Settings row.
     @State var showSettingsSheet = false
-    /// T-912 / DUT-551 (CL-306) — the Cooking Tools hub's Shopping List reroute
-    /// token. `routeToShoppingList()` selects `.cookingTools` + mints a UUID; the
-    /// hub consumes it via `.task(id:)` and pushes the Shopping List. Owned here
-    /// (like `tabPaths`) so it survives the iPad flip. Mirrors CL-301's token.
+    /// T-912 / DUT-551 (CL-306) — the hub's Shopping List reroute token.
+    /// `routeToShoppingList()` selects `.cookingTools` + mints a UUID; the hub
+    /// pushes the Shopping List via `.task(id:)`. Owned here so it survives the
+    /// iPad flip. Mirrors CL-301's token.
     @State var hubShoppingListToken: UUID?
+    /// T-912 / DUT-551 (CL-306) — the hub's Heat Coach token. `routeToHeatCoach()`
+    /// (the per-recipe nudge) mints it; the hub presents Heat Coach via `.task(id:)`.
+    /// Owned here (like `hubShoppingListToken`) so it survives the iPad flip.
+    @State var hubHeatCoachToken: UUID?
     @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The system `openURL`, captured before RootView overrides it for its
@@ -219,9 +223,8 @@ struct RootView: View {
             onDismiss: presentCloudSyncPromptIfPending,
             content: { onboardingCover }
         )
-        // T-912 / DUT-551 (CL-306) — Settings sheet. The Feed header gear
-        // (iPhone) + iPad sidebar row both flip `showSettingsSheet`; the shared
-        // `settingsSheetViewModel()` helper wires the same dependency surface.
+        // T-912 / DUT-551 (CL-306) — Settings sheet. The iPhone gear + iPad
+        // sidebar row both flip `showSettingsSheet`.
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView(
@@ -281,7 +284,10 @@ struct RootView: View {
                     openShoppingList: { routeToShoppingList() },
                     onOpenSettings: { showSettingsSheet = true },
                     onFindRecipe: { selectedTab = .feed },
+                    // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
+                    openHeatCoach: { routeToHeatCoach() },
                     hubShoppingListToken: tab == .cookingTools ? $hubShoppingListToken : .constant(nil),
+                    hubHeatCoachToken: tab == .cookingTools ? $hubHeatCoachToken : .constant(nil),
                     // DUT-546 — one shared moderation store across every recipe screen.
                     commentModeration: commentModeration
                 )
@@ -354,7 +360,10 @@ struct RootView: View {
                 // T-912/DUT-551 — Shopping List reroute + hub Cook Mode → Recipes.
                 openShoppingList: { routeToShoppingList() },
                 onFindRecipe: { selectedTab = .feed },
+                // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
+                openHeatCoach: { routeToHeatCoach() },
                 hubShoppingListToken: selectedTab == .cookingTools ? $hubShoppingListToken : .constant(nil),
+                hubHeatCoachToken: selectedTab == .cookingTools ? $hubHeatCoachToken : .constant(nil),
                 // DUT-546 — one shared moderation store across every recipe screen.
                 commentModeration: commentModeration
             )
@@ -382,16 +391,10 @@ struct RootView: View {
     }
 
     /// Map the user-selected preference onto SwiftUI's `ColorScheme?`.
-    /// `.system` returns `nil` so `.preferredColorScheme(...)` becomes a
-    /// no-op and the OS-level setting drives every screen — matches the
-    /// "Match System" default. T-756 / CL-153 — delegates to the shared
-    /// ``AppearancePreference/colorScheme`` so RootView (main window) and
-    /// SettingsView (the sheet's own live theme) map identically.
+    /// `.system` returns `nil` so `.preferredColorScheme(...)` is a no-op and the
+    /// OS drives every screen. T-756 / CL-153 — delegates to the shared
+    /// ``AppearancePreference/colorScheme`` so RootView + SettingsView map identically.
     private func preferredColorScheme(for value: AppearancePreference) -> ColorScheme? {
         value.colorScheme
     }
 }
-
-// DOD-ART-2 / DUT-243 / DUT-246 / DUT-250 — the in-app article-link routing
-// helpers (`handleArticleLinkTap`, `openRecipeLink`, `routeIntoCurrentTab`,
-// `externalRouteBinding(for:)`, `pathBinding(for:)`) live in `RootView+LinkRouting.swift`.

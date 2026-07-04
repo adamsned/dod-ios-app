@@ -45,11 +45,49 @@ extension CookModeView {
                     viewModel: viewModel
                 )
             }
+            heatCoachShortcut(for: step)
         }
         .padding(.horizontal, DODSpacing.md)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Step \(step.step). \(displayText)")
     }
+
+    /// T-912 / DUT-551 (CL-306) — a compact "Open Heat Coach" shortcut, shown
+    /// only on **heat-related** steps and only when the host wired
+    /// `heatCoachSheet`. A tab switch would be invisible under Cook Mode's
+    /// full-screen cover, so the tap presents Heat Coach as a sheet OVER the
+    /// cover (`isHeatCoachPresented`). Hidden on non-heat steps and on hosts /
+    /// previews that don't wire hub routing (same seam as `onLogCook`).
+    @ViewBuilder
+    private func heatCoachShortcut(for step: RecipeInstruction) -> some View {
+        if heatCoachSheet != nil, Self.stepIsHeatRelated(step.text) {
+            Button {
+                isHeatCoachPresented = true
+            } label: {
+                Label("Open Heat Coach", systemImage: "thermometer.medium")
+                    .dodFont(DODType.bodyEmphasized)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(DODColor.burntOrange)
+            .accessibilityIdentifier("cook-mode-heat-coach")
+        }
+    }
+
+    /// Whether a step's text is about heat — it carries an explicit-unit
+    /// temperature (via ``TemperatureConverter/fahrenheitValues(in:)``) OR one of
+    /// a small set of coal / fire keywords. Case-insensitive substring match.
+    nonisolated static func stepIsHeatRelated(_ text: String) -> Bool {
+        if !TemperatureConverter.fahrenheitValues(in: text).isEmpty { return true }
+        let haystack = text.lowercased()
+        return heatKeywords.contains(where: haystack.contains)
+    }
+
+    /// Coal / fire language that flags a step as heat-related even without an
+    /// explicit temperature (e.g. "arrange the coals", "let the briquettes ash
+    /// over", "preheat the oven").
+    private nonisolated static let heatKeywords = [
+        "coal", "briquette", "preheat", "pre-heat", "oven temp", "charcoal",
+    ]
 
     /// DUT-245 — map a step's text through the temperature converter for the
     /// resolved preference (`nil` → unchanged). Mirrors

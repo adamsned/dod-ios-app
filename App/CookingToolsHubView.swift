@@ -38,6 +38,13 @@ struct CookingToolsHubView: View {
     /// `openShoppingListToken` pattern the Saved tab used (CL-301).
     @Binding var shoppingListToken: UUID?
 
+    /// T-912 / DUT-551 — the Heat Coach reroute token. `RootView` mints a fresh
+    /// UUID when the per-recipe Heat Coach nudge (Recipe Detail) fires and selects
+    /// this tab; the hub consumes it via `.task(id:)` (not `.onChange`, so a token
+    /// already set when the tab mounts still fires) and presents Heat Coach as a
+    /// sheet — reusing the same `showingHeatCoach` state the hub's row #3 drives.
+    @Binding var heatCoachToken: UUID?
+
     /// The hub tab's own navigation stack (Shopping List pushes onto it).
     @State private var path: [HubDestination] = []
     /// Presents the "Your First Cookout" roadmap (`CookChooserFlow`).
@@ -69,10 +76,12 @@ struct CookingToolsHubView: View {
     init(
         dependencies: AppDependencies,
         shoppingListToken: Binding<UUID?> = .constant(nil),
+        heatCoachToken: Binding<UUID?> = .constant(nil),
         onFindRecipe: @escaping () -> Void = {}
     ) {
         self.dependencies = dependencies
         self._shoppingListToken = shoppingListToken
+        self._heatCoachToken = heatCoachToken
         self.onFindRecipe = onFindRecipe
         _feedViewModel = State(
             initialValue: FeedViewModel(dependencies: dependencies.feedDependencies())
@@ -104,6 +113,15 @@ struct CookingToolsHubView: View {
             guard shoppingListToken != nil else { return }
             if path.last != .shoppingList { path.append(.shoppingList) }
             shoppingListToken = nil
+        }
+        // T-912 / DUT-551 — consume the Heat Coach reroute token (the per-recipe
+        // nudge). `.task(id:)` (not `.onChange`) so a token already set when this
+        // tab first mounts still presents. Reuses the same `showingHeatCoach`
+        // sheet the hub's row #3 drives. A nil token is a no-op.
+        .task(id: heatCoachToken) {
+            guard heatCoachToken != nil else { return }
+            showingHeatCoach = true
+            heatCoachToken = nil
         }
         .onAppear { Telemetry.shared.send(.screenView(name: "cooking_tools")) }
         .sheet(
