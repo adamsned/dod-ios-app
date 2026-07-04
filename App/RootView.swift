@@ -69,6 +69,11 @@ struct RootView: View {
     /// can set them.
     @State var showTipDialog = false
     @State var tipDialogText = ""
+    /// DUT-549 — a deep link / notification whose recipe fails BOTH cache and
+    /// network resolution surfaces this transient snackbar instead of dumping
+    /// the user on a blank Feed. Set by `handle(intent:)`; the overlay +
+    /// `deepLinkFailedMessage` copy live in `RootView+LinkRouting.swift`.
+    @State var deepLinkErrorMessage: String?
     // Per-tab external-route sinks. Feed carries deep links (App Intents /
     // Spotlight, spec.md US-10, replace semantics) AND in-app link taps;
     // Saved + Search exist so an article link tapped there opens in place
@@ -228,6 +233,9 @@ struct RootView: View {
             if showTipDialog { cookingTipOverlay }
         }
         .animation(.easeInOut(duration: 0.2), value: showTipDialog)
+        // DUT-549 — transient "couldn't open that recipe" toast for a failed
+        // deep-link resolve (modifier + copy in `RootView+LinkRouting.swift`).
+        .modifier(DeepLinkErrorSnackbar(message: $deepLinkErrorMessage))
         // Intercept in-app link taps (DOD-ART-2): a dutchovendaddy.com recipe
         // link inside a rendered article opens the recipe in-app instead of
         // bouncing to Safari. Set on the whole tree so it reaches the article
@@ -323,54 +331,9 @@ struct RootView: View {
 
     // MARK: - Deep-link routing
     //
-    // `handle(widgetLink:)` lives in `RootView+LinkRouting.swift` (keeps this
-    // file under the SwiftLint `file_length` cap).
-
-    /// Routes a parsed `DeepLinkIntent` into tab + path state (US-10).
-    /// Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)` can call it.
-    func handle(intent: DeepLinkIntent) {
-        switch intent {
-        case .openSaved:
-            selectedTab = .saved
-        case .openRecipe(let id):
-            selectedTab = .feed
-            Task { @MainActor in
-                guard let route = await resolveRecipeRoute(id: id, autoStartCookMode: false) else {
-                    return
-                }
-                // DUT-310 — deep links replace the stack (Back → tab root).
-                feedExternalRoute.enqueue(.replaceStack(route))
-            }
-        case .startCookMode(let recipeID):
-            selectedTab = .feed
-            Task { @MainActor in
-                guard
-                    let route = await resolveRecipeRoute(
-                        id: recipeID,
-                        autoStartCookMode: true
-                    )
-                else { return }
-                feedExternalRoute.enqueue(.replaceStack(route))
-            }
-        }
-    }
-
-    /// Resolve a deep-link recipe/post id into a route, fetching on a cache
-    /// miss (T-632 / REG-20 / CL-101). Cache-hit (widget / Spotlight) stays
-    /// network-free; cache-miss (notification — the post is brand-new and
-    /// never cached) fetches the post by id so its `canonicalURL` is known,
-    /// then routes to recipe-detail, which classifies recipe-vs-article via
-    /// its existing JSON-LD fetch path (AC-4.11 / AC-37.2). The policy lives
-    /// in ``RecipeRouteResolver`` so it is unit-testable without a SwiftUI
-    /// host; this method just supplies the two live I/O edges.
-    private func resolveRecipeRoute(id: Int, autoStartCookMode: Bool) async -> RecipeRoute? {
-        await RecipeRouteResolver.resolve(
-            id: id,
-            autoStartCookMode: autoStartCookMode,
-            cachedLookup: { try await dependencies.store.recipeWithoutTouching(id: $0) },
-            fetch: { try await dependencies.fetchListItem(forPostID: $0) }
-        )
-    }
+    // `handle(widgetLink:)`, `handle(intent:)`, and `resolveRecipeRoute(id:…)`
+    // live in `RootView+LinkRouting.swift` (keeps this file under the SwiftLint
+    // `file_length` cap).
 
     // MARK: - Appearance (US-36 AC-36.2)
 
