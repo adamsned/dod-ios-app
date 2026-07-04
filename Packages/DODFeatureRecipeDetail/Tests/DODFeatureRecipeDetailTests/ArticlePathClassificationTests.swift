@@ -66,14 +66,16 @@ struct ArticlePathClassificationTests {
         #expect(dependencies.markedFailedIDs.isEmpty)
     }
 
-    @Test func parsedRecipeWithEmptyInstructionsAndNoCardFallsBackToArticleBody() async throws {
-        // DUT-185 (as narrowed by DUT-538): a recipe that parses with EMPTY
-        // instructions falls back to the article-body path ONLY when the page
-        // ships NO WPRM recipe card. `htmlToReturn` defaults to `<html></html>`
-        // (no card), so `hasRecipeCard` is false and the step-less recipe still
-        // routes to `.article` — the genuine-article case is preserved.
+    @Test func parsedRecipeWithEmptyInstructionsAndNoRecipeSubjectFallsBackToArticleBody() async throws {
+        // DUT-185 (as narrowed by DUT-538, corrected by DUT-544): a page that
+        // parses with EMPTY instructions falls back to the article-body path
+        // when its subject is NOT a recipe — i.e. no `@type: Recipe` JSON-LD
+        // node (`hasRecipeJSONLDResult == false`). `htmlToReturn` defaults to
+        // `<html></html>` (no card either), so the step-less post routes to
+        // `.article` — the genuine-article case is preserved.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 17, withDetail: false)
+        dependencies.hasRecipeJSONLDResult = false
         dependencies.articleBodyToExtract = "How to Make. Step 1: Open and dump."
         let viewModel = makeViewModel(dependencies: dependencies, listItemID: 17)
         await viewModel.onAppear()
@@ -85,12 +87,14 @@ struct ArticlePathClassificationTests {
         }
     }
 
-    @Test func emptyInstructionsWithWPRMCardStaysRecipeNotArticle() async throws {
-        // DUT-538: the 7 Can Soup regression. `parseJSONLD` SUCCEEDS but the
-        // recipe has empty instructions (the WPRM card had no instruction rows);
-        // however the page ships a `wprm-recipe-container`. Presence of the card
-        // means this is a RECIPE — it must NOT be reclassified as an article
-        // that dumps the whole blog body. It stays `.ready` with kind `.recipe`.
+    @Test func emptyInstructionsWithRecipeSubjectStaysRecipeNotArticle() async throws {
+        // DUT-538 (as corrected by DUT-544): the 7 Can Soup regression.
+        // `parseJSONLD` SUCCEEDS but the recipe has empty instructions (the WPRM
+        // card had no instruction rows) and the page's JSON-LD carries a
+        // `@type: Recipe` node — a genuine recipe whose subject IS a recipe. It
+        // must NOT be reclassified as an article that dumps the whole blog body:
+        // it stays `.ready` with kind `.recipe`. (`hasRecipeJSONLDResult`
+        // defaults to `true`, modeling the Recipe node the live page carries.)
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 19, withDetail: false)
         dependencies.htmlToReturn = "<html><body><div class=\"wprm-recipe-container\"></div></body></html>"
@@ -99,6 +103,60 @@ struct ArticlePathClassificationTests {
         await viewModel.onAppear()
         #expect(viewModel.loadState == .ready)
         #expect(viewModel.recipe?.kind == .recipe)
+        #expect(dependencies.markedFailedIDs.isEmpty)
+    }
+
+    @Test func roundUpArticleThatEmbedsCardClassifiesAsArticleNotRecipe() async throws {
+        // DUT-544: the over-classification bug. The JSON-LD parse FAILS (no
+        // Recipe node — the page is a round-up / guide ARTICLE), yet the page
+        // embeds a `wprm-recipe-container` card. Pre-DUT-544 the mere card
+        // presence forced the recipe path, dumping the card in place of the
+        // whole article body. Now the recipe path requires the recipe-SUBJECT
+        // signal (`hasRecipeJSONLD == false` here), so the post correctly routes
+        // to `.article` and its body is PRESERVED — not replaced by the card.
+        let dependencies = FakeRecipeDetailDependencies()
+        // parseJSONLD throws (parsedRecipe is nil) — the round-up has no Recipe node.
+        dependencies.hasRecipeJSONLDResult = false
+        dependencies.htmlToReturn = "<html><body><div class=\"wprm-recipe-container\"></div></body></html>"
+        dependencies.articleBodyToExtract = "The 15 best dump cake recipes, ranked. Start with cherry..."
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 23)
+        await viewModel.onAppear()
+        if case .article(let article) = viewModel.loadState {
+            #expect(article.kind == .article)
+            // Body PRESERVED — the whole round-up prose, not the embedded card.
+            #expect(article.articleBodyHTML == "The 15 best dump cake recipes, ranked. Start with cherry...")
+            #expect(article.id == 23)
+        } else {
+            Issue.record("Round-up embedding a card should classify as .article, got \(viewModel.loadState)")
+        }
+    }
+
+    @Test func recipeSubjectWithCardRecoversRecipeWhenJSONLDParseFails() async throws {
+        // DUT-544 companion: a GENUINE recipe whose JSON-LD parse fails (thin /
+        // malformed Recipe node) but whose page IS recipe-typed
+        // (`hasRecipeJSONLD == true`) still routes to the card-recovery recipe
+        // path — DUT-538 is preserved for real recipes. The 7 Can Soup shape:
+        // card present + recipe subject → `.recipe`, never the article dump.
+        let dependencies = FakeRecipeDetailDependencies()
+        // parseJSONLD throws (parsedRecipe nil), but the page is recipe-typed...
+        dependencies.hasRecipeJSONLDResult = true
+        dependencies.htmlToReturn = """
+            <html><body>
+            <h2>How to Make It</h2>
+            <ol class="is-style-circle-number-list"><li>Step 1: Dump every can in.</li></ol>
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">black beans</span></li>
+            </ul>
+            </div>
+            </body></html>
+            """
+        dependencies.articleBodyToExtract = "this should not be reached"
+        let viewModel = makeViewModel(dependencies: dependencies, listItemID: 29)
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .ready)
+        #expect(viewModel.recipe?.kind == .recipe)
+        #expect(viewModel.recipe?.ingredients.contains { $0.text == "black beans" } == true)
         #expect(dependencies.markedFailedIDs.isEmpty)
     }
 

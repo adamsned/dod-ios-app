@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<!--
+  DUT-544 golden fixture: a trimmed-but-faithful capture of a round-up / guide
+  ARTICLE that embeds a WPRM recipe card, modeled on
+  https://www.dutchovendaddy.com/dump-cake-recipes/ (fetched 2026-07-04).
+
+  This is the OVER-CLASSIFICATION case DUT-544 fixes. Like the real round-up:
+    - The page's JSON-LD @type is Article + ItemList — there is NO
+      `@type: Recipe` node anywhere in the graph (validated 2026-07-04: the
+      dump-cake / memorial-day / dutch-oven round-ups all emit Article /
+      ItemList / CollectionPage but never a Recipe node).
+    - It nonetheless embeds a `wprm-recipe-container` card (one of the round-up's
+      featured recipes) plus links out to individual recipe posts.
+    - It has a substantial article body (the round-up prose).
+
+  DUT-538 keyed the recipe path off mere card presence, so this page was
+  rendered as a bare recipe and lost its whole body. DUT-544 requires the
+  Recipe-subject JSON-LD signal, so a page like this (card but no Recipe node)
+  routes to the ARTICLE body instead. The `hasRecipeJSONLD` assertion in
+  JSONLDRecipeParserTests pins the signal; the article-body classification is
+  covered by the DODFeatureRecipeDetail tests.
+-->
+<html lang="en-US">
+<head>
+<meta charset="UTF-8">
+<title>15 Best Dump Cake Recipes - Dutch Oven Daddy</title>
+<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https://schema.org","@graph":[
+  {"@type":"Article","@id":"https://www.dutchovendaddy.com/dump-cake-recipes/#article","headline":"15 Best Dump Cake Recipes","author":{"@type":"Person","name":"Ned"}},
+  {"@type":"WebPage","@id":"https://www.dutchovendaddy.com/dump-cake-recipes/","name":"15 Best Dump Cake Recipes"},
+  {"@type":"ItemList","itemListElement":[
+    {"@type":"ListItem","position":1,"name":"Cherry Dump Cake","url":"https://www.dutchovendaddy.com/cherry-dump-cake/"},
+    {"@type":"ListItem","position":2,"name":"Peach Dump Cake","url":"https://www.dutchovendaddy.com/peach-dump-cake/"}
+  ]}
+]}</script>
+</head>
+<body>
+<div class="entry-content">
+<p>Dump cakes are the easiest dessert you can make in a Dutch oven: layer the fruit, top with cake mix and butter, and bake. This round-up gathers our fifteen favorite dump cake recipes so you can pick one for your next cookout.</p>
+<h2 id="cherry-dump-cake">1. Cherry Dump Cake</h2>
+<p>Our most popular dump cake. Bright cherry pie filling under a golden, buttery crust. Follow the full recipe on its own page for the exact measurements.</p>
+<h2 id="peach-dump-cake">2. Peach Dump Cake</h2>
+<p>Summer in a Dutch oven. Sliced peaches and a yellow cake mix bake into a cobbler-like dessert everyone fights over.</p>
+<h2 id="featured-recipe">Featured: Easy Cherry Dump Cake</h2>
+<div id="wprm-recipe-container-4100" class="wprm-recipe-container" data-recipe-id="4100">
+<div class="wprm-recipe wprm-recipe-template-custom-template">
+<h2 class="wprm-recipe-name wprm-block-text-bold">Easy Cherry Dump Cake</h2>
+<div class="wprm-recipe-ingredients-container">
+<h3 class="wprm-recipe-header wprm-recipe-ingredients-header">Ingredients</h3>
+<ul class="wprm-recipe-ingredients">
+<li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">2</span> <span class="wprm-recipe-ingredient-unit">cans</span> <span class="wprm-recipe-ingredient-name">cherry pie filling</span></li>
+<li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">1</span> <span class="wprm-recipe-ingredient-unit">box</span> <span class="wprm-recipe-ingredient-name">yellow cake mix</span></li>
+</ul>
+</div>
+</div>
+</div>
+<h2 id="more">More Dump Cake Ideas</h2>
+<p>Once you master the basic ratio, you can swap in any fruit and cake mix combination. Try apple with spice cake, or pineapple with vanilla, for a whole new dessert every weekend.</p>
+</div>
+</body>
+</html>
