@@ -151,7 +151,18 @@ extension RecipeStore {
                 // A CloudKit-mirrored open can't itself be the migration failure
                 // (its own fallback handles that), so recovery always opens the
                 // plain local layout after moving the corrupt store aside.
-                resetOnDiskStores()
+                //
+                // DUT-586: scope the reset. The `default.store` cache is the store
+                // that actually fails migration/corruption, so it always resets.
+                // `SyncedSaved.store` (the user's whole Saved tab) is a SEPARATE
+                // store; for an opted-OUT user it is local-only with no remote
+                // copy, so sweeping it aside would DESTROY the sole copy of their
+                // Saved list with nothing to re-hydrate it. Only sweep it when the
+                // CloudKit mirror is active (opt-in ON) so a re-import can restore
+                // it; otherwise leave the intact synced store in place and reopen
+                // it as-is.
+                let cloudSyncOn = cloudKitSyncOptIn(in: defaults)
+                resetOnDiskStores(includingSyncedStore: cloudSyncOn)
                 return try ModelContainer(
                     for: Schema(SchemaV6.models),
                     migrationPlan: MigrationPlan.self,
@@ -162,11 +173,18 @@ extension RecipeStore {
         )
     }
 
-    /// Move any on-disk SwiftData store files aside so the next open starts from
-    /// a clean slate. Renames rather than deletes, so a corrupt store is
-    /// preserved for post-mortem rather than destroyed. Best effort: a rename
-    /// failure is swallowed so recovery still attempts the fresh open.
-    static func resetOnDiskStores() {
+    /// Move on-disk SwiftData store files aside so the next open starts from a
+    /// clean slate. Renames rather than deletes, so a corrupt store is preserved
+    /// for post-mortem rather than destroyed. Best effort: a rename failure is
+    /// swallowed so recovery still attempts the fresh open.
+    ///
+    /// DUT-586 — `default.store` (the local `CachedRecipe` cache, the store that
+    /// actually fails migration) is ALWAYS swept aside. `SyncedSaved.store` (the
+    /// user's Saved list) is swept aside ONLY when `includingSyncedStore` is true
+    /// — i.e. the CloudKit mirror is active so a remote copy can re-hydrate it.
+    /// For an opted-out user the synced store is local-only and stays in place,
+    /// so recovery from a corrupt cache never wipes their Saved list.
+    static func resetOnDiskStores(includingSyncedStore: Bool) {
         let fileManager = FileManager.default
         guard
             let supportDirectory = fileManager.urls(
@@ -174,16 +192,31 @@ extension RecipeStore {
                 in: .userDomainMask
             ).first
         else { return }
+        resetStores(in: supportDirectory, includingSyncedStore: includingSyncedStore)
+    }
+
+    /// The directory-injectable core of ``resetOnDiskStores(includingSyncedStore:)``,
+    /// split out so the DUT-586 sweep-scope contract is testable against a temp
+    /// directory without touching the shared on-disk stores. Production always
+    /// passes the real Application Support directory.
+    static func resetStores(in directory: URL, includingSyncedStore: Bool) {
+        let fileManager = FileManager.default
         // SwiftData writes `default.store` (+ `-wal` / `-shm` sidecars) for the
-        // unnamed local config and `SyncedSaved.store` for the named one.
-        let stems = ["default.store", "SyncedSaved.store"]
+        // unnamed local config and `SyncedSaved.store` for the named one. DUT-586:
+        // `SyncedSaved.store` is swept aside ONLY when the CloudKit mirror is
+        // active (a remote copy can re-hydrate it); an opted-out user's local-only
+        // Saved list stays put.
+        var stems = ["default.store"]
+        if includingSyncedStore {
+            stems.append("SyncedSaved.store")
+        }
         let suffixes = ["", "-wal", "-shm"]
         let stamp = Int(Date().timeIntervalSince1970)
         for stem in stems {
             for suffix in suffixes {
-                let source = supportDirectory.appendingPathComponent(stem + suffix)
+                let source = directory.appendingPathComponent(stem + suffix)
                 guard fileManager.fileExists(atPath: source.path) else { continue }
-                let destination = supportDirectory.appendingPathComponent(
+                let destination = directory.appendingPathComponent(
                     "\(stem).corrupt-\(stamp)\(suffix)"
                 )
                 try? fileManager.moveItem(at: source, to: destination)
