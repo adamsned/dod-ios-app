@@ -162,6 +162,37 @@ struct IngredientAisleClassifierTests {
         #expect(IngredientAisleClassifier.classify("All-Purpose Flour") == .pantry)
     }
 
+    // MARK: - Equal-length keyword ties (DUT-497)
+
+    // A line matching two equal-length keywords from different aisles must
+    // resolve DETERMINISTICALLY (same result every launch/build), not by the
+    // randomized `Dictionary.keys` iteration order. The tiebreak is a total
+    // order: length descending, then the keyword itself ascending — so among
+    // equal-length keywords the alphabetically-first keyword wins. Each case
+    // is asserted at the concrete aisle that tiebreak selects, and re-run in a
+    // loop to prove the result is stable within a process.
+
+    @Test func beefBeatsRiceOnEqualLengthTie() {
+        // "beef" (.meat) vs "rice" (.pantry), both length 4 → "beef" < "rice".
+        for _ in 0..<64 {
+            #expect(IngredientAisleClassifier.classify("beef and rice bowl") == .meat)
+        }
+    }
+
+    @Test func steakBeatsThymeOnEqualLengthTie() {
+        // "steak" (.meat) vs "thyme" (.spices), both length 5 → "steak" < "thyme".
+        for _ in 0..<64 {
+            #expect(IngredientAisleClassifier.classify("steak rubbed with thyme") == .meat)
+        }
+    }
+
+    @Test func eggBeatsHamOnEqualLengthTie() {
+        // "egg" (.dairy) vs "ham" (.meat), both length 3 → "egg" < "ham".
+        for _ in 0..<64 {
+            #expect(IngredientAisleClassifier.classify("ham and egg") == .dairy)
+        }
+    }
+
     // MARK: - Enum completeness
 
     /// Every aisle is reachable — the case set the AC-39.4 render order walks.
