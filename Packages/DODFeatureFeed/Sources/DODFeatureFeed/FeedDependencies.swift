@@ -278,8 +278,16 @@ public struct LiveFeedDependencies: FeedDependencies {
         guard let imagePrefetcher else { return }
         let urls = entries.compactMap(\.heroImageURL)
         guard !urls.isEmpty else { return }
-        Task.detached { [imagePrefetcher, urls] in
+        // DUT-561 — mirror the saved-recipes sibling
+        // (`SavedRecipesWidgetPublisher.publish`): await the prefetch then fire
+        // a SECOND `widgetReload?` so the freshly-bridged hero bytes are on disk
+        // before the timeline rebuilds. Without it the reload at line 269 races
+        // ahead of the bridged `.img` write and `WidgetCard.Hero` keeps showing
+        // its gradient placeholder until the next 4-hour cadence.
+        let reloadEntries = Array(entries)
+        Task.detached { [imagePrefetcher, widgetReload, urls, reloadEntries] in
             await imagePrefetcher(urls)
+            widgetReload?(reloadEntries)
         }
     }
 
