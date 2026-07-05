@@ -39,6 +39,17 @@ public enum DeepLinkIntent: Equatable, Sendable {
         case ("recipe", _):
             guard let id else { return nil }
             return .openRecipe(id: id)
+        case ("article", _):
+            // DUT-566 — `dod://article/<id>` (the notification grammar for
+            // `.article` posts) resolves by post id through the same
+            // open-by-id route as a recipe: `PostKind` lives on the `Recipe`
+            // domain type, so the detail view classifies recipe-vs-article
+            // once the post is resolved. The id rides the path (`/<id>`), so
+            // fall back to the trailing path component when no `?id=` query is
+            // present, matching `WidgetDeepLinkParser`'s article grammar.
+            let articleID = id ?? Int(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+            guard let articleID, articleID > 0 else { return nil }
+            return .openRecipe(id: articleID)
         default:
             return nil
         }

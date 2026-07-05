@@ -178,7 +178,14 @@ public enum WidgetDeepLinkParser {
         guard url.scheme?.lowercased() == "dod" else { return nil }
         let host = url.host?.lowercased() ?? ""
         switch host {
-        case "recipe":
+        case "recipe", "article":
+            // DUT-566 — `dod://article/<id>` (emitted by `NotificationContent`
+            // for `.article` posts) resolves by post id exactly like a recipe:
+            // `PostKind` lives on the `Recipe` domain type, so both kinds open
+            // through the same by-id route and the detail view classifies
+            // recipe-vs-article once the post is resolved. Article URLs carry no
+            // `?source=` query, so they fall back to `.featured` like any bare
+            // recipe URL.
             let trimmed = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             guard let id = Int(trimmed), id > 0 else { return nil }
             return .recipe(id: id, source: parseSource(from: url))
