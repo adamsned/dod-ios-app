@@ -77,7 +77,8 @@ struct CookTimer: View {
 
     /// Thin brand progress bar showing elapsed fraction of the countdown.
     private func progressBar(remaining: Int, didComplete: Bool) -> some View {
-        let elapsed = totalSeconds > 0
+        let elapsed =
+            totalSeconds > 0
             ? Double(totalSeconds - remaining) / Double(totalSeconds) : (didComplete ? 1 : 0)
         return GeometryReader { geo in
             ZStack(alignment: .leading) {

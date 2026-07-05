@@ -3273,3 +3273,5 @@ Pure-core slice serving the "Your First Cookout" keystone (DUT-140). Adds, in `D
 ---
 
 Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites the T-ID + the AC IDs it implements.
+
+- **T-918 (DUT-582, CL-315) — Cook Mode player redesign.** Re-imagine Cook Mode as a music/podcast player: tall ~340pt album-art hero on every step, facelifted `CookTimer`, a front-and-center transport bar (`CookModePlayerControls`: center Voice play/pause, Prev/Next flanks, Replay + tortoise/hare speed), and a bottom paged step indicator (`CookModeStepIndicator`: dots + "Step X of Y", progress bar past 12 steps). Move all controls onto the brand palette (fixes the grey bordered Previous + timer Reset + neutral ingredients pull-tab). Status: SHIPPED (PR #467).
