@@ -15,19 +15,18 @@ import SwiftUI
 /// no header); **Measurements & Units** (Use Metric Units toggle + Recipe
 /// Step Temperatures picker); **Notification Settings** (When New Recipes
 /// Drop + When Someone Replies to My Comment toggles); **Customization**
-/// (Appearance picker + Cook Mode Voice rows via ``VoiceRows``); **Data &
-/// Privacy** (iCloud Sync via ``CloudSyncRows`` + Clear Cached Recipe Images
-/// + Share Anonymous Usage Data); About Dutch Oven Daddy; version footer.
-/// (DUT-196 moved the former **Tools** ▸ Heat Coach and **Shop** ▸ Buy
-/// BuzzyWaxx rows into the Feed's "Cooking Tools" menu, so neither lives in
-/// Settings anymore.)
+/// (Appearance picker + Cook Mode Voice rows via ``VoiceRows`` + the DUT-596
+/// Cook Mode controls auto-minimize picker); **Data & Privacy** (iCloud Sync
+/// via ``CloudSyncRows`` + Clear Cached Recipe Images + Share Anonymous Usage
+/// Data); About Dutch Oven Daddy; version footer. (DUT-196 moved the former
+/// **Tools** ▸ Heat Coach and **Shop** ▸ Buy BuzzyWaxx rows into the Feed's
+/// "Cooking Tools" menu, so neither lives in Settings anymore.)
 ///
 /// Section subheaders use `DODType.heading` + primary `DODColor.label`
 /// (T-751 / CL-148) so they read distinctly above the `caption` +
 /// `labelSecondary` footers. All row labels + headers are Title Case
-/// (T-750); footers stay sentence case. The "Default Share Format" UI row
-/// was removed in T-750 (the ``SettingsViewModel/shareFormat`` preference
-/// is retained for the future link+text share).
+/// (T-750); footers stay sentence case. The "Default Share Format" UI row was
+/// removed in T-750 (the ``SettingsViewModel/shareFormat`` preference is kept).
 ///
 /// Spec trace: US-32 AC-32.1..AC-32.5; US-36 AC-36.1..AC-36.8;
 /// US-41 AC-41.3, AC-41.4; US-44; CL-89; CL-147; CL-148; CL-149.
@@ -242,6 +241,8 @@ public struct SettingsView: View {
                 LayoutSettingPicker()
 
                 VoiceRows(viewModel: viewModel)
+
+                CookModeControlsPicker()  // DUT-596
             } header: {
                 sectionHeader("Customization")
             } footer: {

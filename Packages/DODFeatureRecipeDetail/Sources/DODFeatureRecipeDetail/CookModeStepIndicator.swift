@@ -1,45 +1,37 @@
 import DODDesignSystem
 import SwiftUI
 
-/// DUT-582 (CL-315) — Cook Mode's paged progress indicator, shown at the bottom
-/// of the player (the step counter left the top bar).
+/// DUT-596 (was DUT-582 / CL-315) — Cook Mode's slim brand progress bar, shown
+/// at the bottom of the player (below the ingredients pull tab).
 ///
-/// A media-player "page dots" affordance: one brand-colored dot per step with
-/// the current step filled, plus a "Step X of Y" caption. Recipes with many
-/// steps can't fit a dot each, so past a threshold it degrades to a slim brand
-/// progress bar (fraction = `(currentStepIndex + 1) / stepCount`) with the same
-/// caption. Purely presentational — reads `currentStepIndex`, `stepCount`, and
+/// A single continuous progress bar (the old per-step "page dots" are gone: they
+/// didn't scale to long recipes and read as clutter next to the transport). A
+/// `surfaceDivider` track carries a `burntOrange` fill whose width is the
+/// completion fraction, with a star glyph pinned to the trailing end — an outline
+/// `star` while cooking, becoming a filled burnt-orange `star.fill` only on the
+/// "All Done" page. Below it sits the "Step X of Y" caption ("Done" when
+/// finished). Purely presentational — reads `currentStepIndex`, `stepCount`, and
 /// `isFinished` off the view model.
 struct CookModeStepIndicator: View {
 
     let viewModel: CookModeViewModel
 
-    /// Above this many steps, dots stop fitting cleanly on a phone width, so we
-    /// fall back to the progress bar.
-    private let dotThreshold = 12
+    /// Diameter of the trailing star glyph, and the horizontal room reserved for
+    /// it so the fill never runs under the star.
+    private let starSize: CGFloat = 18
 
-    private var stepCount: Int { max(viewModel.stepCount, 1) }
-
-    /// The 0-based "active" index, clamped into range and pinned to the last
-    /// step when finished so the indicator reads fully complete.
-    private var activeIndex: Int {
-        if viewModel.isFinished { return stepCount - 1 }
-        return min(max(viewModel.currentStepIndex, 0), stepCount - 1)
-    }
-
-    /// Completion fraction for the progress-bar fallback (1.0 when finished).
-    private var fraction: Double {
-        viewModel.isFinished ? 1 : Double(activeIndex + 1) / Double(stepCount)
+    private var progress: CookModeProgress {
+        CookModeProgress(
+            currentStepIndex: viewModel.currentStepIndex,
+            stepCount: viewModel.stepCount,
+            isFinished: viewModel.isFinished
+        )
     }
 
     var body: some View {
         VStack(spacing: DODSpacing.xs) {
-            if stepCount > dotThreshold {
-                progressBar
-            } else {
-                dots
-            }
-            Text(counterLabel)
+            progressBar
+            Text(progress.counterLabel)
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
                 .monospacedDigit()
@@ -48,49 +40,72 @@ struct CookModeStepIndicator: View {
         .padding(.vertical, DODSpacing.xs)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(counterAccessibilityLabel)
+        .accessibilityLabel(progress.accessibilityLabel)
     }
 
-    // MARK: - Dots
-
-    private var dots: some View {
-        HStack(spacing: DODSpacing.xs) {
-            ForEach(0..<stepCount, id: \.self) { index in
-                Circle()
-                    .fill(index == activeIndex ? DODColor.burntOrange : DODColor.surfaceDivider)
-                    .frame(
-                        width: index == activeIndex ? 10 : 7,
-                        height: index == activeIndex ? 10 : 7
-                    )
-            }
-        }
-    }
-
-    // MARK: - Progress bar (many-step fallback)
+    // MARK: - Progress bar with trailing star
 
     private var progressBar: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(DODColor.surfaceDivider)
-                Capsule()
-                    .fill(DODColor.burntOrange)
-                    .frame(width: max(6, geo.size.width * fraction))
+        let fraction = progress.fraction
+        return HStack(spacing: DODSpacing.xs) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(DODColor.surfaceDivider)
+                    Capsule()
+                        .fill(DODColor.burntOrange)
+                        .frame(width: max(6, geo.size.width * fraction))
+                }
             }
+            .frame(height: 6)
+
+            Image(systemName: progress.isFinished ? "star.fill" : "star")
+                .font(.system(size: starSize * 0.8, weight: .semibold))
+                .foregroundStyle(progress.isFinished ? DODColor.burntOrange : DODColor.surfaceDivider)
+                .frame(width: starSize, height: starSize)
+                .accessibilityHidden(true)
         }
-        .frame(height: 6)
-        .frame(maxWidth: 240)
+        .frame(maxWidth: 280)
+    }
+}
+
+/// DUT-596 — the pure progress model behind ``CookModeStepIndicator``. Extracted
+/// so the fraction, the star-filled decision, and the caption/accessibility copy
+/// are unit-testable without booting SwiftUI.
+struct CookModeProgress: Equatable {
+
+    let currentStepIndex: Int
+    let rawStepCount: Int
+    let isFinished: Bool
+
+    init(currentStepIndex: Int, stepCount: Int, isFinished: Bool) {
+        self.currentStepIndex = currentStepIndex
+        self.rawStepCount = stepCount
+        self.isFinished = isFinished
     }
 
-    // MARK: - Labels
+    /// Step count clamped to at least 1 so the fraction / caption never divide
+    /// by zero on a recipe with no parsed instructions.
+    var stepCount: Int { max(rawStepCount, 1) }
 
-    private var counterLabel: String {
-        if viewModel.isFinished { return "Done" }
-        return "Step \(activeIndex + 1) of \(stepCount)"
+    /// The 0-based active index, clamped into range and pinned to the last step
+    /// when finished so the bar reads fully complete.
+    var activeIndex: Int {
+        if isFinished { return stepCount - 1 }
+        return min(max(currentStepIndex, 0), stepCount - 1)
     }
 
-    private var counterAccessibilityLabel: String {
-        if viewModel.isFinished { return "Cooking complete" }
-        return "Step \(activeIndex + 1) of \(stepCount)"
+    /// Completion fraction in `0...1`: `(activeIndex + 1) / stepCount` while
+    /// cooking, `1.0` when finished. The star fills at `1.0`.
+    var fraction: Double {
+        isFinished ? 1 : Double(activeIndex + 1) / Double(stepCount)
+    }
+
+    var counterLabel: String {
+        isFinished ? "Done" : "Step \(activeIndex + 1) of \(stepCount)"
+    }
+
+    var accessibilityLabel: String {
+        isFinished ? "Cooking complete" : "Step \(activeIndex + 1) of \(stepCount)"
     }
 }

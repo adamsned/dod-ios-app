@@ -33,7 +33,9 @@ public struct CookModeView: View {
     /// DUT-529 — when Reduce Motion is on, drop the step-change slide/scale
     /// animation (constitution §7); the step swap still happens, just without the
     /// motion. Mirrors the `LoadingSkeleton` shimmer guard.
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// `internal` (not `private`) so `CookModeView+Controls.swift` can gate the
+    /// panel's collapse/expand animation on Reduce Motion (constitution §7).
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     // `internal` (not `private`) so the step-body composition in
     // `CookModeView+StepBody.swift` can present the journal-log sheet.
     /// DUT-326 — drives the "Add to Cooking Journal" capture sheet on the
@@ -89,6 +91,25 @@ public struct CookModeView: View {
     @AppStorage(IngredientMetricConverter.preferenceKey)
     var useMetricUnits: Bool = false
 
+    /// DUT-596 — the idle delay (seconds) after which the player controls
+    /// auto-minimize so more step text shows. `0` == Never. Shared with the
+    /// Settings picker via ``CookModeControlsAutoMinimize/preferenceKey``.
+    /// `internal` (not `private`) so the auto-minimize logic in
+    /// `CookModeView+Controls.swift` can read the delay.
+    @AppStorage(CookModeControlsAutoMinimize.preferenceKey)
+    var autoMinimizeSeconds: Int = CookModeControlsAutoMinimize.defaultSeconds
+
+    /// DUT-596 — whether the player control panel is currently expanded. Flips to
+    /// `false` after `autoMinimizeSeconds` of no interaction (never while
+    /// finished); ANY interaction restores it via ``wakeControls()``. `internal`
+    /// so `CookModeView+Controls.swift` drives it.
+    @State var controlsExpanded = true
+
+    /// DUT-596 — the in-flight "minimize after the idle delay" task, cancelled +
+    /// rescheduled on every interaction and torn down on disappear. `internal` so
+    /// `CookModeView+Controls.swift` owns its lifecycle.
+    @State var minimizeTask: Task<Void, Never>?
+
     public init(
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
@@ -120,18 +141,21 @@ public struct CookModeView: View {
                 .padding(.top, DODSpacing.sm)
                 .padding(.bottom, DODSpacing.md)
             }
-            // DUT-582 (CL-315) — the player transport bar + paged step indicator
-            // replace the old full-width Next/Previous block. The center control
-            // is Voice play/pause; Prev/Next flank it; page dots + "Step X of Y"
-            // sit at the very bottom.
-            CookModePlayerControls(
-                viewModel: viewModel,
-                stepChangeAnimation: stepChangeAnimation,
-                onFinish: { close() }
-            )
+            // DUT-596 — tapping anywhere in the step area wakes minimized
+            // controls (one easy tap to bring them back). `contentShape` so the
+            // tap lands on the whole scroll region, not just its text. Doesn't
+            // interfere with scrolling — a tap-only gesture.
+            .contentShape(Rectangle())
+            .onTapGesture { wakeControls() }
+            // DUT-596 (was DUT-582 / CL-315) — the auto-minimizing player panel:
+            // the transport bar collapses after an idle delay so more step text
+            // shows, with a slim always-visible grabber to restore it in one tap.
+            playerPanel
+            // DUT-596 — the ingredients pull tab now sits ABOVE the progress bar
+            // so the expanded control cluster is a little shorter.
+            ingredientsPullTab
             CookModeStepIndicator(viewModel: viewModel)
                 .padding(.bottom, DODSpacing.xs)
-            ingredientsPullTab
         }
         .background(DODColor.surface.ignoresSafeArea())
         .gesture(swipeGesture)
@@ -163,6 +187,8 @@ public struct CookModeView: View {
         .task {
             // Idempotent — see CookModeViewModel.beginCookMode().
             viewModel.beginCookMode()
+            // DUT-596 — start visible, then arm the idle-minimize timer.
+            wakeControls()
         }
         .onReceive(timerTicker) { _ in viewModel.tickTimers() }
         .sensoryFeedback(.success, trigger: viewModel.timerCompletionTick)
@@ -177,8 +203,17 @@ public struct CookModeView: View {
         // new step (or the completion state) so VoiceOver users aren't left
         // hunting for the changed text after tapping Next.
         .onChange(of: viewModel.currentStepIndex) { _, _ in announceCurrentStep() }
-        .onChange(of: viewModel.isFinished) { _, _ in announceCurrentStep() }
+        .onChange(of: viewModel.isFinished) { _, _ in
+            announceCurrentStep()
+            // DUT-596 — the Done card must stay fully visible: expand and keep
+            // the controls up (scheduleMinimize no-ops while finished).
+            wakeControls()
+        }
         .onDisappear {
+            // DUT-596 — cancel the in-flight minimize task so it can't fire into
+            // a torn-down view.
+            minimizeTask?.cancel()
+            minimizeTask = nil
             viewModel.endCookMode()
         }
         // DUT-529 — idle-timer safety net for atypical teardowns that never fire
@@ -302,8 +337,10 @@ public struct CookModeView: View {
                 let isMostlyHorizontal = abs(value.translation.width) > abs(value.translation.height) * 1.2
                 guard isMostlyHorizontal else { return }
                 if value.translation.width < -horizontalThreshold {
+                    wakeControls()  // DUT-596
                     withAnimation(stepChangeAnimation) { advance() }
                 } else if value.translation.width > horizontalThreshold {
+                    wakeControls()  // DUT-596
                     withAnimation(stepChangeAnimation) { viewModel.goBack() }
                 }
             }
