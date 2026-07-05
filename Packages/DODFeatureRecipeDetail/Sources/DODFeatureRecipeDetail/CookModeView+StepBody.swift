@@ -24,13 +24,16 @@ extension CookModeView {
         // DUT-245 — apply the temperature-unit preference at display time, like
         // Recipe Detail does, so the step reads in the user's chosen unit.
         let displayText = convertedStepText(step.text)
+        // DUT-582 (CL-315) — "now playing" treatment: a small burnt-orange
+        // eyebrow ("STEP N") over the prominent step text (the numbered badge +
+        // its own step counter are redundant now the bottom indicator owns
+        // position). The recipe title sits above as a quiet subtitle.
         return VStack(alignment: .leading, spacing: DODSpacing.md) {
-            HStack(alignment: .top, spacing: DODSpacing.md) {
-                Text("\(step.step)")
-                    .dodFont(DODType.displayMedium)
-                    .foregroundStyle(DODColor.cream)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(DODColor.burntOrange))
+            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                Text("Step \(step.step)")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.burntOrange)
+                    .textCase(.uppercase)
                     .accessibilityHidden(true)
                 Text(displayText)
                     .dodFont(DODType.displayMedium)
@@ -109,7 +112,7 @@ extension CookModeView {
                 .foregroundStyle(DODColor.label)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
-            Text("Tap Finish to leave Cook Mode.")
+            Text("Tap the checkmark below to leave Cook Mode.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
                 .multilineTextAlignment(.center)
