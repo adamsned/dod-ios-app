@@ -208,6 +208,14 @@ public final class VoiceReader {
     /// reads.
     public var onDidFinishSpeaking: (() -> Void)?
 
+    /// DUT-595 — invoked (on the main actor) when an audio interruption ends
+    /// WITHOUT `.shouldResume`, so the reader intentionally leaves playback
+    /// parked. Mirrors ``onDidFinishSpeaking`` (a genuine drain fires that one).
+    /// Cook Mode uses it to sync its transport out of `.speaking` — otherwise
+    /// the pause glyph lingers over silence, the first tap is a no-op, and
+    /// VoiceOver mis-reports "playing."
+    public var onDidPauseForInterruption: (() -> Void)?
+
     /// Speak the supplied text aloud.
     ///
     /// Activates the `.playback` + `.duckOthers` audio session on the first
@@ -349,9 +357,18 @@ public final class VoiceReader {
             // engine), not solely `isPaused`, which iOS may have cleared.
             let options = optionsRaw.map(AVAudioSession.InterruptionOptions.init(rawValue:))
             let shouldResume = options?.contains(.shouldResume) == true
-            if shouldResume, wasInterruptedWhileSpeaking || synthesizer.isPaused {
+            let wasParked = wasInterruptedWhileSpeaking || synthesizer.isPaused
+            if shouldResume, wasParked {
                 activateAudioSessionIfNeeded()
                 synthesizer.continueSpeaking()
+            } else if wasParked {
+                // DUT-595 — we were mid-utterance when the interruption began but
+                // the system did NOT grant `.shouldResume`, so we intentionally
+                // leave playback parked. Notify Cook Mode so its transport drops
+                // to paused; otherwise `playbackState` stays `.speaking` while
+                // nothing plays (stuck pause glyph, two-tap resume, VoiceOver
+                // mis-reports "playing").
+                onDidPauseForInterruption?()
             }
             wasInterruptedWhileSpeaking = false
         @unknown default:

@@ -117,6 +117,17 @@ public final class CookModeViewModel {
             guard let self, self.playbackState == .speaking else { return }
             self.playbackState = .idle
         }
+        // DUT-595 — an audio interruption (call / Siri / timer alarm) ended
+        // WITHOUT `.shouldResume`, so the reader left playback parked and iOS
+        // cancelled the in-flight utterance. Drop the transport to idle so its
+        // glyph shows "play" (not a stuck "pause"), a single tap does a fresh
+        // `speakCurrentStep()` (not a no-op `pauseVoice()`), and VoiceOver stops
+        // mis-reporting "playing." Guard on `.speaking` so a stale callback
+        // can't stomp a `.paused`/idle state the user just set.
+        voiceReader.onDidPauseForInterruption = { [weak self] in
+            guard let self, self.playbackState == .speaking else { return }
+            self.playbackState = .idle
+        }
     }
 
     /// Total number of steps, derived from the recipe. Zero if the recipe
