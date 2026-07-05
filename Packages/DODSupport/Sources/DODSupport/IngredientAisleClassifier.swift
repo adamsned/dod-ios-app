@@ -80,8 +80,19 @@ public enum IngredientAisleClassifier {
     /// Keywords sorted longest-first so a multi-word stem (`"ground beef"`,
     /// `"vanilla extract"`, `"olive oil"`) is tested before any single-word
     /// fragment of it. Computed once.
+    ///
+    /// DUT-497: the ordering is a **total order** — length descending, then the
+    /// keyword itself ascending as a stable secondary key. Length alone is only
+    /// a partial order, so among equal-length keywords `sorted(by:)` (which is
+    /// not a stable sort) would fall back on `Dictionary.keys` iteration order,
+    /// which Swift randomizes per process launch via hash-seed randomization.
+    /// A line matching two equal-length keywords from different aisles (e.g.
+    /// `"beef and rice bowl"` → `"beef"`/`.meat` vs `"rice"`/`.pantry`, both
+    /// length 4) would then resolve to a per-launch coin flip. The alphabetical
+    /// tiebreak makes the winner a pure, deterministic function of the input:
+    /// the equal-length keyword that sorts first alphabetically wins.
     private static let sortedKeywords: [String] = keywordMap.keys.sorted {
-        $0.count > $1.count
+        $0.count != $1.count ? $0.count > $1.count : $0 < $1
     }
 
     /// The v1 static keyword map (CL-67). ~60 common ingredient stems hand
