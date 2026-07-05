@@ -22,7 +22,9 @@ public struct CookModeView: View {
     // `internal` (not `private`) so the header composition in
     // `CookModeView+Header.swift` can read the view model.
     @State var viewModel: CookModeViewModel
-    @State private var ingredientsDrawerVisible: Bool = false
+    /// DUT-599 — `internal` so `CookModeView+Controls.swift` can open the drawer
+    /// from the carrot button wired into the transport's secondary row.
+    @State var ingredientsDrawerVisible: Bool = false
     /// DUT-529 — belt-and-suspenders idle-timer safety net. `.onDisappear`
     /// already restores the idle timer on a normal teardown; this observer also
     /// restores it when the app backgrounds (so an atypical teardown that never
@@ -141,19 +143,29 @@ public struct CookModeView: View {
                 .padding(.top, DODSpacing.sm)
                 .padding(.bottom, DODSpacing.md)
             }
-            // DUT-596 — tapping anywhere in the step area wakes minimized
-            // controls (one easy tap to bring them back). `contentShape` so the
-            // tap lands on the whole scroll region, not just its text. Doesn't
-            // interfere with scrolling — a tap-only gesture.
+            // DUT-596/599 — tapping the step area while the controls are
+            // collapsed brings them back (one easy tap). While expanded a tap is
+            // a no-op so it never fights reading. `contentShape` so the tap lands
+            // on the whole scroll region; a tap-only gesture that leaves
+            // scrolling alone.
             .contentShape(Rectangle())
-            .onTapGesture { wakeControls() }
+            .onTapGesture { if !controlsExpanded { wakeControls() } }
+            // DUT-599 — scrolling DOWN the step hides the controls (more room to
+            // read); scrolling back UP pops them right back. `onScrollGeometryChange`
+            // is iOS 18+/macOS 15+, so the modifier guards both `#if os(iOS)` and
+            // `if #available(iOS 18)` (the package deploys below both) and no-ops
+            // gracefully on older OSes — the idle timer + grabber still work.
+            .modifier(
+                StepScrollHideModifier { oldOffset, newOffset in
+                    handleStepScroll(from: oldOffset, to: newOffset)
+                }
+            )
             // DUT-596 (was DUT-582 / CL-315) — the auto-minimizing player panel:
-            // the transport bar collapses after an idle delay so more step text
-            // shows, with a slim always-visible grabber to restore it in one tap.
+            // the transport collapses (after an idle delay, a scroll-down, or a
+            // tap on the grabber) so more step text shows; the grabber toggles it
+            // back and mini prev/next arrows keep navigation available while
+            // collapsed.
             playerPanel
-            // DUT-596 — the ingredients pull tab now sits ABOVE the progress bar
-            // so the expanded control cluster is a little shorter.
-            ingredientsPullTab
             CookModeStepIndicator(viewModel: viewModel)
                 .padding(.bottom, DODSpacing.xs)
         }
@@ -287,28 +299,11 @@ public struct CookModeView: View {
     }
 
     // MARK: - Ingredients drawer (AC-7.2, AC-7.5)
-
-    private var ingredientsPullTab: some View {
-        Button {
-            ingredientsDrawerVisible = true
-        } label: {
-            HStack(spacing: DODSpacing.xs) {
-                Image(systemName: "chevron.up")
-                Text("Ingredients")
-                    .dodFont(DODType.bodyEmphasized)
-                Text("(\(viewModel.checkedIngredientIDs.count) of \(viewModel.recipe.ingredients.count))")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.burntOrange.opacity(0.85))
-            }
-            // DUT-582 (CL-315) — brand-tinted pull tab (was neutral `label`).
-            .foregroundStyle(DODColor.burntOrange)
-            .padding(.vertical, DODSpacing.sm)
-            .frame(maxWidth: .infinity)
-            .background(DODColor.surfaceElevated)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Show ingredients")
-    }
+    //
+    // DUT-599 — the old bottom "Ingredients" pull tab is gone; ingredients now
+    // open from the `carrot.fill` button in the transport's secondary row (see
+    // `CookModePlayerControls`), wired via `openIngredients()` in
+    // `CookModeView+Controls.swift`. The drawer itself is unchanged.
 
     private var ingredientsDrawer: some View {
         NavigationStack {

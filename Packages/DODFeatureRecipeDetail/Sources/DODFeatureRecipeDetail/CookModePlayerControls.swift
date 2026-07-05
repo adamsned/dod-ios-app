@@ -30,6 +30,10 @@ struct CookModePlayerControls: View {
     /// the host can wake the auto-minimizing control panel and re-arm the idle
     /// timer. Defaults to a no-op for previews / hosts that don't wire it.
     var onInteract: () -> Void = {}
+    /// DUT-599 — open the ingredients drawer. The ingredients access moved off
+    /// the old bottom pull tab into the `carrot.fill` button in the secondary
+    /// row. No-op default for previews.
+    var onIngredients: () -> Void = {}
 
     private var showsPrevious: Bool {
         viewModel.currentStepIndex > 0 || viewModel.isFinished
@@ -129,11 +133,12 @@ struct CookModePlayerControls: View {
         return viewModel.isPlaying ? "pause reading this step" : "read this step aloud"
     }
 
-    // MARK: - Secondary row (Replay + speed)
+    // MARK: - Secondary row (Ingredients + Replay + speed)
 
     private var secondaryRow: some View {
         HStack(spacing: DODSpacing.xl) {
             Spacer(minLength: 0)
+            ingredientsButton
             replayButton
             speedButton
             Spacer(minLength: 0)
@@ -141,6 +146,20 @@ struct CookModePlayerControls: View {
         .opacity(viewModel.isFinished ? 0 : 1)
         .disabled(viewModel.isFinished)
         .accessibilityHidden(viewModel.isFinished)
+    }
+
+    /// DUT-599 — ingredients access, a `carrot.fill` to the LEFT of Replay
+    /// (replacing the old bottom pull tab). Opens the ingredients drawer.
+    private var ingredientsButton: some View {
+        secondaryButton(symbol: "carrot.fill", title: "Ingredients") {
+            onInteract()
+            onIngredients()
+        }
+        .accessibilityIdentifier("cook-mode-ingredients")
+        .accessibilityLabel("Show ingredients")
+        .accessibilityValue(
+            "\(viewModel.checkedIngredientIDs.count) of \(viewModel.recipe.ingredients.count) checked"
+        )
     }
 
     private var replayButton: some View {
