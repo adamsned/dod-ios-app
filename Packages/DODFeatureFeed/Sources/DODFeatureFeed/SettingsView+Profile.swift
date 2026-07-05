@@ -43,7 +43,8 @@ struct ProfileSettingsRow: View {
                         await viewModel?.refreshProfile()
                     },
                     photoStore: viewModel.profilePhotoStore,
-                    statsHooks: profileStatsHooks
+                    statsHooks: profileStatsHooks,
+                    extraTeardown: viewModel.accountTeardownExtras
                 )
             } else {
                 // Previews + snapshot hosts without a wired store:
@@ -64,7 +65,8 @@ struct ProfileSettingsRow: View {
                     onProfileChanged: { [weak viewModel] in
                         await viewModel?.refreshProfile()
                     },
-                    statsHooks: profileStatsHooks
+                    statsHooks: profileStatsHooks,
+                    extraTeardown: viewModel.accountTeardownExtras
                 )
             } else {
                 Text("Profile editing requires a store.")

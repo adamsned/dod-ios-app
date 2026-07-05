@@ -62,6 +62,34 @@ import Testing
         #expect(google.revokeCalls == [false])  // DUT-296 — Google signOut (no revoke)
     }
 
+    /// DUT-565 — the injected `extraTeardown` seam (recent searches + comment
+    /// moderation, wired by the App composition root) must run on BOTH Sign Out
+    /// and Delete, mirroring the guest-identity "don't prefill for the NEXT user"
+    /// treatment. Asserted via a spy on the closure.
+    @Test func extraTeardownRunsOnBothSignOutAndDelete() async throws {
+        let extras = ExtraTeardownSpy()
+
+        try await ProfileEditView.performAccountTeardown(
+            revoke: false,
+            profileStore: SpyProfileStore(),
+            sessionStore: InMemoryAppleAuthSessionStore(),
+            guestIdentity: SpyGuestIdentityStore(),
+            revoker: SpyRevoker(),
+            extraTeardown: extras.hook
+        )
+        #expect(extras.calls == [false])  // Sign Out
+
+        try await ProfileEditView.performAccountTeardown(
+            revoke: true,
+            profileStore: SpyProfileStore(),
+            sessionStore: InMemoryAppleAuthSessionStore(),
+            guestIdentity: SpyGuestIdentityStore(),
+            revoker: SpyRevoker(),
+            extraTeardown: extras.hook
+        )
+        #expect(extras.calls == [false, true])  // Delete also ran
+    }
+
     /// DUT-268 — a profile-clear failure must NOT skip the session/guest clears,
     /// the revoke, or the Google teardown; they all run, then the error surfaces.
     @Test func profileClearFailureStillRunsTheRestThenThrows() async {
@@ -123,5 +151,15 @@ private final class GoogleTeardownSpy: @unchecked Sendable {
     private(set) var revokeCalls: [Bool] = []
     var hook: (@Sendable (Bool) async -> Void) {
         { revoke in self.revokeCalls.append(revoke) }
+    }
+}
+
+/// DUT-565 — spies on the injected `extraTeardown` (recent searches + comment
+/// moderation clears wired by the App composition root).
+@MainActor
+private final class ExtraTeardownSpy {
+    private(set) var calls: [Bool] = []
+    var hook: (@MainActor (Bool) async -> Void) {
+        { revoke in self.calls.append(revoke) }
     }
 }

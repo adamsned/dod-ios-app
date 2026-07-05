@@ -13,6 +13,10 @@ struct SidebarProfileRow: View {
 
     let profileStore: (any ProfileStoring)?
     let profilePhotoStore: (any ProfilePhotoStoring)?
+    /// DUT-565 — extra local-state clears (recent searches + comment moderation)
+    /// threaded into the editor's account teardown. Injected by `RootView` (the
+    /// composition root that owns those stores). `nil` in previews.
+    var accountTeardownExtras: (@MainActor (Bool) async -> Void)?
 
     @State private var profile: UserProfile?
     @State private var showingEditor = false
@@ -47,7 +51,8 @@ struct SidebarProfileRow: View {
                         store: profileStore,
                         existingProfile: profile,
                         onProfileChanged: { await reload() },
-                        photoStore: profilePhotoStore
+                        photoStore: profilePhotoStore,
+                        extraTeardown: accountTeardownExtras
                     )
                 }
             }

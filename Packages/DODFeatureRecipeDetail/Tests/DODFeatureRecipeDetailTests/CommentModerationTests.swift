@@ -75,6 +75,30 @@ struct CommentModerationTests {
         #expect(store.isVisible(comment(id: 1, author: "Real Name")) == false)
     }
 
+    // DUT-565 — account teardown must wipe ALL moderation state so it can't leak
+    // to the next device user. `clear()` empties both persisted keys AND the
+    // in-memory `@Observable` sets (so an already-open screen re-shows the
+    // previously-hidden comments), and a store constructed afterwards reads empty.
+    @Test func clearEmptiesBothKeysAndInMemorySets() {
+        let defaults = isolatedDefaults()
+        let store = CommentModerationStore(defaults: defaults)
+        store.block(author: "Troll")
+        store.hide(commentID: 9)
+        #expect(store.blockedAuthors.isEmpty == false)
+        #expect(store.hiddenCommentIDs.isEmpty == false)
+
+        store.clear()
+
+        // In-memory sets reset immediately (an open screen reflects the reset).
+        #expect(store.blockedAuthors.isEmpty)
+        #expect(store.hiddenCommentIDs.isEmpty)
+        #expect(store.isVisible(comment(id: 9, author: "Troll")))
+        // Persisted keys removed: a fresh store over the same defaults reads empty.
+        let reloaded = CommentModerationStore(defaults: defaults)
+        #expect(reloaded.blockedAuthors.isEmpty)
+        #expect(reloaded.hiddenCommentIDs.isEmpty)
+    }
+
     @Test func isAnonymousDetectsBlankNames() {
         #expect(CommentModerationStore.isAnonymous(author: ""))
         #expect(CommentModerationStore.isAnonymous(author: "  \n "))
