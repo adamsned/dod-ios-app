@@ -82,7 +82,9 @@ public struct WPCommentsClient: Sendable {
         // only Last-Modified — see WPRestClient.getPaged).
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        // DUT-578: no manual `Accept-Encoding: gzip` — URLSession negotiates gzip
+        // and only transparently decompresses when it owns the header (this module
+        // has no gunzip). See WPRestClient.getPaged.
 
         // DUT-23 / DUT-7 parity: log the GET target so the owner can confirm
         // on-device (Console.app, subsystem com.dutchovendaddy.DODApp) which
@@ -160,7 +162,8 @@ public struct WPCommentsClient: Sendable {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        // DUT-578: no manual `Accept-Encoding: gzip` — let URLSession negotiate +
+        // transparently decompress the response (this module has no gunzip).
         // DUT-23: identify this client as the Dutch Oven Daddy app so the
         // WordPress side can allow anonymous comment creation for the app only
         // (its `rest_allow_anonymous_comments` filter gates on this header).
