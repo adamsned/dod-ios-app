@@ -73,6 +73,11 @@ struct RecipeDetailHero: View {
                 Text(title)
                     .dodFont(DODType.displayLarge)
                     .foregroundStyle(.white)
+                    // Long recipe titles ("Cast Iron Cherry Cobbler with Candied
+                    // Pecans") must show in full, not truncate on the hero — allow
+                    // up to two lines and shrink slightly before wrapping a third.
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
                     .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 2)
                     .padding(.horizontal, DODSpacing.md)
                     .padding(.bottom, DODSpacing.md)
@@ -83,7 +88,11 @@ struct RecipeDetailHero: View {
             // stays pinned to the resting bottom position.
             .offset(y: -stretch)
         }
-        .frame(height: baseHeight)
+        // Reserve the hero's FULL resting height (base + the top inset it draws
+        // into) so the content below it doesn't overlap the banner / title. The
+        // ZStack is `baseHeight + topInset` tall at rest; a bare `baseHeight`
+        // frame here let the bottom `topInset` overflow onto the Cook Mode CTA.
+        .frame(height: baseHeight + topInset)
         .ignoresSafeArea(.container, edges: .top)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
