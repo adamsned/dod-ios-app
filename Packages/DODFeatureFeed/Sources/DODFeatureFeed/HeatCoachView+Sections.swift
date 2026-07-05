@@ -31,7 +31,9 @@ extension HeatCoachView {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            coalSplitDiagram(coachModel.coalSplit)
+            // DUT-600 — the diagram reflects the CONDITION-adjusted count so a
+            // hot/cold/windy day moves the starting point, not just the notes.
+            coalSplitDiagram(coachModel.adjustedCoalSplit)
 
             if let context = recipeContextLine {
                 Text(context)
