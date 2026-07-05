@@ -41,19 +41,44 @@ public struct FeedView: View {
     /// existing callers (tests / previews) can omit it; nil renders no gear.
     /// Production wires it through `TabStack` → `RootView.showSettingsSheet`.
     public let onOpenSettings: (() -> Void)?
+    /// DUT-571 — the top-of-feed First-Cookout hero's "Let's Cook" action. Opens
+    /// the guided path landing on the recommended rung. Optional so tests /
+    /// previews can omit it (nil → the button is inert); production wires it
+    /// through `TabStack` → `RootView.route(toHubTool: .firstCookout)`.
+    public let onStartFirstCookout: (() -> Void)?
+    /// DUT-571 — the hero's "Or Cook a Dump Cake" action. Opens the same guided
+    /// path (the dump cakes live in `CookChooserFlow`'s "Anytime Treats"
+    /// section — there's no distinct dump-cake route). Optional; wired through
+    /// `TabStack` → `RootView.route(toHubTool: .firstCookout)`.
+    public let onCookDumpCake: (() -> Void)?
+
+    /// DUT-571 — the cook's real next un-cooked rung, loaded in a `.task` (see
+    /// `FeedView+FirstCookoutHero`). `nil` before it loads OR once the cook has
+    /// graduated the whole path; either way the hero stays hidden.
+    @State var heroCookout: GuidedCookout?
+    /// DUT-571 — flips true once `loadFirstCookoutHeroState()` has run, so the
+    /// hero never flashes before the real cook state is known.
+    @State var heroCookStateLoaded = false
+    /// DUT-571 — persisted dismissal (a once-per-install "x" tap). `.standard`
+    /// mirrors the Feed's existing `RecipeListLayout` layout-toggle store.
+    @AppStorage(FeedView.firstCookoutHeroDismissedKey) var firstCookoutHeroDismissed = false
 
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
         onSave: ((RecipeListItem) -> Void)? = nil,
         openShoppingList: (() -> Void)? = nil,
-        onOpenSettings: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        onStartFirstCookout: (() -> Void)? = nil,
+        onCookDumpCake: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.openShoppingList = openShoppingList
         self.onOpenSettings = onOpenSettings
+        self.onStartFirstCookout = onStartFirstCookout
+        self.onCookDumpCake = onCookDumpCake
     }
 
     public var body: some View {
@@ -84,6 +109,10 @@ public struct FeedView: View {
         // tab. Pushed detail screens keep their own nav bar.
         .dodHidesNavBar()
         .task { await viewModel.onAppear() }
+        // DUT-571 — load the cook's real next rung for the top-of-feed hero card,
+        // off the feed's own load so it never blocks the list. A separate `.task`
+        // (its own lifecycle) keeps `onAppear`'s paging logic untouched.
+        .task { await loadFirstCookoutHeroState() }
         // DUT-527 — `refreshAndAnnounce` runs the pull-to-refresh, then posts a
         // VoiceOver completion + result-count announcement (see FeedView+Helpers).
         .refreshable { await refreshAndAnnounce() }
@@ -144,6 +173,11 @@ public struct FeedView: View {
         // Cooking Tools callout floats as an overlay; `list` is just the grid.
         let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
         return ScrollView {
+            // DUT-571 — the First-Cookout hero sits ABOVE the recipe list, once
+            // for both layouts. `firstCookoutHero` self-gates (new / un-graduated,
+            // non-dismissed cook only) and carries its own padding, so it and its
+            // spacing vanish entirely (no reserved gap) for everyone else.
+            firstCookoutHero
             Group {
                 switch layout {
                 case .gallery:
