@@ -282,18 +282,17 @@ struct RootView: View {
                     onFindRecipe: { selectedTab = .feed },
                     // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                     openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
+                    startFirstCookout: { route(toHubTool: .firstCookout) },  // DUT-571 hero → guided path
                     hubPendingTool: tab == .cookingTools ? $hubPendingTool : .constant(nil),
                     hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
                     // DUT-546 — one shared moderation store across every recipe screen.
                     commentModeration: commentModeration
                 )
                 .tabItem {
-                    // T-660 / CL-65: bottom-tab `Label` reads `tabLabel`
-                    // (short — "Recipes" for `.feed`) so the tab-bar's
-                    // ~80pt fixed-width slot doesn't truncate the
-                    // "Recipes & Articles" rename to "Recipes & Arti...".
-                    // The screen-header `navigationTitle` continues to
-                    // render the full `title`.
+                    // T-660 / CL-65: bottom-tab `Label` reads `tabLabel` (short —
+                    // "Recipes" for `.feed`) so the ~80pt fixed-width tab-bar slot
+                    // doesn't truncate the "Recipes & Articles" rename. The
+                    // screen-header `navigationTitle` still renders the full `title`.
                     Label(tab.tabLabel, systemImage: tab.systemImage)
                 }
                 .tag(tab)
@@ -356,13 +355,13 @@ struct RootView: View {
                 externalRoute: externalRouteBinding(for: selectedTab),
                 // T-912/DUT-551 — Shopping List reroute + hub Cook Mode → Recipes.
                 openShoppingList: { routeToShoppingList() },
-                // DUT-563 — wire the header gear on iPad too (the phone branch
-                // already does). Without this the detail `TabStack` took the
-                // default no-op `{}`, so the rendered gear was a dead button.
+                // DUT-563 — wire the header gear on iPad too (else the detail
+                // `TabStack` took the no-op default and the gear was a dead button).
                 onOpenSettings: { showSettingsSheet = true },
                 onFindRecipe: { selectedTab = .feed },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                 openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
+                startFirstCookout: { route(toHubTool: .firstCookout) },  // DUT-571
                 hubPendingTool: selectedTab == .cookingTools ? $hubPendingTool : .constant(nil),
                 hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
                 // DUT-546 — one shared moderation store across every recipe screen.
