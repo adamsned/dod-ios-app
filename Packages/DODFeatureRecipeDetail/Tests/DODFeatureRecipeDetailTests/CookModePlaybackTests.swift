@@ -61,6 +61,57 @@ struct CookModePlaybackTests {
         #expect(mock.spokenTexts == ["Step 1 body."])
     }
 
+    /// DUT-595 — after an audio interruption ends WITHOUT `.shouldResume`, the
+    /// reader leaves playback parked and fires `onDidPauseForInterruption`. The
+    /// VM must drop the transport out of `.speaking` (so the glyph shows "play"
+    /// and VoiceOver stops mis-reporting "playing") and a SINGLE tap must resume
+    /// with a fresh read — not the old no-op `pauseVoice()` that took two taps.
+    @Test func interruptionWithoutResumeSyncsTransportAndResumesInOneTap() {
+        let mock = MockSpeechSynthesizer()
+        let reader = VoiceReader(synthesizer: mock)
+        let viewModel = CookModeViewModelTests.makeViewModel(
+            stepCount: 3,
+            voiceReader: reader
+        )
+        viewModel.togglePlayback()  // idle -> speaking (1 speak)
+        #expect(viewModel.playbackState == .speaking)
+        #expect(viewModel.isVoiceModeEnabled)
+
+        // Simulate the reader's `.ended`-without-`shouldResume` branch (the
+        // iOS-only interruption handler is compiled out on the macOS test slice).
+        reader.onDidPauseForInterruption?()
+
+        // Transport no longer claims to be playing while silent.
+        #expect(viewModel.playbackState != .speaking)
+        #expect(!viewModel.isPlaying)
+
+        // A single tap resumes — one fresh read, no wasted no-op tap.
+        viewModel.togglePlayback()
+
+        #expect(viewModel.playbackState == .speaking)
+        #expect(viewModel.isPlaying)
+        #expect(mock.spokenTexts == ["Step 1 body.", "Step 1 body."])
+    }
+
+    /// DUT-595 — the interruption callback must not stomp a `.paused` state the
+    /// user just set (a stale/late fire): it only fires the transport out of
+    /// `.speaking`, mirroring the `onDidFinishSpeaking` `.speaking`-guard.
+    @Test func interruptionCallbackDoesNotStompUserPause() {
+        let mock = MockSpeechSynthesizer()
+        let reader = VoiceReader(synthesizer: mock)
+        let viewModel = CookModeViewModelTests.makeViewModel(
+            stepCount: 3,
+            voiceReader: reader
+        )
+        viewModel.togglePlayback()  // speaking
+        viewModel.togglePlayback()  // user paused
+        #expect(viewModel.playbackState == .paused)
+
+        reader.onDidPauseForInterruption?()
+
+        #expect(viewModel.playbackState == .paused)
+    }
+
     /// A one-shot replay while Voice Mode is OFF still reads once but leaves the
     /// transport idle (it is not a play/pause session).
     @Test func replayWhileVoiceOffLeavesTransportIdle() {

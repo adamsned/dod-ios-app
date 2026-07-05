@@ -132,6 +132,27 @@ import Testing
         reader.speak("Step two.")
         #expect(reader.hasActiveAudioSession)  // recovered — not silent for the session
     }
+
+    /// DUT-595 — `onDidPauseForInterruption` is a seam distinct from
+    /// `onDidFinishSpeaking` (a genuine drain fires *finish*; an interruption we
+    /// don't auto-resume fires *this* one), each independently settable so Cook
+    /// Mode can wire them to different transport transitions. The iOS-only
+    /// interruption handler that fires it on a `.ended`-without-`shouldResume`
+    /// event is compiled out of the macOS test slice; the observable behaviour —
+    /// the transport syncing out of `.speaking` and resuming in one tap — is
+    /// covered end-to-end through the VM in `CookModePlaybackTests`.
+    @Test func interruptionPauseCallbackIsADistinctSettableSeam() {
+        let reader = VoiceReader(synthesizer: MockSpeechSynthesizer())
+        var didFinish = false
+        var didPauseForInterruption = false
+        reader.onDidFinishSpeaking = { didFinish = true }
+        reader.onDidPauseForInterruption = { didPauseForInterruption = true }
+
+        reader.onDidPauseForInterruption?()
+
+        #expect(didPauseForInterruption)
+        #expect(!didFinish)  // firing one seam must not fire the other
+    }
 }
 
 /// Records calls + flips its own speaking/paused flags so ``VoiceReader``'s
