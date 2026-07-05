@@ -73,14 +73,16 @@ import Testing
         first.toggleChecked(onion)
         first.markAlreadyHave(salt)
 
-        // Reopen.
+        // Reopen. DUT-589: markAlreadyHave REMOVES the row (salt) from `items`
+        // rather than masking it, so the persisted blob no longer carries it and
+        // the remaining rows' checked state survives the round-trip.
         let reopened = ShoppingListViewModel(store: store)
-        #expect(reopened.items.map(\.ingredientText) == ["1 onion", "1 lb chicken", "1 tsp salt"])
+        #expect(reopened.items.map(\.ingredientText) == ["1 onion", "1 lb chicken"])
         #expect(reopened.checkedIDs == [onion.id])
-        #expect(reopened.alreadyHaveIDs == [salt.id])
+        #expect(reopened.alreadyHaveIDs.isEmpty)
         // Derived render model reflects the restored state.
         #expect(reopened.isChecked(onion))
-        #expect(reopened.remainingCount == 2)  // salt dropped out (already-have)
+        #expect(reopened.remainingCount == 2)  // salt gone; onion (checked) + chicken remain
     }
 
     // MARK: - Mutations persist
@@ -104,14 +106,52 @@ import Testing
         #expect(Set(snapshot.checkedIDs) == [item.id])
     }
 
-    @Test func markAlreadyHavePersists() throws {
+    @Test func markAlreadyHavePersistsRowRemoval() throws {
+        // DUT-589: the row is removed from `items` (and no id lingers in the
+        // parallel sets), so the persisted snapshot shrinks instead of growing.
         let store = try Self.freshStore()
-        let item = Self.item("1 onion", "R", .produce)
-        let viewModel = ShoppingListViewModel(items: [item], store: store)
-        viewModel.markAlreadyHave(item)
+        let keep = Self.item("1 onion", "R", .produce)
+        let have = Self.item("1 tsp salt", "R", .spices)
+        let viewModel = ShoppingListViewModel(items: [keep, have], store: store)
+        viewModel.markAlreadyHave(have)
 
         let snapshot = try #require(store.load())
-        #expect(Set(snapshot.alreadyHaveIDs) == [item.id])
+        #expect(snapshot.items.map(\.id) == [keep.id])
+        #expect(snapshot.alreadyHaveIDs.isEmpty)
+        #expect(snapshot.checkedIDs.isEmpty)
+    }
+
+    /// DUT-589: repeatedly adding the same recipes and marking rows "already
+    /// have" must NOT grow the persisted blob without bound. The old code left
+    /// marked rows in `items` (masked by a growing `alreadyHaveIDs`) and re-added
+    /// them with no de-dup, so `items` + `alreadyHaveIDs` climbed every week.
+    @Test func repeatedAddThenAlreadyHaveDoesNotGrowTheBlob() throws {
+        let store = try Self.freshStore()
+        let recipe = Self.recipe(id: 1, title: "A", ingredients: ["1 onion", "1 tsp salt"])
+
+        func blobByteCount() throws -> Int {
+            let defaults = store.debugDefaults
+            return try #require(defaults.data(forKey: ShoppingListStore.key)).count
+        }
+
+        var previousCount: Int?
+        for _ in 0..<5 {
+            let viewModel = ShoppingListViewModel(store: store)
+            viewModel.add(recipes: [recipe])  // de-dup → no re-stack
+            if let salt = viewModel.items.first(where: { $0.ingredientText == "1 tsp salt" }) {
+                viewModel.markAlreadyHave(salt)  // removes the row outright
+            }
+            let count = try blobByteCount()
+            if let previous = previousCount {
+                #expect(count == previous, "persisted blob must be bounded, not monotonic")
+            }
+            previousCount = count
+        }
+
+        // Steady state: exactly the one still-need row, nothing accumulated.
+        let final = try #require(store.load())
+        #expect(final.items.map(\.ingredientText) == ["1 onion"])
+        #expect(final.alreadyHaveIDs.isEmpty)
     }
 
     // MARK: - clearAll
@@ -174,6 +214,51 @@ import Testing
         viewModel.toggleChecked(onion)
         let saved = try #require(store.load())
         #expect(saved.items.map(\.recipeTitle) == ["A", "A"])
+    }
+
+    // MARK: - Defensive aisle decode (DUT-590)
+
+    @Test func unknownAisleRawValueDecodesToOtherAndRestSurvives() throws {
+        // Simulate a future release that renamed/removed an aisle case: a
+        // persisted row carries a raw value the current enum doesn't know
+        // ("meatSeafood"). Pre-fix this failed the whole `Snapshot` decode and
+        // `load()` returned nil → the ENTIRE list silently vanished. Now the bad
+        // row decodes with `aisle == .other` and every other row survives.
+        let knownID = UUID()
+        let unknownID = UUID()
+        let checkedID = UUID()
+        let json = """
+            {
+              "items": [
+                {
+                  "id": "\(knownID.uuidString)",
+                  "ingredientText": "1 onion",
+                  "recipeTitle": "A",
+                  "aisle": "produce"
+                },
+                {
+                  "id": "\(unknownID.uuidString)",
+                  "ingredientText": "1 lb salmon",
+                  "recipeTitle": "A",
+                  "aisle": "meatSeafood"
+                }
+              ],
+              "checkedIDs": ["\(checkedID.uuidString)"],
+              "alreadyHaveIDs": []
+            }
+            """
+        let defaults = try Self.freshDefaults()
+        defaults.set(Data(json.utf8), forKey: ShoppingListStore.key)
+        let store = ShoppingListStore(defaults: defaults)
+
+        let snapshot = try #require(store.load(), "one unknown aisle must not nuke the whole snapshot")
+        #expect(snapshot.items.count == 2)
+        let unknownRow = try #require(snapshot.items.first { $0.id == unknownID })
+        #expect(unknownRow.aisle == .other)
+        #expect(unknownRow.ingredientText == "1 lb salmon")  // the row itself survives intact
+        let knownRow = try #require(snapshot.items.first { $0.id == knownID })
+        #expect(knownRow.aisle == .produce)  // known cases still decode normally
+        #expect(snapshot.checkedIDs == [checkedID])
     }
 
     @Test func mockUsesNoStoreSoNeverTouchesAppGroup() {

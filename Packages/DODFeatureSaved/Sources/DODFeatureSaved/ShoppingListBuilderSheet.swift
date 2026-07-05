@@ -75,7 +75,7 @@ struct ShoppingListBuilderSheet: View {
                 }
             } header: {
                 Text(
-                    "Pick the recipes you're shopping for. We'll merge their ingredients "
+                    "Pick the recipes you're shopping for. We'll combine their ingredients "
                         + "into one list, sorted by store aisle so you can shop in one loop."
                 )
                 .dodFont(DODType.caption)

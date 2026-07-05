@@ -106,13 +106,39 @@ import Testing
         #expect(viewModel.sections.map(\.aisle) == [.produce, .meat, .spices])
     }
 
-    @Test func addingSameRecipeTwiceStacksItsRows() {
-        // Re-adding a recipe already on the list appends its rows again — no
-        // cross-add de-dup (CL-77).
+    @Test func addingSameRecipeTwiceDoesNotRestackItsRows() {
+        // DUT-589: re-adding a recipe already on the list no longer stacks its
+        // rows again — de-dup keys on (recipeTitle, ingredientText), which is
+        // what kept `items` growing without bound. The list is unchanged.
         let recipe = Self.recipe(id: 1, title: "A", ingredients: ["1 onion", "1 tsp salt"])
         let viewModel = ShoppingListViewModel(recipes: [recipe])
         viewModel.add(recipes: [recipe])
-        #expect(viewModel.items.count == 4)
+        #expect(viewModel.items.count == 2)
+        #expect(viewModel.items.map(\.ingredientText) == ["1 onion", "1 tsp salt"])
+    }
+
+    @Test func addingDifferentRecipesThatShareAnIngredientKeepsSeparateRows() {
+        // CL-77 preserved under DUT-589 de-dup: distinct recipes that share an
+        // ingredient still produce distinct per-recipe rows (identity is the
+        // recipe+text pair, not text alone).
+        let viewModel = ShoppingListViewModel(recipes: [
+            Self.recipe(id: 1, title: "Pot Roast", ingredients: ["1 yellow onion"])
+        ])
+        viewModel.add(recipes: [
+            Self.recipe(id: 2, title: "Chicken Tacos", ingredients: ["1 yellow onion"])
+        ])
+        #expect(viewModel.items.count == 2)
+        #expect(viewModel.items.map(\.recipeTitle) == ["Pot Roast", "Chicken Tacos"])
+    }
+
+    @Test func rowsFromRecipesDropsBlankIngredientLines() {
+        // DUT-587 defense-in-depth: a blank / whitespace-only ingredient never
+        // becomes a row, even if it slips past the parser.
+        let viewModel = ShoppingListViewModel(recipes: [
+            Self.recipe(id: 1, title: "A", ingredients: ["1 onion", "", "   ", "1 tsp salt"])
+        ])
+        #expect(viewModel.items.map(\.ingredientText) == ["1 onion", "1 tsp salt"])
+        #expect(!viewModel.items.contains { $0.ingredientText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
     }
 
     // MARK: - Check toggle (AC-39.5)
