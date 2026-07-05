@@ -281,7 +281,7 @@ struct RootView: View {
                     onOpenSettings: { showSettingsSheet = true },
                     onFindRecipe: { selectedTab = .feed },
                     // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
-                    openHeatCoach: { routeToHeatCoach() },
+                    openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
                     hubPendingTool: tab == .cookingTools ? $hubPendingTool : .constant(nil),
                     hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
                     // DUT-546 — one shared moderation store across every recipe screen.
@@ -362,7 +362,7 @@ struct RootView: View {
                 onOpenSettings: { showSettingsSheet = true },
                 onFindRecipe: { selectedTab = .feed },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
-                openHeatCoach: { routeToHeatCoach() },
+                openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
                 hubPendingTool: selectedTab == .cookingTools ? $hubPendingTool : .constant(nil),
                 hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
                 // DUT-546 — one shared moderation store across every recipe screen.

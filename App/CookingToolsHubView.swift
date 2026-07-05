@@ -19,7 +19,12 @@ enum HubDestination: Hashable {
 /// hub tool. Drives ``HubToolRoute``.
 enum HubTool: Equatable {
     case shoppingList
-    case heatCoach
+    /// DUT-584 — an optional ``HeatCoachSeed`` pre-answers the coach when it's
+    /// opened from a recipe (the per-recipe nudge threads the recipe's oven
+    /// diameter + derived style + target °F). `nil` for standalone opens (the
+    /// hub tile, the deep link, the Control Center control), which keep today's
+    /// 12"/even default.
+    case heatCoach(seed: HeatCoachSeed?)
     case cookingJournal
     case firstCookout
     case cookMode
@@ -77,6 +82,10 @@ struct CookingToolsHubView: View {
     @State var showingFirstCookout = false
     /// Presents the Dutch Oven Heat Coach.
     @State var showingHeatCoach = false
+    /// DUT-584 — the seed the Heat Coach opens with. Set from the pending
+    /// ``HubToolRoute`` (the per-recipe nudge threads a recipe seed here); `nil`
+    /// for a standalone open, which keeps the 12"/even default.
+    @State var heatCoachSeed: HeatCoachSeed?
     /// Presents the "I Made This" Cooking Journal.
     @State var showingJournal = false
     /// Cook Mode needs a recipe, so its row is an explainer sheet whose CTA
@@ -175,7 +184,8 @@ struct CookingToolsHubView: View {
             switch pendingTool.tool {
             case .shoppingList:
                 if path.last != .shoppingList { path.append(.shoppingList) }
-            case .heatCoach:
+            case .heatCoach(let seed):
+                heatCoachSeed = seed
                 showingHeatCoach = true
             case .cookingJournal:
                 showingJournal = true
@@ -239,7 +249,9 @@ struct CookingToolsHubView: View {
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingHeatCoach) {
-            NavigationStack { HeatCoachView() }
+            // DUT-584 — open pre-answered when a recipe seeded the route; a
+            // standalone open (hub tile / deep link) leaves `heatCoachSeed` nil.
+            NavigationStack { HeatCoachView(seed: heatCoachSeed) }
         }
         .sheet(isPresented: $showingJournal) {
             CookJournalView(

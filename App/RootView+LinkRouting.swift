@@ -120,7 +120,10 @@ extension RootView {
     /// T-912 / DUT-551 (CL-306) — route to Heat Coach (the hub's row #3 sheet).
     /// The per-recipe Heat Coach nudge (Recipe Detail) taps this. Kept as a named
     /// function for its callers; delegates to the unified `route(toHubTool:)`.
-    func routeToHeatCoach() { route(toHubTool: .heatCoach) }
+    /// DUT-584 — `seed` pre-answers the coach when opened from a recipe (the
+    /// per-recipe nudge passes the recipe's oven diameter + derived style +
+    /// target °F); `nil` (deep link, Control Center) keeps the 12"/even default.
+    func routeToHeatCoach(seed: HeatCoachSeed? = nil) { route(toHubTool: .heatCoach(seed: seed)) }
 
     /// DUT-560 (was DUT-480) — read + clear the iOS 18 Control Center control's
     /// App Group pending-route flag and route to whichever cooking tool it
@@ -134,7 +137,7 @@ extension RootView {
         guard let route = ControlRouteStore()?.takePending() else { return }
         switch route {
         case .shoppingList: routeToShoppingList()
-        case .heatCoach: routeToHeatCoach()
+        case .heatCoach: routeToHeatCoach()  // DUT-584 — Control Center opens the standalone coach (no seed).
         case .cookingJournal: self.route(toHubTool: .cookingJournal)
         case .firstCookout: self.route(toHubTool: .firstCookout)
         case .cookMode: self.route(toHubTool: .cookMode)
