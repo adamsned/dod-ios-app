@@ -23,16 +23,12 @@ extension HeatCoachView {
     // MARK: - The answer, first + visual
 
     var answerCard: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.md) {
-            Text("A starting point. Then cook by feel.")
+        VStack(spacing: DODSpacing.sm) {
+            Text("A Starting Point. Then Cook by Feel.")
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelOnAccent.opacity(0.9))
                 .textCase(.uppercase)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text("Your Starting Coals")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.labelOnAccent)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             coalSplitDiagram(coachModel.coalSplit)
@@ -41,17 +37,13 @@ extension HeatCoachView {
                 Text(context)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("heat-coach-recipe-context")
             }
-
-            Text(coachModel.styleNote)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(DODSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(DODSpacing.lg)
+        .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.accent)
@@ -72,16 +64,24 @@ extension HeatCoachView {
 
     var primaryInputsCard: some View {
         VStack(alignment: .leading, spacing: DODSpacing.md) {
+            // Oven Size as a compact stepper row: the current size reads large on
+            // the left, the − / + control sits inline on the right. Tighter and
+            // more tactile than a dropdown, and it never covers the answer.
             labeledRow("Oven Size") {
-                Picker("Oven Size", selection: $ovenDiameterInches) {
-                    ForEach(HeatCoachModel.ovenSizes, id: \.self) { size in
-                        Text("\(size)\"").tag(size)
-                    }
+                Stepper(
+                    value: $ovenDiameterInches,
+                    in: sizeRange,
+                    step: 2
+                ) {
+                    Text("\(ovenDiameterInches)\" Diameter")
+                        .dodFont(DODType.bodyEmphasized)
+                        .foregroundStyle(DODColor.label)
                 }
-                .pickerStyle(.menu)
                 .tint(DODColor.accent)
                 .accessibilityIdentifier("heat-coach-oven-size")
             }
+
+            Divider().overlay(DODColor.surfaceDivider)
 
             labeledRow("Cooking Style") {
                 accentSelector(
@@ -90,10 +90,25 @@ extension HeatCoachView {
                     accessibilityID: "heat-coach-style"
                 )
             }
+
+            // The style note explains the split at the point of choice — moved
+            // out of the hero so the result stays a clean number.
+            Text(coachModel.styleNote)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("heat-coach-style-note")
         }
         .padding(DODSpacing.md)
         .cardSurface()
         .accessibilityIdentifier("heat-coach-setup")
+    }
+
+    /// The oven-diameter stepper bounds, derived from the model's supported
+    /// sizes (8-16") so the stepper and the old menu offer the same range.
+    private var sizeRange: ClosedRange<Int> {
+        let sizes = HeatCoachModel.ovenSizes
+        return (sizes.min() ?? 8)...(sizes.max() ?? 16)
     }
 
     // MARK: - Optional condition fine-tuning + adjustment notes (collapsed)
@@ -204,19 +219,27 @@ extension HeatCoachView {
             .foregroundStyle(DODColor.labelSecondary)
             .fixedSize(horizontal: false, vertical: true)
 
-            VStack(spacing: DODSpacing.sm) {
-                ForEach(DutchOvenHeatCoach.feelCues) { cue in
-                    feelCueCard(cue)
+            // DUT-598 — the six cues were six floating cards (a wall). They now
+            // live as compact rows inside ONE card, hairline-divided, so the
+            // section reads as a single reference the eye can scan.
+            VStack(spacing: 0) {
+                ForEach(Array(DutchOvenHeatCoach.feelCues.enumerated()), id: \.element.id) { index, cue in
+                    if index > 0 {
+                        Divider().overlay(DODColor.surfaceDivider)
+                    }
+                    feelCueRow(cue)
                 }
             }
+            .padding(.vertical, DODSpacing.xxs)
+            .cardSurface()
         }
         .accessibilityIdentifier("heat-coach-feel")
     }
 
-    private func feelCueCard(_ cue: FeelCue) -> some View {
+    private func feelCueRow(_ cue: FeelCue) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Text(cue.title)
-                .dodFont(DODType.heading)
+                .dodFont(DODType.bodyEmphasized)
                 .foregroundStyle(DODColor.label)
 
             signalRow(symbol: "checkmark.circle.fill", tint: DODColor.accent, text: cue.onTrack)
@@ -224,10 +247,6 @@ extension HeatCoachView {
         }
         .padding(DODSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                .fill(DODColor.surfaceElevated)
-        )
     }
 
     private func signalRow(symbol: String, tint: Color, text: String) -> some View {

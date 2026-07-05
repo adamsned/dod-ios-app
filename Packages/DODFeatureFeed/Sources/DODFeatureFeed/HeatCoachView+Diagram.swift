@@ -47,10 +47,16 @@ extension HeatCoachView {
         .accessibilityHidden(true)
     }
 
-    /// The oven body: the big total, then the "N on the lid · M underneath"
-    /// split line. Decorative here too — the diagram's combined label speaks it.
+    /// The oven body: a small "Starting Coals" caption, the big total, then the
+    /// "N on the lid · M underneath" split line. The caption self-labels the
+    /// number now that the hero card dropped its separate heading. Decorative
+    /// here too — the diagram's combined label speaks the whole thing.
     private func ovenBody(_ split: CoalSplit) -> some View {
         VStack(spacing: DODSpacing.xxs) {
+            Text("Starting Coals")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelOnAccent.opacity(0.85))
+                .textCase(.uppercase)
             Text("~\(split.total)")
                 .dodFont(DODType.displayLarge)
                 .foregroundStyle(DODColor.labelOnAccent)
@@ -60,10 +66,10 @@ extension HeatCoachView {
                 .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, DODSpacing.sm)
+        .padding(.vertical, DODSpacing.md)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+            RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
                 .strokeBorder(DODColor.labelOnAccent.opacity(0.35), lineWidth: 2)
         )
         .accessibilityHidden(true)
