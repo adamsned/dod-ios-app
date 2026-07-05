@@ -10,8 +10,11 @@ public enum ArticleHTMLParser {
     /// Parse a WordPress post page into article blocks in document order.
     /// Returns `[]` when nothing renderable is found; blank blocks are skipped.
     ///
-    /// - Parameter html: the full rendered HTML page (or any fragment).
-    public static func parse(html: String) -> [ArticleBlock] {
+    /// - Parameters:
+    ///   - html: the full rendered HTML page (or any fragment).
+    ///   - baseURL: DUT-582 — page canonical URL to resolve protocol-/root-
+    ///     relative image sources to absolute `http(s)`. Defaults `nil` (compat).
+    public static func parse(html: String, baseURL: URL? = nil) -> [ArticleBlock] {
         // DUT-389/DUT-437: strip comments BEFORE the entry-content extraction —
         // a comment carrying `<div`/`</div>` corrupts the slice boundary's
         // depth tracking. The stripper is `<script>`/`<style>`-opaque (DUT-437).
@@ -26,7 +29,7 @@ public enum ArticleHTMLParser {
         // `removeFeastSEOBlocks`. Runs after the svg removal so the Trusted-
         // Source block's inline icon is already gone before the div walk.
         content = removeFeastSEOBlocks(from: content)
-        return scanBlocks(content)
+        return scanBlocks(content, baseURL: baseURL)
     }
 }
 
@@ -38,7 +41,7 @@ extension ArticleHTMLParser {
     private static let depthTrackedContainers = ["figure", "ul", "ol", "blockquote"]
 
     /// Walk `html` emitting one ``ArticleBlock`` per recognized block-level tag.
-    private static func scanBlocks(_ html: String) -> [ArticleBlock] {
+    private static func scanBlocks(_ html: String, baseURL: URL?) -> [ArticleBlock] {
         var blocks: [ArticleBlock] = []
         var cursor = html.startIndex
         while cursor < html.endIndex {
@@ -51,7 +54,7 @@ extension ArticleHTMLParser {
                 cursor = close.upperBound
                 continue
             }
-            if let (block, next) = block(named: name, openTag: open, closeTag: close, in: html) {
+            if let (block, next) = block(named: name, openTag: open, closeTag: close, in: html, baseURL: baseURL) {
                 if let block { blocks.append(block) }
                 cursor = next
             } else {
@@ -67,10 +70,11 @@ extension ArticleHTMLParser {
         named name: String,
         openTag open: Range<String.Index>,
         closeTag close: Range<String.Index>,
-        in html: String
+        in html: String,
+        baseURL: URL?
     ) -> (ArticleBlock?, String.Index)? {
         if name == "img" {
-            return (imageBlock(fromTag: html[open.upperBound..<close.lowerBound]), close.upperBound)
+            return (imageBlock(fromTag: html[open.upperBound..<close.lowerBound], baseURL: baseURL), close.upperBound)
         }
         if depthTrackedContainers.contains(name) {
             guard
@@ -84,7 +88,10 @@ extension ArticleHTMLParser {
                 return (nil, close.upperBound)
             }
             let next = html.index(close.upperBound, offsetBy: inner.count)
-            return (containerBlock(name: name, inner: inner), advance(past: "</\(name)>", from: next, in: html))
+            return (
+                containerBlock(name: name, inner: inner, baseURL: baseURL),
+                advance(past: "</\(name)>", from: next, in: html)
+            )
         }
         if name == "p" || isHeading(name) {
             let (inner, next) = sliceSimpleClose(name: name, from: close.upperBound, in: html)
@@ -94,9 +101,9 @@ extension ArticleHTMLParser {
     }
 
     /// Build a depth-tracked container block (`figure`/`ul`/`ol`/`blockquote`).
-    private static func containerBlock<S: StringProtocol>(name: String, inner: S) -> ArticleBlock? {
+    private static func containerBlock<S: StringProtocol>(name: String, inner: S, baseURL: URL?) -> ArticleBlock? {
         switch name {
-        case "figure": return figureBlock(inner: inner)
+        case "figure": return figureBlock(inner: inner, baseURL: baseURL)
         case "ul": return listBlock(inner: inner, ordered: false)
         case "ol": return listBlock(inner: inner, ordered: true)
         case "blockquote":
@@ -119,24 +126,17 @@ extension ArticleHTMLParser {
     // MARK: - Images
 
     /// Build an `.image` from a `<figure>` (caption = `<figcaption>` else `alt`).
-    private static func figureBlock<S: StringProtocol>(inner: S) -> ArticleBlock? {
+    private static func figureBlock<S: StringProtocol>(inner: S, baseURL: URL?) -> ArticleBlock? {
         guard let imgTag = firstTagBody(named: "img", in: inner) else { return nil }
-        guard let url = imageURL(fromTag: imgTag) else { return nil }
+        guard let url = imageURL(fromTag: imgTag, baseURL: baseURL) else { return nil }
         let caption = figcaptionText(in: inner)
         return .image(url: url, caption: caption ?? altCaption(in: imgTag))
     }
 
     /// Build an `.image` from a standalone `<img>` (caption = `alt` else nil).
-    private static func imageBlock<S: StringProtocol>(fromTag tagBody: S) -> ArticleBlock? {
-        guard let url = imageURL(fromTag: tagBody) else { return nil }
+    private static func imageBlock<S: StringProtocol>(fromTag tagBody: S, baseURL: URL?) -> ArticleBlock? {
+        guard let url = imageURL(fromTag: tagBody, baseURL: baseURL) else { return nil }
         return .image(url: url, caption: altCaption(in: tagBody))
-    }
-
-    /// The image URL from `src="…"` (never `srcset`), entity-decoded, or nil.
-    private static func imageURL<S: StringProtocol>(fromTag tagBody: S) -> URL? {
-        let src = attributeValue("src", in: tagBody)
-        guard !src.isEmpty else { return nil }
-        return URL(string: HTMLSanitizer.decodingEntities(src))
     }
 
     /// The `alt` attribute, decoded + edge-trimmed, as a caption (nil if empty).
