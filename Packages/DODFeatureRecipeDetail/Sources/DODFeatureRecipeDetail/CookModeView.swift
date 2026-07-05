@@ -117,10 +117,21 @@ public struct CookModeView: View {
                     heroBlock
                     stepBody
                 }
-                .padding(.bottom, DODSpacing.xl)
+                .padding(.top, DODSpacing.sm)
+                .padding(.bottom, DODSpacing.md)
             }
+            // DUT-582 (CL-315) — the player transport bar + paged step indicator
+            // replace the old full-width Next/Previous block. The center control
+            // is Voice play/pause; Prev/Next flank it; page dots + "Step X of Y"
+            // sit at the very bottom.
+            CookModePlayerControls(
+                viewModel: viewModel,
+                stepChangeAnimation: stepChangeAnimation,
+                onFinish: { close() }
+            )
+            CookModeStepIndicator(viewModel: viewModel)
+                .padding(.bottom, DODSpacing.xs)
             ingredientsPullTab
-            bottomControls
         }
         .background(DODColor.surface.ignoresSafeArea())
         .gesture(swipeGesture)
@@ -204,43 +215,38 @@ public struct CookModeView: View {
 
     // MARK: - Hero (AC-7.2)
 
+    /// DUT-582 (CL-315) — the "album art": the recipe hero, taller (~340pt) and
+    /// rounded (`DODRadius.standard`), shown on every step. No bottom gradient
+    /// now that the step text lives below the image rather than over it.
+    private let heroHeight: CGFloat = 340
+
     @ViewBuilder
     private var heroBlock: some View {
         if let url = viewModel.recipe.heroImageLargeURL ?? viewModel.recipe.heroImage {
-            ZStack(alignment: .bottomLeading) {
-                // T-839 — reliable cached loader (ReliableImage), not AsyncImage,
-                // so the Cook Mode hero doesn't stick on the skeleton.
-                ReliableImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        // DUT-524 — neutral static placeholder instead of the
-                        // infinite skeleton shimmer when the hero can't load.
-                        DODColor.surfaceElevated
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .overlay(
-                                Image(systemName: "fork.knife")
-                                    .font(.system(size: 40))
-                                    .foregroundStyle(DODColor.labelSecondary)
-                            )
-                    case .empty:
-                        LoadingSkeleton(cornerRadius: 0)
-                    }
+            // T-839 — reliable cached loader (ReliableImage), not AsyncImage,
+            // so the Cook Mode hero doesn't stick on the skeleton.
+            ReliableImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                case .failure:
+                    // DUT-524 — neutral static placeholder instead of the
+                    // infinite skeleton shimmer when the hero can't load.
+                    DODColor.surfaceElevated
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .overlay(
+                            Image(systemName: "fork.knife")
+                                .font(.system(size: 40))
+                                .foregroundStyle(DODColor.labelSecondary)
+                        )
+                case .empty:
+                    LoadingSkeleton(cornerRadius: DODRadius.standard)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 200)
-                .clipped()
-
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.45)],
-                    startPoint: .center,
-                    endPoint: .bottom
-                )
-                .frame(height: 200)
-                .allowsHitTesting(false)
             }
-            .frame(height: 200)
+            .frame(maxWidth: .infinity)
+            .frame(height: heroHeight)
+            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
+            .padding(.horizontal, DODSpacing.md)
             .accessibilityHidden(true)
         }
     }
@@ -257,9 +263,10 @@ public struct CookModeView: View {
                     .dodFont(DODType.bodyEmphasized)
                 Text("(\(viewModel.checkedIngredientIDs.count) of \(viewModel.recipe.ingredients.count))")
                     .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                    .foregroundStyle(DODColor.burntOrange.opacity(0.85))
             }
-            .foregroundStyle(DODColor.label)
+            // DUT-582 (CL-315) — brand-tinted pull tab (was neutral `label`).
+            .foregroundStyle(DODColor.burntOrange)
             .padding(.vertical, DODSpacing.sm)
             .frame(maxWidth: .infinity)
             .background(DODColor.surfaceElevated)
@@ -284,47 +291,6 @@ public struct CookModeView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
         }
-    }
-
-    // MARK: - Bottom controls (AC-7.4)
-
-    @ViewBuilder
-    private var bottomControls: some View {
-        HStack(spacing: DODSpacing.sm) {
-            if viewModel.currentStepIndex > 0 || viewModel.isFinished {
-                Button {
-                    withAnimation(stepChangeAnimation) { viewModel.goBack() }
-                } label: {
-                    Label("Previous", systemImage: "chevron.left")
-                        .frame(maxWidth: .infinity)
-                }
-                .dodBorderedButton()
-                .tint(DODColor.label)
-                .accessibilityLabel("Previous step")
-            }
-            Button {
-                advance()
-            } label: {
-                Label(primaryButtonLabel, systemImage: primaryButtonSymbol)
-                    .frame(maxWidth: .infinity)
-            }
-            .dodProminentButton()
-            .tint(DODColor.accent)
-            .accessibilityLabel(primaryButtonLabel)
-        }
-        .padding(.horizontal, DODSpacing.md)
-        .padding(.vertical, DODSpacing.sm)
-        .background(DODColor.surface)
-    }
-
-    private var primaryButtonLabel: String {
-        if viewModel.isFinished { return "Finish" }
-        return viewModel.isOnLastStep ? "Done Cooking" : "Next"
-    }
-
-    private var primaryButtonSymbol: String {
-        if viewModel.isFinished { return "checkmark" }
-        return viewModel.isOnLastStep ? "checkmark.circle.fill" : "chevron.right"
     }
 
     // MARK: - Gestures (AC-7.4)

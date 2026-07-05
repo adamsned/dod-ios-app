@@ -10,6 +10,11 @@ import SwiftUI
 /// Live Activity. The display self-ticks from the stored `endDate` via a
 /// `TimelineView`, so it's correct even after the view was off screen.
 ///
+/// DUT-582 (CL-315) — restyled as a player-style brand card: a big monospaced
+/// countdown, a thin progress bar showing elapsed time, and circular
+/// Start/Pause (`burntOrange`, cream glyph) + Reset (brand-tinted) controls. No
+/// control renders grey — the old `labelSecondary`-tinted Reset moved to brand.
+///
 /// Lifecycle: the user taps Start (no auto-start); Pause freezes without
 /// resetting; Reset returns to the original duration; at 00:00 the time turns
 /// ``DODColor.accent`` and the completion haptic fires (from `CookModeView`).
@@ -33,7 +38,7 @@ struct CookTimer: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let snapshot = timer
-            row(
+            card(
                 remaining: snapshot.remaining(at: context.date),
                 isRunning: snapshot.isRunning,
                 didComplete: snapshot.didComplete
@@ -41,50 +46,83 @@ struct CookTimer: View {
         }
     }
 
-    private func row(remaining: Int, isRunning: Bool, didComplete: Bool) -> some View {
-        HStack(spacing: DODSpacing.sm) {
-            Image(systemName: "timer")
-                .foregroundStyle(didComplete ? DODColor.accent : DODColor.label)
-                .font(.title3)
-                .accessibilityHidden(true)
-            Text(formatted(remaining))
-                .dodFont(DODType.displayMedium)
-                .monospacedDigit()
-                .foregroundStyle(didComplete ? DODColor.accent : DODColor.label)
-                .accessibilityLabel(accessibilityTimeLabel(remaining))
-                .frame(minWidth: 88, alignment: .leading)
-            Spacer(minLength: 0)
-            controls(isRunning: isRunning, didComplete: didComplete)
+    private func card(remaining: Int, isRunning: Bool, didComplete: Bool) -> some View {
+        VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            HStack(alignment: .center, spacing: DODSpacing.sm) {
+                Image(systemName: "timer")
+                    .foregroundStyle(didComplete ? DODColor.accent : DODColor.burntOrange)
+                    .font(.title3)
+                    .accessibilityHidden(true)
+                Text(formatted(remaining))
+                    .dodFont(DODType.displayLarge)
+                    .monospacedDigit()
+                    .foregroundStyle(didComplete ? DODColor.accent : DODColor.label)
+                    .accessibilityLabel(accessibilityTimeLabel(remaining))
+                Spacer(minLength: 0)
+                controls(isRunning: isRunning, didComplete: didComplete)
+            }
+            progressBar(remaining: remaining, didComplete: didComplete)
         }
-        .padding(.horizontal, DODSpacing.md)
-        .padding(.vertical, DODSpacing.sm)
+        .padding(DODSpacing.md)
         .background(
             RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .fill(DODColor.surfaceElevated)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                .strokeBorder(DODColor.burntOrange.opacity(0.25), lineWidth: 1)
+        )
         .accessibilityElement(children: .combine)
+    }
+
+    /// Thin brand progress bar showing elapsed fraction of the countdown.
+    private func progressBar(remaining: Int, didComplete: Bool) -> some View {
+        let elapsed = totalSeconds > 0
+            ? Double(totalSeconds - remaining) / Double(totalSeconds) : (didComplete ? 1 : 0)
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(DODColor.surfaceDivider)
+                Capsule()
+                    .fill(didComplete ? DODColor.accent : DODColor.burntOrange)
+                    .frame(width: max(0, geo.size.width * min(max(elapsed, 0), 1)))
+            }
+        }
+        .frame(height: 5)
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
     private func controls(isRunning: Bool, didComplete: Bool) -> some View {
-        HStack(spacing: DODSpacing.xs) {
-            Button(isRunning ? "Pause" : (didComplete ? "Done" : "Start")) {
+        HStack(spacing: DODSpacing.sm) {
+            Button {
                 if didComplete { return }
                 if isRunning {
                     viewModel.pauseTimer(forStep: stepIndex)
                 } else {
                     viewModel.startOrResumeTimer(forStep: stepIndex, totalSeconds: totalSeconds)
                 }
+            } label: {
+                Image(systemName: didComplete ? "checkmark" : (isRunning ? "pause.fill" : "play.fill"))
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(DODColor.cream)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(DODColor.burntOrange))
             }
-            .dodProminentButton()
-            .tint(DODColor.accent)
+            .buttonStyle(.plain)
             .disabled(didComplete)
             .accessibilityLabel(isRunning ? "Pause timer" : "Start timer")
 
-            Button("Reset") { viewModel.resetTimer(forStep: stepIndex) }
-                .dodBorderedButton()
-                .tint(DODColor.labelSecondary)
-                .accessibilityLabel("Reset timer")
+            Button {
+                viewModel.resetTimer(forStep: stepIndex)
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(DODColor.accent)
+                    .frame(width: 44, height: 44)
+                    .overlay(Circle().strokeBorder(DODColor.accent, lineWidth: 1.5))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Reset timer")
         }
     }
 
