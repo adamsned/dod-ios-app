@@ -24,23 +24,16 @@ extension CookModeView {
         // DUT-245 — apply the temperature-unit preference at display time, like
         // Recipe Detail does, so the step reads in the user's chosen unit.
         let displayText = convertedStepText(step.text)
-        // DUT-582 (CL-315) — "now playing" treatment: a small burnt-orange
-        // eyebrow ("STEP N") over the prominent step text (the numbered badge +
-        // its own step counter are redundant now the bottom indicator owns
-        // position). The recipe title sits above as a quiet subtitle.
+        // DUT-583 — "now playing" treatment: just the prominent step text. The
+        // "STEP N" eyebrow is gone — the bottom paged indicator ("Step X of Y"
+        // under the dots) is the single source of position, so a second counter
+        // above the step was redundant.
         return VStack(alignment: .leading, spacing: DODSpacing.md) {
-            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                Text("Step \(step.step)")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.burntOrange)
-                    .textCase(.uppercase)
-                    .accessibilityHidden(true)
-                Text(displayText)
-                    .dodFont(DODType.displayMedium)
-                    .foregroundStyle(DODColor.label)
-                    .lineSpacing(DODSpacing.xs)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            Text(displayText)
+                .dodFont(DODType.displayMedium)
+                .foregroundStyle(DODColor.label)
+                .lineSpacing(DODSpacing.xs)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if let duration = StepTimerParser.firstDuration(in: step.text) {
                 CookTimer(
                     stepIndex: viewModel.currentStepIndex,
@@ -102,13 +95,12 @@ extension CookModeView {
     }
 
     private var doneCard: some View {
+        // DUT-583 — the celebratory line IS the icon now; the big
+        // `checkmark.seal.fill` was redundant with the center transport button,
+        // which already becomes a checkmark in the finished state.
         VStack(alignment: .center, spacing: DODSpacing.md) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(DODColor.accent)
-                .frame(maxWidth: .infinity, alignment: .center)
             Text("All Done, Enjoy!")
-                .dodFont(DODType.displayMedium)
+                .dodFont(DODType.displayLarge)
                 .foregroundStyle(DODColor.label)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
