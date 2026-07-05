@@ -2,25 +2,29 @@ import DODDesignSystem
 import DODSupport
 import SwiftUI
 
-/// **Dutch Oven Heat Coach** (DUT-48; redesigned DUT-584) — a starting coal
-/// estimate, condition adjustments, and a cook-by-feel reference.
+/// **Dutch Oven Heat Coach** (DUT-48; redesigned DUT-584, DUT-598) — a starting
+/// coal estimate, condition adjustments, and a cook-by-feel reference.
 ///
 /// This screen embodies Dutch Oven Daddy's published method (the
 /// `/dutch-oven-temperature-chart/` page): *stop using the chart; give a
 /// starting point, then adapt by feel.* The estimate is framed everywhere as
 /// "a starting point, not a rule."
 ///
-/// **DUT-584 redesign — answer-first single screen.** The DUT-274 three-tab
-/// switcher (Coals / Feel / Tips) buried the cook-by-feel cues — the heart of
-/// the method — behind a tab and put a heavy conditions card next to the
-/// answer. This is now ONE vertical scroll, answer-first:
-///   1. The answer + a **visual coal-split diagram** (dots on the lid /
-///      underneath, the big total in the middle) so the number reads instantly.
-///   2. Minimal primary inputs (Oven Size + Cooking Style) directly under it.
-///   3. Conditions collapsed into an optional "Adjust for Conditions" expander
-///      (default collapsed) — elevation / air temp / wind + the adjustment notes.
-///   4. Cook-by-feel cues, ALWAYS visible (the point of the method).
-///   5. Coal-management tips + wind guidance below, in a lighter collapsed group.
+/// **DUT-598 interface overhaul.** DUT-584 was already answer-first, but the
+/// screen still read as a wall of equal-weight cards (the wordy style note lived
+/// in the hero, and the six feel cues floated as six separate cards). This pass
+/// keeps the same computed answer + copy and tightens the information hierarchy:
+///   1. **Hero result** — the big coal total + the visual coal-split diagram,
+///      and nothing else competing with it. The recipe context, when seeded,
+///      sits under the number as one quiet line.
+///   2. **Setup** — the two controls that drive the answer (Oven Size stepper +
+///      Cooking Style pills) sit directly under the result, with the style note
+///      as a helper caption at the point of choice (moved out of the hero).
+///   3. **Adjust for Conditions** — optional, collapsed (elevation / air temp /
+///      wind + the adjustment notes).
+///   4. **Cook by Feel** — the six cues consolidated into ONE card of compact
+///      rows (was six cards), still always visible: the heart of the method.
+///   5. **Coal Management & Wind** — collapsed, below.
 /// Every option and guide is preserved; the copy (pinned by the DODSupport
 /// tests) is unchanged. The compositions live in `HeatCoachView+Sections` and
 /// the diagram in `HeatCoachView+Diagram`.
@@ -89,9 +93,13 @@ public struct HeatCoachView: View {
 
     public var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DODSpacing.lg) {
+            VStack(alignment: .leading, spacing: DODSpacing.md) {
+                // The result + the controls that drive it read as one connected
+                // unit at the top (tight spacing), then the reference sections
+                // step down below with a little more air between them.
                 answerCard
                 primaryInputsCard
+                    .padding(.bottom, DODSpacing.xs)
                 conditionsGroup(coachModel)
                 feelReferenceSection
                 tipsGroup

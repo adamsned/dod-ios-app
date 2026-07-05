@@ -290,12 +290,20 @@ struct CookingToolsHubView: View {
                 .foregroundStyle(DODColor.labelSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+                // DUT-597 — a balanced, hugging capsule (matching the app's shared
+                // `EmptyState` CTA proportions) instead of the old full-width
+                // `.frame(maxWidth: .infinity)`, which stretched the capsule into an
+                // awkward short-and-long bar. Explicit horizontal/vertical padding
+                // gives it a comfortable height and width that harmonizes with the
+                // rest of the hub's design language.
                 Button {
                     showingCookModeExplainer = false
                     onFindRecipe()
                 } label: {
                     Text("Find a Recipe")
-                        .frame(maxWidth: .infinity)
+                        .dodFont(DODType.bodyEmphasized)
+                        .padding(.horizontal, DODSpacing.lg)
+                        .padding(.vertical, DODSpacing.sm)
                 }
                 .dodProminentButton()
                 .accessibilityIdentifier("hub-cook-mode-find-recipe")
