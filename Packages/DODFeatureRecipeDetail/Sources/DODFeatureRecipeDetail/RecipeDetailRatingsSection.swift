@@ -97,18 +97,19 @@ public struct RecipeDetailRatingsSection: View {
     // MARK: - RatingsHeader
 
     /// AC-13.1 / AC-44.14 — aggregate when count ≥ 1; otherwise the
-    /// "Be the first to rate this recipe." invitation when comments
-    /// are ALSO empty (a recipe with 0 ratings AND ≥1 comments isn't
-    /// truly empty — conversation has started, only the aggregate is
-    /// missing, so the header collapses to nothing per CL-140).
-    /// `summary.count` is a rating-count integer (not a collection
-    /// size), so the `empty_count` rule is misfiring — disabled on
-    /// this line.
+    /// "Be the first to rate this recipe." invitation when the VISIBLE
+    /// comments are ALSO empty (0 ratings + ≥1 rendered comment isn't truly
+    /// empty — the header collapses to nothing per CL-140).
+    /// DUT-576 — gate on `visibleComments` (comments minus reported/blocked),
+    /// the exact input `commentsList` renders. Gating on the UNFILTERED
+    /// `comments` blanked the header (neither aggregate nor invitation) when a
+    /// recipe's only comment was moderation-hidden. `summary.count` is a
+    /// rating-count integer, so the `empty_count` rule misfires — disabled below.
     @ViewBuilder
     private var ratingsHeader: some View {
         if let summary = viewModel.ratingSummary, summary.count > 0 {  // swiftlint:disable:this empty_count
             StarRatingDisplay(average: summary.average, count: summary.count, starSize: 18)
-        } else if viewModel.comments.isEmpty {
+        } else if viewModel.visibleComments.isEmpty {
             Text("Be the first to rate this recipe.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
