@@ -35,11 +35,7 @@ extension CookingToolsHubView {
                     title: "Shopping List",
                     description: "Turn the recipes you're making into one aisle-sorted list, "
                         + "so you shop in a single loop.",
-                    accessibilityID: "hub-shopping-list",
-                    // DUT-570 — the ONLY card that pushes a `HubDestination`, so the
-                    // only one that earns the drill-down chevron. Every other card
-                    // opens a sheet or a browser URL, where a push chevron misleads.
-                    pushesDestination: true
+                    accessibilityID: "hub-shopping-list"
                 ) {
                     if path.last != .shoppingList { path.append(.shoppingList) }
                 }
@@ -82,15 +78,15 @@ extension CookingToolsHubView {
     /// One hub tool card: a circle-free (larger) icon + Title-Case title +
     /// sentence-case description, wrapped as a full-width plain button on the
     /// brand `surfaceElevated` surface (white light / warm brown dark). A trailing
-    /// `chevron.right` shows ONLY when the card pushes an in-app destination
-    /// (`pushesDestination`) — DUT-570 — so the chevron doesn't falsely imply push
-    /// nav on the sheet / browser-URL cards.
+    /// `chevron.right` reads as the shared tappable-row affordance on EVERY tool
+    /// card — DUT-597 — so the hub's rows are visually consistent (previously only
+    /// the Shopping List push carried it, DUT-570). Every card here acts (opens a
+    /// sheet, pushes a destination, or hands off to the browser), so all navigate.
     func toolCard(
         icon: String,
         title: String,
         description: String,
         accessibilityID: String,
-        pushesDestination: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -108,14 +104,13 @@ extension CookingToolsHubView {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: DODSpacing.sm)
-                // DUT-570 — the drill-down chevron only on the card that actually
-                // pushes a `HubDestination` (Shopping List). Sheet / URL cards omit
-                // it so the affordance stays honest.
-                if pushesDestination {
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(DODColor.labelSecondary)
-                }
+                // DUT-597 — the trailing chevron now reads as the shared
+                // tappable-row affordance on every tool card (same style, size, and
+                // color the Shopping List row introduced in DUT-570), so the hub's
+                // rows are visually consistent as navigation.
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
             }
             .padding(DODSpacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
