@@ -45,6 +45,42 @@ import Testing
         #expect(model(style: .baking).styleNote.contains("3:1"))
     }
 
+    // MARK: - Condition-adjusted starting split (DUT-600)
+
+    @Test func adjustedCoalSplit_mildCalm_equalsBase() {
+        let mildCalm = model(ambient: .mild, windy: false)
+        #expect(mildCalm.adjustedCoalSplit == mildCalm.coalSplit)
+        #expect(mildCalm.conditionCoalDelta == 0...0)
+    }
+
+    @Test func adjustedCoalSplit_cold_addsCoals() {
+        // base 24 (12" even) + midpoint of cold delta (2...3 → 3) = 27
+        #expect(model(ambient: .cold).adjustedCoalSplit.total == 27)
+    }
+
+    @Test func adjustedCoalSplit_hot_pullsCoals() {
+        // base 24 + midpoint of hot delta (-3...-2 → -3) = 21
+        #expect(model(ambient: .hot).adjustedCoalSplit.total == 21)
+    }
+
+    @Test func adjustedCoalSplit_coldAndWindy_stacksBothDeltas() {
+        // cold (2...3) + wind (3...4) = 5...7 → midpoint 6 → 24 + 6 = 30
+        #expect(model(ambient: .cold, windy: true).adjustedCoalSplit.total == 30)
+    }
+
+    @Test func adjustedCoalSplit_reSplitsByStyle() {
+        // baking, cold: total 27 re-split 3:1 → lid 20, bottom 7
+        let split = model(style: .baking, ambient: .cold).adjustedCoalSplit
+        #expect(split.total == 27)
+        #expect(split.lid == 20)
+        #expect(split.bottom == 7)
+    }
+
+    @Test func adjustedCoalSplit_elevationDoesNotChangeCoals() {
+        // elevation adjusts cook TIME, not coal count — total stays the base 24
+        #expect(model(elevationFeet: 5000, ambient: .mild).adjustedCoalSplit.total == 24)
+    }
+
     // MARK: - Ambient note (mild omitted; hot/cold show a range)
 
     @Test func ambientNote_mild_isOmitted() {

@@ -32,6 +32,34 @@ struct HeatCoachModel {
         DutchOvenHeatCoach.startingCoals(ovenDiameterInches: ovenDiameterInches, style: style)
     }
 
+    /// The condition coal delta applied to the starting estimate: the ambient
+    /// (air-temperature) adjustment PLUS the wind adjustment, summed. Elevation
+    /// is deliberately excluded — it changes cook TIME, not coal count. Mild +
+    /// calm → `0...0` (no change).
+    var conditionCoalDelta: ClosedRange<Int> {
+        let ambientDelta = DutchOvenHeatCoach.ambientCoalDelta(ambient)
+        let windDelta = DutchOvenHeatCoach.windCoalDelta(windy)
+        return (ambientDelta.lowerBound + windDelta.lowerBound)...(ambientDelta.upperBound + windDelta.upperBound)
+    }
+
+    /// The starting split ADJUSTED for the current conditions (DUT-600): the
+    /// base ``coalSplit`` total shifted by a representative (midpoint) of
+    /// ``conditionCoalDelta``, re-split by ``style`` via the same public
+    /// even/baking splitters — so the answer diagram MOVES when the cook sets a
+    /// hot / cold / windy day. At mild + calm the delta is `0...0`, so this
+    /// equals ``coalSplit`` and the default answer is unchanged. The precise
+    /// per-condition ranges still surface in the "What Changes" notes; this is
+    /// the single "starting point" number the diagram shows.
+    var adjustedCoalSplit: CoalSplit {
+        let delta = conditionCoalDelta
+        let midpoint = Int((Double(delta.lowerBound + delta.upperBound) / 2.0).rounded())
+        let adjustedTotal = max(0, coalSplit.total + midpoint)
+        switch style {
+        case .even: return DutchOvenHeatCoach.evenSplit(total: adjustedTotal)
+        case .baking: return DutchOvenHeatCoach.bakingSplit(total: adjustedTotal)
+        }
+    }
+
     /// Headline number line, e.g. "Start with ~24 coals: 18 on the lid, 6 underneath".
     var coalHeadline: String {
         let split = coalSplit
