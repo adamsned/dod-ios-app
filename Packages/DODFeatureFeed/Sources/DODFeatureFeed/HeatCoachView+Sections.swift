@@ -35,6 +35,17 @@ extension HeatCoachView {
             // hot/cold/windy day moves the starting point, not just the notes.
             coalSplitDiagram(coachModel.adjustedCoalSplit)
 
+            // DUT-601 — elevation adjusts cook TIME (not coals, per the DOD
+            // method), so surface it live in the answer so the Elevation input
+            // also visibly moves the recommendation. Divider reads on accent.
+            Divider().overlay(DODColor.labelOnAccent.opacity(0.25))
+            Text(coachModel.elevationCookTimeLine)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("heat-coach-cook-time")
+
             if let context = recipeContextLine {
                 Text(context)
                     .dodFont(DODType.caption)
