@@ -9,15 +9,15 @@ import SwiftUI
 /// control (the pacing menu, surfaced as a visible affordance).
 ///
 /// This is a pure presentation layer over ``CookModeViewModel`` — it wires the
-/// existing bindings (`goBack`/`goNext`, `toggleVoiceMode`/`replayCurrentStep`,
-/// `speedUp`/`slowDown`) and holds no state of its own. All controls render on
-/// brand tokens (`burntOrange`/`accent`/`cream`); nothing renders grey.
+/// existing bindings (`goBack`/`goNext`, `togglePlayback`, `replayCurrentStep`,
+/// `cycleVoiceSpeed`/`setVoiceSpeed`) and holds no state of its own. All controls
+/// render on brand tokens (`burntOrange`/`accent`/`cream`); nothing renders grey.
 ///
-/// Center semantics: the big button is a **Voice play/pause**. When Voice Mode
-/// is OFF it shows a play glyph; tapping turns Voice Mode on AND speaks the
-/// current step immediately (`replayCurrentStep`) so "play" reads aloud right
-/// away. When ON it shows a pause glyph and tapping stops the reader. In the
-/// finished state it becomes a "Finish" affordance that closes Cook Mode.
+/// Center semantics (DUT-583): a true **play / pause / resume** control driven by
+/// `playbackState`. Idle → play glyph; tapping starts reading. Speaking → pause
+/// glyph; tapping pauses in place (no restart). Paused → play glyph; tapping
+/// resumes from where it left off. In the finished state it becomes a "Finish"
+/// affordance that closes Cook Mode.
 struct CookModePlayerControls: View {
 
     let viewModel: CookModeViewModel
@@ -57,7 +57,7 @@ struct CookModePlayerControls: View {
     @ViewBuilder
     private var previousButton: some View {
         if showsPrevious {
-            flankButton(symbol: "backward.end.fill", label: "Previous Step") {
+            flankButton(symbol: "arrow.backward", label: "Previous Step") {
                 withAnimation(stepChangeAnimation) { viewModel.goBack() }
             }
             .accessibilityIdentifier("cook-mode-previous")
@@ -68,7 +68,7 @@ struct CookModePlayerControls: View {
     }
 
     private var nextButton: some View {
-        flankButton(symbol: "forward.end.fill", label: "Next Step") {
+        flankButton(symbol: "arrow.forward", label: "Next Step") {
             withAnimation(stepChangeAnimation) { viewModel.goNext() }
         }
         .accessibilityIdentifier("cook-mode-next")
@@ -85,6 +85,8 @@ struct CookModePlayerControls: View {
             Image(systemName: centerSymbol)
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(DODColor.cream)
+                // DUT-583 — crisp play↔pause swap; no lingering fade/delay.
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: centerDiameter, height: centerDiameter)
                 .background(Circle().fill(DODColor.burntOrange))
         }
@@ -92,7 +94,7 @@ struct CookModePlayerControls: View {
         .accessibilityIdentifier("cook-mode-voice-playpause")
         .accessibilityLabel(centerAccessibilityLabel)
         .accessibilityHint(centerAccessibilityHint)
-        .accessibilityAddTraits(viewModel.isVoiceModeEnabled ? .isSelected : [])
+        .accessibilityAddTraits(viewModel.isPlaying ? .isSelected : [])
     }
 
     private func centerAction() {
@@ -100,29 +102,24 @@ struct CookModePlayerControls: View {
             onFinish()
             return
         }
-        let wasOff = !viewModel.isVoiceModeEnabled
-        viewModel.toggleVoiceMode()
-        // Turning voice ON should speak the current step immediately so the
-        // "play" button behaves like a player. `toggleVoiceMode` already reads
-        // on turn-on, but replay guarantees it even if that path changes.
-        if wasOff, viewModel.isVoiceModeEnabled {
-            viewModel.replayCurrentStep()
-        }
+        // DUT-583 — one call owns start / pause / resume (no "play then replay"
+        // double-speak). Pause holds position; resume continues from there.
+        viewModel.togglePlayback()
     }
 
     private var centerSymbol: String {
         if viewModel.isFinished { return "checkmark" }
-        return viewModel.isVoiceModeEnabled ? "pause.fill" : "play.fill"
+        return viewModel.isPlaying ? "pause.fill" : "play.fill"
     }
 
     private var centerAccessibilityLabel: String {
         if viewModel.isFinished { return "Finish" }
-        return viewModel.isVoiceModeEnabled ? "Pause voice" : "Play voice"
+        return viewModel.isPlaying ? "Pause voice" : "Play voice"
     }
 
     private var centerAccessibilityHint: String {
         if viewModel.isFinished { return "leave Cook Mode" }
-        return viewModel.isVoiceModeEnabled ? "stop reading steps aloud" : "read this step aloud"
+        return viewModel.isPlaying ? "pause reading this step" : "read this step aloud"
     }
 
     // MARK: - Secondary row (Replay + speed)
@@ -148,36 +145,44 @@ struct CookModePlayerControls: View {
         .accessibilityHint("read this step aloud once")
     }
 
-    /// The pacing control, surfaced from the old long-press menu as a visible
-    /// tortoise/hare affordance: tap the hare to speed up, the tortoise to slow
-    /// down. Both re-speak when Voice Mode is on (handled by the view model).
+    /// DUT-583 — the pacing control as a single "1x" pill that shows the actual
+    /// speed. A tap cycles up through the speeds and wraps from the top (2×)
+    /// back to the bottom (0.5×); a long press opens a menu to pick an exact
+    /// speed. Re-speaks when a step is actively reading (handled by the model).
     private var speedButton: some View {
-        HStack(spacing: DODSpacing.md) {
-            Button {
-                viewModel.slowDown()
-            } label: {
-                Image(systemName: "tortoise.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(DODColor.accent)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("cook-mode-voice-slower")
-            .accessibilityLabel("Slow down voice")
+        Button {
+            viewModel.cycleVoiceSpeed()
+        } label: {
+            Text(viewModel.voiceSpeedLabel)
+                .dodFont(DODType.bodyEmphasized)
+                .monospacedDigit()
+                .foregroundStyle(DODColor.accent)
+                .frame(minWidth: 56, minHeight: 40)
+                .contentShape(Capsule())
+                .overlay(
+                    Capsule().strokeBorder(DODColor.accent.opacity(0.6), lineWidth: 1.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("cook-mode-voice-speed")
+        .accessibilityLabel("Playback speed")
+        .accessibilityValue(viewModel.voiceSpeedLabel)
+        .accessibilityHint("tap to change speed, touch and hold to pick one")
+        .contextMenu { speedMenu }
+    }
 
+    @ViewBuilder
+    private var speedMenu: some View {
+        ForEach(VoiceReader.speedMultipliers, id: \.self) { speed in
             Button {
-                viewModel.speedUp()
+                viewModel.setVoiceSpeed(speed)
             } label: {
-                Image(systemName: "hare.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(DODColor.accent)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                if speed == viewModel.voiceSpeedMultiplier {
+                    Label(CookModeViewModel.speedLabel(for: speed), systemImage: "checkmark")
+                } else {
+                    Text(CookModeViewModel.speedLabel(for: speed))
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("cook-mode-voice-faster")
-            .accessibilityLabel("Speed up voice")
         }
     }
 

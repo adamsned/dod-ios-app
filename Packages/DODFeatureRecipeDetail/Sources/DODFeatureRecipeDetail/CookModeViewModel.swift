@@ -42,6 +42,23 @@ public final class CookModeViewModel {
     /// can flip it; the public read-only contract is unchanged.
     public internal(set) var isVoiceModeEnabled: Bool = false
 
+    /// DUT-583 — the voice player's transport state, driving the center
+    /// play/pause button like a podcast player. `.idle` and `.paused` show a
+    /// play glyph (nothing reading / resumable), `.speaking` shows pause.
+    /// Maintained by the Voice methods in `CookModeViewModel+Voice.swift`;
+    /// `internal(set)` so those siblings can flip it. Reset to `.idle` when a
+    /// step finishes reading on its own (via the reader's finish callback) or
+    /// when Cook Mode ends.
+    public enum VoicePlaybackState: Sendable { case idle, speaking, paused }
+
+    /// DUT-583 — current transport state for the center play/pause button.
+    public internal(set) var playbackState: VoicePlaybackState = .idle
+
+    /// DUT-583 — the current voice speed as a multiplier of the natural 1×
+    /// rate, always one of ``VoiceReader/speedMultipliers``. Session-only; not
+    /// persisted (resets to 1× each Cook Mode entry, like Voice Mode itself).
+    public internal(set) var voiceSpeedMultiplier: Double = 1.0
+
     private let idleTimer: any IdleTimerController
     private let liveActivity: any CookLiveActivityController
     /// `internal` (not `private`) so the Voice Mode + pacing methods in
@@ -93,6 +110,13 @@ public final class CookModeViewModel {
         self.liveActivity = liveActivity
         self.voiceReader = voiceReader
         self.voiceLanguageCode = locale.language.languageCode?.identifier
+        // DUT-583 — when a step finishes reading on its own, drop the play/pause
+        // button back to the idle "play" glyph. Guard on `.speaking` so a stale
+        // drain callback can't stomp a `.paused` state the user just set.
+        voiceReader.onDidFinishSpeaking = { [weak self] in
+            guard let self, self.playbackState == .speaking else { return }
+            self.playbackState = .idle
+        }
     }
 
     /// Total number of steps, derived from the recipe. Zero if the recipe
@@ -158,6 +182,9 @@ public final class CookModeViewModel {
         // the moment they leave Cook Mode.
         voiceReader.stop()
         isVoiceModeEnabled = false
+        // DUT-583 — a re-entry starts clean: idle transport + natural pace.
+        playbackState = .idle
+        voiceSpeedMultiplier = 1.0
         // Unregister from the Voice Mode command bus so a Siri command fired
         // after Cook Mode closes is a no-op rather than driving a stale session
         // (US-40 / AC-40.5, CL-83). Guard against clobbering a newer session

@@ -25,12 +25,13 @@ extension CookModeViewModel {
             // DUT-390 — hold the audio session open across steps while Voice
             // Mode is on so other audio doesn't un-duck/re-duck between reads.
             voiceReader.setSessionHold(true)
-            speakCurrentStep()
+            speakCurrentStep()  // sets playbackState = .speaking
         } else {
             // DUT-390 — stop() releases the session now; drop the hold so any
             // later one-shot replay releases it on completion too.
             voiceReader.setSessionHold(false)
             voiceReader.stop()
+            playbackState = .idle
         }
         // AC-40.8 / CL-83 — report the user-driven on/off as an allowlisted
         // device-state event. Payload is a single boolean — no recipe id, no
@@ -65,7 +66,37 @@ extension CookModeViewModel {
     /// quickly never overlaps two voices.
     func speakCurrentStep() {
         guard isVoiceModeEnabled else { return }
-        voiceReader.speak(currentSpokenText)
+        let text = currentSpokenText
+        guard !text.isEmpty else { return }
+        voiceReader.speak(text)
+        playbackState = .speaking
+    }
+
+    /// DUT-583 — the single center play/pause control, podcast-style. Pauses
+    /// speaking in place, resumes from where it left off, or starts reading
+    /// when idle. This is the ONLY thing the on-screen button calls, so the
+    /// "play then replay" double-speak (a play tap reading the step twice) is
+    /// gone: starting simply enables Voice Mode, which reads once.
+    public func togglePlayback() {
+        switch playbackState {
+        case .speaking:
+            pauseVoice()
+        case .paused:
+            resumeVoice()
+        case .idle:
+            if isVoiceModeEnabled {
+                // Voice Mode is on but the step finished reading — read it again.
+                speakCurrentStep()
+            } else {
+                setVoiceMode(true)  // enable + read once
+            }
+        }
+    }
+
+    /// DUT-583 — true while a step is actively being read (the center button
+    /// shows a pause glyph); false when idle or paused (shows play).
+    public var isPlaying: Bool {
+        playbackState == .speaking
     }
 
     /// DUT-325 — the text Voice Mode reads for the current position: the step
@@ -105,22 +136,63 @@ extension CookModeViewModel {
         let text = currentSpokenText
         guard !text.isEmpty else { return }
         voiceReader.speak(text)
+        // A replay while Voice Mode is on restarts the read, so reflect that in
+        // the transport; a one-shot replay with Voice Mode off is transient and
+        // leaves the (idle) player button alone.
+        if isVoiceModeEnabled { playbackState = .speaking }
     }
 
-    // MARK: - Voice pacing (DUT-325)
+    // MARK: - Voice pacing (DUT-325 / DUT-583)
 
-    /// DUT-325 — speed the reader up one step for the session (not persisted).
-    /// Re-speaks the current step when Voice Mode is on so the change is
-    /// audible immediately; otherwise just primes the next utterance.
+    /// DUT-583 — the current speed as a display label for the speed button:
+    /// "1x", "1.5x", "0.5x", etc. (trailing zeros trimmed).
+    public var voiceSpeedLabel: String {
+        Self.speedLabel(for: voiceSpeedMultiplier)
+    }
+
+    /// DUT-583 — format any speed multiplier as a compact label ("1x", "1.5x",
+    /// "0.5x"), shared by the speed button and its long-press menu so a picked
+    /// speed and the button text always match.
+    public nonisolated static func speedLabel(for multiplier: Double) -> String {
+        if multiplier == multiplier.rounded() { return "\(Int(multiplier))x" }
+        var text = String(format: "%.2f", multiplier)
+        while text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        return "\(text)x"
+    }
+
+    /// DUT-583 — advance the voice speed one notch, wrapping from the top (2×)
+    /// back to the bottom (0.5×). Drives the single tap on the speed button.
+    public func cycleVoiceSpeed() {
+        let speeds = VoiceReader.speedMultipliers
+        let index = speeds.firstIndex(of: voiceSpeedMultiplier) ?? speeds.firstIndex(of: 1.0) ?? 0
+        setVoiceSpeed(speeds[(index + 1) % speeds.count])
+    }
+
+    /// DUT-583 — set an exact speed (the long-press menu picks one). Applies the
+    /// mapped engine rate and, when a step is *actively* reading, re-speaks it so
+    /// the new pace is audible at once. Changing speed while paused or idle only
+    /// primes the next utterance — it never starts playback.
+    public func setVoiceSpeed(_ multiplier: Double) {
+        voiceSpeedMultiplier = multiplier
+        voiceReader.speechRate = VoiceReader.rate(for: multiplier)
+        if playbackState == .speaking { speakCurrentStep() }
+    }
+
+    /// DUT-325 — speed the reader up one notch for the session (not persisted).
+    /// Retained for the AC-40.5 command surface; folds into the DUT-583 discrete
+    /// speed list so the button, menu, and any voice command stay in lock-step.
     public func speedUp() {
-        voiceReader.speedUp()
-        if isVoiceModeEnabled { speakCurrentStep() }
+        let speeds = VoiceReader.speedMultipliers
+        let index = speeds.firstIndex(of: voiceSpeedMultiplier) ?? speeds.firstIndex(of: 1.0) ?? 0
+        setVoiceSpeed(speeds[min(index + 1, speeds.count - 1)])
     }
 
-    /// DUT-325 — slow the reader down one step for the session (not persisted).
+    /// DUT-325 — slow the reader down one notch for the session (not persisted).
     public func slowDown() {
-        voiceReader.slowDown()
-        if isVoiceModeEnabled { speakCurrentStep() }
+        let speeds = VoiceReader.speedMultipliers
+        let index = speeds.firstIndex(of: voiceSpeedMultiplier) ?? speeds.firstIndex(of: 1.0) ?? 0
+        setVoiceSpeed(speeds[max(index - 1, 0)])
     }
 
     // MARK: - Voice command surface (US-40 / AC-40.5)
@@ -155,6 +227,8 @@ extension CookModeViewModel {
     /// "repeat" command resumes reading aloud.
     public func pauseVoice() {
         voiceReader.pause()
+        // DUT-583 — keep the position; the button flips to "play" (resumable).
+        playbackState = .paused
     }
 
     /// "Resume" / "Continue" — resume a paused utterance (DUT-343). Pairs with
@@ -163,5 +237,7 @@ extension CookModeViewModel {
     /// so "Pause" was a hands-free dead-end.
     public func resumeVoice() {
         voiceReader.resume()
+        // DUT-583 — continue from the pause point (no restart); button → pause.
+        playbackState = .speaking
     }
 }

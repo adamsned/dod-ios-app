@@ -153,9 +153,16 @@ public final class VoiceReader {
         // main-actor Task, so a superseded utterance's `didCancel` can land
         // AFTER the new utterance began; re-check the queue is REALLY empty.
         self.synthesizer.onQueueDidEmpty = { [weak self] in
-            guard let self, !self.holdsSessionOpen,
-                !self.synthesizer.isSpeaking, !self.synthesizer.isPaused
+            // DUT-434 — re-check the queue is REALLY empty: a superseded
+            // utterance's `didCancel` can land AFTER the new one began.
+            guard let self, !self.synthesizer.isSpeaking, !self.synthesizer.isPaused
             else { return }
+            // DUT-583 — a step finished reading on its own; let Cook Mode reset
+            // its play/pause button even while Voice Mode holds the session.
+            self.onDidFinishSpeaking?()
+            // DUT-390 — release the session only for one-shot reads; Voice Mode
+            // holds it open across steps so ducked audio doesn't flap.
+            guard !self.holdsSessionOpen else { return }
             self.deactivateAudioSession()
         }
         #if os(iOS)
@@ -192,40 +199,14 @@ public final class VoiceReader {
         set { synthesizer.speechRate = newValue }
     }
 
-    /// The lowest rate the session menu allows — half the platform default
-    /// (≈0.5×). Slow enough to follow a tricky step, never so slow it drags.
-    static var minimumRate: Float { Self.defaultRate * 0.5 }
-    /// The highest rate the session menu allows — double the platform default
-    /// (≈2×). Fast enough to skim, never so fast it garbles.
-    static var maximumRate: Float { Self.defaultRate * 2 }
-    /// Per-tap increment (a fifth of the default span) so a couple of taps
-    /// spans the comfortable range.
-    static var rateStep: Float { Self.defaultRate * 0.15 }
-
-    /// The platform default speech rate. `AVSpeechUtteranceDefaultSpeechRate`
-    /// where AVFoundation exists; a matching constant on the fallback slice.
-    static var defaultRate: Float {
-        #if canImport(AVFoundation)
-        AVSpeechUtteranceDefaultSpeechRate
-        #else
-        0.5
-        #endif
-    }
-
-    /// DUT-325 — nudge the session speech rate up one step (clamped). Returns
-    /// the new rate so the caller can decide whether to re-speak.
-    @discardableResult
-    public func speedUp() -> Float {
-        speechRate = min(Self.maximumRate, speechRate + Self.rateStep)
-        return speechRate
-    }
-
-    /// DUT-325 — nudge the session speech rate down one step (clamped).
-    @discardableResult
-    public func slowDown() -> Float {
-        speechRate = max(Self.minimumRate, speechRate - Self.rateStep)
-        return speechRate
-    }
+    /// DUT-583 — invoked (on the main actor) when the reader finishes an
+    /// utterance *and the queue is truly drained* (not merely superseded by a
+    /// new step). Cook Mode uses it to drop its play/pause button back to the
+    /// idle "play" glyph when a step finishes reading on its own. Fires even
+    /// while Voice Mode holds the session open — distinct from the private
+    /// audio-session release wired at init, which still only runs for one-shot
+    /// reads.
+    public var onDidFinishSpeaking: (() -> Void)?
 
     /// Speak the supplied text aloud.
     ///

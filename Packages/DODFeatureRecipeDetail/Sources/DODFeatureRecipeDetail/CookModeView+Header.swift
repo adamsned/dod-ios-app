@@ -4,8 +4,8 @@ import SwiftUI
 /// Cook Mode header (DUT-325, redesigned DUT-582 / CL-315) — extracted from
 /// `CookModeView.swift` so that file stays under the SwiftLint `file_length` cap.
 ///
-/// DUT-582 layout: a **minimal** top bar — a close control (`chevron.down`) on
-/// the leading edge, the recipe title small and centered, nothing else. The
+/// DUT-582 layout: a **minimal** top bar — a back control (`chevron.backward`)
+/// on the leading edge, the recipe title small and centered, nothing else. The
 /// voice/replay/speed controls moved into the player transport bar
 /// (`CookModePlayerControls`) and the step counter moved to the bottom paged
 /// indicator (`CookModeStepIndicator`), so this row is now just "get me out"
@@ -36,13 +36,14 @@ extension CookModeView {
         .background(DODColor.surface)
     }
 
-    /// Close (exit Cook Mode). A downward chevron reads as "dismiss this
-    /// now-playing sheet", matching the music/podcast-player language.
+    /// Close (exit Cook Mode). DUT-583 — a back chevron ("go back" to the recipe
+    /// page), which reads more naturally than a downward dismiss now that Cook
+    /// Mode is a destination you navigated into.
     private var closeButton: some View {
         Button {
             close()
         } label: {
-            Image(systemName: "chevron.down")
+            Image(systemName: "chevron.backward")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(DODColor.burntOrange)
                 .frame(minWidth: 44, minHeight: 44)
