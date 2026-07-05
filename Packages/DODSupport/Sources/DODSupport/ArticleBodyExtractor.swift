@@ -108,17 +108,13 @@ public enum ArticleBodyExtractor {
     ///
     /// - Parameters:
     ///   - html: the full rendered HTML page.
-    ///   - paragraphLimit: maximum number of `<p>` blocks to retain in the
-    ///     returned HTML (T-733 / CL-130). The walk truncates at the Nth
-    ///     `</p>` close tag; headings / images / lists that sit BEFORE the
-    ///     Nth `<p>` boundary are preserved (they're context for the
-    ///     surrounding paragraphs); content after is dropped. If the source
-    ///     has fewer than `paragraphLimit` paragraphs total, returns what it
-    ///     has (no padding). `paragraphLimit: 0` returns empty
-    ///     (degenerate-but-safe). Default `2` — the 1-2 paragraph user ask
-    ///     per CL-130. Article callers wanting the FULL body do not use this
-    ///     entry point (they call ``extract(html:)`` / ``extractContentHTML(html:)``
-    ///     instead — both unaffected by the cap).
+    ///   - paragraphLimit: maximum number of `<p>` blocks to retain (T-733 /
+    ///     CL-130). The walk truncates at the Nth `</p>` close tag; headings /
+    ///     images / lists BEFORE the Nth `<p>` boundary are preserved, content
+    ///     after is dropped. Fewer than `paragraphLimit` paragraphs → returns
+    ///     what it has (no padding). `0` returns empty (degenerate-but-safe).
+    ///     Default `2`. Article callers wanting the FULL body use
+    ///     ``extract(html:)`` / ``extractContentHTML(html:)`` instead.
     ///
     /// **Fallback:** when no WPRM card is found in the `entry-content` slice
     /// (rare — a recipe page without WPRM, a custom theme, a malformed page),
@@ -144,9 +140,13 @@ public enum ArticleBodyExtractor {
             return ""
         }
         // First crop at the WPRM recipe card boundary (T-732 / CL-129); then
-        // apply the paragraph cap to the cropped region (T-733 / CL-130).
+        // crop again at the author's inline "how to make" walkthrough heading
+        // (DUT-573 / CL-313 — the full pre-card body duplicates the Instructions
+        // section rendered below via AC-4.3, so drop the walkthrough while keeping
+        // the intro story + tips); then apply the paragraph cap (T-733 / CL-130).
         let preCardSlice = sliceBeforeWPRMCard(in: entryContent)
-        return cappingAtParagraphLimit(preCardSlice, limit: paragraphLimit)
+        let preInstructionsSlice = croppingBeforeInstructionHeading(preCardSlice)
+        return cappingAtParagraphLimit(preInstructionsSlice, limit: paragraphLimit)
     }
 
     /// Helper: returns the substring of `entryContent` preceding the first
