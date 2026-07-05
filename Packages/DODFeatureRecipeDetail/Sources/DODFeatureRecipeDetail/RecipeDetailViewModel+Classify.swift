@@ -94,27 +94,23 @@ extension RecipeDetailViewModel {
         // DUT-544: build a recipe from the WPRM card only when the page's SUBJECT
         // is a recipe (its JSON-LD carries a `@type: Recipe` node). `isRecipeSubject`
         // is threaded in already-computed (DUT-577 dedupe) — no re-scan.
-        if isRecipeSubject,
-            let cardRecipe = recipeFromWPRMCard(
-                html: html,
-                listItem: listItem,
-                canonicalURL: canonicalURL
-            )
-        {
-            return .cardRecipe(cardRecipe)
+        let subjectCard =
+            isRecipeSubject
+            ? recipeFromWPRMCard(html: html, listItem: listItem, canonicalURL: canonicalURL)
+            : nil
+        if let subjectCard {
+            return .cardRecipe(subjectCard)
         }
         // DUT-555: card-only-recipe safety net — a genuine recipe whose structured
         // data lives ONLY in the WPRM card (no Recipe node) is recovered here, but
         // ONLY when the card yields BOTH ingredients AND recovered steps, which
         // separates it from a round-up's embedded card (routed to the article path).
-        if !isRecipeSubject,
-            let cardRecipe = cardOnlyRecipe(
-                html: html,
-                listItem: listItem,
-                canonicalURL: canonicalURL
-            )
-        {
-            return .cardRecipe(cardRecipe)
+        let onlyCard =
+            isRecipeSubject
+            ? nil
+            : cardOnlyRecipe(html: html, listItem: listItem, canonicalURL: canonicalURL)
+        if let onlyCard {
+            return .cardRecipe(onlyCard)
         }
         let body = dependencies.extractArticleBody(html: html)
         guard !body.isEmpty else { return .unavailable }
