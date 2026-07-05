@@ -18,6 +18,12 @@ extension RecipeStore {
     func setCookLogSaveFailpointForTesting(_ error: Error?) {
         cookLogSaveFailpointError = error
     }
+
+    /// DUT-593 test-only: arm/disarm the ``logCook`` dedup-fetch failpoint on
+    /// THIS actor instance (see ``cookLogDedupFetchFailpointError``).
+    func setCookLogDedupFetchFailpointForTesting(_ error: Error?) {
+        cookLogDedupFetchFailpointError = error
+    }
     #endif
 
     /// Append one cook to the private journal.
@@ -31,7 +37,14 @@ extension RecipeStore {
         let recent = FetchDescriptor<CachedCookLogEntry>(
             predicate: #Predicate { $0.recipeID == recipeID && $0.cookedAt >= lower && $0.cookedAt <= upper }
         )
-        if let existing = try? modelContext.fetch(recent), !existing.isEmpty {
+        #if DEBUG
+        if let error = cookLogDedupFetchFailpointError { throw error }  // DUT-593 test seam
+        #endif
+        // DUT-593: use `try` (not `try?`). A `try?` here swallows a fetch error to
+        // `nil`, skips the dedup check, and inserts a SECOND cook for the same event
+        // — silently defeating the ±3s idempotency window. Propagate instead, so a
+        // fetch failure surfaces rather than producing a duplicate journal row.
+        if !(try modelContext.fetch(recent)).isEmpty {
             // DUT-423: the caller already wrote the photo JPEG to disk before calling
             // us; on a dedup skip, delete it so it doesn't orphan (no row will ever
             // reference its `photoLocalID`, so the DUT-338 cleanup can't reach it).

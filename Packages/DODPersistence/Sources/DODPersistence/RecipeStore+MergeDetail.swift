@@ -3,6 +3,29 @@ import Foundation
 
 extension RecipeStore {
 
+    /// DUT-592: copy `ingredients`/`instructions` onto the cached row WITHOUT
+    /// clobbering previously-good content with `[]`. For a `.recipe`, a
+    /// partial/truncated re-parse (a WPRM markup change, a throttled fetch, an
+    /// unhandled JSON-LD variant) can yield an empty array; overwriting would wipe
+    /// content a saved/downloaded recipe needs offline (AC-4.9 / AC-5.2), so we
+    /// only overwrite when the parse actually produced content — matching the
+    /// DUT-399 don't-clobber-with-empty convention. An `.article` legitimately has
+    /// none, so it clears them unconditionally (unchanged behavior).
+    func applyIngredientsAndInstructions(from recipe: Recipe, to target: CachedRecipe) throws {
+        switch recipe.kind {
+        case .recipe:
+            if !recipe.ingredients.isEmpty {
+                target.ingredientsJSON = try JSONEncoder().encode(recipe.ingredients)
+            }
+            if !recipe.instructions.isEmpty {
+                target.instructionsJSON = try JSONEncoder().encode(recipe.instructions)
+            }
+        case .article:
+            target.ingredientsJSON = try JSONEncoder().encode(recipe.ingredients)
+            target.instructionsJSON = try JSONEncoder().encode(recipe.instructions)
+        }
+    }
+
     /// DUT-399: copy the parsed detail fields onto the cached row WITHOUT
     /// clobbering previously-good values with nil. A partial re-parse (e.g.
     /// `backfillIngredientsIfEmpty` recovering ingredients but not nutrition/time

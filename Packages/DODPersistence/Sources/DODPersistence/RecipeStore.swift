@@ -25,6 +25,12 @@ public actor RecipeStore {
     /// a test can drive the failed-save rollback. Per-actor (not a global
     /// static) so parallel suites can't observe each other's failpoint.
     var cookLogSaveFailpointError: Error?
+
+    /// DUT-593 test seam: when set, ``logCook`` throws this at the ±3s dedup
+    /// fetch (an on-device fetch failure isn't hermetically reproducible). Proves
+    /// the fetch now uses `try` — a fetch error propagates rather than silently
+    /// skipping the dedup and inserting a duplicate cook. Per-actor, like above.
+    var cookLogDedupFetchFailpointError: Error?
     #endif
 
     /// DUT-302: flips true once `AppDependencies.bootstrap` confirms the one-time
@@ -134,8 +140,9 @@ public actor RecipeStore {
             recipe.heroImageLargeURL?.absoluteString
             ?? target.heroImageLargeURLString
         target.categoryIDs = recipe.categoryIDs.isEmpty ? target.categoryIDs : recipe.categoryIDs
-        target.ingredientsJSON = try JSONEncoder().encode(recipe.ingredients)
-        target.instructionsJSON = try JSONEncoder().encode(recipe.instructions)
+        // DUT-592: don't clobber cached ingredients/instructions with `[]` on a
+        // partial recipe-kind re-parse (see `applyIngredientsAndInstructions`).
+        try applyIngredientsAndInstructions(from: recipe, to: target)
         // DUT-399: copy parsed detail fields without clobbering cached values with
         // nil (see `applyParsedDetailFields`).
         applyParsedDetailFields(from: recipe, to: target)
@@ -292,27 +299,10 @@ public actor RecipeStore {
 
     // MARK: - Eviction policies (T-074)
     //
-    // Image cache + image-eviction lives in `RecipeStore+ImageCache.swift` —
-    // extracted there to keep this actor body under the `type_body_length` cap.
-
-    /// Trim unsaved AND non-downloaded CachedRecipes to ``unsavedLRUCap`` by
-    /// oldest `lastViewedAt`. Saved recipes are never evicted (NFR-1);
-    /// explicitly-downloaded recipes (US-35 / AC-35.5) are also pinned — the
-    /// predicate requires both flags clear before a row is eligible.
-    public func evictIfNeeded() throws {
-        evictIfNeededCallCount += 1  // DUT-257 test spy; never read in production.
-        let descriptor = FetchDescriptor<CachedRecipe>(
-            predicate: #Predicate { $0.isSaved == false && $0.downloadedAt == nil },
-            sortBy: [SortDescriptor(\.lastViewedAt, order: .forward)]
-        )
-        let unsaved = try modelContext.fetch(descriptor)
-        let overflow = unsaved.count - Self.unsavedLRUCap
-        guard overflow > 0 else { return }
-        for row in unsaved.prefix(overflow) {
-            modelContext.delete(row)
-        }
-        try modelContext.save()
-    }
+    // `evictIfNeeded()` + its DUT-591 dependent-row cascade live in
+    // `RecipeStore+Eviction.swift`; image cache + image-eviction live in
+    // `RecipeStore+ImageCache.swift` — both extracted to keep this actor body
+    // under the `type_body_length` cap.
 
     // MARK: - Helpers
 
