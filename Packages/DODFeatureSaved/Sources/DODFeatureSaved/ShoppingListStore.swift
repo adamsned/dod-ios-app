@@ -109,11 +109,16 @@ public struct ShoppingListStore: @unchecked Sendable {
     /// ``load()``.
     ///
     /// - Parameter rows: the freshly built per-recipe rows to append (CL-77 —
-    ///   appended AS-IS, no cross-row merge, consistent with
-    ///   ``ShoppingListViewModel/add(recipes:)``).
+    ///   no cross-row merge, consistent with ``ShoppingListViewModel/add(recipes:)``).
+    ///   De-duped against the existing list on the `(recipeTitle, ingredientText)`
+    ///   pair (DUT-589) so re-appending the same recipe doesn't re-stack its rows
+    ///   and grow the blob without bound.
     public func append(rows: [ShoppingListViewModel.Item]) {
         let current = load()
-        let merged = (current?.items ?? []) + rows
+        let merged = ShoppingListViewModel.dedupedAppend(
+            existing: current?.items ?? [],
+            adding: rows
+        )
         save(
             items: merged,
             checked: Set(current?.checkedIDs ?? []),
@@ -125,4 +130,8 @@ public struct ShoppingListStore: @unchecked Sendable {
     public func clear() {
         defaults.removeObject(forKey: key)
     }
+
+    /// Test-only accessor for the backing `UserDefaults`, so tests can assert on
+    /// the raw persisted blob size (DUT-589 — proving the blob stays bounded).
+    var debugDefaults: UserDefaults { defaults }
 }

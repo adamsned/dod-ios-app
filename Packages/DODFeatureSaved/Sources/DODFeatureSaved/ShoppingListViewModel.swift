@@ -50,6 +50,30 @@ public final class ShoppingListViewModel {
             self.recipeTitle = recipeTitle
             self.aisle = aisle
         }
+
+        private enum CodingKeys: String, CodingKey {
+            case id, ingredientText, recipeTitle, aisle
+        }
+
+        /// Defensive decode (DUT-590). The `aisle` enum is stored raw inside
+        /// each persisted row, and ``ShoppingListStore/load()`` treats ANY
+        /// decode failure as "no saved list" (`try?` → nil). If a future release
+        /// renames/removes an ``IngredientAisleClassifier/Aisle`` case, every
+        /// existing row carrying that raw value would fail to decode and the
+        /// WHOLE snapshot would silently vanish. Decoding the raw String and
+        /// falling back to `.other` on an unknown/removed case contains the blast
+        /// radius to that one row, so a single bad case can't nuke the list.
+        /// This lives in DODFeatureSaved's Codable layer only — the `Aisle` enum
+        /// itself is unchanged. (The `dod.shoppingList.v1` store key stays; any
+        /// genuinely incompatible wire change still bumps to `vN`.)
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = try container.decode(UUID.self, forKey: .id)
+            self.ingredientText = try container.decode(String.self, forKey: .ingredientText)
+            self.recipeTitle = try container.decode(String.self, forKey: .recipeTitle)
+            let rawAisle = try container.decode(String.self, forKey: .aisle)
+            self.aisle = IngredientAisleClassifier.Aisle(rawValue: rawAisle) ?? .other
+        }
     }
 
     /// One rendered aisle section: the aisle + its rows, in input order.
@@ -188,22 +212,34 @@ public final class ShoppingListViewModel {
     }
 
     /// Mark a row "I already have this" — it drops out of the still-need list
-    /// (CL-82). Also clears any check state for the row so re-adding it later
-    /// (T-680c) starts clean. Persists (DUT-488).
+    /// (CL-82). The row is REMOVED from `items` outright (DUT-589) rather than
+    /// merely masked by `alreadyHaveIDs`, so the persisted App-Group blob shrinks
+    /// with it instead of growing without bound; its id is also purged from both
+    /// ephemeral sets so no parallel bookkeeping lingers. The trailing-swipe UX
+    /// (ShoppingListView) is unchanged — the row still disappears from the list,
+    /// and every other row's checked state survives (only this row's state is
+    /// dropped). Persists (DUT-488).
     public func markAlreadyHave(_ item: Item) {
-        alreadyHaveIDs.insert(item.id)
+        items.removeAll { $0.id == item.id }
+        alreadyHaveIDs.remove(item.id)
         checkedIDs.remove(item.id)
         persist()
     }
 
     /// Append more recipes' ingredients to the list in place (DUT-487 / T-906).
     /// Explodes + classifies each recipe's ingredients into per-recipe rows and
-    /// appends them, keeping every existing row. No de-dup — per-recipe rows are
-    /// intentional (CL-77), so adding a recipe already on the list stacks its
-    /// rows again. Backs the "Add recipes" affordance on the populated list.
-    /// Persists (DUT-488).
+    /// appends them, keeping every existing row.
+    ///
+    /// De-dup (DUT-589): a row is skipped only when the SAME recipe already
+    /// contributed the SAME ingredient line — i.e. re-adding a recipe already on
+    /// the list no longer re-stacks its rows, which is what let `items` grow
+    /// without bound. Distinct recipes that share an ingredient (three recipes
+    /// each calling for "yellow onion") still produce distinct per-recipe rows —
+    /// CL-77's per-recipe-row behavior is preserved because the identity is the
+    /// `(recipeTitle, ingredientText)` pair, not the ingredient text alone.
+    /// Backs the "Add recipes" affordance on the populated list. Persists.
     public func add(recipes: [Recipe]) {
-        items.append(contentsOf: Self.rows(from: recipes))
+        items = Self.dedupedAppend(existing: items, adding: Self.rows(from: recipes))
         persist()
     }
 
@@ -250,14 +286,47 @@ extension ShoppingListViewModel {
     /// explode-and-classify logic.
     static func rows(from recipes: [Recipe]) -> [Item] {
         recipes.flatMap { recipe in
-            recipe.ingredients.map { ingredient in
-                Item(
+            recipe.ingredients.compactMap { ingredient -> Item? in
+                // Defense-in-depth (DUT-587): drop any ingredient whose text
+                // trims to empty so a blank/whitespace line — even one that
+                // slips past the parser — never becomes a garbage row.
+                guard
+                    !ingredient.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                else {
+                    return nil
+                }
+                return Item(
                     ingredientText: ingredient.text,
                     recipeTitle: recipe.title,
                     aisle: IngredientAisleClassifier.classify(ingredient.text)
                 )
             }
         }
+    }
+
+    /// Append `adding` to `existing`, skipping any new row that duplicates a row
+    /// already present (DUT-589). Row identity for de-dup is the
+    /// `(recipeTitle, ingredientText)` pair — NOT the ingredient text alone — so
+    /// re-adding the same recipe doesn't re-stack its rows while distinct recipes
+    /// that share an ingredient still keep separate per-recipe rows (CL-77).
+    /// Shared by ``add(recipes:)`` and ``ShoppingListStore/append(rows:)`` so the
+    /// in-list add and the external (Recipe Detail / card) append de-dup the same
+    /// way.
+    nonisolated static func dedupedAppend(existing: [Item], adding: [Item]) -> [Item] {
+        var seen = Set(existing.map { RowKey(recipeTitle: $0.recipeTitle, text: $0.ingredientText) })
+        var result = existing
+        for row in adding {
+            let key = RowKey(recipeTitle: row.recipeTitle, text: row.ingredientText)
+            guard seen.insert(key).inserted else { continue }
+            result.append(row)
+        }
+        return result
+    }
+
+    /// De-dup identity for a row: its source recipe + its ingredient line.
+    private struct RowKey: Hashable {
+        let recipeTitle: String
+        let text: String
     }
 }
 

@@ -200,8 +200,11 @@ public enum JSONLDRecipeParser {
     }
 
     static func mapIngredients(_ raw: Any?) -> [RecipeIngredient] {
+        // Drop blank/whitespace-only entries so comments, section headers, and
+        // stray markup that sanitize to empty don't become garbage Shopping List
+        // rows (DUT-587). Mirrors the WPRM card parser's non-empty guard.
         guard let array = raw as? [String] else { return [] }
-        return array.map { RecipeIngredient(text: HTMLSanitizer.plainText(from: $0)) }
+        return array.compactMap { RecipeIngredient(nonBlank: HTMLSanitizer.plainText(from: $0)) }
     }
 
     /// Handle the three shapes WPRM/Schema.org can emit:
@@ -339,5 +342,15 @@ public enum JSONLDRecipeParser {
         let duration = parseISO8601Duration(dict["duration"] as? String)
 
         return RecipeVideo(url: url, thumbnailURL: thumbnail, duration: duration)
+    }
+}
+
+extension RecipeIngredient {
+    /// Failable init used by ``JSONLDRecipeParser/mapIngredients(_:)`` to drop
+    /// blank/whitespace-only ingredient lines (DUT-587) — returns nil when the
+    /// text trims to empty so a garbage Shopping List row is never created.
+    fileprivate init?(nonBlank text: String) {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        self.init(text: text)
     }
 }

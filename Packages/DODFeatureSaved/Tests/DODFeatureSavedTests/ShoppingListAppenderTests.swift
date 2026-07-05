@@ -70,17 +70,22 @@ struct ShoppingListAppenderTests {
         #expect(result == .couldntLoad)
     }
 
-    /// Appending is additive across two calls (per-recipe rows stack — CL-77),
-    /// so the same recipe added twice yields double the rows.
-    @Test func appendsAreAdditiveAcrossCalls() async {
+    /// Appending is additive across calls for DISTINCT recipes (per-recipe rows
+    /// stack — CL-77), but DUT-589: re-appending the SAME recipe de-dups on the
+    /// `(recipeTitle, ingredientText)` pair so it no longer double-stacks (which
+    /// is what grew the App-Group blob without bound).
+    @Test func appendsAreAdditiveAcrossCallsButDeDupSameRecipe() async {
         let store = Self.freshStore()
         let appender = LiveShoppingListAppender(store: store)
         let recipe = Self.recipe(id: 3, ingredients: ["1 onion", "2 carrots"])
 
         _ = await appender.addToShoppingList(recipe)
-        _ = await appender.addToShoppingList(recipe)
+        _ = await appender.addToShoppingList(recipe)  // same recipe → de-duped
+        #expect(store.load()?.items.count == 2)  // not 4 — no re-stack (DUT-589)
 
-        #expect(store.load()?.items.count == 4)  // 2 + 2, no merge
+        // A DIFFERENT recipe still stacks additively.
+        _ = await appender.addToShoppingList(Self.recipe(id: 4, ingredients: ["3 eggs"]))
+        #expect(store.load()?.items.count == 3)
     }
 
     // MARK: - Subset append (DUT-535 — the selection sheet path)
