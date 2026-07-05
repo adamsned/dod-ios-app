@@ -21,7 +21,10 @@ public struct CookJournalView: View {
     /// DUT-514 — delete an entry (cascades its photo in the store). Defaults to a
     /// no-op so existing previews / tests that only pass `load` keep compiling.
     private let delete: (CookLogEntry) async -> Void
-    private let photoStore = CookPhotoStore()
+    /// DUT-588 — off-main, downsampled, id-cached thumbnail loader. Replaces the
+    /// old synchronous full-res `photoStore.data(forID:)` + `UIImage(data:)`
+    /// decode that ran per row in the view body.
+    @State private var thumbnails = CookThumbnailLoader()
     @State private var cooks: [CookLogEntry] = []
     @State private var loaded = false
     /// DUT-514 — the entry the user is confirming a delete for (drives the alert).
@@ -137,7 +140,10 @@ public struct CookJournalView: View {
 
     private var journalList: some View {
         ScrollView {
-            VStack(spacing: DODSpacing.md) {
+            // DUT-588 — LazyVStack so off-screen rows aren't built (and their
+            // thumbnails aren't loaded/decoded) until they scroll into view; the
+            // old eager `VStack` built every row on open.
+            LazyVStack(spacing: DODSpacing.md) {
                 journeyHeader
                 statsHeader
                 ForEach(cooks) { cook in
@@ -288,32 +294,44 @@ public struct CookJournalView: View {
         )
     }
 
+    /// DUT-588 — the thumbnail loads asynchronously (off the main thread, id
+    /// cached, downsampled to 56pt) via ``CookThumbnailLoader``. Until a decoded
+    /// image lands — and permanently for a missing / undecodable file — the row
+    /// shows the same flame placeholder as before, so nothing crashes on a
+    /// deleted photo and the layout never shifts.
     @ViewBuilder private func photoThumbnail(_ id: String?) -> some View {
-        if let id, let data = photoStore.data(forID: id), let image = imageFromData(data) {
-            image
-                .resizable()
-                .scaledToFill()
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
-                // DUT-232 — VoiceOver otherwise announces a generic "image".
-                .accessibilityLabel(Text(Self.photoThumbnailAccessibilityLabel))
-        } else {
-            RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
-                .fill(DODColor.burntOrange.opacity(0.15))
-                .frame(width: 56, height: 56)
-                .overlay(
-                    Image(systemName: "flame.fill")
-                        .foregroundStyle(DODColor.burntOrange)
-                )
-                // DUT-232 — the flame is a decorative placeholder for a missing
-                // photo; hide it so VoiceOver doesn't stop on a meaningless glyph.
-                .accessibilityHidden(true)
+        Group {
+            if let id, let image = decodedThumbnail(for: id) {
+                image
+                    .resizable()
+                    .scaledToFill()
+                    // DUT-232 — VoiceOver otherwise announces a generic "image".
+                    .accessibilityLabel(Text(Self.photoThumbnailAccessibilityLabel))
+            } else {
+                RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
+                    .fill(DODColor.burntOrange.opacity(0.15))
+                    .overlay(
+                        Image(systemName: "flame.fill")
+                            .foregroundStyle(DODColor.burntOrange)
+                    )
+                    // DUT-232 — the flame is a decorative placeholder for a
+                    // missing photo; hide it so VoiceOver doesn't stop on a
+                    // meaningless glyph.
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(width: 56, height: 56)
+        .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
+        .task(id: id) {
+            if let id { await thumbnails.loadThumbnail(id: id) }
         }
     }
 
-    private func imageFromData(_ data: Data) -> Image? {
+    /// The cached, downsampled thumbnail for `id` as a SwiftUI `Image`, or nil
+    /// when it hasn't decoded yet (or the photo is missing).
+    private func decodedThumbnail(for id: String) -> Image? {
         #if canImport(UIKit)
-        if let uiImage = UIImage(data: data) { return Image(uiImage: uiImage) }
+        if let uiImage = thumbnails.cachedImage(for: id) { return Image(uiImage: uiImage) }
         #endif
         return nil
     }
