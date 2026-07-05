@@ -232,9 +232,10 @@ public struct RecipeDetailView: View {
             let topInset = geo.safeAreaInsets.top
             ScrollViewReader { proxy in
                 ScrollView {
-                    // DUT-572 / CL-312 — new editorial order: full-bleed hero →
-                    // quick-start cluster → info card → published date → full
-                    // description → Heat Coach nudge → video → ingredients /
+                    // DUT-573 / CL-313 — iterated editorial order: full-bleed hero
+                    // → [published date · Jump to Instructions] row → editorial
+                    // (cropped blurb) → Cook Mode CTA → info card (interactive
+                    // Servings) → Heat Coach nudge → video → ingredients /
                     // instructions → related → ratings.
                     VStack(alignment: .leading, spacing: DODSpacing.lg) {
                         // Hero sits OUTSIDE the reading column — full-bleed, no
@@ -247,11 +248,26 @@ public struct RecipeDetailView: View {
                         // Top block — capped to the reading column on iPad,
                         // byte-identical on iPhone.
                         VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                            quickStartCluster(proxy: proxy)
-                            RecipeInfoCard(model: infoCardModel)
-                            PublishedDateCaption(date: viewModel.listItem.publishedAt)
-                                .padding(.horizontal, DODSpacing.md)
+                            // DUT-573 / CL-313 — publish date + Jump to
+                            // Instructions link, right under the hero/name.
+                            dateAndJumpRow(proxy: proxy)
                             excerptText
+                            if !(viewModel.recipe?.instructions.isEmpty ?? true) {
+                                CookNowCTA(onTap: {
+                                    Task { await viewModel.didTapCookMode() }
+                                    isCookModePresented = true
+                                })
+                            }
+                            RecipeInfoCard(
+                                model: infoCardModel,
+                                servingsBinding: Binding(
+                                    get: { viewModel.userServings },
+                                    set: { viewModel.setUserServings($0) }
+                                ),
+                                servingsRange: viewModel.userServingsRange,
+                                sourceServings: viewModel.sourceServings,
+                                showsServingWarning: viewModel.shouldShowServingWarning
+                            )
                             heatCoachNudge
                             if let video = viewModel.recipe?.video {
                                 RecipeDetailVideoSection(video: video, isOfflineSnapshot: isOfflineSnapshot)
@@ -278,27 +294,28 @@ public struct RecipeDetailView: View {
         }
     }
 
-    /// DUT-572 / CL-312 — the quick-start cluster (Cook Mode CTA + Serves scaler
-    /// + Jump to Instructions). Owns no state; the parent passes the servings
-    /// binding, the AC-7.1 cook-mode gate, and the jump proxy.
-    private func quickStartCluster(proxy: ScrollViewProxy) -> some View {
-        RecipeQuickStartCluster(
-            showsCookMode: !(viewModel.recipe?.instructions.isEmpty ?? true),
-            onCookMode: {
-                Task { await viewModel.didTapCookMode() }
-                isCookModePresented = true
-            },
-            servingsBinding: Binding(
-                get: { viewModel.userServings },
-                set: { viewModel.setUserServings($0) }
-            ),
-            servingsRange: viewModel.userServingsRange,
-            sourceServings: viewModel.sourceServings,
-            showsServingWarning: viewModel.shouldShowServingWarning,
-            onJumpToInstructions: {
-                withAnimation { proxy.scrollTo(SectionAnchor.instructions, anchor: .top) }
+    /// DUT-573 / CL-313 — the first row of scrolling content, right under the
+    /// hero (the recipe name is overlaid on the hero): the publish date on the
+    /// leading edge, a subtle "Jump to Instructions" link on the trailing edge.
+    /// The link scrolls to the instructions anchor via the enclosing
+    /// `ScrollViewReader`'s proxy.
+    private func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            PublishedDateCaption(date: viewModel.listItem.publishedAt)
+            Spacer(minLength: DODSpacing.sm)
+            if !(viewModel.recipe?.instructions.isEmpty ?? true) {
+                Button {
+                    withAnimation { proxy.scrollTo(SectionAnchor.instructions, anchor: .top) }
+                } label: {
+                    Text("Jump to Instructions")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Jumps to Instructions section")
             }
-        )
+        }
+        .padding(.horizontal, DODSpacing.md)
     }
 
     /// Ingredients + Instructions. Side by side in a wider centered band on a
@@ -333,31 +350,10 @@ public struct RecipeDetailView: View {
     // through the shared `ArticleBlocksView` (paragraphs, headings, lists, AND
     // inline images).
 
-    /// DUT-572 / CL-312 — resolved ``RecipeInfoCard/Model`` built from the
-    /// loaded recipe: times pre-formatted, arrays joined with ", ", diet values
-    /// prettified from schema.org URLs. Every field is optional — the card
-    /// renders only the non-nil rows / cells and no-ops when everything is nil.
-    private var infoCardModel: RecipeInfoCard.Model {
-        let recipe = viewModel.recipe
-        return RecipeInfoCard.Model(
-            prepTime: recipe?.prepTime.map { format(duration: $0) },
-            cookTime: recipe?.cookTime.map { format(duration: $0) },
-            totalTime: recipe?.totalTime.map { format(duration: $0) },
-            course: joinedOrNil(recipe?.recipeCategory),
-            cuisine: joinedOrNil(recipe?.recipeCuisine),
-            diet: joinedOrNil(recipe?.suitableForDiet.map(RecipeInfoCard.prettifyDiet)),
-            servings: recipe?.servings.map { "\($0)" },
-            calories: recipe?.nutrition?.calories,
-            author: recipe?.author
-        )
-    }
-
-    /// Join a non-empty `[String]` with ", "; `nil` for a missing or empty
-    /// array so the info card cell hides.
-    private func joinedOrNil(_ values: [String]?) -> String? {
-        guard let values, !values.isEmpty else { return nil }
-        return values.joined(separator: ", ")
-    }
+    // DUT-572 / CL-312 — the `infoCardModel` builder + its `joinedOrNil` and
+    // `format(duration:)` helpers live in `RecipeDetailView+InfoCard.swift`
+    // (extension on `RecipeDetailView`) so this file stays under the SwiftLint
+    // file-length cap.
 }
 
 // MARK: - Helpers
@@ -385,14 +381,5 @@ extension RecipeDetailView {
         pendingAutoCookMode = false
         Task { await viewModel.didTapCookMode() }
         isCookModePresented = true
-    }
-
-    fileprivate func format(duration: Duration) -> String {
-        let seconds = Int(duration.components.seconds)
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes) min" }
-        let hours = minutes / 60
-        let remainder = minutes % 60
-        return remainder == 0 ? "\(hours) hr" : "\(hours)h \(remainder)m"
     }
 }

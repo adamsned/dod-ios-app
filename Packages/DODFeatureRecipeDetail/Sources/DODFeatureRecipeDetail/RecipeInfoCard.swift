@@ -38,6 +38,23 @@ struct RecipeInfoCard: View {
 
     let model: Model
 
+    /// DUT-573 / CL-313 — when non-nil, the Servings cell becomes INTERACTIVE:
+    /// it shows the current user serving count with a compact −/+ stepper
+    /// (folding in the old standalone `RecipeServingsScaler`, now deleted).
+    /// When nil, the static `model.servings` string renders as before. Defaults
+    /// keep previews / other callers source-compatible.
+    var servingsBinding: Binding<Int>?
+    /// Clamp range for the interactive stepper (mirrors the view model's
+    /// `userServingsRange`). Ignored when `servingsBinding` is nil.
+    var servingsRange: ClosedRange<Int> = 1...24
+    /// Source `recipeYield` — shown as a "Recipe makes N." secondary line when
+    /// the user has scaled away from it. Ignored when `servingsBinding` is nil.
+    var sourceServings: Int = 0
+    /// True when the user has scaled past the home-dutch-oven capacity
+    /// threshold (CL-52) — drives the ">12 servings" warning caption under the
+    /// card. Only rendered when `servingsBinding` is non-nil.
+    var showsServingWarning: Bool = false
+
     /// A single time row: Title-Case label over a big centered value.
     private struct TimeRow: Identifiable {
         let id = UUID()
@@ -45,11 +62,14 @@ struct RecipeInfoCard: View {
         let value: String
     }
 
-    /// A single metadata cell: caption label over a body value.
+    /// A single metadata cell: caption label over a body value. `isServings`
+    /// flags the cell that becomes the interactive stepper when a
+    /// `servingsBinding` is supplied (DUT-573 / CL-313).
     private struct MetaCell: Identifiable {
         let id = UUID()
         let label: String
         let value: String
+        var isServings = false
     }
 
     private var timeRows: [TimeRow] {
@@ -65,31 +85,69 @@ struct RecipeInfoCard: View {
         if let course = model.course { cells.append(.init(label: "Course", value: course)) }
         if let cuisine = model.cuisine { cells.append(.init(label: "Cuisine", value: cuisine)) }
         if let diet = model.diet { cells.append(.init(label: "Diet", value: diet)) }
-        if let servings = model.servings { cells.append(.init(label: "Servings", value: servings)) }
+        // DUT-573 / CL-313 — when a binding is present the Servings cell renders
+        // the interactive stepper (the `value` string is unused for that cell,
+        // it reads the live binding); otherwise the static `model.servings`.
+        if let binding = servingsBinding {
+            cells.append(.init(label: "Servings", value: "\(binding.wrappedValue)", isServings: true))
+        } else if let servings = model.servings {
+            cells.append(.init(label: "Servings", value: servings))
+        }
         if let calories = model.calories { cells.append(.init(label: "Calories", value: calories)) }
         if let author = model.author { cells.append(.init(label: "Author", value: author)) }
         return cells
     }
 
     var body: some View {
-        if !model.isEmpty {
-            VStack(alignment: .leading, spacing: DODSpacing.md) {
-                timesBlock
-                if !timeRows.isEmpty, !metaCells.isEmpty {
-                    Rectangle()
-                        .fill(DODColor.surfaceDivider)
-                        .frame(height: 1)
+        // Render whenever there's static content OR an interactive servings
+        // binding (the stepper cell renders even if `model` is otherwise empty).
+        if !model.isEmpty || servingsBinding != nil {
+            VStack(alignment: .leading, spacing: DODSpacing.sm) {
+                VStack(alignment: .leading, spacing: DODSpacing.md) {
+                    timesBlock
+                    if !timeRows.isEmpty, !metaCells.isEmpty {
+                        Rectangle()
+                            .fill(DODColor.surfaceDivider)
+                            .frame(height: 1)
+                    }
+                    metadataGrid
                 }
-                metadataGrid
+                .padding(DODSpacing.md)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                        .fill(DODColor.surfaceElevated)
+                )
+                // DUT-573 / CL-313 — the ">12 servings" capacity warning sits
+                // UNDER the card (mirrors the old scaler's AC-31.6 caption).
+                if servingsBinding != nil, showsServingWarning {
+                    servingWarningCaption
+                }
             }
-            .padding(DODSpacing.md)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                    .fill(DODColor.surfaceElevated)
-            )
             .padding(.horizontal, DODSpacing.md)
         }
+    }
+
+    /// DUT-573 / CL-313 — non-blocking dutch-oven capacity warning (AC-31.6),
+    /// rendered under the card when the interactive servings count is >12.
+    private var servingWarningCaption: some View {
+        HStack(alignment: .top, spacing: DODSpacing.xs) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(DODColor.burntOrange)
+                .accessibilityHidden(true)
+            Text(
+                "Most home dutch ovens (5-quart) cap out around 12 servings. "
+                    + "Consider doubling the recipe in two batches instead."
+            )
+            .dodFont(DODType.caption)
+            .foregroundStyle(DODColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, DODSpacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "Capacity warning. Most home dutch ovens cap out around 12 servings."
+        )
     }
 
     @ViewBuilder
@@ -126,20 +184,55 @@ struct RecipeInfoCard: View {
             ]
             LazyVGrid(columns: columns, alignment: .leading, spacing: DODSpacing.md) {
                 ForEach(metaCells) { cell in
-                    VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                        Text(cell.label)
-                            .dodFont(DODType.caption)
-                            .foregroundStyle(DODColor.labelSecondary)
-                        Text(cell.value)
-                            .dodFont(DODType.body)
-                            .foregroundStyle(DODColor.label)
-                            .fixedSize(horizontal: false, vertical: true)
+                    if cell.isServings, let binding = servingsBinding {
+                        servingsStepperCell(binding: binding)
+                    } else {
+                        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                            Text(cell.label)
+                                .dodFont(DODType.caption)
+                                .foregroundStyle(DODColor.labelSecondary)
+                            Text(cell.value)
+                                .dodFont(DODType.body)
+                                .foregroundStyle(DODColor.label)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .combine)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityElement(children: .combine)
                 }
             }
         }
+    }
+
+    /// DUT-573 / CL-313 — the interactive Servings cell: the "Servings" label
+    /// over the current count with a compact −/+ stepper, plus a "Recipe makes
+    /// N." secondary line when the user has scaled away from the source yield.
+    /// Reuses the visual language of the old `RecipeServingsScaler` (US-31 /
+    /// AC-31.1 / AC-31.2). The `Stepper` clamps to `servingsRange`.
+    private func servingsStepperCell(binding: Binding<Int>) -> some View {
+        let value = binding.wrappedValue
+        return VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+            Text("Servings")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+            HStack(spacing: DODSpacing.sm) {
+                Text("\(value)")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                Stepper("Servings", value: binding, in: servingsRange, step: 1)
+                    .labelsHidden()
+            }
+            if value != sourceServings, sourceServings > 0 {
+                Text("Recipe makes \(sourceServings).")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Servings")
+        .accessibilityValue("\(value)")
     }
 
     /// DUT-572 / CL-312 — prettify a `suitableForDiet` value. The parser stores
