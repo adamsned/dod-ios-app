@@ -22,6 +22,9 @@ extension RecipeDetailView {
                 } label: {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
+                        // DUT-572 / CL-312 — glyph shadow so state colors survive
+                        // over the full-bleed hero photo (mirrors the title shadow).
+                        .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
 
@@ -38,6 +41,7 @@ extension RecipeDetailView {
                 } label: {
                     Image(systemName: "cart.badge.plus")
                         .foregroundStyle(DODColor.label)
+                        .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Add to Shopping List")
@@ -58,12 +62,14 @@ extension RecipeDetailView {
                             : "square.and.arrow.down"
                     )
                     .foregroundStyle(viewModel.isDownloaded ? DODColor.burntOrange : DODColor.label)
+                    .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
 
                 ShareLink(item: viewModel.canonicalURL) {
                     Image(systemName: "square.and.arrow.up")
                         .foregroundStyle(DODColor.label)
+                        .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .simultaneousGesture(
                     TapGesture().onEnded {

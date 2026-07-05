@@ -1,57 +1,132 @@
 import DODDesignSystem
 import SwiftUI
 
-/// Hero image + bottom gradient + overlaid title for the detail screen.
-/// Pulled out of ``RecipeDetailView`` so the parent stays under the
-/// per-file line budget.
+/// DUT-572 / CL-312 — full-bleed, stretchy hero with a progressive-blur strip
+/// under the nav bar.
+///
+/// The image reaches the very top of the screen (into the safe area) and
+/// rubber-bands taller on pull-down. A top strip blurs the band behind the
+/// toolbar glyphs (public-API `.ultraThinMaterial` masked by a fading
+/// `LinearGradient` — NOT the private `variableBlur` CAFilter) so the
+/// back / Save / Share / Download buttons stay legible over any photo, fading
+/// to a crisp banner below. The existing bottom gradient + overlaid title are
+/// kept.
+///
+/// The hero ignores the top safe area, so it can't read its own inset; the
+/// parent (`RecipeDetailView.readyBody`) reads the real top inset and passes it
+/// in as `topInset`.
 struct RecipeDetailHero: View {
 
     let url: URL?
     let title: String
+    /// Real top safe-area inset, read at the parent level (the hero ignores
+    /// safe area so can't read its own).
+    let topInset: CGFloat
+
+    /// Resting hero height below the safe area. The effective height grows by
+    /// `topInset` (to reach the top of the screen) plus any positive pull-down.
+    private let baseHeight: CGFloat = 320
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // T-839 — reliable cached loader (DUT-195's ReliableImage) instead of
-            // AsyncImage, which left the detail hero stuck on the skeleton when a
-            // load hit a transient error or was cancelled (tester-reported).
-            ReliableImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
-                case .failure:
-                    // DUT-524 — a missing / permanently-failing hero used to fall
-                    // through to `default` and draw the animated skeleton forever
-                    // (an infinite "loading" shimmer). Render a neutral static
-                    // placeholder instead, matching the app's feed-card empty tile.
-                    heroFailurePlaceholder
-                case .empty:
-                    LoadingSkeleton(cornerRadius: 0)
-                }
+        GeometryReader { geo in
+            // minY in the named scroll coordinate space: 0 at rest, positive on
+            // pull-down (rubber-band), negative once scrolled up. Only the top
+            // grows on pull-down — the image is bottom-anchored.
+            let minY = geo.frame(in: .named("recipeScroll")).minY
+            let stretch = max(0, minY)
+            let height = baseHeight + topInset + stretch
+
+            ZStack(alignment: .bottomLeading) {
+                heroImage
+                    .frame(width: geo.size.width, height: height)
+                    .clipped()
+
+                // Faint dark scrim under the blur strip (same mask geometry) so
+                // the glyphs keep contrast over bright photos.
+                Rectangle()
+                    .fill(.black.opacity(0.18))
+                    .frame(height: topInset + 56)
+                    .mask(blurMaskGradient)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .allowsHitTesting(false)
+
+                // Progressive blur strip — public API only. A clear rectangle
+                // over `.ultraThinMaterial`, masked by a top-to-clear gradient,
+                // blurs the band behind the toolbar and fades out below.
+                Rectangle()
+                    .fill(.clear)
+                    .background(.ultraThinMaterial)
+                    .mask(blurMaskGradient)
+                    .frame(height: topInset + 56)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .allowsHitTesting(false)
+
+                // Soft bottom gradient — covers the lower portion of the hero so
+                // the title reads against any photo background.
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.5)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+
+                Text(title)
+                    .dodFont(DODType.displayLarge)
+                    .foregroundStyle(.white)
+                    // Long recipe titles ("Cast Iron Cherry Cobbler with Candied
+                    // Pecans") must show in full, not truncate on the hero — allow
+                    // up to two lines and shrink slightly before wrapping a third.
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 2)
+                    .padding(.horizontal, DODSpacing.md)
+                    .padding(.bottom, DODSpacing.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 320)
-            .clipped()
-
-            // Soft bottom gradient — covers the lower ~40% of the hero so the
-            // title reads against any photo background.
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.5)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-            .frame(height: 320)
-            .allowsHitTesting(false)
-
-            Text(title)
-                .dodFont(DODType.displayLarge)
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 2)
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.bottom, DODSpacing.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: geo.size.width, height: height)
+            // Bottom-anchor so pull-down only grows the top edge; the image
+            // stays pinned to the resting bottom position.
+            .offset(y: -stretch)
         }
-        .frame(height: 320)
+        // Reserve the hero's FULL resting height (base + the top inset it draws
+        // into) so the content below it doesn't overlap the banner / title. The
+        // ZStack is `baseHeight + topInset` tall at rest; a bare `baseHeight`
+        // frame here let the bottom `topInset` overflow onto the Cook Mode CTA.
+        .frame(height: baseHeight + topInset)
+        .ignoresSafeArea(.container, edges: .top)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
+    }
+
+    /// The mask gradient shared by the blur strip + its dark scrim: opaque at
+    /// the very top (under the nav bar), fading to clear so the band below is
+    /// crisp.
+    private var blurMaskGradient: LinearGradient {
+        LinearGradient(
+            colors: [.black, .black.opacity(0.6), .clear],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    @ViewBuilder
+    private var heroImage: some View {
+        // T-839 — reliable cached loader (DUT-195's ReliableImage) instead of
+        // AsyncImage, which left the detail hero stuck on the skeleton when a
+        // load hit a transient error or was cancelled (tester-reported).
+        ReliableImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().aspectRatio(contentMode: .fill)
+            case .failure:
+                // DUT-524 — a missing / permanently-failing hero renders a
+                // neutral static placeholder (matching the feed-card empty tile)
+                // instead of an infinite "loading" shimmer.
+                heroFailurePlaceholder
+            case .empty:
+                LoadingSkeleton(cornerRadius: 0)
+            }
+        }
     }
 
     /// DUT-524 — neutral static tile shown when the hero image can't load, so a
