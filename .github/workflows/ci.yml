@@ -167,12 +167,13 @@ jobs:
                      DODPersistence DODFeatureFeed DODFeatureCategories \
                      DODFeatureSearch DODFeatureRecipeDetail DODFeatureSaved; do
             echo "::group::swift test — $pkg"
-            if [ "$pkg" = "DODFeatureSearch" ]; then
-              # DODFeatureSearch intermittently aborts with signal 6 (SIGABRT)
-              # on exit under `swift test --parallel` on macos-15, even though
-              # every test passes — the parallel swift-testing harness crashes
-              # while tearing down. Run this one package serially to dodge the
-              # flake; all other packages keep --parallel.
+            if [ "$pkg" = "DODFeatureSearch" ] || [ "$pkg" = "DODFeatureFeed" ]; then
+              # DODFeatureSearch and DODFeatureFeed intermittently abort on exit
+              # under `swift test --parallel` on macos-15 (signal 6 SIGABRT /
+              # signal 11 SIGSEGV respectively), even though every test passes —
+              # the parallel swift-testing harness crashes while tearing down.
+              # Run these serially to dodge the flake; all other packages keep
+              # --parallel. (DODFeatureFeed added DUT-596.)
               (cd "Packages/$pkg" && swift test)
             else
               (cd "Packages/$pkg" && swift test --parallel)
