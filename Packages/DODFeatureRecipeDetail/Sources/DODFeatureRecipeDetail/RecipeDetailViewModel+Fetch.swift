@@ -77,7 +77,9 @@ extension RecipeDetailViewModel {
             blurbBlocks =
                 blurbHTML.isEmpty
                 ? []
-                : ArticleHTMLParser.parse(html: blurbHTML)
+                // DUT-582: pass the page's canonical URL so protocol-/root-
+                // relative body-image sources resolve to absolute http(s) URLs.
+                : ArticleHTMLParser.parse(html: blurbHTML, baseURL: canonicalURL)
             loadState = .ready
             await loadRelated(forCategoryID: parsed.categoryIDs.first)
         } catch {
@@ -314,7 +316,9 @@ extension RecipeDetailViewModel {
         guard let html = try? await dependencies.fetchHTML(for: url) else { return }
         let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html, paragraphLimit: .max)
         guard !blurbHTML.isEmpty else { return }
-        let parsed = ArticleHTMLParser.parse(html: blurbHTML)
+        // DUT-582: same base-URL threading as `fetchAndParse` so body images
+        // resolve to absolute http(s) URLs on the refresh path too.
+        let parsed = ArticleHTMLParser.parse(html: blurbHTML, baseURL: url)
         guard !parsed.isEmpty else { return }
         blurbBlocks = parsed
     }
