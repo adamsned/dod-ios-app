@@ -128,6 +128,51 @@ struct FirstCookoutFeedBugBatchTests {
         )
     }
 
+    // MARK: - DUT-559 — the hub feeds real progress state, so a fresh cook
+    //          doesn't see the whole guided path already completed
+
+    /// The DUT-551 hub refactor stranded DUT-212/DUT-381: the hub built
+    /// `CookChooserFlow(recommended: nil)` AND omitted `cookedRecipeIDs`, so
+    /// `nodeState` fell through the empty-recommended guard and painted EVERY rung
+    /// `.done` — a brand-new user saw their whole path completed. With the fix the
+    /// hub loads the real (empty) `cookedRecipeIDs` and, once loaded, the real
+    /// `nextUncookedRung` recommendation, so rung 1 is `.current` and the rest are
+    /// `.upcoming` — never all `.done`.
+    @Test func freshCookHubStateDoesNotPaintEveryRungDone() {
+        let cookedRecipeIDs: Set<Int> = []  // a brand-new user, no logged cooks
+        let recommended = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
+        #expect(recommended?.recipeID == GuidedCookout.path[0].recipeID)
+
+        // The exact state the hub passes into CookChooserFlow once loaded.
+        let states = GuidedCookout.path.indices.map { index in
+            CookChooserFlow.nodeState(
+                index: index,
+                recommended: recommended,
+                cookedRecipeIDs: cookedRecipeIDs
+            )
+        }
+        #expect(states.first == .current, "rung 1 is the 'start here' current rung")
+        #expect(
+            !states.allSatisfy { $0 == .done },
+            "a fresh cook must NOT see the whole guided path painted done (DUT-559)"
+        )
+        #expect(
+            states.dropFirst().allSatisfy { $0 == .upcoming },
+            "every rung after the current one is upcoming for a fresh cook"
+        )
+    }
+
+    /// The pre-fix reproduction, pinned so a regression is obvious: with
+    /// `recommended: nil` AND an empty `cookedRecipeIDs`, `nodeState` paints EVERY
+    /// rung `.done`. This is exactly what the stranded hub produced; the fix is to
+    /// pass a real recommendation once loaded (see the test above).
+    @Test func nilRecommendedWithNoCookHistoryPaintsEveryRungDone() {
+        let states = GuidedCookout.path.indices.map { index in
+            CookChooserFlow.nodeState(index: index, recommended: nil, cookedRecipeIDs: [])
+        }
+        #expect(states.allSatisfy { $0 == .done }, "the stranded-hub bug: all rungs falsely done")
+    }
+
     // MARK: - DUT-211 — share copy / subject reflect the correct rung
 
     @Test func shareCopyReadsFirstOnlyForTheFirstRung() {

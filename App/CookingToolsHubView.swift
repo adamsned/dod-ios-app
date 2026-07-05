@@ -1,6 +1,7 @@
 import DODAnalytics
 import DODDesignSystem
 import DODFeatureFeed
+import DODSupport
 import SwiftUI
 
 /// T-912 / DUT-551 (CL-306) — a pushable destination inside the Cooking Tools
@@ -87,6 +88,19 @@ struct CookingToolsHubView: View {
     /// same store the Feed tab does. Built once from `feedDependencies()` (the
     /// exact seam `FeedView` uses).
     @State private var feedViewModel: FeedViewModel
+
+    /// DUT-559 — the recipe ids the cook has actually logged (DUT-104 journal),
+    /// derived from `feedViewModel.cookLogs()`. Passed to `CookChooserFlow` so a
+    /// rung the cook already made renders as done (DUT-381) — without this a
+    /// brand-new user with no cook history still saw a real recommendation but a
+    /// returning cook's out-of-order rungs were never marked cooked.
+    @State private var cookedRecipeIDs: Set<Int> = []
+
+    /// DUT-559 / DUT-212 — the cold-launch gate: the recommended rung is only
+    /// handed to `CookChooserFlow` once the real cook state has loaded. Before
+    /// then `recommended` stays `nil` (the chooser falls through to the plain
+    /// roadmap) rather than recommending a stale rung 1 to a returning cook.
+    @State private var cookStateLoaded = false
 
     /// Route the user to the Recipes tab to pick a recipe to cook (the Cook Mode
     /// row's explainer CTA). Injected by `RootView` so this app-level view never
@@ -181,16 +195,30 @@ struct CookingToolsHubView: View {
             path.removeAll()
             tipToken = nil
         }
-        .onAppear { Telemetry.shared.send(.screenView(name: "cooking_tools")) }
+        // DUT-559 — load the cook state (the DUT-104 journal's recipe ids) so the
+        // guided chooser recommends the cook's REAL next rung and marks the rungs
+        // they've already made as done (re-activating DUT-212 + DUT-381, stranded
+        // by the DUT-551 hub refactor). `.task` runs once when the hub mounts.
+        .task { await loadCookState() }
         .sheet(
             isPresented: $showingFirstCookout,
-            onDismiss: { feedViewModel.cookoutFlowDidDismiss() },
+            // Reload the cook state after the cookout sheet closes: the cook may
+            // have logged a rung in the flow, which advances the recommendation.
+            onDismiss: {
+                feedViewModel.cookoutFlowDidDismiss()
+                Task { await loadCookState() }
+            },
             content: {
                 CookChooserFlow(
-                    // No progress state at the hub (unlike the Feed's rung-aware
-                    // presentation) — the chooser falls through to its plain
-                    // roadmap, highlighting the first rung as "start here".
-                    recommended: nil,
+                    // DUT-559 / DUT-212 — hand the real recommended rung only once
+                    // the cook state has loaded (the cold-launch gate); before then
+                    // `nil` falls through to the plain roadmap rather than a stale
+                    // rung 1. `cookedRecipeIDs` is ALWAYS the real set so a fresh
+                    // cook's rungs aren't all painted done (DUT-381).
+                    recommended: cookStateLoaded
+                        ? GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
+                        : nil,
+                    cookedRecipeIDs: cookedRecipeIDs,
                     onLogCook: { entry in
                         Task { await feedViewModel.logCook(entry) }
                     }
@@ -284,5 +312,16 @@ struct CookingToolsHubView: View {
         if let url = URL(string: string) {
             openURL(url)
         }
+    }
+
+    /// DUT-559 — load the logged cooks (the DUT-104 journal) into `cookedRecipeIDs`
+    /// and flip `cookStateLoaded`, so the guided chooser recommends the cook's real
+    /// next rung and marks already-made rungs done. Reads through the same
+    /// `feedViewModel.cookLogs()` seam the Journal uses; a failure yields an empty
+    /// set (a brand-new cook), which recommends rung 1 once loaded.
+    private func loadCookState() async {
+        let logs = await feedViewModel.cookLogs()
+        cookedRecipeIDs = Set(logs.map(\.recipeID))
+        cookStateLoaded = true
     }
 }
