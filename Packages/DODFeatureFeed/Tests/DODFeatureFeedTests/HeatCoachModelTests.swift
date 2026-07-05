@@ -112,6 +112,18 @@ import Testing
         #expect(copy?.contains("3,000 ft") == true)
     }
 
+    // MARK: - Elevation cook-time line (always shown; DUT-601)
+
+    @Test func elevationCookTimeLine_atBaseline_statesUsualTime() {
+        #expect(model(elevationFeet: 0).elevationCookTimeLine == "Cook for the recipe's usual time.")
+    }
+
+    @Test func elevationCookTimeLine_threeThousand_addsTime() {
+        let copy = model(elevationFeet: 3000).elevationCookTimeLine
+        #expect(copy.contains("45–60 min"))
+        #expect(copy.contains("3,000 ft"))
+    }
+
     // MARK: - Replenish + wind
 
     @Test func replenishNote_mildCalm_isThirty() {

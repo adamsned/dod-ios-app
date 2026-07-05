@@ -108,6 +108,22 @@ struct HeatCoachModel {
         return "At \(feet) ft: add \(range.lowerBound)-\(range.upperBound) minutes to the cook."
     }
 
+    /// Always-shown cook-time readout for the answer card (DUT-601 — every
+    /// input must visibly move the recommendation). Unlike ``elevationNote``
+    /// this is never nil: at/below the baseline it states the recipe's usual
+    /// time; above it, the elevation-added time. Elevation adjusts cook TIME,
+    /// not coal count (the DOD method), so it lives in the answer here rather
+    /// than the coal diagram — but changing the elevation stepper still moves
+    /// the answer live.
+    var elevationCookTimeLine: String {
+        let range = DutchOvenHeatCoach.cookTimeExtraMinutes(elevationFeetAboveBaseline: elevationFeet)
+        if range.upperBound <= 0 {
+            return "Cook for the recipe's usual time."
+        }
+        let feet = Self.feetFormatter.string(from: NSNumber(value: elevationFeet)) ?? "\(elevationFeet)"
+        return "Add \(range.lowerBound)–\(range.upperBound) min for cooking at \(feet) ft."
+    }
+
     /// Replenish-cadence line, always shown.
     var replenishNote: String {
         let minutes = DutchOvenHeatCoach.replenishMinutes(ambient: ambient, windy: windy)
