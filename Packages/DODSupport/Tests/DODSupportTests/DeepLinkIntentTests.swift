@@ -62,4 +62,33 @@ import Testing
         let url = try #require(URL(string: "dod://recipe?id=abc"))
         #expect(DeepLinkIntent.parse(url) == nil)
     }
+
+    // MARK: - DUT-566 `dod://article/<id>` (notification grammar)
+
+    /// `dod://article/<id>` (the notification grammar for `.article` posts)
+    /// resolves by post id to the same `.openRecipe(id:)` route as a recipe —
+    /// `PostKind` lives on `Recipe`, so the detail view classifies the kind
+    /// once the post is resolved.
+    @Test func articlePathURLParsesID() throws {
+        let url = try #require(URL(string: "dod://article/123"))
+        #expect(DeepLinkIntent.parse(url) == .openRecipe(id: 123))
+    }
+
+    /// The `?id=` query form is accepted too, mirroring the recipe host.
+    @Test func articleQueryURLParsesID() throws {
+        let url = try #require(URL(string: "dod://article?id=99"))
+        #expect(DeepLinkIntent.parse(url) == .openRecipe(id: 99))
+    }
+
+    /// Zero, negative, non-numeric, or missing ids fall through to nil.
+    @Test func articleURLWithBadIDReturnsNil() throws {
+        let zero = try #require(URL(string: "dod://article/0"))
+        #expect(DeepLinkIntent.parse(zero) == nil)
+        let negative = try #require(URL(string: "dod://article/-3"))
+        #expect(DeepLinkIntent.parse(negative) == nil)
+        let nonNumeric = try #require(URL(string: "dod://article/abc"))
+        #expect(DeepLinkIntent.parse(nonNumeric) == nil)
+        let empty = try #require(URL(string: "dod://article"))
+        #expect(DeepLinkIntent.parse(empty) == nil)
+    }
 }

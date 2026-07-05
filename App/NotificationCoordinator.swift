@@ -12,15 +12,19 @@ import UserNotifications
 ///   fires while the app is open is observable rather than silently
 ///   swallowed (important for the simulator test).
 /// - **Tap routing (AC-42.3):** `didReceive` reads the `dod://…` deep-link
-///   string from `userInfo` (under ``NotificationPlan/deepLinkKey``),
-///   extracts the integer post id, and routes through the existing
-///   `DeepLinkDispatcher` — the same dispatcher App Intents / Spotlight
-///   use (US-10) — so a tapped notification opens the post exactly the way
-///   a widget tap or a Spotlight result does. **No new URL grammar.**
-///   Routing by id (rather than re-opening the URL) handles both
-///   `dod://recipe/<id>` and `dod://article/<id>` uniformly: `PostKind`
-///   lives on the `Recipe` domain type (US-37 / CL-63), so the detail view
-///   model classifies recipe-vs-article itself once the post is resolved.
+///   string from `userInfo` (under ``NotificationPlan/deepLinkKey``), parses
+///   it through the shared `DeepLinkIntent.parse` — the same parser
+///   `RootView.onOpenURL` runs App Intents / Spotlight URLs through (US-10) —
+///   and routes the resulting intent through `DeepLinkDispatcher`, so a
+///   tapped notification opens the post exactly the way a widget tap or a
+///   Spotlight result does. **No new URL grammar.** The notification's own
+///   `dod://article/<id>` grammar (DUT-566) round-trips through that shared
+///   parser, which maps both `dod://recipe/<id>` and `dod://article/<id>` to
+///   `.openRecipe(id:)`: `PostKind` lives on the `Recipe` domain type
+///   (US-37 / CL-63), so the detail view model classifies recipe-vs-article
+///   itself once the post is resolved. A private `postID(fromDeepLink:)`
+///   remains only as a last-resort fallback for any well-formed `dod://…/<id>`
+///   URL the shared parser doesn't recognize.
 ///
 /// `NSObject` subclass because `UNUserNotificationCenterDelegate` is an
 /// Objective-C protocol. Set as the center's delegate in `AppDelegate`.
@@ -45,7 +49,7 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         let userInfo = response.notification.request.content.userInfo
         guard
             let urlString = userInfo[NotificationPlan.deepLinkKey] as? String,
-            let id = Self.postID(fromDeepLink: urlString)
+            let intent = Self.intent(fromDeepLink: urlString)
         else {
             DODLog.app.error("notification tap: no routable deep link in userInfo")
             return
@@ -53,13 +57,30 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         // Reuse the existing dispatcher (US-10) — RootView observes
         // `pending` and resolves the route from the cache. Works for both
         // recipe and article kinds (PostKind lives on Recipe).
-        Task { @MainActor in DeepLinkDispatcher.shared.dispatch(.openRecipe(id: id)) }
+        Task { @MainActor in DeepLinkDispatcher.shared.dispatch(intent) }
+    }
+
+    /// Maps a notification's `dod://…` deep-link string to the `DeepLinkIntent`
+    /// the dispatcher routes on. DUT-566 — this runs the string through the
+    /// shared `DeepLinkIntent.parse` so the notification grammar
+    /// (`dod://recipe/<id>` and `dod://article/<id>`) round-trips through the
+    /// exact path `RootView.onOpenURL` uses. If the shared parser doesn't
+    /// recognize the URL, it falls back to the private `postID(fromDeepLink:)`
+    /// hand-parser (mapping to `.openRecipe(id:)`) so no previously-working
+    /// payload regresses. Returns `nil` only when both fail.
+    static func intent(fromDeepLink urlString: String) -> DeepLinkIntent? {
+        if let url = URL(string: urlString), let intent = DeepLinkIntent.parse(url) {
+            return intent
+        }
+        guard let id = postID(fromDeepLink: urlString) else { return nil }
+        return .openRecipe(id: id)
     }
 
     /// Extracts the integer post id from a `dod://recipe/<id>` or
     /// `dod://article/<id>` deep link. Returns `nil` for any URL that
     /// doesn't carry a positive integer id so a malformed payload is
-    /// ignored rather than crashing.
+    /// ignored rather than crashing. Fallback only — see
+    /// ``intent(fromDeepLink:)``.
     static func postID(fromDeepLink urlString: String) -> Int? {
         guard
             let url = URL(string: urlString),

@@ -174,4 +174,40 @@ import Testing
         let url = try #require(URL(string: "dod://shopping-list/foo"))
         #expect(WidgetDeepLinkParser.parse(url) == nil)
     }
+
+    // MARK: - DUT-566 `dod://article/<id>` (notification grammar)
+
+    /// `dod://article/<id>` (emitted by `NotificationContent` for `.article`
+    /// posts) resolves by post id through the same by-id route as a recipe —
+    /// `PostKind` lives on `Recipe`, so both kinds open the same way.
+    @Test func parsesArticleWithPositiveID() throws {
+        let url = try #require(URL(string: "dod://article/123"))
+        #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 123))
+    }
+
+    /// Article URLs carry no `?source=`, so they attribute to `.featured`
+    /// like any bare recipe URL.
+    @Test func parsesArticleDefaultsToFeaturedSource() throws {
+        let url = try #require(URL(string: "dod://article/4641"))
+        #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 4641, source: .featured))
+    }
+
+    /// Case-insensitive scheme + host, same contract as every other route.
+    @Test func articleRouteIsCaseInsensitive() throws {
+        let url = try #require(URL(string: "DOD://Article/12"))
+        #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 12))
+    }
+
+    /// A zero, negative, non-numeric, or missing id is rejected — same
+    /// guard the recipe host applies.
+    @Test func rejectsBadArticleID() throws {
+        let zero = try #require(URL(string: "dod://article/0"))
+        #expect(WidgetDeepLinkParser.parse(zero) == nil)
+        let negative = try #require(URL(string: "dod://article/-3"))
+        #expect(WidgetDeepLinkParser.parse(negative) == nil)
+        let nonNumeric = try #require(URL(string: "dod://article/abc"))
+        #expect(WidgetDeepLinkParser.parse(nonNumeric) == nil)
+        let empty = try #require(URL(string: "dod://article"))
+        #expect(WidgetDeepLinkParser.parse(empty) == nil)
+    }
 }
