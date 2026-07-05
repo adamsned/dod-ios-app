@@ -82,8 +82,9 @@ public struct RecipeDetailView: View {
     /// Coach" tap. The App root passes a closure that selects the Cooking Tools
     /// hub tab and mints a hub token; the feature package stays free of any App /
     /// tab-selection import. `nil` (default) hides the whole nudge (same seam as
-    /// `openShoppingList`).
-    public let openHeatCoach: (() -> Void)?
+    /// `openShoppingList`). DUT-584 — carries an optional ``HeatCoachSeed`` so the
+    /// nudge opens the coach pre-answered from the recipe's own heat profile.
+    public let openHeatCoach: ((HeatCoachSeed?) -> Void)?
     /// T-912 / DUT-551 (CL-306) — builds the Heat Coach surface presented as a
     /// sheet OVER Cook Mode's full-screen cover. `HeatCoachView` lives in
     /// `DODFeatureFeed` (not importable here), so the App root injects a
@@ -103,7 +104,7 @@ public struct RecipeDetailView: View {
         autoStartCookMode: Bool = false,
         openShoppingList: (() -> Void)? = nil,
         addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)? = nil,
-        openHeatCoach: (() -> Void)? = nil,
+        openHeatCoach: ((HeatCoachSeed?) -> Void)? = nil,
         heatCoachSheet: (() -> AnyView)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)

@@ -49,7 +49,18 @@ extension RecipeDetailView {
                 .foregroundStyle(DODColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-                Button(action: openHeatCoach) {
+                Button {
+                    // DUT-584 — open the coach pre-answered from this recipe: 12"
+                    // (the nudge's own assumption), style derived from the recipe's
+                    // task, and the recipe's target °F for the answer's context line.
+                    openHeatCoach(
+                        HeatCoachSeed(
+                            fromRecipeTask: derived.task,
+                            ovenDiameterInches: Self.heatCoachOvenDiameterInches,
+                            targetTemperatureF: derived.ovenTempF
+                        )
+                    )
+                } label: {
                     Text("Open Heat Coach")
                         .dodFont(DODType.bodyEmphasized)
                 }

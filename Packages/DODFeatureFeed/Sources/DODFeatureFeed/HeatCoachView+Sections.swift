@@ -2,25 +2,76 @@ import DODDesignSystem
 import DODSupport
 import SwiftUI
 
-// The page compositions for ``HeatCoachView`` (DUT-48; CL-274 redesign), split
-// out of `HeatCoachView.swift` so each file stays under the `file_length` cap
-// and the struct body stays under `type_body_length`.
+// The section compositions for ``HeatCoachView`` (DUT-48; DUT-584 answer-first
+// redesign), split out of `HeatCoachView.swift` so each file stays under the
+// `file_length` cap and the struct body stays under `type_body_length`.
 //
-//   - Coals page: ``setupCard`` → ``resultCard`` → ``conditionsCard``.
-//   - Feel page:  ``feelReferenceSection`` (the cook-by-feel cues — the point).
-//   - Tips page:  ``coalManagementSection`` (coal habits + wind guidance).
+//   - ``answerCard`` — the answer first: the coal-split diagram (in `+Diagram`)
+//     under the "starting point, then cook by feel" framing + optional recipe
+//     context line.
+//   - ``primaryInputsCard`` — the two minimal inputs (Oven Size + Cooking Style).
+//   - ``conditionsGroup`` — the optional collapsed "Adjust for Conditions"
+//     expander (elevation / air temp / wind + the adjustment notes).
+//   - ``feelReferenceSection`` — the cook-by-feel cues, always visible (the point).
+//   - ``tipsGroup`` — coal-management habits + wind guidance, collapsed.
 //
 // The cue / habit / wind copy is one source of truth in ``DutchOvenHeatCoach``
 // (DODSupport) and is pinned by `DutchOvenHeatCoachTests`.
 
 extension HeatCoachView {
 
-    // MARK: - Coals page: setup
+    // MARK: - The answer, first + visual
 
-    var setupCard: some View {
+    var answerCard: some View {
         VStack(alignment: .leading, spacing: DODSpacing.md) {
-            sectionHeader("Start Here")
+            Text("A starting point. Then cook by feel.")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelOnAccent.opacity(0.9))
+                .textCase(.uppercase)
+                .fixedSize(horizontal: false, vertical: true)
 
+            Text("Your Starting Coals")
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.labelOnAccent)
+                .fixedSize(horizontal: false, vertical: true)
+
+            coalSplitDiagram(coachModel.coalSplit)
+
+            if let context = recipeContextLine {
+                Text(context)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("heat-coach-recipe-context")
+            }
+
+            Text(coachModel.styleNote)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(DODSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                .fill(DODColor.accent)
+        )
+        .accessibilityIdentifier("heat-coach-result")
+    }
+
+    /// The recipe context line ("For this recipe at 350°F"), shown only when the
+    /// coach was seeded from a recipe with a target temperature. Split out so the
+    /// `if let` in ``answerCard`` stays a single line (swift-format vs SwiftLint
+    /// `opening_brace` peace).
+    private var recipeContextLine: String? {
+        guard let seedTemperatureF else { return nil }
+        return "For this recipe at \(seedTemperatureF)°F."
+    }
+
+    // MARK: - Minimal primary inputs (live-update the answer)
+
+    var primaryInputsCard: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.md) {
             labeledRow("Oven Size") {
                 Picker("Oven Size", selection: $ovenDiameterInches) {
                     ForEach(HeatCoachModel.ovenSizes, id: \.self) { size in
@@ -45,47 +96,34 @@ extension HeatCoachView {
         .accessibilityIdentifier("heat-coach-setup")
     }
 
-    // MARK: - Coals page: the starting estimate
-
-    var resultCard: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text("A starting point. Then cook by feel.")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.9))
-                .textCase(.uppercase)
-
-            Text(coachModel.coalHeadline)
-                .dodFont(DODType.displayMedium)
-                .foregroundStyle(DODColor.labelOnAccent)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text(coachModel.styleNote)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(DODSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                .fill(DODColor.accent)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("heat-coach-result")
-    }
-
-    // MARK: - Coals page: optional condition fine-tuning + adjustment notes
+    // MARK: - Optional condition fine-tuning + adjustment notes (collapsed)
 
     @ViewBuilder
-    func conditionsCard(_ coachModel: HeatCoachModel) -> some View {
+    func conditionsGroup(_ coachModel: HeatCoachModel) -> some View {
+        DisclosureGroup(isExpanded: $showConditions) {
+            conditionsContent(coachModel)
+                .padding(.top, DODSpacing.sm)
+        } label: {
+            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                Text("Adjust for Conditions")
+                    .dodFont(DODType.heading)
+                    .foregroundStyle(DODColor.label)
+                Text("Optional. The estimate already works for a calm, mild day.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(minHeight: 44, alignment: .leading)  // DUT-291: 44pt tap target
+        }
+        .tint(DODColor.accent)
+        .padding(DODSpacing.md)
+        .cardSurface()
+        .accessibilityIdentifier("heat-coach-conditions")
+    }
+
+    @ViewBuilder
+    private func conditionsContent(_ coachModel: HeatCoachModel) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.md) {
-            sectionHeader("Fine-Tune for Conditions")
-
-            Text("Optional. The estimate already works for a calm, mild day.")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-
             labeledRow("Elevation") {
                 Stepper(value: $elevationFeet, in: 0...15000, step: 500) {
                     Text(elevationFeet == 0 ? "Sea level" : "\(elevationFeet) ft")
@@ -124,9 +162,6 @@ extension HeatCoachView {
                 }
             }
         }
-        .padding(DODSpacing.md)
-        .cardSurface()
-        .accessibilityIdentifier("heat-coach-conditions")
     }
 
     /// The adjustment notes that apply to the current conditions, in order. A
@@ -155,7 +190,7 @@ extension HeatCoachView {
         }
     }
 
-    // MARK: - Feel page: cook-by-feel cues (the heart of the feature)
+    // MARK: - Cook-by-feel cues (the heart of the feature — always visible)
 
     var feelReferenceSection: some View {
         VStack(alignment: .leading, spacing: DODSpacing.sm) {
@@ -209,34 +244,44 @@ extension HeatCoachView {
         }
     }
 
-    // MARK: - Tips page: coal-management habits + wind guidance
+    // MARK: - Coal-management habits + wind guidance (collapsed)
 
-    var coalManagementSection: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            sectionHeader("Coal Management")
+    @ViewBuilder
+    var tipsGroup: some View {
+        DisclosureGroup(isExpanded: $showTips) {
+            tipsContent
+                .padding(.top, DODSpacing.sm)
+        } label: {
+            Text("Coal Management & Wind")
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.label)
+                .frame(minHeight: 44, alignment: .leading)  // DUT-291: 44pt tap target
+        }
+        .tint(DODColor.accent)
+        .padding(DODSpacing.md)
+        .cardSurface()
+        .accessibilityIdentifier("heat-coach-coal-management")
+    }
 
+    @ViewBuilder
+    private var tipsContent: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.md) {
             VStack(alignment: .leading, spacing: DODSpacing.sm) {
                 ForEach(DutchOvenHeatCoach.coalManagementHabits, id: \.self) { habit in
                     habitLine(habit)
                 }
             }
-            .padding(DODSpacing.md)
-            .cardSurface()
 
             Text("Wind")
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
-                .padding(.top, DODSpacing.xs)
 
             VStack(alignment: .leading, spacing: DODSpacing.sm) {
                 ForEach(DutchOvenHeatCoach.windGuidance, id: \.self) { tip in
                     habitLine(tip)
                 }
             }
-            .padding(DODSpacing.md)
-            .cardSurface()
         }
-        .accessibilityIdentifier("heat-coach-coal-management")
     }
 
     private func habitLine(_ text: String) -> some View {

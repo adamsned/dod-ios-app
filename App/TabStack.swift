@@ -54,8 +54,9 @@ struct TabStack: View {
     /// and the Cook Mode heat-step shortcut both point at the always-available
     /// hub Heat Coach. This closure (`RootView.routeToHeatCoach()`) selects
     /// `.cookingTools` + mints the hub Heat Coach token. Threaded from `RootView`
-    /// like `openShoppingList`; defaults to a no-op.
-    let openHeatCoach: () -> Void
+    /// like `openShoppingList`; defaults to a no-op. DUT-584 — carries an optional
+    /// ``HeatCoachSeed`` so the per-recipe nudge can open the coach pre-answered.
+    let openHeatCoach: (HeatCoachSeed?) -> Void
     /// DUT-560 — the UNIFIED hub-tool reroute request, owned by `RootView` and
     /// bound only into the Cooking Tools tab (every tool entry point mints it via
     /// `route(toHubTool:)`). The hub consumes it via `.task(id:)` and opens the
@@ -88,7 +89,7 @@ struct TabStack: View {
         openShoppingList: @escaping () -> Void = {},
         onOpenSettings: @escaping () -> Void = {},
         onFindRecipe: @escaping () -> Void = {},
-        openHeatCoach: @escaping () -> Void = {},
+        openHeatCoach: @escaping (HeatCoachSeed?) -> Void = { _ in },
         hubPendingTool: Binding<HubToolRoute?> = .constant(nil),
         hubTipToken: Binding<UUID?> = .constant(nil),
         commentModeration: CommentModerationStore = CommentModerationStore()
