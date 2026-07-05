@@ -60,12 +60,15 @@ extension RecipeDetailViewModel {
                 if !parsed.instructions.isEmpty || isRecipeSubject {
                     // T-732 / CL-129 / AC-4.12 — extract the narrative blurb (the
                     // prose preceding the WPRM card) and parse it into native
-                    // blocks. DUT-572 / CL-312: `paragraphLimit: .max`.
+                    // blocks. DUT-572 / CL-312: `paragraphLimit: .max`. DUT-582:
+                    // pass `canonicalURL` so protocol-/root-relative body-image
+                    // sources resolve to absolute http(s) URLs.
                     let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(
                         html: html,
                         paragraphLimit: .max
                     )
-                    let blurbBlocks = blurbHTML.isEmpty ? [] : ArticleHTMLParser.parse(html: blurbHTML)
+                    let blurbBlocks =
+                        blurbHTML.isEmpty ? [] : ArticleHTMLParser.parse(html: blurbHTML, baseURL: canonicalURL)
                     return .recipe(parsed, blurbBlocks: blurbBlocks)
                 }
             }

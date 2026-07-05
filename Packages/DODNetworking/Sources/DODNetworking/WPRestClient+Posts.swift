@@ -37,11 +37,13 @@ extension WPRestClient {
         if let categoryID {
             queryItems.append(URLQueryItem(name: "categories", value: String(categoryID)))
         }
-        let (posts, totalPages): ([WPDTO.Post], Int) = try await getPaged(
+        // DUT-575: decode the page lossily so a single malformed post (e.g.
+        // `title: null`) is skipped instead of emptying the whole feed.
+        let (lossy, totalPages): (LossyArray<WPDTO.Post>, Int) = try await getPaged(
             path: "posts",
             queryItems: queryItems
         )
-        return (posts.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }, totalPages)
+        return (lossy.elements.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }, totalPages)
     }
 
     /// Fetch a single post by its WP id and project it to a
@@ -82,8 +84,9 @@ extension WPRestClient {
             URLQueryItem(name: "slug", value: slug),
             URLQueryItem(name: "_embed", value: "wp:featuredmedia"),
         ]
-        let posts: [WPDTO.Post] = try await get(path: "posts", queryItems: queryItems)
-        return posts.first.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
+        // DUT-575: lossy decode — a malformed sibling row must not fail the slug lookup.
+        let lossy: LossyArray<WPDTO.Post> = try await get(path: "posts", queryItems: queryItems)
+        return lossy.elements.first.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
     }
 
     /// Search posts by query string.
@@ -117,7 +120,8 @@ extension WPRestClient {
             // _links field that drives embedding, so omit _fields here.
             URLQueryItem(name: "_embed", value: "wp:featuredmedia"),
         ]
-        let posts: [WPDTO.Post] = try await get(path: "posts", queryItems: queryItems)
-        return posts.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
+        // DUT-575: lossy decode so one malformed search hit can't empty the results.
+        let lossy: LossyArray<WPDTO.Post> = try await get(path: "posts", queryItems: queryItems)
+        return lossy.elements.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
     }
 }

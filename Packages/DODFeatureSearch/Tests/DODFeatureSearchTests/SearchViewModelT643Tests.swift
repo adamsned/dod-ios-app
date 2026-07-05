@@ -5,13 +5,19 @@ import Testing
 
 @testable import DODFeatureSearch
 
-/// CL-121 (T-643) — L1 pipeline coverage for the category-name match path.
-/// Each test pins a user-facing contract from CL-121's "what changes" list:
-/// `"Dessert Recipes"` surfaces the full Dessert category (regression fix
-/// for T-642 / CL-120); `"Chicken"` surfaces Path A + Path B unioned with
-/// title matches first; `"Nachos"` is unchanged from REG-29 (Path B empty
-/// so the title-precision contract stands alone); Path B failure does NOT
-/// block Path A (graceful degradation).
+/// CL-121 (T-643) — L1 pipeline coverage for the category-name match path,
+/// updated for DUT-574's Path B gate.
+///
+/// DUT-574: Path B (the `?categories=<id>&per_page=100` category fetch) no
+/// longer fires off the *typed query text* naming a category — that fired up
+/// to two 100-post round-trips on every finalized plain-text search and
+/// polluted results with unrelated recent category posts (the user-reported
+/// "slow + doesn't work right" bug). Path B now fires ONLY when a category
+/// filter chip is actually set (`filters.categoryID != nil`). These tests are
+/// updated accordingly: the plain-text "Dessert Recipes" / "Chicken" cases
+/// now assert NO category fan-out, and a dedicated filter-active test proves
+/// Path B still fires + unions when the filter IS set. `"Nachos"` (Path B
+/// naturally empty) and the graceful-degradation contract are unchanged.
 ///
 /// Split into its own file so `SearchViewModelTests.swift` stays under
 /// SwiftLint's `file_length` cap — mirrors T-637 / T-640's split pattern.
@@ -39,24 +45,20 @@ import Testing
         DODDomain.Category(id: 337, name: "Dutch Oven Camp Recipes", slug: "dutch-oven-camp-recipes", count: 26),
     ]
 
-    // MARK: - The "Dessert Recipes" contract (the regression T-643 fixes)
+    // MARK: - DUT-574: a plain text search never fires the category fan-out
 
-    @Test func dessertRecipesSurfacesFullCategory() async {
-        // T-642 / CL-120 regression: typing "Dessert Recipes" returned 0
-        // items because no individual dessert recipe is titled "Dessert
-        // Recipes" — the title-precision filter dropped them all.
-        // T-643 / CL-121 fix: Path B fires `?categories=336&per_page=100`
-        // and surfaces every dessert. With Path A empty and Path B
-        // returning 53, the merged set is 53.
+    @Test func plainTextSearchNamingACategoryDoesNotFirePathB() async {
+        // DUT-574 (was `dessertRecipesSurfacesFullCategory`): typing the
+        // category name "Dessert Recipes" with NO category filter set must
+        // make exactly ONE primary request (Path A) and never fire the
+        // `?categories=336&per_page=100` fan-out. The pre-DUT-574 code fired
+        // Path B off the query text, pulling the whole 53-post category into
+        // the results even though the user only typed text — the slowness +
+        // "doesn't work right" bug. With Path A empty, the result is empty.
         let dependencies = FakeSearchDependencies()
         dependencies.categories = Self.liveCategories
-        // Path A: title-search REST returns the cookbook's actual response
-        // for "Dessert Recipes" — basically nothing (the phrase isn't in
-        // any recipe title). Empty.
         dependencies.results["Dessert Recipes"] = []
-        // Path B: 53 dessert posts in category 336. Titles intentionally
-        // don't contain "dessert recipes" — that's the whole point of the
-        // regression (these would be dropped by the title filter).
+        // Seeded but must NOT be fetched — no filter is set.
         dependencies.categoryFetchResults[336] = Self.fakeDesserts(count: 53)
         let viewModel = SearchViewModel(
             dependencies: dependencies,
@@ -67,22 +69,24 @@ import Testing
         viewModel.query = "Dessert Recipes"
         await viewModel.runImmediateSearch()
 
-        #expect(viewModel.state == .results)
-        #expect(viewModel.items.count == 53, "All 53 desserts must surface via Path B")
-        // The Path B fetch was actually called against the right category.
-        #expect(dependencies.categoryFetchCalls.contains { $0.categoryID == 336 })
+        #expect(
+            dependencies.categoryFetchCalls.isEmpty,
+            "Plain text search must not fire the category fan-out (DUT-574)"
+        )
+        // Exactly one primary REST call for the finalized search.
+        #expect(dependencies.searches == ["Dessert Recipes"])
+        #expect(viewModel.items.isEmpty)
     }
 
-    // MARK: - The "Chicken" contract — Path A + Path B union
+    // MARK: - DUT-574: Path B still fires + unions when a category filter IS set
 
-    @Test func chickenUnionsPathAAndPathBDedupedTitleFirst() async {
-        // "Chicken" matches Path A (5 chicken-titled posts the title
-        // filter accepts) and Path B (32 posts in "Chicken and Poultry
-        // Recipes" category id 338). One id (333) overlaps — it's a
-        // chicken-titled post that's also in the category. Expected:
-        // - title matches come first
-        // - the overlap is deduped (counted once, in title-match position)
-        // - Path B-only contributions follow
+    @Test func categoryFilterSetFiresPathBAndUnionsTitleFirst() async {
+        // DUT-574 (adapted from `chickenUnionsPathAAndPathBDedupedTitleFirst`):
+        // with the "Chicken and Poultry Recipes" category filter (id 338)
+        // actually set, Path B fires and unions with Path A — title matches
+        // first, category-only contributions after, overlap deduped. The
+        // filter's post-filter narrows to recipes tagged with category 338,
+        // so every surfaced id is mapped to 338 in `categoryMap`.
         let dependencies = FakeSearchDependencies()
         dependencies.categories = Self.liveCategories
         let titlePosts = [
@@ -90,34 +94,37 @@ import Testing
             Self.makeItem(102, title: "Bourbon Chicken"),
             Self.makeItem(103, title: "Chicken Marsala"),
             Self.makeItem(104, title: "Chicken Tacos"),
-            // 333 is the overlap with Path B below — surfaces as a
-            // title match here and as a category match below.
+            // 333 overlaps with Path B below.
             Self.makeItem(333, title: "Chicken Alfredo Casserole"),
         ]
         dependencies.results["Chicken"] = titlePosts
         let categoryPosts = Self.fakeCategoryPosts(count: 32, idOffset: 300)
-        // Insert the overlap id at a known position so the test asserts
-        // dedupe regardless of which post happens to land where.
         var withOverlap = categoryPosts
         withOverlap[5] = Self.makeItem(333, title: "Chicken Alfredo Casserole")
         dependencies.categoryFetchResults[338] = withOverlap
+        // Tag every surfaced id with category 338 so the post-filter admits
+        // them (the filter narrows the union to the filtered category).
+        var categoryMap: [Int: [Int]] = [:]
+        for item in titlePosts + withOverlap { categoryMap[item.id] = [338] }
+        dependencies.categoryMap = categoryMap
 
         let viewModel = SearchViewModel(
             dependencies: dependencies,
             recentSearches: Self.scratchRecents()
         )
         await viewModel.loadCategoriesIfNeeded()
+        // The actually-set filter is what unlocks Path B now.
+        viewModel.filters.categoryID = 338
 
         viewModel.query = "Chicken"
         await viewModel.runImmediateSearch()
 
         #expect(viewModel.state == .results)
+        #expect(dependencies.categoryFetchCalls.contains { $0.categoryID == 338 })
         // 5 title-matches + 32 category-matches - 1 overlap = 36 unique ids.
         #expect(viewModel.items.count == 36)
-        // Title matches occupy the first 5 positions.
         let firstFiveIds = viewModel.items.prefix(5).map(\.id)
         #expect(Set(firstFiveIds) == Set([101, 102, 103, 104, 333]))
-        // No duplicate of 333 in the Path B-only tail.
         #expect(viewModel.items.filter { $0.id == 333 }.count == 1)
     }
 
@@ -176,19 +183,24 @@ import Testing
         dependencies.categoryFetchResults[336] = Self.fakeDesserts(count: 53)
         // Force Path B to throw so the union sees only Path A.
         dependencies.categoryFetchShouldThrow = true
+        // DUT-574: Path B only fires with a filter set — tag the Path A titles
+        // with category 336 so the post-filter admits them once they render.
+        dependencies.categoryMap = [1: [336], 2: [336]]
 
         let viewModel = SearchViewModel(
             dependencies: dependencies,
             recentSearches: Self.scratchRecents()
         )
         await viewModel.loadCategoriesIfNeeded()
+        // DUT-574: the set filter unlocks Path B (which then throws).
+        viewModel.filters.categoryID = 336
 
         viewModel.query = "Dessert Recipes"
         await viewModel.runImmediateSearch()
 
         #expect(viewModel.state == .results, "Path A's title matches must still render")
         #expect(viewModel.items.count == 2)
-        // Path B was attempted (the matcher fired) but the throw means
+        // Path B was attempted (the filter fired it) but the throw means
         // no posts contributed.
         #expect(dependencies.categoryFetchCalls.contains { $0.categoryID == 336 })
     }

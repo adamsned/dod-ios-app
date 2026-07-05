@@ -25,7 +25,9 @@ struct RecipeDetailHero: View {
 
     /// Resting hero height below the safe area. The effective height grows by
     /// `topInset` (to reach the top of the screen) plus any positive pull-down.
-    private let baseHeight: CGFloat = 320
+    /// DUT-582: raised 320 → 400 so the photo dominates the top of the page and
+    /// the blur strip reads clearly as a header band over a bigger image.
+    private let baseHeight: CGFloat = 400
 
     var body: some View {
         GeometryReader { geo in
@@ -41,10 +43,12 @@ struct RecipeDetailHero: View {
                     .frame(width: geo.size.width, height: height)
                     .clipped()
 
-                // Faint dark scrim under the blur strip (same mask geometry) so
-                // the glyphs keep contrast over bright photos.
+                // Dark scrim under the blur strip (same mask geometry) so the
+                // glyphs keep contrast over bright photos. DUT-582: strengthened
+                // 0.18 → 0.28 for the taller edge-to-edge hero — the mask pins it
+                // to the top band, so the photo below stays untouched.
                 Rectangle()
-                    .fill(.black.opacity(0.18))
+                    .fill(.black.opacity(0.28))
                     .frame(height: topInset + 56)
                     .mask(blurMaskGradient)
                     .frame(maxHeight: .infinity, alignment: .top)

@@ -46,7 +46,8 @@ extension RecipeDetailViewModel {
         // awaits the async persistence/related-load seams. Classification is
         // identical to the pre-DUT-577 inline decision tree (DUT-544/554/555),
         // and `hasRecipeJSONLD` is scanned exactly ONCE (the old code re-scanned
-        // it at the article-classify entry — deduped here).
+        // it at the article-classify entry — deduped here). DUT-582's blurb
+        // body-image base-URL threading lives inside `classifyPage(html:)`.
         let classification = await classifyPage(html: html)
         await apply(classification: classification, html: html)
     }
@@ -193,7 +194,10 @@ extension RecipeDetailViewModel {
     /// articles render rich-body on re-open without needing a refresh.
     /// `onAppear()`'s `.article` case is unchanged by T-736.
     func refreshBlurbBlocks(html: String) async {
-        let parsed = await Self.parseBlurbBlocks(html: html)
+        // DUT-582: thread the page's canonical URL into the off-main parse so
+        // protocol-/root-relative body-image sources resolve to absolute
+        // http(s) URLs on the cache-hit refresh path too (matches `fetchAndParse`).
+        let parsed = await Self.parseBlurbBlocks(html: html, baseURL: canonicalURL)
         guard !parsed.isEmpty else { return }
         blurbBlocks = parsed
     }
@@ -201,11 +205,13 @@ extension RecipeDetailViewModel {
     /// DUT-577 — the pure blurb extract + parse, run off the main actor. Static +
     /// Sendable so it hops onto a detached task; the `@MainActor` caller only
     /// assigns the returned blocks. Empty result when the extract is empty (same
-    /// contract as the inline pre-DUT-577 code).
-    nonisolated static func parseBlurbBlocks(html: String) async -> [ArticleBlock] {
+    /// contract as the inline pre-DUT-577 code). DUT-582 — `baseURL` is threaded
+    /// into `ArticleHTMLParser.parse` so protocol-/root-relative body-image
+    /// sources resolve to absolute http(s) URLs.
+    nonisolated static func parseBlurbBlocks(html: String, baseURL: URL) async -> [ArticleBlock] {
         await Task.detached(priority: .userInitiated) {
             let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html, paragraphLimit: .max)
-            return blurbHTML.isEmpty ? [] : ArticleHTMLParser.parse(html: blurbHTML)
+            return blurbHTML.isEmpty ? [] : ArticleHTMLParser.parse(html: blurbHTML, baseURL: baseURL)
         }.value
     }
 
