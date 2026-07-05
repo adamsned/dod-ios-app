@@ -26,6 +26,10 @@ struct CookModePlayerControls: View {
     let stepChangeAnimation: Animation?
     /// Invoked when the center button acts as "Finish" in the done state.
     let onFinish: () -> Void
+    /// DUT-596 — called on ANY control interaction (transport, replay, speed) so
+    /// the host can wake the auto-minimizing control panel and re-arm the idle
+    /// timer. Defaults to a no-op for previews / hosts that don't wire it.
+    var onInteract: () -> Void = {}
 
     private var showsPrevious: Bool {
         viewModel.currentStepIndex > 0 || viewModel.isFinished
@@ -58,6 +62,7 @@ struct CookModePlayerControls: View {
     private var previousButton: some View {
         if showsPrevious {
             flankButton(symbol: "arrow.backward", label: "Previous Step") {
+                onInteract()
                 withAnimation(stepChangeAnimation) { viewModel.goBack() }
             }
             .accessibilityIdentifier("cook-mode-previous")
@@ -69,6 +74,7 @@ struct CookModePlayerControls: View {
 
     private var nextButton: some View {
         flankButton(symbol: "arrow.forward", label: "Next Step") {
+            onInteract()
             withAnimation(stepChangeAnimation) { viewModel.goNext() }
         }
         .accessibilityIdentifier("cook-mode-next")
@@ -98,6 +104,7 @@ struct CookModePlayerControls: View {
     }
 
     private func centerAction() {
+        onInteract()
         if viewModel.isFinished {
             onFinish()
             return
@@ -138,6 +145,7 @@ struct CookModePlayerControls: View {
 
     private var replayButton: some View {
         secondaryButton(symbol: "arrow.trianglehead.counterclockwise", title: "Replay") {
+            onInteract()
             viewModel.replayCurrentStep()
         }
         .accessibilityIdentifier("cook-mode-replay-step")
@@ -151,6 +159,7 @@ struct CookModePlayerControls: View {
     /// speed. Re-speaks when a step is actively reading (handled by the model).
     private var speedButton: some View {
         Button {
+            onInteract()
             viewModel.cycleVoiceSpeed()
         } label: {
             Text(viewModel.voiceSpeedLabel)

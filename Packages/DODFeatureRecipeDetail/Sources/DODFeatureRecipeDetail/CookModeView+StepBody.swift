@@ -104,17 +104,24 @@ extension CookModeView {
                 .foregroundStyle(DODColor.label)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
+            // DUT-596 — the "log this cook" CTA now leads the exit hint (was
+            // below it), so the primary celebratory action is what the eye lands
+            // on first and the "tap the checkmark" instruction reads as the
+            // quieter follow-up.
+            logCookButton
             Text("Tap the checkmark below to leave Cook Mode.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
-            // DUT-326 — optional celebratory "log this cook" action.
-            logCookButton
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.horizontal, DODSpacing.md)
     }
+
+    /// DUT-596 — a comfortable fixed width for the Done-card journal CTA so it
+    /// reads taller/skinnier (centered) rather than stretching full-bleed.
+    private var logCookButtonWidth: CGFloat { 220 }
 
     /// DUT-326 — a clear, optional CTA on the Done card to save this cook to
     /// the Cooking Journal (photo + caption). Hidden when no `onLogCook` sink
@@ -126,8 +133,13 @@ extension CookModeView {
             Button {
                 isJournalLogPresented = true
             } label: {
+                // DUT-596 — skinnier/taller: a constrained centered width (not
+                // full-bleed) with extra vertical padding so the CTA reads as a
+                // deliberate pill rather than a wide bar.
                 Label("Add to Cooking Journal", systemImage: "camera.fill")
-                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .frame(width: logCookButtonWidth)
+                    .padding(.vertical, DODSpacing.sm)
             }
             .dodProminentButton()
             .tint(DODColor.accent)
