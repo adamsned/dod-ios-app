@@ -100,6 +100,99 @@ struct ArticleBodyExtractorInstructionCropTests {
         #expect(!result.contains("steps here"))
     }
 
+    // MARK: - DUT-579: broad-heading over-match regressions
+
+    /// DUT-579: a "How to Store Leftovers" intro heading is NOT an instruction
+    /// boundary — the intro/tips/storage paragraphs after it are preserved.
+    @Test func doesNotCropAtHowToStoreHeading() {
+        let html = """
+            <p>The intro story.</p>
+            <h2>How to Store Leftovers</h2>
+            <p>Keep it in the fridge up to four days.</p>
+            """
+        let result = ArticleBodyExtractor.croppingBeforeInstructionHeading(html)
+        #expect(result == html)
+    }
+
+    /// DUT-579: "How to Serve" is a serving-suggestion heading, not an
+    /// instruction boundary — nothing is dropped.
+    @Test func doesNotCropAtHowToServeHeading() {
+        let html = """
+            <p>Intro.</p>
+            <h2>How to Serve This Dish</h2>
+            <p>Serve warm with crusty bread.</p>
+            """
+        let result = ArticleBodyExtractor.croppingBeforeInstructionHeading(html)
+        #expect(result == html)
+    }
+
+    /// DUT-579: "My Secret Method" merely contains "method" — it must not be
+    /// treated as a "Method" instruction heading.
+    @Test func doesNotCropAtSecretMethodHeading() {
+        let html = """
+            <p>Intro.</p>
+            <h2>My Secret Method</h2>
+            <p>The tip that makes it shine.</p>
+            """
+        let result = ArticleBodyExtractor.croppingBeforeInstructionHeading(html)
+        #expect(result == html)
+    }
+
+    /// DUT-579: a heading that merely contains "steps" ("Storage steps to
+    /// remember") is not the crop boundary.
+    @Test func doesNotCropAtHeadingContainingSteps() {
+        let html = """
+            <p>Intro.</p>
+            <h2>Storage Steps to Remember</h2>
+            <p>Cool completely first.</p>
+            """
+        let result = ArticleBodyExtractor.croppingBeforeInstructionHeading(html)
+        #expect(result == html)
+    }
+
+    /// DUT-579 hold on DUT-573: a genuine whole-heading "Method" still crops.
+    @Test func cropsAtWholeMethodHeading() {
+        let html = """
+            <p>A little backstory.</p>
+            <h2>Method</h2>
+            <p>Do the thing.</p>
+            """
+        let result = ArticleBodyExtractor.croppingBeforeInstructionHeading(html)
+        #expect(result.contains("A little backstory"))
+        #expect(!result.contains("Do the thing"))
+    }
+
+    /// DUT-579 hold on DUT-573: a whole-heading "Steps" (with trailing colon)
+    /// still crops.
+    @Test func cropsAtWholeStepsHeadingWithPunctuation() {
+        let html = """
+            <p>Backstory.</p>
+            <h2>Steps:</h2>
+            <p>First, chop.</p>
+            """
+        let result = ArticleBodyExtractor.croppingBeforeInstructionHeading(html)
+        #expect(result.contains("Backstory"))
+        #expect(!result.contains("First, chop"))
+    }
+
+    /// DUT-579 hold on DUT-573: "How to Make Chili" (prefix form) still crops,
+    /// keeping the intro + tips before it.
+    @Test func cropsAtHowToMakeChiliKeepingIntroAndTips() {
+        let html = """
+            <p>Intro story.</p>
+            <h2>Why You'll Love This</h2>
+            <p>A helpful tip.</p>
+            <h2>How to Make Chili</h2>
+            <p>Brown the beef.</p>
+            """
+        let result = ArticleBodyExtractor.croppingBeforeInstructionHeading(html)
+        #expect(result.contains("Intro story"))
+        #expect(result.contains("Why You'll Love This"))
+        #expect(result.contains("A helpful tip"))
+        #expect(!result.contains("How to Make Chili"))
+        #expect(!result.contains("Brown the beef"))
+    }
+
     /// End-to-end through `extractRecipeBlurb`: the crop runs between the WPRM
     /// crop and the paragraph cap, so the walkthrough after a "How to Make"
     /// heading is dropped even before the card boundary.

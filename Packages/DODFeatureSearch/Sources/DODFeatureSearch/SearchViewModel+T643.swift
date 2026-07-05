@@ -16,17 +16,34 @@ import Foundation
 /// `private` to `internal`).
 extension SearchViewModel {
 
-    /// Fire Path A (REST `?search=<query>`) and Path B (REST `?categories=`
-    /// per matched category, top-2 cap) in parallel via `async let`. Both
+    /// Fire Path A (REST `?search=<query>`) and — only when the user has an
+    /// actual category filter chip set — Path B (REST `?categories=` per
+    /// matched category, top-2 cap) in parallel via `async let`. Both
     /// short-circuit to `[]` when offline so the existing offline-state
     /// branch in `performSearch()` keeps working without a network round-
     /// trip. Path B's failure does NOT block Path A — each failure path
     /// logs and returns `[]`, so the caller always gets a usable tuple.
+    ///
+    /// DUT-574: Path B used to fire whenever the *typed query text* happened
+    /// to name a WP category (e.g. "beef" → "Beef and Red Meat Recipes"),
+    /// firing up to two `?categories=<id>&per_page=100` fetches — up to 200
+    /// extra posts — on every finalized plain-text search, then unioning ALL
+    /// of them (date-ordered, most NOT matching the query) into the results.
+    /// That doubled/tripled the per-query round-trips (slowness) AND polluted
+    /// the result list with unrelated recent category posts (the "doesn't
+    /// work right" symptom). The category-match fan-out now fires ONLY when a
+    /// category filter is actually set (`filters.categoryID != nil`) — a plain
+    /// text search makes exactly one primary REST call. Preserved for the
+    /// filter-active case so the category-scoped surface still works.
     func fanOutSearchPaths(
         trimmed: String,
         online: Bool
     ) async -> (restResults: [RecipeListItem], categoryResults: [RecipeListItem]) {
         guard online else { return ([], []) }
+        guard filters.categoryID != nil else {
+            // Plain text search: single primary request, no category fan-out.
+            return (await fetchTitleSearchOrEmpty(trimmed: trimmed), [])
+        }
         async let restTask = fetchTitleSearchOrEmpty(trimmed: trimmed)
         async let categoryTask = fetchCategoryMatchesOrEmpty(trimmed: trimmed)
         return await (restTask, categoryTask)

@@ -57,7 +57,11 @@ public struct WPRestClient: Sendable {
         let url = try buildURL(path: path, queryItems: queryItems)
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "GET"
-        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        // DUT-578: no manual `Accept-Encoding: gzip`. URLSession requests gzip by
+        // default and only performs TRANSPARENT response decompression when it
+        // owns that header; setting it ourselves would make the caller responsible
+        // for gunzipping the `Content-Encoding: gzip` body — and there is no
+        // gunzip/inflate anywhere in this module. Let URLSession negotiate + decode.
         // REG-18 (CL-50): bypass URLCache.shared AND Cloudflare's edge CDN so
         // pull-to-refresh actually picks up newly-published recipes. WP REST
         // responses lack a `Cache-Control` header but carry `Last-Modified`,

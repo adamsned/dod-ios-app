@@ -15,10 +15,11 @@ extension ArticleBodyExtractor {
     /// Instructions section (AC-4.3). Returns the input unchanged when no such
     /// heading is present.
     ///
-    /// **Patterns** (matched as a case-insensitive substring of the stripped
-    /// heading text): "how to make", "how to", "instructions", "directions",
-    /// "step by step", "step-by-step", "steps", "method", "let's make",
-    /// "how i make".
+    /// **Patterns** (DUT-579: matched as a whole-heading / prefix / whole-word
+    /// anchor of the stripped, punctuation-trimmed heading text, NOT a loose
+    /// substring). Prefix forms: "how to make", "how to cook", "how to prepare",
+    /// "how i make", "let's make", "step by step", "step-by-step". Whole-word /
+    /// whole-heading forms: "instructions", "directions", "steps", "method".
     public static func croppingBeforeInstructionHeading(_ html: String) -> String {
         var cursor = html.startIndex
         while cursor < html.endIndex {
@@ -59,23 +60,39 @@ extension ArticleBodyExtractor {
         return html
     }
 
-    /// DUT-573 / CL-313: instruction-section heading patterns (lowercase).
-    /// Matched as a case-insensitive substring of the tag-stripped heading text.
+    /// DUT-573 / CL-313 / DUT-579: instruction-section heading prefixes
+    /// (lowercase). A heading matches when its stripped text EQUALS one of these
+    /// or STARTS WITH one followed by a space (so "How to Make Beef Stew" and
+    /// "Step by Step" match, but "How to Store Leftovers" / "My Secret Method"
+    /// do not). "how to" is gated behind the real instruction verbs so bare
+    /// "How to Serve" / "How to Store" headings never trip the crop.
     static let instructionHeadingPatterns: [String] = [
         "how to make",
+        "how to cook",
+        "how to prepare",
         "how i make",
-        "how to",
         "let's make",
         "step by step",
         "step-by-step",
+    ]
+
+    /// DUT-579: single-token instruction headings that must match the WHOLE
+    /// heading (after trimming trailing punctuation/whitespace), never as a
+    /// substring — so "Method"/"Steps"/"Instructions"/"Directions" crop, but
+    /// "My Secret Method", "Storage steps to note", or "Instructions vary" do
+    /// not.
+    static let instructionHeadingWholeWords: [String] = [
         "instructions",
         "directions",
         "steps",
         "method",
     ]
 
-    /// DUT-573 / CL-313: true when the heading's inner HTML, with tags stripped,
-    /// contains any ``instructionHeadingPatterns`` token (case-insensitive).
+    /// DUT-573 / CL-313 / DUT-579: true when the heading's inner HTML, with tags
+    /// stripped and edge punctuation/whitespace trimmed, is a genuine
+    /// instruction heading — an exact/prefix match against
+    /// ``instructionHeadingPatterns`` or a whole-heading match against
+    /// ``instructionHeadingWholeWords`` (all case-insensitive).
     static func headingTextMatchesInstructionPattern<S: StringProtocol>(_ innerHTML: S) -> Bool {
         // Strip any nested tags (e.g. `<span>`) from the heading text.
         var text = ""
@@ -89,8 +106,13 @@ extension ArticleBodyExtractor {
                 text.append(character)
             }
         }
-        let normalized = text.lowercased()
-        for pattern in instructionHeadingPatterns where normalized.contains(pattern) {
+        let trimSet = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+        let normalized = text.lowercased().trimmingCharacters(in: trimSet)
+        if instructionHeadingWholeWords.contains(normalized) {
+            return true
+        }
+        for pattern in instructionHeadingPatterns
+        where normalized == pattern || normalized.hasPrefix(pattern + " ") {
             return true
         }
         return false

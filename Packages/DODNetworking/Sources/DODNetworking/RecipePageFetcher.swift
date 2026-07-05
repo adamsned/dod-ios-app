@@ -19,7 +19,8 @@ public struct RecipePageFetcher: Sendable {
         // (WP sends only Last-Modified — the same trap DUT-355 fixed for REST GETs).
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        // DUT-578: no manual `Accept-Encoding: gzip` — URLSession negotiates +
+        // transparently decompresses (this module has no gunzip).
         request.setValue("text/html", forHTTPHeaderField: "Accept")
 
         let (data, response) = try await httpClient.data(for: request)

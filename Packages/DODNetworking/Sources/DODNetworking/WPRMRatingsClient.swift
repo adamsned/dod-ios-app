@@ -45,7 +45,8 @@ public struct WPRMRatingsClient: Sendable {
         // (WP REST sends only Last-Modified — see WPRestClient.getPaged).
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        // DUT-578: no manual `Accept-Encoding: gzip` — URLSession negotiates +
+        // transparently decompresses (this module has no gunzip).
 
         let (data, response): (Data, HTTPURLResponse)
         do {
@@ -94,7 +95,8 @@ public struct WPRMRatingsClient: Sendable {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
+        // DUT-578: no manual `Accept-Encoding: gzip` — let URLSession negotiate +
+        // transparently decompress (this module has no gunzip).
         request.httpBody = try Self.encodePostBody(
             recipeID: recipeID,
             stars: stars,
