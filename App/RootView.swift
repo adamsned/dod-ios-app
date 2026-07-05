@@ -224,8 +224,15 @@ struct RootView: View {
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView(
-                    viewModel: dependencies.settingsSheetViewModel(),
-                    onClearImageCache: { try await dependencies.store.clearImageCache() }
+                    viewModel: dependencies.settingsSheetViewModel(
+                        accountTeardownExtras: accountTeardownExtras
+                    ),
+                    onClearImageCache: { try await dependencies.store.clearImageCache() },
+                    // DUT-572 — hide the Profile row on iPad. This reads RootView's
+                    // TRUE device size class (the same signal that selects iPadSplit
+                    // vs phoneTabs); the sheet itself always reports `.compact`, so
+                    // the flag must be resolved here and injected.
+                    hidesProfile: horizontalSizeClass == .regular
                 )
             }
         }
@@ -310,7 +317,8 @@ struct RootView: View {
                 Section {
                     SidebarProfileRow(
                         profileStore: dependencies.profileStore,
-                        profilePhotoStore: dependencies.profilePhotoStore
+                        profilePhotoStore: dependencies.profilePhotoStore,
+                        accountTeardownExtras: accountTeardownExtras
                     )
                 }
                 Section {
@@ -348,6 +356,10 @@ struct RootView: View {
                 externalRoute: externalRouteBinding(for: selectedTab),
                 // T-912/DUT-551 — Shopping List reroute + hub Cook Mode → Recipes.
                 openShoppingList: { routeToShoppingList() },
+                // DUT-563 — wire the header gear on iPad too (the phone branch
+                // already does). Without this the detail `TabStack` took the
+                // default no-op `{}`, so the rendered gear was a dead button.
+                onOpenSettings: { showSettingsSheet = true },
                 onFindRecipe: { selectedTab = .feed },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                 openHeatCoach: { routeToHeatCoach() },
@@ -373,16 +385,15 @@ struct RootView: View {
     /// Decode the `@AppStorage`-backed raw value into a typed enum. An
     /// absent / malformed value falls back to `.system` so users always
     /// see a sensible default — same defensive fallback
-    /// `AppearancePreference.fromDefaults(_:)` implements for the
-    /// non-`@AppStorage` read path.
+    /// `AppearancePreference.fromDefaults(_:)` implements for the non-`@AppStorage` path.
     private var appearance: AppearancePreference {
         AppearancePreference(rawValue: appearanceRaw) ?? .system
     }
 
-    /// Map the user-selected preference onto SwiftUI's `ColorScheme?`.
-    /// `.system` returns `nil` so `.preferredColorScheme(...)` is a no-op and the
-    /// OS drives every screen. T-756 / CL-153 — delegates to the shared
-    /// ``AppearancePreference/colorScheme`` so RootView + SettingsView map identically.
+    /// Map the user-selected preference onto SwiftUI's `ColorScheme?`. `.system`
+    /// returns `nil` so `.preferredColorScheme(...)` is a no-op and the OS drives
+    /// every screen. T-756 / CL-153 — delegates to the shared
+    /// ``AppearancePreference/colorScheme`` (RootView + SettingsView agree).
     private func preferredColorScheme(for value: AppearancePreference) -> ColorScheme? {
         value.colorScheme
     }

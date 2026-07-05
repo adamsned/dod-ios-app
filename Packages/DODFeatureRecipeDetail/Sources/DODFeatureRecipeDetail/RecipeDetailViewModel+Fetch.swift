@@ -70,7 +70,10 @@ extension RecipeDetailViewModel {
             // surface. Failure / empty result → `blurbBlocks` stays at
             // its default `[]` and the view falls back to the
             // collapsed-only state gracefully.
-            let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+            // DUT-572 / CL-312 — `paragraphLimit: .max` keeps the WPRM-card
+            // boundary crop but drops the 2-paragraph cap, so the full editorial
+            // description flows into the blurb (the More/Less toggle is removed).
+            let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html, paragraphLimit: .max)
             blurbBlocks =
                 blurbHTML.isEmpty
                 ? []
@@ -309,7 +312,7 @@ extension RecipeDetailViewModel {
     func refreshBlurbBlocks(forCanonicalURL url: URL) async {
         guard await dependencies.isOnline() else { return }
         guard let html = try? await dependencies.fetchHTML(for: url) else { return }
-        let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html)
+        let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html, paragraphLimit: .max)
         guard !blurbHTML.isEmpty else { return }
         let parsed = ArticleHTMLParser.parse(html: blurbHTML)
         guard !parsed.isEmpty else { return }

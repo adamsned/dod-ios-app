@@ -27,7 +27,8 @@ extension SettingsViewModel {
         profileStore: (any ProfileStoring)? = nil,
         profilePhotoStore: (any ProfilePhotoStoring)?,
         initialProfile: UserProfile? = nil,
-        requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false }
+        requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false },
+        accountTeardownExtras: (@MainActor (Bool) async -> Void)? = nil
     ) {
         self.init(
             defaults: defaults,
@@ -36,7 +37,8 @@ extension SettingsViewModel {
             voiceLocale: voiceLocale,
             profileStore: profileStore,
             initialProfile: initialProfile,
-            requestNotificationAuthorization: requestNotificationAuthorization
+            requestNotificationAuthorization: requestNotificationAuthorization,
+            accountTeardownExtras: accountTeardownExtras
         )
         self.profilePhotoStore = profilePhotoStore
     }

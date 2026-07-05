@@ -73,6 +73,20 @@ public enum SchemaV2: VersionedSchema {
 /// new optional properties are accepted when the schema identifier
 /// hasn't bumped.
 ///
+/// **DUT-572 / CL-310 note:** the four editorial columns on
+/// `CachedRecipe` (`recipeCategory` / `recipeCuisine` /
+/// `suitableForDiet` / `author`) follow the SAME `articleBodyHTML`
+/// pattern — additive optional/defaulted attributes accepted via
+/// SwiftData's in-place inference, NOT a new versioned schema. A
+/// standalone `SchemaV7` was considered but rejected: it adds no new
+/// entity, so its `@Model` class shapes are identical to V6's and
+/// registering both trips the "Duplicate version checksums detected"
+/// trap (the same trap that keeps the phantom V4 out of the plan —
+/// see the SchemaV4 note above). Because `CachedRecipe`'s attributes
+/// carry defaults (`[]` / nil), the fingerprint change is absorbed by
+/// same-version inference and existing stores open cleanly with the
+/// new columns defaulted.
+///
 /// Per MIGRATION.md rule 3 every stage has a paired migration test:
 /// - `MigrationTests.lightweightV1toV2OpensCleanly`
 /// - `MigrationV3Tests.V2_to_V3_lightweightMigration`
@@ -83,6 +97,9 @@ public enum SchemaV2: VersionedSchema {
 ///   `SyncedSavedRecipe` entity, two-configuration split; DUT-35).
 /// - `SchemaV6Tests.v5ToV6LightweightMigrationOpensCleanly` (additive
 ///   local-only `CachedCookLogEntry` cook journal; DUT-104).
+/// - `SchemaV6Tests.recipeEditorialColumnsInferAdditively` (the four
+///   DUT-572 / CL-310 `CachedRecipe` columns added via same-version
+///   inference — no new schema stage; back-compat + round-trip proven).
 public enum MigrationPlan: SchemaMigrationPlan {
 
     public static var schemas: [any VersionedSchema.Type] {
@@ -103,6 +120,12 @@ public enum MigrationPlan: SchemaMigrationPlan {
             // `CachedCookLogEntry` cook-journal model. No existing field
             // changes; the new table starts empty and never mirrors to CloudKit.
             .lightweight(fromVersion: SchemaV5.self, toVersion: SchemaV6.self),
+            // DUT-572 / CL-310: the four editorial `CachedRecipe` columns are
+            // NOT a new stage — they're additive optional/defaulted attributes
+            // absorbed by same-version inference (the `articleBodyHTML`
+            // pattern). A SchemaV7 with no new entity would collide fingerprints
+            // with V6 and trip "Duplicate version checksums detected"; see the
+            // header note above.
         ]
     }
 }

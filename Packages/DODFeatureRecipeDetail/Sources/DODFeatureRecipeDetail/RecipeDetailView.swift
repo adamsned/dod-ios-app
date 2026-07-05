@@ -25,9 +25,9 @@ public struct RecipeDetailView: View {
     }
 
     // `internal` (default) access so the `RecipeDetailView+Blurb.swift`
-    // extension can read `viewModel` + `isBlurbExpanded` to render the
-    // expand/collapse blurb surface (Swift extensions don't see
-    // `private`/`fileprivate` declarations from a sibling file).
+    // extension can read `viewModel` to render the full-description surface
+    // (Swift extensions don't see `private`/`fileprivate` declarations from a
+    // sibling file).
     @State var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
     @State private var isCookModePresented: Bool = false
@@ -36,12 +36,6 @@ public struct RecipeDetailView: View {
     /// soon as the recipe has instructions to render. Resets to false
     /// after firing so a manual exit + re-entry behaves normally.
     @State private var pendingAutoCookMode: Bool
-    /// T-732 / CL-129 / AC-4.12: expand-collapse state for the recipe blurb.
-    /// Default collapsed (`false`); tapping "More" flips to `true` with a
-    /// `withAnimation` transition; tapping "Less" flips back. View-local
-    /// state — collapsing does not persist across screen re-entries (matches
-    /// the AC-4.2 ingredient check lifetime contract: view-lifetime state).
-    @State var isBlurbExpanded: Bool = false
     /// DUT-47 (temperature half) — the user's recipe-step temperature unit
     /// preference, read from the same `UserDefaults` key Settings writes
     /// (`TemperatureConverter.preferenceKey`) via `@AppStorage` so a change
@@ -68,10 +62,6 @@ public struct RecipeDetailView: View {
     /// (iPad) bounds the content below the hero to a centered column;
     /// `.compact` (iPhone) leaves the layout byte-identical.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    /// DUT-529 — when Reduce Motion is on, the blurb More/Less expand/collapse
-    /// (in `RecipeDetailView+Blurb.swift`) skips its animation (constitution §7).
-    /// `internal` (not `private`) so the `+Blurb` extension can read it.
-    @Environment(\.accessibilityReduceMotion) var reduceMotion
     public let onSelectRelated: (RecipeListItem) -> Void
     /// DUT-534 — the "View" action on the "Added to your Shopping List"
     /// Snackbar routes here. The App composition root passes a closure that
@@ -89,18 +79,16 @@ public struct RecipeDetailView: View {
     /// don't wire the list) falls back to the DUT-534 immediate add-all.
     public let addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)?
     /// T-912 / DUT-551 (CL-306) — the per-recipe Heat Coach nudge's "Open Heat
-    /// Coach" tap. The App composition root passes a closure that selects the
-    /// Cooking Tools hub tab and mints a hub token; the feature package stays free
-    /// of any App / tab-selection import. `nil` (the default) hides the whole
-    /// nudge — used by previews / hosts that don't wire hub routing (same seam as
+    /// Coach" tap. The App root passes a closure that selects the Cooking Tools
+    /// hub tab and mints a hub token; the feature package stays free of any App /
+    /// tab-selection import. `nil` (default) hides the whole nudge (same seam as
     /// `openShoppingList`).
     public let openHeatCoach: (() -> Void)?
     /// T-912 / DUT-551 (CL-306) — builds the Heat Coach surface presented as a
-    /// sheet OVER Cook Mode's full-screen cover (a tab switch would be invisible
-    /// under the cover). The `HeatCoachView` lives in `DODFeatureFeed`, which this
-    /// package must not import, so the App composition root injects a type-erased
-    /// `AnyView` builder. Forwarded down to `CookModeView`. `nil` (previews /
-    /// unwired hosts) hides the Cook Mode shortcut.
+    /// sheet OVER Cook Mode's full-screen cover. `HeatCoachView` lives in
+    /// `DODFeatureFeed` (not importable here), so the App root injects a
+    /// type-erased `AnyView` builder, forwarded to `CookModeView`. `nil`
+    /// (previews / unwired hosts) hides the Cook Mode shortcut.
     public let heatCoachSheet: (() -> AnyView)?
 
     /// DUT-535 — the recipe whose ingredient-selection sheet is presented.
@@ -135,6 +123,12 @@ public struct RecipeDetailView: View {
         .background(DODColor.surface)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        // DUT-572 / CL-312 — full-bleed hero: hide the nav-bar background so the
+        // hero photo reaches the top of the screen, and force a dark color
+        // scheme so the system chrome (back chevron + our glyphs) renders light
+        // over the photo.
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         #endif
         .toolbar { toolbarItems }
         // Note: T-302 originally added a sticky `RecipeDetailFloatingActions`
@@ -230,27 +224,51 @@ public struct RecipeDetailView: View {
         // flip Ingredients|Instructions into a two-up band once it's wide
         // enough (landscape iPad / large split). Size classes alone can't tell
         // iPad portrait from landscape (both are `.regular`), so we read width.
+        // DUT-572 / CL-312 — also reads the real top safe-area inset here (the
+        // full-bleed hero ignores safe area, so it can't read its own) and
+        // passes it into `RecipeDetailHero`.
         GeometryReader { geo in
             let twoUp = geo.size.width >= 1000
+            let topInset = geo.safeAreaInsets.top
             ScrollViewReader { proxy in
                 ScrollView {
+                    // DUT-573 / CL-313 — iterated editorial order: full-bleed hero
+                    // → [published date · Jump to Instructions] row → editorial
+                    // (cropped blurb) → Cook Mode CTA → info card (interactive
+                    // Servings) → Heat Coach nudge → video → ingredients /
+                    // instructions → related → ratings.
                     VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                        // Hero sits OUTSIDE the reading column — full-bleed, no
+                        // horizontal padding.
                         RecipeDetailHero(
                             url: viewModel.recipe?.heroImageLargeURL ?? viewModel.listItem.heroImage,
-                            title: viewModel.listItem.title
+                            title: viewModel.listItem.title,
+                            topInset: topInset
                         )
                         // Top block — capped to the reading column on iPad,
-                        // byte-identical on iPhone. T-803 keeps the published
-                        // date inset directly below the hero.
+                        // byte-identical on iPhone.
                         VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                            PublishedDateCaption(date: viewModel.listItem.publishedAt)
-                                .padding(.horizontal, DODSpacing.md)
-                            RecipeDetailMetaPills(items: metaPillItems)
-                            servingsScaler
-                            cookNowSection
-                            heatCoachNudge
+                            // DUT-573 / CL-313 — publish date + Jump to
+                            // Instructions link, right under the hero/name.
+                            dateAndJumpRow(proxy: proxy)
                             excerptText
-                            RecipeDetailQuickJump(items: quickJumpItems(proxy: proxy))
+                            if !(viewModel.recipe?.instructions.isEmpty ?? true) {
+                                CookNowCTA(onTap: {
+                                    Task { await viewModel.didTapCookMode() }
+                                    isCookModePresented = true
+                                })
+                            }
+                            RecipeInfoCard(
+                                model: infoCardModel,
+                                servingsBinding: Binding(
+                                    get: { viewModel.userServings },
+                                    set: { viewModel.setUserServings($0) }
+                                ),
+                                servingsRange: viewModel.userServingsRange,
+                                sourceServings: viewModel.sourceServings,
+                                showsServingWarning: viewModel.shouldShowServingWarning
+                            )
+                            heatCoachNudge
                             if let video = viewModel.recipe?.video {
                                 RecipeDetailVideoSection(video: video, isOfflineSnapshot: isOfflineSnapshot)
                             }
@@ -269,8 +287,35 @@ public struct RecipeDetailView: View {
                     }
                     .padding(.bottom, DODSpacing.xl)
                 }
+                // DUT-572 / CL-312 — named space the stretchy hero reads `minY`
+                // from to grow only its top edge on pull-down.
+                .coordinateSpace(name: "recipeScroll")
             }
         }
+    }
+
+    /// DUT-573 / CL-313 — the first row of scrolling content, right under the
+    /// hero (the recipe name is overlaid on the hero): the publish date on the
+    /// leading edge, a subtle "Jump to Instructions" link on the trailing edge.
+    /// The link scrolls to the instructions anchor via the enclosing
+    /// `ScrollViewReader`'s proxy.
+    private func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            PublishedDateCaption(date: viewModel.listItem.publishedAt)
+            Spacer(minLength: DODSpacing.sm)
+            if !(viewModel.recipe?.instructions.isEmpty ?? true) {
+                Button {
+                    withAnimation { proxy.scrollTo(SectionAnchor.instructions, anchor: .top) }
+                } label: {
+                    Text("Jump to Instructions")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Jumps to Instructions section")
+            }
+        }
+        .padding(.horizontal, DODSpacing.md)
     }
 
     /// Ingredients + Instructions. Side by side in a wider centered band on a
@@ -298,63 +343,17 @@ public struct RecipeDetailView: View {
         }
     }
 
-    /// Per-render serving-count scaler. US-31 / AC-31.1.
-    private var servingsScaler: some View {
-        RecipeServingsScaler(
-            value: Binding(
-                get: { viewModel.userServings },
-                set: { viewModel.setUserServings($0) }
-            ),
-            range: viewModel.userServingsRange,
-            sourceServings: viewModel.sourceServings,
-            showsWarning: viewModel.shouldShowServingWarning
-        )
-    }
+    // DUT-572 / CL-312: the `excerptText` body (now the FULL description) + the
+    // `strippingExcerptTruncationTail(from:)` pure helper live in
+    // `RecipeDetailView+Blurb.swift` (extension on `RecipeDetailView`) so this
+    // file stays under the SwiftLint file-length cap. The description renders
+    // through the shared `ArticleBlocksView` (paragraphs, headings, lists, AND
+    // inline images).
 
-    // T-732 / CL-129 / AC-4.12: the `excerptText` body + the
-    // `strippingExcerptTruncationTail(from:)` pure helper + the
-    // `recognizedTruncationTails` table live in
-    // `RecipeDetailView+Blurb.swift` (extension on `RecipeDetailView`) so
-    // this file stays under the SwiftLint file-length cap. The expanded
-    // blurb's rich-block rendering goes through the shared
-    // `ArticleBlocksView` (in `ArticleBlocksView.swift`) so articles and
-    // recipes use the same per-block styling.
-
-    /// AC-7.1 CTA. Hidden until the recipe detail has parsed instructions
-    /// — without those, Cook Mode would open onto an empty step list.
-    @ViewBuilder
-    private var cookNowSection: some View {
-        if let recipe = viewModel.recipe, !recipe.instructions.isEmpty {
-            CookNowCTA(onTap: {
-                Task { await viewModel.didTapCookMode() }
-                isCookModePresented = true
-            })
-        }
-    }
-
-    private var metaPillItems: [RecipeDetailMetaPills.Item] {
-        // T-732 / CL-129: the servings mini-chip is removed — the
-        // `RecipeServingsScaler` row (AC-31.1) directly below the meta pills
-        // is the single Serves indicator on the screen. The pre-T-732 chip
-        // ("\(servings) servings") duplicated the stepper's canonical
-        // "Serves \(userServings)" / "Recipe makes N." display.
-        var result: [RecipeDetailMetaPills.Item] = []
-        if let total = viewModel.recipe?.totalTime {
-            result.append(.init(icon: "clock", label: format(duration: total)))
-        }
-        return result
-    }
-
-    private func quickJumpItems(proxy: ScrollViewProxy) -> [RecipeDetailQuickJump.Item] {
-        [
-            .init(title: "Ingredients") {
-                withAnimation { proxy.scrollTo(SectionAnchor.ingredients, anchor: .top) }
-            },
-            .init(title: "Instructions") {
-                withAnimation { proxy.scrollTo(SectionAnchor.instructions, anchor: .top) }
-            },
-        ]
-    }
+    // DUT-572 / CL-312 — the `infoCardModel` builder + its `joinedOrNil` and
+    // `format(duration:)` helpers live in `RecipeDetailView+InfoCard.swift`
+    // (extension on `RecipeDetailView`) so this file stays under the SwiftLint
+    // file-length cap.
 }
 
 // MARK: - Helpers
@@ -382,14 +381,5 @@ extension RecipeDetailView {
         pendingAutoCookMode = false
         Task { await viewModel.didTapCookMode() }
         isCookModePresented = true
-    }
-
-    fileprivate func format(duration: Duration) -> String {
-        let seconds = Int(duration.components.seconds)
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes) min" }
-        let hours = minutes / 60
-        let remainder = minutes % 60
-        return remainder == 0 ? "\(hours) hr" : "\(hours)h \(remainder)m"
     }
 }

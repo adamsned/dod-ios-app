@@ -102,6 +102,12 @@ public final class SettingsViewModel {
     /// Keychain-backed profile store. `nil` for previews / snapshots.
     let profileStore: (any ProfileStoring)?
 
+    /// DUT-565 — extra local-state clears (recent searches + comment moderation,
+    /// which live in sibling feature packages) threaded into the Profile editor's
+    /// account teardown. Injected by the App composition root that owns those
+    /// stores; `nil` for previews / tests that don't reach the teardown buttons.
+    let accountTeardownExtras: (@MainActor (Bool) async -> Void)?
+
     #if canImport(UIKit)
     /// Phase b (T-740) — Documents JPG photo store routed into the
     /// Profile row's avatar + the edit view's picker. `nil` for previews
@@ -261,7 +267,8 @@ public final class SettingsViewModel {
         voiceLocale: Locale = .current,
         profileStore: (any ProfileStoring)? = nil,
         initialProfile: UserProfile? = nil,
-        requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false }
+        requestNotificationAuthorization: @escaping @MainActor () async -> Bool = { false },
+        accountTeardownExtras: (@MainActor (Bool) async -> Void)? = nil
     ) {
         self.defaults = defaults
         // T-756 / CL-153 — seed the observable picker preferences (didSet
@@ -276,6 +283,7 @@ public final class SettingsViewModel {
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies
         self.profileStore = profileStore
+        self.accountTeardownExtras = accountTeardownExtras
         #if canImport(UIKit)
         self.profilePhotoStore = nil
         #endif

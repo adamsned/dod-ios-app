@@ -74,6 +74,20 @@ public final class CommentModerationStore {
         defaults.set(Array(hiddenCommentIDs), forKey: Self.hiddenKey)
     }
 
+    /// DUT-565 — wipe ALL local moderation state (both persisted keys AND the
+    /// in-memory `@Observable` sets) for account teardown (Sign Out / Delete
+    /// Profile). Resetting the in-memory sets — not just the defaults — means an
+    /// already-open recipe screen re-shows the previously-hidden/blocked comments
+    /// immediately, so the next device user never inherits User A's block list
+    /// (App Store Guideline 1.2 is a per-user control). A store constructed after
+    /// this reads both sets empty.
+    public func clear() {
+        blockedAuthors.removeAll()
+        hiddenCommentIDs.removeAll()
+        defaults.removeObject(forKey: Self.blockedKey)
+        defaults.removeObject(forKey: Self.hiddenKey)
+    }
+
     /// Normalize an author name for stable matching (trim + case-fold).
     static func authorKey(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

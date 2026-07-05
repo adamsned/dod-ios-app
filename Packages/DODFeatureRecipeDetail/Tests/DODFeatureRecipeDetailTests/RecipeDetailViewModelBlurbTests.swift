@@ -52,6 +52,53 @@ struct RecipeDetailViewModelBlurbTests {
         #expect(!allParagraphText.contains { $0.contains("1 cup flour") })
     }
 
+    /// DUT-572 / CL-312: the full editorial description now flows through — the
+    /// pre-DUT-572 2-paragraph cap is gone (`paragraphLimit: .max`) AND inline
+    /// images render (the `.image`-filter in the view is removed). A blurb with
+    /// FOUR paragraphs and an inline image before the recipe card must produce
+    /// all four `.paragraph` blocks plus the `.image` block, in order, with the
+    /// card content excluded.
+    @Test func blurbBlocksCarryFullBodyAndImagesPastTheOldCap() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 204,
+            withDetail: true
+        )
+        dependencies.htmlToReturn = """
+            <html><body>
+            <div class="entry-content">
+            <p>Paragraph one of the story.</p>
+            <p>Paragraph two of the story.</p>
+            <img src="https://example.com/inline.jpg" alt="inline" />
+            <p>Paragraph three of the story.</p>
+            <p>Paragraph four of the story.</p>
+            <div class="wprm-recipe-container">
+            <ul><li>1 cup flour</li></ul>
+            </div>
+            </div>
+            </body></html>
+            """
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 204)
+        await viewModel.onAppear()
+
+        #expect(viewModel.loadState == .ready)
+        // All four narrative paragraphs survive — no 2-paragraph cap.
+        let paragraphs = viewModel.blurbBlocks.compactMap { block -> String? in
+            if case .paragraph(let text) = block { return String(text.characters) }
+            return nil
+        }
+        #expect(paragraphs.count == 4)
+        #expect(paragraphs.contains { $0.contains("Paragraph four") })
+        // The inline image is retained (the view no longer filters `.image`).
+        let hasImage = viewModel.blurbBlocks.contains { block in
+            if case .image = block { return true }
+            return false
+        }
+        #expect(hasImage)
+        // Recipe-card structured content must NOT leak into the blurb.
+        #expect(!paragraphs.contains { $0.contains("1 cup flour") })
+    }
+
     /// HTML present but `entry-content` slice missing entirely — extraction
     /// returns empty string → parser returns `[]` → `blurbBlocks` stays at
     /// its `[]` default. The view falls back to collapsed-only.
