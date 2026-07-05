@@ -37,184 +37,48 @@ extension RecipeDetailViewModel {
             return
         }
 
-        do {
-            let parsed = try dependencies.parseJSONLD(
-                html: html,
-                merging: listItem,
-                canonicalURL: canonicalURL
-            )
-            // DUT-538 (supersedes DUT-185): the WPRM-card parser recovers the
-            // "How to Make" numbered steps from the post body when the card
-            // itself carries no `wprm-recipe-instruction` rows (the 7 Can Soup
-            // shape), so `parsed.instructions` is normally non-empty here and we
-            // render the structured recipe.
-            //
-            // DUT-544: when a parse STILL yields no instructions, route to the
-            // recipe path only if the page's SUBJECT is a recipe — i.e. its
-            // JSON-LD actually carries a `@type: Recipe` node. Mere presence of
-            // a `wprm-recipe-container` is NOT enough: a round-up / guide ARTICLE
-            // that embeds (or links) a WPRM card has a card but no Recipe node,
-            // and forcing it onto the recipe path dumps the card in place of the
-            // whole article body. 7 Can Soup keeps the recipe path — it HAS the
-            // Recipe node (only its `recipeIngredient`/`recipeInstructions` are
-            // empty).
-            guard !parsed.instructions.isEmpty || dependencies.hasRecipeJSONLD(html: html) else {
-                await classifyAsArticleOrFail(html: html)
-                return
-            }
-            try await dependencies.mergeDetail(parsed)
-            recipe = parsed
-            // T-732 / CL-129 / AC-4.12: extract the recipe blurb (the
-            // narrative HTML preceding the WPRM recipe card) and parse it
-            // into native `ArticleBlock`s for the expand-collapse blurb
-            // surface. Failure / empty result → `blurbBlocks` stays at
-            // its default `[]` and the view falls back to the
-            // collapsed-only state gracefully.
-            // DUT-572 / CL-312 — `paragraphLimit: .max` keeps the WPRM-card
-            // boundary crop but drops the 2-paragraph cap, so the full editorial
-            // description flows into the blurb (the More/Less toggle is removed).
-            let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html, paragraphLimit: .max)
-            blurbBlocks =
-                blurbHTML.isEmpty
-                ? []
-                : ArticleHTMLParser.parse(html: blurbHTML)
-            loadState = .ready
-            await loadRelated(forCategoryID: parsed.categoryIDs.first)
-        } catch {
-            // US-37 / CL-63 / AC-37.2 (T-640): JSON-LD parse failed.
-            // Pre-T-640 this was the terminal failure path. Now we try
-            // article-body extraction before falling through to
-            // `.unavailable`.
-            DODLog.network.error("recipe JSON-LD parse failed: \(String(describing: error))")
-            await classifyAsArticleOrFail(html: html)
-        }
+        // DUT-577: run the full classify/parse pipeline (JSON-LD parse,
+        // recipe-subject detection, WPRM-card recovery, article-body
+        // extraction, blurb extraction + parse) OFF the main actor so the
+        // main thread isn't blocked scanning a several-hundred-KB round-up
+        // page before `loadState` flips. The pure result is a `PageClassification`
+        // value; the main-actor code below only sets `@Observable` state and
+        // awaits the async persistence/related-load seams. Classification is
+        // identical to the pre-DUT-577 inline decision tree (DUT-544/554/555),
+        // and `hasRecipeJSONLD` is scanned exactly ONCE (the old code re-scanned
+        // it at the article-classify entry — deduped here).
+        let classification = await classifyPage(html: html)
+        await apply(classification: classification, html: html)
     }
 
-    /// US-37 / CL-63 / AC-37.2 + AC-37.3 (T-640): the JSON-LD parse failed.
-    /// Attempt article-body extraction; on success classify the post as
-    /// an article and transition to `.article(recipe)`. On failure fall
-    /// through to the terminal `.unavailable` path with the same snackbar
-    /// + auto-pop behavior the pre-T-640 implementation surfaced.
-    func classifyAsArticleOrFail(html: String) async {
-        // DUT-544 (amends DUT-538): only build a recipe from the WPRM card when
-        // the page's SUBJECT is a recipe — its JSON-LD carries a `@type: Recipe`
-        // node. DUT-538 keyed off mere card presence, which over-classifies: a
-        // round-up / guide ARTICLE that embeds (or links) a WPRM card has a card
-        // but NO Recipe node (validated 2026-07-04 against the dump-cake /
-        // memorial-day / dutch-oven round-ups), so forcing the card path dumped
-        // the card in place of the whole article body. Requiring the Recipe node
-        // preserves DUT-538 for 7 Can Soup (it HAS the node) while routing the
-        // round-ups to the article-body extraction below.
-        let isRecipeSubject = dependencies.hasRecipeJSONLD(html: html)
-        if isRecipeSubject, let cardRecipe = recipeFromWPRMCard(html: html) {
+    /// DUT-577 — `@MainActor` apply step: consume the off-main
+    /// ``PageClassification`` and set `@Observable` state + await the async
+    /// persistence / related-strip seams. Behavior/ordering matches the
+    /// pre-DUT-577 inline flow.
+    func apply(classification: PageClassification, html: String) async {
+        switch classification {
+        case .recipe(let parsed, let blurbBlocks):
+            try? await dependencies.mergeDetail(parsed)
+            recipe = parsed
+            self.blurbBlocks = blurbBlocks
+            loadState = .ready
+            await loadRelated(forCategoryID: parsed.categoryIDs.first)
+        case .cardRecipe(let cardRecipe):
             try? await dependencies.mergeDetail(cardRecipe)
             recipe = cardRecipe
             loadState = .ready
             await loadRelated(forCategoryID: cardRecipe.categoryIDs.first)
-            return
-        }
-        // DUT-555: restore the card-only-recipe safety net DUT-544 dropped. When
-        // the page's SUBJECT is NOT a recipe (no `@type: Recipe` JSON-LD node),
-        // DUT-544 gated the whole card path on `isRecipeSubject`, which made the
-        // above branch dead against real HTML (`hasRecipeJSONLD` and `parseJSONLD`
-        // share the same extraction, so a true `isRecipeSubject` implies the parse
-        // already succeeded). But a genuine recipe whose structured data lives
-        // ONLY in the WPRM card — older posts, WPRM with JSON-LD schema output
-        // disabled, theme/plugin variants — has NO Recipe node and would dump as
-        // an article. Recover it from the card, but ONLY when the card yields BOTH
-        // non-empty ingredients AND recovered steps: that both-lists signal
-        // distinguishes a real card-only recipe from a round-up's embedded card
-        // (which has a card but the ARTICLE is the page's subject), which is
-        // routed to the article-body path below — preserving DUT-544.
-        if !isRecipeSubject, let cardRecipe = cardOnlyRecipe(html: html) {
-            try? await dependencies.mergeDetail(cardRecipe)
-            recipe = cardRecipe
-            loadState = .ready
-            await loadRelated(forCategoryID: cardRecipe.categoryIDs.first)
-            return
-        }
-        let body = dependencies.extractArticleBody(html: html)
-        guard !body.isEmpty else {
+        case .article(let article):
+            // Persist so subsequent opens hit the cache path. `mergeDetail` on an
+            // article-kind recipe stamps `jsonLDFailedAt = .now` (CL-63 decision 7).
+            try? await dependencies.mergeDetail(article)
+            recipe = article
+            loadState = .article(article)
+        case .unavailable:
             try? await dependencies.markJSONLDFailed(id: listItem.id)
             loadState = .unavailable
             snackbarMessage = "Recipe unavailable."
-            return
         }
-        let article = Recipe(
-            id: listItem.id,
-            slug: "",
-            title: listItem.title,
-            excerpt: listItem.excerpt,
-            canonicalURL: canonicalURL,
-            heroImage: listItem.heroImage,
-            heroImageLargeURL: nil,
-            categoryIDs: [],
-            publishedAt: listItem.publishedAt,
-            kind: .article,
-            articleBodyHTML: body
-        )
-        // Persist so subsequent opens hit the cache path. `mergeDetail`
-        // on an article-kind recipe stamps `jsonLDFailedAt = .now` (the
-        // kind discriminator per CL-63 decision 7).
-        try? await dependencies.mergeDetail(article)
-        recipe = article
-        loadState = .article(article)
-    }
-
-    /// DUT-538: build a `.recipe`-kind `Recipe` straight from the WPRM card
-    /// when the JSON-LD parse threw (or came back thin) but the page ships a
-    /// structured recipe card. Returns nil when the card recovers NEITHER an
-    /// ingredient NOR an instruction — a genuinely empty card offers nothing to
-    /// render, so the caller falls through to the article-body path. List
-    /// fields (id / title / image / dates) come from `listItem`; detail fields
-    /// from the card. Times / nutrition / video stay nil — the card-only path
-    /// is reached only when the JSON-LD that carries them was unavailable.
-    func recipeFromWPRMCard(html: String) -> Recipe? {
-        let card = WPRMRecipeCardParser.parse(html: html)
-        guard !card.ingredients.isEmpty || !card.instructions.isEmpty else {
-            return nil
-        }
-        return recipe(fromCard: card)
-    }
-
-    /// DUT-555: build a `.recipe`-kind `Recipe` from the WPRM card for the
-    /// card-only-recipe shape (no `@type: Recipe` JSON-LD node), but ONLY when
-    /// the card yields BOTH non-empty ingredients AND recovered steps. That
-    /// stricter both-lists gate — vs. ``recipeFromWPRMCard(html:)``'s
-    /// either-list gate — is what separates a genuine card-only recipe from a
-    /// round-up ARTICLE that merely embeds a WPRM card: the round-up's card
-    /// rarely carries both a full ingredient list AND recovered steps as the
-    /// page's subject, so it stays on the article-body path. Returns nil when
-    /// either list is empty.
-    func cardOnlyRecipe(html: String) -> Recipe? {
-        let card = WPRMRecipeCardParser.parse(html: html)
-        guard !card.ingredients.isEmpty, !card.instructions.isEmpty else {
-            return nil
-        }
-        return recipe(fromCard: card)
-    }
-
-    /// Shared builder: map a parsed ``WPRMRecipeCardParser/Card`` onto a
-    /// `.recipe`-kind `Recipe`, sourcing list fields (id / title / image / dates)
-    /// from `listItem` and detail fields from the card. Times / nutrition / video
-    /// stay nil — the card-only path is reached only when the JSON-LD that
-    /// carries them was unavailable.
-    func recipe(fromCard card: WPRMRecipeCardParser.Card) -> Recipe {
-        Recipe(
-            id: listItem.id,
-            slug: canonicalURL.lastPathComponent,
-            title: listItem.title,
-            excerpt: listItem.excerpt,
-            canonicalURL: canonicalURL,
-            heroImage: listItem.heroImage,
-            heroImageLargeURL: nil,
-            categoryIDs: listItem.categoryIDs ?? [],
-            publishedAt: listItem.publishedAt,
-            ingredients: card.ingredients.map { RecipeIngredient(text: $0) },
-            instructions: card.instructions.enumerated().map { index, text in
-                RecipeInstruction(step: index + 1, text: text)
-            }
-        )
     }
 
     /// DUT-185: cache-hit dispatch for `.recipe`-kind posts. A recipe cached
@@ -256,14 +120,27 @@ extension RecipeDetailViewModel {
         // `.ready`; the rich blurb arrives in a later frame when the
         // background fetch lands. Holding `onAppear()` open on this would
         // serialize subsequent UI work behind a network call (REG-37).
-        let url = canonicalURL
         Task { [weak self] in
-            await self?.refreshBlurbBlocks(forCanonicalURL: url)
-            // DUT-53: self-heal a cached recipe whose ingredients are empty
-            // — parsed before the DUT-42 WPRM fallback existed, or fixed on
-            // the site since it was cached. No-op when ingredients present.
-            await self?.backfillIngredientsIfEmpty()
+            await self?.hydrateBlurbAndIngredients()
         }
+    }
+
+    /// DUT-581 — the cache-hit background hydrate: fetch the canonical HTML
+    /// ONCE and pass it into BOTH the blurb refresh and the ingredient
+    /// backfill. Pre-DUT-581 each helper fetched its own copy, so a cache-hit
+    /// with instructions-present-but-empty-ingredients (DUT-53 shape) fired
+    /// two back-to-back GETs of the identical URL. Gating (online) + fail-silent
+    /// semantics are unchanged: offline skips the fetch entirely (no network
+    /// call, no state change), a transient fetch error is swallowed (`try?`),
+    /// and neither helper ever surfaces a snackbar or downgrades the load state.
+    func hydrateBlurbAndIngredients() async {
+        guard await dependencies.isOnline() else { return }
+        guard let html = try? await dependencies.fetchHTML(for: canonicalURL) else { return }
+        await refreshBlurbBlocks(html: html)
+        // DUT-53: self-heal a cached recipe whose ingredients are empty —
+        // parsed before the DUT-42 WPRM fallback existed, or fixed on the site
+        // since it was cached. No-op when ingredients are already present.
+        await backfillIngredientsIfEmpty(html: html)
     }
 
     /// T-736 / CL-133 / AC-4.12 (amended): refresh `blurbBlocks` on a cache-
@@ -294,7 +171,7 @@ extension RecipeDetailViewModel {
     ///    Matches the `loadRatingsAndComments` no-op-on-failure pattern
     ///    (REG-14 / AC-14.6).
     /// 3. Run the same `ArticleBodyExtractor.extractRecipeBlurb` +
-    ///    `ArticleHTMLParser.parse` pipeline `fetchAndParse()` uses (line 47).
+    ///    `ArticleHTMLParser.parse` pipeline `fetchAndParse()` uses.
     /// 4. Assign `blurbBlocks` ONLY if the parsed result is non-empty. The
     ///    non-empty guard prevents a transient parse failure from
     ///    overwriting a previously-successful population with `[]`,
@@ -305,18 +182,31 @@ extension RecipeDetailViewModel {
     ///    guard means an empty parse never *downgrades* a previously-
     ///    successful render.)
     ///
+    /// DUT-581 — the HTML is fetched ONCE by ``hydrateBlurbAndIngredients()``
+    /// and passed in (the online-gate + fetch moved to that coordinator so the
+    /// blurb refresh + ingredient backfill share a single GET). DUT-577 — the
+    /// pure `extractRecipeBlurb` + `parse` scan runs OFF the main actor; only
+    /// the `blurbBlocks` assignment stays on the main actor.
+    ///
     /// **Not called for articles.** Articles persist `articleBodyHTML` in
     /// the `Recipe` data model itself (US-37 / CL-63 / AC-37.3) so cached
     /// articles render rich-body on re-open without needing a refresh.
     /// `onAppear()`'s `.article` case is unchanged by T-736.
-    func refreshBlurbBlocks(forCanonicalURL url: URL) async {
-        guard await dependencies.isOnline() else { return }
-        guard let html = try? await dependencies.fetchHTML(for: url) else { return }
-        let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html, paragraphLimit: .max)
-        guard !blurbHTML.isEmpty else { return }
-        let parsed = ArticleHTMLParser.parse(html: blurbHTML)
+    func refreshBlurbBlocks(html: String) async {
+        let parsed = await Self.parseBlurbBlocks(html: html)
         guard !parsed.isEmpty else { return }
         blurbBlocks = parsed
+    }
+
+    /// DUT-577 — the pure blurb extract + parse, run off the main actor. Static +
+    /// Sendable so it hops onto a detached task; the `@MainActor` caller only
+    /// assigns the returned blocks. Empty result when the extract is empty (same
+    /// contract as the inline pre-DUT-577 code).
+    nonisolated static func parseBlurbBlocks(html: String) async -> [ArticleBlock] {
+        await Task.detached(priority: .userInitiated) {
+            let blurbHTML = ArticleBodyExtractor.extractRecipeBlurb(html: html, paragraphLimit: .max)
+            return blurbHTML.isEmpty ? [] : ArticleHTMLParser.parse(html: blurbHTML)
+        }.value
     }
 
     /// DUT-53: cache-hit ingredient self-heal. A recipe cached with empty
@@ -340,18 +230,26 @@ extension RecipeDetailViewModel {
     /// reach here — `onAppear()` routes them straight to `fetchAndParse()`,
     /// which already applies the DUT-42 fallback on every open. This closes
     /// the remaining gap for the has-instructions-but-no-ingredients shape.
-    func backfillIngredientsIfEmpty() async {
+    ///
+    /// DUT-581 — the HTML is fetched ONCE by ``hydrateBlurbAndIngredients()`` and
+    /// passed in (no second GET of the same URL). The empty-ingredients guard
+    /// runs first so a recipe that already HAS ingredients short-circuits without
+    /// touching the passed HTML. DUT-577 — the pure `parseJSONLD` re-scan runs
+    /// off the main actor; only `mergeDetail` + the `recipe` assignment are on
+    /// the main actor.
+    func backfillIngredientsIfEmpty(html: String) async {
         guard recipe?.ingredients.isEmpty == true else { return }
-        guard await dependencies.isOnline() else { return }
-        guard let html = try? await dependencies.fetchHTML(for: canonicalURL) else { return }
-        guard
-            let reparsed = try? dependencies.parseJSONLD(
+        let dependencies = self.dependencies
+        let listItem = self.listItem
+        let canonicalURL = self.canonicalURL
+        let reparsed = await Task.detached(priority: .userInitiated) {
+            try? dependencies.parseJSONLD(
                 html: html,
                 merging: listItem,
                 canonicalURL: canonicalURL
-            ),
-            !reparsed.ingredients.isEmpty
-        else { return }
+            )
+        }.value
+        guard let reparsed, !reparsed.ingredients.isEmpty else { return }
         try? await dependencies.mergeDetail(reparsed)
         recipe = reparsed
     }

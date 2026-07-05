@@ -63,6 +63,11 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     /// production implies a Recipe node existed) keeps the recipe path.
     var hasRecipeJSONLDResult = true
 
+    /// DUT-577 — spies recording whether the pure classify/parse scanners ran OFF
+    /// the main thread (via `Task.detached`). `false` = ran on main (regression).
+    var parseJSONLDRanOffMainThread: Bool?
+    var hasRecipeJSONLDRanOffMainThread: Bool?
+
     // MARK: - Comments + ratings test surface
 
     /// Pre-loaded rating summary returned from the network. Defaults to a
@@ -137,23 +142,25 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     }
 
     func parseJSONLD(html: String, merging: RecipeListItem, canonicalURL: URL) throws -> Recipe {
+        // DUT-577 — record the executor the scan ran on (off-main iff offloaded).
+        parseJSONLDRanOffMainThread = !Thread.isMainThread
         if fetchShouldFail { throw URLError(.cannotParseResponse) }
         guard let parsed = parsedRecipe else { throw URLError(.badServerResponse) }
         return parsed
     }
 
     /// US-37 / CL-63 / T-640: return the canned `articleBodyToExtract`
-    /// regardless of `html`. The view model only inspects the return
-    /// value's emptiness to decide between `.article` and the terminal
-    /// `.unavailable` path; tests configure `articleBodyToExtract` to
-    /// drive the desired branch.
+    /// regardless of `html`. The view model only inspects the return value's
+    /// emptiness to decide between `.article` and `.unavailable`.
     func extractArticleBody(html: String) -> String {
         articleBodyToExtract
     }
 
     /// DUT-544: return the canned recipe-subject signal, independent of `html`.
     func hasRecipeJSONLD(html: String) -> Bool {
-        hasRecipeJSONLDResult
+        // DUT-577 — record the executor the scan ran on (off-main iff offloaded).
+        hasRecipeJSONLDRanOffMainThread = !Thread.isMainThread
+        return hasRecipeJSONLDResult
     }
 
     func relatedRecipes(forCategoryID: Int) async throws -> [RecipeListItem] { related }

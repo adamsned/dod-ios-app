@@ -51,6 +51,10 @@ struct RecipeDetailViewModelBlurbRefreshTests {
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 300)
 
         await viewModel.onAppear()
+        // DUT-577: the cache-hit blurb parse now runs off the main actor via
+        // `Task.detached`, so the fire-and-forget background Task settles a hop
+        // later than the pre-DUT-577 inline parse. Drain until it lands.
+        await Self.drain(until: { !viewModel.blurbBlocks.isEmpty })
 
         #expect(viewModel.loadState == .ready)
         // The background refresh fetched the HTML and populated blurbBlocks.
@@ -187,6 +191,18 @@ struct RecipeDetailViewModelBlurbRefreshTests {
     }
 
     // MARK: - Helpers
+
+    /// Yield the MainActor until `condition` holds or the spin cap is hit. The
+    /// fake settles each await in one hop, so the fire-and-forget background
+    /// Task (which now offloads its parse off-main per DUT-577) converges within
+    /// a handful of yields; the cap turns a regression into a failed assertion.
+    static func drain(until condition: @MainActor () -> Bool, spins: Int = 500) async {
+        var iteration = 0
+        while !condition(), iteration < spins {
+            await Task.yield()
+            iteration += 1
+        }
+    }
 
     static func makeViewModel(
         dependencies: RecipeDetailDependencies,
