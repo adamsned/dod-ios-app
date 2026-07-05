@@ -153,8 +153,14 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
     /// suspend inside `cachedRecipeTitles()` before the fixture is returned.
     var cachedTitlesGate: (@Sendable () async -> Void)?
 
+    /// DUT-574 — count the cached-titles fetches so a perf test can assert the
+    /// "did you mean?" rescue path stays off the critical path (only consulted
+    /// when the result set settles sparse).
+    var cachedTitlesCallCount = 0
+
     /// CL-127 (T-649): returns the pre-seeded cached-titles fixture.
     func cachedRecipeTitles() async throws -> [String] {
+        cachedTitlesCallCount += 1
         if let cachedTitlesGate { await cachedTitlesGate() }
         return cachedTitlesArray
     }
