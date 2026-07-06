@@ -5,6 +5,55 @@ import SwiftUI
 
 extension RecipeDetailView {
 
+    // MARK: - Ingredients + Instructions layout
+
+    /// Ingredients + Instructions. Side by side in a wider centered band on a
+    /// wide canvas (landscape iPad), stacked in the reading column otherwise.
+    /// iPhone (compact) always stacks — byte-identical. T-804.
+    @ViewBuilder
+    func ingredientsInstructions(twoUp: Bool) -> some View {
+        if twoUp {
+            HStack(alignment: .top, spacing: DODSpacing.lg) {
+                ingredientsSection
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .id(SectionAnchor.ingredients)
+                // DUT-631 — the Cook Mode CTA leads the Instructions column and
+                // carries the `.instructions` scroll anchor, so "Jump to
+                // Instructions" lands with the CTA at the top of the viewport.
+                VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                    cookModeCTA
+                    instructionsSection
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .id(SectionAnchor.instructions)
+            }
+            .frame(maxWidth: DODContentWidth.wide)
+            .frame(maxWidth: .infinity, alignment: .center)
+        } else {
+            VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                ingredientsSection.id(SectionAnchor.ingredients)
+                // DUT-631 — Cook Mode CTA sits directly above Instructions and
+                // owns the `.instructions` anchor (see two-up branch above).
+                cookModeCTA.id(SectionAnchor.instructions)
+                instructionsSection
+            }
+            .readableContentColumn(horizontalSizeClass)
+        }
+    }
+
+    /// DUT-631 — the Cook Mode CTA, relocated to sit directly above the
+    /// Instructions section. Gated on a non-empty instruction list (AC-7.1);
+    /// the tap seam records the intent then presents the full-screen cover.
+    @ViewBuilder
+    var cookModeCTA: some View {
+        if !(viewModel.recipe?.instructions.isEmpty ?? true) {
+            CookNowCTA(onTap: {
+                Task { await viewModel.didTapCookMode() }
+                isCookModePresented = true
+            })
+        }
+    }
+
     // MARK: - Ingredients + Instructions
 
     // Extracted from `RecipeDetailView` (T-804) so the main struct's body stays
