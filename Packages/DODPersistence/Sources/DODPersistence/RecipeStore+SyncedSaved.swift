@@ -40,10 +40,12 @@ extension RecipeStore {
     func upsertSyncedSaved(from row: CachedRecipe) throws {
         let isArticle = row.jsonLDFailedAt != nil && !(row.articleBodyHTML ?? "").isEmpty
         let existingRows = try fetchAllSyncedSaved(id: row.id)
-        if let existing = existingRows.first {
-            // DUT-378: collapse any CloudKit-duplicate rows into the earliest one
-            // so the set converges to a single record for this id.
-            for duplicate in existingRows.dropFirst() {
+        // DUT-650: collapse CloudKit-duplicate rows into the NEWEST (max `savedAt`)
+        // one — matching the newest-first survivor `savedRecipesWithSavedAt()`
+        // displays. Keeping the earliest (as DUT-378 originally did) made a re-save
+        // collapse to the old row, so the recipe jumped back to its old position.
+        if let existing = existingRows.max(by: { $0.savedAt < $1.savedAt }) {
+            for duplicate in existingRows where duplicate !== existing {
                 modelContext.delete(duplicate)
             }
             existing.title = row.title
@@ -252,6 +254,14 @@ extension RecipeStore {
         guard let row = try fetchRecipe(id: id) else { return }
         row.isSaved = true
         try removeSyncedSaved(id: id)
+        try modelContext.save()
+    }
+
+    /// Test-only (DUT-650): run the `upsertSyncedSaved` collapse for a cached id
+    /// and commit, so a test can assert which CloudKit-duplicate row survives.
+    func performUpsertSyncedSavedForTesting(id: Int) throws {
+        guard let row = try fetchRecipe(id: id) else { return }
+        try upsertSyncedSaved(from: row)
         try modelContext.save()
     }
 

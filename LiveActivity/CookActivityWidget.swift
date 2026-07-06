@@ -37,7 +37,9 @@ struct CookActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.trailing) {
                     CookActivityCompactTrailingView(
                         remainingSeconds: context.state.remainingSeconds,
-                        endDate: context.state.endDate
+                        endDate: context.state.endDate,
+                        isPaused: context.state.isPaused,
+                        isCompleted: context.state.isCompleted
                     )
                     .padding(.trailing, DODSpacing.xs)
                 }
@@ -57,7 +59,9 @@ struct CookActivityWidget: Widget {
             } compactTrailing: {
                 CookActivityCompactTrailingView(
                     remainingSeconds: context.state.remainingSeconds,
-                    endDate: context.state.endDate
+                    endDate: context.state.endDate,
+                    isPaused: context.state.isPaused,
+                    isCompleted: context.state.isCompleted
                 )
             } minimal: {
                 CookActivityCompactLeadingView()

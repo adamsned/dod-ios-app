@@ -200,26 +200,52 @@ public struct CookActivityCompactTrailingView: View {
 
     public let remainingSeconds: Int
     public let endDate: Date?
+    /// DUT-662: a paused timer must not self-tick and must read muted, matching
+    /// the card — a bright accent countdown that keeps counting contradicts a
+    /// paused/done card.
+    public let isPaused: Bool
+    /// DUT-662: mirrors ``CookActivityProgressArc.arcColor`` — a completed
+    /// (buzzer) timer keeps the accent fill even though it is technically paused.
+    public let isCompleted: Bool
 
-    public init(remainingSeconds: Int, endDate: Date? = nil) {
+    public init(
+        remainingSeconds: Int,
+        endDate: Date? = nil,
+        isPaused: Bool = false,
+        isCompleted: Bool = false
+    ) {
         self.remainingSeconds = remainingSeconds
         self.endDate = endDate
+        self.isPaused = isPaused
+        self.isCompleted = isCompleted
     }
 
     public var body: some View {
+        // DUT-662: a ≥1h `H:MM:SS` countdown (7 chars) has no width budget in the
+        // Dynamic Island trailing slot and clips — shrink to fit on one line.
         countdownText
             .dodFont(DODType.bodyEmphasized)
             .monospacedDigit()
-            .foregroundStyle(DODColor.accent)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .foregroundStyle(countdownColor)
     }
 
     /// DUT-218: self-updating while running (survives backgrounding), static
-    /// snapshot when no `endDate` (snapshots) or already elapsed.
+    /// snapshot when no `endDate` (snapshots), already elapsed, or paused — a
+    /// paused timer must freeze rather than keep ticking (DUT-662).
     private var countdownText: Text {
-        if let endDate, endDate > Date() {
+        if let endDate, !isPaused, endDate > Date() {
             return Text(timerInterval: Date()...endDate, countsDown: true)
         }
         return Text(formattedCookActivityCountdown(remainingSeconds))
+    }
+
+    /// DUT-662: mirror ``CookActivityProgressArc.arcColor`` so the numeral's tint
+    /// agrees with the card — muted when paused, accent when running or completed.
+    private var countdownColor: Color {
+        if isCompleted { return DODColor.accent }
+        return isPaused ? DODColor.labelSecondary : DODColor.accent
     }
 }
 
