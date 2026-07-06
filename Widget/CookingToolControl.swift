@@ -112,13 +112,18 @@ struct OpenCookingToolIntent: AppIntent {
 
     init(toolToken: String) { self.toolToken = toolToken }
 
-    func perform() async throws -> some IntentResult {
-        // Fire-and-forget: a nil store (unopenable App Group suite) or an
-        // unrecognized token just foregrounds the app without a flag — no crash.
-        if let route = ControlRouteStore.Route(rawValue: toolToken) {
-            ControlRouteStore()?.setPending(route)
-        }
-        return .result()
+    func perform() async throws -> some IntentResult & OpensIntent {
+        // A nil store (unopenable App Group suite) or an unrecognized token just
+        // foregrounds the app; fall back to the Shopping List so the tap still
+        // lands somewhere sensible rather than crashing.
+        let route = ControlRouteStore.Route(rawValue: toolToken) ?? .shoppingList
+        ControlRouteStore()?.setPending(route)  // signed-build path (unchanged)
+        // DUT-674 — cross-build fallback: adhoc/dev builds strip the App Group,
+        // so also hand the app the route as a dod:// URL (routed via onOpenURL).
+        // The token is a fixed `Route` raw value, so `URL(string:)` never fails;
+        // the `??` keeps SwiftLint's force_unwrapping rule happy without a bang.
+        let url = URL(string: "dod://\(route.rawValue)") ?? URL(fileURLWithPath: "/")
+        return .result(opensIntent: OpenURLIntent(url))
     }
 }
 

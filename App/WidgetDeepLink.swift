@@ -39,6 +39,10 @@ extension WidgetDeepLink {
             // Shopping List out of the Saved tab into the top-level Grocery
             // List tab; the widget surface it maps to stays `.saved`.
             .saved
+        case .cookingTool:
+            // DUT-674 — the `dod://<tool>` URL fallback for the configurable
+            // Control Center control; maps to the same surface as `.shoppingList`.
+            .saved
         }
     }
 
@@ -47,7 +51,7 @@ extension WidgetDeepLink {
     var recipeID: Int? {
         switch self {
         case .recipe(let id, _): id
-        case .feed, .saved, .tip, .shoppingList: nil
+        case .feed, .saved, .tip, .shoppingList, .cookingTool: nil
         }
     }
 }

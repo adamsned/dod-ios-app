@@ -378,13 +378,13 @@ struct TabStack: View {
             // Already on Feed (RootView set the tab); just clear any push
             // stack so the user lands on the root list.
             path = []
-        case .saved, .tip, .shoppingList:
-            // RootView routes `.saved` (Saved tab), `.tip` (the DUT-457 dialog),
-            // and `.shoppingList` (DUT-480 Control Center control → T-912/DUT-551
-            // now selects the Cooking Tools tab + mints the hub Shopping List
-            // token) directly and never sets `pendingDeepLink`, so these are
-            // unreachable here. Kept exhaustive so the compiler catches any future
-            // caller that does forward the link through here.
+        case .saved, .tip, .shoppingList, .cookingTool:
+            // RootView routes `.saved` (Saved tab), `.tip` (DUT-457 dialog),
+            // `.shoppingList` (DUT-480 control → T-912/DUT-551 Cooking Tools tab +
+            // hub Shopping List token), and `.cookingTool` (DUT-674 URL fallback
+            // for the DUT-560 configurable control) directly and never set
+            // `pendingDeepLink`, so these are unreachable here. Kept exhaustive so
+            // the compiler catches any future caller that forwards a link here.
             break
         }
     }

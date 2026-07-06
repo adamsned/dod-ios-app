@@ -22,7 +22,7 @@ public struct ControlRouteStore: @unchecked Sendable {
     /// DUT-560 — the configurable iOS 18 Control Center control lets the user
     /// pick which of the six cooking tools it opens, so every tool has a stable
     /// token here.
-    public enum Route: String, Sendable {
+    public enum Route: String, Sendable, Equatable {
         case shoppingList = "shopping-list"
         case heatCoach = "heat-coach"
         case cookingJournal = "journal"

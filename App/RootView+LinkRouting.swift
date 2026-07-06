@@ -43,6 +43,26 @@ extension RootView {
         case .shoppingList:
             // DUT-480 — the iOS 18 Control Center control's `dod://` link path.
             routeToShoppingList()
+        case .cookingTool(let controlRoute):
+            // DUT-674 — the URL fallback won the race; drain any pending App-Group
+            // flag so the `.active` transition can't double-route the same tap.
+            _ = ControlRouteStore()?.takePending()
+            route(control: controlRoute)
+        }
+    }
+
+    /// DUT-674 — the single tool→action mapping shared by the App-Group pending-
+    /// route drain (`consumePendingControlRoute`) and the `dod://<tool>` URL path
+    /// (`handle(widgetLink: .cookingTool)`).
+    func route(control controlRoute: ControlRouteStore.Route) {
+        switch controlRoute {
+        case .shoppingList: routeToShoppingList()
+        case .heatCoach: routeToHeatCoach()  // DUT-584 — standalone coach, no seed.
+        case .cookingJournal: self.route(toHubTool: .cookingJournal)
+        case .firstCookout: self.route(toHubTool: .firstCookout)
+        case .cookMode: self.route(toHubTool: .cookMode)
+        case .buyBuzzyWaxx:
+            if let url = URL(string: SettingsViewModel.buyBuzzyWaxxURLString) { systemOpenURL(url) }
         }
     }
 
@@ -134,18 +154,8 @@ extension RootView {
     /// `buyBuzzyWaxx` opens the store URL; every other tool routes through the
     /// hub. A `nil` (nothing pending) is a no-op.
     func consumePendingControlRoute() {
-        guard let route = ControlRouteStore()?.takePending() else { return }
-        switch route {
-        case .shoppingList: routeToShoppingList()
-        case .heatCoach: routeToHeatCoach()  // DUT-584 — Control Center opens the standalone coach (no seed).
-        case .cookingJournal: self.route(toHubTool: .cookingJournal)
-        case .firstCookout: self.route(toHubTool: .firstCookout)
-        case .cookMode: self.route(toHubTool: .cookMode)
-        case .buyBuzzyWaxx:
-            if let url = URL(string: SettingsViewModel.buyBuzzyWaxxURLString) {
-                systemOpenURL(url)
-            }
-        }
+        guard let pending = ControlRouteStore()?.takePending() else { return }
+        route(control: pending)
     }
 
     /// The external-route sink for one tab. Feed/Saved/Search each own a
