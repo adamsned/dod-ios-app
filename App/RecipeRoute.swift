@@ -20,9 +20,9 @@ enum RecipeRoute: Hashable {
     // read the full item); only equality/hashing is narrowed.
     static func == (lhs: RecipeRoute, rhs: RecipeRoute) -> Bool {
         switch (lhs, rhs) {
-        case let (.recipe(lItem, lAuto), .recipe(rItem, rAuto)):
+        case (.recipe(let lItem, let lAuto), .recipe(let rItem, let rAuto)):
             return lItem.id == rItem.id && lAuto == rAuto
-        case let (.category(lCategory), .category(rCategory)):
+        case (.category(let lCategory), .category(let rCategory)):
             return lCategory == rCategory
         default:
             return false
@@ -31,11 +31,11 @@ enum RecipeRoute: Hashable {
 
     func hash(into hasher: inout Hasher) {
         switch self {
-        case let .recipe(item, autoStartCookMode):
+        case .recipe(let item, let autoStartCookMode):
             hasher.combine(0)
             hasher.combine(item.id)
             hasher.combine(autoStartCookMode)
-        case let .category(category):
+        case .category(let category):
             hasher.combine(1)
             hasher.combine(category)
         }
