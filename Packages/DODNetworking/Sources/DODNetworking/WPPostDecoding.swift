@@ -28,6 +28,10 @@ extension WPDTO.Post {
         dateGMT = try container.decodeIfPresent(String.self, forKey: .dateGMT)
         featuredMedia = try container.decodeIfPresent(Int.self, forKey: .featuredMedia)
         categories = try container.decodeIfPresent([Int].self, forKey: .categories)
-        embedded = try container.decodeIfPresent(WPDTO.PostEmbedded.self, forKey: .embedded)
+        // DUT-640: decode `_embedded` leniently. A malformed embedded block
+        // (e.g. `wp:featuredmedia` carrying a WP error object instead of a media
+        // array) should cost only the inline hero image, not the whole post —
+        // the hero re-hydrates later via the `/media/{id}` fallback.
+        embedded = try? container.decodeIfPresent(WPDTO.PostEmbedded.self, forKey: .embedded)
     }
 }
