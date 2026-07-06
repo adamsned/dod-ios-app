@@ -53,7 +53,14 @@ struct RecipeDetailVideoSection: View {
         .frame(maxWidth: .infinity, maxHeight: Self.maxHeight)
         .padding(.horizontal, DODSpacing.md)
         .task(id: video.url) {
-            if player == nil { player = AVPlayer(url: video.url) }
+            if player == nil {
+                // DUT-632 — switch the shared audio session to `.playback` so the
+                // video is audible even with the hardware silent switch on. The
+                // player itself is never muted; the default `.soloAmbient`
+                // category was silencing it whenever the ringer switch was off.
+                RecipeVideoAudioSession.activateForPlayback()
+                player = AVPlayer(url: video.url)
+            }
             if let ratio = await Self.loadAspectRatio(for: video.url) {
                 aspectRatio = ratio
             }
