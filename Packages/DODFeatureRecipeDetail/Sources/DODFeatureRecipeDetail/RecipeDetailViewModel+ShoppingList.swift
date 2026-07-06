@@ -15,7 +15,7 @@ extension RecipeDetailViewModel {
     /// - `.added(count:)` → "Added N ingredients to your Shopping List" with a
     ///   trailing **View** action (the view routes it to `dod://shopping-list`).
     /// - `.couldntLoad` (no recipe yet, or the append seam isn't wired) →
-    ///   "Couldn't load ingredients — open the recipe to add." with no action.
+    ///   "Couldn't load ingredients. Open the recipe to add." with no action.
     ///
     /// Wraps the existing snackbar machinery: setting `snackbarMessage` shows
     /// the toast, and `snackbarActionTitle` drives the optional button; the
@@ -39,7 +39,7 @@ extension RecipeDetailViewModel {
             snackbarMessage = Self.addedMessage(count: count)
             snackbarActionTitle = "View"
         case .couldntLoad:
-            snackbarMessage = "Couldn't load ingredients — open the recipe to add."
+            snackbarMessage = "Couldn't load ingredients. Open the recipe to add."
             snackbarActionTitle = nil
         }
     }

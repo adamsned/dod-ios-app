@@ -18,7 +18,7 @@ extension SearchViewModel {
     /// - `.added(count:)` → "Added N ingredients to your Shopping List" with a
     ///   trailing **View** action (the view routes it to `dod://shopping-list`).
     /// - `.couldntLoad` (offline / unfetchable / no ingredients) → the fallback
-    ///   "Couldn't load ingredients — open the recipe to add." with no action.
+    ///   "Couldn't load ingredients. Open the recipe to add." with no action.
     public func addToShoppingList(_ item: RecipeListItem) async {
         // DUT-541 in-flight guard: a rapid double long-press fires two
         // independent Tasks; skip the second concurrent add of the SAME recipe
@@ -41,7 +41,7 @@ extension SearchViewModel {
             shoppingListSnackbarMessage = Self.shoppingListAddedMessage(count: count)
             shoppingListSnackbarActionTitle = "View"
         case .couldntLoad:
-            shoppingListSnackbarMessage = "Couldn't load ingredients — open the recipe to add."
+            shoppingListSnackbarMessage = "Couldn't load ingredients. Open the recipe to add."
             shoppingListSnackbarActionTitle = nil
         }
     }

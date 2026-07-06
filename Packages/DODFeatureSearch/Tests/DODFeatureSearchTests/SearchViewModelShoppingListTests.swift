@@ -69,7 +69,7 @@ struct SearchViewModelShoppingListTests {
 
         #expect(
             viewModel.shoppingListSnackbarMessage
-                == "Couldn't load ingredients — open the recipe to add."
+                == "Couldn't load ingredients. Open the recipe to add."
         )
         #expect(viewModel.shoppingListSnackbarActionTitle == nil)
     }

@@ -108,7 +108,7 @@ extension FirstCookoutView {
     var heatCoachCallToAction: some View {
         VStack(spacing: DODSpacing.xs) {
             Text(
-                "Every fire is different — wind, weather, and your charcoal all change "
+                "Every fire is different. Wind, weather, and your charcoal all change "
                     + "the count. Read the coals by feel instead of trusting one number."
             )
             .dodFont(DODType.body)
@@ -140,7 +140,7 @@ extension FirstCookoutView {
         let high = coals.totalBriquettes + 2
         return Text(
             "Rough starting point: about \(low)-\(high) coals for a "
-                + "\(cookout.ovenDiameterInches)-inch oven — then dial it in for your "
+                + "\(cookout.ovenDiameterInches)-inch oven, then dial it in for your "
                 + "conditions with the Heat Coach."
         )
         .dodFont(DODType.caption)

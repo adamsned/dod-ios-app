@@ -335,7 +335,7 @@ public final class SettingsViewModel {
             // already wrapped in `try modelContext.save()` which surfaces
             // here on persistence failure. Surface a humane error rather
             // than silently failing.
-            snackbarMessage = "Couldn't clear cache — try again."
+            snackbarMessage = "Couldn't clear cache. Try again."
         }
     }
 
