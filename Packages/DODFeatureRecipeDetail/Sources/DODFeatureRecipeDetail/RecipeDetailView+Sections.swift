@@ -17,33 +17,28 @@ extension RecipeDetailView {
                 ingredientsSection
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .id(SectionAnchor.ingredients)
-                // DUT-631 — the Cook Mode CTA leads the Instructions column and
-                // carries the `.instructions` scroll anchor, so "Jump to
-                // Instructions" lands with the CTA at the top of the viewport.
-                VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                    cookModeCTA
-                    instructionsSection
-                }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .id(SectionAnchor.instructions)
+                // DUT-673 — the Cook Mode CTA now lives INSIDE the Instructions
+                // section (right under its "Instructions" header, which carries
+                // the `.instructions` scroll anchor), so "Jump to Instructions"
+                // lands with the header on top and the CTA immediately visible.
+                instructionsSection
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .frame(maxWidth: DODContentWidth.wide)
             .frame(maxWidth: .infinity, alignment: .center)
         } else {
             VStack(alignment: .leading, spacing: DODSpacing.lg) {
                 ingredientsSection.id(SectionAnchor.ingredients)
-                // DUT-631 — Cook Mode CTA sits directly above Instructions and
-                // owns the `.instructions` anchor (see two-up branch above).
-                cookModeCTA.id(SectionAnchor.instructions)
                 instructionsSection
             }
             .readableContentColumn(horizontalSizeClass)
         }
     }
 
-    /// DUT-631 — the Cook Mode CTA, relocated to sit directly above the
-    /// Instructions section. Gated on a non-empty instruction list (AC-7.1);
-    /// the tap seam records the intent then presents the full-screen cover.
+    /// DUT-631/673 — the Cook Mode CTA, sitting just under the Instructions
+    /// header (inside ``instructionsSection``). Gated on a non-empty instruction
+    /// list (AC-7.1); the tap seam records the intent then presents the
+    /// full-screen cover.
     @ViewBuilder
     var cookModeCTA: some View {
         if !(viewModel.recipe?.instructions.isEmpty ?? true) {
@@ -109,6 +104,12 @@ extension RecipeDetailView {
                 Text("Instructions")
                     .dodFont(DODType.heading)
                     .foregroundStyle(DODColor.label)
+                    // DUT-673 — the scroll anchor lives on the header so "Jump to
+                    // Instructions" lands with "Instructions" at the top of the
+                    // viewport and the Cook Mode CTA (just below) immediately in view.
+                    .id(SectionAnchor.instructions)
+                // DUT-673 — Cook Mode CTA directly under the header, above step 1.
+                cookModeCTA
                 ForEach(instructions) { step in
                     InstructionStepView(
                         step: step,
