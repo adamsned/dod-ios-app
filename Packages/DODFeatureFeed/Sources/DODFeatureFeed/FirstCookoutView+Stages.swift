@@ -227,6 +227,7 @@ extension FirstCookoutView {
         } else {
             Button("Start the \(cookout.bakeMinutes)-minute bake timer") {
                 let duration = Double(cookout.bakeMinutes) * 60
+                didStartBake = true  // DUT-626 — mark real cook progress for the onDisappear log gate.
                 timerEngine.start(label: bakeTimerLabel, duration: duration, recipeID: cookout.recipeID)
                 // DUT-297: schedule the deadline alert so "you can step away" holds
                 // backgrounded (tick loop is foreground-only). DUT-547: keyed per rung.

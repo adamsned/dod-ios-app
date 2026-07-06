@@ -172,8 +172,15 @@ extension GuidedCookout {
     public static let path: [GuidedCookout] = [firstCookout, italianChicken, campfire]
 
     /// The next rung the cook hasn't done yet, given the recipe ids they've
-    /// logged (the DUT-104 cook journal). Returns the first un-cooked rung in
-    /// ``path``, or nil once every rung is cooked (a path graduate).
+    /// logged (the DUT-104 cook journal). Returns the first rung in ``path``
+    /// whose recipeID is NOT in `cookedRecipeIDs`, or nil once every rung is
+    /// cooked (a path graduate).
+    ///
+    /// DUT-628: this honors `cookedRecipeIDs` for EVERY rung, not just an
+    /// in-order high-water mark. So a cook who completed a later rung out of
+    /// order (e.g. rung 2 before rung 1) is still recommended the earliest rung
+    /// they genuinely haven't cooked (rung 1) — the hero never points at a rung
+    /// already in the journal.
     public static func nextUncookedRung(cookedRecipeIDs: Set<Int>) -> GuidedCookout? {
         path.first { !cookedRecipeIDs.contains($0.recipeID) }
     }

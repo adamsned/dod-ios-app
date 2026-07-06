@@ -54,13 +54,16 @@ import Testing
     }
 
     @Test func adjustedCoalSplit_cold_addsCoals() {
-        // base 24 (12" even) + midpoint of cold delta (2...3 → 3) = 27
-        #expect(model(ambient: .cold).adjustedCoalSplit.total == 27)
+        // DUT-653: base 24 (12" even) + midpoint of cold delta (2...3 → 2.5,
+        // rounded to-nearest-even → 2) = 26. The old away-from-zero rounding
+        // biased this to 3 (→ 27).
+        #expect(model(ambient: .cold).adjustedCoalSplit.total == 26)
     }
 
     @Test func adjustedCoalSplit_hot_pullsCoals() {
-        // base 24 + midpoint of hot delta (-3...-2 → -3) = 21
-        #expect(model(ambient: .hot).adjustedCoalSplit.total == 21)
+        // DUT-653: base 24 + midpoint of hot delta (-3...-2 → -2.5, rounded
+        // to-nearest-even → -2) = 22. The old rounding biased this to -3 (→ 21).
+        #expect(model(ambient: .hot).adjustedCoalSplit.total == 22)
     }
 
     @Test func adjustedCoalSplit_coldAndWindy_stacksBothDeltas() {
@@ -69,11 +72,12 @@ import Testing
     }
 
     @Test func adjustedCoalSplit_reSplitsByStyle() {
-        // baking, cold: total 27 re-split 3:1 → lid 20, bottom 7
+        // DUT-653: baking, cold: total 26 (midpoint 2, nearest-even) re-split
+        // 3:1 → lid round(26 * 0.75) = round(19.5) = 20, bottom 6.
         let split = model(style: .baking, ambient: .cold).adjustedCoalSplit
-        #expect(split.total == 27)
+        #expect(split.total == 26)
         #expect(split.lid == 20)
-        #expect(split.bottom == 7)
+        #expect(split.bottom == 6)
     }
 
     @Test func adjustedCoalSplit_elevationDoesNotChangeCoals() {

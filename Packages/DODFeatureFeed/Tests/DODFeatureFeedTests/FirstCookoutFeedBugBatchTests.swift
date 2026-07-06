@@ -173,6 +173,50 @@ struct FirstCookoutFeedBugBatchTests {
         #expect(states.allSatisfy { $0 == .done }, "the stranded-hub bug: all rungs falsely done")
     }
 
+    // MARK: - DUT-644 — VoiceOver bake countdown uses singular units
+
+    /// The spelled-out countdown label must say "1 minute" / "1 second", not
+    /// "1 minutes" / "1 seconds", while keeping plurals for other values.
+    @Test func bakeCountdownLabelUsesSingularUnitsForOne() {
+        let view = FirstCookoutView(cookout: GuidedCookout.firstCookout)
+        // 1:01 → both units singular.
+        #expect(view.bakeCountdownLabel(61) == "1 minute 1 second remaining")
+        // 1:00 → minutes-only, singular.
+        #expect(view.bakeCountdownLabel(60) == "1 minute remaining")
+        // 0:01 → seconds-only, singular.
+        #expect(view.bakeCountdownLabel(1) == "1 second remaining")
+        // Plurals preserved: 5:03 and 0:30.
+        #expect(view.bakeCountdownLabel(303) == "5 minutes 3 seconds remaining")
+        #expect(view.bakeCountdownLabel(30) == "30 seconds remaining")
+        // Mixed singular/plural: 1:30 and 2:01.
+        #expect(view.bakeCountdownLabel(90) == "1 minute 30 seconds remaining")
+        #expect(view.bakeCountdownLabel(121) == "2 minutes 1 second remaining")
+    }
+
+    // MARK: - DUT-626 — the onDisappear cook-log gate needs real bake progress
+
+    /// `hasBakeProgress` — which gates the `.onDisappear` cook-log safety net — is
+    /// false when the cook merely paged to the celebration without ever starting
+    /// the bake, and true once the shared engine holds a timer for this rung.
+    @Test func hasBakeProgressReflectsActualCookProgress() {
+        let engine = CookTimerEngine()
+        let cookout = GuidedCookout.firstCookout
+
+        // Never started: no timer for this rung → no progress → no phantom log.
+        let view = FirstCookoutView(cookout: cookout, timerEngine: engine)
+        #expect(view.hasBakeProgress == false)
+
+        // Start a bake for this rung on the shared engine → progress is real, so
+        // a later re-entered lifecycle (rebuilt view, same engine) sees it.
+        _ = engine.start(label: "bake", duration: 60, recipeID: cookout.recipeID)
+        let reEntered = FirstCookoutView(cookout: cookout, timerEngine: engine)
+        #expect(reEntered.hasBakeProgress == true)
+
+        // A sibling rung's timer does not count as THIS rung's progress.
+        let sibling = FirstCookoutView(cookout: GuidedCookout.path[1], timerEngine: engine)
+        #expect(sibling.hasBakeProgress == false)
+    }
+
     // MARK: - DUT-211 — share copy / subject reflect the correct rung
 
     @Test func shareCopyReadsFirstOnlyForTheFirstRung() {

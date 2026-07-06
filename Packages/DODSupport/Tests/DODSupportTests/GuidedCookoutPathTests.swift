@@ -49,6 +49,26 @@ struct GuidedCookoutPathTests {
         #expect(GuidedCookout.nextUncookedRung(cookedRecipeIDs: allCooked) == nil)
     }
 
+    /// DUT-628 — out-of-order completion: a cook who logged a LATER rung first
+    /// (rung 2 before rung 1) is still recommended the earliest genuinely
+    /// un-cooked rung (rung 1), never the already-cooked one.
+    @Test func nextUncookedRungHonorsOutOfOrderCompletion() {
+        // Rung 2 (the chicken) cooked, rung 1 (the lasagna) NOT -> still rung 1.
+        let onlyRung2: Set<Int> = [GuidedCookout.italianChicken.recipeID]
+        #expect(
+            GuidedCookout.nextUncookedRung(cookedRecipeIDs: onlyRung2)?.recipeID
+                == GuidedCookout.firstCookout.recipeID
+        )
+        // Rung 1 + rung 3 cooked, rung 2 skipped -> the skipped rung 2.
+        let rung1And3: Set<Int> = [
+            GuidedCookout.firstCookout.recipeID, GuidedCookout.campfire.recipeID,
+        ]
+        #expect(
+            GuidedCookout.nextUncookedRung(cookedRecipeIDs: rung1And3)?.recipeID
+                == GuidedCookout.italianChicken.recipeID
+        )
+    }
+
     @Test func isFirstRungOnlyForRungOne() {
         #expect(GuidedCookout.firstCookout.isFirstRung == true)
         #expect(GuidedCookout.italianChicken.isFirstRung == false)

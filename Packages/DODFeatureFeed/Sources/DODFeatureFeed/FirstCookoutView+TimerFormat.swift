@@ -70,12 +70,18 @@ extension FirstCookoutView {
 
     /// DUT-401 — spell out the bake countdown for VoiceOver ("5 minutes 3
     /// seconds remaining") instead of letting it read the "5:03" digits.
+    /// DUT-644 — singular units ("1 minute", "1 second") so VoiceOver never
+    /// says "1 minutes" / "1 seconds".
     func bakeCountdownLabel(_ seconds: TimeInterval) -> String {
         let total = max(Int(seconds.rounded()), 0)
         let minutes = total / 60
         let secs = total % 60
-        if minutes > 0 && secs > 0 { return "\(minutes) minutes \(secs) seconds remaining" }
-        if minutes > 0 { return "\(minutes) minutes remaining" }
-        return "\(secs) seconds remaining"
+        let minuteUnit = minutes == 1 ? "minute" : "minutes"
+        let secondUnit = secs == 1 ? "second" : "seconds"
+        if minutes > 0 && secs > 0 {
+            return "\(minutes) \(minuteUnit) \(secs) \(secondUnit) remaining"
+        }
+        if minutes > 0 { return "\(minutes) \(minuteUnit) remaining" }
+        return "\(secs) \(secondUnit) remaining"
     }
 }

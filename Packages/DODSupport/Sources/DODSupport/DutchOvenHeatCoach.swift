@@ -112,14 +112,16 @@ public enum DutchOvenHeatCoach {
     /// Extra cook time for elevation, as a **range** of minutes:
     /// **+15 to +20 minutes per 1,000 ft** above the chosen baseline.
     ///
-    /// Thousands are counted whole (2,500 ft → 2 → `30...40`); anything at or
-    /// below the baseline clamps to `0...0` (elevation never *shortens* a
-    /// cook). The baseline itself is the caller's reference altitude — pass
-    /// `feetAboveBaseline = absoluteElevation - baseline`; the default
-    /// baseline is sea level (0 ft).
+    /// DUT-651: interpolated CONTINUOUSLY (`feet * 15 / 1000 ... feet * 20 /
+    /// 1000`) rather than bucketed by whole thousands, so every 500-ft step of
+    /// the elevation stepper visibly moves the number (2,500 ft → `37...50`,
+    /// not the old `30...40`). Anything at or below the baseline clamps to
+    /// `0...0` (elevation never *shortens* a cook). The baseline itself is the
+    /// caller's reference altitude — pass `feetAboveBaseline = absoluteElevation
+    /// - baseline`; the default baseline is sea level (0 ft).
     public static func cookTimeExtraMinutes(elevationFeetAboveBaseline feet: Int) -> ClosedRange<Int> {
-        let thousands = max(0, feet) / 1000
-        return (thousands * 15)...(thousands * 20)
+        let above = max(0, feet)
+        return (above * 15 / 1000)...(above * 20 / 1000)
     }
 
     // MARK: - Hand test (palm over the coals)

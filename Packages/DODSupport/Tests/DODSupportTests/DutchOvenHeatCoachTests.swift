@@ -150,9 +150,18 @@ import Testing
         #expect(DutchOvenHeatCoach.cookTimeExtraMinutes(elevationFeetAboveBaseline: 3000) == 45...60)
     }
 
-    @Test func elevation_partialThousandTruncates() {
-        // Integer thousands: 2500 ft → floor(2.5) = 2 → 30 ... 40.
-        #expect(DutchOvenHeatCoach.cookTimeExtraMinutes(elevationFeetAboveBaseline: 2500) == 30...40)
+    @Test func elevation_partialThousandInterpolatesContinuously() {
+        // DUT-651: continuous interpolation, not whole-thousand buckets.
+        // 2500 ft → 2500*15/1000 ... 2500*20/1000 = 37 ... 50.
+        #expect(DutchOvenHeatCoach.cookTimeExtraMinutes(elevationFeetAboveBaseline: 2500) == 37...50)
+    }
+
+    /// DUT-651 — every 500-ft stepper tap must move the number (the old
+    /// `feet/1000` bucketing froze half the taps). 500 and 1500 ft now yield
+    /// distinct non-bucketed ranges rather than collapsing to 0 and 15...20.
+    @Test func elevation_fiveHundredFootSteps_eachMoveTheNumber() {
+        #expect(DutchOvenHeatCoach.cookTimeExtraMinutes(elevationFeetAboveBaseline: 500) == 7...10)
+        #expect(DutchOvenHeatCoach.cookTimeExtraMinutes(elevationFeetAboveBaseline: 1500) == 22...30)
     }
 
     @Test func elevation_belowBaselineClampsToZero() {

@@ -108,6 +108,30 @@ import Testing
         #expect(viewModel.loadState == .firstLaunchOffline)
     }
 
+    /// DUT-621 — an ONLINE first-launch fetch failure must route to the
+    /// `.firstLaunchFailed` error state (message + Retry), NOT the dead-end
+    /// `.empty` "No recipes". Also surfaces the failure message.
+    @Test func firstLaunchOnlineFailureShowsErrorState() async throws {
+        let dependencies = FakeFeedDependencies()
+        dependencies.shouldFail = true
+        dependencies.online = true
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .firstLaunchFailed)
+        #expect(viewModel.errorMessage == "Couldn't load recipes.")
+    }
+
+    /// DUT-621 — `.empty` is reserved for a genuine zero-result SUCCESS (the
+    /// fetch succeeded but returned no items), never a failure.
+    @Test func firstLaunchZeroResultSuccessShowsEmpty() async throws {
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = []  // fetch succeeds, but there are no recipes
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .empty)
+        #expect(viewModel.errorMessage == nil)
+    }
+
     @Test func refreshClearsBlocklistAndReloads() async throws {
         let dependencies = FakeFeedDependencies()
         dependencies.pages[1] = (1...3).map(Self.makeItem)
