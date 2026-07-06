@@ -17,17 +17,38 @@ struct ScreenViewTracking: ViewModifier {
 
     let selectedTab: AppTab
 
+    /// DUT-618 — the last tab we actually emitted `screen_view` for. `phoneTabs`
+    /// and `iPadSplit` BOTH apply this modifier and swap at the size-class
+    /// boundary; a pure layout flip (e.g. an iPad rotate, or a Split View resize
+    /// crossing the compact/regular threshold) tears down one branch and mounts
+    /// the other, re-firing `.onAppear` for the tab that was already visible —
+    /// double-counting a `screen_view` no human navigation produced. Deduping on
+    /// the last-emitted tab makes the layout swap a no-op while a genuine tab
+    /// change still emits (the new tab differs from the last one recorded).
+    @State private var lastEmittedTab: AppTab?
+
     func body(content: Content) -> some View {
         content
             .onChange(of: selectedTab) { _, newValue in
-                Self.emitScreenView(for: newValue)
+                emitIfChanged(newValue)
             }
             .onAppear {
                 // Cold-launch emit for the initially-selected tab (Feed by
                 // default). `.onChange` alone would never fire for the launch
-                // screen — that omission was the DUT-256 iPad undercount.
-                Self.emitScreenView(for: selectedTab)
+                // screen — that omission was the DUT-256 iPad undercount. Guarded
+                // by `emitIfChanged` so a size-class layout swap that re-mounts
+                // this modifier doesn't re-emit for the already-visible tab.
+                emitIfChanged(selectedTab)
             }
+    }
+
+    /// Emit `screen_view` for `tab` only when it differs from the last tab we
+    /// emitted for, then record it. Suppresses the duplicate a layout swap would
+    /// otherwise produce (DUT-618) without changing what a real tab change emits.
+    private func emitIfChanged(_ tab: AppTab) {
+        guard lastEmittedTab != tab else { return }
+        lastEmittedTab = tab
+        Self.emitScreenView(for: tab)
     }
 
     /// Send the `screen_view` event for `tab`. Both the on-appear (cold-launch)

@@ -28,7 +28,7 @@ extension CookingToolsHubView {
                     description: "New to Dutch oven cooking? Get coached through a whole cook, "
                         + "start to finish.",
                     accessibilityID: "hub-first-cookout"
-                ) { showingFirstCookout = true }
+                ) { activeToolSheet = .firstCookout }
 
                 toolCard(
                     icon: "cart.fill",
@@ -46,7 +46,7 @@ extension CookingToolsHubView {
                     description: "Figure out how many coals your oven needs for any temperature, "
                         + "then adjust by feel.",
                     accessibilityID: "hub-heat-coach"
-                ) { showingHeatCoach = true }
+                ) { activeToolSheet = .heatCoach(seed: nil) }
 
                 toolCard(
                     icon: "flame.circle.fill",
@@ -54,14 +54,14 @@ extension CookingToolsHubView {
                     description: "Cook any recipe hands-free, one step at a time, with timers "
                         + "and voice. Open a recipe and tap Cook Now to start.",
                     accessibilityID: "hub-cook-mode"
-                ) { showingCookModeExplainer = true }
+                ) { activeToolSheet = .cookModeExplainer }
 
                 toolCard(
                     icon: "book.closed.fill",
                     title: "Cooking Journal",
                     description: "Log every cook with a photo and notes, and build your streak.",
                     accessibilityID: "hub-journal"
-                ) { showingJournal = true }
+                ) { activeToolSheet = .cookingJournal }
 
                 toolCard(
                     icon: "bag.fill",

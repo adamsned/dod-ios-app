@@ -40,6 +40,33 @@ struct HubToolRoute: Equatable {
     let tool: HubTool
 }
 
+/// DUT-615 — the single sheet the hub can have up at any moment. The hub used to
+/// declare FIVE independent `.sheet` presenters (First Cookout, Celebration,
+/// Heat Coach, Journal, Cook Mode explainer); asking to present a second while
+/// one was already up dropped it silently (SwiftUI only honors one sheet per
+/// presenting anchor). Folding them into one `.sheet(item:)` bound to this enum
+/// means exactly one presenter exists, so a new request always replaces (never
+/// races) whatever is showing. The `heatCoach` case carries the DUT-584 seed and
+/// the `celebration` case carries the DUT-104 payload, preserving each sheet's
+/// content verbatim.
+enum ActiveHubSheet: Identifiable {
+    case firstCookout
+    case celebration(CookCelebration)
+    case heatCoach(seed: HeatCoachSeed?)
+    case cookingJournal
+    case cookModeExplainer
+
+    var id: String {
+        switch self {
+        case .firstCookout: return "firstCookout"
+        case .celebration(let celebration): return "celebration-\(celebration.id)"
+        case .heatCoach: return "heatCoach"
+        case .cookingJournal: return "cookingJournal"
+        case .cookModeExplainer: return "cookModeExplainer"
+        }
+    }
+}
+
 /// T-912 / DUT-551 (CL-306) — the **Cooking Tools** hub: a first-class tab that
 /// lists every utility a cook reaches for, **in meal-making order** (shop →
 /// heat → cook → after). It replaces the retired standalone "Cooking Tools"
@@ -78,20 +105,13 @@ struct CookingToolsHubView: View {
     // (SwiftLint `type_body_length` relief) can drive it across the file boundary.
     /// The hub tab's own navigation stack (Shopping List pushes onto it).
     @State var path: [HubDestination] = []
-    /// Presents the "Your First Cookout" roadmap (`CookChooserFlow`).
-    @State var showingFirstCookout = false
-    /// Presents the Dutch Oven Heat Coach.
-    @State var showingHeatCoach = false
-    /// DUT-584 — the seed the Heat Coach opens with. Set from the pending
-    /// ``HubToolRoute`` (the per-recipe nudge threads a recipe seed here); `nil`
-    /// for a standalone open, which keeps the 12"/even default.
-    @State var heatCoachSeed: HeatCoachSeed?
-    /// Presents the "I Made This" Cooking Journal.
-    @State var showingJournal = false
-    /// Cook Mode needs a recipe, so its row is an explainer sheet whose CTA
-    /// routes the user to the Recipes tab to pick something to cook (never
-    /// constructs Cook Mode with a nil `Recipe`).
-    @State var showingCookModeExplainer = false
+    /// DUT-615 — the single active tool sheet (First Cookout, Heat Coach with its
+    /// DUT-584 seed, Cooking Journal, or the Cook Mode explainer). Replaces the
+    /// four independent `showing…` booleans + `heatCoachSeed`, so only one
+    /// presenter exists and a second request replaces rather than races the
+    /// first. The Celebration sheet is surfaced separately by ``activeHubSheet``
+    /// because it's driven reactively by `feedViewModel.celebration`.
+    @State var activeToolSheet: ActiveHubSheet?
 
     /// Reused so "Your First Cookout" + the Cooking Journal log/read through the
     /// same store the Feed tab does. Built once from `feedDependencies()` (the
@@ -185,14 +205,13 @@ struct CookingToolsHubView: View {
             case .shoppingList:
                 if path.last != .shoppingList { path.append(.shoppingList) }
             case .heatCoach(let seed):
-                heatCoachSeed = seed
-                showingHeatCoach = true
+                activeToolSheet = .heatCoach(seed: seed)
             case .cookingJournal:
-                showingJournal = true
+                activeToolSheet = .cookingJournal
             case .firstCookout:
-                showingFirstCookout = true
+                activeToolSheet = .firstCookout
             case .cookMode:
-                showingCookModeExplainer = true
+                activeToolSheet = .cookModeExplainer
             }
             self.pendingTool = nil
         }
@@ -210,57 +229,85 @@ struct CookingToolsHubView: View {
         // they've already made as done (re-activating DUT-212 + DUT-381, stranded
         // by the DUT-551 hub refactor). `.task` runs once when the hub mounts.
         .task { await loadCookState() }
-        .sheet(
-            isPresented: $showingFirstCookout,
-            // Reload the cook state after the cookout sheet closes: the cook may
-            // have logged a rung in the flow, which advances the recommendation.
-            onDismiss: {
-                feedViewModel.cookoutFlowDidDismiss()
-                Task { await loadCookState() }
+        // DUT-615 — ONE sheet presenter for every hub tool + the celebration, so a
+        // second presentation replaces (never silently drops) whatever is up.
+        .sheet(item: activeHubSheet, onDismiss: handleHubSheetDismiss) { sheet in
+            hubSheet(for: sheet)
+        }
+    }
+
+    /// DUT-615 — the single sheet the hub presents. The reactive celebration
+    /// (`feedViewModel.celebration`, set after logging a cook) takes precedence
+    /// over the tool-driven `activeToolSheet`; the setter clears whichever source
+    /// backed the currently-shown sheet so a swipe-dismiss unwinds cleanly.
+    private var activeHubSheet: Binding<ActiveHubSheet?> {
+        Binding(
+            get: {
+                if let celebration = feedViewModel.celebration {
+                    return .celebration(celebration)
+                }
+                return activeToolSheet
             },
-            content: {
-                CookChooserFlow(
-                    // DUT-559 / DUT-212 — hand the real recommended rung only once
-                    // the cook state has loaded (the cold-launch gate); before then
-                    // `nil` falls through to the plain roadmap rather than a stale
-                    // rung 1. `cookedRecipeIDs` is ALWAYS the real set so a fresh
-                    // cook's rungs aren't all painted done (DUT-381).
-                    recommended: cookStateLoaded
-                        ? GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
-                        : nil,
-                    cookedRecipeIDs: cookedRecipeIDs,
-                    onLogCook: { entry in
-                        Task { await feedViewModel.logCook(entry) }
+            set: { newValue in
+                if newValue == nil {
+                    if feedViewModel.celebration != nil {
+                        feedViewModel.dismissCelebration()
                     }
-                )
-                .onAppear { feedViewModel.cookoutFlowWillPresent() }
+                    activeToolSheet = nil
+                }
             }
         )
-        // Celebration — a logged cook that graduates the First Cookout path or
-        // bumps a rank fires the moment, once the cookout sheet closes (the hub
-        // now owns the flow that logs the cook, so it owns this sheet too).
-        .sheet(
-            item: Binding(
-                get: { feedViewModel.celebration },
-                set: { if $0 == nil { feedViewModel.dismissCelebration() } }
+    }
+
+    /// DUT-615 — the per-sheet `onDismiss`. Only First Cookout had dismiss
+    /// behavior (reload the cook state, since a rung may have been logged in the
+    /// flow, which advances the recommendation); every other sheet dismisses
+    /// with no side effect. Keyed on `activeToolSheet` because by the time
+    /// `onDismiss` fires the binding has already been cleared.
+    private func handleHubSheetDismiss() {
+        guard case .firstCookout = activeToolSheet else { return }
+        feedViewModel.cookoutFlowDidDismiss()
+        Task { await loadCookState() }
+    }
+
+    /// DUT-615 — the content for the single hub sheet. Each branch preserves the
+    /// exact view, seed, and presentation detents the five separate `.sheet`
+    /// modifiers used before the consolidation.
+    @ViewBuilder
+    private func hubSheet(for sheet: ActiveHubSheet) -> some View {
+        switch sheet {
+        case .firstCookout:
+            CookChooserFlow(
+                // DUT-559 / DUT-212 — hand the real recommended rung only once
+                // the cook state has loaded (the cold-launch gate); before then
+                // `nil` falls through to the plain roadmap rather than a stale
+                // rung 1. `cookedRecipeIDs` is ALWAYS the real set so a fresh
+                // cook's rungs aren't all painted done (DUT-381).
+                recommended: cookStateLoaded
+                    ? GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
+                    : nil,
+                cookedRecipeIDs: cookedRecipeIDs,
+                onLogCook: { entry in
+                    Task { await feedViewModel.logCook(entry) }
+                }
             )
-        ) { celebration in
+            .onAppear { feedViewModel.cookoutFlowWillPresent() }
+        case .celebration(let celebration):
+            // Celebration — a logged cook that graduates the First Cookout path
+            // or bumps a rank fires the moment, once the cookout sheet closes.
             CookCelebrationView(celebration: celebration) { feedViewModel.dismissCelebration() }
                 .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $showingHeatCoach) {
+        case .heatCoach(let seed):
             // DUT-584 — open pre-answered when a recipe seeded the route; a
-            // standalone open (hub tile / deep link) leaves `heatCoachSeed` nil.
-            NavigationStack { HeatCoachView(seed: heatCoachSeed) }
-        }
-        .sheet(isPresented: $showingJournal) {
+            // standalone open (hub tile / deep link) leaves the seed nil.
+            NavigationStack { HeatCoachView(seed: seed) }
+        case .cookingJournal:
             CookJournalView(
                 load: { await feedViewModel.cookLogs() },
                 update: { await feedViewModel.updateCook($0) },
                 delete: { await feedViewModel.deleteCook($0) }
             )
-        }
-        .sheet(isPresented: $showingCookModeExplainer) {
+        case .cookModeExplainer:
             cookModeExplainer
         }
     }
@@ -297,7 +344,7 @@ struct CookingToolsHubView: View {
                 // gives it a comfortable height and width that harmonizes with the
                 // rest of the hub's design language.
                 Button {
-                    showingCookModeExplainer = false
+                    activeToolSheet = nil
                     onFindRecipe()
                 } label: {
                     Text("Find a Recipe")
@@ -315,7 +362,7 @@ struct CookingToolsHubView: View {
             .dodInlineNavTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { showingCookModeExplainer = false }
+                    Button("Done") { activeToolSheet = nil }
                         .tint(DODColor.burntOrange)
                 }
             }
