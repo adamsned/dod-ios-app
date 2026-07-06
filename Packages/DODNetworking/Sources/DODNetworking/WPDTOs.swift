@@ -74,6 +74,7 @@ enum WPDTO {
         }
     }
 
+    // DUT-640: custom lenient `init(from:)` lives in `WPDTOs+Media.swift`.
     struct MediaDetails: Decodable {
         let sizes: [String: MediaSize]?
     }
@@ -304,7 +305,7 @@ extension WPDTO.Post {
         RecipeListItem(
             id: id,
             title: HTMLSanitizer.plainText(from: title.rendered),
-            excerpt: HTMLSanitizer.plainText(from: excerpt.rendered),
+            excerpt: HTMLSanitizer.plainText(from: WPDTO.strippingMoreLink(excerpt.rendered)),
             heroImage: heroImage,
             // DUT-311: `date` is site-local; `date_gmt` is genuine UTC, so it
             // drives `publishedAt` (parseWPDate assumes UTC for offsetless input).
@@ -351,8 +352,7 @@ extension WPDTO.RecipeCard {
 }
 
 extension WPDTO {
-    /// Parse an optional URL string the lenient way: nil / empty / whitespace /
-    /// unparseable all collapse to `nil`. No force-unwrap.
+    /// Parse an optional URL leniently: nil / empty / whitespace / unparseable all collapse to `nil`.
     static func parseOptionalURL(_ raw: String?) -> URL? {
         guard let raw else { return nil }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
