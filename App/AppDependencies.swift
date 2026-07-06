@@ -197,18 +197,17 @@ final class AppDependencies {
     /// `publicCloudDatabase` / `sharedCloudDatabase` / `discoverUserIdentity`
     /// surface reference exists in the entire app per the REG-25 contract.
     private func checkCloudKitAvailability() async {
-        let container = CKContainer(
-            identifier: RecipeStore.cloudKitContainerIdentifier
-        )
+        // DUT-675 (completes DUT-630) — `CKContainer(identifier:)` traps at INIT
+        // (uncatchable by the `accountStatus()` try/catch) without the iCloud
+        // entitlement, which adhoc/CLI sim builds strip. Skip on Simulator, where
+        // CloudKit sync is untestable anyway — the gate DUT-630 uses for mirroring.
+        guard RecipeStore.cloudKitMirroringAvailable else { return }
+        let container = CKContainer(identifier: RecipeStore.cloudKitContainerIdentifier)
         do {
             let status = try await container.accountStatus()
-            DODLog.app.info(
-                "CloudKit account status: \(String(describing: status))"
-            )
+            DODLog.app.info("CloudKit account status: \(String(describing: status))")
         } catch {
-            DODLog.app.notice(
-                "CloudKit availability check failed: \(error.localizedDescription)"
-            )
+            DODLog.app.notice("CloudKit availability check failed: \(error.localizedDescription)")
         }
     }
 
