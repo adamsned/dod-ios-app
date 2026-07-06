@@ -297,6 +297,7 @@ import Testing
         seed: Set<UUID> = [],
         idleTimer: IdleTimerController = FakeIdleTimerController(),
         liveActivity: any CookLiveActivityController = FakeLiveActivityController(),
+        stepTimerNotifier: any CookStepTimerNotifying = FakeCookStepTimerNotifier(),
         voiceReader: VoiceReader = VoiceReader()
     ) -> CookModeViewModel {
         let instructions = (1...max(stepCount, 1)).map { index in
@@ -316,10 +317,15 @@ import Testing
             initialCheckedIngredients: seed,
             idleTimer: idleTimer,
             liveActivity: liveActivity,
+            stepTimerNotifier: stepTimerNotifier,
             voiceReader: voiceReader
         )
     }
 }
+
+// DUT-604 — `FakeCookStepTimerNotifier` (the spy for `CookStepTimerNotifying`)
+// lives in `CookModeStepTimerNotificationTests.swift` so this file stays under
+// the SwiftLint 400-line `file_length` cap.
 
 @MainActor
 final class FakeIdleTimerController: IdleTimerController {

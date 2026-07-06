@@ -37,7 +37,12 @@ extension RecipeDetailRatingsSection {
             relativeDate: Self.relativeDateString(comment.dateGMT),
             bodyText: comment.body,
             ratingValue: comment.ratingValue,
-            isPendingModeration: comment.status != .approved,
+            // DUT-606: badge only on the EXPLICIT pending-moderation status
+            // (`.hold`). The old `!= .approved` test also badged `.unknown`
+            // (a status we couldn't map) and `.spam` / `.trash` as "Awaiting
+            // approval", which is wrong — only a held comment is genuinely
+            // awaiting a moderator.
+            isPendingModeration: comment.status == .hold,
             avatarOverride: ownCommentAvatarOverride(for: comment)
         )
         // DUT-501 (Guideline 1.2) — report/block another user's comment. Report

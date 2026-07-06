@@ -92,9 +92,16 @@ extension RecipeDetailView {
     private func presentAddToShoppingList() {
         guard let recipe = viewModel.recipe else { return }
         if addToShoppingListSheet != nil {
-            recipeForShoppingListSheet = SheetRecipe(recipe: recipe)
+            // DUT-639 — hand the selection sheet the SCALED (+ metric-converted)
+            // recipe so the chosen rows match the displayed ingredient lines.
+            let scaled = RecipeDetailViewModel.scaledRecipe(
+                recipe,
+                by: viewModel.servingsScaleFactor,
+                useMetric: useMetricUnits
+            )
+            recipeForShoppingListSheet = SheetRecipe(recipe: scaled)
         } else {
-            Task { await viewModel.addToShoppingList() }
+            Task { await viewModel.addToShoppingList(useMetric: useMetricUnits) }
         }
     }
 

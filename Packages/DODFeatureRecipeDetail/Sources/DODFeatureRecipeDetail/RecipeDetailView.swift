@@ -216,6 +216,18 @@ public struct RecipeDetailView: View {
                 title: "Recipe unavailable",
                 message: "This recipe can't be displayed right now."
             )
+        // DUT-627 — a transient network failure with no cache. Distinct from
+        // `.unavailable` (which auto-pops): keep the user here with a Retry
+        // button so a flaky-connection open isn't mistaken for a dead recipe.
+        case .retryableError:
+            EmptyState(
+                systemImage: "wifi.slash",
+                title: "Couldn't load recipe",
+                message: "Check your connection and try again.",
+                action: .init(title: "Retry") {
+                    Task { await viewModel.retryLoad() }
+                }
+            )
         case .ready:
             readyBody
         // US-37 / CL-63 / AC-37.3 (T-640): article rendering branch.

@@ -274,63 +274,10 @@ public struct RecipeDetailRatingsSection: View {
         }
     }
 
-    /// Optional inline comment editor (AC-14.3). Empty is valid — the user
-    /// can submit a star rating alone. Styling matches the DesignSystem
-    /// `CommentComposer` editor (bordered `TextEditor` + placeholder) so the
-    /// look is unchanged from the old composer, minus its duplicate stars.
-    private var commentField: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text("Add a comment (optional)")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                    .stroke(DODColor.labelSecondary.opacity(0.25), lineWidth: 1)
-
-                TextEditor(
-                    text: Binding(
-                        get: { viewModel.commentDraft },
-                        set: { viewModel.setCommentDraft($0) }
-                    )
-                )
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .scrollContentBackground(.hidden)
-                .padding(DODSpacing.xs)
-                .frame(minHeight: 120)
-                .disabled(viewModel.isSubmittingRatingOrComment)
-                .accessibilityLabel("Comment (optional)")
-
-                if viewModel.commentDraft.isEmpty {
-                    Text("Share your tips, substitutions, or thoughts.")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.labelSecondary.opacity(0.7))
-                        .padding(.horizontal, DODSpacing.sm)
-                        .padding(.vertical, DODSpacing.sm + 2)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-            }
-        }
-    }
-
-    /// The one and only Submit control for the section. Enabled when the
-    /// user has set a rating OR typed a comment AND the on-form name + email
-    /// are valid (DUT-28). One tap persists the identity and posts.
-    private var submitButton: some View {
-        Button {
-            Task { await viewModel.submitRatingAndComment() }
-        } label: {
-            Text(viewModel.isSubmittingRatingOrComment ? "Submitting…" : "Submit")
-                .dodFont(DODType.bodyEmphasized)
-                .padding(.horizontal, DODSpacing.lg)
-                .padding(.vertical, DODSpacing.sm)
-        }
-        .dodProminentButton()
-        .tint(DODColor.accent)
-        .disabled(!viewModel.canSubmitRatingOrComment || viewModel.isSubmittingRatingOrComment)
-        .accessibilityLabel("Submit rating and review")
-    }
+    // The comment editor (`commentField`), the DUT-605 character counter
+    // (`commentCharacterCounter`), and the `submitButton` live in the
+    // `RecipeDetailRatingsSection+Composer.swift` extension so this file stays
+    // under the SwiftLint 400-line `file_length` cap (same pattern as `+PhaseD`).
 
     // MARK: - CommentsList
 

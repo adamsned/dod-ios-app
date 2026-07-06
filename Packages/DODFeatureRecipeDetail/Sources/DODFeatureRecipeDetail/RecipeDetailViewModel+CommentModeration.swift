@@ -94,8 +94,15 @@ extension RecipeDetailViewModel {
     /// True when a comment belongs to the signed-in user (their own posts carry
     /// their profile email; other users' GET comments have an empty email).
     func isOwnComment(_ comment: RecipeComment) -> Bool {
-        guard let email = profile?.email.lowercased(), !email.isEmpty else { return false }
-        return comment.authorEmail.lowercased() == email
+        // DUT-647 tail: trim BOTH sides before the case-insensitive compare. A
+        // profile email stored with a stray leading/trailing space (or a wire
+        // value with surrounding whitespace) otherwise fails an equality that
+        // should match, so the user's own comment loses its profile avatar.
+        let charSet = CharacterSet.whitespacesAndNewlines
+        let email = profile?.email.lowercased().trimmingCharacters(in: charSet) ?? ""
+        guard !email.isEmpty else { return false }
+        let commentEmail = comment.authorEmail.lowercased().trimmingCharacters(in: charSet)
+        return commentEmail == email
     }
 
     /// Moderation contact — also the Guideline 1.2 "published contact" surface.

@@ -24,6 +24,12 @@ public final class RecipeDetailViewModel {
         case article(Recipe)
         case unavailable  // AC-4.11 — final fallback (both JSON-LD AND
         // article-body extraction failed).
+        /// DUT-627 — a *transient* network failure with no cache to fall back
+        /// on. Distinct from `.unavailable` (a confirmed missing / JSON-LD-failed
+        /// post): the post may well exist, we just couldn't reach it. The view
+        /// keeps the user here with a Retry affordance instead of auto-popping,
+        /// so a flaky-connection open isn't mistaken for a dead recipe.
+        case retryableError
     }
 
     /// State machine for the ratings + comments section. `.idle` means
@@ -105,6 +111,15 @@ public final class RecipeDetailViewModel {
     /// `internal(set)` so the `+RatingSubmit` extension can flip it
     /// (the extraction keeps the parent under the `file_length` cap).
     public internal(set) var isSubmittingRating: Bool = false
+    /// DUT-602 — synchronous in-flight guard for the consolidated
+    /// ``submitRatingAndComment()`` entry point. `isSubmittingRating` /
+    /// `isSubmittingComment` only flip deep inside (after the first `await
+    /// persistAuthorIdentity`), so a fast double-tap slipped a second call past
+    /// them and fired two POSTs. This flag is set synchronously at the very top
+    /// of the combined submit (before any `await`) and cleared at the end; it is
+    /// folded into ``isSubmittingRatingOrComment`` so the Submit button also
+    /// disables on it. `internal(set)` so the `+CommentSubmit` extension sets it.
+    public internal(set) var isSubmittingRatingOrCommentInFlight: Bool = false
     /// DUT-28 — the commenter's display name, surfaced directly on the
     /// consolidated rate + comment form (no more one-time pop-up gate).
     /// Pre-filled from the saved guest identity on appear; editable inline;
@@ -139,6 +154,12 @@ public final class RecipeDetailViewModel {
     /// fires at most one telemetry event (spec AC-7.7).
     private var cookModeTelemetrySentThisSession: Bool = false
 
+    /// DUT-634 — tracks whether `offlineRead` has already been sent this session
+    /// for this recipe, so a re-appear (deep-link push, background→foreground)
+    /// fires at most one `offline_read` event per view session — mirrors the
+    /// ``cookModeTelemetrySentThisSession`` dedupe.
+    private var offlineReadTelemetrySentThisSession: Bool = false
+
     /// Internal so the fetch + classification extension (in
     /// `RecipeDetailViewModel+Fetch.swift`, T-640) and the US-35
     /// `+Download` extension (T-620) can read it. The dependency
@@ -171,6 +192,12 @@ public final class RecipeDetailViewModel {
         // Step 1: hydrate from cache if present (fast path).
         if let cached = try? await dependencies.cachedRecipe(id: listItem.id), cached.hasDetail {
             recipe = cached
+            // DUT-634 — a cache hit served while the device is offline is an
+            // "offline read". Fire the `offline_read` event once per session
+            // (deduped like `cookModeStarted`) so the offline-first behavior
+            // (AC-5.4) is actually measurable. Only the cache path can be an
+            // offline read — the fetch path below requires the network.
+            await sendOfflineReadTelemetryIfNeeded()
             // US-37 / CL-63 / AC-37.3 (T-640): articles route to `.article`;
             // recipes use the `.ready` + related-strip path (no related
             // strip on articles per CL-63 decision 5).
@@ -250,55 +277,11 @@ public final class RecipeDetailViewModel {
         pendingUserRating = stars
     }
 
-    public func setCommentDraft(_ text: String) {
-        commentDraft = text
-    }
-
-    /// DUT-28 — bind the on-form "Display name" field.
-    public func setCommentAuthorName(_ name: String) {
-        commentAuthorName = name
-    }
-
-    /// DUT-28 — bind the on-form "Email" field.
-    public func setCommentAuthorEmail(_ email: String) {
-        commentAuthorEmail = email
-    }
-
-    /// DUT-28 — seed ``commentAuthorName`` + ``commentAuthorEmail`` from the
-    /// saved guest identity so a returning commenter sees their details
-    /// pre-filled on the form. Leaves the fields empty if nothing is saved.
-    /// Only seeds a field the user hasn't already typed into this session,
-    /// so a late background refresh never clobbers in-progress edits.
-    public func prefillAuthorIdentity() async {
-        guard let identity = await dependencies.loadGuestIdentity() else { return }
-        if commentAuthorName.isEmpty {
-            commentAuthorName = identity.name
-        }
-        if commentAuthorEmail.isEmpty {
-            commentAuthorEmail = identity.email
-        }
-    }
-
-    // `submitRating(stars:)` lives in
-    // `RecipeDetailViewModel+RatingSubmit.swift`.
-
-    // `submitComment()` lives in `RecipeDetailViewModel+CommentSubmit.swift`
-    // (extracted with the DUT-7 author-identity guard so this file stays
-    // under the SwiftLint 400-line `file_length` cap — same pattern as the
-    // `+CommentSnackbar` / `+Fetch` extensions).
-
-    /// DUT-28 — persist the on-form display name + email to the Keychain so
-    /// the next visit pre-fills them. Best-effort: a Keychain write failure
-    /// is logged and surfaced but never blocks the comment/rating POST the
-    /// caller is about to make (the values are still valid in memory).
-    func persistAuthorIdentity(name: String, email: String) async {
-        do {
-            try await dependencies.saveGuestIdentity(name: name, email: email)
-        } catch {
-            DODLog.persistence.error("save guest identity failed: \(String(describing: error))")
-            snackbarMessage = "Couldn't save your name — we'll still post your comment."
-        }
-    }
+    // The comment-form binders (`setCommentDraft` + the DUT-605 length cap,
+    // `setCommentAuthorName`, `setCommentAuthorEmail`), the guest-identity
+    // prefill/persist, `submitRating(stars:)`, and `submitComment()` live in
+    // sibling extensions (`+CommentForm`, `+RatingSubmit`, `+CommentSubmit`) so
+    // this file stays under the SwiftLint 400-line `file_length` cap.
 
     public func toggleIngredient(_ id: UUID) {
         if checkedIngredientIDs.contains(id) {
@@ -342,6 +325,18 @@ public final class RecipeDetailViewModel {
         guard !cookModeTelemetrySentThisSession else { return }
         cookModeTelemetrySentThisSession = true
         await dependencies.sendTelemetry(.cookModeStarted(recipeID: listItem.id))
+    }
+
+    /// DUT-634 — fire `offline_read` when a cached recipe is served while the
+    /// device is offline, at most once per view session (dedupe mirrors
+    /// ``didTapCookMode``). No-ops when online (a fresh read, not an offline
+    /// one) or when already sent this session. Called from ``onAppear()`` after
+    /// a cache hit resolves.
+    func sendOfflineReadTelemetryIfNeeded() async {
+        guard !offlineReadTelemetrySentThisSession else { return }
+        guard await isOffline else { return }
+        offlineReadTelemetrySentThisSession = true
+        await dependencies.sendTelemetry(.offlineRead(recipeID: listItem.id))
     }
 
     /// Merges back the ingredient check set from Cook Mode's drawer so

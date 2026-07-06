@@ -134,8 +134,14 @@ struct CookTimer: View {
     private func accessibilityTimeLabel(_ remaining: Int) -> String {
         let minutes = remaining / 60
         let seconds = remaining % 60
-        if minutes > 0 && seconds > 0 { return "\(minutes) minutes \(seconds) seconds remaining" }
-        if minutes > 0 { return "\(minutes) minutes remaining" }
-        return "\(seconds) seconds remaining"
+        // DUT-644: singular/plural units — "1 minute" / "2 minutes", "1 second"
+        // / "30 seconds" — so VoiceOver never reads "1 minutes".
+        let minuteWord = minutes == 1 ? "minute" : "minutes"
+        let secondWord = seconds == 1 ? "second" : "seconds"
+        if minutes > 0 && seconds > 0 {
+            return "\(minutes) \(minuteWord) \(seconds) \(secondWord) remaining"
+        }
+        if minutes > 0 { return "\(minutes) \(minuteWord) remaining" }
+        return "\(seconds) \(secondWord) remaining"
     }
 }
