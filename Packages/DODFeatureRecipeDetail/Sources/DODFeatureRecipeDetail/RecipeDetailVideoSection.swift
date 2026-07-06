@@ -3,6 +3,10 @@ import DODDesignSystem
 import DODDomain
 import SwiftUI
 
+#if os(iOS)
+import Combine
+#endif
+
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -53,10 +57,22 @@ struct RecipeDetailVideoSection: View {
         .frame(maxWidth: .infinity, maxHeight: Self.maxHeight)
         .padding(.horizontal, DODSpacing.md)
         .task(id: video.url) {
+            // DUT-632 — do NOT touch the audio session here: creating the player
+            // (or scrolling the section into view) must not interrupt the user's
+            // background music. We grab the `.playback` session only once
+            // playback actually starts (see `.onVideoPlaybackStarted` below).
             if player == nil { player = AVPlayer(url: video.url) }
             if let ratio = await Self.loadAspectRatio(for: video.url) {
                 aspectRatio = ratio
             }
+        }
+        .onVideoPlaybackStarted(of: player) {
+            // DUT-632 — switch the shared audio session to `.playback` the moment
+            // the user actually plays the video, so it's audible even with the
+            // hardware silent switch on. The player itself is never muted; the
+            // default `.soloAmbient` category was silencing it when the ringer
+            // switch was off. Idempotent, so repeated transitions are harmless.
+            RecipeVideoAudioSession.activateForPlayback()
         }
     }
 
@@ -91,6 +107,37 @@ struct RecipeDetailVideoSection: View {
         let height = abs(displaySize.height)
         guard width > 0, height > 0 else { return nil }
         return width / height
+    }
+}
+
+extension View {
+    /// DUT-632 — run `action` whenever `player` transitions into actually
+    /// playing. On iOS we observe the player's `timeControlStatus` via its KVO
+    /// publisher and fire only on `.playing` (mapped through
+    /// ``RecipeVideoAudioSession/shouldActivate(for:)``), so nothing happens
+    /// until the user starts playback. Off iOS this is a no-op — the package
+    /// builds for the macOS host in `swift test`, where the audio session (and
+    /// this side effect) don't apply.
+    @ViewBuilder
+    func onVideoPlaybackStarted(of player: AVPlayer?, perform action: @escaping () -> Void) -> some View {
+        #if os(iOS)
+        if let player {
+            onReceive(player.publisher(for: \.timeControlStatus)) { status in
+                let state: RecipeVideoAudioSession.PlaybackState =
+                    switch status {
+                    case .paused: .paused
+                    case .waitingToPlayAtSpecifiedRate: .waitingToPlay
+                    case .playing: .playing
+                    @unknown default: .paused
+                    }
+                if RecipeVideoAudioSession.shouldActivate(for: state) { action() }
+            }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
     }
 }
 
