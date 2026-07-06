@@ -73,6 +73,13 @@ struct ArticleDetailView: View {
                 }
             }
             .coordinateSpace(name: "recipeScroll")
+            // DUT-672 — same immersive header as the recipe hero (DUT-638): let
+            // the scroll content run to the very top so the article photo sits
+            // UNDER the toolbar (the blur strip is the header), instead of the
+            // GeometryReader keeping the ScrollView below the safe-area top and
+            // the brown `DODColor.surface` background showing as a header band.
+            // The parent GeometryReader still reports the real `topInset`.
+            .ignoresSafeArea(.container, edges: .top)
         }
         .background(DODColor.surface)
     }
