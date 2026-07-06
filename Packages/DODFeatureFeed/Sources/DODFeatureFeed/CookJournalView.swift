@@ -129,7 +129,7 @@ public struct CookJournalView: View {
             Text("No Cooks Logged Yet")
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
-            Text("Finish Your First Cookout and it shows up here — every cook builds your streak.")
+            Text("Finish Your First Cookout and it shows up here. Every cook builds your streak.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
                 .multilineTextAlignment(.center)
