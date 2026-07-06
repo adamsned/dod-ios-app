@@ -40,9 +40,10 @@ public struct AppleProfileSignInButton: View {
             // cancel (stay silent — they backed out on purpose) from a real
             // error (network, unknown), and surface the latter to the host.
             guard case .success(let authorization) = result else {
-                if case .failure(let error) = result,
-                    let message = Self.userFacingErrorMessage(for: error) {
-                    onError?(message)
+                if case .failure(let error) = result {
+                    if let message = Self.userFacingErrorMessage(for: error) {
+                        onError?(message)
+                    }
                 }
                 return
             }

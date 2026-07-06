@@ -26,7 +26,8 @@ struct AppleCredentialValidatorTests {
         status: AppleCredentialValidator.Status?,
         onCleared: (@Sendable () async -> Void)? = nil
     ) -> Fixture {
-        let sessionStore = session.map { InMemoryAppleAuthSessionStore(initial: $0) }
+        let sessionStore =
+            session.map { InMemoryAppleAuthSessionStore(initial: $0) }
             ?? InMemoryAppleAuthSessionStore()
         let profileStore = InMemoryProfileStore(
             initial: UserProfile(id: UUID(), displayName: "Ned", email: "ned@dod.com")
