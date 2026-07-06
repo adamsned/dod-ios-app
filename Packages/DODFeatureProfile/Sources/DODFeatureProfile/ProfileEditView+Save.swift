@@ -70,6 +70,10 @@ extension ProfileEditView {
             switch error {
             case .displayNameEmpty:
                 saveError = "Add your name to save your profile."
+            case .displayNameTooLong:
+                // DUT-647 — the shared 1–40 cap; keep it symmetric with the
+                // guest/comment path's `GuestIdentitySheet.isValidName`.
+                saveError = "Your name is too long (\(UserProfile.maxDisplayNameLength) characters max)."
             case .emailEmpty:
                 emailValidationError = "Add your email to save your profile."
             case .emailInvalid:

@@ -19,21 +19,34 @@ public struct AppleProfileSignInButton: View {
 
     private let profileStore: any ProfileStoring
     private let onComplete: @MainActor (AppleProfileSignIn.Outcome) -> Void
+    private let onError: (@MainActor (String) -> Void)?
 
     public init(
         profileStore: any ProfileStoring,
-        onComplete: @MainActor @escaping (AppleProfileSignIn.Outcome) -> Void
+        onComplete: @MainActor @escaping (AppleProfileSignIn.Outcome) -> Void,
+        onError: (@MainActor (String) -> Void)? = nil
     ) {
         self.profileStore = profileStore
         self.onComplete = onComplete
+        self.onError = onError
     }
 
     public var body: some View {
         SignInWithAppleButton(.signIn) { request in
             request.requestedScopes = [.fullName, .email]
         } onCompletion: { result in
-            guard case .success(let authorization) = result,
-                let credential = authorization.credential as? ASAuthorizationAppleIDCredential
+            // DUT-636: a `.failure` was previously swallowed, leaving the user
+            // staring at a button that did nothing. Distinguish a user-initiated
+            // cancel (stay silent — they backed out on purpose) from a real
+            // error (network, unknown), and surface the latter to the host.
+            guard case .success(let authorization) = result else {
+                if case .failure(let error) = result,
+                    let message = Self.userFacingErrorMessage(for: error) {
+                    onError?(message)
+                }
+                return
+            }
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential
             else { return }
             // Capture the credential fields up front (the credential isn't
             // Sendable) before hopping onto the sign-in task.
@@ -64,6 +77,27 @@ public struct AppleProfileSignInButton: View {
         .signInWithAppleButtonStyle(.black)
         .frame(height: 44)
         .accessibilityIdentifier("profile-sign-in-apple")
+    }
+
+    /// DUT-636 — classify a Sign in with Apple failure. Returns `nil` when the
+    /// user simply canceled / dismissed the sheet (no error UI — that's a
+    /// deliberate back-out, matching the empty-credential silent no-op above),
+    /// and a short user-facing message for a real failure the host should
+    /// surface. `unknown` is bucketed with cancellation: the system reports a
+    /// user-driven dismissal as `.unknown` on some OS versions, so treating it
+    /// as an error would nag users who just changed their mind.
+    static func userFacingErrorMessage(for error: any Error) -> String? {
+        guard let authError = error as? ASAuthorizationError else {
+            return "Couldn't Sign In With Apple. Try Again."
+        }
+        switch authError.code {
+        case .canceled, .unknown:
+            return nil
+        case .failed, .invalidResponse, .notHandled, .notInteractive:
+            return "Couldn't Sign In With Apple. Try Again."
+        @unknown default:
+            return "Couldn't Sign In With Apple. Try Again."
+        }
     }
 }
 #endif

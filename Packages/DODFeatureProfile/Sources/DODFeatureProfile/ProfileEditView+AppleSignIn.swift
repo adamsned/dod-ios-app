@@ -53,6 +53,10 @@ extension ProfileEditView {
         if existingProfile == nil {
             AppleProfileSignInButton(profileStore: store) { outcome in
                 handleAppleSignIn(outcome)
+            } onError: { message in
+                // DUT-636: surface a real SiwA failure (cancellation stays silent,
+                // filtered out in the button) via the editor's existing error row.
+                saveError = message
             }
             // Sign in with Google (DUT-276) — shown once a real client ID is
             // wired (GoogleSignInConfig.isConfigured); the GIDSignIn flow runs

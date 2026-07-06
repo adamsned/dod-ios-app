@@ -11,6 +11,9 @@ extension ProfileEditView {
     /// the Save button's `.disabled(...)`.
     var isFormValid: Bool {
         guard DisplayNameValidator.validate(displayName) == .ok else { return false }
+        // DUT-647 — also enforce the shared 1–40 length cap so the Save gate and
+        // the guest/comment path (`GuestIdentitySheet.isValidName`) agree.
+        guard (try? UserProfile.validateDisplayName(displayName)) != nil else { return false }
         return (try? UserProfile.validateEmail(email)) != nil
     }
 
@@ -20,7 +23,12 @@ extension ProfileEditView {
         switch DisplayNameValidator.validate(displayName) {
         case .empty: return "Display name is required."
         case .inappropriate: return "Please choose a different display name and try again."
-        case .ok: return nil
+        case .ok:
+            // DUT-647 — surface the shared length cap inline too.
+            if (try? UserProfile.validateDisplayName(displayName)) == nil {
+                return "Display name must be \(UserProfile.maxDisplayNameLength) characters or fewer."
+            }
+            return nil
         }
     }
 
