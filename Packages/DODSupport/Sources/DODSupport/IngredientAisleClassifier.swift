@@ -171,16 +171,30 @@ public enum IngredientAisleClassifier {
         "yogurt": .dairy,
 
         // MARK: Pantry
+        "almond milk": .pantry,
         "baking powder": .pantry,
         "baking soda": .pantry,
         "bread": .pantry,
         "broth": .pantry,
         "brown sugar": .pantry,
+        // DUT-661: canned/boxed pantry compounds that must win over the bare
+        // produce/meat/dairy fragment they contain. `sortedKeywords` scans
+        // longest-first, so each of these (all longer than `chicken` / `milk`
+        // / `tomato` / `mushroom`) is tested before its fragment and buckets
+        // the line to `.pantry` — e.g. "chicken broth" no longer misfiles as
+        // `.meat`, "coconut milk" not `.dairy`, "cream of mushroom" not
+        // `.produce`.
+        "chicken bouillon": .pantry,
+        "chicken broth": .pantry,
+        "chicken stock": .pantry,
+        "coconut milk": .pantry,
+        "cream of mushroom": .pantry,
         "flour": .pantry,
         "honey": .pantry,
         "ketchup": .pantry,
         "mayonnaise": .pantry,
         "mustard": .pantry,
+        "oat milk": .pantry,
         "oats": .pantry,
         "olive oil": .pantry,
         "pasta": .pantry,
@@ -189,6 +203,7 @@ public enum IngredientAisleClassifier {
         "stock": .pantry,
         "sugar": .pantry,
         "tomato paste": .pantry,
+        "tomato sauce": .pantry,
         "vanilla extract": .pantry,
         "vegetable oil": .pantry,
         "vinegar": .pantry,

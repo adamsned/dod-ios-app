@@ -86,4 +86,25 @@ import Testing
         let subs = matchedSubstrings(text, "bites")
         #expect(subs == ["Bites"])
     }
+
+    // MARK: - DUT-668 NFC normalization
+
+    /// A DECOMPOSED accent in the title (`n` + combining `~` for `ñ`) is not
+    /// folded by `.diacriticInsensitive` alone. Precomposing both sides to NFC
+    /// first realigns them so the accented word highlights. The offsets are
+    /// against the precomposed text, so index into that form to read them back.
+    @Test func decomposedAccentInTitleHighlights() {
+        // "Jalapen\u{0303}o" — decomposed ñ (n + COMBINING TILDE).
+        let decomposedTitle = "Jalape\u{006E}\u{0303}o Poppers"
+        let ranges = SearchTermHighlighter.matchedRanges(in: decomposedTitle, query: "jalapeno")
+        #expect(ranges.count == 1)
+        let normalized = decomposedTitle.precomposedStringWithCanonicalMapping
+        guard let range = ranges.first else {
+            Issue.record("expected one matched range")
+            return
+        }
+        let lower = normalized.index(normalized.startIndex, offsetBy: range.lowerBound)
+        let upper = normalized.index(normalized.startIndex, offsetBy: range.upperBound)
+        #expect(String(normalized[lower..<upper]) == "Jalapeño")
+    }
 }

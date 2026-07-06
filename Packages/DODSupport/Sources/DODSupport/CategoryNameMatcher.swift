@@ -117,7 +117,12 @@ public enum CategoryNameMatcher {
     private static func matches(query: String, name: String, topic: String) -> Bool {
         if query == name { return true }
         if query == topic { return true }
-        if query.count >= Self.substringOfTopicMinLength, topic.contains(query) {
+        // DUT-664: gate rule 3 with the same whole-word containment as rule 4
+        // (DUT-508). Raw `topic.contains(query)` false-positives when the query
+        // is embedded in a larger word of the topic — e.g. query "read" inside
+        // topic "bread". The query must appear as a standalone token in the
+        // topic (`"beef"` in `"beef and broccoli"` still matches).
+        if query.count >= Self.substringOfTopicMinLength, containsWholeWord(query, in: topic) {
             return true
         }
         // DUT-317: gate rule 4 on the same minimum-length floor as rule 3

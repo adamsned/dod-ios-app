@@ -25,6 +25,35 @@ import Testing
         #expect(DeepLinkIntent.parse(url) == nil)
     }
 
+    // MARK: - DUT-603
+
+    /// `dod://recipe/123` — the id rides the trailing path component, mirroring
+    /// the article grammar, so it parses without a `?id=` query.
+    @Test func recipePathURLParsesID() throws {
+        let url = try #require(URL(string: "dod://recipe/4641"))
+        #expect(DeepLinkIntent.parse(url) == .openRecipe(id: 4641))
+    }
+
+    /// Zero, negative, and non-numeric recipe-path ids fall through to nil.
+    @Test func recipePathURLWithBadIDReturnsNil() throws {
+        let zero = try #require(URL(string: "dod://recipe/0"))
+        #expect(DeepLinkIntent.parse(zero) == nil)
+        let negative = try #require(URL(string: "dod://recipe/-5"))
+        #expect(DeepLinkIntent.parse(negative) == nil)
+        let nonNumeric = try #require(URL(string: "dod://recipe/abc"))
+        #expect(DeepLinkIntent.parse(nonNumeric) == nil)
+    }
+
+    /// A path-bearing `saved` variant is malformed and must not route
+    /// (matching WidgetDeepLinkParser's bare-host gate).
+    @Test func savedWithPathReturnsNil() throws {
+        let withPath = try #require(URL(string: "dod://saved/123"))
+        #expect(DeepLinkIntent.parse(withPath) == nil)
+        // Bare + trailing-slash forms both still route to saved.
+        let trailingSlash = try #require(URL(string: "dod://saved/"))
+        #expect(DeepLinkIntent.parse(trailingSlash) == .openSaved)
+    }
+
     @Test func cookModeURLWithoutIDReturnsNil() throws {
         let url = try #require(URL(string: "dod://recipe/cook"))
         #expect(DeepLinkIntent.parse(url) == nil)
