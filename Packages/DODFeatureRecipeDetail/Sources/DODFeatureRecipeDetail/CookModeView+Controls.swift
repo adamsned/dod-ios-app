@@ -98,7 +98,9 @@ extension CookModeView {
         viewModel.currentStepIndex > 0
     }
 
-    private var miniNavDiameter: CGFloat { 40 }
+    // DUT-616: 44pt minimum hit target (HIG). The glyph stays at 18pt; only the
+    // frame/hit area grows, matching the >=44pt siblings.
+    private var miniNavDiameter: CGFloat { 44 }
 
     private func miniNavButton(
         symbol: String,

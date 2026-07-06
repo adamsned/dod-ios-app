@@ -230,9 +230,22 @@ struct RecipeInfoCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        // DUT-614: present as ONE adjustable control so VoiceOver can change the
+        // count, mirroring the StarRating (DUT-409) idiom. `.combine` with no
+        // adjustable action read "Servings, N" with no way to increment.
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Servings")
         .accessibilityValue("\(value)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                binding.wrappedValue = min(value + 1, servingsRange.upperBound)
+            case .decrement:
+                binding.wrappedValue = max(value - 1, servingsRange.lowerBound)
+            @unknown default:
+                break
+            }
+        }
     }
 
     /// DUT-572 / CL-312 — prettify a `suitableForDiet` value. The parser stores

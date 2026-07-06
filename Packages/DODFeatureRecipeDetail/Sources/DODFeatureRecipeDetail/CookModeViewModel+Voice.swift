@@ -226,6 +226,9 @@ extension CookModeViewModel {
     /// (AC-40.4 / AC-40.5). Leaves Voice Mode on so a subsequent navigation or
     /// "repeat" command resumes reading aloud.
     public func pauseVoice() {
+        // DUT-620 — with Voice Mode off there's no utterance to pause; mutating
+        // playbackState here flipped the transport state spuriously (Siri).
+        guard isVoiceModeEnabled else { return }
         voiceReader.pause()
         // DUT-583 — keep the position; the button flips to "play" (resumable).
         playbackState = .paused
@@ -236,6 +239,9 @@ extension CookModeViewModel {
     /// the step (Next / Previous / Repeat all `stop()` + re-read from the top),
     /// so "Pause" was a hands-free dead-end.
     public func resumeVoice() {
+        // DUT-620 — mirror pauseVoice(): don't touch the transport state when
+        // Voice Mode is off (there's nothing to resume).
+        guard isVoiceModeEnabled else { return }
         voiceReader.resume()
         // DUT-583 — continue from the pause point (no restart); button → pause.
         playbackState = .speaking
