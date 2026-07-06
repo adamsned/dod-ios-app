@@ -114,9 +114,14 @@ public struct WPCommentsClient: Sendable {
             }
             throw WPClientError.httpStatus(response.statusCode)
         }
+        // DUT-619: decode the page lossily so one wholly malformed comment is
+        // dropped instead of failing the entire thread. Mirrors the feed /
+        // category / search paths, which already wrap their WP list decode in
+        // `LossyArray<WPDTO.Post>` for exactly this (DUT-575).
         let dtos: [WPDTO.Comment]
         do {
-            dtos = try decoder.decode([WPDTO.Comment].self, from: data)
+            let lossy = try decoder.decode(LossyArray<WPDTO.Comment>.self, from: data)
+            dtos = lossy.elements
         } catch {
             throw WPClientError.decoding(message: String(describing: error))
         }

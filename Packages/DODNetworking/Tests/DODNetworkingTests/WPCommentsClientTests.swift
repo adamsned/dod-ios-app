@@ -136,6 +136,43 @@ import Testing
         #expect(page.comments.first?.status == .unknown)
     }
 
+    /// DUT-619: one wholly malformed comment in the page (here `id` is a
+    /// non-numeric string the `Int` decode can't accept — a mis-shape the
+    /// per-field DTO leniency can't rescue) must be dropped, not fail the
+    /// entire thread. Mirrors the feed / category / search `LossyArray`
+    /// resilience (DUT-575). The valid sibling still decodes.
+    @Test func oneMalformedCommentIsDroppedNotFatalToPage() async throws {
+        let synthetic = #"""
+            [
+              {
+                "id": "not-an-int", "post": 21238, "parent": 0,
+                "author_name": "Broken",
+                "date_gmt": "2026-05-04T12:00:00",
+                "content": { "rendered": "x" },
+                "status": "approved",
+                "meta": {}
+              },
+              {
+                "id": 2, "post": 21238, "parent": 0,
+                "author_name": "Valid",
+                "date_gmt": "2026-05-04T12:00:00",
+                "content": { "rendered": "Good comment." },
+                "status": "approved",
+                "meta": {}
+              }
+            ]
+            """#
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "comments", json: Data(synthetic.utf8))
+        let client = WPCommentsClient(httpClient: fake)
+
+        let page = try await client.comments(forPostID: 21238)
+        #expect(page.comments.count == 1, "The malformed comment should be dropped, not throw")
+        let survivor = try #require(page.comments.first)
+        #expect(survivor.id == 2)
+        #expect(survivor.authorName == "Valid")
+    }
+
     // MARK: - DUT-23: non-2xx surfaces the server reason (read-path parity
     // with the DUT-7-hardened POST path). The TestFlight "Couldn't load
     // comments" report carried no server detail because this GET path used
