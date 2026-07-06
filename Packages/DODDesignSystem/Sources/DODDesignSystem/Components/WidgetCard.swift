@@ -53,41 +53,6 @@ public enum WidgetCard {
         }
     }
 
-    // MARK: - Small
-
-    /// Square small-widget layout: hero behind a bottom gradient + title.
-    public struct Small: View {
-
-        public let content: Content
-
-        public init(content: Content) {
-            self.content = content
-        }
-
-        public var body: some View {
-            ZStack(alignment: .bottomLeading) {
-                Hero(url: content.heroImageURL)
-
-                // Contrast scrim behind the title. See ``TintSafeScrim`` for
-                // why this is a `.fullColor` rasterised `Image` and not a
-                // plain translucent `LinearGradient` (DUT-9 root cause).
-                TintSafeScrim()
-
-                VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                    if let totalTime = content.totalTimeDisplay {
-                        TimeChip(text: totalTime)
-                    }
-                    Text(content.title)
-                        .font(.system(.subheadline, design: .default, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                }
-                .padding(DODSpacing.sm)
-            }
-        }
-    }
-
     // MARK: - Medium
 
     /// Wide medium-widget layout: hero on the left, copy on the right.
