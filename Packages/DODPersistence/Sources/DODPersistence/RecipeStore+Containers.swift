@@ -48,6 +48,26 @@ extension RecipeStore {
         defaults.bool(forKey: cloudKitSyncOptInKey)
     }
 
+    /// DUT-630 — whether `cloudKitDatabase: .private(...)` mirroring can safely be
+    /// enabled in this runtime. **False on the Simulator.** SwiftData's CloudKit
+    /// stack traps ASYNCHRONOUSLY during mirror setup on the sim
+    /// (`NSCloudKitMirroringDelegate._performSetupRequest` →
+    /// `PFCloudKitContainerProvider containerWithIdentifier:options:` → SIGTRAP),
+    /// which no synchronous try/catch around `ModelContainer` init can catch (the
+    /// DOD-CRASH-1 fallback only catches the SYNCHRONOUS open throw). So even an
+    /// opted-in sim launch would crash. Gating mirroring off on the Simulator
+    /// makes the app launch on a local store there; real devices + TestFlight are
+    /// unaffected (CloudKit sync is untestable on the Simulator anyway). Exposed
+    /// as the default for ``productionContainer(defaults:inMemory:cloudKitAvailable:)``'s
+    /// `cloudKitAvailable` parameter so the L1 suite can drive both branches.
+    public nonisolated static var cloudKitMirroringAvailable: Bool {
+        #if targetEnvironment(simulator)
+        false
+        #else
+        true
+        #endif
+    }
+
     /// `UserDefaults` key for the one-time synced-saved backfill-complete flag
     /// (DUT-240). Written by `AppDependencies.backfillSyncedSavedIfNeeded` once
     /// a seed/reconcile completes; the App target reads it through this shared
@@ -153,23 +173,30 @@ extension RecipeStore {
     /// passes `false` so the real on-disk container is used.
     public static func productionContainer(
         defaults: UserDefaults,
-        inMemory: Bool = false
+        inMemory: Bool = false,
+        cloudKitAvailable: Bool = cloudKitMirroringAvailable
     ) throws -> ContainerBuildResult {
         let schema = Schema(SchemaV6.models)
         // DUT-35: the six cache models are local-only; ONLY `SyncedSavedRecipe`
         // is a CloudKit-mirror candidate. Both stores live in the same
         // container, so the `@ModelActor`'s single `ModelContext` reaches both.
         let local = localCacheConfiguration(inMemory: inMemory)
-        guard cloudKitSyncOptIn(in: defaults) else {
-            // Opt-out: both stores local. A failure here is a real
-            // migration error and must propagate.
+        let optedIn = cloudKitSyncOptIn(in: defaults)
+        // DUT-630 — build a local store when the user is opted out OR CloudKit
+        // mirroring can't run here (the Simulator). The latter is the crash fix:
+        // enabling `.private` mirroring on the sim traps async, which the
+        // DOD-CRASH-1 catch can't reach. When opted-in-but-unavailable we still
+        // flag `usedCloudKitFallback` so the "running local this launch"
+        // diagnostics stay honest (same as a real CloudKit-open failure).
+        guard optedIn, cloudKitAvailable else {
+            // A failure here is a real migration error and must propagate.
             let container = try ModelContainer(
                 for: schema,
                 migrationPlan: inMemory ? nil : MigrationPlan.self,
                 configurations: local,
                 syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)
             )
-            return ContainerBuildResult(container: container, usedCloudKitFallback: false)
+            return ContainerBuildResult(container: container, usedCloudKitFallback: optedIn)
         }
         // Opt-in: mirror ONLY the synced store to the CloudKit private DB,
         // falling back to an all-local layout if the `.private` open throws.
