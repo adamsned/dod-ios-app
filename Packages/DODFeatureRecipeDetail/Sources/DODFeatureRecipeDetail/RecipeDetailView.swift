@@ -294,6 +294,16 @@ public struct RecipeDetailView: View {
                 // DUT-572 / CL-312 — named space the stretchy hero reads `minY`
                 // from to grow only its top edge on pull-down.
                 .coordinateSpace(name: "recipeScroll")
+                // DUT-638 — let the scroll content run to the very top of the
+                // screen so the hero photo sits UNDER the toolbar (the blur strip
+                // is the header). Without this the enclosing GeometryReader keeps
+                // the ScrollView below the safe-area top, so the hero started
+                // under the nav bar and the brown `DODColor.surface` body
+                // background showed as a header band above it. The parent
+                // GeometryReader still reports the real `topInset` (it's the one
+                // that reads the safe area), so the hero's blur-band height + the
+                // extra height it draws into the notch are unchanged.
+                .ignoresSafeArea(.container, edges: .top)
             }
         }
     }
