@@ -17,6 +17,12 @@ import UIKit
 /// extension below to keep this struct body under SwiftLint's `type_body_length`.
 struct CookJournalEntryView: View {
 
+    /// DUT-611 — longest-edge pixel cap for the entry-detail photo decode. The
+    /// slot is at most the screen width wide and 220pt tall (scaled to fill), so
+    /// ~1200px stays crisp at 3× Retina while keeping the decoded bitmap a
+    /// fraction of a full-res phone photo (~3000–4000px on the long edge).
+    private static let detailPhotoMaxPixel = 1200
+
     let entry: CookLogEntry
     /// Persist the edited entry (note + photo). The journal reloads after this.
     let onSave: (CookLogEntry) async -> Void
@@ -26,6 +32,13 @@ struct CookJournalEntryView: View {
     let onDelete: (() async -> Void)?
 
     private let photoStore = CookPhotoStore()
+    /// DUT-611 — decode the existing entry photo OFF the main thread, downsampled,
+    /// via the same ``CookThumbnailLoader`` DUT-588 introduced for the journal
+    /// list. The detail slot renders larger than a 56pt list thumbnail, so it's
+    /// sized to a detail-appropriate longest-edge cap rather than the full native
+    /// camera resolution — enough to stay crisp in the 220pt scaled-to-fill slot
+    /// while never materializing the full-res bitmap on the main actor.
+    @State private var photoLoader = CookThumbnailLoader(maxPixel: CookJournalEntryView.detailPhotoMaxPixel)
     @Environment(\.dismiss) private var dismiss
 
     @State var note: String
@@ -99,7 +112,7 @@ extension CookJournalEntryView {
                     .disabled(isSaving)
             }
         }
-        .task { loadExistingPhoto() }
+        .task(id: entry.photoLocalID) { await loadExistingPhoto() }
         .photosPicker(isPresented: $showingPhotosPicker, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in Task { await loadPicked(item) } }
         .confirmationDialog("Photo", isPresented: $showingPhotoOptions, titleVisibility: .hidden) {
@@ -227,12 +240,23 @@ extension CookJournalEntryView {
 
     // MARK: - Photo + save logic
 
-    private func loadExistingPhoto() {
-        guard displayImage == nil, !photoCleared, pendingImageData == nil,
-            let id = entry.photoLocalID, let data = photoStore.data(forID: id)
-        else { return }
+    /// DUT-611 — load the existing entry photo OFF the main thread, downsampled,
+    /// via ``CookThumbnailLoader`` (the same off-main read + ImageIO downsample
+    /// path DUT-588 gave the journal list). The disk read and decode run inside
+    /// the loader's detached task; only the final `Image` assignment hops back
+    /// here on the MainActor. Preserves the prior guards (skip when a photo is
+    /// already shown, was cleared, or a freshly picked one is pending) and the
+    /// placeholder fallback for a missing / undecodable file. The enclosing
+    /// `.task(id:)` cancels this on disappear.
+    private func loadExistingPhoto() async {
+        guard displayImage == nil, !photoCleared, pendingImageData == nil else { return }
+        guard let id = entry.photoLocalID else { return }
+        await photoLoader.loadThumbnail(id: id)
+        // A concurrent pick/clear/dismiss may have raced the off-main decode;
+        // re-check before adopting the decoded image so we never clobber it.
+        guard displayImage == nil, !photoCleared, pendingImageData == nil else { return }
         #if canImport(UIKit)
-        if let uiImage = UIImage(data: data) { displayImage = Image(uiImage: uiImage) }
+        if let uiImage = photoLoader.cachedImage(for: id) { displayImage = Image(uiImage: uiImage) }
         #endif
     }
 
