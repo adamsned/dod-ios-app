@@ -10,7 +10,10 @@ import SwiftUI
 /// Cook Now CTA presents Cook Mode (US-7).
 public struct RecipeDetailView: View {
 
-    private enum SectionAnchor: Hashable {
+    // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
+    // extension can attach these ids to the ingredients / Cook Mode + instructions
+    // blocks it now owns (DUT-631).
+    enum SectionAnchor: Hashable {
         case ingredients
         case instructions
     }
@@ -30,7 +33,9 @@ public struct RecipeDetailView: View {
     // sibling file).
     @State var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
-    @State private var isCookModePresented: Bool = false
+    // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
+    // extension's relocated Cook Mode CTA tap can present the cover (DUT-631).
+    @State var isCookModePresented: Bool = false
     /// True when the screen was entered via the StartCookModeIntent deep
     /// link (US-10). We watch the load state and flip the cover open as
     /// soon as the recipe has instructions to render. Resets to false
@@ -60,8 +65,10 @@ public struct RecipeDetailView: View {
     @Environment(\.dismiss) private var dismiss
     /// T-804 — drives the iPad reading-column cap in `readyBody`. `.regular`
     /// (iPad) bounds the content below the hero to a centered column;
-    /// `.compact` (iPhone) leaves the layout byte-identical.
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// `.compact` (iPhone) leaves the layout byte-identical. DUT-631 — now
+    /// `internal` (not `private`) so `RecipeDetailView+Sections.swift`'s
+    /// relocated `ingredientsInstructions(twoUp:)` can read it.
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     public let onSelectRelated: (RecipeListItem) -> Void
     /// DUT-534 — the "View" action on the "Added to your Shopping List"
     /// Snackbar routes here. The App composition root passes a closure that
@@ -233,11 +240,13 @@ public struct RecipeDetailView: View {
             let topInset = geo.safeAreaInsets.top
             ScrollViewReader { proxy in
                 ScrollView {
-                    // DUT-573 / CL-313 — iterated editorial order: full-bleed hero
-                    // → [published date · Jump to Instructions] row → editorial
-                    // (cropped blurb) → Cook Mode CTA → info card (interactive
-                    // Servings) → Heat Coach nudge → video → ingredients /
-                    // instructions → related → ratings.
+                    // DUT-573 / CL-313 + DUT-631 — iterated editorial order:
+                    // full-bleed hero → [published date · Jump to Instructions]
+                    // row → editorial (cropped blurb) → info card (interactive
+                    // Servings) → Heat Coach nudge → video → ingredients → Cook
+                    // Mode CTA → instructions → related → ratings. DUT-631 moved
+                    // the Cook Mode CTA to sit directly above Instructions so the
+                    // "Jump to Instructions" link lands on the CTA.
                     VStack(alignment: .leading, spacing: DODSpacing.lg) {
                         // Hero sits OUTSIDE the reading column — full-bleed, no
                         // horizontal padding.
@@ -253,12 +262,6 @@ public struct RecipeDetailView: View {
                             // Instructions link, right under the hero/name.
                             dateAndJumpRow(proxy: proxy)
                             excerptText
-                            if !(viewModel.recipe?.instructions.isEmpty ?? true) {
-                                CookNowCTA(onTap: {
-                                    Task { await viewModel.didTapCookMode() }
-                                    isCookModePresented = true
-                                })
-                            }
                             RecipeInfoCard(
                                 model: infoCardModel,
                                 servingsBinding: Binding(
@@ -298,8 +301,10 @@ public struct RecipeDetailView: View {
     /// DUT-573 / CL-313 — the first row of scrolling content, right under the
     /// hero (the recipe name is overlaid on the hero): the publish date on the
     /// leading edge, a subtle "Jump to Instructions" link on the trailing edge.
-    /// The link scrolls to the instructions anchor via the enclosing
-    /// `ScrollViewReader`'s proxy.
+    /// The link scrolls to the `.instructions` anchor via the enclosing
+    /// `ScrollViewReader`'s proxy. DUT-631 — that anchor now sits on the Cook
+    /// Mode CTA that leads the Instructions section, so the jump lands with Cook
+    /// Mode at the top of the viewport (Instructions immediately below it).
     private func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
         HStack(alignment: .firstTextBaseline) {
             PublishedDateCaption(date: viewModel.listItem.publishedAt)
@@ -319,30 +324,10 @@ public struct RecipeDetailView: View {
         .padding(.horizontal, DODSpacing.md)
     }
 
-    /// Ingredients + Instructions. Side by side in a wider centered band on a
-    /// wide canvas (landscape iPad), stacked in the reading column otherwise.
-    /// iPhone (compact) always stacks — byte-identical. T-804.
-    @ViewBuilder
-    private func ingredientsInstructions(twoUp: Bool) -> some View {
-        if twoUp {
-            HStack(alignment: .top, spacing: DODSpacing.lg) {
-                ingredientsSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .id(SectionAnchor.ingredients)
-                instructionsSection
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .id(SectionAnchor.instructions)
-            }
-            .frame(maxWidth: DODContentWidth.wide)
-            .frame(maxWidth: .infinity, alignment: .center)
-        } else {
-            VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                ingredientsSection.id(SectionAnchor.ingredients)
-                instructionsSection.id(SectionAnchor.instructions)
-            }
-            .readableContentColumn(horizontalSizeClass)
-        }
-    }
+    // DUT-804 / DUT-631 — the `ingredientsInstructions(twoUp:)` layout helper and
+    // the relocated `cookModeCTA` live in `RecipeDetailView+Sections.swift`
+    // (extension on `RecipeDetailView`) so this file stays under the SwiftLint
+    // file-length cap.
 
     // DUT-572 / CL-312: the `excerptText` body (now the FULL description) + the
     // `strippingExcerptTruncationTail(from:)` pure helper live in
