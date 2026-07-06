@@ -86,6 +86,41 @@ import Testing
         #expect(viewModel.celebration == .graduatedFirstCookout)
     }
 
+    /// DUT-625 — a first-ever cook that is an off-path DUMP CAKE must NOT fire a
+    /// rank-up. The rank ladder counts the path population only (graduation is
+    /// path-only), so an "Anytime Treat" can't spuriously bump the rank.
+    @Test func firstEverDumpCakeDoesNotFireARankUp() async {
+        let dependencies = FakeFeedDependencies()  // no prior cooks
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        guard let cake = DumpCake.all.first else {
+            Issue.record("no dump cakes configured")
+            return
+        }
+
+        await viewModel.logCook(makeCook(cake.id))  // 1st cook overall, but off-path
+
+        #expect(viewModel.celebration == nil)
+    }
+
+    /// DUT-625 — dump-cake cooks are excluded from the rank ladder, so they
+    /// don't inflate the count that a later PATH cook's rank-up is measured
+    /// against: a first path cook still earns Fire Starter even after dump cakes.
+    @Test func dumpCakesDoNotInflateTheRankLadderForPathCooks() async {
+        let dependencies = FakeFeedDependencies()
+        // Two dump cakes already logged — off-path, so the rank count is still 0.
+        dependencies.cooks = DumpCake.all.prefix(2).map { makeCook($0.id) }
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        // The first PATH cook is rank-ladder cook #1 -> Fire Starter (threshold 1).
+        await viewModel.logCook(makeCook(GuidedCookout.firstCookout.recipeID))
+
+        if case .rankUp(let rank) = viewModel.celebration {
+            #expect(rank.title == "Fire Starter")
+        } else {
+            Issue.record("expected Fire Starter rank-up, got \(String(describing: viewModel.celebration))")
+        }
+    }
+
     @Test func dismissingClearsTheCelebration() async {
         let dependencies = FakeFeedDependencies()
         dependencies.cooks = [makeCook(9001), makeCook(9002)]

@@ -17,6 +17,11 @@ public final class FeedViewModel {
         case loadingMore
         case empty
         case firstLaunchOffline
+        /// DUT-621 — an ONLINE first-launch fetch that failed (server / decode
+        /// error, not connectivity). Distinct from `.empty` (a genuine
+        /// zero-result success) so the view can offer a failure message + a
+        /// Retry action instead of a dead-end "No recipes."
+        case firstLaunchFailed
     }
 
     public private(set) var items: [RecipeListItem] = []
@@ -170,7 +175,10 @@ public final class FeedViewModel {
         let isGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedAfter) == nil
         if isGraduate && !wasGraduate {
             pendingCelebration = .graduatedFirstCookout
-        } else if let reached = CookProgression.rankUp(from: logsBefore.count, to: logsAfter.count) {
+        } else if let reached = CookProgression.rankUp(
+            from: Self.rankLadderCookCount(logsBefore),
+            to: Self.rankLadderCookCount(logsAfter)
+        ) {
             pendingCelebration = .rankUp(reached)
         }
         promoteCelebrationIfReady()
@@ -201,27 +209,6 @@ public final class FeedViewModel {
     /// Dismiss the celebration (DUT-323).
     public func dismissCelebration() {
         celebration = nil
-    }
-
-    /// DUT-104 — the logged cooks (newest first) for the Cooking Journal view.
-    public func cookLogs() async -> [CookLogEntry] {
-        (try? await dependencies.cookLogs()) ?? []
-    }
-
-    /// CL-273 — save a journal entry's personal reflection / photo. Best-effort
-    /// (a journal write never blocks the UI). This updates an existing entry in
-    /// place and never logs a new cook, so it cannot change the cook count and
-    /// therefore cannot affect rank.
-    public func updateCook(_ entry: CookLogEntry) async {
-        try? await dependencies.updateCookLog(entry)
-    }
-
-    /// DUT-514 — delete a journal entry (cascades its photo file in the store).
-    /// Best-effort, mirroring `updateCook`. Unlike an edit this DOES change the
-    /// cook count, so the journal must reload its stats after — the view does that
-    /// by re-running its `load` closure once this returns.
-    public func deleteCook(_ entry: CookLogEntry) async {
-        try? await dependencies.deleteCookLog(id: entry.id)
     }
 
     /// Pull-to-refresh (AC-1.4 + clears blocklist per AC-1.7).
@@ -332,7 +319,11 @@ public final class FeedViewModel {
             // DUT-511: bail if a newer load superseded this failed one.
             guard generation == loadGeneration else { return }
             isOffline = !online
-            loadState = isOffline ? .firstLaunchOffline : .empty
+            // DUT-621: an ONLINE first-launch failure is NOT an empty result —
+            // route it to `.firstLaunchFailed` (a failure message + Retry), not
+            // the dead-end `.empty` state. `.empty` is reserved for a genuine
+            // zero-result success (see the success path above).
+            loadState = isOffline ? .firstLaunchOffline : .firstLaunchFailed
             errorMessage = "Couldn't load recipes."
         }
     }

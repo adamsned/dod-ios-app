@@ -55,20 +55,41 @@ public struct CookChooserFlow: View {
     @Environment(\.dismiss) private var dismiss
 
     public var body: some View {
-        if let selected {
-            // CL-267 — `onBack` returns to the roadmap (clears the selection) so a
-            // picked recipe isn't a dead end; the X still closes the whole sheet.
-            FirstCookoutView(
-                cookout: selected,
-                onLogCook: onLogCook,
-                onBack: { self.selected = nil },
-                timerEngine: timerEngine,
-                loggedRecipeIDs: $loggedRecipeIDs  // DUT-548 — dedup across re-enter.
-            )
-        } else {
-            // DUT-235 — always show the chooser first (no auto-jump into a dish);
-            // the recommended rung is highlighted in place as the "start here".
-            picker
+        Group {
+            if let selected {
+                // CL-267 — `onBack` returns to the roadmap (clears the selection) so a
+                // picked recipe isn't a dead end; the X still closes the whole sheet.
+                FirstCookoutView(
+                    cookout: selected,
+                    onLogCook: onLogCook,
+                    onBack: { self.selected = nil },
+                    timerEngine: timerEngine,
+                    loggedRecipeIDs: $loggedRecipeIDs  // DUT-548 — dedup across re-enter.
+                )
+            } else {
+                // DUT-235 — always show the chooser first (no auto-jump into a dish);
+                // the recommended rung is highlighted in place as the "start here".
+                picker
+            }
+        }
+        // DUT-624 — drive the SHARED bake-timer engine from the HOST, not from
+        // the child `FirstCookoutView`'s own `.task`. That child's tick loop is
+        // cancelled the instant the cook taps "Back to the path" (the view is
+        // torn down), so a guided bake would freeze — never reaching "Timer's
+        // Up!" — while the roadmap is on screen. This host-level `.task` outlives
+        // any single child, so the countdown keeps advancing to `.finished`
+        // regardless of which child view is mounted. Idempotent alongside the
+        // child's own tick (a `refresh()` on an already-finished timer no-ops).
+        .task { await tickTimerEngine() }
+    }
+
+    /// DUT-624 — advance the shared engine ~1×/s for as long as the guided path
+    /// (this host) is on screen, so a running bake finishes even while the cook
+    /// is browsing the roadmap rather than the recipe flow.
+    private func tickTimerEngine() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1))
+            timerEngine.refresh()
         }
     }
 

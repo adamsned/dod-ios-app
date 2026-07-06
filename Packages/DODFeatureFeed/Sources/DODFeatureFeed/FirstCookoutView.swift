@@ -65,6 +65,11 @@ public struct FirstCookoutView: View {
     /// injected (DumpCakeFlow / previews) the view owns its own.
     @State var timerEngine: CookTimerEngine
     @State var showingHeatCoach = false
+    /// DUT-626 — flips true the moment the cook actually starts the bake timer
+    /// for this rung, so the `.onDisappear` safety-net logs a cook only on real
+    /// progress (not merely paging to the celebration). Internal so the Start
+    /// action in `+Stages.swift` can set it.
+    @State var didStartBake = false
     /// Items the cook has ticked off the *gather* checklist.
     @State var checkedItems: Set<String> = []
     @State var cookPhotoItem: PhotosPickerItem?
@@ -119,6 +124,15 @@ public struct FirstCookoutView: View {
     }
 
     var lastIndex: Int { cookout.steps.count + 1 }
+
+    /// DUT-626 — true when the cook has ACTUALLY engaged the bake for this rung:
+    /// either they tapped Start this lifecycle (`didStartBake`) or the shared
+    /// engine still holds a timer for this rung (survives a "Back to the path" →
+    /// re-enter cycle, DUT-484). Gates the `.onDisappear` cook-log safety net so
+    /// paging to the celebration without cooking never logs a phantom cook.
+    var hasBakeProgress: Bool {
+        didStartBake || timerEngine.timers.contains { $0.recipeID == cookout.recipeID }
+    }
 
     // `shareCaption` moved to `FirstCookoutView+TimerFormat.swift` (DUT-484 — the
     // injectable-engine init pushed this struct body over the type_body_length
@@ -194,8 +208,13 @@ public struct FirstCookoutView: View {
         // the cook) but left via the X / swipe-down instead of tapping "Done", log
         // it anyway. `logCookIfNeeded()` is guarded by `hasLoggedCook`, so the
         // explicit "Done" tap and this path never double-log.
+        // DUT-626 — additionally gate on ACTUAL cook progress (the bake timer for
+        // this rung was started or finished), not merely reaching the last page
+        // index. Paging to the celebration WITHOUT ever cooking (e.g. swiping
+        // through) must not log a phantom cook via this safety net. The explicit
+        // "Done" tap remains an intentional log and is unaffected.
         .onDisappear {
-            if index >= lastIndex { logCookIfNeeded() }
+            if index >= lastIndex, hasBakeProgress { logCookIfNeeded() }
         }
     }
 

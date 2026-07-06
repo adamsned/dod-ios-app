@@ -52,7 +52,12 @@ struct HeatCoachModel {
     /// the single "starting point" number the diagram shows.
     var adjustedCoalSplit: CoalSplit {
         let delta = conditionCoalDelta
-        let midpoint = Int((Double(delta.lowerBound + delta.upperBound) / 2.0).rounded())
+        // DUT-653: round the midpoint to nearest-EVEN, not away-from-zero. The
+        // default `.rounded()` rounds a .5 midpoint away from zero, so a cold
+        // 2...3 (mid 2.5) biased UP to 3 and a hot -3...-2 (mid -2.5) biased
+        // DOWN to -3 — every asymmetric adjustment skewed to its outer edge.
+        // `.toNearestOrEven` gives a true, unbiased midpoint (2.5 → 2, -2.5 → -2).
+        let midpoint = Int((Double(delta.lowerBound + delta.upperBound) / 2.0).rounded(.toNearestOrEven))
         let adjustedTotal = max(0, coalSplit.total + midpoint)
         switch style {
         case .even: return DutchOvenHeatCoach.evenSplit(total: adjustedTotal)
