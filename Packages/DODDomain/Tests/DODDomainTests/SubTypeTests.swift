@@ -13,17 +13,28 @@ import Testing
 }
 
 @Suite("RecipeIngredient value type") struct RecipeIngredientTests {
-    @Test func twoIngredientsWithSameTextAreNotEqualWhenIDsDiffer() {
+    // DUT-641: `id` now derives deterministically from `text`, so two
+    // ingredients built from the same line share an id (and are equal). This
+    // is what keeps check-state (keyed on `id`) stable across a mid-session
+    // recipe re-parse.
+    @Test func sameTextYieldsSameDeterministicID() {
+        #expect(RecipeIngredient(text: "x").id == RecipeIngredient(text: "x").id)
         let one = RecipeIngredient(text: "1 cup flour")
         let two = RecipeIngredient(text: "1 cup flour")
-        #expect(one != two, "Distinct UUIDs mean distinct identities")
+        #expect(one.id == two.id, "Same text must map to the same deterministic id")
+        #expect(one == two)
     }
 
-    @Test func ingredientWithExplicitIDIsStable() {
+    @Test func differentTextYieldsDifferentID() {
+        #expect(RecipeIngredient(text: "1 cup flour").id != RecipeIngredient(text: "2 cups flour").id)
+    }
+
+    @Test func explicitIDOverridesTheDeterministicDefault() {
         let fixedID = UUID()
         let one = RecipeIngredient(id: fixedID, text: "1 cup flour")
         let two = RecipeIngredient(id: fixedID, text: "1 cup flour")
         #expect(one == two)
+        #expect(one.id == fixedID)
     }
 }
 

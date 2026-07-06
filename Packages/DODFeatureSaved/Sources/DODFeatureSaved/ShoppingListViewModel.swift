@@ -230,14 +230,12 @@ public final class ShoppingListViewModel {
     /// Explodes + classifies each recipe's ingredients into per-recipe rows and
     /// appends them, keeping every existing row.
     ///
-    /// De-dup (DUT-589): a row is skipped only when the SAME recipe already
-    /// contributed the SAME ingredient line — i.e. re-adding a recipe already on
-    /// the list no longer re-stacks its rows, which is what let `items` grow
-    /// without bound. Distinct recipes that share an ingredient (three recipes
-    /// each calling for "yellow onion") still produce distinct per-recipe rows —
-    /// CL-77's per-recipe-row behavior is preserved because the identity is the
-    /// `(recipeTitle, ingredientText)` pair, not the ingredient text alone.
-    /// Backs the "Add recipes" affordance on the populated list. Persists.
+    /// De-dup (DUT-589 / DUT-648): a row is skipped only when the same recipe
+    /// already contributed the same line the same number of times — so a
+    /// whole-recipe re-add no longer re-stacks rows, distinct recipes sharing an
+    /// ingredient still keep separate rows, AND a recipe that legitimately
+    /// repeats a line keeps BOTH (see ``dedupedAppend(existing:adding:)``).
+    /// Persists.
     public func add(recipes: [Recipe]) {
         items = Self.dedupedAppend(existing: items, adding: Self.rows(from: recipes))
         persist()
@@ -304,30 +302,9 @@ extension ShoppingListViewModel {
         }
     }
 
-    /// Append `adding` to `existing`, skipping any new row that duplicates a row
-    /// already present (DUT-589). Row identity for de-dup is the
-    /// `(recipeTitle, ingredientText)` pair — NOT the ingredient text alone — so
-    /// re-adding the same recipe doesn't re-stack its rows while distinct recipes
-    /// that share an ingredient still keep separate per-recipe rows (CL-77).
-    /// Shared by ``add(recipes:)`` and ``ShoppingListStore/append(rows:)`` so the
-    /// in-list add and the external (Recipe Detail / card) append de-dup the same
-    /// way.
-    nonisolated static func dedupedAppend(existing: [Item], adding: [Item]) -> [Item] {
-        var seen = Set(existing.map { RowKey(recipeTitle: $0.recipeTitle, text: $0.ingredientText) })
-        var result = existing
-        for row in adding {
-            let key = RowKey(recipeTitle: row.recipeTitle, text: row.ingredientText)
-            guard seen.insert(key).inserted else { continue }
-            result.append(row)
-        }
-        return result
-    }
-
-    /// De-dup identity for a row: its source recipe + its ingredient line.
-    private struct RowKey: Hashable {
-        let recipeTitle: String
-        let text: String
-    }
+    // DUT-648: the append de-dup (`dedupedAppend` / `occurrenceKeys` / `RowKey`)
+    // lives in `ShoppingListViewModel+Dedup.swift` to keep this file under
+    // SwiftLint's `file_length` cap.
 }
 
 // MARK: - Mock fixture (CL-82 — drives the view ahead of the entry surfaces)

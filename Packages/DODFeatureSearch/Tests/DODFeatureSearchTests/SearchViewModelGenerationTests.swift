@@ -32,7 +32,7 @@ import Testing
             merged: [Self.makeItem(2, title: "Chicken Pot Pie")],
             localItems: [],
             trimmed: "chick",
-            online: true,
+            network: .init(online: true, restFailed: false),
             generation: currentGeneration - 1
         )
         #expect(viewModel.items.map(\.id) == [1])  // still chicken — stale finish bailed
@@ -42,7 +42,7 @@ import Testing
             merged: [Self.makeItem(2, title: "Chicken Pot Pie")],
             localItems: [],
             trimmed: "chicken",
-            online: true,
+            network: .init(online: true, restFailed: false),
             generation: currentGeneration
         )
         #expect(viewModel.items.map(\.id) == [2])
@@ -74,7 +74,7 @@ import Testing
             merged: [Self.makeItem(9, title: "Chicken Soup")],
             localItems: [],
             trimmed: "chicken",
-            online: true,
+            network: .init(online: true, restFailed: false),
             generation: inFlightGeneration
         )
         #expect(viewModel.state == .idle)

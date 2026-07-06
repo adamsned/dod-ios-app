@@ -18,6 +18,9 @@ public final class SearchViewModel {
         case searching
         case results
         case noResults
+        /// DUT-622: the online REST search FAILED (threw) with no local
+        /// fallback — distinct from `.noResults` so the view offers a Retry.
+        case error
         case offline
     }
 
@@ -292,15 +295,12 @@ public final class SearchViewModel {
         searchGeneration &+= 1
         let generation = searchGeneration
 
-        // The local ingredient index works offline; the REST pass does not.
-        // We try both and gracefully degrade (see the DUT-11 tier below).
+        // The local ingredient index works offline; the REST pass does not. We
+        // try both and gracefully degrade (see the DUT-11 tier below).
         let online = await dependencies.isOnline()
 
         state = .searching
-        let (restResults, categoryResults) = await fanOutSearchPaths(
-            trimmed: trimmed,
-            online: online
-        )
+        let fanOut = await fanOutSearchPaths(trimmed: trimmed, online: online)
 
         // DUT-11: the local "Recipes using <term>" tier — works offline.
         let localItems =
@@ -308,7 +308,7 @@ public final class SearchViewModel {
 
         let titleMerged = SearchResultMerger.merge(
             query: trimmed,
-            restResults: restResults,
+            restResults: fanOut.restResults,
             localIngredientResults: localItems
         )
         // T-643 / CL-121: union the title-tier-ordered Path A results
@@ -318,23 +318,23 @@ public final class SearchViewModel {
         // desc order. See `CategoryNameMatcher` doc-comment for the rule.
         let merged = mergeWithCategoryResults(
             titleMerged: titleMerged,
-            categoryResults: categoryResults
+            categoryResults: fanOut.categoryResults
         )
 
         // DUT-11: dedup ingredient tier + offline guard + cache stash
-        // (`finishTextSearch` lives in `+T643` for the body-length cap).
+        // (`finishTextSearch` lives in `+T643`). DUT-622: `restFailed` rides
+        // along so a failed request with no fallback surfaces `.error`.
         await finishTextSearch(
             merged: merged,
             localItems: localItems,
             trimmed: trimmed,
-            online: online,
+            network: .init(online: online, restFailed: fanOut.restFailed),
             generation: generation
         )
     }
 
-    // CL-121 (T-643) + DUT-11: the `performSearch` helpers (fan-out / Path A
-    // / Path B / merge / finish / finalize) live in `SearchViewModel+T643.swift`
-    // so this file stays under SwiftLint's `file_length` cap.
+    // CL-121 (T-643) + DUT-11: the `performSearch` helpers (fan-out / Path A / B
+    // / merge / finish / finalize) live in `SearchViewModel+T643.swift`.
 
     /// Send the AC-3.6 SHA-256-hashed query to analytics on each completed
     /// search. T-779 / DUT-85 moved recent-recording out of this path into
