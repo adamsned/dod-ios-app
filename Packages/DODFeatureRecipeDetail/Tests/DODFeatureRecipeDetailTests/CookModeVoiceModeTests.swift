@@ -181,6 +181,25 @@ import Testing
         #expect(!mock.isPaused)
     }
 
+    /// DUT-620 — with Voice Mode off, a Siri "pause"/"resume" must not flip the
+    /// transport state. Before the guard, `pauseVoice()`/`resumeVoice()`
+    /// unconditionally set `playbackState`, spuriously showing paused/speaking.
+    @Test func pauseAndResumeDoNotFlipTransportWhenVoiceModeOff() {
+        let mock = MockSpeechSynthesizer()
+        let viewModel = CookModeViewModelTests.makeViewModel(
+            stepCount: 3,
+            voiceReader: VoiceReader(synthesizer: mock)
+        )
+        #expect(!viewModel.isVoiceModeEnabled)
+        #expect(viewModel.playbackState == .idle)
+
+        viewModel.pauseVoice()
+        #expect(viewModel.playbackState == .idle)
+
+        viewModel.resumeVoice()
+        #expect(viewModel.playbackState == .idle)
+    }
+
     /// AC-40.1 — toggling Voice Mode off stops the reader and disables the flag.
     @Test func turningVoiceModeOffStopsTheReader() {
         let mock = MockSpeechSynthesizer()
