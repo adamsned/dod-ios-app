@@ -85,6 +85,14 @@ public struct CommentComposer: View {
                 .frame(minHeight: 140)
                 .disabled(isSubmitting)
                 .accessibilityLabel("Comment body")
+                // DUT-605 — hard-clamp input to `maxCharacters`. The counter was
+                // decorative; without this, a paste could blow past the cap and
+                // (before the `canSubmit` length gate below) still submit.
+                .onChange(of: text) {
+                    if text.count > maxCharacters {
+                        text = String(text.prefix(maxCharacters))
+                    }
+                }
 
             if text.isEmpty {
                 Text("Share your tips, substitutions, or thoughts.")
@@ -147,9 +155,26 @@ public struct CommentComposer: View {
     }
 
     /// Either the trimmed body OR a non-zero rating qualifies as a real
-    /// submission. Disabled while in-flight to prevent double-tap.
+    /// submission. Disabled while in-flight to prevent double-tap. DUT-605 —
+    /// also blocked when the body exceeds `maxCharacters`, so an over-cap
+    /// comment can never be submitted (the `.onChange` clamp normally keeps
+    /// this from happening, but the gate is the authoritative contract).
     private var canSubmit: Bool {
+        Self.canSubmit(
+            text: text,
+            rating: rating,
+            maxCharacters: maxCharacters,
+            isSubmitting: isSubmitting
+        )
+    }
+
+    /// DUT-605 — the submit-enablement contract, factored out so it is testable
+    /// directly (the `canSubmit` computed property is `private` and the body is
+    /// an opaque `some View`). Enabled iff not in-flight, within the character
+    /// cap, and carrying a non-empty trimmed body or a non-zero rating.
+    static func canSubmit(text: String, rating: Int, maxCharacters: Int, isSubmitting: Bool) -> Bool {
         guard !isSubmitting else { return false }
+        guard text.count <= maxCharacters else { return false }
         let hasComment = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasRating = rating > 0
         return hasComment || hasRating
