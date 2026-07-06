@@ -3300,3 +3300,7 @@ Phase 5 starts when this list is approved and T-001 is picked up. Each PR cites 
 - **T-926 (DUT-632, CL-323) — recipe video plays with audio.** `RecipeVideoAudioSession.activateForPlayback()` sets `.playback`/`.moviePlayback` (no duck) so the silent switch no longer mutes recipe videos; fires only on the `timeControlStatus` → `.playing` transition (not on appear) so it never pre-empts the user's music. Pure `Configuration` + `shouldActivate(for:)`, 6 L1 tests. Status: SHIPPED (PR #492).
 
 - **T-927 (DUT-638, CL-324) — immersive recipe hero.** Add `.ignoresSafeArea(.container, edges: .top)` to the readyBody ScrollView so the hero photo runs to y=0 under the toolbar with the blur as the header (removes the brown band). Verified on the sim. Status: SHIPPED (PR #494).
+
+- **T-928 (DUT-672, CL-325) — immersive article hero.** Add `.ignoresSafeArea(.container, edges: .top)` to `ArticleDetailView`'s ScrollView so the article photo runs to the top under the toolbar with the blur as the header (mirrors DUT-638). Verified on the sim. Status: SHIPPED (PR #500).
+
+- **T-929 (DUT-673, CL-326) — Cook Mode below the Instructions header.** Move `cookModeCTA` inside `instructionsSection` right under the "Instructions" header; move the `.instructions` scroll anchor onto the header so "Jump to Instructions" lands with the header on top and the CTA immediately visible. Status: SHIPPED (PR #500).
