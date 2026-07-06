@@ -303,17 +303,6 @@ public enum JSONLDRecipeParser {
         }
     }
 
-    static func mapNutrition(_ raw: Any?) -> RecipeNutrition? {
-        guard let dict = raw as? [String: Any] else { return nil }
-        return RecipeNutrition(
-            calories: dict["calories"] as? String,
-            servingSize: dict["servingSize"] as? String,
-            proteinGrams: dict["proteinContent"] as? String,
-            carbsGrams: dict["carbohydrateContent"] as? String,
-            fatGrams: dict["fatContent"] as? String
-        )
-    }
-
     static func mapVideo(_ raw: Any?) -> RecipeVideo? {
         let dict: [String: Any]?
         if let object = raw as? [String: Any] {

@@ -157,3 +157,35 @@ struct RecipeInfoFieldsEndToEndTests {
         #expect(recipe.author == nil)
     }
 }
+
+@Suite("JSONLDRecipeParser.parseServings array/non-positive (DUT-610)")
+struct ParseServingsArrayTests {
+
+    /// The array branch must apply the same unit-word split fallback as the
+    /// string branch, accept a numeric element, and treat a non-positive yield
+    /// as absent. Previously `["6 servings"]` returned nil and silently
+    /// mis-scaled every ingredient in the detail view.
+    @Test func parsesArrayAndRejectsNonPositive() {
+        #expect(JSONLDRecipeParser.parseServings(["6 servings"]) == 6)
+        #expect(JSONLDRecipeParser.parseServings(["4", "4 servings"]) == 4)
+        #expect(JSONLDRecipeParser.parseServings([8]) == 8)
+        #expect(JSONLDRecipeParser.parseServings("0") == nil)
+        #expect(JSONLDRecipeParser.parseServings(0) == nil)
+    }
+}
+
+@Suite("JSONLDRecipeParser.mapNutrition sanitization (DUT-612)")
+struct MapNutritionSanitizationTests {
+
+    /// Nutrition string fields must be HTML-sanitized like every sibling
+    /// mapper, so entities such as `250&nbsp;kcal` render as plain text and a
+    /// missing field stays `nil` rather than sanitizing into `""`.
+    @Test func sanitizesNutritionFields() {
+        let nutrition = JSONLDRecipeParser.mapNutrition([
+            "calories": "250&nbsp;kcal", "proteinContent": "12&amp;g",
+        ])
+        #expect(nutrition?.calories == "250 kcal")
+        #expect(nutrition?.proteinGrams == "12&g")
+        #expect(nutrition?.servingSize == nil)
+    }
+}

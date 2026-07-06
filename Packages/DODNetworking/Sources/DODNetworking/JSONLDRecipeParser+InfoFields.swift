@@ -1,3 +1,4 @@
+import DODDomain
 import DODSupport
 import Foundation
 
@@ -7,8 +8,18 @@ import Foundation
 /// keep that file under the file_length / type_body_length caps.
 extension JSONLDRecipeParser {
 
-    /// `recipeYield` may be a number, a string, or an array of strings.
+    /// `recipeYield` may be a number, a string, or an array whose first element
+    /// is a number or string (e.g. `["6 servings"]`). A non-positive yield
+    /// (`0`, `"0"`) is treated as absent (DUT-610).
     static func parseServings(_ raw: Any?) -> Int? {
+        guard let value = parseServingsValue(raw) else { return nil }
+        return value > 0 ? value : nil
+    }
+
+    /// Extract an `Int` from a `recipeYield` value without the positivity
+    /// filter. An array is resolved by parsing its first element with the same
+    /// number/string fallback logic as a top-level value (DUT-610).
+    private static func parseServingsValue(_ raw: Any?) -> Int? {
         if let int = raw as? Int { return int }
         if let double = raw as? Double {
             // DUT-518: `Int(Double)` traps on out-of-range or non-finite input
@@ -16,9 +27,21 @@ extension JSONLDRecipeParser {
             // converting so untrusted scraped values return nil, not a crash.
             return Int(exactly: double.rounded())
         }
-        if let string = raw as? String { return Int(string) ?? Int(string.split(separator: " ").first ?? "") }
-        if let array = raw as? [String], let first = array.first { return Int(first) }
+        if let string = raw as? String { return parseServingsString(string) }
+        if let array = raw as? [Any], let first = array.first {
+            // Recurse so a numeric first element (`[8]`) or a string with a
+            // trailing unit word (`["6 servings"]`) both resolve.
+            return parseServingsValue(first)
+        }
         return nil
+    }
+
+    /// Parse a `recipeYield` string, falling back to the leading whitespace-
+    /// delimited token so `"4 servings"` yields `4` (DUT-610).
+    private static func parseServingsString(_ string: String) -> Int? {
+        if let direct = Int(string) { return direct }
+        let leading = string.split(separator: " ").first.map(String.init) ?? ""
+        return Int(leading)
     }
 
     /// Map a JSON-LD field that may be a bare `String`, a `[String]`, or an
@@ -80,5 +103,24 @@ extension JSONLDRecipeParser {
             }
         }
         return nil
+    }
+
+    /// Map a schema.org `NutritionInformation` object into `RecipeNutrition`.
+    /// Each string field is run through the same `HTMLSanitizer` plain-text path
+    /// the sibling mappers use so entities like `250&nbsp;kcal` render as plain
+    /// text; a missing field stays nil rather than sanitizing an empty string
+    /// (DUT-612).
+    static func mapNutrition(_ raw: Any?) -> RecipeNutrition? {
+        guard let dict = raw as? [String: Any] else { return nil }
+        func clean(_ value: Any?) -> String? {
+            (value as? String).map { HTMLSanitizer.plainText(from: $0) }
+        }
+        return RecipeNutrition(
+            calories: clean(dict["calories"]),
+            servingSize: clean(dict["servingSize"]),
+            proteinGrams: clean(dict["proteinContent"]),
+            carbsGrams: clean(dict["carbohydrateContent"]),
+            fatGrams: clean(dict["fatContent"])
+        )
     }
 }
