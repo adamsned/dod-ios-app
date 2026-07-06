@@ -160,6 +160,37 @@ import Testing
         #expect(FractionRenderer.renderQuantity(0.34) == "⅓")
     }
 
+    // MARK: - ⅖/⅗ snap gap (DUT-608)
+
+    /// 0.4 now snaps to ⅖ instead of dropping to a raw decimal.
+    @Test func renderQuantityTwoFifths() {
+        #expect(FractionRenderer.renderQuantity(0.4) == "⅖")
+    }
+
+    /// 0.6 now snaps to ⅗ instead of dropping to a raw decimal.
+    @Test func renderQuantityThreeFifths() {
+        #expect(FractionRenderer.renderQuantity(0.6) == "⅗")
+    }
+
+    /// 1.4 keeps its fraction: "1 ⅖", not a silently truncated "1".
+    @Test func renderQuantityOneAndTwoFifths() {
+        #expect(FractionRenderer.renderQuantity(1.4) == "1 ⅖")
+    }
+
+    /// 1.6 keeps its fraction: "1 ⅗".
+    @Test func renderQuantityOneAndThreeFifths() {
+        #expect(FractionRenderer.renderQuantity(1.6) == "1 ⅗")
+    }
+
+    // MARK: - Int overflow guard (DUT-609)
+
+    /// A malformed huge quantity (past Int.max) must NOT trap; it returns a
+    /// non-empty decimal string instead of crashing an aggregated line.
+    @Test func renderQuantityHugeValueDoesNotCrash() {
+        let rendered = FractionRenderer.renderQuantity(1e20)
+        #expect(!rendered.isEmpty)
+    }
+
     // MARK: - Range ingredients (DUT-304)
 
     /// "2-3 cloves × 2 → 4-6 cloves" — BOTH bounds scale, not just the lower.
