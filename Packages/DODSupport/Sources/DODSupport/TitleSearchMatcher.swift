@@ -211,9 +211,11 @@ public enum TitleSearchMatcher {
                 )
                 // Adjacent transposition: the last two characters of each side
                 // are swapped (a[i-1]==b[j] && a[i]==b[j-1]) → one edit.
-                if row > 1, column > 1,
-                    lhsChars[row - 1] == rhsChars[column - 2],
-                    lhsChars[row - 2] == rhsChars[column - 1] {
+                let isTranspose =
+                    row > 1 && column > 1
+                    && lhsChars[row - 1] == rhsChars[column - 2]
+                    && lhsChars[row - 2] == rhsChars[column - 1]
+                if isTranspose {
                     best = min(best, prev2[column - 2] + 1)
                 }
                 current[column] = best
