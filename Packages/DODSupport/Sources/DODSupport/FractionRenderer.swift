@@ -14,7 +14,7 @@ import Foundation
 ///
 /// **Cook-friendly precision (CL-52):** quantities snap to the closest
 /// value in the canonical fraction set
-/// `{ 1/8, 1/4, 1/3, 1/2, 2/3, 3/4, 7/8 }` plus whole numbers. The set is
+/// `{ 1/8, 1/4, 1/3, 2/5, 1/2, 3/5, 2/3, 3/4, 7/8 }` plus whole numbers. The set is
 /// what cooks actually measure with — `0.75` becomes `¾`, `0.333…` becomes
 /// `⅓`, `1.5` becomes `1 ½`. Two of the JSON-LD fixtures already in the
 /// repo use exactly this vocabulary (`1 1/2 pounds`, `2/3 cup`).
@@ -77,6 +77,14 @@ public enum FractionRenderer {
         let whole = floor(value)
         let remainder = value - whole
 
+        // DUT-609: a malformed 20+ digit quantity can exceed Int.max, and every
+        // downstream `Int(whole…)` conversion traps on overflow. Guard once here
+        // (mirrors the `Int(exactly:)` pattern from DUT-518) and fall back to the
+        // decimal formatter so an aggregated Shopping List line can never crash.
+        guard Int(exactly: whole) != nil, Int(exactly: whole + 1) != nil else {
+            return decimalFallback(for: value)
+        }
+
         // Remainder approaches 1 within tolerance → bump to next whole.
         if remainder > (1.0 - snapTolerance) {
             return String(Int(whole + 1))
@@ -93,6 +101,12 @@ public enum FractionRenderer {
         // Quantities this small (e.g. 0.04 tsp) are vanishingly rare on a
         // post-multiplication line; emit the literal value rather than
         // pretending it's a fraction.
+        return decimalFallback(for: value)
+    }
+
+    /// Locale-aware two-decimal fallback for values that don't snap or that
+    /// overflow the integer path (DUT-609).
+    private static func decimalFallback(for value: Double) -> String {
         let formatter = Self.fallbackFormatter
         return formatter.string(from: NSNumber(value: value)) ?? String(value)
     }
@@ -120,7 +134,11 @@ public enum FractionRenderer {
         .init(value: 1.0 / 8.0, glyph: "⅛"),
         .init(value: 1.0 / 4.0, glyph: "¼"),
         .init(value: 1.0 / 3.0, glyph: "⅓"),
+        // DUT-608: ⅖/⅗ close the snap gaps at 0.4/0.6 so scaled servings
+        // (e.g. 1.4 → "1 ⅖") no longer silently drop the fraction.
+        .init(value: 2.0 / 5.0, glyph: "⅖"),
         .init(value: 1.0 / 2.0, glyph: "½"),
+        .init(value: 3.0 / 5.0, glyph: "⅗"),
         .init(value: 2.0 / 3.0, glyph: "⅔"),
         .init(value: 3.0 / 4.0, glyph: "¾"),
         .init(value: 7.0 / 8.0, glyph: "⅞"),
@@ -165,7 +183,10 @@ public enum FractionRenderer {
 
     /// Compose whole + fraction glyph into a display string.
     private static func formatMixed(whole: Double, fractionGlyph: String) -> String {
-        let wholeInt = Int(whole)
+        // DUT-609: `Int(exactly:)` (never a trapping `Int(Double)`) so an
+        // overflowing whole can't crash. In practice `renderQuantity` already
+        // guards the magnitude before calling here; this stays defensive.
+        guard let wholeInt = Int(exactly: whole) else { return fractionGlyph }
         // `formatMixed` is only reached after `nearestCanonicalFraction`
         // returned a snap (i.e. remainder ≥ snapTolerance), so we always
         // render the fraction glyph.
