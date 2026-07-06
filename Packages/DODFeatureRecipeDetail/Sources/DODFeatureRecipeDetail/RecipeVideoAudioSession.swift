@@ -20,6 +20,14 @@ import AVFoundation
 /// Voice Mode may hold it open (they share the app's one session) would fight
 /// Cook Mode. Leaving a `.playback` session in place is benign; the app already
 /// tolerates it after every Voice Mode read.
+///
+/// DUT-632 (follow-up) — we activate only when playback actually STARTS, not
+/// when the player/section appears. `setActive(true)` on a non-mixing
+/// `.playback` session interrupts the user's background music, so activating on
+/// mere creation would stop their music just for scrolling past a video they
+/// never tapped. The view watches the player's `timeControlStatus` and calls
+/// ``activateForPlayback()`` on the transition to playing (see
+/// ``shouldActivate(for:)``); repeat calls are harmless (idempotent).
 enum RecipeVideoAudioSession {
 
     /// The category/mode/options a recipe video needs to be audible.
@@ -39,10 +47,29 @@ enum RecipeVideoAudioSession {
         )
     }
 
+    /// The playback states a video can be in, mapped from `AVPlayer`'s
+    /// `AVPlayer.TimeControlStatus` at the call site. Pure and platform-free so
+    /// the "activate now?" decision is unit-testable on the macOS host.
+    enum PlaybackState {
+        case paused
+        case waitingToPlay
+        case playing
+    }
+
+    /// True only when the player has actually started playing — the moment we
+    /// want to grab the `.playback` session. We deliberately do NOT activate for
+    /// `.waitingToPlay` (buffering can occur before the user ever hears audio)
+    /// or `.paused`, so merely showing/creating the player never interrupts the
+    /// user's background music.
+    static func shouldActivate(for state: PlaybackState) -> Bool {
+        state == .playing
+    }
+
     /// Activate a `.playback` session so a recipe video is audible even with the
     /// hardware silent switch on. No-op off iOS. A failed activation must never
     /// break playback (the video still plays, just possibly muted by the switch),
-    /// so errors are swallowed — matching ``VoiceReader``'s posture.
+    /// so errors are swallowed — matching ``VoiceReader``'s posture. Idempotent:
+    /// safe to call on every transition to playing.
     static func activateForPlayback() {
         #if os(iOS)
         let config = Configuration.forRecipeVideo

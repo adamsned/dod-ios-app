@@ -31,4 +31,23 @@ struct RecipeVideoAudioSessionTests {
                 == RecipeVideoAudioSession.Configuration(categoryIsPlayback: true, ducksOthers: false)
         )
     }
+
+    // DUT-632 (follow-up) — we grab the `.playback` session only once playback
+    // actually starts, never on mere creation/appear, so scrolling past a video
+    // doesn't interrupt the user's background music.
+
+    @Test("activate only when the video is actually playing")
+    func activatesOnPlaying() {
+        #expect(RecipeVideoAudioSession.shouldActivate(for: .playing))
+    }
+
+    @Test("do not activate while paused (e.g. on creation/appear)")
+    func doesNotActivateWhilePaused() {
+        #expect(RecipeVideoAudioSession.shouldActivate(for: .paused) == false)
+    }
+
+    @Test("do not activate while merely buffering to play")
+    func doesNotActivateWhileWaiting() {
+        #expect(RecipeVideoAudioSession.shouldActivate(for: .waitingToPlay) == false)
+    }
 }
