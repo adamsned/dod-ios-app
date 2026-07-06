@@ -123,6 +123,49 @@ struct CloudKitContainerSelectionTests {
         #expect(result.container === localContainer)
     }
 
+    // MARK: - DUT-630: CloudKit unavailable (Simulator) never enables mirroring
+
+    /// DUT-630 — an opted-IN user on a runtime where CloudKit mirroring can't run
+    /// (the Simulator, `cloudKitAvailable == false`) must build a LOCAL container
+    /// instead of `.private` mirroring — the mirror setup traps ASYNCHRONOUSLY on
+    /// the sim, which the synchronous DOD-CRASH-1 catch can't reach, so the app
+    /// would crash on launch. The build must succeed and report the fallback so
+    /// the "running local this launch" diagnostics stay honest.
+    @Test func optedInButCloudKitUnavailableBuildsLocalWithFallbackFlag() throws {
+        let defaults = Self.isolatedDefaults()
+        defaults.set(true, forKey: RecipeStore.cloudKitSyncOptInKey)
+        let result = try RecipeStore.productionContainer(
+            defaults: defaults,
+            inMemory: true,
+            cloudKitAvailable: false
+        )
+        #expect(result.usedCloudKitFallback == true)
+        // Sanity: the local container is fully usable.
+        let context = ModelContext(result.container)
+        context.insert(
+            CachedRecipe(
+                id: 9,
+                slug: "s",
+                title: "T",
+                excerptText: "e",
+                canonicalURLString: "https://example.com/9",
+                publishedAt: .now
+            )
+        )
+        try context.save()
+        let rows = try context.fetch(
+            FetchDescriptor<CachedRecipe>(predicate: #Predicate { $0.id == 9 })
+        )
+        #expect(rows.count == 1)
+    }
+
+    /// DUT-630 — the fix ONLY gates the Simulator. The L1 suite runs on macOS
+    /// (not a simulator), so mirroring stays enabled for real runtimes; this
+    /// pins that the default isn't accidentally forced off everywhere.
+    @Test func cloudKitMirroringAvailableIsTrueOffSimulator() {
+        #expect(RecipeStore.cloudKitMirroringAvailable == true)
+    }
+
     @Test func cloudKitBuildSuccessDoesNotUseFallback() throws {
         // When the CloudKit build succeeds, the fallback never fires and the
         // returned container is the CloudKit one.
