@@ -1,16 +1,22 @@
 import DODDesignSystem
 import DODDomain
+import DODFeatureProfile
 import DODSupport
 import Foundation
 
 extension RecipeDetailViewModel {
 
-    /// DUT-28 — true when the on-form "Display name" passes the shared
-    /// ``GuestIdentitySheet/isValidName(_:)`` rule (1–40 chars trimmed).
-    /// Drives the inline field feedback and (with ``isAuthorEmailValid``)
-    /// the Submit enablement.
+    /// DUT-28 / DUT-647 tail — true when the on-form "Display name" passes BOTH
+    /// the shared ``GuestIdentitySheet/isValidName(_:)`` shape rule (1–40 chars
+    /// trimmed) AND the ``DisplayNameValidator`` content moderation (blank /
+    /// vulgar / impersonation blocklist). The guest/comment name path previously
+    /// only ran the shape check, so an inappropriate display name that the
+    /// profile flow would reject still submitted on a comment. This view model
+    /// can see both modules, so it composes them here. Drives the inline field
+    /// feedback and (with ``isAuthorEmailValid``) the Submit enablement.
     public var isAuthorNameValid: Bool {
         GuestIdentitySheet.isValidName(commentAuthorName)
+            && DisplayNameValidator.validate(commentAuthorName) == .ok
     }
 
     /// DUT-28 — true when the on-form "Email" passes the shared
@@ -36,13 +42,19 @@ extension RecipeDetailViewModel {
         let hasRating = pendingUserRating > 0
         let hasComment =
             !commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return (hasRating || hasComment) && isAuthorIdentityValid
+        // DUT-605: never allow submit past the character cap. The setter already
+        // clamps, so this is belt-and-suspenders against any un-clamped path.
+        let withinLimit = commentDraft.count <= RecipeDetailViewModel.commentDraftCharacterLimit
+        return (hasRating || hasComment) && isAuthorIdentityValid && withinLimit
     }
 
     /// True while either the rating or the comment submit is in flight.
     /// Drives the consolidated Submit button's busy label + disabled state.
     public var isSubmittingRatingOrComment: Bool {
-        isSubmittingRating || isSubmittingComment
+        // DUT-602 — the synchronous in-flight guard is folded in so the Submit
+        // button disables the instant the combined submit starts, before the
+        // first await flips `isSubmittingRating` / `isSubmittingComment`.
+        isSubmittingRatingOrCommentInFlight || isSubmittingRating || isSubmittingComment
     }
 
     /// DUT-24 / DUT-28 / DUT-31: single entry point for the consolidated
@@ -66,6 +78,13 @@ extension RecipeDetailViewModel {
     /// doomed POST; a valid identity is persisted to the Keychain so the
     /// next visit pre-fills it.
     public func submitRatingAndComment() async {
+        // DUT-602: synchronous double-submit guard. Set BEFORE the first await
+        // (below) so a fast second tap that races in before `isSubmittingRating`
+        // / `isSubmittingComment` flip is dropped rather than firing a second
+        // POST. `@MainActor` isolation makes the check-and-set atomic. Cleared on
+        // every exit via `defer`.
+        guard !isSubmittingRatingOrCommentInFlight else { return }
+
         let hasComment =
             !commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasRating = pendingUserRating > 0
@@ -77,6 +96,9 @@ extension RecipeDetailViewModel {
             snackbarMessage = "Add your name and a valid email to submit."
             return
         }
+
+        isSubmittingRatingOrCommentInFlight = true
+        defer { isSubmittingRatingOrCommentInFlight = false }
 
         // Persist the entered identity before posting so a returning
         // commenter is pre-filled next time. Best-effort — never blocks the

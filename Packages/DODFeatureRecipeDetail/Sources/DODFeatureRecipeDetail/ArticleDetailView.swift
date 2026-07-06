@@ -46,7 +46,17 @@ struct ArticleDetailView: View {
 
     init(recipe: Recipe) {
         self.recipe = recipe
-        _blocks = State(initialValue: ArticleHTMLParser.parse(html: recipe.articleBodyHTML ?? ""))
+        // DUT-654: thread the post's canonical URL as the parse base URL so
+        // protocol-/root-relative body-image sources in the article HTML resolve
+        // to absolute http(s) URLs (matches the blurb/recipe path in
+        // `RecipeDetailViewModel+Fetch.parseBlurbBlocks`); without it relative
+        // body images fail to load and vanish.
+        _blocks = State(
+            initialValue: ArticleHTMLParser.parse(
+                html: recipe.articleBodyHTML ?? "",
+                baseURL: recipe.canonicalURL
+            )
+        )
     }
 
     var body: some View {

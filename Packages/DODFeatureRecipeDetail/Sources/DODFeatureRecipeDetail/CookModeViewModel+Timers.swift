@@ -33,6 +33,14 @@ extension CookModeViewModel {
         timer.state = .running(endDate: now.addingTimeInterval(TimeInterval(remaining)))
         stepTimers[index] = timer
         reconcileLiveActivity(now: now)
+        // DUT-604: schedule the backgrounded "step timer done" alert at the
+        // deadline. Fire-and-forget — the notifier no-ops without permission /
+        // when notifications are toggled off. A resume re-schedules from the
+        // (possibly reduced) remaining time; the request id is per-step so it
+        // replaces this step's prior pending request rather than stacking.
+        let recipeID = recipe.id
+        let seconds = TimeInterval(remaining)
+        Task { await stepTimerNotifier.scheduleStepDone(after: seconds, recipeID: recipeID, stepIndex: index) }
     }
 
     /// Pause the countdown for `index`, freezing the remaining time.
@@ -41,6 +49,10 @@ extension CookModeViewModel {
         timer.state = .paused(remaining: timer.remaining(at: now))
         stepTimers[index] = timer
         reconcileLiveActivity(now: now)
+        // DUT-604: a paused timer isn't counting down, so cancel its pending
+        // background alert. A subsequent resume re-schedules from the frozen
+        // remaining time.
+        cancelStepDoneNotification(forStep: index)
     }
 
     /// Reset the countdown for `index` to its full duration, stopped.
@@ -49,6 +61,15 @@ extension CookModeViewModel {
         timer.state = .idle
         stepTimers[index] = timer
         reconcileLiveActivity(now: now)
+        // DUT-604: reset stops the countdown — drop its pending alert.
+        cancelStepDoneNotification(forStep: index)
+    }
+
+    /// DUT-604 — cancel the pending background alert for `index`. Fire-and-forget
+    /// wrapper so the timer methods read cleanly.
+    private func cancelStepDoneNotification(forStep index: Int) {
+        let recipeID = recipe.id
+        Task { await stepTimerNotifier.cancelStepDone(recipeID: recipeID, stepIndex: index) }
     }
 
     /// Advance all running timers to `now`: any that reached zero flip to
@@ -63,6 +84,13 @@ extension CookModeViewModel {
             done.state = .completed
             stepTimers[key] = done
             completedAny = true
+            // DUT-604: this timer finished IN THE FOREGROUND (the tick loop only
+            // runs while Cook Mode is on screen), so the in-app buzzer + Live
+            // Activity "done" state cover it — cancel the pending system banner so
+            // the cook doesn't get a redundant alert. The `deliveryGrace` on the
+            // scheduled request keeps it pending until now, so this cancel lands
+            // before it fires.
+            cancelStepDoneNotification(forStep: key)
         }
         if completedAny { timerCompletionTick &+= 1 }
         reconcileLiveActivity(now: now)

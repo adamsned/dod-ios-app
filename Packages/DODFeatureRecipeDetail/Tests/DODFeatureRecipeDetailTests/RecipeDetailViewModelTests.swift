@@ -27,16 +27,21 @@ import Testing
         #expect(viewModel.related.count == 2)
     }
 
-    @Test func fetchFailureTransitionsToUnavailable() async throws {
+    @Test func fetchFailureWithNoCacheTransitionsToRetryableError() async throws {
         // US-37 / CL-63 / T-640: pre-T-640 this also marked the blocklist,
         // post-T-640 it doesn't (an HTML fetch failure is a transient
         // network issue, not a missing-JSON-LD signal). The marking-on-
         // JSON-LD-failure path moved to `ArticlePathClassificationTests`.
+        //
+        // DUT-627: a no-cache fetch failure is now `.retryableError`, NOT
+        // `.unavailable`. The fetch threw before we ever saw the page, so we
+        // can't know the post is genuinely missing — keep the user on a
+        // retryable surface instead of the auto-popping "unavailable" state.
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.fetchShouldFail = true
         let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 9)
         await viewModel.onAppear()
-        #expect(viewModel.loadState == .unavailable)
+        #expect(viewModel.loadState == .retryableError)
     }
 
     @Test func cachedRecipeWithDetailSkipsNetworkWhenOffline() async throws {

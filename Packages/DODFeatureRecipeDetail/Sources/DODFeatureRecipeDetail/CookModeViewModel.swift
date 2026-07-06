@@ -61,6 +61,10 @@ public final class CookModeViewModel {
 
     private let idleTimer: any IdleTimerController
     private let liveActivity: any CookLiveActivityController
+    /// DUT-604 — schedules the "step timer done" local notification so a
+    /// backgrounded step timer still alerts (the in-app buzzer only fires on the
+    /// foreground tick). `internal` so the `+Timers` extension drives it.
+    let stepTimerNotifier: any CookStepTimerNotifying
     /// `internal` (not `private`) so the Voice Mode + pacing methods in
     /// `CookModeViewModel+Voice.swift` can drive the reader from a sibling file.
     let voiceReader: VoiceReader
@@ -101,6 +105,7 @@ public final class CookModeViewModel {
         initialCheckedIngredients: Set<UUID>,
         idleTimer: any IdleTimerController = SystemIdleTimerController(),
         liveActivity: any CookLiveActivityController = SystemCookLiveActivityController(),
+        stepTimerNotifier: any CookStepTimerNotifying = SystemCookStepTimerNotifier(),
         voiceReader: VoiceReader = VoiceReader(),
         locale: Locale = .current
     ) {
@@ -108,6 +113,7 @@ public final class CookModeViewModel {
         self.checkedIngredientIDs = initialCheckedIngredients
         self.idleTimer = idleTimer
         self.liveActivity = liveActivity
+        self.stepTimerNotifier = stepTimerNotifier
         self.voiceReader = voiceReader
         self.voiceLanguageCode = locale.language.languageCode?.identifier
         // DUT-583 — when a step finishes reading on its own, drop the play/pause
@@ -182,6 +188,12 @@ public final class CookModeViewModel {
         // ghost activity behind would be the Live Activity equivalent of
         // the "battery still draining" idle-timer bug.
         liveActivity.end()
+        // DUT-604 — the session's over: cancel every pending step-timer alert so
+        // a scheduled banner never fires for a timer whose session the cook has
+        // left. Fire-and-forget; captured before `stepTimers` is cleared (the
+        // notifier keys on recipe id, not the timer set, so ordering is moot).
+        let recipeID = recipe.id
+        Task { await stepTimerNotifier.cancelAllStepDone(recipeID: recipeID) }
         // DUT-293/294 — the session's over: drop all step timers + forget which
         // one drove the card, so a re-entry starts clean.
         stepTimers.removeAll()
@@ -357,44 +369,3 @@ public final class CookModeViewModel {
 /// conformance lets ``VoiceCommandBus`` forward Siri commands straight into the
 /// live session with no adapter (CL-83).
 extension CookModeViewModel: VoiceCommandHandler {}
-
-// MARK: - Idle timer abstraction
-
-/// Lets the view model drive `UIApplication.isIdleTimerDisabled` in
-/// production while letting tests stub the property with a plain class.
-/// Marker-only protocol — the actual production conformance lives in
-/// ``SystemIdleTimerController``.
-@MainActor
-public protocol IdleTimerController: AnyObject {
-    var isDisabled: Bool { get set }
-}
-
-/// Production conformance — backed by `UIApplication.shared.isIdleTimerDisabled`.
-/// On non-UIKit hosts (e.g. swift test on macOS), reads/writes a local
-/// boolean so the type still satisfies the protocol.
-@MainActor
-public final class SystemIdleTimerController: IdleTimerController {
-
-    public init() {}
-
-    public var isDisabled: Bool {
-        get {
-            #if canImport(UIKit)
-            UIApplication.shared.isIdleTimerDisabled
-            #else
-            localValue
-            #endif
-        }
-        set {
-            #if canImport(UIKit)
-            UIApplication.shared.isIdleTimerDisabled = newValue
-            #else
-            localValue = newValue
-            #endif
-        }
-    }
-
-    #if !canImport(UIKit)
-    private var localValue: Bool = false
-    #endif
-}

@@ -18,6 +18,12 @@ struct PublishedDateCaption: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .long
         formatter.timeStyle = .none
+        // DUT-623: the incoming `date` is a `date_gmt` UTC instant. Format it in
+        // UTC so the shown calendar day matches the publication day. Without a
+        // pinned time zone the formatter uses the device's local zone, which
+        // shifts a near-midnight UTC instant back a day for users west of GMT
+        // (e.g. a "June 1 00:30 UTC" post shows "May 31" in US time zones).
+        formatter.timeZone = TimeZone(identifier: "UTC")
         return formatter
     }()
 

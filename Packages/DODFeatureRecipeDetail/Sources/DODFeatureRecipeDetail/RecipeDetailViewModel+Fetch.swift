@@ -31,8 +31,14 @@ extension RecipeDetailViewModel {
             if let recipe, !recipe.ingredients.isEmpty {
                 loadState = .ready
             } else {
-                loadState = .unavailable
-                snackbarMessage = "Recipe unavailable."
+                // DUT-627: the FETCH threw — we never saw the page, so we can't
+                // know the post is genuinely missing (that's the JSON-LD-failed
+                // `.unavailable` branch in `apply(classification:)`, which only
+                // runs after a successful fetch). Treat a no-cache fetch failure
+                // as RETRYABLE: keep the user on a retry surface instead of
+                // downgrading to `.unavailable` + auto-pop on a flaky connection.
+                loadState = .retryableError
+                snackbarMessage = "Couldn't load recipe — check your connection."
             }
             return
         }
@@ -50,6 +56,17 @@ extension RecipeDetailViewModel {
         // body-image base-URL threading lives inside `classifyPage(html:)`.
         let classification = await classifyPage(html: html)
         await apply(classification: classification, html: html)
+    }
+
+    /// DUT-627 — retry the fetch after a transient `.retryableError`. Resets to
+    /// the loading skeleton and re-runs the fetch/parse pipeline; a now-reachable
+    /// network resolves to `.ready` / `.article`, a confirmed-missing post to
+    /// `.unavailable`, and a still-flaky connection back to `.retryableError`.
+    /// Wired to the Retry button the view shows in the `.retryableError` state.
+    public func retryLoad() async {
+        loadState = .loadingDetail
+        snackbarMessage = nil
+        await fetchAndParse()
     }
 
     /// DUT-577 — `@MainActor` apply step: consume the off-main
