@@ -44,6 +44,21 @@ public final class TelemetryDeckTransport: TelemetryTransport, @unchecked Sendab
     private let defaults: UserDefaults
     private let initializeSDK: (String) -> Void
     private let emitSignal: (String, [String: String]) -> Void
+    private let purgeSDK: () -> Void
+
+    /// Per-app constant salt for the pseudonymous identifier (DUT-669).
+    ///
+    /// TelemetryDeck salts the device identifier before hashing it into a
+    /// pseudonymous id. When `salt` is left unset the SDK falls back to
+    /// `salt=""`, which makes the pseudonym an *unsalted* SHA-256 of the
+    /// device identifier — trivially precomputable / cross-app correlatable.
+    /// A fixed non-empty per-app constant keeps the pseudonym stable across
+    /// runs (so distinct-user counts still work) while removing the empty
+    /// default. It is intentionally hard-coded (not user- or install-derived)
+    /// so it never changes and never itself becomes tracked data.
+    ///
+    /// Spec trace: DUT-669 — salt the pseudonymous id.
+    static let pseudonymSalt = "dod.telemetry.pseudonym.salt.v1"
 
     /// `defaults` defaults to `UserDefaults.standard` in production. The L1 unit
     /// tests inject an isolated suite via `UserDefaults(suiteName:)` so they can
@@ -51,7 +66,10 @@ public final class TelemetryDeckTransport: TelemetryTransport, @unchecked Sendab
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.initializeSDK = { appID in
-            var config = TelemetryDeck.Config(appID: appID)
+            // DUT-669: pass a fixed non-empty `salt` so the pseudonymous id is
+            // no longer an unsalted SHA-256 of the device identifier. `salt` is
+            // a `let` on `Config` — it can only be set through the initializer.
+            let config = TelemetryDeck.Config(appID: appID, salt: Self.pseudonymSalt)
             // DUT-241: stop the SDK from emitting its OWN session/identity
             // signal (TelemetryDeck.Session.started + the salted identifier)
             // outside the app's gated allowlist.
@@ -61,19 +79,28 @@ public final class TelemetryDeckTransport: TelemetryTransport, @unchecked Sendab
         self.emitSignal = { name, parameters in
             TelemetryDeck.signal(name, parameters: parameters)
         }
+        // DUT-665: `terminate()` deinitializes the current `TelemetryManager`,
+        // which drops its `SignalManager` and cancels the background flush
+        // timer — the only public SDK API that actually stops the SDK's own
+        // on-disk cache + background dispatch. See `send(_:)` for the opt-out
+        // transition that invokes it.
+        self.purgeSDK = { TelemetryDeck.terminate() }
     }
 
-    /// Test seam (DUT-241): inject fakes for SDK init + signal so L1 tests can
-    /// assert the privacy gate prevents BOTH initialization and emission,
-    /// without linking the real TelemetryDeck wire path.
+    /// Test seam (DUT-241 / DUT-665): inject fakes for SDK init + signal + purge
+    /// so L1 tests can assert the privacy gate prevents BOTH initialization and
+    /// emission, and that opting out tears the SDK down — without linking the
+    /// real TelemetryDeck wire path.
     init(
         defaults: UserDefaults,
         initializeSDK: @escaping (String) -> Void,
-        emitSignal: @escaping (String, [String: String]) -> Void
+        emitSignal: @escaping (String, [String: String]) -> Void,
+        purgeSDK: @escaping () -> Void = {}
     ) {
         self.defaults = defaults
         self.initializeSDK = initializeSDK
         self.emitSignal = emitSignal
+        self.purgeSDK = purgeSDK
     }
 
     /// Store the upstream app ID. DUT-241: this no longer initializes the SDK —
@@ -93,7 +120,18 @@ public final class TelemetryDeckTransport: TelemetryTransport, @unchecked Sendab
         // flipping the toggle takes effect immediately; the SDK is lazily
         // initialized on the first ALLOWED event (so enabling it mid-session
         // works without a relaunch).
-        guard isTelemetryEnabled() else { return }
+        // DUT-665: the per-send gate below blocks FUTURE sends, but the
+        // already-initialized SDK keeps its own on-disk signal cache and a
+        // background flush timer — so signals queued while telemetry was ON
+        // could still leave the device after the user opts OUT. On the opt-out
+        // transition (disabled AND the SDK was previously initialized) we
+        // additionally tear the SDK down (`purgeSDK` -> `TelemetryDeck.terminate()`),
+        // which deinitializes the manager and cancels its background flush, and
+        // reset `initialized` so a later opt-in re-initializes cleanly.
+        guard isTelemetryEnabled() else {
+            purgeIfInitialized()
+            return
+        }
         lock.lock()
         if !initialized {
             guard let appID else {
@@ -105,6 +143,21 @@ public final class TelemetryDeckTransport: TelemetryTransport, @unchecked Sendab
         }
         lock.unlock()
         emitSignal(event.name, event.payload)
+    }
+
+    /// DUT-665: on an opt-out where the SDK is already live, stop and deinit it
+    /// so its cached signals + background flush can't send after opt-out. Runs
+    /// under `lock` and only purges once per initialization so repeated
+    /// opted-out sends don't re-terminate an already-torn-down client.
+    private func purgeIfInitialized() {
+        lock.lock()
+        guard initialized else {
+            lock.unlock()
+            return
+        }
+        initialized = false
+        lock.unlock()
+        purgeSDK()
     }
 
     /// Read the user's privacy toggle, defaulting to `true` when absent.

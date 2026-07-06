@@ -146,6 +146,7 @@ import Testing
         var initCount = 0
         var initAppIDs: [String] = []
         var signals: [String] = []
+        var purgeCount = 0
     }
 
     private func makeTransport(enabled: Bool, spy: Spy) -> (TelemetryDeckTransport, UserDefaults) {
@@ -159,7 +160,8 @@ import Testing
                 spy.initCount += 1
                 spy.initAppIDs.append($0)
             },
-            emitSignal: { name, _ in spy.signals.append(name) }
+            emitSignal: { name, _ in spy.signals.append(name) },
+            purgeSDK: { spy.purgeCount += 1 }
         )
         return (transport, defaults)
     }
@@ -207,5 +209,62 @@ import Testing
         transport.send(.appOpen)  // no configure(appID:) yet -> no appID to init with
         #expect(spy.initCount == 0)
         #expect(spy.signals.isEmpty)
+    }
+
+    // MARK: - DUT-665: opt-out tears the live SDK down
+
+    @Test func optingOutAfterInitPurgesTheSDK() {
+        let spy = Spy()
+        let (transport, defaults) = makeTransport(enabled: true, spy: spy)
+        transport.configure(appID: "app-id")
+        transport.send(.appOpen)  // lazily initializes the live SDK
+        #expect(spy.initCount == 1)
+
+        // Flip OFF mid-session -> the next send tears the SDK down so its
+        // cached signals + background flush can't send after opt-out.
+        defaults.set(false, forKey: TelemetryDeckTransport.telemetryEnabledKey)
+        transport.send(.appOpen)
+        #expect(spy.purgeCount == 1)
+        #expect(spy.signals.count == 1)  // the opted-out send emits nothing
+    }
+
+    @Test func optingOutBeforeInitDoesNotPurge() {
+        let spy = Spy()
+        let (transport, _) = makeTransport(enabled: false, spy: spy)
+        transport.configure(appID: "app-id")
+        transport.send(.appOpen)  // opted out, SDK never initialized
+        // Nothing to tear down -> no spurious terminate().
+        #expect(spy.purgeCount == 0)
+        #expect(spy.initCount == 0)
+    }
+
+    @Test func repeatedOptedOutSendsPurgeExactlyOnce() {
+        let spy = Spy()
+        let (transport, defaults) = makeTransport(enabled: true, spy: spy)
+        transport.configure(appID: "app-id")
+        transport.send(.appOpen)  // initialize
+
+        defaults.set(false, forKey: TelemetryDeckTransport.telemetryEnabledKey)
+        transport.send(.appOpen)
+        transport.send(.appOpen)
+        transport.send(.appOpen)
+        // Purge only fires on the transition, not on every opted-out send.
+        #expect(spy.purgeCount == 1)
+    }
+
+    @Test func reOptInAfterPurgeReinitializes() {
+        let spy = Spy()
+        let (transport, defaults) = makeTransport(enabled: true, spy: spy)
+        transport.configure(appID: "app-id")
+        transport.send(.appOpen)  // init #1
+
+        defaults.set(false, forKey: TelemetryDeckTransport.telemetryEnabledKey)
+        transport.send(.appOpen)  // purge, initialized reset
+
+        defaults.set(true, forKey: TelemetryDeckTransport.telemetryEnabledKey)
+        transport.send(.appOpen)  // init #2 (clean re-init)
+        #expect(spy.initCount == 2)
+        #expect(spy.purgeCount == 1)
+        #expect(spy.signals.count == 2)
     }
 }
