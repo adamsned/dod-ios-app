@@ -170,6 +170,12 @@ public enum WidgetDeepLinkParser {
         /// Lock Screen control's tap — the app switches to the Saved tab and opens
         /// the Shopping List screen empty-first. Bare URL only.
         case shoppingList
+        /// `dod://<tool>` — DUT-674 URL fallback for the iOS 18 configurable Control
+        /// Center control (DUT-560). The control's App Group hand-off is stripped on
+        /// dev/adhoc builds, so it also opens this URL; the app routes it through the
+        /// same control-tool mapping. Bare host only. `shopping-list` keeps its
+        /// dedicated `.shoppingList` case for back-compat.
+        case cookingTool(ControlRouteStore.Route)
     }
 
     /// Returns `nil` for any URL we don't recognize so callers never spawn
@@ -208,6 +214,23 @@ public enum WidgetDeepLinkParser {
             // The control emits the bare URL; anything with a path is
             // malformed and ignored.
             return isBare(url) ? .shoppingList : nil
+        default:
+            // DUT-674 — the `dod://<tool>` cooking-tool URL fallback. Handled in
+            // a helper so the main switch stays under the cyclomatic-complexity
+            // cap; `shopping-list` is intercepted above and keeps `.shoppingList`.
+            return parseCookingTool(host: host, url: url)
+        }
+    }
+
+    /// DUT-674 — maps a bare `dod://<tool>` host to `.cookingTool(route)`. The
+    /// URL fallback for the iOS 18 configurable Control Center control: adhoc/dev
+    /// builds strip the App Group, so the control also opens this URL. Bare host
+    /// only (mirrors `.shoppingList`); an unknown host or any path returns `nil`.
+    private static func parseCookingTool(host: String, url: URL) -> Route? {
+        switch host {
+        case "heat-coach", "journal", "first-cookout", "cook-mode", "buzzywaxx":
+            guard isBare(url), let route = ControlRouteStore.Route(rawValue: host) else { return nil }
+            return .cookingTool(route)
         default:
             return nil
         }

@@ -210,4 +210,54 @@ import Testing
         let empty = try #require(URL(string: "dod://article"))
         #expect(WidgetDeepLinkParser.parse(empty) == nil)
     }
+
+    // MARK: - DUT-674 `dod://<tool>` cooking-tool URL fallback (Control Center)
+
+    /// The configurable Control Center control also opens `dod://<tool>` so it
+    /// works on dev/adhoc builds where the App Group entitlement is stripped.
+    /// Each cooking-tool host maps to its `ControlRouteStore.Route`.
+    @Test func parsesHeatCoachTool() throws {
+        let url = try #require(URL(string: "dod://heat-coach"))
+        #expect(WidgetDeepLinkParser.parse(url) == .cookingTool(.heatCoach))
+    }
+
+    @Test func parsesCookingJournalTool() throws {
+        let url = try #require(URL(string: "dod://journal"))
+        #expect(WidgetDeepLinkParser.parse(url) == .cookingTool(.cookingJournal))
+    }
+
+    @Test func parsesFirstCookoutTool() throws {
+        let url = try #require(URL(string: "dod://first-cookout"))
+        #expect(WidgetDeepLinkParser.parse(url) == .cookingTool(.firstCookout))
+    }
+
+    @Test func parsesCookModeTool() throws {
+        let url = try #require(URL(string: "dod://cook-mode"))
+        #expect(WidgetDeepLinkParser.parse(url) == .cookingTool(.cookMode))
+    }
+
+    @Test func parsesBuyBuzzyWaxxTool() throws {
+        let url = try #require(URL(string: "dod://buzzywaxx"))
+        #expect(WidgetDeepLinkParser.parse(url) == .cookingTool(.buyBuzzyWaxx))
+    }
+
+    /// `shopping-list` keeps its dedicated `.shoppingList` case for back-compat
+    /// (it is NOT collapsed into `.cookingTool`).
+    @Test func shoppingListStaysDedicatedRoute() throws {
+        let url = try #require(URL(string: "dod://shopping-list"))
+        #expect(WidgetDeepLinkParser.parse(url) == .shoppingList)
+    }
+
+    /// Bare-host only — a path-bearing cooking-tool URL is rejected, mirroring
+    /// `.shoppingList`.
+    @Test func cookingToolWithExtraPathIsRejected() throws {
+        let url = try #require(URL(string: "dod://heat-coach/extra"))
+        #expect(WidgetDeepLinkParser.parse(url) == nil)
+    }
+
+    /// An unknown host is still rejected.
+    @Test func bogusHostIsRejected() throws {
+        let url = try #require(URL(string: "dod://bogus"))
+        #expect(WidgetDeepLinkParser.parse(url) == nil)
+    }
 }
