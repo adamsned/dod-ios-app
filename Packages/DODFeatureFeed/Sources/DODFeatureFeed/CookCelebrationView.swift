@@ -37,23 +37,29 @@ public struct CookCelebrationView: View {
     public var body: some View {
         VStack(spacing: DODSpacing.md) {
             Spacer()
-            Text(emoji)
-                .font(.system(size: 88))
-                .accessibilityHidden(true)
-            Text(eyebrow)
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.burntOrange)
-                .textCase(.uppercase)
-                .tracking(2)
-            Text(title)
-                .dodFont(DODType.displayMedium)
-                .foregroundStyle(DODColor.label)
-                .multilineTextAlignment(.center)
-            Text(subtitle)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.labelSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, DODSpacing.md)
+            // The celebratory message — combined into a single VO element so it
+            // reads eyebrow + title + subtitle in one swipe. The dismiss CTA is
+            // kept OUTSIDE this group so `.combine` can't swallow its action.
+            VStack(spacing: DODSpacing.md) {
+                Text(emoji)
+                    .font(.system(size: 88))
+                    .accessibilityHidden(true)
+                Text(eyebrow)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.burntOrange)
+                    .textCase(.uppercase)
+                    .tracking(2)
+                Text(title)
+                    .dodFont(DODType.displayMedium)
+                    .foregroundStyle(DODColor.label)
+                    .multilineTextAlignment(.center)
+                Text(subtitle)
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, DODSpacing.md)
+            }
+            .accessibilityElement(children: .combine)
             Spacer()
             Button(buttonTitle) { onDismiss() }
                 .dodProminentButton()
@@ -62,8 +68,6 @@ public struct CookCelebrationView: View {
         .padding(DODSpacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DODColor.surface.ignoresSafeArea())
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(title)
     }
 
     private var emoji: String {
