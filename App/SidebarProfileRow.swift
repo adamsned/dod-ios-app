@@ -41,10 +41,14 @@ struct SidebarProfileRow: View {
                         .dodFont(DODType.heading)
                         .foregroundStyle(DODColor.label)
                         .lineLimit(1)
+                        // DUT-695 — shrink rather than clip at large Dynamic Type.
+                        .minimumScaleFactor(0.8)
                     Text(profile == nil ? "Add Your Name and Photo" : "View profile")
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)
                         .lineLimit(1)
+                        // DUT-695 — shrink rather than clip at large Dynamic Type.
+                        .minimumScaleFactor(0.8)
                 }
                 Spacer(minLength: 0)
             }

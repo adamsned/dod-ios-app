@@ -149,8 +149,8 @@ struct CookingToolsHubView: View {
 
     /// DUT-572 — gates the header Settings gear to compact width (iPhone). On iPad
     /// (regular width) the sidebar already hosts a Settings row, so the gear is
-    /// redundant here.
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// redundant here. `internal` so the extracted tool cards read it too (DUT-695).
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
 
     init(
         dependencies: AppDependencies,
@@ -369,7 +369,7 @@ struct CookingToolsHubView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { activeToolSheet = nil }
-                        .tint(DODColor.burntOrange)
+                        .tint(DODColor.burntOrange).keyboardShortcut(.cancelAction)  // DUT-695
                 }
             }
         }

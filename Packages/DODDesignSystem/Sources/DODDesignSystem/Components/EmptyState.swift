@@ -64,6 +64,11 @@ public struct EmptyState: View {
             }
         }
         .padding(DODSpacing.xl)
+        // DUT-695 — cap the prose/CTA reading width BEFORE the infinity centering
+        // so the content doesn't span the full iPad canvas. 420 is wider than the
+        // iPhone content region, so compact layouts (and their L4 snapshots) stay
+        // byte-identical; only wide (iPad) width is bounded + centered.
+        .frame(maxWidth: 420)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DODColor.surface)
     }

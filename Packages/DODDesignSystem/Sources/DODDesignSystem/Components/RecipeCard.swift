@@ -253,8 +253,17 @@ extension View {
     /// accessibility trait manually so VoiceOver + XCUITest still see
     /// the row as a tappable element.
     public func recipeCardTap(_ action: @escaping () -> Void) -> some View {
-        self
-            .contentShape(Rectangle())
+        // DUT-695 — trackpad/pointer lift on every recipe card (Feed/Saved/
+        // Search/Categories all route through this modifier). `.hoverEffect` is
+        // a no-op without a pointer, so iPhone is unaffected; it's unavailable on
+        // macOS, where this package's L1 `swift test` compiles, so it's guarded.
+        let tappable = self.contentShape(Rectangle())
+        #if os(iOS)
+        let hoverable = tappable.hoverEffect(.highlight)
+        #else
+        let hoverable = tappable
+        #endif
+        return hoverable
             .onTapGesture(perform: action)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
