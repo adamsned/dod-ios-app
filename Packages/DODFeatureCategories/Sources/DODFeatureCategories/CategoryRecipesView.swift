@@ -54,6 +54,19 @@ public struct CategoryRecipesView: View {
                     Task { await viewModel.retry() }
                 }
             )
+        case .offline:
+            // DUT-695 — a connectivity failure on the initial load gets a
+            // "reconnect" hint (mirrors Search's `.offline` copy tone) rather
+            // than the generic "Couldn't load". Retry re-runs the same load.
+            EmptyState(
+                systemImage: "wifi.slash",
+                title: "No Internet Connection",
+                message: "Reconnect to browse dutchovendaddy.com.",
+                action: .init(title: "Retry") {
+                    Task { await viewModel.retry() }
+                }
+            )
+            .accessibilityIdentifier("dod.category.offlineState")
         case .empty:
             EmptyState(
                 systemImage: "tray",

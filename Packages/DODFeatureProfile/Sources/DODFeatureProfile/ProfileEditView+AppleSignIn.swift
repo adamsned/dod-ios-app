@@ -163,7 +163,14 @@ extension ProfileEditView {
         hasSession = true  // DUT-281 — a session was persisted; keep Sign Out reachable
         if let name = outcome.displayName { displayName = name }
         if let mail = outcome.email { email = mail }
-        guard outcome.profileSaved else { return }
+        // DUT-695 — auth succeeded but the Keychain/profile WRITE failed (the
+        // "Couldn't Save Your Profile" case). Surface it via the editor's
+        // existing error row instead of silently no-oping; the fields stay
+        // filled so the user can retry the manual Save.
+        guard outcome.profileSaved else {
+            saveError = "Couldn't Save Your Profile. Try Again."
+            return
+        }
         Task {
             await onProfileChanged()
             dismiss()
@@ -187,7 +194,13 @@ extension ProfileEditView {
             )
             if let name = outcome.displayName { self.displayName = name }
             if let mail = outcome.email { self.email = mail }
-            guard outcome.profileSaved else { return }
+            // DUT-695 — mirror the Apple handler: auth succeeded but the
+            // profile WRITE failed, so surface the error row instead of a
+            // silent no-op (the fields stay filled for a manual Save retry).
+            guard outcome.profileSaved else {
+                saveError = "Couldn't Save Your Profile. Try Again."
+                return
+            }
             await onProfileChanged()
             dismiss()
         }
