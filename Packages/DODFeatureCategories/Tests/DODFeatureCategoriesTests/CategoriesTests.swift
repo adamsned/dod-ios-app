@@ -109,6 +109,36 @@ import Testing
         #expect(viewModel.refreshCount == 0)  // no reward on failure
     }
 
+    @Test func saveToggleCountFiresOnlyOnGenuineToggleNotOnAppearOrRefresh() async {
+        // DUT-697: the `.selection` save haptic must fire ONLY on a genuine
+        // long-press Save/Unsave — never on appear/refresh reconciliation of the
+        // saved-id set (which reassigns `savedRecipeIDs` and previously drove the
+        // haptic directly, mis-firing on first appear + every pull-to-refresh).
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.posts[1] = (1...5).map(Self.makeItem)
+        dependencies.savedIDs = [1, 3]  // a populated set to reconcile on appear
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 5)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+
+        // Appear hydrates the (non-empty) saved set but must not fire the haptic.
+        await viewModel.onAppear()
+        #expect(viewModel.savedRecipeIDs == [1, 3])
+        #expect(viewModel.saveToggleCount == 0)
+
+        // A pull-to-refresh (even one that picks up an out-of-band save) must not
+        // fire the save haptic either.
+        dependencies.savedIDs = [1, 3, 5]
+        await viewModel.refresh()
+        #expect(viewModel.savedRecipeIDs == [1, 3, 5])
+        #expect(viewModel.saveToggleCount == 0)
+
+        // Only a genuine user toggle bumps the count.
+        viewModel.applyOptimisticSaveToggle(id: 5)  // unsave
+        #expect(viewModel.saveToggleCount == 1)
+        viewModel.applyOptimisticSaveToggle(id: 2)  // save
+        #expect(viewModel.saveToggleCount == 2)
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
@@ -153,4 +183,10 @@ final class FakeCategoriesDependencies: CategoriesDependencies, @unchecked Senda
         let byID = Dictionary(grouping: allPagedItems, by: \.id).mapValues { $0.first }
         return ids.compactMap { byID[$0].flatMap { $0 } }
     }
+
+    /// DUT-697: the saved-id set the VM hydrates on appear/refresh (defaults to
+    /// empty via the protocol extension; overridden here to exercise a populated
+    /// reconciliation that must NOT fire the save haptic).
+    var savedIDs: Set<Int> = []
+    func savedRecipeIDs() async throws -> Set<Int> { savedIDs }
 }
