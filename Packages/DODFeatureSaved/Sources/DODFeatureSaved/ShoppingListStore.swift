@@ -126,11 +126,6 @@ public struct ShoppingListStore: @unchecked Sendable {
         )
     }
 
-    /// Test helper: drop the persisted list.
-    public func clear() {
-        defaults.removeObject(forKey: key)
-    }
-
     /// Test-only accessor for the backing `UserDefaults`, so tests can assert on
     /// the raw persisted blob size (DUT-589 — proving the blob stays bounded).
     var debugDefaults: UserDefaults { defaults }

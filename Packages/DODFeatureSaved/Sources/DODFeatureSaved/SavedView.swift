@@ -130,6 +130,11 @@ public struct SavedView: View {
                 .padding(.horizontal, DODSpacing.md)
                 .padding(.vertical, DODSpacing.md)
             }
+            // DUT-693 — pull-to-refresh re-runs the same load the appear-time
+            // `.task` does (Feed already has this), so a cross-device save/unsave
+            // can be pulled in without waiting for the debounced remote-change
+            // refresh or a tab switch.
+            .refreshable { await viewModel.refresh() }
         }
     }
 

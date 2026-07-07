@@ -73,9 +73,11 @@ public enum ShoppingListFormatter {
         return ([header] + blocks).joined(separator: "\n\n")
     }
 
-    /// AC-39.4 aisle display names for the six shipped logic-core cases
-    /// (mirrors `ShoppingListView`'s inline `AisleHeader.displayName`; `meat`
-    /// renders "Meat & Seafood" per AC-39.4, folding seafood in per CL-80).
+    /// AC-39.4 aisle display names for the six shipped logic-core cases. DUT-693
+    /// — this is the single source of truth; `ShoppingListView`'s
+    /// `AisleHeader.displayName` delegates here so the section headers and the
+    /// share text can never drift. (`meat` renders "Meat & Seafood" per AC-39.4,
+    /// folding seafood in per CL-80.)
     static func displayName(_ aisle: IngredientAisleClassifier.Aisle) -> String {
         switch aisle {
         case .produce: "Produce"
