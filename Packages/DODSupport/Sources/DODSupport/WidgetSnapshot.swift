@@ -144,7 +144,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
 ///     fire this URL.
 ///   - `dod://shopping-list` — open the app straight to the Shopping List
 ///     screen empty-first (DUT-480 / CL-301). Emitted by the iOS 18
-///     Control Center / Lock Screen control ``ShoppingListControl``.
+///     Control Center / Lock Screen control ``CookingToolControl``.
 public enum WidgetDeepLinkParser {
 
     /// Which widget surface produced the URL. Inferred from the URL itself:

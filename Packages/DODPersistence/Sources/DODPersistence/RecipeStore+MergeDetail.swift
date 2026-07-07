@@ -3,6 +3,13 @@ import Foundation
 
 extension RecipeStore {
 
+    /// Shared, default-config `JSONEncoder` reused by the detail-persist paths
+    /// below — a default `JSONEncoder` is safe to reuse across encode calls, so
+    /// this avoids allocating a fresh encoder per blob field on every
+    /// `mergeDetail` (fired on every recipe open/refresh). Mirrors the shared
+    /// ``sharedDecoder`` on the read path. DUT-694.
+    private static let encoder = JSONEncoder()
+
     /// DUT-592: copy `ingredients`/`instructions` onto the cached row WITHOUT
     /// clobbering previously-good content with `[]`. For a `.recipe`, a
     /// partial/truncated re-parse (a WPRM markup change, a throttled fetch, an
@@ -15,14 +22,14 @@ extension RecipeStore {
         switch recipe.kind {
         case .recipe:
             if !recipe.ingredients.isEmpty {
-                target.ingredientsJSON = try JSONEncoder().encode(recipe.ingredients)
+                target.ingredientsJSON = try Self.encoder.encode(recipe.ingredients)
             }
             if !recipe.instructions.isEmpty {
-                target.instructionsJSON = try JSONEncoder().encode(recipe.instructions)
+                target.instructionsJSON = try Self.encoder.encode(recipe.instructions)
             }
         case .article:
-            target.ingredientsJSON = try JSONEncoder().encode(recipe.ingredients)
-            target.instructionsJSON = try JSONEncoder().encode(recipe.instructions)
+            target.ingredientsJSON = try Self.encoder.encode(recipe.ingredients)
+            target.instructionsJSON = try Self.encoder.encode(recipe.instructions)
         }
     }
 
@@ -34,7 +41,7 @@ extension RecipeStore {
     /// Extracted from `RecipeStore.swift` to keep that file under the file_length cap.
     func applyParsedDetailFields(from recipe: Recipe, to target: CachedRecipe) {
         func encoded<T: Encodable>(_ value: T?) -> Data? {
-            value.flatMap { try? JSONEncoder().encode($0) }
+            value.flatMap { try? Self.encoder.encode($0) }
         }
         target.nutritionJSON = encoded(recipe.nutrition) ?? target.nutritionJSON
         target.videoJSON = encoded(recipe.video) ?? target.videoJSON
