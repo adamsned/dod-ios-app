@@ -1,10 +1,10 @@
 import Testing
 
+@testable import DODFeatureRecipeDetail
+
 #if os(iOS)
 import AVFoundation
 #endif
-
-@testable import DODFeatureRecipeDetail
 
 /// L1 unit coverage for `RecipeVideoAudioSession.Configuration` — the pure,
 /// platform-free decision of which audio-session posture a recipe video needs.
