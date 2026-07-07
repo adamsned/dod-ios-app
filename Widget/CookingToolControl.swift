@@ -103,20 +103,25 @@ struct OpenCookingToolIntent: AppIntent {
     // don't (and can't reliably) do it ourselves from a Control.
     static let openAppWhenRun = true
 
-    /// The chosen tool's ``ControlRouteStore/Route`` raw token, carried so
-    /// `perform()` knows which tool to flag.
-    @Parameter(title: "Tool Token")
-    var toolToken: String
+    /// DUT-691 — the chosen tool as the typed ``CookingToolControlOption``
+    /// AppEnum WITH a default (was a raw, defaultless `toolToken: String`). A
+    /// required untyped String couldn't be resolved in the non-interactive
+    /// Control context, so the button's intent silently failed to run (the tap
+    /// opened nothing). The typed enum + default mirrors ``SelectCookingToolIntent``
+    /// and also gives the Shortcuts action a proper picker instead of a text field.
+    @Parameter(title: "Cooking Tool", default: .shoppingList)
+    var tool: CookingToolControlOption
 
     init() {}
 
-    init(toolToken: String) { self.toolToken = toolToken }
+    init(tool: CookingToolControlOption) { self.tool = tool }
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Open \(\.$tool)")
+    }
 
     func perform() async throws -> some IntentResult {
-        // A nil store (unopenable App Group suite) or an unrecognized token just
-        // foregrounds the app; fall back to the Shopping List so the tap still
-        // lands somewhere sensible rather than crashing.
-        let route = ControlRouteStore.Route(rawValue: toolToken) ?? .shoppingList
+        let route = tool.route
         ControlRouteStore()?.setPending(route)
         // DUT-690 — `openAppWhenRun` foregrounds the app; the App Group flag above
         // is how the app learns WHICH tool to open (app + widget both carry the
@@ -146,7 +151,7 @@ struct CookingToolControl: ControlWidget {
             kind: Self.kind,
             provider: Provider()
         ) { tool in
-            ControlWidgetButton(action: OpenCookingToolIntent(toolToken: tool.route.rawValue)) {
+            ControlWidgetButton(action: OpenCookingToolIntent(tool: tool)) {
                 Label(tool.displayLabel, systemImage: tool.symbol)
             }
         }
