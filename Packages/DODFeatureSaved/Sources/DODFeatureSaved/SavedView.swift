@@ -25,7 +25,12 @@ public struct SavedView: View {
     /// renders "Unsave" + outline `bookmark` when `isSaved: true` (always
     /// the case here) and "Save" + `bookmark.fill` when `isSaved: false`
     /// (used by Feed/Categories/Search per their respective TODO markers).
-    public let onSave: ((Recipe) -> Void)?
+    ///
+    /// DUT-629 — the closure reports the store write's success via a completion
+    /// (`@MainActor (Bool) -> Void`). The card is removed optimistically before
+    /// the call; a `false` completion means the write failed, so the view
+    /// re-refreshes to restore the row that was wrongly removed.
+    public let onSave: ((Recipe, @escaping @MainActor (Bool) -> Void) -> Void)?
     /// DUT-551 (CL-306) — opens the Settings sheet from the header's trailing
     /// gear (Settings left the tab bar; the gear now lives on every main tab).
     /// Optional + default nil so existing callers / previews / snapshots show no
@@ -35,7 +40,7 @@ public struct SavedView: View {
     public init(
         viewModel: SavedViewModel,
         onSelect: @escaping (Recipe) -> Void,
-        onSave: ((Recipe) -> Void)? = nil,
+        onSave: ((Recipe, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
@@ -184,7 +189,10 @@ public struct SavedView: View {
                         // (tab switch). Order matters: UI first, then
                         // persistence fires asynchronously.
                         viewModel.optimisticallyRemove(id: recipe.id)
-                        onSave?(recipe)
+                        // DUT-629 — restore the row if the store write failed.
+                        onSave?(recipe) { didSave in
+                            if !didSave { Task { await viewModel.refresh() } }
+                        }
                     },
                     onRemoveDownload: {
                         // T-775 / DUT-81 — un-download clears the badge
@@ -226,7 +234,10 @@ public struct SavedView: View {
                     isDownloaded: viewModel.downloadedIDs.contains(recipe.id),
                     onToggle: {
                         viewModel.optimisticallyRemove(id: recipe.id)
-                        onSave?(recipe)
+                        // DUT-629 — restore the row if the store write failed.
+                        onSave?(recipe) { didSave in
+                            if !didSave { Task { await viewModel.refresh() } }
+                        }
                     },
                     onRemoveDownload: {
                         Task { await viewModel.requestRemoveDownload(id: recipe.id) }

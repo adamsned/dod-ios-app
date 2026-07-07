@@ -52,7 +52,8 @@ final class AppDependencies {
 
     /// Diagnostic observer for the SwiftData ↔ CloudKit mirror (round-12 backlog
     /// bug). Started from `bootstrap()` only when the iCloud-Sync opt-in is on.
-    private let cloudKitDiagnostics = CloudKitSyncDiagnostics()
+    /// Non-private so `AppDependencies+CloudKit.swift` can fold the account probe.
+    let cloudKitDiagnostics = CloudKitSyncDiagnostics()
 
     /// `true` when the opt-in flag was ON but the CloudKit `.private` container
     /// failed to open at launch, so the DOD-CRASH-1 net (DUT-6) degraded to a
@@ -64,6 +65,13 @@ final class AppDependencies {
     /// DUT-494 — synced saved-id baseline captured SYNCHRONOUSLY in `init` (pre
     /// run loop / import) so the async CloudKit import can't poison the seed.
     let processStartSyncedIDs: Set<Int>
+
+    /// DUT-657 — `bootstrap()` is called from the launch `.task`, which SwiftUI
+    /// can re-run if the hosting view is re-created (a spurious relaunch of the
+    /// `.task`). Its side effects — the `.appOpen` telemetry, `networkMonitor.start()`,
+    /// the CloudKit availability probe — must fire at most once per process, so
+    /// this latch makes a second `bootstrap()` a no-op.
+    private var hasBootstrapped = false
 
     init() {
         var fellBackToLocal = false
@@ -128,6 +136,10 @@ final class AppDependencies {
 
     /// Called once from `@main` at app launch.
     func bootstrap() async {
+        // DUT-657 — guard against a re-run of the launch `.task`: side effects
+        // (appOpen telemetry, network monitor start, CloudKit probe) fire once.
+        guard !hasBootstrapped else { return }
+        hasBootstrapped = true
         await networkMonitor.start()
         // DUT-377: ReliableImage offline disk fallback (saved/downloaded heroes).
         ReliableImageConfig.setOfflineDataProvider { [store] url in try? await store.image(url: url) }
@@ -185,33 +197,9 @@ final class AppDependencies {
         }
     }
 
-    /// US-41 / AC-41.1 + AC-41.7 / REG-25 + REG-26 (T-702). Probe the
-    /// user's iCloud account status so subsequent sync attempts know
-    /// whether to proceed (`.available`) or pause with a status sublabel
-    /// (`.noAccount` / `.restricted` / `.couldNotDetermine` — T-705 owns
-    /// the sublabel surface). Per AC-41.1 the app **must not crash** when
-    /// the account is unavailable — we log + continue, and the existing
-    /// SwiftData store keeps working unchanged on the AC-41.1 fallback
-    /// path.
-    ///
-    /// Surface trace (REG-25): the only `CKContainer` APIs this method
-    /// touches are the initializer + `accountStatus()`. No
-    /// `publicCloudDatabase` / `sharedCloudDatabase` / `discoverUserIdentity`
-    /// surface reference exists in the entire app per the REG-25 contract.
-    private func checkCloudKitAvailability() async {
-        // DUT-675 (completes DUT-630) — `CKContainer(identifier:)` traps at INIT
-        // (uncatchable by the `accountStatus()` try/catch) without the iCloud
-        // entitlement, which adhoc/CLI sim builds strip. Skip on Simulator, where
-        // CloudKit sync is untestable anyway — the gate DUT-630 uses for mirroring.
-        guard RecipeStore.cloudKitMirroringAvailable else { return }
-        let container = CKContainer(identifier: RecipeStore.cloudKitContainerIdentifier)
-        do {
-            let status = try await container.accountStatus()
-            DODLog.app.info("CloudKit account status: \(String(describing: status))")
-        } catch {
-            DODLog.app.notice("CloudKit availability check failed: \(error.localizedDescription)")
-        }
-    }
+    // `checkCloudKitAvailability()` + `accountUnavailableMessage(for:)` (the
+    // AC-41.1 account probe, DUT-671) live in `AppDependencies+CloudKit.swift`
+    // (keeps this file under the SwiftLint `file_length` cap).
 
     // MARK: - Per-feature dependency views
 

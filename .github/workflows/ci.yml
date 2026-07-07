@@ -168,13 +168,23 @@ jobs:
                      DODFeatureSearch DODFeatureRecipeDetail DODFeatureSaved; do
             echo "::group::swift test — $pkg"
             if [ "$pkg" = "DODFeatureSearch" ] || [ "$pkg" = "DODFeatureFeed" ]; then
-              # DODFeatureSearch and DODFeatureFeed intermittently abort on exit
-              # under `swift test --parallel` on macos-15 (signal 6 SIGABRT /
-              # signal 11 SIGSEGV respectively), even though every test passes —
-              # the parallel swift-testing harness crashes while tearing down.
-              # Run these serially to dodge the flake; all other packages keep
-              # --parallel. (DODFeatureFeed added DUT-596.)
-              (cd "Packages/$pkg" && swift test)
+              # DODFeatureSearch and DODFeatureFeed intermittently abort ON EXIT
+              # under `swift test` on macos-15 (signal 6 SIGABRT / signal 11
+              # SIGSEGV respectively) even when every test PASSES — the
+              # swift-testing harness crashes while tearing down. Serial runs
+              # (already the case here) don't dodge it, so under `set -e` that
+              # teardown crash fails the whole job (DUT-613).
+              #
+              # DUT-613 — bounded retry: run once; on ANY non-zero exit run once
+              # MORE, and only fail if the SECOND attempt also fails. A genuine
+              # test failure fails both attempts (still fails the job); the
+              # exit-teardown flake almost never repeats back-to-back, so the
+              # retry absorbs it. `|| ...` keeps `set -e` intact for the retry
+              # branch and every other package.
+              (cd "Packages/$pkg" && swift test) || {
+                echo "::warning::$pkg failed on first attempt (possible exit-teardown flake, DUT-613); retrying once"
+                (cd "Packages/$pkg" && swift test)
+              }
             else
               (cd "Packages/$pkg" && swift test --parallel)
             fi

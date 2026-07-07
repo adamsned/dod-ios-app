@@ -29,7 +29,13 @@ public struct FeedView: View {
     /// here means the context menu still appears but the Save button is a
     /// no-op; production callers (TabStack) always pass a non-nil closure
     /// that routes through `RecipeStore.toggleSaved` per CL-59.
-    public let onSave: ((RecipeListItem) -> Void)?
+    ///
+    /// DUT-629 — the closure reports the store write's success via a completion
+    /// (`@MainActor (Bool) -> Void`): the view flips its optimistic
+    /// `savedRecipeIDs` membership before calling this, and re-inverts it when the
+    /// completion reports `false`, so a failed write doesn't leave the menu
+    /// showing a save that never persisted.
+    public let onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)?
     /// DUT-534 Part 2 — the Shopping List snackbar's "View" action opens the
     /// Shopping List (`dod://shopping-list`). Optional so existing callers
     /// (tests / previews) can omit it; when nil the append still works but the
@@ -66,7 +72,7 @@ public struct FeedView: View {
     public init(
         viewModel: FeedViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
-        onSave: ((RecipeListItem) -> Void)? = nil,
+        onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         openShoppingList: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
         onStartFirstCookout: (() -> Void)? = nil,

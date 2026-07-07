@@ -18,8 +18,8 @@ public struct SearchView: View {
         RecipeListLayout.gallery.rawValue
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
-    /// `FeedView.onSave` for the contract; same shape applied to search hits.
-    public let onSave: ((RecipeListItem) -> Void)?
+    /// `FeedView.onSave` for the contract (DUT-629 success completion incl.).
+    public let onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)?
     /// T-799 / CL-193 — browse-category tap → host pushes the category's
     /// recipes. Defaulted no-op; `TabStack` wires `path.append(.category)`.
     public let onSelectCategory: (DODDomain.Category) -> Void
@@ -38,7 +38,7 @@ public struct SearchView: View {
     public init(
         viewModel: SearchViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
-        onSave: ((RecipeListItem) -> Void)? = nil,
+        onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         onSelectCategory: @escaping (DODDomain.Category) -> Void = { _ in },
         openShoppingList: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil
@@ -342,8 +342,11 @@ public struct SearchView: View {
                 .recipeCardContextMenu(
                     isSaved: viewModel.savedRecipeIDs.contains(item.id),
                     onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                        }
                     },
                     // DUT-534 Part 2 — Search opts into the shared helper's
                     // "Add to Shopping List" item (Categories/Saved don't).
@@ -376,8 +379,11 @@ public struct SearchView: View {
                 .recipeCardContextMenu(
                     isSaved: viewModel.savedRecipeIDs.contains(item.id),
                     onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                        }
                     },
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )
