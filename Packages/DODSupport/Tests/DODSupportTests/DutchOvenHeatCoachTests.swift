@@ -278,4 +278,27 @@ import Testing
         }
         #expect(handCue.onTrack.contains("325-350°F") || handCue.onTrack.contains("375-425°F"))
     }
+
+    // MARK: - elevationCoalDelta: altitude ADDS coals, +1 per 2,500 ft (DUT-682)
+
+    @Test func elevationCoal_atBaseline_isZero() {
+        #expect(DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: 0) == 0)
+    }
+
+    @Test func elevationCoal_belowFirstStep_isZero() {
+        // 2,000 ft is under the 2,500-ft threshold → still 0 (rounds down).
+        #expect(DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: 2000) == 0)
+    }
+
+    @Test func elevationCoal_stepsUpEveryTwentyFiveHundredFeet() {
+        #expect(DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: 2500) == 1)
+        #expect(DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: 5000) == 2)
+        #expect(DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: 6000) == 2)  // rounds down
+        #expect(DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: 7500) == 3)
+        #expect(DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: 10000) == 4)
+    }
+
+    @Test func elevationCoal_neverNegative() {
+        #expect(DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: -3000) == 0)
+    }
 }

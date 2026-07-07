@@ -53,6 +53,39 @@ import Testing
         #expect(mildCalm.conditionCoalDelta == 0...0)
     }
 
+    // MARK: - Elevation moves the COAL count, not just cook time (DUT-682)
+
+    @Test func adjustedCoalSplit_movesWithElevation() {
+        // The bug: elevation used to leave the coal count unchanged. Now +1 per
+        // 2,500 ft (5,000 ft → +2 → 24 + 2 = 26), so the diagram MOVES.
+        let seaLevel = model(elevationFeet: 0)
+        let highAltitude = model(elevationFeet: 5000)
+        #expect(seaLevel.adjustedCoalSplit.total == 24)
+        #expect(highAltitude.adjustedCoalSplit.total == 26)
+        #expect(highAltitude.adjustedCoalSplit.total != seaLevel.adjustedCoalSplit.total)
+    }
+
+    @Test func conditionCoalDelta_includesElevation() {
+        // mild + calm + 5,000 ft → 0 + 0 + 2 = 2...2.
+        #expect(model(elevationFeet: 5000).conditionCoalDelta == 2...2)
+        // Stacks with ambient + wind: cold (2...3) + wind (3...4) + elevation (2) = 7...9.
+        #expect(model(elevationFeet: 5000, ambient: .cold, windy: true).conditionCoalDelta == 7...9)
+    }
+
+    @Test func adjustedCoalSplit_elevationStacksWithConditions() {
+        // 7...9 → midpoint 8 → 24 + 8 = 32.
+        #expect(model(elevationFeet: 5000, ambient: .cold, windy: true).adjustedCoalSplit.total == 32)
+    }
+
+    @Test func elevationCoalNote_reflectsTheDelta() {
+        #expect(model(elevationFeet: 0).elevationCoalNote == nil)
+        #expect(model(elevationFeet: 2000).elevationCoalNote == nil)  // below the 2,500-ft first step
+        #expect(model(elevationFeet: 2500).elevationCoalNote?.contains("add 1 coal,") == true)
+        let high = model(elevationFeet: 5000).elevationCoalNote
+        #expect(high?.contains("add 2 coals") == true)
+        #expect(high?.contains("5,000") == true)
+    }
+
     @Test func adjustedCoalSplit_cold_addsCoals() {
         // DUT-653: base 24 (12" even) + midpoint of cold delta (2...3 → 2.5,
         // rounded to-nearest-even → 2) = 26. The old away-from-zero rounding
@@ -80,9 +113,10 @@ import Testing
         #expect(split.bottom == 6)
     }
 
-    @Test func adjustedCoalSplit_elevationDoesNotChangeCoals() {
-        // elevation adjusts cook TIME, not coal count — total stays the base 24
-        #expect(model(elevationFeet: 5000, ambient: .mild).adjustedCoalSplit.total == 24)
+    @Test func adjustedCoalSplit_elevationAddsCoals() {
+        // DUT-682: elevation now adjusts BOTH cook time AND the coal count.
+        // 5,000 ft → +2 coals (1 per 2,500 ft) → base 24 → 26.
+        #expect(model(elevationFeet: 5000, ambient: .mild).adjustedCoalSplit.total == 26)
     }
 
     // MARK: - Ambient note (mild omitted; hot/cold show a range)

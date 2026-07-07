@@ -107,6 +107,20 @@ public enum DutchOvenHeatCoach {
         windy ? 3...4 : 0...0
     }
 
+    // MARK: - Elevation coal adjustment
+
+    /// How many coals to **add for elevation** (DUT-682). Higher altitude =
+    /// thinner air = briquettes burn cooler, so you add heat: **+1 coal per
+    /// 2,500 ft** above the baseline (rounded down). At or below the baseline →
+    /// `0`. Unlike the cook-time adjustment (a *range* of minutes), this is a
+    /// single coal count folded into ``HeatCoachModel/conditionCoalDelta`` so
+    /// the coal diagram moves with elevation as well as the cook-time line.
+    /// Altitude affects BOTH heat and time, so it stacks with — doesn't replace
+    /// — ``cookTimeExtraMinutes(elevationFeetAboveBaseline:)``.
+    public static func elevationCoalDelta(elevationFeetAboveBaseline feet: Int) -> Int {
+        max(0, feet) / 2500
+    }
+
     // MARK: - Elevation cook-time adjustment
 
     /// Extra cook time for elevation, as a **range** of minutes:

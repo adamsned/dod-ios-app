@@ -211,6 +211,7 @@ extension HeatCoachView {
     private func adjustmentNotes(_ coachModel: HeatCoachModel) -> [String] {
         var notes: [String] = []
         if let ambientNote = coachModel.ambientNote { notes.append(ambientNote) }
+        if let elevationCoalNote = coachModel.elevationCoalNote { notes.append(elevationCoalNote) }
         if let elevationNote = coachModel.elevationNote { notes.append(elevationNote) }
         notes.append(coachModel.replenishNote)
         if let windCoalNote = coachModel.windCoalNote { notes.append(windCoalNote) }
