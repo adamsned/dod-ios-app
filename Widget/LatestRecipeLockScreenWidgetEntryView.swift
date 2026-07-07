@@ -77,8 +77,11 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
 
     /// Build a `dod://recipe/<id>` URL for tap-through. Mirrors
     /// `FeaturedRecipeWidgetEntryView.deepLink(for:)` so all three
-    /// widgets emit recipe URLs in the same shape.
+    /// widgets emit recipe URLs in the same shape. DUT-652 — a placeholder entry
+    /// carries `id <= 0`, whose `dod://recipe/0` tap is dead, so fall back to
+    /// `dod://feed` for those (matching the empty-tile URL).
     static func deepLink(for recipe: WidgetSnapshot.Entry) -> URL? {
+        guard recipe.id > 0 else { return URL(string: "dod://feed") }
         var components = URLComponents()
         components.scheme = "dod"
         components.host = "recipe"

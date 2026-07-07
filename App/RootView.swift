@@ -52,15 +52,12 @@ struct RootView: View {
     /// completes rather than being swallowed mid-dismiss (replaces the old fixed
     /// 450 ms sleep).
     @State var pendingCloudSyncPromptAfterOnboarding = false
-    /// US-36 AC-36.2 — user-selected appearance preference. Backed by
-    /// `UserDefaults` (key `dod.settings.appearance`) via `@AppStorage`
-    /// so a write from `SettingsViewModel.appearance` (the Picker's
-    /// setter) lands here in the same frame. Applied to the root
-    /// `Group` via `.preferredColorScheme(...)`. When the value is
-    /// `.system` the modifier receives `nil` and the OS-level setting
-    /// drives every screen's color scheme.
+    /// US-36 AC-36.2 — user-selected appearance preference (key
+    /// `dod.settings.appearance`), applied to the root `Group` via
+    /// `.preferredColorScheme(...)`; `.system` yields `nil` (OS drives it).
+    /// Non-private so `RootView+Appearance.swift` decodes it.
     @AppStorage(SettingsViewModel.appearancePreferenceKey)
-    private var appearanceRaw: String = AppearancePreference.system.rawValue
+    var appearanceRaw: String = AppearancePreference.system.rawValue
     /// Widget deep link (spec.md US-9 AC-9.2). Feed tab consumes via .task(id:).
     /// Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)` can set it.
     @State var pendingDeepLink: WidgetDeepLink?
@@ -127,6 +124,16 @@ struct RootView: View {
     /// cold-launch index (concurrent delete+index can interleave the domain). Not
     /// `private` so the `+Spotlight` extension file can read it.
     @State var isIndexingSpotlight = false
+    /// DUT-642 — identifiers from the last SUCCESSFUL index, so the next index can
+    /// index-then-diff-delete (delete only stale ids) rather than delete-first (which
+    /// left Spotlight empty on a rebuild throw). Non-private for `+Spotlight`.
+    @State var lastIndexedSpotlightIdentifiers: Set<String> = []
+    /// DUT-643 — last successful Spotlight index time, so a foreground return
+    /// throttles the full rebuild to ``RootView/spotlightMinReindexInterval``.
+    @State var lastSpotlightIndexAt: Date?
+    /// DUT-635 (wire) — the Apple-credential revocation observer token, retained for
+    /// the app's lifetime (see `RootView+CredentialValidation.swift`).
+    @State var appleCredentialRevocationObserver: NSObjectProtocol?
 
     init(dependencies: AppDependencies) {
         _dependencies = State(initialValue: dependencies)
@@ -149,6 +156,9 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.2), value: appearance)
         .task {
             await dependencies.bootstrap()
+            // DUT-635 (wire) — validate the Apple credential + start the revocation
+            // observer (retained for the app's lifetime).
+            await validateAppleCredentialOnLaunch()
             migrateFirstRunFlagsIfNeeded()  // DUT-400
             // DUT-280 — recover the first-run prompts if a prior launch dismissed
             // onboarding but didn't finish them (killed mid-flow). The welcome
@@ -200,7 +210,11 @@ struct RootView: View {
             reindexSpotlightOnForeground($1)
             // DUT-480 — a Control Center tap set `openAppWhenRun`, so it
             // foregrounds us here; drain the pending-route flag and route.
-            if $1 == .active { consumePendingControlRoute() }
+            if $1 == .active {
+                consumePendingControlRoute()
+                // DUT-635 (wire) — re-poll the Apple credential on foreground.
+                Task { await validateAppleCredentialOnForeground() }
+            }
         }
         .onChange(of: dispatcher.pending) { _, newValue in
             guard let newValue else { return }
@@ -317,7 +331,13 @@ struct RootView: View {
                     SidebarProfileRow(
                         profileStore: dependencies.profileStore,
                         profilePhotoStore: dependencies.profilePhotoStore,
-                        accountTeardownExtras: accountTeardownExtras
+                        accountTeardownExtras: accountTeardownExtras,
+                        // DUT-607 — feed the same stats-backing VM the iPhone
+                        // Settings profile uses so the iPad sidebar profile shows
+                        // the Cook Rank / counts / Cooking Journal section too.
+                        settingsViewModel: dependencies.settingsSheetViewModel(
+                            accountTeardownExtras: accountTeardownExtras
+                        )
                     )
                 }
                 Section {
@@ -373,27 +393,6 @@ struct RootView: View {
         .modifier(ScreenViewTracking(selectedTab: selectedTab))
     }
 
-    // MARK: - Deep-link routing
-    //
-    // `handle(widgetLink:)`, `handle(intent:)`, and `resolveRecipeRoute(id:…)`
-    // live in `RootView+LinkRouting.swift` (keeps this file under the SwiftLint
-    // `file_length` cap).
-
-    // MARK: - Appearance (US-36 AC-36.2)
-
-    /// Decode the `@AppStorage`-backed raw value into a typed enum. An
-    /// absent / malformed value falls back to `.system` so users always
-    /// see a sensible default — same defensive fallback
-    /// `AppearancePreference.fromDefaults(_:)` implements for the non-`@AppStorage` path.
-    private var appearance: AppearancePreference {
-        AppearancePreference(rawValue: appearanceRaw) ?? .system
-    }
-
-    /// Map the user-selected preference onto SwiftUI's `ColorScheme?`. `.system`
-    /// returns `nil` so `.preferredColorScheme(...)` is a no-op and the OS drives
-    /// every screen. T-756 / CL-153 — delegates to the shared
-    /// ``AppearancePreference/colorScheme`` (RootView + SettingsView agree).
-    private func preferredColorScheme(for value: AppearancePreference) -> ColorScheme? {
-        value.colorScheme
-    }
+    // Deep-link routing lives in `RootView+LinkRouting.swift`; appearance helpers
+    // in `RootView+Appearance.swift` (keeps this file under the `file_length` cap).
 }
