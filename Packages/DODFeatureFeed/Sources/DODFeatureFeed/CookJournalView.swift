@@ -360,8 +360,7 @@ extension CookJournalView {
     /// DUT-588 — the thumbnail loads asynchronously (off the main thread, id
     /// cached, downsampled to 56pt) via ``CookThumbnailLoader``. Until a decoded
     /// image lands — and permanently for a missing / undecodable file — the row
-    /// shows the same flame placeholder as before, so nothing crashes on a
-    /// deleted photo and the layout never shifts.
+    /// shows the same flame placeholder, so a deleted photo never crashes or shifts layout.
     @ViewBuilder private func photoThumbnail(_ id: String?) -> some View {
         Group {
             if let id, let image = decodedThumbnail(for: id) {
