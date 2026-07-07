@@ -41,6 +41,10 @@
 	<string>5</string>
 	<key>DODCommentAPIKey</key>
 	<string>$(DOD_COMMENT_API_KEY)</string>
+	<key>GA4APISecret</key>
+	<string>$(GA4_API_SECRET)</string>
+	<key>GA4MeasurementID</key>
+	<string>$(GA4_MEASUREMENT_ID)</string>
 	<key>GIDClientID</key>
 	<string>16278307823-o18m60h5rq1m76b9mqam4nhj8po9pipf.apps.googleusercontent.com</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

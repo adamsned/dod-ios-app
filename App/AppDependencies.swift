@@ -147,6 +147,8 @@ final class AppDependencies {
         // constitution §9). For v1 we read from Info.plist; if unset we
         // skip telemetry rather than fail launch.
         let appID = Bundle.main.object(forInfoDictionaryKey: "TelemetryDeckAppID") as? String
+        // DUT-680: self-gating GA4 content-traffic mirror; register BEFORE `start`.
+        Telemetry.shared.addTransport(GA4Transport())
         if let appID, !appID.isEmpty {
             Telemetry.shared.start(appID: appID)
         }
