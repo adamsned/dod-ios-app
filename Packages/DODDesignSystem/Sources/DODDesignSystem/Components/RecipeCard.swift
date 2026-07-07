@@ -263,7 +263,8 @@ extension View {
         #else
         let hoverable = tappable
         #endif
-        return hoverable
+        return
+            hoverable
             .onTapGesture(perform: action)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
