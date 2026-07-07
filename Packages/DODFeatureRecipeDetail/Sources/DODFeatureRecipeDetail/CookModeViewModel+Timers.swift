@@ -51,8 +51,9 @@ extension CookModeViewModel {
         reconcileLiveActivity(now: now)
         // DUT-604: a paused timer isn't counting down, so cancel its pending
         // background alert. A subsequent resume re-schedules from the frozen
-        // remaining time.
-        cancelStepDoneNotification(forStep: index)
+        // remaining time. DUT-686: pending-only — a pause must not yank a banner
+        // that already fired and the cook hasn't acknowledged.
+        cancelPendingStepDoneNotification(forStep: index)
     }
 
     /// Reset the countdown for `index` to its full duration, stopped.
@@ -65,11 +66,21 @@ extension CookModeViewModel {
         cancelStepDoneNotification(forStep: index)
     }
 
-    /// DUT-604 — cancel the pending background alert for `index`. Fire-and-forget
-    /// wrapper so the timer methods read cleanly.
+    /// DUT-604 — cancel the pending AND delivered background alert for `index`.
+    /// For explicit user-driven stops/resets, which acknowledge the alert.
+    /// Fire-and-forget wrapper so the timer methods read cleanly.
     private func cancelStepDoneNotification(forStep index: Int) {
         let recipeID = recipe.id
         Task { await stepTimerNotifier.cancelStepDone(recipeID: recipeID, stepIndex: index) }
+    }
+
+    /// DUT-686 — cancel only the PENDING background alert for `index`, leaving an
+    /// already-delivered banner in place. For non-acknowledging paths (pause, a
+    /// foreground finish) where yanking a fired banner would rob the cook of an
+    /// alert they haven't seen. Fire-and-forget wrapper.
+    private func cancelPendingStepDoneNotification(forStep index: Int) {
+        let recipeID = recipe.id
+        Task { await stepTimerNotifier.cancelPendingStepDone(recipeID: recipeID, stepIndex: index) }
     }
 
     /// Advance all running timers to `now`: any that reached zero flip to
@@ -89,8 +100,11 @@ extension CookModeViewModel {
             // Activity "done" state cover it — cancel the pending system banner so
             // the cook doesn't get a redundant alert. The `deliveryGrace` on the
             // scheduled request keeps it pending until now, so this cancel lands
-            // before it fires.
-            cancelStepDoneNotification(forStep: key)
+            // before it fires. DUT-686: pending-only — if the banner ALREADY fired
+            // (the app was backgrounded past the deadline, then returned to the
+            // foreground where this tick runs), leave the delivered banner alone
+            // so the cook isn't robbed of an alert they haven't acknowledged.
+            cancelPendingStepDoneNotification(forStep: key)
         }
         if completedAny { timerCompletionTick &+= 1 }
         reconcileLiveActivity(now: now)
