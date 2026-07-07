@@ -31,12 +31,13 @@ public struct CategoryRecipesView: View {
             .background(DODColor.surface)
             .navigationTitle(viewModel.category.name)
             .task { await viewModel.onAppear() }
-            // DUT-693 (PR6) — haptics parity with Feed. A `.success` tap on a
-            // clean pull-to-refresh / retry (see `refreshCount`), and a
-            // `.selection` tap whenever the saved-id set flips from a card
-            // long-press Save/Unsave (mirrors the Feed's sensoryFeedback wiring).
+            // DUT-693 (PR6) — a `.success` tap on a clean pull-to-refresh /
+            // retry (see `refreshCount`). DUT-697 — a `.selection` tap only on
+            // a genuine card long-press Save/Unsave (keyed to `saveToggleCount`,
+            // not `savedRecipeIDs`, so appear/refresh reconciliation of the id
+            // set doesn't mis-fire the haptic).
             .sensoryFeedback(.success, trigger: viewModel.refreshCount)
-            .sensoryFeedback(.selection, trigger: viewModel.savedRecipeIDs)
+            .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
     @ViewBuilder
