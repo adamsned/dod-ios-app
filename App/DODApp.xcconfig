@@ -19,4 +19,16 @@
 // .github/workflows/release.yml). To exercise comment posting from a LOCAL
 // build, set a real value in the gitignored DODApp.local.xcconfig override.
 DOD_COMMENT_API_KEY =
+// DUT-680: GA4 Measurement Protocol creds, surfaced to the app as the
+// GA4MeasurementID / GA4APISecret Info.plist values. The GA4Transport mirrors
+// in-app recipe/article OPENS into Google Analytics 4 as content traffic.
+// BLANK here on purpose so NO secret lives in this public repo — with either
+// value blank the transport no-ops (dev / PR / unconfigured builds send
+// nothing). CI injects the real values at archive time from the
+// GA4_MEASUREMENT_ID / GA4_API_SECRET GitHub secrets (mirror the
+// DOD_COMMENT_API_KEY pattern in .github/workflows/release.yml). To exercise
+// GA4 from a LOCAL build, set real values in the gitignored
+// DODApp.local.xcconfig override.
+GA4_MEASUREMENT_ID =
+GA4_API_SECRET =
 #include? "DODApp.local.xcconfig"

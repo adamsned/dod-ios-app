@@ -16,6 +16,11 @@ public final class Telemetry: @unchecked Sendable {
 
     private let lock = NSLock()
     private var transport: TelemetryTransport = TelemetryDeckTransport()
+    /// Additional fan-out transports registered alongside the primary one
+    /// (DUT-680: the GA4 content-traffic mirror). Each receives every send;
+    /// each self-gates (config + opt-out + scope). Empty by default so the
+    /// facade's behavior is unchanged until a transport is added.
+    private var additionalTransports: [TelemetryTransport] = []
     private var configured = false
 
     private init() {}
@@ -26,7 +31,21 @@ public final class Telemetry: @unchecked Sendable {
         defer { lock.unlock() }
         guard !configured else { return }
         transport.configure(appID: appID)
+        for extra in additionalTransports { extra.configure(appID: appID) }
         configured = true
+    }
+
+    /// Register an additional fan-out transport. Additive — the primary
+    /// TelemetryDeck transport is untouched. Each registered transport
+    /// receives every `send(_:)` and is responsible for its own gating
+    /// (config, opt-out, event scope). Intended for the composition root
+    /// (e.g. the GA4 content-traffic mirror, DUT-680). No-op once the facade
+    /// has already been `start`-ed, matching that call's idempotency.
+    public func addTransport(_ transport: TelemetryTransport) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !configured else { return }
+        additionalTransports.append(transport)
     }
 
     /// Send a single event. Safe to call before ``start(appID:)`` — the
@@ -35,8 +54,10 @@ public final class Telemetry: @unchecked Sendable {
     public func send(_ event: AnalyticsEvent) {
         lock.lock()
         let transport = self.transport
+        let additional = self.additionalTransports
         lock.unlock()
         transport.send(event)
+        for extra in additional { extra.send(event) }
     }
 
     /// Replace the transport. Intended for tests only; the production
@@ -45,6 +66,7 @@ public final class Telemetry: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         self.transport = transport
+        additionalTransports = []
         configured = false
     }
 }

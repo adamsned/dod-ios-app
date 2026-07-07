@@ -91,6 +91,16 @@ targets:
         # secret (see .github/workflows/release.yml). Blank in dev / PR builds,
         # where the app omits the header.
         DODCommentAPIKey: "$(DOD_COMMENT_API_KEY)"
+        # DUT-680: GA4 Measurement Protocol creds, read by GA4Transport via
+        # `Bundle.main.object(forInfoDictionaryKey:)` to mirror in-app
+        # recipe/article OPENS into Google Analytics 4 as content traffic. The
+        # values are the `GA4_MEASUREMENT_ID` / `GA4_API_SECRET` build settings
+        # — blank in the committed App/DODApp.xcconfig (no secret in this public
+        # repo), injected at archive time from the matching GitHub secrets (see
+        # .github/workflows/release.yml). Blank in dev / PR builds, where the
+        # transport no-ops and sends NOTHING to Google.
+        GA4MeasurementID: "$(GA4_MEASUREMENT_ID)"
+        GA4APISecret: "$(GA4_API_SECRET)"
         # Export-compliance self-classification. `false` declares the app
         # uses ONLY exempt encryption — i.e. TLS via URLSession, SHA-256
         # hashing via CryptoKit, Keychain via Security framework. Apple
