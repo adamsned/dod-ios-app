@@ -177,13 +177,14 @@ struct TabStack: View {
             FeedView(
                 viewModel: FeedViewModel(dependencies: dependencies.feedDependencies()),
                 onSelect: { item in path.append(.recipe(item: item)) },
-                onSave: { item in
+                onSave: { item, report in
                     Task {
-                        await Self.saveFromCard(
+                        let didSave = await Self.saveFromCard(
                             item: item,
                             store: dependencies.store,
                             publisher: dependencies.savedWidgetPublisher()
                         )
+                        report(didSave)  // DUT-629 — revert optimistic flip on failure
                     }
                 },
                 // DUT-534 Part 2 — the card snackbar's "View" opens the Shopping
@@ -200,13 +201,14 @@ struct TabStack: View {
             SearchView(
                 viewModel: SearchViewModel(dependencies: dependencies.searchDependencies()),
                 onSelect: { item in path.append(.recipe(item: item)) },
-                onSave: { item in
+                onSave: { item, report in
                     Task {
-                        await Self.saveFromCard(
+                        let didSave = await Self.saveFromCard(
                             item: item,
                             store: dependencies.store,
                             publisher: dependencies.savedWidgetPublisher()
                         )
+                        report(didSave)  // DUT-629 — revert optimistic flip on failure
                     }
                 },
                 // T-799 / CL-193: browse-category tap → push the category's
@@ -225,13 +227,14 @@ struct TabStack: View {
             SavedView(
                 viewModel: SavedViewModel(dependencies: dependencies.savedDependencies()),
                 onSelect: { recipe in path.append(.recipe(item: Self.listItem(from: recipe))) },
-                onSave: { recipe in
+                onSave: { recipe, report in
                     Task {
-                        await Self.saveFromCard(
+                        let didSave = await Self.saveFromCard(
                             item: Self.listItem(from: recipe),
                             store: dependencies.store,
                             publisher: dependencies.savedWidgetPublisher()
                         )
+                        report(didSave)  // DUT-629 — restore the row on failure
                     }
                 },
                 onOpenSettings: onOpenSettings  // DUT-551 (CL-306) — header gear
@@ -294,13 +297,14 @@ struct TabStack: View {
                     dependencies: dependencies.categoriesDependencies()
                 ),
                 onSelect: { item in path.append(.recipe(item: item)) },
-                onSave: { item in
+                onSave: { item, report in
                     Task {
-                        await Self.saveFromCard(
+                        let didSave = await Self.saveFromCard(
                             item: item,
                             store: dependencies.store,
                             publisher: dependencies.savedWidgetPublisher()
                         )
+                        report(didSave)  // DUT-629 — revert optimistic flip on failure
                     }
                 }
             )
@@ -310,47 +314,9 @@ struct TabStack: View {
         }
     }
 
-    /// US-34 / AC-34.2 / AC-34.3 — execute the same save side-effect as
-    /// the recipe-detail nav-bar bookmark tap (AC-4.7 / AC-5.1), invoked
-    /// from a `RecipeCard`'s long-press context menu. Caches the listItem
-    /// first so freshly-fetched REST hits (Search/Categories) have a row
-    /// to mutate, then toggles `isSaved`, then republishes the
-    /// saved-recipes widget snapshot so the home-screen widget timeline
-    /// refreshes the same frame the user expects. Per CL-59's
-    /// always-"Save" decision, this is idempotent in the user-visible
-    /// sense — a follow-up long-press just toggles state again with no
-    /// user-visible error path. Errors are logged + swallowed so the menu
-    /// never surfaces a crash to the user.
-    private static func saveFromCard(
-        item: RecipeListItem,
-        store: RecipeStore,
-        publisher: SavedRecipesWidgetPublisher
-    ) async {
-        do {
-            try await store.cache(listItem: item)
-            _ = try await store.toggleSaved(id: item.id)
-        } catch {
-            DODLog.persistence.error("save-from-card failed: \(String(describing: error))")
-            return
-        }
-        // T-770 / CL-167 (DUT-76) — `publisher` is built by
-        // `AppDependencies.savedWidgetPublisher()` with the hero-image
-        // prefetcher, so saving from a card (where the recipe's hero bytes are
-        // usually not cached yet) still bridges the photo into the widget.
-        await publisher.publish()
-    }
-
-    private static func listItem(from recipe: Recipe) -> RecipeListItem {
-        RecipeListItem(
-            id: recipe.id,
-            title: recipe.title,
-            excerpt: recipe.excerpt,
-            heroImage: recipe.heroImage,
-            publishedAt: recipe.publishedAt,
-            totalTimeDisplay: nil,
-            canonicalURL: recipe.canonicalURL
-        )
-    }
+    // `saveFromCard(...)` (the shared card-save path, DUT-629) and
+    // `listItem(from:)` live in `TabStack+CardSave.swift` (keeps this file under
+    // the SwiftLint `file_length` cap).
 
     /// Service a widget deep link by pushing the recipe detail onto our
     /// path. Resolution preference, best → worst:

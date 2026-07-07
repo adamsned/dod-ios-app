@@ -91,8 +91,11 @@ extension SearchView {
                 .recipeCardContextMenu(
                     isSaved: viewModel.savedRecipeIDs.contains(item.id),
                     onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                        }
                     },
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )
@@ -116,8 +119,11 @@ extension SearchView {
                 .recipeCardContextMenu(
                     isSaved: viewModel.savedRecipeIDs.contains(item.id),
                     onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                        }
                     },
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )

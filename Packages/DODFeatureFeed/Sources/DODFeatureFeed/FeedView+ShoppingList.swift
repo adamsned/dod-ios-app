@@ -22,8 +22,12 @@ extension FeedView {
                     .recipeCardContextMenu(
                         isSaved: viewModel.savedRecipeIDs.contains(item.id),
                         onToggle: {
+                            // DUT-629 — optimistic flip, re-inverted if the store
+                            // write reported failure via the completion.
                             viewModel.applyOptimisticSaveToggle(id: item.id)
-                            onSave?(item)
+                            onSave?(item) { didSave in
+                                if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                            }
                         },
                         // DUT-534 Part 2 — Feed opts into the shared helper's
                         // "Add to Shopping List" item (Categories/Saved don't).
@@ -64,8 +68,11 @@ extension FeedView {
                 .recipeCardContextMenu(
                     isSaved: viewModel.savedRecipeIDs.contains(item.id),
                     onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                        }
                     },
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )

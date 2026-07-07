@@ -12,14 +12,14 @@ public struct CategoryRecipesView: View {
         RecipeListLayout.gallery.rawValue
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. See
-    /// `FeedView.onSave` for the contract; same shape applied to category
-    /// recipe lists.
-    public let onSave: ((RecipeListItem) -> Void)?
+    /// `FeedView.onSave` for the contract (incl. the DUT-629 success completion);
+    /// same shape applied to category recipe lists.
+    public let onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)?
 
     public init(
         viewModel: CategoryRecipesViewModel,
         onSelect: @escaping (RecipeListItem) -> Void,
-        onSave: ((RecipeListItem) -> Void)? = nil
+        onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
@@ -121,8 +121,11 @@ public struct CategoryRecipesView: View {
             // T-765 / CL-162 (DUT-71) — state-aware Save/Unsave from the
             // viewmodel-owned saved-id set; optimistic flip on toggle.
             .recipeCardContextMenu(isSaved: viewModel.savedRecipeIDs.contains(item.id)) {
+                // DUT-629 — optimistic flip, re-inverted on write failure.
                 viewModel.applyOptimisticSaveToggle(id: item.id)
-                onSave?(item)
+                onSave?(item) { didSave in
+                    if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                }
             }
             // T-610 — stable L5 handle for the category → recipe journey.
             // Mirrors `dod.feed.card` / `dod.search.card`.
