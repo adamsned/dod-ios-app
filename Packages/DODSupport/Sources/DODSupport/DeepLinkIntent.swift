@@ -26,19 +26,35 @@ public enum DeepLinkIntent: Equatable, Sendable {
         // falls through to the path-only branch below.
         let host = url.host?.lowercased()
         let path = url.path.lowercased()
+        // Path with leading/trailing slashes stripped — a bare host route
+        // (`dod://saved`, `dod://saved/`) normalizes to "".
+        let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let idString = comps?.queryItems?.first(where: { $0.name == "id" })?.value
         let id = idString.flatMap(Int.init)
 
+        // DUT-603 — constrain `saved` to the bare host (empty path) or the
+        // path-only `dod:///saved` form, matching WidgetDeepLinkParser's
+        // `isBare` gate. A path-bearing variant (`dod://saved/123`) is
+        // malformed and must not route.
+        if host == "saved" {
+            return trimmedPath.isEmpty ? .openSaved : nil
+        }
+
         switch (host, path) {
-        case ("saved", _), (nil, "/saved"):
+        case (nil, "/saved"):
             return .openSaved
         case ("recipe", "/cook"):
             guard let id else { return nil }
             return .startCookMode(recipeID: id)
         case ("recipe", _):
-            guard let id else { return nil }
-            return .openRecipe(id: id)
+            // DUT-603 — mirror the `article` branch: the id may ride the
+            // trailing path component (`dod://recipe/123`) instead of a
+            // `?id=` query. Fall back to the trimmed path so both grammars
+            // parse, then reject non-positive ids.
+            let recipeID = id ?? Int(trimmedPath)
+            guard let recipeID, recipeID > 0 else { return nil }
+            return .openRecipe(id: recipeID)
         case ("article", _):
             // DUT-566 — `dod://article/<id>` (the notification grammar for
             // `.article` posts) resolves by post id through the same
@@ -47,7 +63,7 @@ public enum DeepLinkIntent: Equatable, Sendable {
             // once the post is resolved. The id rides the path (`/<id>`), so
             // fall back to the trailing path component when no `?id=` query is
             // present, matching `WidgetDeepLinkParser`'s article grammar.
-            let articleID = id ?? Int(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+            let articleID = id ?? Int(trimmedPath)
             guard let articleID, articleID > 0 else { return nil }
             return .openRecipe(id: articleID)
         default:

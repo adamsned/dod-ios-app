@@ -48,7 +48,13 @@ public enum IngredientLineParser {
         guard let (quantity, afterQuantity) = readLeadingQuantity(trimmed) else {
             return unparseable
         }
-        let remainder = trimmed[afterQuantity...].trimmingCharacters(in: .whitespaces)
+        let afterQuantityText = trimmed[afterQuantity...].trimmingCharacters(in: .whitespaces)
+        // DUT-667: drop a leading parenthetical size annotation before the
+        // unit/name scan, e.g. `"1 (14 oz) can black beans"` → scan
+        // `"can black beans"` so the unit reads `can` and the name `black
+        // beans`, not a bogus `(14` unit-word. Only a leading `(…)` is
+        // stripped; parentheticals later in the line are left in the name.
+        let remainder = strippingLeadingParenthetical(afterQuantityText)
         let (unit, nameStart) = readUnit(remainder)
         // A quantity with an empty trailing name (e.g. the line was just "2")
         // isn't a useful shopping item — fall back to verbatim.
@@ -146,6 +152,18 @@ public enum IngredientLineParser {
     }
 
     // MARK: - Unit + name
+
+    /// Drop a single leading `(…)` parenthetical from `text` (DUT-667 — a size
+    /// annotation like `"(14 oz)"` between the quantity and the unit). Returns
+    /// the whitespace-trimmed remainder after the matching `)`. When the text
+    /// doesn't start with `(`, or the `(` is unterminated, the text is returned
+    /// trimmed and unchanged.
+    private static func strippingLeadingParenthetical(_ text: String) -> String {
+        guard text.first == "(" else { return text }
+        guard let close = text.firstIndex(of: ")") else { return text }
+        let after = text[text.index(after: close)...]
+        return after.trimmingCharacters(in: .whitespaces)
+    }
 
     /// If `text` begins with a known unit token, return its normalized singular
     /// form and the index where the name begins; otherwise `nil` unit and the

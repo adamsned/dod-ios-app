@@ -85,12 +85,18 @@ public enum WPRMRecipeCardParser {
     /// - Returns: a ``Card`` with plain-text ingredient + instruction lines.
     ///   Empty lists when no card / no rows are found.
     public static func parse(html: String) -> Card {
-        guard let card = sliceRecipeContainer(in: html) else {
+        // DUT-633: strip HTML comments BEFORE any slicing (mirrors
+        // ``ArticleHTMLParser``). A comment carrying `<div`/`</div>`/`<li>`
+        // inside the container corrupts the depth-tracking slice boundary,
+        // dropping or merging recipe rows. The stripper is
+        // `<script>`/`<style>`-opaque.
+        let stripped = HTMLSanitizer.strippingComments(html)
+        guard let card = sliceRecipeContainer(in: stripped) else {
             return Card(ingredients: [], instructions: [])
         }
         return Card(
             ingredients: parseIngredients(in: card),
-            instructions: parseInstructions(in: card, page: html)
+            instructions: parseInstructions(in: card, page: stripped)
         )
     }
 
@@ -99,7 +105,11 @@ public enum WPRMRecipeCardParser {
     /// card is a recipe — even if a first parse came back thin — and must not
     /// be reclassified as an article that dumps the whole blog body.
     public static func hasRecipeCard(html: String) -> Bool {
-        sliceRecipeContainer(in: html) != nil
+        // DUT-633: strip comments before slicing (mirrors ``parse(html:)``)
+        // so a commented-out `<div class="wprm-recipe-container">` doesn't
+        // register — and a comment inside the real container doesn't corrupt
+        // its depth-tracked close.
+        sliceRecipeContainer(in: HTMLSanitizer.strippingComments(html)) != nil
     }
 
     // MARK: - Container slice

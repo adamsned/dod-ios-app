@@ -193,6 +193,29 @@ struct IngredientAisleClassifierTests {
         }
     }
 
+    // MARK: - DUT-661 pantry compounds win over their fragment
+
+    /// Canned/boxed pantry compounds must bucket to `.pantry`, not the bare
+    /// produce/meat/dairy fragment they contain — the longest-first scan tests
+    /// the compound before its fragment.
+    @Test func pantryCompoundsBeatTheirFragment() {
+        #expect(IngredientAisleClassifier.classify("2 cups chicken broth") == .pantry)
+        #expect(IngredientAisleClassifier.classify("1 cup chicken stock") == .pantry)
+        #expect(IngredientAisleClassifier.classify("1 tsp chicken bouillon") == .pantry)
+        #expect(IngredientAisleClassifier.classify("1 can coconut milk") == .pantry)
+        #expect(IngredientAisleClassifier.classify("1 cup almond milk") == .pantry)
+        #expect(IngredientAisleClassifier.classify("½ cup oat milk") == .pantry)
+        #expect(IngredientAisleClassifier.classify("1 can tomato sauce") == .pantry)
+        #expect(IngredientAisleClassifier.classify("1 can cream of mushroom soup") == .pantry)
+    }
+
+    /// The bare fragments still classify to their own aisle unchanged.
+    @Test func bareFragmentsUnchanged() {
+        #expect(IngredientAisleClassifier.classify("2 lbs chicken thighs") == .meat)
+        #expect(IngredientAisleClassifier.classify("1 cup whole milk") == .dairy)
+        #expect(IngredientAisleClassifier.classify("2 diced tomato") == .produce)
+    }
+
     // MARK: - Enum completeness
 
     /// Every aisle is reachable — the case set the AC-39.4 render order walks.

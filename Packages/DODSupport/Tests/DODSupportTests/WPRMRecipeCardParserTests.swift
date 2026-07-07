@@ -294,4 +294,30 @@ import Testing
         #expect(card.ingredients.isEmpty)
         #expect(card.instructions.isEmpty)
     }
+
+    // MARK: - DUT-633 comment stripping
+
+    /// An HTML comment carrying a stray `</div>` inside the recipe container
+    /// used to mis-terminate the container's depth-tracked close, dropping the
+    /// ingredient rows that followed. Stripping comments before the slice
+    /// (mirroring ``ArticleHTMLParser``) keeps every row.
+    @Test func commentWithClosingDivInsideContainerDoesNotTruncate() {
+        let html = """
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">flour</span></li>
+            <!-- legacy markup: </div> old wrapper -->
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">sugar</span></li>
+            </ul>
+            </div>
+            """
+        let card = WPRMRecipeCardParser.parse(html: html)
+        #expect(card.ingredients == ["flour", "sugar"])
+    }
+
+    /// A commented-out container is not a real recipe card.
+    @Test func commentedOutContainerIsNotDetected() {
+        let html = "<!-- <div class=\"wprm-recipe-container\">stale</div> -->"
+        #expect(WPRMRecipeCardParser.hasRecipeCard(html: html) == false)
+    }
 }

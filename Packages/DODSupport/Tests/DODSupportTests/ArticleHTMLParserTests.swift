@@ -296,6 +296,8 @@ import Testing
 
     // DUT-437 comment-vs-slice-boundary regression tests live in
     // `ArticleHTMLParserCommentBoundaryTests.swift` (type_body_length cap).
+    // DUT-655 nested-list + blockquote tests live in
+    // `ArticleHTMLParserBlocksTests.swift` (type_body_length cap).
 
     // MARK: - Fixture
 

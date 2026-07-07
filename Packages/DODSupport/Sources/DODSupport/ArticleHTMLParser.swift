@@ -54,8 +54,8 @@ extension ArticleHTMLParser {
                 cursor = close.upperBound
                 continue
             }
-            if let (block, next) = block(named: name, openTag: open, closeTag: close, in: html, baseURL: baseURL) {
-                if let block { blocks.append(block) }
+            if let (emitted, next) = block(named: name, openTag: open, closeTag: close, in: html, baseURL: baseURL) {
+                blocks.append(contentsOf: emitted)
                 cursor = next
             } else {
                 // Unrecognized tag — skip it and keep scanning its contents.
@@ -66,15 +66,18 @@ extension ArticleHTMLParser {
     }
 
     /// Dispatch one opening tag to its block builder (`nil` => unrecognized).
+    /// Returns the emitted blocks (0, 1, or — for a multi-paragraph
+    /// `<blockquote>`, DUT-655 — several) plus the next cursor.
     private static func block(
         named name: String,
         openTag open: Range<String.Index>,
         closeTag close: Range<String.Index>,
         in html: String,
         baseURL: URL?
-    ) -> (ArticleBlock?, String.Index)? {
+    ) -> ([ArticleBlock], String.Index)? {
         if name == "img" {
-            return (imageBlock(fromTag: html[open.upperBound..<close.lowerBound], baseURL: baseURL), close.upperBound)
+            let image = imageBlock(fromTag: html[open.upperBound..<close.lowerBound], baseURL: baseURL)
+            return (image.map { [$0] } ?? [], close.upperBound)
         }
         if depthTrackedContainers.contains(name) {
             guard
@@ -85,31 +88,35 @@ extension ArticleHTMLParser {
                     bodyStart: close.upperBound
                 )
             else {
-                return (nil, close.upperBound)
+                return ([], close.upperBound)
             }
             let next = html.index(close.upperBound, offsetBy: inner.count)
             return (
-                containerBlock(name: name, inner: inner, baseURL: baseURL),
+                containerBlocks(name: name, inner: inner, baseURL: baseURL),
                 advance(past: "</\(name)>", from: next, in: html)
             )
         }
         if name == "p" || isHeading(name) {
             let (inner, next) = sliceSimpleClose(name: name, from: close.upperBound, in: html)
-            return (textBlock(name: name, inner: inner), next)
+            return (textBlock(name: name, inner: inner).map { [$0] } ?? [], next)
         }
         return nil
     }
 
     /// Build a depth-tracked container block (`figure`/`ul`/`ol`/`blockquote`).
-    private static func containerBlock<S: StringProtocol>(name: String, inner: S, baseURL: URL?) -> ArticleBlock? {
+    ///
+    /// DUT-655: `figure`/`ul`/`ol` yield a single block; a `<blockquote>`
+    /// wrapping several `<p>` children yields ONE paragraph block per child
+    /// (see ``blockquoteBlocks``). `containerBlock` therefore returns a list —
+    /// the caller appends whatever it produces — instead of a single block.
+    private static func containerBlocks<S: StringProtocol>(name: String, inner: S, baseURL: URL?) -> [ArticleBlock]
+    where S.Index == String.Index {
         switch name {
-        case "figure": return figureBlock(inner: inner, baseURL: baseURL)
-        case "ul": return listBlock(inner: inner, ordered: false)
-        case "ol": return listBlock(inner: inner, ordered: true)
-        case "blockquote":
-            let text = inlineAttributedString(from: inner)
-            return text.runs.isEmpty ? nil : .paragraph(text)
-        default: return nil
+        case "figure": return figureBlock(inner: inner, baseURL: baseURL).map { [$0] } ?? []
+        case "ul": return listBlock(inner: inner, ordered: false).map { [$0] } ?? []
+        case "ol": return listBlock(inner: inner, ordered: true).map { [$0] } ?? []
+        case "blockquote": return blockquoteBlocks(inner: inner)
+        default: return []
         }
     }
 
@@ -164,22 +171,10 @@ extension ArticleHTMLParser {
         return String(text.characters)
     }
 
-    // MARK: - Lists
-
-    /// Build a `.list` by inline-parsing each `<li>…</li>`, or nil when empty.
-    private static func listBlock<S: StringProtocol>(inner: S, ordered: Bool) -> ArticleBlock?
-    where S.Index == String.Index {
-        var items: [AttributedString] = []
-        var cursor = inner.startIndex
-        while let open = inner.range(of: "<li", options: .caseInsensitive, range: cursor..<inner.endIndex) {
-            guard let openEnd = inner.range(of: ">", range: open.upperBound..<inner.endIndex) else { break }
-            let (liInner, next) = sliceSimpleClose(name: "li", from: openEnd.upperBound, in: inner)
-            let text = inlineAttributedString(from: liInner)
-            if !text.runs.isEmpty { items.append(text) }
-            cursor = next
-        }
-        return items.isEmpty ? nil : .list(ordered: ordered, items: items)
-    }
+    // MARK: - Lists / blockquote
+    //
+    // `listBlock`, `sliceMatchingLI`, and `blockquoteBlocks` live in
+    // `ArticleHTMLParser+Blocks.swift` (DUT-655 — file_length cap).
 
     // MARK: - Inline → AttributedString
 
@@ -291,7 +286,7 @@ extension ArticleHTMLParser {
     }
 
     /// Slice a non-nesting `<name>…</name>` body: inner substring + next cursor.
-    private static func sliceSimpleClose<S: StringProtocol>(
+    static func sliceSimpleClose<S: StringProtocol>(
         name: String,
         from bodyStart: S.Index,
         in html: S
@@ -320,7 +315,7 @@ extension ArticleHTMLParser {
     }
 
     /// Lowercased tag name: first token, keeping a leading `/` for close tags.
-    private static func tagName<S: StringProtocol>(of tagBody: S) -> String {
+    static func tagName<S: StringProtocol>(of tagBody: S) -> String {
         var name = ""
         for character in tagBody {
             if character.isWhitespace { break }

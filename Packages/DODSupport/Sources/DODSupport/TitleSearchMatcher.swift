@@ -40,6 +40,11 @@ public enum TitleMatchKind: Int, Comparable, Sendable {
 /// Spec trace: CL-120 (Nacho Bug), REG-29, US-12 amendment, US-29 amendment.
 public enum TitleSearchMatcher {
 
+    /// DUT-668: minimum normalized-query length for ``match(query:title:)`` to
+    /// evaluate any tier. A 1-character query is rejected outright — it matches
+    /// nearly every title and carries no search intent.
+    static let minimumQueryLength = 2
+
     /// Returns the strongest ``TitleMatchKind`` for `query` vs `title`,
     /// or `nil` when no rule matches. Inputs are normalized (HTML-entity
     /// decoded, lowercased, punctuation → space, whitespace collapsed)
@@ -56,6 +61,11 @@ public enum TitleSearchMatcher {
         let normalizedTitle = normalize(title)
         let normalizedQuery = normalize(query)
         guard !normalizedTitle.isEmpty, !normalizedQuery.isEmpty else { return nil }
+        // DUT-668: reject a 1-character normalized query. A single letter
+        // substring-matches nearly every title (and Levenshtein-1 matches any
+        // 1-2 char token), fanning out noise; the search surface has no use
+        // for a one-char match tier.
+        guard normalizedQuery.count >= minimumQueryLength else { return nil }
 
         if normalizedTitle == normalizedQuery {
             return .exact
@@ -171,6 +181,14 @@ public enum TitleSearchMatcher {
     /// module for the "did you mean?" path; the access stays
     /// module-internal so the math has one canonical definition for
     /// every search-precision consumer in `DODSupport`.
+    /// DUT-663: Damerau–Levenshtein — an adjacent transposition (e.g.
+    /// `"nahcos"` ↔ `"nachos"`) costs 1, matching the header's promise that a
+    /// swap counts as a single edit. Plain two-row Wagner–Fischer cannot see a
+    /// transposition (it charges two substitutions), so we keep THREE rows
+    /// (`prev2`/`prev`/`current`) and add the optimal-string-alignment
+    /// transposition term. O(m·n) time, O(min(m,n)) space — the extra row is
+    /// the OSA restriction (no substring is edited more than once), which is
+    /// exact for the distance-≤1 gate this matcher uses.
     static func levenshteinDistance(_ lhs: String, _ rhs: String) -> Int {
         let lhsChars = Array(lhs)
         let rhsChars = Array(rhs)
@@ -179,19 +197,34 @@ public enum TitleSearchMatcher {
         if lhsCount == 0 { return rhsCount }
         if rhsCount == 0 { return lhsCount }
 
+        var prev2 = [Int](repeating: 0, count: rhsCount + 1)
         var previous = Array(0...rhsCount)
         var current = [Int](repeating: 0, count: rhsCount + 1)
         for row in 1...lhsCount {
             current[0] = row
             for column in 1...rhsCount {
                 let cost = lhsChars[row - 1] == rhsChars[column - 1] ? 0 : 1
-                current[column] = min(
+                var best = min(
                     previous[column] + 1,  // deletion
                     current[column - 1] + 1,  // insertion
                     previous[column - 1] + cost  // substitution
                 )
+                // Adjacent transposition: the last two characters of each side
+                // are swapped (a[i-1]==b[j] && a[i]==b[j-1]) → one edit.
+                let isTranspose =
+                    row > 1 && column > 1
+                    && lhsChars[row - 1] == rhsChars[column - 2]
+                    && lhsChars[row - 2] == rhsChars[column - 1]
+                if isTranspose {
+                    best = min(best, prev2[column - 2] + 1)
+                }
+                current[column] = best
             }
-            swap(&previous, &current)
+            // Rotate the three rows: prev2 ← previous ← current.
+            let recycled = prev2
+            prev2 = previous
+            previous = current
+            current = recycled
         }
         return previous[rhsCount]
     }

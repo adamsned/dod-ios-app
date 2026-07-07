@@ -34,23 +34,32 @@ public enum SearchTermHighlighter {
             .filter { $0.count >= minimumTokenLength }
         guard !tokens.isEmpty, !text.isEmpty else { return [] }
 
+        // DUT-668: normalize both sides to NFC before the diacritic-insensitive
+        // search. `.diacriticInsensitive` folds a PRECOMPOSED accent (`é`,
+        // U+00E9) but not a DECOMPOSED one (`e` + U+0301); WP titles and pasted
+        // queries mix both forms, so a decomposed "Jalapeño" would silently
+        // fail to highlight. Precomposing both aligns them. Offsets are taken
+        // against the precomposed text and consumed by an `AttributedString`
+        // built from the same normalized string, so they stay in sync.
+        let normalizedText = text.precomposedStringWithCanonicalMapping
         var ranges: [Range<Int>] = []
-        for token in tokens {
-            var searchStart = text.startIndex
-            while let found = text.range(
+        for rawToken in tokens {
+            let token = rawToken.precomposedStringWithCanonicalMapping
+            var searchStart = normalizedText.startIndex
+            while let found = normalizedText.range(
                 of: token,
                 options: [.caseInsensitive, .diacriticInsensitive],
-                range: searchStart..<text.endIndex
+                range: searchStart..<normalizedText.endIndex
             ) {
-                let lower = text.distance(from: text.startIndex, to: found.lowerBound)
-                let upper = text.distance(from: text.startIndex, to: found.upperBound)
+                let lower = normalizedText.distance(from: normalizedText.startIndex, to: found.lowerBound)
+                let upper = normalizedText.distance(from: normalizedText.startIndex, to: found.upperBound)
                 ranges.append(lower..<upper)
                 // Always advance at least one character so a degenerate match
                 // can't spin the loop forever.
                 searchStart =
                     found.upperBound > found.lowerBound
-                    ? found.upperBound : text.index(after: found.lowerBound)
-                if searchStart >= text.endIndex { break }
+                    ? found.upperBound : normalizedText.index(after: found.lowerBound)
+                if searchStart >= normalizedText.endIndex { break }
             }
         }
         return mergeOverlapping(ranges)

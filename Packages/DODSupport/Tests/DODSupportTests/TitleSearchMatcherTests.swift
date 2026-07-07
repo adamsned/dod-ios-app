@@ -186,4 +186,38 @@ import Testing
         )
         #expect(TitleSearchMatcher.normalize("Jalapeño") == "jalapeno")
     }
+
+    // MARK: - DUT-663 adjacent transposition (Damerau)
+
+    /// A single adjacent-character swap now costs 1, so a transposed token
+    /// fuzzy-matches its target — the header's stated promise.
+    @Test func adjacentTranspositionCostsOneEdit() {
+        #expect(TitleSearchMatcher.levenshteinDistance("nahcos", "nachos") == 1)
+    }
+
+    /// The transposition flows through the fuzzy match tier.
+    @Test func transposedQueryFuzzyMatchesTitle() {
+        #expect(TitleSearchMatcher.match(query: "nahcos", title: "Loaded Nachos") == .fuzzy)
+    }
+
+    /// Two separate typos are still distance 2 (transposition doesn't loosen
+    /// the CL-120 "two typos is too loose" contract).
+    @Test func twoEditsStillDistanceTwo() {
+        #expect(TitleSearchMatcher.levenshteinDistance("naxxos", "nachos") == 2)
+    }
+
+    // MARK: - DUT-668 minimum query length
+
+    /// A 1-character normalized query is rejected outright — it would match
+    /// nearly every title and carries no search intent.
+    @Test func singleCharacterQueryRejected() {
+        #expect(TitleSearchMatcher.match(query: "n", title: "Nachos") == nil)
+        // Punctuation that normalizes to a single char is likewise rejected.
+        #expect(TitleSearchMatcher.match(query: "a!", title: "Apple Pie") == nil)
+    }
+
+    /// A 2-character query still matches at the substring tier.
+    @Test func twoCharacterQueryStillMatches() {
+        #expect(TitleSearchMatcher.match(query: "pb", title: "PB Cookies") != nil)
+    }
 }

@@ -314,4 +314,18 @@ struct CategoryNameMatcherTests {
         // a hot path).
         #expect(CategoryNameMatcher.stripRecipesSuffix("recipes") == "recipes")
     }
+
+    // MARK: - DUT-664 rule-3 whole-word gate
+
+    /// Rule 3 (query is a substring of the topic) is now whole-word gated:
+    /// query "read" must NOT match a "Bread Recipes" category (topic "bread")
+    /// just because "read" is embedded in "bread". Previously the raw
+    /// `topic.contains(query)` false-positived and fanned out a `?categories=`
+    /// fetch the user never intended.
+    @Test func embeddedSubstringNoLongerMatchesRule3() {
+        let bread = DODDomain.Category(id: 900, name: "Bread Recipes", slug: "bread-recipes", count: 12)
+        #expect(CategoryNameMatcher.match(query: "read", in: [bread]).isEmpty)
+        // The genuine whole-word query still matches.
+        #expect(CategoryNameMatcher.match(query: "bread", in: [bread]).map(\.id) == [900])
+    }
 }
