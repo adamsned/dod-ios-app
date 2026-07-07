@@ -98,6 +98,7 @@ public struct SettingsView: View {
                     Label("Back", systemImage: "chevron.left")
                 }
                 .tint(DODColor.burntOrange)
+                .keyboardShortcut(.cancelAction)  // DUT-695 — Esc dismisses on iPad
                 .accessibilityIdentifier("settings-back")
             }
         }
