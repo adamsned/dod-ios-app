@@ -1,3 +1,4 @@
+import DODDesignSystem
 import SwiftUI
 
 // T-745 / CL-142 — `handleSave` extracted from ``ProfileEditView``'s
@@ -96,6 +97,9 @@ extension ProfileEditView {
     /// cleaned values; the new-profile setup flow dismisses as before.
     @MainActor
     func finishAfterSave(cleanedName: String, cleanedEmail: String) {
+        // DUT-693 PR4 — fire the `.success` haptic on every successful save (both
+        // the new-profile setup and the in-place existing-profile save).
+        saveSuccessTick &+= 1
         guard existingProfile != nil else {
             dismiss()
             return
@@ -106,5 +110,50 @@ extension ProfileEditView {
         initialEmail = cleanedEmail
         initialPhotoFilename = inFlightPhotoFilename
         isEditing = false
+        // DUT-693 PR4 — the in-place save stays on the page, so confirm success
+        // with a brief snackbar (no em dash per Spencer's copy rule).
+        savedConfirmationMessage = "Profile saved."
+    }
+}
+
+/// DUT-693 PR4 — the in-place save-confirmation surface: a bottom ``Snackbar``
+/// ("Profile saved.") plus a `.success` sensory feedback that fires on every
+/// save. Reuses the Settings ▸ Clear Cache overlay mechanism (a `Snackbar` in a
+/// bottom overlay with a reduce-motion-aware transition + self-owned
+/// auto-dismiss). Packaged as a `ViewModifier` so `ProfileEditView.swift` (at
+/// the SwiftLint `file_length` cap) only gains a single call site.
+extension View {
+    func profileSavedConfirmation(message: Binding<String?>, token: Int) -> some View {
+        modifier(ProfileSavedConfirmationModifier(message: message, token: token))
+    }
+}
+
+private struct ProfileSavedConfirmationModifier: ViewModifier {
+    @Binding var message: String?
+    let token: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottom) {
+                if let message {
+                    Snackbar(
+                        message: message,
+                        presentationToken: token,
+                        onAutoDismiss: { self.message = nil }
+                    )
+                    .id(token)
+                    .padding(.bottom, DODSpacing.md)
+                    // DUT-529 — under Reduce Motion drop the slide, crossfade only.
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .move(edge: .bottom).combined(with: .opacity)
+                    )
+                    .accessibilityIdentifier("profile-saved-snackbar")
+                }
+            }
+            .animation(reduceMotion ? nil : .default, value: message)
+            .sensoryFeedback(.success, trigger: token)
     }
 }

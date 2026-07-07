@@ -2,13 +2,13 @@
 import DODDesignSystem
 import SwiftUI
 
-/// "Sign in with Google" button — SCAFFOLD (see `GoogleProfileSignIn`). Mirrors
-/// `AppleProfileSignInButton`'s 44pt full-width shape. The caller gates it behind
-/// ``GoogleSignInConfig/isConfigured``, so it only appears once a real client ID
-/// is wired. The provider seam is injected — `UnconfiguredGoogleSignInProvider`
-/// by default, the real `GIDSignIn`-backed one once the SDK lands.
+/// "Sign in with Google" button. Mirrors `AppleProfileSignInButton`'s 44pt
+/// full-width shape. The caller gates it behind ``GoogleSignInConfig/isConfigured``,
+/// so it only appears once a real client ID is wired. The provider seam is
+/// injected and now defaults to the live, `GIDSignIn`-backed ``GIDSignInProvider``
+/// (the SDK has landed); tests inject a fake through the same `provider` parameter.
 ///
-/// TODO(2026-06-23, nadams): swap the placeholder `g.circle.fill` symbol for the official
+/// TODO(2026-07-07, nadams): swap the placeholder `g.circle.fill` symbol for the official
 /// Google logo asset + the standard Google button styling (white background,
 /// Google "G"), per Google's sign-in branding guidelines.
 public struct GoogleProfileSignInButton: View {
