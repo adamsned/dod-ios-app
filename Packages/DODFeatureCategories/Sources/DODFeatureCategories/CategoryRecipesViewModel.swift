@@ -28,6 +28,11 @@ public final class CategoryRecipesViewModel {
     /// trigger:)` haptic. Not part of any AC — UX polish mirroring
     /// `FeedViewModel.refreshCount`.
     public private(set) var refreshCount: Int = 0
+    /// DUT-697 — bumped only on a genuine long-press Save/Unsave so the view can
+    /// fire a `.sensoryFeedback(.selection, trigger:)` haptic. Keyed to this
+    /// (not `savedRecipeIDs`) so appear/refresh reconciliation of the id set
+    /// doesn't mis-fire the haptic.
+    public private(set) var saveToggleCount: Int = 0
 
     private let dependencies: CategoriesDependencies
     private var currentPage: Int = 0
@@ -63,6 +68,9 @@ public final class CategoryRecipesViewModel {
         } else {
             savedRecipeIDs.insert(id)
         }
+        // DUT-697 — signal the view to fire the `.selection` haptic on this
+        // genuine user toggle only (not on appear/refresh set reconciliation).
+        saveToggleCount &+= 1
     }
 
     public func retry() async {
