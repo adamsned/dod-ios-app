@@ -42,8 +42,16 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
     /// suggestion path implicitly land at `didYouMean == nil`.
     var cachedTitlesArray: [String] = []
 
+    /// DUT-622 — set to `true` to make the primary REST `search(query:)` throw,
+    /// simulating an online request FAILURE (vs a genuine zero-result response).
+    /// Drives the retryable `.error` state.
+    var searchShouldThrow = false
+
     func search(query: String) async throws -> [RecipeListItem] {
         searches.append(query)
+        if searchShouldThrow {
+            throw NSError(domain: "FakeSearchDependencies", code: -622)
+        }
         return results[query] ?? []
     }
 

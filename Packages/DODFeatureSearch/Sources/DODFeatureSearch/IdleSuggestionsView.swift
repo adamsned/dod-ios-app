@@ -187,7 +187,9 @@ struct IdleSuggestionsView: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(category.name), \(category.count) recipes")
+        // DUT-644: singular/plural agreement — "1 recipe", not "1 recipes"
+        // (mirrors SearchView's result-count announcement).
+        .accessibilityLabel("\(category.name), \(category.count) \(category.count == 1 ? "recipe" : "recipes")")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("dod.search.categoryRow")
     }

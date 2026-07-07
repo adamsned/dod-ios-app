@@ -16,6 +16,15 @@ import Foundation
 /// `private` to `internal`).
 extension SearchViewModel {
 
+    /// DUT-622: re-run the current query after a `.error` (REST failure) state.
+    /// Wired to the Retry affordance in ``SearchView``'s `.error` empty state; a
+    /// transient blip that has since cleared now yields results. Lives here (not
+    /// on the main type) for the `file_length` budget; delegates to
+    /// ``runImmediateSearch()`` since `performSearch()` is file-private there.
+    public func retrySearch() async {
+        await runImmediateSearch()
+    }
+
     /// Fire Path A (REST `?search=<query>`) and — only when the user has an
     /// actual category filter chip set — Path B (REST `?categories=` per
     /// matched category, top-2 cap) in parallel via `async let`. Both
@@ -35,31 +44,57 @@ extension SearchViewModel {
     /// category filter is actually set (`filters.categoryID != nil`) — a plain
     /// text search makes exactly one primary REST call. Preserved for the
     /// filter-active case so the category-scoped surface still works.
+    /// DUT-622: `restFailed` is `true` when the primary REST request actually
+    /// threw (vs genuinely returning zero rows). It rides out of the fan-out so
+    /// `finishTextSearch` can surface a retryable `.error` state instead of the
+    /// misleading `.noResults` dead-end when the online request failed and no
+    /// local ingredient fallback covers it. Offline short-circuits to
+    /// `restFailed: false` — that path is the `.offline` state's job, not
+    /// `.error`'s.
     func fanOutSearchPaths(
         trimmed: String,
         online: Bool
-    ) async -> (restResults: [RecipeListItem], categoryResults: [RecipeListItem]) {
-        guard online else { return ([], []) }
+    ) async -> FanOutResult {
+        guard online else { return FanOutResult(restResults: [], categoryResults: [], restFailed: false) }
         guard filters.categoryID != nil else {
             // Plain text search: single primary request, no category fan-out.
-            return (await fetchTitleSearchOrEmpty(trimmed: trimmed), [])
+            let outcome = await fetchTitleSearchOrEmpty(trimmed: trimmed)
+            return FanOutResult(restResults: outcome.items, categoryResults: [], restFailed: outcome.failed)
         }
         async let restTask = fetchTitleSearchOrEmpty(trimmed: trimmed)
         async let categoryTask = fetchCategoryMatchesOrEmpty(trimmed: trimmed)
-        return await (restTask, categoryTask)
+        let (restOutcome, categoryResults) = await (restTask, categoryTask)
+        return FanOutResult(
+            restResults: restOutcome.items,
+            categoryResults: categoryResults,
+            restFailed: restOutcome.failed
+        )
     }
 
-    /// Path A wrapper: REST `?search=<query>` → `[RecipeListItem]`, plus
-    /// the existing background cache-write. Errors are logged and return
-    /// `[]` so the caller's tuple is never the source of a thrown error.
-    func fetchTitleSearchOrEmpty(trimmed: String) async -> [RecipeListItem] {
+    /// The fan-out's three outputs bundled (avoids a 3-tuple return). Path A's
+    /// title results, Path B's category results, and — DUT-622 — whether the
+    /// primary REST request actually FAILED (vs genuinely returning zero).
+    struct FanOutResult {
+        let restResults: [RecipeListItem]
+        let categoryResults: [RecipeListItem]
+        let restFailed: Bool
+    }
+
+    /// Path A wrapper: REST `?search=<query>` → `[RecipeListItem]`, plus the
+    /// existing background cache-write. Errors are logged and return
+    /// `(items: [], failed: true)` so the caller's tuple is never the source of
+    /// a thrown error — DUT-622: `failed` lets the caller tell an actual REST
+    /// FAILURE (retryable `.error`) apart from a genuine zero-result response
+    /// (`.noResults`). A successful fetch — even of zero rows — returns
+    /// `failed: false`.
+    func fetchTitleSearchOrEmpty(trimmed: String) async -> (items: [RecipeListItem], failed: Bool) {
         do {
             let restResults = try await dependencies.search(query: trimmed)
             try? await dependencies.cache(listItems: restResults)
-            return restResults
+            return (restResults, false)
         } catch {
             DODLog.network.error("search REST failed: \(String(describing: error))")
-            return []
+            return ([], true)
         }
     }
 
@@ -125,11 +160,19 @@ extension SearchViewModel {
     /// filter-re-rank caches, and hands off to `applyFiltersAndFinalize`.
     /// Extracted from `performSearch()` so that method stays under SwiftLint's
     /// `function_body_length` cap.
+    /// The network outcome of a fan-out, bundled so `finishTextSearch` stays
+    /// under SwiftLint's parameter-count cap: whether we were `online`, and —
+    /// DUT-622 — whether the primary REST request actually FAILED.
+    struct NetworkOutcome {
+        let online: Bool
+        let restFailed: Bool
+    }
+
     func finishTextSearch(
         merged: [RecipeListItem],
         localItems: [RecipeListItem],
         trimmed: String,
-        online: Bool,
+        network: NetworkOutcome,
         generation: Int
     ) async {
         // H1: a newer search may have started while we awaited the fan-out.
@@ -141,8 +184,21 @@ extension SearchViewModel {
         // ingredient hit needs no network, so it keeps the user on a results
         // screen even with REST down — the offline-resilience win DUT-11
         // unlocks on top of CL-120's title-precision contract.
-        if merged.isEmpty, ingredientOnly.isEmpty, !online {
+        if merged.isEmpty, ingredientOnly.isEmpty, !network.online {
             state = .offline
+            items = []
+            ingredientItems = []
+            return
+        }
+
+        // DUT-622: the online REST request FAILED (threw, not "returned zero")
+        // and no local ingredient tier covers it. Surface a retryable `.error`
+        // instead of falling through to `.noResults` ("No recipes match
+        // '<query>'"), which reads as "we searched and found nothing" and offers
+        // no recovery. `restFailed` is only ever `true` while `online`, so this
+        // never masks the offline branch above.
+        if merged.isEmpty, ingredientOnly.isEmpty, network.restFailed {
+            state = .error
             items = []
             ingredientItems = []
             return

@@ -131,6 +131,50 @@ import Testing
         #expect(viewModel.items.map(\.recipeTitle) == ["Pot Roast", "Chicken Tacos"])
     }
 
+    @Test func addingRecipeWithRepeatedLineKeepsBothRows() {
+        // DUT-648: a recipe that legitimately lists the SAME line twice (olive
+        // oil for the marinade AND the sear) must keep BOTH rows on append — the
+        // old (recipeTitle, text)-only key dropped the second, causing under-buy.
+        let base = Self.recipe(id: 1, title: "A", ingredients: ["1 onion"])
+        let repeatedLine = Self.recipe(
+            id: 2,
+            title: "Seared Chicken",
+            ingredients: ["1 tbsp olive oil", "1 lb chicken", "1 tbsp olive oil"]
+        )
+        let viewModel = ShoppingListViewModel(recipes: [base], store: nil)
+        viewModel.add(recipes: [repeatedLine])
+        let oilRows = viewModel.items.filter { $0.ingredientText == "1 tbsp olive oil" }
+        #expect(oilRows.count == 2, "Both legitimately-repeated lines must survive the append")
+        #expect(viewModel.items.count == 4)
+    }
+
+    @Test func initialBuildKeepsRepeatedLineConsistentlyWithAppend() {
+        // DUT-648: the initial build and the append path follow ONE rule — a
+        // recipe with a repeated line keeps both rows either way.
+        let repeatedLine = Self.recipe(
+            id: 1,
+            title: "Seared Chicken",
+            ingredients: ["1 tbsp olive oil", "1 tbsp olive oil"]
+        )
+        let viewModel = ShoppingListViewModel(recipes: [repeatedLine], store: nil)
+        #expect(viewModel.items.count == 2)
+    }
+
+    @Test func reAddingWholeRecipeWithRepeatedLineStillDoesNotDuplicate() {
+        // DUT-648: the repeated-line fix must NOT reopen the DUT-589 re-stack
+        // bug — re-adding the exact same recipe (repeated line and all) is still
+        // a no-op.
+        let recipe = Self.recipe(
+            id: 1,
+            title: "Seared Chicken",
+            ingredients: ["1 tbsp olive oil", "1 lb chicken", "1 tbsp olive oil"]
+        )
+        let viewModel = ShoppingListViewModel(recipes: [recipe], store: nil)
+        #expect(viewModel.items.count == 3)
+        viewModel.add(recipes: [recipe])
+        #expect(viewModel.items.count == 3, "Re-adding the whole recipe must not duplicate any row")
+    }
+
     @Test func rowsFromRecipesDropsBlankIngredientLines() {
         // DUT-587 defense-in-depth: a blank / whitespace-only ingredient never
         // becomes a row, even if it slips past the parser.

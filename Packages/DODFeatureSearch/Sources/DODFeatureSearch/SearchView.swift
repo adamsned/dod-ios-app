@@ -141,6 +141,10 @@ public struct SearchView: View {
             message = "\(count) \(count == 1 ? "recipe" : "recipes") found."
         case .noResults:
             message = "No recipes found."
+        case .error:
+            // DUT-622: announce the failure so a VoiceOver user isn't left in
+            // silence at the Retry screen.
+            message = "Search couldn't load. Try again."
         case .idle, .searching, .offline:
             return
         }
@@ -295,6 +299,19 @@ public struct SearchView: View {
                 title: "Search needs internet",
                 message: "Reconnect to search dutchovendaddy.com."
             )
+        case .error:
+            // DUT-622: the online request FAILED (vs genuinely finding nothing),
+            // so offer a Retry rather than the dead-end "No recipes match"
+            // screen. Tapping Retry re-runs the same query.
+            EmptyState(
+                systemImage: "exclamationmark.arrow.circlepath",
+                title: "Search Couldn't Load",
+                message: "Something went wrong reaching dutchovendaddy.com. Try again.",
+                action: .init(title: "Retry") {
+                    Task { await viewModel.retrySearch() }
+                }
+            )
+            .accessibilityIdentifier("dod.search.errorState")
         case .results:
             // US-38 / AC-38.3 / AC-38.4 (T-650) + DUT-11: the scrolling
             // results body (title tier + the labeled "Recipes using <term>"
