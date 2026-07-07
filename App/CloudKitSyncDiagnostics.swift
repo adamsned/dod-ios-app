@@ -85,4 +85,15 @@ final class CloudKitSyncDiagnostics {
     func markContainerOpenFailed() {
         latestStatus = .error("CloudKit container failed to open; sync is paused on this device.")
     }
+
+    /// DUT-671 — fold a non-`.available` iCloud account status into
+    /// `latestStatus`. `checkCloudKitAvailability()` used to only *log* a
+    /// `.noAccount` / `.restricted` / `.couldNotDetermine` result, so the
+    /// Settings row read an idle "Off" while sync could never actually run.
+    /// Surfacing it as an error lets Settings tell the user "no iCloud account"
+    /// instead. `.available` is left untouched — the mirror-event observer owns
+    /// the healthy idle/syncing states.
+    func markAccountUnavailable(_ message: String) {
+        latestStatus = .error(message)
+    }
 }
