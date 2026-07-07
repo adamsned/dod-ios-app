@@ -16,20 +16,20 @@ import SwiftUI
 /// Step Temperatures picker); **Notification Settings** (When New Recipes
 /// Drop + When Someone Replies to My Comment toggles); **Customization**
 /// (Appearance picker + Cook Mode Voice rows via ``VoiceRows`` + the DUT-596
-/// Cook Mode controls auto-minimize picker); **Data & Privacy** (iCloud Sync
+/// controls auto-minimize picker); **Data & Privacy** (iCloud Sync
 /// via ``CloudSyncRows`` + Clear Cached Recipe Images + Share Anonymous Usage
-/// Data); About Dutch Oven Daddy; version footer. (DUT-196 moved the former
-/// **Tools** ▸ Heat Coach and **Shop** ▸ Buy BuzzyWaxx rows into the Feed's
-/// "Cooking Tools" menu, so neither lives in Settings anymore.)
+/// Data + the DUT-679 Privacy Policy link); About Dutch Oven Daddy; version
+/// footer. (DUT-196 moved the former **Tools** ▸ Heat Coach and **Shop** ▸ Buy
+/// BuzzyWaxx rows into the Feed's "Cooking Tools" menu, off Settings.)
 ///
 /// Section subheaders use `DODType.heading` + primary `DODColor.label`
 /// (T-751 / CL-148) so they read distinctly above the `caption` +
-/// `labelSecondary` footers. All row labels + headers are Title Case
-/// (T-750); footers stay sentence case. The "Default Share Format" UI row was
-/// removed in T-750 (the ``SettingsViewModel/shareFormat`` preference is kept).
+/// `labelSecondary` footers. All row labels + headers are Title Case (T-750);
+/// footers stay sentence case. The "Default Share Format" UI row was removed in
+/// T-750 (the ``SettingsViewModel/shareFormat`` preference is kept).
 ///
-/// Spec trace: US-32 AC-32.1..AC-32.5; US-36 AC-36.1..AC-36.8;
-/// US-41 AC-41.3, AC-41.4; US-44; CL-89; CL-147; CL-148; CL-149.
+/// Spec trace: US-32 AC-32.1..AC-32.5; US-36 AC-36.1..AC-36.8; US-41 AC-41.3,
+/// AC-41.4; US-44; CL-89; CL-147; CL-148; CL-149; DUT-679 (Guideline 5.1.1(i)).
 public struct SettingsView: View {
 
     // `internal` (not `private`) so the `Binding` wrappers in
@@ -120,39 +120,29 @@ public struct SettingsView: View {
         let baseList = List {
             // MARK: US-44 (T-739) — Profile row at the top
 
-            // The Profile section MUST be the first section (above Use
-            // Metric Units) per the locked CL-136 / DUT-36 Phase a
-            // decision — the user expects "Settings → Profile" to be
-            // the first thing they see, matching iOS Settings' "Apple
-            // ID" placement. Renders the empty-state "Set up your
-            // profile" row when no profile exists; renders the avatar
-            // + display name + email row when one does. Tap pushes
-            // `ProfileEditView`.
-            // T-783 / DUT-89 — hidden on iPad (Profile lives in the
-            // sidebar via SidebarProfileRow); kept on iPhone. DUT-572 — the
-            // hide signal is now injected (`hidesProfile`) from RootView's real
-            // device size class, because a sheet reports `.compact` on iPad and
-            // the section could never see regular width on its own.
-            // DUT-238 — account + sign-in (Sign in with Apple, Sign Out, Delete)
-            // all live inside the Profile flow now (tap the Profile row →
-            // `ProfileEditView`). The former standalone Settings ▸ Account section
-            // (US-46) was redundant with that and is removed.
+            // The Profile section MUST be first (above Use Metric Units) per the
+            // locked CL-136 / DUT-36 Phase a decision, matching iOS Settings'
+            // "Apple ID" placement. Renders the empty-state "Set up your profile"
+            // row when none exists, else avatar + name + email; tap pushes
+            // `ProfileEditView`. T-783 / DUT-89 — hidden on iPad (Profile lives
+            // in the sidebar via SidebarProfileRow); the DUT-572 `hidesProfile`
+            // signal is injected from RootView's real size class (a sheet reports
+            // `.compact` on iPad). DUT-238 — account + sign-in (Sign in with
+            // Apple, Sign Out, Delete) all live inside the Profile flow now; the
+            // former standalone Settings ▸ Account section (US-46) is removed.
             ProfileSettingsSection(viewModel: viewModel, hidesProfile: hidesProfile)
 
-            // T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`.
-
             // MARK: T-750 / CL-147 — Measurements & Units group
+            // (T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`.)
 
             // DUT-56 — the "Use Metric Units" toggle (US-32 AC-32.4) + the
-            // "Recipe Step Temperatures" picker (DUT-47) are grouped into
-            // one titled section so the two unit-related controls sit
-            // together instead of scattered across the page.
+            // "Recipe Step Temperatures" picker (DUT-47) grouped into one titled
+            // section so the two unit-related controls sit together.
             Section {
-                // DUT-517 — the "Use Metric Units" toggle now drives a live
-                // consumer: `IngredientMetricConverter` rewrites each scaled
-                // ingredient line to metric (grams / millilitres) at display
-                // time in Recipe Detail + the Cook Mode drawer. The former
-                // DUT-307 "Coming soon" gate (disabled toggle + caption) is
+                // DUT-517 — the "Use Metric Units" toggle drives a live consumer:
+                // `IngredientMetricConverter` rewrites each scaled ingredient line
+                // to metric (grams / millilitres) at display time in Recipe Detail
+                // + the Cook Mode drawer. The former DUT-307 "Coming soon" gate is
                 // removed now that the conversion path exists.
                 Toggle(isOn: useMetricUnitsBinding) {
                     Text("Use Metric Units")
@@ -256,13 +246,11 @@ public struct SettingsView: View {
             .listRowBackground(DODColor.surfaceElevated)
 
             // MARK: T-752 / CL-149 — Data & Privacy group
-
             // DUT-58 — iCloud Sync (`CloudSyncRows`) + Share Anonymous Usage
-            // Data + Clear Cached Recipe Images grouped under one "Data &
-            // Privacy" header, between Tools and About. The iCloud
-            // confirmation alert + status refresh stay on the host body.
-            // T-758 / CL-155 (DUT-64) — Clear Cache moved BELOW the telemetry
-            // toggle (was above).
+            // Data + Clear Cached Recipe Images + the DUT-679 Privacy Policy link
+            // under one "Data & Privacy" header (iCloud alert + status refresh
+            // stay on the host body). T-758 / CL-155 (DUT-64) — Clear Cache below
+            // the telemetry toggle.
             Section {
                 CloudSyncRows(viewModel: viewModel)
 
@@ -281,6 +269,18 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.accent)
                 }
                 .accessibilityIdentifier("settings-button-clear-cache")
+
+                // DUT-679 — App Store Guideline 5.1.1(i) in-app Privacy Policy
+                // link (see `SettingsViewModel+Privacy.swift`).
+                if let privacyPolicyURL = URL(string: SettingsViewModel.privacyPolicyURLString) {
+                    Link(destination: privacyPolicyURL) {
+                        Text("Privacy Policy")
+                            .dodFont(DODType.body)
+                            .foregroundStyle(DODColor.accent)
+                    }
+                    .accessibilityIdentifier("settings-privacy-policy-link")
+                    .accessibilityLabel("Privacy Policy, opens in browser")
+                }
             } header: {
                 sectionHeader("Data & Privacy")
             } footer: {
