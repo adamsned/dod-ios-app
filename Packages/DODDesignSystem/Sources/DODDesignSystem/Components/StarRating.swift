@@ -113,8 +113,6 @@ public struct StarRatingInput: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isSubmitting)
-                .accessibilityLabel("Rate \(star) star\(star == 1 ? "" : "s")")
-                .accessibilityAddTraits(.isButton)
             }
         }
         .opacity(isSubmitting ? 0.5 : 1.0)
