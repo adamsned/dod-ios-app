@@ -35,6 +35,12 @@ public struct AddToShoppingListSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    /// DUT-693 — true while ``confirm()`` awaits the append. Without it a quick
+    /// double-tap on the confirm button fires two overlapping appends (and two
+    /// `onComplete` calls, so the host shows its toast twice); the disable while
+    /// in-flight makes the confirm single-shot.
+    @State private var isSubmitting = false
+
     public init(
         recipe: Recipe,
         appender: any ShoppingListAppender,
@@ -65,7 +71,7 @@ public struct AddToShoppingListSheet: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button(confirmTitle) { confirm() }
-                            .disabled(selection.selectedCount == 0)
+                            .disabled(selection.selectedCount == 0 || isSubmitting)
                             .accessibilityIdentifier("dod.detail.addToShoppingList.confirm")
                     }
                 }
@@ -144,6 +150,10 @@ public struct AddToShoppingListSheet: View {
     }
 
     private func confirm() {
+        // DUT-693 — guard against a double-tap firing two appends. Flip before
+        // the await so the button is disabled for the whole in-flight window.
+        guard !isSubmitting else { return }
+        isSubmitting = true
         let rows = selection.selectedRows
         Task {
             let result = await appender.addToShoppingList(rows: rows)

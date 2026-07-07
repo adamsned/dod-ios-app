@@ -54,6 +54,13 @@ public struct ShoppingListView: View {
     /// confirms first.
     @State private var isConfirmingClear = false
 
+    /// DUT-693 — a transient "couldn't load ingredients" snackbar. `hydrate` is
+    /// non-throwing and returns recipes with EMPTY `ingredients` when a detail
+    /// fetch fails (offline, or a never-opened recipe), so ``build(from:)`` can
+    /// silently append zero rows and drop the cook back on the empty state.
+    /// Surfacing this toast tells them why nothing appeared and what to do.
+    @State private var buildFailureMessage: String?
+
     public init(
         viewModel: ShoppingListViewModel,
         recipes: [Recipe] = [],
@@ -107,6 +114,21 @@ public struct ShoppingListView: View {
                     buildingOverlay
                 }
             }
+            // DUT-693 — the offline / never-opened "couldn't load ingredients"
+            // toast. Reuses the shared `Snackbar`; a `.task` auto-dismisses it
+            // (mirrors Feed / Recipe Detail's snackbar hosts).
+            .overlay(alignment: .bottom) {
+                if let message = buildFailureMessage {
+                    Snackbar(message: message)
+                        .id(message)
+                        .padding(.bottom, DODSpacing.md)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .task {
+                            try? await Task.sleep(nanoseconds: 4_000_000_000)
+                            buildFailureMessage = nil
+                        }
+                }
+            }
     }
 
     /// DUT-487 — subtle progress overlay shown while ``build(from:)`` hydrates
@@ -142,6 +164,15 @@ public struct ShoppingListView: View {
                 return out
             }
             viewModel.add(recipes: hydrated)
+            // DUT-693 — `hydrate` never throws; a failed detail fetch (offline /
+            // never-opened) comes back with empty `ingredients`, so `add` appends
+            // zero rows and the list would silently stay empty. When EVERY picked
+            // recipe hydrated to no ingredients, tell the cook why + how to fix it
+            // rather than dumping them back on the empty state with no explanation.
+            if !hydrated.isEmpty, hydrated.allSatisfy({ $0.ingredients.isEmpty }) {
+                buildFailureMessage =
+                    "Couldn't load ingredients. Open these recipes once while online, then try again."
+            }
             isBuilding = false
         }
     }
@@ -195,11 +226,13 @@ public struct ShoppingListView: View {
     private var shareToolbar: some ToolbarContent {
         if !viewModel.isEmpty {
             ToolbarItem(placement: .primaryAction) {
-                ShareLink(item: ShoppingListFormatter.shareText(viewModel)) {
-                    Label("Share via iMessage", systemImage: "square.and.arrow.up")
-                }
-                .accessibilityIdentifier("shopping-list-share")
-                .accessibilityLabel("Share shopping list")
+                // DUT-693 — the ShareLink payload lives in a child view that
+                // owns it. Building `ShoppingListFormatter.shareText(viewModel)`
+                // reads checked state, so inlining it here rebuilt the payload on
+                // every toggle even with the share sheet closed. In its own view
+                // the read is isolated to that view's body: the button re-renders
+                // on a toggle, the parent body no longer does.
+                ShareShoppingListButton(viewModel: viewModel)
             }
         }
     }
@@ -233,7 +266,19 @@ public struct ShoppingListView: View {
             ForEach(viewModel.sections) { section in
                 Section {
                     ForEach(section.items) { item in
-                        row(for: item)
+                        // DUT-693 — the row is its own `View` (`ShoppingListRow`)
+                        // that takes a plain `checked` Bool + closures. The
+                        // `isChecked` read happens inside this `ForEach` content
+                        // scope (not the enclosing `body`), so a check toggle
+                        // no longer invalidates `ShoppingListView.body` — the
+                        // aisle `sections` regroup + `visibleItems` refilter +
+                        // both toolbars stop recomputing on every toggle.
+                        ShoppingListRow(
+                            item: item,
+                            checked: viewModel.isChecked(item),
+                            onToggle: { viewModel.toggleChecked(item) },
+                            onMarkAlreadyHave: { viewModel.markAlreadyHave(item) }
+                        )
                     }
                 } header: {
                     AisleHeader(aisle: section.aisle)
@@ -245,75 +290,6 @@ public struct ShoppingListView: View {
         #else
         return list
         #endif
-    }
-
-    @ViewBuilder
-    private func row(for item: ShoppingListViewModel.Item) -> some View {
-        let checked = viewModel.isChecked(item)
-        HStack(alignment: .firstTextBaseline, spacing: DODSpacing.sm) {
-            Button {
-                viewModel.toggleChecked(item)
-            } label: {
-                Image(systemName: checked ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(checked ? DODColor.accent : DODColor.labelSecondary)
-                    // DUT-527 — SF-Symbol-only toggle; guarantee a 44pt tap target.
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("shopping-list-row-toggle")
-            // DUT-231 — the leading circle CHECKS a row off (strikethrough,
-            // row stays visible); it is NOT the "already have" affordance (that
-            // is the trailing swipe → `markAlreadyHave`, which removes the row).
-            // Label it for its real behavior and reflect the current state, so
-            // VoiceOver users can tell check-off from swipe-to-remove.
-            .accessibilityLabel(Self.checkOffLabel(checked: checked))
-
-            VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                Text(item.ingredientText)
-                    .dodFont(DODType.body)
-                    .strikethrough(checked)
-                    .foregroundStyle(checked ? DODColor.labelSecondary : DODColor.label)
-                Text(item.recipeTitle)
-                    .dodFont(DODType.caption)
-                    .strikethrough(checked)
-                    .foregroundStyle(DODColor.labelSecondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, DODSpacing.xxs)
-        .listRowBackground(DODColor.surfaceElevated)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel(for: item))
-        .accessibilityAddTraits(checked ? .isSelected : [])
-        // DUT-483 / AC-39.11 — `.accessibilityElement(.ignore)` collapses the
-        // row and swallows the leading check-toggle Button, and the trailing
-        // swipe action REMOVES the row (markAlreadyHave). Without this a
-        // VoiceOver shopper has no way to check a row off — their only action
-        // deletes it. Re-expose the core AC-39.5 check-off as a custom action.
-        // DUT-231 — this action mirrors the leading toggle (check-off, not
-        // "already have"), so it uses the same state-reflecting Check/Uncheck
-        // wording; "already have" stays reserved for the trailing swipe.
-        .accessibilityAction(named: Self.checkOffLabel(checked: checked)) {
-            viewModel.toggleChecked(item)
-        }
-        // AC-39.5 / CL-82 — the trailing "I already have this" affordance.
-        .swipeActions(edge: .trailing) {
-            Button {
-                viewModel.markAlreadyHave(item)
-            } label: {
-                Label("I already have this", systemImage: "checkmark.circle")
-            }
-            .tint(DODColor.accent)
-        }
-    }
-
-    /// AC-39.11 — `"<ingredient text>, <aisle>, from <recipe title>"`.
-    private func accessibilityLabel(for item: ShoppingListViewModel.Item) -> String {
-        "\(item.ingredientText), \(AisleHeader.displayName(item.aisle)), from \(item.recipeTitle)"
     }
 
     /// DUT-231 — VoiceOver label for the leading check-off toggle (and its
@@ -349,16 +325,11 @@ struct AisleHeader: View {
 
     /// AC-39.4 display names for the six shipped aisles. `meat` renders as
     /// "Meat & Seafood" per AC-39.4 (the logic core folds seafood into `.meat`
-    /// per CL-80).
+    /// per CL-80). DUT-693 — the switch lives once on ``ShoppingListFormatter``
+    /// (the pure, unit-tested home); this delegates so the header + the share
+    /// text can never drift.
     static func displayName(_ aisle: IngredientAisleClassifier.Aisle) -> String {
-        switch aisle {
-        case .produce: "Produce"
-        case .meat: "Meat & Seafood"
-        case .dairy: "Dairy"
-        case .pantry: "Pantry"
-        case .spices: "Spices"
-        case .other: "Other"
-        }
+        ShoppingListFormatter.displayName(aisle)
     }
 
     /// AC-39.4 per-aisle SF Symbol glyphs (mapped for the six shipped cases).
@@ -374,6 +345,31 @@ struct AisleHeader: View {
         case .spices: "flame"
         case .other: "cart"
         }
+    }
+}
+
+// MARK: - Share button (DUT-693 — isolates the ShareLink payload read)
+
+/// AC-39.7 / CL-85 decision 3 — "Share via iMessage". A SwiftUI `ShareLink`
+/// wrapping the plain-text payload from ``ShoppingListFormatter`` (no `MessageUI`
+/// dependency, per AC-39.7 / CL-72 — the system share sheet routes to iMessage /
+/// AirDrop / Mail / Notes / Copy). The shared text is the still-need subset —
+/// checked + already-have rows are excluded (CL-85's recorded deviation from
+/// CL-72's full-list snapshot).
+///
+/// DUT-693 — this lives in its own view so the `shareText(viewModel)` build (it
+/// reads checked state) is scoped to THIS body, not ``ShoppingListView``'s. The
+/// old inline placement rebuilt the payload on every check toggle even with the
+/// share sheet closed.
+private struct ShareShoppingListButton: View {
+    let viewModel: ShoppingListViewModel
+
+    var body: some View {
+        ShareLink(item: ShoppingListFormatter.shareText(viewModel)) {
+            Label("Share via iMessage", systemImage: "square.and.arrow.up")
+        }
+        .accessibilityIdentifier("shopping-list-share")
+        .accessibilityLabel("Share shopping list")
     }
 }
 
