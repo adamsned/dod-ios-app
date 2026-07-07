@@ -68,8 +68,13 @@ struct FeaturedRecipeWidgetEntryView: View {
         }
     }
 
-    /// Build a `dod://recipe/<id>` URL for tap-through.
+    /// Build a `dod://recipe/<id>` URL for tap-through. DUT-652 — a placeholder
+    /// entry (the `.auto` / `.recipes` empty fallback) carries `id <= 0`, whose
+    /// `dod://recipe/0` deep link is a dead tap (no such recipe). Fall back to
+    /// `dod://feed` for those so the tap still lands somewhere useful, matching
+    /// the `recipe == nil` empty-tile behaviour.
     static func deepLink(for recipe: WidgetSnapshot.Entry) -> URL? {
+        guard recipe.id > 0 else { return URL(string: "dod://feed") }
         var components = URLComponents()
         components.scheme = "dod"
         components.host = "recipe"

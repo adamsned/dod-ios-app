@@ -1,5 +1,4 @@
 import AppIntents
-import DODAnalytics
 import DODFeatureRecipeDetail
 import Foundation
 
@@ -8,12 +7,16 @@ import Foundation
 /// Spec trace: US-40 / AC-40.5, CL-83. Each intent is a thin adapter: it posts
 /// a ``VoiceCommand`` onto the process-wide ``VoiceCommandBus`` (which the live
 /// Cook Mode session registers itself with — see
-/// ``CookModeViewModel/beginCookMode()``) and fires a `voiceCommandFired`
-/// telemetry event. The bus forwards to the active session's already-tested
-/// control method, so a Siri command and an on-screen tap reach identical code
-/// (AC-7.4). When Cook Mode isn't foreground the bus has no handler and the
-/// command is a silent no-op — Siri can match the phrase from the lock screen
-/// without an active session.
+/// ``CookModeViewModel/beginCookMode()``). The bus forwards to the active
+/// session's already-tested control method, so a Siri command and an on-screen
+/// tap reach identical code (AC-7.4). When Cook Mode isn't foreground the bus
+/// has no handler and the command is a silent no-op — Siri can match the phrase
+/// from the lock screen without an active session.
+///
+/// DUT-637 — the `voiceCommandFired` telemetry is emitted by the bus's
+/// ``VoiceCommandBus/deliver(_:)`` ONLY when a handler consumed the command, so
+/// a no-op lock-screen dispatch no longer logs a phantom "fired" event. The
+/// intents therefore just dispatch and return.
 ///
 /// The intents take **no** `recipe` parameter (unlike US-10's `OpenRecipeIntent`)
 /// because they act on whatever step the live session is on, and they leave
@@ -31,7 +34,6 @@ struct NextStepIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         VoiceCommandBus.shared.dispatch(.next)
-        Telemetry.shared.send(.voiceCommandFired(command: .next))
         return .result()
     }
 }
@@ -47,7 +49,6 @@ struct PreviousStepIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         VoiceCommandBus.shared.dispatch(.previous)
-        Telemetry.shared.send(.voiceCommandFired(command: .previous))
         return .result()
     }
 }
@@ -63,7 +64,6 @@ struct RepeatStepIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         VoiceCommandBus.shared.dispatch(.repeat)
-        Telemetry.shared.send(.voiceCommandFired(command: .repeat))
         return .result()
     }
 }
@@ -79,7 +79,6 @@ struct PauseVoiceIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         VoiceCommandBus.shared.dispatch(.pause)
-        Telemetry.shared.send(.voiceCommandFired(command: .pause))
         return .result()
     }
 }
@@ -96,7 +95,6 @@ struct ResumeVoiceIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         VoiceCommandBus.shared.dispatch(.resume)
-        Telemetry.shared.send(.voiceCommandFired(command: .resume))
         return .result()
     }
 }
