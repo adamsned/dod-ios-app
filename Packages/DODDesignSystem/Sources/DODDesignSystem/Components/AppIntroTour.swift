@@ -99,6 +99,10 @@ public struct AppIntroTour: View {
                     .dodFont(DODType.displayLarge)
                     .foregroundStyle(DODColor.label)
                     .multilineTextAlignment(.center)
+                    // DUT-694 (PR-C): let the headline grow vertically (like the
+                    // body below) so it wraps instead of truncating first at
+                    // large Dynamic Type sizes.
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Text(page.description)
                     .dodFont(DODType.body)
