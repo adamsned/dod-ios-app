@@ -74,6 +74,41 @@ import Testing
         #expect(viewModel.loadState == .loaded)  // NOT .error
     }
 
+    @Test func refreshReloadsPageOneAndBumpsHapticCount() async {
+        // DUT-693 (PR6): pull-to-refresh reloads page 1 and bumps `refreshCount`
+        // (the `.success` haptic trigger) on a clean reload.
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.posts[1] = (1...5).map(Self.makeItem)
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 5)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.refreshCount == 0)
+
+        // Category now returns a different set — refresh replaces page 1.
+        dependencies.posts[1] = (10...16).map(Self.makeItem)
+        await viewModel.refresh()
+        #expect(viewModel.items.count == 7)
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.refreshCount == 1)
+    }
+
+    @Test func refreshFailureKeepsTheLoadedGrid() async {
+        // DUT-693 (PR6): a failed pull-to-refresh on a populated grid keeps the
+        // items + `.loaded` state (no wipe to the error screen) and does NOT
+        // reward a `.success` haptic.
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.posts[1] = (1...5).map(Self.makeItem)
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 5)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+
+        dependencies.failOnPage = 1
+        await viewModel.refresh()
+        #expect(viewModel.items.count == 5)  // grid preserved
+        #expect(viewModel.loadState == .loaded)  // NOT .error
+        #expect(viewModel.refreshCount == 0)  // no reward on failure
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
