@@ -62,7 +62,12 @@ enum RecipeRouteResolver {
         // Cache-first: widgets / Spotlight always hit here, so their
         // behavior is unchanged (no network, no LRU touch).
         if let cached = try? await cachedLookup(id) {
-            let item = RecipeEntityPayload.fromRecipe(cached).toListItem()
+            // DUT-670 — build the list item from the cached `Recipe` directly so
+            // its real `publishedAt` + a formatted `totalTimeDisplay` survive. The
+            // old `RecipeEntityPayload.fromRecipe(cached).toListItem()` hop dropped
+            // both (hardcoded `.distantPast` / `nil`), so the pushed detail row lost
+            // its date + cook-time chip on a cache hit.
+            let item = listItem(fromCached: cached)
             return .recipe(item: item, autoStartCookMode: autoStartCookMode)
         }
 
@@ -81,6 +86,35 @@ enum RecipeRouteResolver {
             DODLog.app.error("deep link: recipe \(id) fetch failed: \(String(describing: error))")
             return nil
         }
+    }
+
+    /// DUT-670 — map a cached ``Recipe`` to the ``RecipeListItem`` the detail
+    /// route carries, preserving `publishedAt` and formatting `totalTime` into
+    /// `totalTimeDisplay` (the two fields the old `RecipeEntityPayload` hop lost).
+    private static func listItem(fromCached recipe: Recipe) -> RecipeListItem {
+        RecipeListItem(
+            id: recipe.id,
+            title: recipe.title,
+            excerpt: recipe.excerpt,
+            heroImage: recipe.heroImage,
+            publishedAt: recipe.publishedAt,
+            totalTimeDisplay: recipe.totalTime.flatMap(Self.timeDisplay),
+            canonicalURL: recipe.canonicalURL
+        )
+    }
+
+    /// DUT-670 — format a `Duration` as the recipe time-chip string ("30 min" /
+    /// "1 hr 15 min"), mirroring the persistence layer's `formatTime` mapping so
+    /// a cache-hit route reads the same chip a fresh REST list item would.
+    private static func timeDisplay(_ duration: Duration) -> String? {
+        let seconds = Int(duration.components.seconds)
+        guard seconds > 0 else { return nil }
+        let minutes = seconds / 60
+        if minutes == 0 { return "<1 min" }
+        if minutes < 60 { return "\(minutes) min" }
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return remainder == 0 ? "\(hours) hr" : "\(hours) hr \(remainder) min"
     }
 
     /// DUT-549 — the caller-facing outcome of a resolve: a route to push, or an

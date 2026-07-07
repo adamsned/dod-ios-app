@@ -1,3 +1,4 @@
+import DODAnalytics
 import Foundation
 import Observation
 
@@ -95,6 +96,25 @@ public final class VoiceCommandBus {
         case .repeat: handler.repeatCurrentStep()
         case .pause: handler.pauseVoice()
         case .resume: handler.resumeVoice()
+        }
+        // DUT-637 — emit the `voiceCommandFired` telemetry only once a handler
+        // has actually CONSUMED the command (past the `guard let handler`). The
+        // intents used to fire it unconditionally, so a Siri command with no
+        // foreground Cook Mode session (the common lock-screen case) logged a
+        // phantom "fired" event even though the command was a silent no-op.
+        Telemetry.shared.send(.voiceCommandFired(command: Self.telemetryName(for: command)))
+    }
+
+    /// DUT-637 — map the bus command onto the analytics `VoiceCommandName`. The
+    /// two enums are intentionally 1:1; kept as an explicit switch so a future
+    /// command can't silently drift the mapping.
+    private static func telemetryName(for command: VoiceCommand) -> VoiceCommandName {
+        switch command {
+        case .next: return .next
+        case .previous: return .previous
+        case .repeat: return .repeat
+        case .pause: return .pause
+        case .resume: return .resume
         }
     }
 }

@@ -23,7 +23,12 @@ enum RecipeRoute: Hashable {
         case (.recipe(let lItem, let lAuto), .recipe(let rItem, let rAuto)):
             return lItem.id == rItem.id && lAuto == rAuto
         case (.category(let lCategory), .category(let rCategory)):
-            return lCategory == rCategory
+            // DUT-658 — key category identity on `id` only, mirroring the
+            // `.recipe` narrowing above. The whole `Category` includes a volatile
+            // `count` (recipe tally) that differs between a browse-list fetch and
+            // a deep-link resolve for the SAME category, which broke NavigationStack
+            // de-duplication (two logically-identical destinations failed `==`).
+            return lCategory.id == rCategory.id
         default:
             return false
         }
@@ -37,7 +42,9 @@ enum RecipeRoute: Hashable {
             hasher.combine(autoStartCookMode)
         case .category(let category):
             hasher.combine(1)
-            hasher.combine(category)
+            // DUT-658 — hash on `id` only so it stays consistent with the
+            // narrowed `==` above (a differing `count` must not change the hash).
+            hasher.combine(category.id)
         }
     }
 }

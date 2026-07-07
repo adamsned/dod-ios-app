@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODFeatureFeed
 import DODFeatureProfile
 import SwiftUI
 
@@ -17,9 +18,17 @@ struct SidebarProfileRow: View {
     /// threaded into the editor's account teardown. Injected by `RootView` (the
     /// composition root that owns those stores). `nil` in previews.
     var accountTeardownExtras: (@MainActor (Bool) async -> Void)?
+    /// DUT-607 — the same `SettingsViewModel` the iPhone `ProfileSettingsRow`
+    /// reads to build the profile-stats hooks. Injected by `RootView` so the iPad
+    /// sidebar's `ProfileEditView` shows the Cook Rank / counts / "View Cooking
+    /// Journal" section the iPhone Settings profile does (it was previously built
+    /// WITHOUT `statsHooks`, so the whole stats section silently vanished on iPad).
+    /// `nil` in previews / unwired hosts, which just hides the section.
+    var settingsViewModel: SettingsViewModel?
 
     @State private var profile: UserProfile?
     @State private var showingEditor = false
+    @State private var showingJournal = false
 
     var body: some View {
         Button {
@@ -52,10 +61,41 @@ struct SidebarProfileRow: View {
                         existingProfile: profile,
                         onProfileChanged: { await reload() },
                         photoStore: profilePhotoStore,
+                        // DUT-607 — pass the stats hooks like the iPhone row does.
+                        statsHooks: profileStatsHooks,
                         extraTeardown: accountTeardownExtras
                     )
                 }
             }
+        }
+        .sheet(isPresented: $showingJournal) { cookJournalSheet }
+    }
+
+    /// DUT-607 — composition hooks for the profile stats section, built from the
+    /// injected `SettingsViewModel` exactly like `ProfileSettingsRow`. Nil (section
+    /// hidden) until a real dependency is wired (`profileStatsAvailable`).
+    private var profileStatsHooks: ProfileStatsHooks? {
+        guard let settingsViewModel, settingsViewModel.profileStatsAvailable else { return nil }
+        return ProfileStatsHooks(
+            load: { [weak settingsViewModel] in await settingsViewModel?.loadProfileStats() ?? .empty },
+            viewCookingJournal: { showingJournal = true }
+        )
+    }
+
+    /// DUT-607 — the Cooking Journal sheet (read + in-place edit), reusing the
+    /// same `CookJournalView` the iPhone profile stats section presents.
+    @ViewBuilder
+    private var cookJournalSheet: some View {
+        if let settingsViewModel {
+            CookJournalView(
+                load: { [weak settingsViewModel] in await settingsViewModel?.profileJournalEntries() ?? [] },
+                update: { [weak settingsViewModel] entry in
+                    await settingsViewModel?.updateProfileJournalEntry(entry)
+                },
+                delete: { [weak settingsViewModel] entry in
+                    await settingsViewModel?.deleteProfileJournalEntry(entry)
+                }
+            )
         }
     }
 
