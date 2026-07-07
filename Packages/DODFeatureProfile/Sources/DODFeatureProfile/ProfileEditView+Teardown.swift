@@ -62,7 +62,11 @@ extension ProfileEditView {
     /// `revoke` is true (Delete Profile), it also revokes the captured refresh
     /// token (best-effort: the local clear already succeeded, and the token
     /// expires server-side, so a transient revoke failure still deletes
-    /// locally). `profileStore.clear()` also deletes the on-disk photo (AC-44.9).
+    /// locally). DUT-678: a revoke failure no longer stays silent — it's
+    /// logged as an error (see below) so a stranded, un-revoked Apple token
+    /// (5.1.1(v)) is observable rather than swallowed, without blocking the
+    /// user's deletion. `profileStore.clear()` also deletes the on-disk photo
+    /// (AC-44.9).
     static func performAccountTeardown(
         revoke: Bool,
         profileStore: any ProfileStoring,
@@ -103,7 +107,21 @@ extension ProfileEditView {
         // would otherwise survive teardown and prefill for the NEXT user.
         try? guestIdentity.clear()
         if revoke, let token, let revoker {
-            try? await revoker.revoke(refreshToken: token)
+            // DUT-678: the revoke is best-effort for the USER — the local rows
+            // are already cleared and the token expires server-side, so a
+            // transient failure must NOT block or fail account deletion. But a
+            // silently-swallowed `try?` made a failed revoke invisible, so we
+            // couldn't tell whether 5.1.1(v) actually held. Keep deletion
+            // non-blocking, but SURFACE the failure as an error log (the token
+            // itself is never logged) so a stranded, un-revoked Apple token is
+            // observable in the field rather than lost.
+            do {
+                try await revoker.revoke(refreshToken: token)
+            } catch {
+                DODLog.network.error(
+                    "SiwA revoke FAILED during account deletion (App Store 5.1.1(v)); local teardown still completed. error=\(String(describing: error), privacy: .public)"
+                )
+            }
         }
         // DUT-296: clear/revoke the GoogleSignIn SDK's own OAuth tokens — they
         // live in a separate Keychain row the app's clears never touch.

@@ -90,6 +90,35 @@ import Testing
         #expect(extras.calls == [false, true])  // Delete also ran
     }
 
+    /// DUT-678 — a FAILED revoke must not fail (or block) account deletion: the
+    /// local rows are already cleared and the token expires server-side, so the
+    /// teardown still completes without throwing. (The failure is surfaced via
+    /// an error log — not asserted here, but the point is it's no longer a
+    /// silent `try?` that also hid the throw from deletion completion.)
+    @Test func failedRevokeStillCompletesDeletionWithoutThrowing() async throws {
+        let profileStore = SpyProfileStore()
+        let sessionStore = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "u1", refreshToken: "rt-1")
+        )
+        let guest = SpyGuestIdentityStore()
+        let failingRevoker = FailingRevoker()
+
+        // Must NOT throw — deletion completes for the user despite the revoke
+        // failing (App Store 5.1.1(v) revoke is best-effort at this layer).
+        try await ProfileEditView.performAccountTeardown(
+            revoke: true,
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            guestIdentity: guest,
+            revoker: failingRevoker
+        )
+
+        #expect(failingRevoker.attempts == 1)  // the revoke WAS attempted
+        #expect(profileStore.clearCalls == 1)  // local teardown still ran
+        #expect((try? sessionStore.load()) == nil)
+        #expect(guest.clearCalls == 1)
+    }
+
     /// DUT-268 — a profile-clear failure must NOT skip the session/guest clears,
     /// the revoke, or the Google teardown; they all run, then the error surfaces.
     @Test func profileClearFailureStillRunsTheRestThenThrows() async {
@@ -145,6 +174,17 @@ private final class SpyRevoker: SiwaRevoking, @unchecked Sendable {
     private(set) var revokedTokens: [String] = []
     func exchange(authorizationCode: String) async throws -> String { "rt" }
     func revoke(refreshToken: String) async throws { revokedTokens.append(refreshToken) }
+}
+
+/// DUT-678 — a revoker whose `revoke` always throws, to pin that a failed
+/// revoke is surfaced (logged) but does NOT fail the user's account deletion.
+private final class FailingRevoker: SiwaRevoking, @unchecked Sendable {
+    private(set) var attempts = 0
+    func exchange(authorizationCode: String) async throws -> String { "rt" }
+    func revoke(refreshToken: String) async throws {
+        attempts += 1
+        throw SiwaRevokeError.http(504)
+    }
 }
 
 private final class GoogleTeardownSpy: @unchecked Sendable {
