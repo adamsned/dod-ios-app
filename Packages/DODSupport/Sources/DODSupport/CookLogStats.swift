@@ -27,6 +27,20 @@ public enum CookLogStats {
         entries.count
     }
 
+    /// DUT-625 / DUT-685 — the cook count that feeds the RANK ladder: the journal
+    /// minus off-path dump-cake cooks. Product assumption: dump cakes are "Anytime
+    /// Treats" off the guided path, and graduation is path-only, so a first-ever
+    /// dump cake must NOT earn a rank the path population wouldn't. This is the
+    /// SINGLE source of truth for the rank population so the rank DISPLAY (Cooking
+    /// Journal + Settings profile) and the rank-up CELEBRATION can never diverge
+    /// (DUT-685 — they previously counted different populations). Distinct from
+    /// ``totalCooks(_:)``, which stays the true "total cooks" stat everywhere it's
+    /// shown.
+    public static func rankLadderCookCount(_ entries: [CookLogEntry]) -> Int {
+        let dumpCakeRecipeIDs = Set(DumpCake.all.map(\.id))
+        return entries.filter { !dumpCakeRecipeIDs.contains($0.recipeID) }.count
+    }
+
     /// How many times a specific recipe has been cooked ("made 4×").
     public static func timesCooked(recipeID: Int, in entries: [CookLogEntry]) -> Int {
         entries.reduce(into: 0) { count, entry in

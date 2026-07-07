@@ -39,10 +39,15 @@ extension ProfileEditView {
     /// Cook Rank hero: the current rank's emoji + title, a progress caption, and
     /// (mid-climb) a progress bar toward the next rank.
     private func rankHero(stats: ProfileStats) -> some View {
-        let rank = CookProgression.currentRank(totalCooks: stats.totalCooks)
+        // DUT-685 — the Cook Rank derives from the path-only `rankLadderCooks`, the
+        // SAME population the rank-up celebration counts, so the visible rank and
+        // the next celebration can't contradict. `totalCooks` still feeds the
+        // "Total Cooks" cell below.
+        let rankCooks = stats.rankLadderCooks
+        let rank = CookProgression.currentRank(totalCooks: rankCooks)
         let climbing =
-            stats.totalCooks > 0
-            && CookProgression.nextRank(totalCooks: stats.totalCooks) != nil
+            rankCooks > 0
+            && CookProgression.nextRank(totalCooks: rankCooks) != nil
         return HStack(spacing: DODSpacing.md) {
             Text(rank?.emoji ?? "🍳")
                 .font(.system(size: 44))
@@ -51,12 +56,12 @@ extension ProfileEditView {
                 Text(rank?.title ?? "Your Cook Rank")
                     .dodFont(DODType.heading)
                     .foregroundStyle(DODColor.labelStrong)
-                Text(Self.rankProgressCaption(totalCooks: stats.totalCooks))
+                Text(Self.rankProgressCaption(totalCooks: rankCooks))
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if climbing {
-                    ProgressView(value: CookProgression.progressToNextRank(totalCooks: stats.totalCooks))
+                    ProgressView(value: CookProgression.progressToNextRank(totalCooks: rankCooks))
                         .tint(DODColor.accent)
                 }
             }
