@@ -75,7 +75,7 @@ struct IdleSuggestionsView: View {
                                     // identifier on the matching one is the
                                     // robust hook.
                                     .accessibilityIdentifier(
-                                        isLatestRecipesCategory(category)
+                                        SearchViewModel.isLatestRecipesCategory(category)
                                             ? "dod.search.tryPill.latestRecipes" : ""
                                     )
                                 }
@@ -108,7 +108,11 @@ struct IdleSuggestionsView: View {
                     .accessibilityLabel("Clear all recent searches")
             }
             FlowLayout(spacing: DODSpacing.xs) {
-                ForEach(Array(recents.enumerated()), id: \.offset) { _, query in
+                // DUT-693 — key by the string, not the array offset: recents
+                // reorder/dedupe (most-recent-first, unique), so a positional id
+                // reuses identity across distinct terms and animates wrong on
+                // reorder. Recents are unique strings, so `\.self` is stable.
+                ForEach(recents, id: \.self) { query in
                     pill(text: query, systemImage: "clock") {
                         onRecentTap(query)
                     }
@@ -204,16 +208,6 @@ struct IdleSuggestionsView: View {
                 .foregroundStyle(DODColor.label)
             content()
         }
-    }
-
-    /// T-638 / CL-107 — case-insensitive name match (or id-1590 fallback)
-    /// against the "Latest Recipes" WP category, mirroring the same check
-    /// `SearchView` uses to route the tap to `surfaceLatestRecipes(...)`.
-    /// Kept in sync with that call site by convention (CL-106's id `1590`
-    /// + name-match contract).
-    private func isLatestRecipesCategory(_ category: DODDomain.Category) -> Bool {
-        category.id == 1590
-            || category.name.localizedCaseInsensitiveCompare("Latest Recipes") == .orderedSame
     }
 
     private func pill(

@@ -137,7 +137,9 @@ public struct SearchView: View {
         let message: String
         switch state {
         case .results:
-            let count = viewModel.items.count
+            // DUT-693 — `.results` covers title-tier OR ingredient-tier hits, so
+            // count both (`items.count` alone announced "0 recipes found").
+            let count = viewModel.items.count + viewModel.ingredientItems.count
             message = "\(count) \(count == 1 ? "recipe" : "recipes") found."
         case .noResults:
             message = "No recipes found."
@@ -247,23 +249,15 @@ public struct SearchView: View {
                 // term. Persisting it makes Clear All look broken because
                 // the same curated terms reappear under Recent.
                 onCategoryTap: { category in
-                    // US-29 / AC-29.1 amendment / CL-106 (T-637): the
-                    // "Latest Recipes" category (id 1590, slug
-                    // `latest-recipes` — confirmed by SubTypeTests.swift)
-                    // is special-cased. Running `selectCuratedSuggestion`
-                    // with the literal name would fire a fulltext REST
-                    // search for "Latest Recipes" which returns garbage
-                    // (the phrase appears in many unrelated articles'
-                    // boilerplate). Case-insensitive name match is the
-                    // canonical check (robust against future renames);
-                    // the id check is a belt-and-suspenders fallback in
-                    // case the name drifts. Every other category falls
-                    // through to the normal curated-tap path (CL-49).
-                    let isLatestRecipes =
-                        category.id == 1590
-                        || category.name.localizedCaseInsensitiveCompare("Latest Recipes")
-                            == .orderedSame
-                    if isLatestRecipes {
+                    // US-29 / AC-29.1 amendment / CL-106 (T-637): "Latest
+                    // Recipes" is special-cased — a literal `selectCuratedSuggestion`
+                    // fulltext search for the phrase returns garbage; every other
+                    // category falls through to the curated-tap path.
+                    // DUT-693 — the id-1590 / name-match test is now the canonical
+                    // `nonisolated static` predicate on the view model
+                    // (`SearchViewModel+T639.swift`); this call site and
+                    // `IdleSuggestionsView` both delegate to it.
+                    if SearchViewModel.isLatestRecipesCategory(category) {
                         Task { await viewModel.surfaceLatestRecipes() }
                     } else {
                         viewModel.selectCuratedSuggestion(category.name)
@@ -294,11 +288,17 @@ public struct SearchView: View {
                 message: "Try a different word or clear a filter."
             )
         case .offline:
+            // DUT-693 — offline only re-fired on a query TEXT change, so an
+            // unchanged query dead-ended; "Try Again" re-runs via `retrySearch()`.
             EmptyState(
                 systemImage: "wifi.slash",
                 title: "Search needs internet",
-                message: "Reconnect to search dutchovendaddy.com."
+                message: "Reconnect to search dutchovendaddy.com.",
+                action: .init(title: "Try Again") {
+                    Task { await viewModel.retrySearch() }
+                }
             )
+            .accessibilityIdentifier("dod.search.offlineState")
         case .error:
             // DUT-622: the online request FAILED (vs genuinely finding nothing),
             // so offer a Retry rather than the dead-end "No recipes match"
