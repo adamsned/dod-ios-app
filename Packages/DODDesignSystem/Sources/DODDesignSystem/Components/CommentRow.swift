@@ -55,7 +55,15 @@ public struct CommentRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let ratingValue, ratingValue > 0 {
-                    StarRatingDisplay(average: Double(ratingValue), count: 1, starSize: 12)
+                    // DUT-646 — `showsCount: false` suppresses the "· 1 rating"
+                    // caption. A per-comment star line is always a single
+                    // rating, so the caption is pure noise here.
+                    StarRatingDisplay(
+                        average: Double(ratingValue),
+                        count: 1,
+                        starSize: 12,
+                        showsCount: false
+                    )
                 }
 
                 if isPendingModeration {

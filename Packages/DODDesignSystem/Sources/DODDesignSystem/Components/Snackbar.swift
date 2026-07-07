@@ -20,13 +20,24 @@ public struct Snackbar: View {
 
     /// DUT-230 — optional self-owned auto-dismiss. When supplied, the snackbar
     /// starts a countdown of ``autoDismissDelay`` and calls this once it
-    /// elapses. The countdown is keyed to `message`, so a message-to-message
-    /// replacement (a new non-nil message replacing the current one, with no
-    /// intervening nil) **restarts** the countdown — the new message always
-    /// gets its full duration rather than inheriting the previous message's
+    /// elapses. The countdown is keyed to ``presentationToken`` (see below), so
+    /// re-presenting **restarts** the countdown — the new presentation always
+    /// gets its full duration rather than inheriting the previous one's
     /// remaining time. `nil` (the default) keeps the component a dumb leaf: a
     /// host that drives its own dismiss timer is unaffected.
     public let onAutoDismiss: (@MainActor () -> Void)?
+
+    /// DUT-659 — the auto-dismiss countdown key. `.task(id:)` cancels + re-runs
+    /// the countdown whenever this value changes. Keying on the message text
+    /// (the old behavior) meant that replacing a message with an **identical**
+    /// string never restarted the countdown, so a re-shown identical message
+    /// inherited the previous one's remaining time (and could dismiss almost
+    /// instantly). Hosts that re-present a snackbar should bump this token on
+    /// each present (a monotonic counter) so every presentation — even one with
+    /// the same text — gets a fresh full-duration countdown. Defaults to `0`;
+    /// combined with `message` for the `.task` id so single-shot hosts that
+    /// leave it at the default still restart on a genuine text change.
+    public let presentationToken: Int
 
     /// DUT-230 — how long a non-nil message stays up before ``onAutoDismiss``
     /// fires. Ignored when `onAutoDismiss` is `nil`.
@@ -48,17 +59,21 @@ public struct Snackbar: View {
 
     /// DUT-230 — designated initializer that opts the snackbar into owning its
     /// auto-dismiss countdown. `sleep` is a seam for tests; production callers
-    /// leave it at the `Task.sleep` default.
+    /// leave it at the `Task.sleep` default. DUT-659 — `presentationToken`
+    /// keys the countdown; bump it on each present so identical-text
+    /// re-presentations restart the full countdown.
     public init(
         message: String,
         action: Action? = nil,
         autoDismissDelay: Duration = .seconds(4),
+        presentationToken: Int = 0,
         onAutoDismiss: (@MainActor () -> Void)?,
         sleep: @Sendable @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) {
         self.message = message
         self.action = action
         self.autoDismissDelay = autoDismissDelay
+        self.presentationToken = presentationToken
         self.onAutoDismiss = onAutoDismiss
         self.sleep = sleep
     }
@@ -94,12 +109,15 @@ public struct Snackbar: View {
             let spoken = action.map { "\(message). \($0.title) available." } ?? message
             AccessibilityNotification.Announcement(spoken).post()
         }
-        // DUT-230 — key the auto-dismiss countdown to `message`. `.task(id:)`
-        // cancels + re-runs whenever `message` changes, so a message-to-message
-        // replacement restarts the full countdown instead of letting the new
-        // message inherit the previous one's remaining time. No-op when the
+        // DUT-659 — key the auto-dismiss countdown to a per-presentation token
+        // (plus `message`), NOT the message text alone. `.task(id:)` cancels +
+        // re-runs only when the id changes; keying on `message` alone meant an
+        // identical-string replacement never restarted the countdown, so the
+        // re-shown message inherited the previous one's remaining time. A host
+        // that bumps `presentationToken` on every present now restarts the full
+        // countdown even when the new message text is identical. No-op when the
         // host owns dismissal (`onAutoDismiss == nil`).
-        .task(id: message) {
+        .task(id: DismissKey(token: presentationToken, message: message)) {
             await Self.runAutoDismiss(
                 delay: autoDismissDelay,
                 sleep: sleep,
@@ -128,6 +146,16 @@ public struct Snackbar: View {
             return  // cancelled (message replaced or view gone) — don't fire.
         }
         onAutoDismiss()
+    }
+
+    /// DUT-659 — the `.task(id:)` key for the auto-dismiss countdown. Combines
+    /// the host-bumped `presentationToken` with `message` so the countdown
+    /// restarts on either a genuine text change OR an identical-text
+    /// re-presentation (token bump). Equal keys keep the in-flight countdown;
+    /// any change cancels + restarts it.
+    struct DismissKey: Equatable {
+        let token: Int
+        let message: String
     }
 }
 

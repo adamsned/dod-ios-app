@@ -15,11 +15,18 @@ public struct StarRatingDisplay: View {
     public let average: Double
     public let count: Int
     public let starSize: CGFloat
+    /// DUT-646 — when `false`, the trailing "· N rating(s)" caption is
+    /// suppressed and only the stars render. `CommentRow` passes `false`
+    /// because a per-comment star line always represents exactly one rating,
+    /// so a "· 1 rating" caption on every row is noise. Defaults to `true`
+    /// to preserve the aggregate-header behavior (average + count).
+    public let showsCount: Bool
 
-    public init(average: Double, count: Int, starSize: CGFloat = 16) {
+    public init(average: Double, count: Int, starSize: CGFloat = 16, showsCount: Bool = true) {
         self.average = average
         self.count = count
         self.starSize = starSize
+        self.showsCount = showsCount
     }
 
     public var body: some View {
@@ -30,9 +37,11 @@ public struct StarRatingDisplay: View {
         } else {
             HStack(spacing: DODSpacing.xxs) {
                 stars
-                Text("· \(count) \(count == 1 ? "rating" : "ratings")")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                if showsCount {
+                    Text("· \(count) \(count == 1 ? "rating" : "ratings")")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityLabel)
