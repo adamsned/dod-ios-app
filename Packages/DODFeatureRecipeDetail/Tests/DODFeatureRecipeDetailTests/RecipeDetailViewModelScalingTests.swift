@@ -76,6 +76,56 @@ import Testing
         #expect(viewModel.servingsScaleFactor == 1.0)
     }
 
+    /// DUT-677 — a recipe whose REAL `recipeYield` is 4 (identical to
+    /// ``defaultServings``) must still sync the stepper to the source yield on
+    /// first load. The old guard (`sourceServings != Self.defaultServings`)
+    /// collided the genuine yield with the not-yet-parsed sentinel and skipped
+    /// the sync, so a stale/manual `userServings` was never reset back to the
+    /// real source yield → ingredients silently scaled at the wrong factor.
+    @Test func firstLoadSyncsGenuineYieldOfFourAfterStaleValue() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 411,
+            withDetail: true,
+            servings: 4
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 411)
+        await viewModel.onAppear()
+
+        // Real parsed yield is genuinely 4 — NOT the unparsed sentinel.
+        #expect(viewModel.sourceServings == 4)
+        #expect(viewModel.recipe?.servings == 4)
+
+        // A stale serving count sits on the stepper before the one-shot fires.
+        viewModel.setUserServings(9)
+        #expect(viewModel.userServings == 9)
+
+        // First-load sync must reset the stepper to the genuine source yield.
+        // Pre-fix the guard bailed because 4 == defaultServings, leaving the
+        // stepper stuck at 9 and scaling ingredients at 9/4.
+        viewModel.resetServingsToSourceIfFirstLoad()
+        #expect(viewModel.userServings == 4)
+        #expect(viewModel.servingsScaleFactor == 1.0)
+        #expect(viewModel.lastSyncedSourceServings == 4)
+    }
+
+    /// DUT-677 regression guard — the true "no parsed yield" (sentinel) case is
+    /// preserved: with no recipe loaded, neither resync path clobbers the
+    /// stepper (the guards must skip when `recipe?.servings` is nil).
+    @Test func noParsedYieldStillSkipsResync() {
+        let dependencies = FakeRecipeDetailDependencies()
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 413)
+        // Recipe never loaded — sourceServings is the sentinel/default.
+        #expect(viewModel.recipe == nil)
+        viewModel.setUserServings(7)
+
+        viewModel.resetServingsToSourceIfFirstLoad()  // records baseline, no clamp
+        #expect(viewModel.userServings == 7)  // manual value survives
+
+        viewModel.resyncServingsIfSourceYieldChanged()
+        #expect(viewModel.userServings == 7)  // still no clobber
+    }
+
     @Test func setUserServingsClampsToRange() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(

@@ -12,6 +12,14 @@ import Foundation
 
 extension RecipeDetailViewModel {
 
+    /// DUT-677 — true once a *real* `recipeYield` has parsed. The resync guards
+    /// must distinguish "the yield is genuinely known" from "still the not-yet-
+    /// parsed sentinel", and `sourceServings` collides the two: a recipe whose
+    /// real yield equals ``defaultServings`` (4) is byte-identical to the
+    /// fallback. Gate on the optional (`recipe?.servings`), which is `nil` only
+    /// while unparsed, instead of on the collided `Int`.
+    private var hasParsedYield: Bool { recipe?.servings != nil }
+
     /// Adjust the user's serving count (clamped to ``userServingsRange``).
     /// Called from the stepper's `value` binding. AC-31.7: changing the
     /// serving count never clears ``checkedIngredientIDs`` — the user's
@@ -33,7 +41,9 @@ extension RecipeDetailViewModel {
         // syncs and ingredients silently scale at default/N. Pinning the
         // baseline to the default makes that later real yield differ → resync.
         lastSyncedSourceServings = sourceServings
-        guard sourceServings != Self.defaultServings else { return }
+        // DUT-677: skip only when NO real yield has parsed yet (sentinel),
+        // not when the parsed yield merely happens to equal ``defaultServings``.
+        guard hasParsedYield else { return }
         userServings = clampToRange(sourceServings)
     }
 
@@ -43,7 +53,9 @@ extension RecipeDetailViewModel {
     /// (same yield) never clobber a manual edit; defers to the one-shot for the
     /// first sync (`lastSyncedSourceServings == nil`).
     public func resyncServingsIfSourceYieldChanged() {
-        guard sourceServings != Self.defaultServings else { return }
+        // DUT-677: gate on a genuinely parsed yield, not on the collided Int —
+        // a recipe whose real yield is ``defaultServings`` (4) must still resync.
+        guard hasParsedYield else { return }
         guard let last = lastSyncedSourceServings, sourceServings != last else { return }
         lastSyncedSourceServings = sourceServings
         userServings = clampToRange(sourceServings)
