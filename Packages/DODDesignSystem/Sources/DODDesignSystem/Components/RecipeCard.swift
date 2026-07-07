@@ -172,6 +172,7 @@ public struct RecipeCard: View {
     static func timeChip(_ display: String) -> some View {
         HStack(spacing: DODSpacing.xxs) {
             Image(systemName: "clock")
+                .accessibilityHidden(true)  // DUT-693 — decorative glyph
             Text(display)
         }
         .dodFont(DODType.caption)

@@ -20,6 +20,7 @@ extension CookingToolsHubView {
                 .foregroundStyle(DODColor.burntOrange)
                 .frame(width: 40, height: 40)
                 .background(DODColor.burntOrange.opacity(0.12), in: Circle())
+                .accessibilityHidden(true)  // DUT-693 — decorative glyph
             VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                 Text("COOKING TIP")
                     .dodFont(DODType.caption)

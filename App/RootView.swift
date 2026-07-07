@@ -283,7 +283,7 @@ struct RootView: View {
     }
 
     private var phoneTabs: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: tabSelection) {
             ForEach(AppTab.allCases) { tab in
                 TabStack(
                     tab: tab,

@@ -176,6 +176,27 @@ extension RootView {
         }
     }
 
+    /// DUT-693 (PR7) — the tab-selection binding for `phoneTabs`' `TabView`.
+    /// Re-tapping the already-selected tab pops that tab's stack to root: the
+    /// hoisted per-tab `NavigationStack(path:)` bindings (DUT-250) defeat
+    /// SwiftUI's implicit "re-tap pops to root", so the setter detects a re-tap
+    /// (the new value equals the current `selectedTab`) and clears that tab's
+    /// slot in `tabPaths` instead of reassigning. A genuine tab switch just
+    /// assigns, leaving the target tab's stack untouched. Lives here (not in
+    /// `RootView.swift`) for the `file_length` cap.
+    var tabSelection: Binding<AppTab> {
+        Binding(
+            get: { selectedTab },
+            set: { newValue in
+                if newValue == selectedTab {
+                    tabPaths[newValue] = []
+                } else {
+                    selectedTab = newValue
+                }
+            }
+        )
+    }
+
     /// DUT-250 — the hoisted navigation-stack binding for one tab. The paths
     /// live in `RootView`'s `tabPaths` dictionary (which survives the iPad
     /// size-class flip), and each `TabStack` reads/writes its slot through this
@@ -278,6 +299,10 @@ extension RootView {
 /// cap.
 struct DeepLinkErrorSnackbar: ViewModifier {
     @Binding var message: String?
+    /// DUT-693 (PR7) — the overlay is reused for the card-save failure toast
+    /// (`TabStack`), so the a11y identifier is a parameter (defaults to the
+    /// original deep-link id) to keep the two snackbars distinguishable.
+    var accessibilityID: String = "deep-link-error-snackbar"
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .bottom) {
@@ -291,7 +316,7 @@ struct DeepLinkErrorSnackbar: ViewModifier {
                         try? await Task.sleep(nanoseconds: 4_000_000_000)
                         self.message = nil
                     }
-                    .accessibilityIdentifier("deep-link-error-snackbar")
+                    .accessibilityIdentifier(accessibilityID)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: message)

@@ -94,6 +94,7 @@ extension CookingToolsHubView {
                 Image(systemName: icon)
                     .font(.title2)
                     .foregroundStyle(DODColor.burntOrange)
+                    .accessibilityHidden(true)  // DUT-693 — decorative glyph
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                     Text(title)
                         .dodFont(DODType.heading)
@@ -111,6 +112,7 @@ extension CookingToolsHubView {
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(DODColor.labelSecondary)
+                    .accessibilityHidden(true)  // DUT-693 — decorative affordance glyph
             }
             .padding(DODSpacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
