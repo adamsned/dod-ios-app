@@ -11,6 +11,8 @@ public struct SearchView: View {
     // the `SearchViewModel` storage was promoted from `private` (CL-106).
     @State var viewModel: SearchViewModel
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    // DUT-700 PR-A — Reduce-Motion gate for the shopping-list snackbar ease.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// US-38 / AC-38.2 / CL-64 (T-650, 2026-05-27) — shared with `FeedView`
     /// via the same `@AppStorage` key. Default `.gallery` preserves the
     /// existing search-results 2-column grid byte-for-byte.
@@ -116,9 +118,10 @@ public struct SearchView: View {
         .onChange(of: viewModel.state) { _, newState in
             announceSearchState(newState)
         }
-        // DUT-534 Part 2 — the "Add to Shopping List" confirmation snackbar,
-        // anchored to the bottom (mirrors Recipe Detail's Part 1 host).
+        // DUT-534 Part 2 — bottom "Add to Shopping List" snackbar host (mirrors
+        // Recipe Detail Part 1). DUT-700 PR-A drives its transition, RM-gated.
         .overlay(alignment: .bottom) { shoppingListSnackbar }
+        .animation(reduceMotion ? nil : .default, value: viewModel.shoppingListSnackbarMessage)
         .background(DODColor.surface)
         // DUT-275 — nav bar hidden so the title pins at the very top, at the same
         // Y as every other tab (the title is the `DODScreenHeader` above).
@@ -130,9 +133,8 @@ public struct SearchView: View {
     }
 
     /// DUT-527 — announce the result count once the search settles, so a
-    /// VoiceOver user hears how many recipes came back (or that none did)
-    /// instead of silently landing in the results list. Gated on the two
-    /// terminal states so the transient `.searching` flip never speaks.
+    /// VoiceOver user hears how many recipes came back (or that none did) rather
+    /// than landing silently. Gated on the two terminal states (no `.searching`).
     private func announceSearchState(_ state: SearchViewModel.State) {
         let message: String
         switch state {
@@ -393,8 +395,6 @@ public struct SearchView: View {
     }
 }
 
-// `FlowLayout` (FlowLayout.swift), `FilterChipRow` (FilterChipRow.swift),
-// `IdleSuggestionsView` (IdleSuggestionsView.swift), and the DUT-25
-// search-field affordance (SearchFieldAffordance.swift) live in their own
-// files to keep this one under SwiftLint's 400-line cap. None depend on
-// `SearchView`'s source.
+// `FlowLayout`, `FilterChipRow`, `IdleSuggestionsView`, and the DUT-25
+// search-field affordance each live in their own file to keep this one under
+// SwiftLint's 400-line cap. None depend on `SearchView`'s source.

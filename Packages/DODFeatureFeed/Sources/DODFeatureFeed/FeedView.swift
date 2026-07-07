@@ -18,6 +18,8 @@ public struct FeedView: View {
     // DUT-534 Part 2 — internal (was `private`) so the card-list builders moved
     // to `FeedView+ShoppingList` can read the size class for adaptive layout.
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    // DUT-700 PR-A — Reduce-Motion gate for the OfflineBanner ease.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// US-38 / AC-38.2 / CL-64 (T-650, 2026-05-27) — shared with `SearchView`
     /// via the same `@AppStorage` key. Default `.gallery` preserves CC-9's
     /// 2-column grid byte-for-byte for users who never tap the toggle.
@@ -122,7 +124,7 @@ public struct FeedView: View {
         // DUT-527 — `refreshAndAnnounce` runs the pull-to-refresh, then posts a
         // VoiceOver completion + result-count announcement (see FeedView+Helpers).
         .refreshable { await refreshAndAnnounce() }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.isOffline)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: viewModel.isOffline)
         .sensoryFeedback(.success, trigger: viewModel.refreshCount)
     }
 

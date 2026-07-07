@@ -303,6 +303,8 @@ struct DeepLinkErrorSnackbar: ViewModifier {
     /// (`TabStack`), so the a11y identifier is a parameter (defaults to the
     /// original deep-link id) to keep the two snackbars distinguishable.
     var accessibilityID: String = "deep-link-error-snackbar"
+    /// DUT-700 PR-A — Reduce-Motion gate for the snackbar's ease.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .bottom) {
@@ -319,6 +321,6 @@ struct DeepLinkErrorSnackbar: ViewModifier {
                     .accessibilityIdentifier(accessibilityID)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: message)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: message)
     }
 }

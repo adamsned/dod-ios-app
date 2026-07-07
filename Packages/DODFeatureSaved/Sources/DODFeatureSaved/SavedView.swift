@@ -193,7 +193,9 @@ public struct SavedView: View {
                         // the row lingers until the next `.task` cycle
                         // (tab switch). Order matters: UI first, then
                         // persistence fires asynchronously.
-                        viewModel.optimisticallyRemove(id: recipe.id)
+                        // DUT-700 PR-A — ease the grid reflow (default ~0.35s;
+                        // an L5 test asserts the card is gone within 0.5s).
+                        withAnimation { viewModel.optimisticallyRemove(id: recipe.id) }
                         // DUT-629 — restore the row if the store write failed.
                         onSave?(recipe) { didSave in
                             if !didSave { Task { await viewModel.refresh() } }
@@ -238,7 +240,9 @@ public struct SavedView: View {
                     isSaved: true,
                     isDownloaded: viewModel.downloadedIDs.contains(recipe.id),
                     onToggle: {
-                        viewModel.optimisticallyRemove(id: recipe.id)
+                        // DUT-700 PR-A — ease the list reflow (default ~0.35s;
+                        // an L5 test asserts the card is gone within 0.5s).
+                        withAnimation { viewModel.optimisticallyRemove(id: recipe.id) }
                         // DUT-629 — restore the row if the store write failed.
                         onSave?(recipe) { didSave in
                             if !didSave { Task { await viewModel.refresh() } }
