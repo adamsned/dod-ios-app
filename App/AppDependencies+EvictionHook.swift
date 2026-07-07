@@ -10,7 +10,6 @@ extension AppDependencies {
     /// Guarded by a lock because `AppDependencies.init` is `@MainActor` but this
     /// static is `nonisolated`.
     private static let evictionHookLock = NSLock()
-    nonisolated(unsafe) private static var evictionHookInstalled = false
 
     /// DUT-475 — install the `RecipeStore.onBridgedImagesEvicted` delivery hook.
     /// Extracted from `init` as the testable seam: the hook the production evict
@@ -25,8 +24,11 @@ extension AppDependencies {
     static func installBridgedEvictionHook(_ reload: @escaping @Sendable () -> Void) {
         evictionHookLock.lock()
         defer { evictionHookLock.unlock() }
-        guard !evictionHookInstalled else { return }
-        evictionHookInstalled = true
+        // Idempotent by the hook's own presence: skip if one is already
+        // installed so a second `AppDependencies()` can't clobber the live
+        // closure. Naturally re-arms when the hook is cleared to nil (tests),
+        // so no separate process-wide latch is needed.
+        guard RecipeStore.onBridgedImagesEvicted == nil else { return }
         RecipeStore.onBridgedImagesEvicted = reload
     }
 }
