@@ -55,18 +55,13 @@ struct CloudKitContainerSelectionTests {
     // MARK: - Configuration branch matches the flag (REG-25 / AC-41.1)
 
     @Test func optOutConfigurationNeverTouchesCloudKit() throws {
-        // Drive the shared-defaults read path the production factory uses.
-        let defaults = UserDefaults.standard
-        let prior = defaults.object(forKey: RecipeStore.cloudKitSyncOptInKey)
+        // Isolated suite so parallel suites can't clobber the shared-defaults
+        // opt-in flag mid-read (DUT-700). The factory reads the flag from the
+        // injected defaults, so this drives the same branch without touching
+        // `.standard`.
+        let defaults = Self.isolatedDefaults()
         defaults.set(false, forKey: RecipeStore.cloudKitSyncOptInKey)
-        defer {
-            if let prior {
-                defaults.set(prior, forKey: RecipeStore.cloudKitSyncOptInKey)
-            } else {
-                defaults.removeObject(forKey: RecipeStore.cloudKitSyncOptInKey)
-            }
-        }
-        let configuration = RecipeStore.makeProductionConfiguration()
+        let configuration = RecipeStore.makeProductionConfiguration(defaults: defaults)
         // The plain configuration carries no CloudKit container identifier.
         #expect(configuration.cloudKitContainerIdentifier == nil)
     }
