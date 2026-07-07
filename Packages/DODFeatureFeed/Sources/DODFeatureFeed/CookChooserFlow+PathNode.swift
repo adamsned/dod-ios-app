@@ -39,6 +39,10 @@ struct CookPathNode: View {
             }
         }
         .frame(width: 48)
+        // The bare node symbol (a number, checkmark, or flame) is read by VO
+        // before every roadmap card, but the card's `statePill` already conveys
+        // done / current / upcoming — so hide the decorative rail from VO.
+        .accessibilityHidden(true)
     }
 
     private var node: some View {

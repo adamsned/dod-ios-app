@@ -149,8 +149,8 @@ struct CookingToolsHubView: View {
 
     /// DUT-572 — gates the header Settings gear to compact width (iPhone). On iPad
     /// (regular width) the sidebar already hosts a Settings row, so the gear is
-    /// redundant here.
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// redundant here. `internal` so the extracted tool cards read it too (DUT-695).
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
 
     init(
         dependencies: AppDependencies,
@@ -321,8 +321,7 @@ struct CookingToolsHubView: View {
     // MARK: - The tool list
 
     // The six tool cards + the `toolCard` builder live in
-    // `CookingToolsHubView+ToolCards.swift` so this host type stays under the
-    // SwiftLint `type_body_length` cap (mirrors the `+TipBanner.swift` split).
+    // `CookingToolsHubView+ToolCards.swift` to stay under `type_body_length`.
 
     /// Cook Mode can't launch without a recipe, so this row's sheet explains the
     /// flow and routes the user to the Recipes tab to pick something to cook.
@@ -332,6 +331,7 @@ struct CookingToolsHubView: View {
                 Image(systemName: "flame.circle.fill")
                     .font(.system(size: 56))
                     .foregroundStyle(DODColor.burntOrange)
+                    .accessibilityHidden(true)
                 Text("Cook Mode")
                     .dodFont(DODType.displayMedium)
                     .foregroundStyle(DODColor.labelStrong)
@@ -369,7 +369,7 @@ struct CookingToolsHubView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { activeToolSheet = nil }
-                        .tint(DODColor.burntOrange)
+                        .tint(DODColor.burntOrange).keyboardShortcut(.cancelAction)  // DUT-695
                 }
             }
         }

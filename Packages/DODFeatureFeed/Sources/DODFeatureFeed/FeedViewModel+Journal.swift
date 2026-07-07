@@ -13,20 +13,33 @@ extension FeedViewModel {
         (try? await dependencies.cookLogs()) ?? []
     }
 
-    /// CL-273 — save a journal entry's personal reflection / photo. Best-effort
-    /// (a journal write never blocks the UI). This updates an existing entry in
-    /// place and never logs a new cook, so it cannot change the cook count and
-    /// therefore cannot affect rank.
-    public func updateCook(_ entry: CookLogEntry) async {
-        try? await dependencies.updateCookLog(entry)
+    /// CL-273 — save a journal entry's personal reflection / photo. This updates an
+    /// existing entry in place and never logs a new cook, so it cannot change the
+    /// cook count and therefore cannot affect rank. DUT-694 (PR-D) — returns whether
+    /// the write succeeded (was `try?`, which swallowed the failure) so the journal
+    /// view can surface it instead of silently losing the edit.
+    public func updateCook(_ entry: CookLogEntry) async -> Bool {
+        do {
+            try await dependencies.updateCookLog(entry)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// DUT-514 — delete a journal entry (cascades its photo file in the store).
-    /// Best-effort, mirroring `updateCook`. Unlike an edit this DOES change the
-    /// cook count, so the journal must reload its stats after — the view does that
-    /// by re-running its `load` closure once this returns.
-    public func deleteCook(_ entry: CookLogEntry) async {
-        try? await dependencies.deleteCookLog(id: entry.id)
+    /// Unlike an edit this DOES change the cook count, so the journal must reload
+    /// its stats after — the view does that by re-running its `load` closure once
+    /// this returns. DUT-694 (PR-D) — returns whether the delete succeeded (was
+    /// `try?`) so the journal view can surface a failure rather than silently
+    /// reloading the "deleted" entry back into the list.
+    public func deleteCook(_ entry: CookLogEntry) async -> Bool {
+        do {
+            try await dependencies.deleteCookLog(id: entry.id)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// DUT-625 / DUT-685 — the cook count that feeds the RANK ladder (journal

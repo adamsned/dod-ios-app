@@ -41,10 +41,14 @@ struct SidebarProfileRow: View {
                         .dodFont(DODType.heading)
                         .foregroundStyle(DODColor.label)
                         .lineLimit(1)
+                        // DUT-695 — shrink rather than clip at large Dynamic Type.
+                        .minimumScaleFactor(0.8)
                     Text(profile == nil ? "Add Your Name and Photo" : "View profile")
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)
                         .lineLimit(1)
+                        // DUT-695 — shrink rather than clip at large Dynamic Type.
+                        .minimumScaleFactor(0.8)
                 }
                 Spacer(minLength: 0)
             }
@@ -89,11 +93,14 @@ struct SidebarProfileRow: View {
         if let settingsViewModel {
             CookJournalView(
                 load: { [weak settingsViewModel] in await settingsViewModel?.profileJournalEntries() ?? [] },
+                // DUT-694 (PR-D) — the journal closures now return success; a
+                // deallocated view-model reports success so a torn-down sheet
+                // never raises a false failure alert.
                 update: { [weak settingsViewModel] entry in
-                    await settingsViewModel?.updateProfileJournalEntry(entry)
+                    await settingsViewModel?.updateProfileJournalEntry(entry) ?? true
                 },
                 delete: { [weak settingsViewModel] entry in
-                    await settingsViewModel?.deleteProfileJournalEntry(entry)
+                    await settingsViewModel?.deleteProfileJournalEntry(entry) ?? true
                 }
             )
         }

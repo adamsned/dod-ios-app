@@ -51,6 +51,8 @@ public struct DODSearchField: View {
         HStack(spacing: DODSpacing.xs) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(DODColor.labelSecondary)
+                // DUT-694 (PR-C): decorative leading glyph — hide from VoiceOver.
+                .accessibilityHidden(true)
             TextField(placeholder, text: $text)
                 .autocorrectionDisabled()
                 .dodFont(DODType.body)
@@ -66,6 +68,11 @@ public struct DODSearchField: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(DODColor.labelSecondary)
+                        // DUT-694 (PR-C): the glyph alone is a sub-44pt target —
+                        // pad the label to the 44pt HIG minimum and make the full
+                        // frame hittable.
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Clear")
             }

@@ -24,6 +24,12 @@ public struct DODHeaderGearButton: View {
             Image(systemName: "gearshape")
                 .font(.title2)
                 .accessibilityLabel("Settings")
+                // DUT-694 (PR-C): the `.title2` glyph alone is only a ~22pt tap
+                // target. Pad the label to the 44pt HIG minimum and make the
+                // whole frame hittable so the Settings entry (present on all 4
+                // tabs) is comfortably tappable.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .tint(DODColor.burntOrange)
         .accessibilityIdentifier(accessibilityID)

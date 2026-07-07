@@ -70,6 +70,10 @@ extension CookingToolsHubView {
                     accessibilityID: "hub-buy-buzzywaxx"
                 ) { openToolURL(SettingsViewModel.buyBuzzyWaxxURLString) }
             }
+            // DUT-695 — cap the 6 tool cards to a readable centered column on
+            // iPad (regular width) so they don't stretch edge-to-edge; compact
+            // (iPhone) is returned unchanged.
+            .readableContentColumn(horizontalSizeClass)
             .padding(.horizontal, DODSpacing.md)
             .padding(.bottom, DODSpacing.md)
         }
@@ -123,6 +127,8 @@ extension CookingToolsHubView {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // DUT-695 — trackpad/pointer lift on iPad; no-op without a pointer.
+        .hoverEffect(.highlight)
         .accessibilityIdentifier(accessibilityID)
     }
 }

@@ -93,8 +93,10 @@ struct ProfileSettingsRow: View {
     private var cookJournalSheet: some View {
         CookJournalView(
             load: { [weak viewModel] in await viewModel?.profileJournalEntries() ?? [] },
-            update: { [weak viewModel] entry in await viewModel?.updateProfileJournalEntry(entry) },
-            delete: { [weak viewModel] entry in await viewModel?.deleteProfileJournalEntry(entry) }  // DUT-514
+            // DUT-694 (PR-D) — a deallocated view-model reports success (nothing to
+            // persist), so a torn-down sheet never raises a false failure alert.
+            update: { [weak viewModel] entry in await viewModel?.updateProfileJournalEntry(entry) ?? true },
+            delete: { [weak viewModel] entry in await viewModel?.deleteProfileJournalEntry(entry) ?? true }  // DUT-514
         )
     }
 }
