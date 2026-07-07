@@ -66,13 +66,26 @@ struct RecipeDetailVideoSection: View {
                 aspectRatio = ratio
             }
         }
-        .onVideoPlaybackStarted(of: player) {
-            // DUT-632 — switch the shared audio session to `.playback` the moment
-            // the user actually plays the video, so it's audible even with the
-            // hardware silent switch on. The player itself is never muted; the
-            // default `.soloAmbient` category was silencing it when the ringer
-            // switch was off. Idempotent, so repeated transitions are harmless.
-            RecipeVideoAudioSession.activateForPlayback()
+        .onVideoPlaybackStateChanged(of: player) { state in
+            switch state {
+            case .playing:
+                // DUT-632 — switch the shared audio session to `.playback` the
+                // moment the user actually plays the video, so it's audible even
+                // with the hardware silent switch on. The player itself is never
+                // muted; the default `.soloAmbient` category was silencing it when
+                // the ringer switch was off. Idempotent, so repeats are harmless.
+                RecipeVideoAudioSession.activateForPlayback()
+            case .paused:
+                // DUT-683 — the video paused/ended, so hand the `.playback`
+                // session back with `.notifyOthersOnDeactivation` — otherwise the
+                // user's background music/podcast, grabbed on the first tap, never
+                // resumes. GUARDED inside `deactivate()` to release only a session
+                // this video path activated, never a live Voice Mode session.
+                RecipeVideoAudioSession.deactivate()
+            case .waitingToPlay:
+                // Buffering — neither grab nor release; wait for a real play/pause.
+                break
+            }
         }
     }
 
@@ -111,26 +124,22 @@ struct RecipeDetailVideoSection: View {
 }
 
 extension View {
-    /// DUT-632 — run `action` whenever `player` transitions into actually
-    /// playing. On iOS we observe the player's `timeControlStatus` via its KVO
-    /// publisher and fire only on `.playing` (mapped through
-    /// ``RecipeVideoAudioSession/shouldActivate(for:)``), so nothing happens
-    /// until the user starts playback. Off iOS this is a no-op — the package
-    /// builds for the macOS host in `swift test`, where the audio session (and
-    /// this side effect) don't apply.
+    /// DUT-632 / DUT-683 — run `action` with the player's playback state whenever
+    /// `player` transitions between paused / buffering / playing. On iOS we
+    /// observe the player's `timeControlStatus` via its KVO publisher and map each
+    /// status onto ``RecipeVideoAudioSession/PlaybackState`` so the call site can
+    /// grab the audio session on `.playing` and release it on `.paused`. Off iOS
+    /// this is a no-op — the package builds for the macOS host in `swift test`,
+    /// where the audio session (and these side effects) don't apply.
     @ViewBuilder
-    func onVideoPlaybackStarted(of player: AVPlayer?, perform action: @escaping () -> Void) -> some View {
+    func onVideoPlaybackStateChanged(
+        of player: AVPlayer?,
+        perform action: @escaping (RecipeVideoAudioSession.PlaybackState) -> Void
+    ) -> some View {
         #if os(iOS)
         if let player {
             onReceive(player.publisher(for: \.timeControlStatus)) { status in
-                let state: RecipeVideoAudioSession.PlaybackState =
-                    switch status {
-                    case .paused: .paused
-                    case .waitingToPlayAtSpecifiedRate: .waitingToPlay
-                    case .playing: .playing
-                    @unknown default: .paused
-                    }
-                if RecipeVideoAudioSession.shouldActivate(for: state) { action() }
+                action(RecipeVideoAudioSession.playbackState(from: status))
             }
         } else {
             self
