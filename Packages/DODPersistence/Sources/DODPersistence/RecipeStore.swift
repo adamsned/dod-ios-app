@@ -333,21 +333,26 @@ public actor RecipeStore {
 
     // Non-private (DUT-513): `savedRecipesWithSavedAt()` in
     // `RecipeStore+SyncedSaved.swift` maps provisional `CachedRecipe` pins here.
+    /// Shared, read-only `JSONDecoder` reused by ``toDomain(_:)`` for all four
+    /// blob fields — `JSONDecoder` is safe to reuse across decode calls, so this
+    /// avoids allocating a fresh decoder per field per row.
+    private static let sharedDecoder = JSONDecoder()
+
     static func toDomain(_ row: CachedRecipe) -> Recipe {
         let canonical = URL(string: row.canonicalURLString) ?? URL(filePath: "/dev/null")
         let ingredients =
             (row.ingredientsJSON.flatMap {
-                try? JSONDecoder().decode([RecipeIngredient].self, from: $0)
+                try? sharedDecoder.decode([RecipeIngredient].self, from: $0)
             }) ?? []
         let instructions =
             (row.instructionsJSON.flatMap {
-                try? JSONDecoder().decode([RecipeInstruction].self, from: $0)
+                try? sharedDecoder.decode([RecipeInstruction].self, from: $0)
             }) ?? []
         let nutrition = row.nutritionJSON.flatMap {
-            try? JSONDecoder().decode(RecipeNutrition.self, from: $0)
+            try? sharedDecoder.decode(RecipeNutrition.self, from: $0)
         }
         let video = row.videoJSON.flatMap {
-            try? JSONDecoder().decode(RecipeVideo.self, from: $0)
+            try? sharedDecoder.decode(RecipeVideo.self, from: $0)
         }
         // US-37 / CL-63 / AC-37.4 (T-640): reconstruct kind from row
         // signals. Non-nil `jsonLDFailedAt` + non-empty body ⇒ article.

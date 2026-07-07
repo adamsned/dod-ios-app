@@ -65,10 +65,13 @@ enum HTMLEntityDecoder {
     /// character references to their Unicode scalar. Unparseable or
     /// out-of-range references are left verbatim, so a stray `&#;` never
     /// silently eats surrounding text.
+    private static let numericEntityRegex = try? NSRegularExpression(
+        pattern: "&#[xX]?[0-9A-Fa-f]+;"
+    )
+
     private static func decodeNumericReferences(_ string: String) -> String {
-        let pattern = "&#[xX]?[0-9A-Fa-f]+;"
         guard
-            let regex = try? NSRegularExpression(pattern: pattern),
+            let regex = numericEntityRegex,
             !string.isEmpty
         else { return string }
 

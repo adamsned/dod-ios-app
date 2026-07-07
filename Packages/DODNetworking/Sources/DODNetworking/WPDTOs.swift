@@ -90,30 +90,9 @@ enum WPDTO {
         }
     }
 
-    /// Parse a WP ISO8601 `date`. DUT-398: append "Z" only when the stamp lacks
-    /// its own offset (doing so blindly niled "…+00:00"/fractional stamps → `now`).
-    static func parseWPDate(_ raw: String?) -> Date {
-        guard let raw else { return Date() }
-        let withZone = hasExplicitOffset(raw) ? raw : raw + "Z"
-        let formatter = ISO8601DateFormatter()
-        for options: ISO8601DateFormatter.Options in [
-            [.withInternetDateTime, .withFractionalSeconds], [.withInternetDateTime],
-        ] {
-            formatter.formatOptions = options
-            if let date = formatter.date(from: withZone) { return date }
-        }
-        return Date()
-    }
-
-    /// True when `raw` carries a timezone ("Z" or a "+HH:MM"/"-HHMM" time offset).
-    private static func hasExplicitOffset(_ raw: String) -> Bool {
-        if raw.hasSuffix("Z") { return true }
-        guard let tIndex = raw.lastIndex(of: "T") else { return false }
-        let time = raw[raw.index(after: tIndex)...]
-        guard let sign = time.lastIndex(where: { $0 == "+" || $0 == "-" }) else { return false }
-        let digits = time[sign...].dropFirst().filter { $0 != ":" }
-        return (digits.count == 2 || digits.count == 4) && digits.allSatisfy(\.isNumber)
-    }
+    // DUT-693: `parseWPDate` + `hasExplicitOffset` + the shared ISO8601
+    // formatters live in `WPDTOs+DateParsing.swift` to keep this file under the
+    // 400-line file_length cap.
 
     // MARK: - Comments (US-13 / REG-13)
 
