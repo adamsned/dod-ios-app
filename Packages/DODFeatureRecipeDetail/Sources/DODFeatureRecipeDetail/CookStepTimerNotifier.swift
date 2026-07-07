@@ -26,9 +26,16 @@ public protocol CookStepTimerNotifying: Sendable {
     /// Schedule the step-done notification `seconds` from now for
     /// `(recipeID, stepIndex)`. A non-positive duration is a no-op.
     func scheduleStepDone(after seconds: TimeInterval, recipeID: Int, stepIndex: Int) async
-    /// Cancel the pending (and any already-delivered) step-done notification for
-    /// `(recipeID, stepIndex)` — the user paused / reset that timer, or it
-    /// finished in the foreground. Only that step's request is removed.
+    /// DUT-686 — cancel only the PENDING (not-yet-fired) step-done request for
+    /// `(recipeID, stepIndex)`, leaving any already-DELIVERED banner in place.
+    /// Used on the paths where the alert is now redundant but the user may not
+    /// have acknowledged a banner that already fired: a pause, or a foreground
+    /// finish (the in-app buzzer covers it). Only that step's pending request is
+    /// removed.
+    func cancelPendingStepDone(recipeID: Int, stepIndex: Int) async
+    /// Cancel the pending AND any already-delivered step-done notification for
+    /// `(recipeID, stepIndex)` — an explicit user-driven stop/reset of that
+    /// timer, which acknowledges the alert. Only that step's request is removed.
     func cancelStepDone(recipeID: Int, stepIndex: Int) async
     /// Cancel EVERY pending / delivered step-done notification for `recipeID` —
     /// the Cook Mode session ended, so no step alert should survive it.
@@ -97,6 +104,18 @@ public struct SystemCookStepTimerNotifier: CookStepTimerNotifying {
             trigger: trigger
         )
         try? await UNUserNotificationCenter.current().add(request)
+        #endif
+    }
+
+    public func cancelPendingStepDone(recipeID: Int, stepIndex: Int) async {
+        #if canImport(UserNotifications)
+        guard Self.hasHostBundle else { return }
+        // DUT-686 — pending only: do NOT touch delivered banners. On a foreground
+        // finish (or a pause) the app may have been backgrounded long enough for
+        // this step's banner to already fire; yanking a delivered banner the cook
+        // hasn't acknowledged is the bug. Only drop the not-yet-fired request.
+        let ids = [Self.identifier(recipeID: recipeID, stepIndex: stepIndex)]
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
         #endif
     }
 

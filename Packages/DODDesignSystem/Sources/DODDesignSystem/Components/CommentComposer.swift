@@ -113,7 +113,7 @@ public struct CommentComposer: View {
                 .dodFont(DODType.caption)
                 .foregroundStyle(counterColor)
                 .monospacedDigit()
-                .accessibilityLabel("\(text.count) of \(maxCharacters) characters used")
+                .accessibilityLabel(counterAccessibilityLabel)
         }
     }
 
@@ -152,6 +152,23 @@ public struct CommentComposer: View {
     private var counterColor: Color {
         let limit = Double(maxCharacters) * 0.95
         return Double(text.count) >= limit ? .red : DODColor.labelSecondary
+    }
+
+    /// DUT-694 — the visible counter signals "approaching the limit" with red
+    /// color alone, which VoiceOver can't perceive. Enrich the a11y label (only)
+    /// so the same warning reaches non-sighted users. At/over the cap reads
+    /// "at limit" (the editor hard-clamps input, so count never exceeds max);
+    /// within the red band but under the cap reads "approaching limit".
+    private var counterAccessibilityLabel: String {
+        let base = "\(text.count) of \(maxCharacters) characters used"
+        if text.count >= maxCharacters {
+            return "\(base), at limit"
+        }
+        let warnThreshold = Double(maxCharacters) * 0.95
+        if Double(text.count) >= warnThreshold {
+            return "\(base), approaching limit"
+        }
+        return base
     }
 
     /// Either the trimmed body OR a non-zero rating qualifies as a real
