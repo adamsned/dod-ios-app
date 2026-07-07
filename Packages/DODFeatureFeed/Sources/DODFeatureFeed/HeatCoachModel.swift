@@ -33,13 +33,16 @@ struct HeatCoachModel {
     }
 
     /// The condition coal delta applied to the starting estimate: the ambient
-    /// (air-temperature) adjustment PLUS the wind adjustment, summed. Elevation
-    /// is deliberately excluded — it changes cook TIME, not coal count. Mild +
-    /// calm → `0...0` (no change).
+    /// (air-temperature) adjustment PLUS the wind adjustment PLUS the elevation
+    /// adjustment (DUT-682 — thin air burns coals cooler, so altitude adds
+    /// heat as well as time), summed. Mild + calm + sea level → `0...0`.
     var conditionCoalDelta: ClosedRange<Int> {
         let ambientDelta = DutchOvenHeatCoach.ambientCoalDelta(ambient)
         let windDelta = DutchOvenHeatCoach.windCoalDelta(windy)
-        return (ambientDelta.lowerBound + windDelta.lowerBound)...(ambientDelta.upperBound + windDelta.upperBound)
+        let elevationDelta = DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: elevationFeet)
+        let lower = ambientDelta.lowerBound + windDelta.lowerBound + elevationDelta
+        let upper = ambientDelta.upperBound + windDelta.upperBound + elevationDelta
+        return lower...upper
     }
 
     /// The starting split ADJUSTED for the current conditions (DUT-600): the
@@ -113,13 +116,26 @@ struct HeatCoachModel {
         return "At \(feet) ft: add \(range.lowerBound)-\(range.upperBound) minutes to the cook."
     }
 
+    /// Elevation coal line, e.g. "At 5,000 ft: add 2 coals, since the thin air
+    /// burns them cooler." (DUT-682 — altitude adds *heat* as well as time; the
+    /// underlying delta is folded into ``conditionCoalDelta`` so the diagram
+    /// also moves.) Pairs with ``elevationNote`` (the added time). `nil` at or
+    /// below the baseline so the UI omits a no-op row.
+    var elevationCoalNote: String? {
+        let delta = DutchOvenHeatCoach.elevationCoalDelta(elevationFeetAboveBaseline: elevationFeet)
+        guard delta > 0 else { return nil }
+        let feet = Self.feetFormatter.string(from: NSNumber(value: elevationFeet)) ?? "\(elevationFeet)"
+        let coalWord = delta == 1 ? "coal" : "coals"
+        return "At \(feet) ft: add \(delta) \(coalWord), since the thin air burns them cooler."
+    }
+
     /// Always-shown cook-time readout for the answer card (DUT-601 — every
     /// input must visibly move the recommendation). Unlike ``elevationNote``
     /// this is never nil: at/below the baseline it states the recipe's usual
-    /// time; above it, the elevation-added time. Elevation adjusts cook TIME,
-    /// not coal count (the DOD method), so it lives in the answer here rather
-    /// than the coal diagram — but changing the elevation stepper still moves
-    /// the answer live.
+    /// time; above it, the elevation-added time. Elevation adjusts BOTH the
+    /// cook time (this line) and the coal count (DUT-682, via
+    /// ``conditionCoalDelta`` → the diagram); this covers the time half, and
+    /// changing the elevation stepper moves both live.
     var elevationCookTimeLine: String {
         let range = DutchOvenHeatCoach.cookTimeExtraMinutes(elevationFeetAboveBaseline: elevationFeet)
         if range.upperBound <= 0 {
