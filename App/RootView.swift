@@ -121,16 +121,18 @@ struct RootView: View {
     // Non-private for `RootView+Spotlight.swift`'s foreground-reindex guard.
     @State var didInitialSpotlightIndex = false
     /// DUT-361: serializes `indexSpotlight()` so a foreground reindex can't race the
-    /// cold-launch index (concurrent delete+index can interleave the domain). Not
-    /// `private` so the `+Spotlight` extension file can read it.
+    /// cold-launch index (concurrent delete+index interleaves). Non-private for `+Spotlight`.
     @State var isIndexingSpotlight = false
     /// DUT-642 — identifiers from the last SUCCESSFUL index, so the next index can
-    /// index-then-diff-delete (delete only stale ids) rather than delete-first (which
-    /// left Spotlight empty on a rebuild throw). Non-private for `+Spotlight`.
+    /// diff-delete (delete only stale ids) rather than delete-first. Non-private for `+Spotlight`.
     @State var lastIndexedSpotlightIdentifiers: Set<String> = []
-    /// DUT-643 — last successful Spotlight index time, so a foreground return
-    /// throttles the full rebuild to ``RootView/spotlightMinReindexInterval``.
+    /// DUT-643 — last successful index time; throttles an unchanged bounce (DUT-687).
     @State var lastSpotlightIndexAt: Date?
+    /// DUT-684 — whether this process purged the recipe Spotlight domain yet.
+    /// `lastIndexedSpotlightIdentifiers` resets empty each cold launch, so the diff-
+    /// delete can't clear a prior session's entries (dead tap, DUT-308); the first
+    /// index purges the whole domain instead. Non-private for `+Spotlight`.
+    @State var hasPurgedSpotlightDomainThisLaunch = false
     /// DUT-635 (wire) — the Apple-credential revocation observer token, retained for
     /// the app's lifetime (see `RootView+CredentialValidation.swift`).
     @State var appleCredentialRevocationObserver: NSObjectProtocol?
