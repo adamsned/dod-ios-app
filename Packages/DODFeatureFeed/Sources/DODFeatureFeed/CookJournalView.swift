@@ -15,12 +15,16 @@ import UIKit
 public struct CookJournalView: View {
 
     private let load: () async -> [CookLogEntry]
-    /// CL-273 — persist an entry's edited reflection / photo. Defaults to a no-op
-    /// so existing previews / tests that only pass `load` keep compiling.
-    private let update: (CookLogEntry) async -> Void
-    /// DUT-514 — delete an entry (cascades its photo in the store). Defaults to a
-    /// no-op so existing previews / tests that only pass `load` keep compiling.
-    private let delete: (CookLogEntry) async -> Void
+    /// CL-273 — persist an entry's edited reflection / photo. DUT-694 (PR-D) —
+    /// returns whether the write succeeded so a failure surfaces instead of being
+    /// swallowed. Defaults to a success no-op so previews / tests that only pass
+    /// `load` keep compiling.
+    private let update: (CookLogEntry) async -> Bool
+    /// DUT-514 — delete an entry (cascades its photo in the store). DUT-694 (PR-D) —
+    /// returns whether the delete succeeded so a failure surfaces instead of the
+    /// "deleted" entry silently reappearing on reload. Defaults to a success no-op
+    /// so previews / tests that only pass `load` keep compiling.
+    private let delete: (CookLogEntry) async -> Bool
     /// DUT-588 — off-main, downsampled, id-cached thumbnail loader. Replaces the
     /// old synchronous full-res `photoStore.data(forID:)` + `UIImage(data:)`
     /// decode that ran per row in the view body.
@@ -29,7 +33,20 @@ public struct CookJournalView: View {
     @State private var loaded = false
     /// DUT-514 — the entry the user is confirming a delete for (drives the alert).
     @State private var pendingDelete: CookLogEntry?
+    /// DUT-694 (PR-D) — a failed delete/edit surfaces here (was swallowed by a
+    /// `try?` in the view-model). Drives a failure alert mirroring the DUT-340
+    /// photo-save alert in ``CookJournalEntryView``, so the user learns why the
+    /// entry is still there rather than seeing it silently reappear after
+    /// confirming a can't-be-undone delete.
+    @State private var actionError: JournalActionError?
     @Environment(\.dismiss) private var dismiss
+
+    /// DUT-694 (PR-D) — a titled failure message for the delete/edit error alert.
+    struct JournalActionError: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
 
     /// DUT-272 — the three mutually exclusive states the body renders. Split out
     /// as a pure function so the load-order gating is unit-testable without a live
@@ -52,8 +69,8 @@ public struct CookJournalView: View {
 
     public init(
         load: @escaping () async -> [CookLogEntry],
-        update: @escaping (CookLogEntry) async -> Void = { _ in },
-        delete: @escaping (CookLogEntry) async -> Void = { _ in }
+        update: @escaping (CookLogEntry) async -> Bool = { _ in true },
+        delete: @escaping (CookLogEntry) async -> Bool = { _ in true }
     ) {
         self.load = load
         self.update = update
@@ -104,6 +121,21 @@ public struct CookJournalView: View {
             } message: { entry in
                 Text("This removes \"\(entry.recipeTitle)\" and its photo from your journal. This can't be undone.")
             }
+            // DUT-694 (PR-D) — surface a swallowed delete/edit failure (mirrors the
+            // DUT-340 photo-save alert in CookJournalEntryView) so the reload's
+            // reappearing entry has an explanation instead of reading as a bug.
+            .alert(
+                actionError?.title ?? "",
+                isPresented: Binding(
+                    get: { actionError != nil },
+                    set: { if !$0 { actionError = nil } }
+                ),
+                presenting: actionError
+            ) { _ in
+                Button("OK", role: .cancel) {}
+            } message: { error in
+                Text(error.message)
+            }
         }
         .task {
             if !loaded {
@@ -117,9 +149,25 @@ public struct CookJournalView: View {
     /// (total / streak / most-cooked, all derived from `cooks`) recompute.
     private func performDelete(_ entry: CookLogEntry) async {
         pendingDelete = nil
-        await delete(entry)
+        let didDelete = await delete(entry)
         cooks = await load()
+        // DUT-694 (PR-D) — on failure the reload brings the entry back; without
+        // this the user sees it silently reappear after confirming a "can't be
+        // undone" delete. Surface why so it doesn't read as a bug.
+        if !didDelete {
+            actionError = JournalActionError(
+                title: "Couldn't Delete Cook",
+                message: "We couldn't delete this cook. Please try again."
+            )
+        }
     }
+}
+
+// DUT-694 (PR-D) — the rendering helpers live in a same-file extension so the
+// primary `CookJournalView` declaration stays under SwiftLint's `type_body_length`
+// cap after the delete/edit failure-surfacing additions landed. Same file, so the
+// `private` state (`cooks`, `thumbnails`) stays reachable.
+extension CookJournalView {
 
     private var emptyState: some View {
         VStack(spacing: DODSpacing.md) {
@@ -152,8 +200,17 @@ public struct CookJournalView: View {
                     // reflects the new note / photo.
                     NavigationLink {
                         CookJournalEntryView(entry: cook) { updated in
-                            await update(updated)
+                            let didUpdate = await update(updated)
                             cooks = await load()
+                            // DUT-694 (PR-D) — the entry page already dismissed, so
+                            // surface a swallowed edit failure here rather than
+                            // silently losing the reflection / photo change.
+                            if !didUpdate {
+                                actionError = JournalActionError(
+                                    title: "Couldn't Save Changes",
+                                    message: "We couldn't save your changes. Please try again."
+                                )
+                            }
                         } onDelete: {
                             // DUT-514 — Delete from inside the open entry page.
                             // No extra confirm: the entry view already confirms.

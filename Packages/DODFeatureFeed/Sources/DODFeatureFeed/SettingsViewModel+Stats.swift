@@ -62,12 +62,31 @@ extension SettingsViewModel {
     }
 
     /// In-place edit of a journal entry from that sheet (note / rating / photo).
-    public func updateProfileJournalEntry(_ entry: CookLogEntry) async {
-        try? await cloudSyncDependency?.updateCookLog(entry)
+    /// DUT-694 (PR-D) — returns whether the write succeeded (was `try?`, which
+    /// swallowed the failure) so the journal view can surface it. An unwired
+    /// dependency (previews / snapshot hosts) reports success — there's nothing to
+    /// persist, so it must not raise a false failure.
+    public func updateProfileJournalEntry(_ entry: CookLogEntry) async -> Bool {
+        guard let cloudSyncDependency else { return true }
+        do {
+            try await cloudSyncDependency.updateCookLog(entry)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// DUT-514 — delete a journal entry from that sheet (cascades its photo).
-    public func deleteProfileJournalEntry(_ entry: CookLogEntry) async {
-        try? await cloudSyncDependency?.deleteCookLog(id: entry.id)
+    /// DUT-694 (PR-D) — returns whether the delete succeeded (was `try?`) so the
+    /// journal view can surface a failure instead of silently reloading and having
+    /// the "deleted" entry reappear after the user confirmed a can't-be-undone alert.
+    public func deleteProfileJournalEntry(_ entry: CookLogEntry) async -> Bool {
+        guard let cloudSyncDependency else { return true }
+        do {
+            try await cloudSyncDependency.deleteCookLog(id: entry.id)
+            return true
+        } catch {
+            return false
+        }
     }
 }
