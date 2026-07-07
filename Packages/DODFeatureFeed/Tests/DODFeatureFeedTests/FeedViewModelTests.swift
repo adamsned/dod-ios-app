@@ -223,7 +223,9 @@ import Testing
 
         #expect(await viewModel.cookLogs().count == 2)
 
-        await viewModel.deleteCook(remove)
+        // DUT-694 (PR-D) — deleteCook now reports success so the journal view can
+        // surface a swallowed failure; a clean delete reports true.
+        #expect(await viewModel.deleteCook(remove))
 
         #expect(dependencies.deletedCookLogIDs == [remove.id])  // routed to the store by id
         let after = await viewModel.cookLogs()

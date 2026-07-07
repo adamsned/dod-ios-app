@@ -40,7 +40,9 @@ public struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     /// DUT-529 — when Reduce Motion is on, the cache-clear snackbar crossfades in
     /// (opacity only) instead of sliding up from the bottom edge (constitution §7).
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// `internal` (not `private`) so `snackbarOverlay` in `SettingsView+Feedback.swift`
+    /// reads it across the file_length split (DUT-694).
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     /// Closure the Clear Cache row delegates to. Returns the total
     /// bytes freed so the snackbar can format the "Freed X.X MB" copy.
     /// Optional so previews + snapshot tests don't need to plumb a
@@ -52,6 +54,11 @@ public struct SettingsView: View {
     /// real device size class because this sheet always reports `.compact` on iPad
     /// (see ``ProfileSettingsSection``); hides on iPad, shows on iPhone.
     private let hidesProfile: Bool
+    /// DUT-694 (PR-D) — in-flight guard for the Clear Cache row. Set while a clear
+    /// runs so a double-tap can't kick off two overlapping clears (which showed
+    /// contradictory snackbars). Also `.disabled`-s the button. `internal` so the
+    /// action in `SettingsView+Feedback.swift` can flip it across the file split.
+    @State var isClearingCache = false
 
     public init(
         viewModel: SettingsViewModel? = nil,
@@ -268,6 +275,10 @@ public struct SettingsView: View {
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.accent)
                 }
+                // DUT-694 (PR-D) — block a second tap while a clear is in flight
+                // (belt-and-suspenders with the `isClearingCache` guard in the
+                // action) so overlapping clears can't show contradictory snackbars.
+                .disabled(isClearingCache)
                 .accessibilityIdentifier("settings-button-clear-cache")
 
                 // DUT-679 — App Store Guideline 5.1.1(i) in-app Privacy Policy
@@ -321,6 +332,12 @@ public struct SettingsView: View {
         }
         .scrollContentBackground(.hidden)
         .background(DODColor.surface)
+        // DUT-694 (PR-D) — buzz `.success` when a cache clear completes, mirroring
+        // FeedView's `.sensoryFeedback(.success, trigger: viewModel.refreshCount)`.
+        // Keyed on the dedicated ``SettingsViewModel/cacheClearSuccessCount`` (not
+        // `snackbarMessage`) so error + notification-deny snackbars don't buzz, and
+        // the system switches keep self-haptic-ing without a duplicate here.
+        .sensoryFeedback(.success, trigger: viewModel.cacheClearSuccessCount)
 
         #if os(iOS)
         baseList.listStyle(.insetGrouped)
@@ -329,34 +346,8 @@ public struct SettingsView: View {
         #endif
     }
 
-    /// Snackbar overlay for the cache-clear feedback (AC-36.4). Hidden
-    /// when the view-model has no message; auto-dismisses on tap.
-    @ViewBuilder
-    private var snackbarOverlay: some View {
-        if let message = viewModel.snackbarMessage {
-            Snackbar(message: message)
-                // DUT-362: key the overlay by the message so a NEW message gives it
-                // fresh identity and restarts the 4s auto-dismiss `.task` (otherwise
-                // the first message's timer fires and clears the second one early).
-                .id(message)
-                .padding(.bottom, DODSpacing.md)
-                // DUT-529: under Reduce Motion, drop the slide and crossfade in
-                // with opacity only (constitution §7); otherwise slide up + fade.
-                .transition(
-                    reduceMotion
-                        ? .opacity
-                        : .move(edge: .bottom).combined(with: .opacity)
-                )
-                .onTapGesture { viewModel.dismissSnackbar() }
-                .task {
-                    // Auto-dismiss after 4 seconds. Matches the Snackbar
-                    // component's documented default presentation length.
-                    try? await Task.sleep(nanoseconds: 4_000_000_000)
-                    viewModel.dismissSnackbar()
-                }
-                .accessibilityIdentifier("settings-snackbar")
-        }
-    }
+    // The cache-clear snackbar overlay (`snackbarOverlay`) lives in
+    // `SettingsView+Feedback.swift` (file_length split, DUT-694).
 
     // MARK: - Section header
 
@@ -381,18 +372,8 @@ public struct SettingsView: View {
     // `SettingsView+Bindings.swift` so this host file stays under the 400-line
     // `file_length` cap (DUT-307, following the T-738 / CL-134 split pattern).
 
-    // MARK: - Actions
-
-    private func clearImageCacheIfAvailable() async {
-        guard let onClearImageCache else {
-            // No closure wired (preview / snapshot host). Surface the
-            // zero-case copy so the button still gives feedback rather
-            // than appearing broken in design surfaces.
-            viewModel.previewCacheClearMessage()
-            return
-        }
-        await viewModel.clearImageCache(onClear: onClearImageCache)
-    }
+    // The Clear Cache action (`clearImageCacheIfAvailable`) + its DUT-694 in-flight
+    // guard live in `SettingsView+Feedback.swift` (file_length split).
 }
 
 // `AboutNedView` lives in `AboutNedView.swift` so the host file stays

@@ -260,6 +260,13 @@ public final class SettingsViewModel {
     /// surface their deny copy across the file_length split (T-750 / CL-147).
     public internal(set) var snackbarMessage: String?
 
+    /// DUT-694 (PR-D) — bumped once per SUCCESSFUL cache clear so the Settings list
+    /// can fire a `.success` sensory haptic (matching `FeedView`'s refresh haptic)
+    /// WITHOUT also buzzing for the error copy or the notification-deny snackbars,
+    /// which all share ``snackbarMessage``. A dedicated signal keeps the haptic
+    /// tied to the one delightful "freed cache" moment.
+    public internal(set) var cacheClearSuccessCount = 0
+
     public init(
         defaults: UserDefaults = .standard,
         dependencies: (any SettingsDependencies)? = nil,
@@ -330,6 +337,9 @@ public final class SettingsViewModel {
         do {
             let freedBytes = try await onClear()
             snackbarMessage = Self.cacheClearMessage(freedBytes: freedBytes)
+            // DUT-694 (PR-D) — a clean completion earns a `.success` haptic via the
+            // dedicated ``cacheClearSuccessCount`` trigger (see the Settings list).
+            cacheClearSuccessCount += 1
         } catch {
             // Best-effort — the store actor's SwiftData writes are
             // already wrapped in `try modelContext.save()` which surfaces

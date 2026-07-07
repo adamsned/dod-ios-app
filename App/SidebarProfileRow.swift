@@ -89,11 +89,14 @@ struct SidebarProfileRow: View {
         if let settingsViewModel {
             CookJournalView(
                 load: { [weak settingsViewModel] in await settingsViewModel?.profileJournalEntries() ?? [] },
+                // DUT-694 (PR-D) — the journal closures now return success; a
+                // deallocated view-model reports success so a torn-down sheet
+                // never raises a false failure alert.
                 update: { [weak settingsViewModel] entry in
-                    await settingsViewModel?.updateProfileJournalEntry(entry)
+                    await settingsViewModel?.updateProfileJournalEntry(entry) ?? true
                 },
                 delete: { [weak settingsViewModel] entry in
-                    await settingsViewModel?.deleteProfileJournalEntry(entry)
+                    await settingsViewModel?.deleteProfileJournalEntry(entry) ?? true
                 }
             )
         }
