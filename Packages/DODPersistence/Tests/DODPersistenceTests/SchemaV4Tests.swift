@@ -29,6 +29,16 @@ import Testing
 ///   the adapter).
 @Suite("SchemaV4 (US-41 / T-702)") struct SchemaV4Tests {
 
+    /// Per-test isolated suite so the shared `.standard` defaults stay clean
+    /// across parallel suites (DUT-700). Mirrors
+    /// `CloudKitContainerSelectionTests.isolatedDefaults`.
+    static func isolatedDefaults() -> UserDefaults {
+        let suiteName = "SchemaV4Tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+
     @Test func v3ToV4LightweightMigrationOpensCleanly() throws {
         // Step 1: V3 container still works and accepts a V3-era row.
         let v3Container = try RecipeStore.inMemoryContainerV3()
@@ -111,18 +121,12 @@ import Testing
         // doing so without instantiating a `CKContainer` reference is
         // the REG-25 surface contract (the only CloudKit symbols in
         // the app source live behind the opt-in branch).
-        let defaults = UserDefaults.standard
-        let priorValue = defaults.object(forKey: RecipeStore.cloudKitSyncOptInKey)
+        // Isolated suite so parallel suites can't clobber the shared-defaults
+        // opt-in flag mid-read (DUT-700).
+        let defaults = Self.isolatedDefaults()
         defaults.set(false, forKey: RecipeStore.cloudKitSyncOptInKey)
-        defer {
-            if let priorValue {
-                defaults.set(priorValue, forKey: RecipeStore.cloudKitSyncOptInKey)
-            } else {
-                defaults.removeObject(forKey: RecipeStore.cloudKitSyncOptInKey)
-            }
-        }
 
-        let configuration = RecipeStore.makeProductionConfiguration()
+        let configuration = RecipeStore.makeProductionConfiguration(defaults: defaults)
 
         // The CloudKit-backed configuration carries a non-nil
         // `cloudKitContainerIdentifier`. The plain configuration

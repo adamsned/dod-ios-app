@@ -97,11 +97,23 @@ struct FirstCookoutBakeNotifierTests {
             recipeID: 101
         )
         onFinished(finishedA)
-        // Let the detached cancel Task run.
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        // The cancel runs on a detached Task, so poll the observable outcome
+        // (A's slot cleared) up to a bounded deadline instead of guessing at a
+        // fixed wall-clock sleep — deterministic on a slow/loaded CI box.
+        await waitUntil { fake.pending[101] == nil }
 
         #expect(fake.pending[101] == nil)  // A's alert cancelled…
         #expect(fake.pending[202] == 1200)  // …B (still on screen) untouched.
+    }
+
+    /// Poll until `condition` holds or a short deadline passes — replaces a
+    /// fixed sleep waiting on a detached Task (DUT-700 test hardening). Mirrors
+    /// `SavedRecipesWidgetPublisherTests.waitUntil`.
+    private func waitUntil(_ condition: @Sendable () -> Bool, timeout: TimeInterval = 2.0) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition(), Date() < deadline {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
     }
 }
 

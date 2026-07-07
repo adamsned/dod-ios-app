@@ -341,12 +341,14 @@ extension RecipeStore {
     ///    stores keep opening with no migration. Guarded by
     ///    `CloudKitSchemaCompatibilityTests` — no prior test built a
     ///    `.private` container, which is how this shipped.
-    static func makeProductionConfiguration() -> ModelConfiguration {
+    /// - Parameter defaults: source of the opt-in flag; `.standard` for
+    ///   production, an isolated suite in parallel tests (DUT-700).
+    static func makeProductionConfiguration(defaults: UserDefaults = .standard) -> ModelConfiguration {
         // DUT-35: the CloudKit flag now lives on the synced sub-store only, so
         // this seam returns that store's configuration. The opt-in -> `.private`
         // / opt-out -> `.none` contract stays directly assertable in the L1
         // suite (CloudKitContainerSelectionTests / SchemaV5Tests).
-        syncedSavedConfiguration(inMemory: false, cloudKit: cloudKitSyncOptIn())
+        syncedSavedConfiguration(inMemory: false, cloudKit: cloudKitSyncOptIn(in: defaults))
     }
 
     /// Create an in-memory container for tests. Uses the current schema so
