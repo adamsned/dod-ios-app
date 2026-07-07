@@ -36,6 +36,41 @@ const APPLE_AUDIENCE = "https://appleid.apple.com"
 const APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
 const APPLE_REVOKE_URL = "https://appleid.apple.com/auth/revoke"
 
+// DUT-678 — reliability. Both upstream calls to Apple had no timeout, so a
+// stalled Apple endpoint could hang the request (and the Delete Account UI)
+// until the platform killed it. Cap each fetch, and give the compliance-
+// critical revoke one idempotent retry on a transient failure.
+const APPLE_FETCH_TIMEOUT_MS = 10_000
+const REVOKE_RETRY_BACKOFF_MS = 300
+
+// A thrown fetch (network error) or an AbortSignal.timeout() firing both land
+// here — the latter as a DOMException named "TimeoutError". `fetchApple`
+// normalizes them into this sentinel so callers can map to a clean 504.
+class UpstreamTimeoutError extends Error {
+  constructor(cause?: unknown) {
+    super("upstream_timeout")
+    this.name = "UpstreamTimeoutError"
+    this.cause = cause
+  }
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+// POST a form to Apple with a hard timeout. Any abort/timeout/network throw is
+// re-thrown as UpstreamTimeoutError (secrets never enter the message).
+async function fetchApple(url: string, form: URLSearchParams): Promise<Response> {
+  try {
+    return await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+      signal: AbortSignal.timeout(APPLE_FETCH_TIMEOUT_MS),
+    })
+  } catch (err) {
+    throw new UpstreamTimeoutError(err)
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method !== "POST") {
@@ -56,6 +91,13 @@ export default {
       }
       return json({ error: "not_found" }, 404)
     } catch (err) {
+      // DUT-678: a stalled/unreachable Apple endpoint surfaces as an
+      // UpstreamTimeoutError. Return a clean 504 (not a generic 500) so the
+      // caller can distinguish "Apple didn't answer in time" and retry.
+      if (err instanceof UpstreamTimeoutError) {
+        console.error("siwa-revoke upstream_timeout", err)
+        return json({ error: "upstream_timeout" }, 504)
+      }
       // Never leak key material / internals to the client. The exception can
       // carry WebCrypto/atob diagnostics over the .p8 (APPLE_PRIVATE_KEY), so
       // log it server-side (visible in `wrangler tail`) and return a generic
@@ -76,11 +118,10 @@ async function handleExchange(request: Request, env: Env, clientSecret: string):
     code: body.code,
     grant_type: "authorization_code",
   })
-  const resp = await fetch(APPLE_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-  })
+  // Single-shot exchange (the /revoke path below carries the idempotent retry;
+  // an authorization_code is one-time so retrying an exchange is not always
+  // safe). A timeout throws UpstreamTimeoutError -> 504 in the top-level catch.
+  const resp = await fetchApple(APPLE_TOKEN_URL, form)
   const data = (await resp.json().catch(() => ({}))) as { refresh_token?: string; error?: string }
   if (!resp.ok || !data.refresh_token) {
     return json({ error: "exchange_failed", apple: data.error ?? null }, 502)
@@ -98,11 +139,31 @@ async function handleRevoke(request: Request, env: Env, clientSecret: string): P
     token: body.refreshToken,
     token_type_hint: "refresh_token",
   })
-  const resp = await fetch(APPLE_REVOKE_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-  })
+
+  // DUT-678: /auth/revoke is idempotent on Apple's side (revoking an already-
+  // revoked or unknown token is a no-op), so on a TRANSIENT failure — an Apple
+  // 5xx OR a fetch throw/timeout — retry ONCE after a short backoff. A 4xx is a
+  // permanent client error (bad token / bad secret); never retry that. This is
+  // the compliance-critical path (App Store 5.1.1(v)).
+  let resp: Response
+  try {
+    resp = await fetchApple(APPLE_REVOKE_URL, form)
+  } catch (err) {
+    // First attempt timed out / threw — treat as transient and retry once.
+    if (err instanceof UpstreamTimeoutError) {
+      await sleep(REVOKE_RETRY_BACKOFF_MS)
+      resp = await fetchApple(APPLE_REVOKE_URL, form) // a throw here -> 504 (top-level catch)
+    } else {
+      throw err
+    }
+  }
+
+  // Retry once on an Apple 5xx (transient). Leave 4xx alone (permanent).
+  if (resp.status >= 500) {
+    await sleep(REVOKE_RETRY_BACKOFF_MS)
+    resp = await fetchApple(APPLE_REVOKE_URL, form) // a throw here -> 504 (top-level catch)
+  }
+
   // Apple returns 200 with an empty body on success. Treat 200 as revoked;
   // surface the status otherwise so the app can decide whether to retry.
   if (!resp.ok) {

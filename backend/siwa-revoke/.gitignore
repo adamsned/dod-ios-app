@@ -3,3 +3,4 @@ node_modules/
 dist/
 *.p8
 .dev.vars
+package-lock.json
