@@ -137,23 +137,61 @@ public struct GuestIdentitySheet: View {
         .accessibilityAddTraits(.isButton)
     }
 
+    /// 1–40 characters after trimming whitespace. Kept in sync with the profile
+    /// editor's cap (see `UserProfile.maxDisplayNameLength`).
+    static let maxNameLength = 40
+
     private var canContinue: Bool {
         guard !isSubmitting else { return false }
         return Self.isValidName(displayName) && Self.isValidEmail(email)
     }
 
-    /// 1–40 characters after trimming whitespace.
+    /// 1–``maxNameLength`` characters after trimming whitespace.
+    ///
+    /// This is the single **structural** name rule shared by BOTH the guest/
+    /// comment path and the profile editor (DUT-647). The profile editor's
+    /// additional moderation pass (`DisplayNameValidator.validate`) lives in
+    /// `DODFeatureProfile`, which depends on this module — so it can't be
+    /// referenced here without a dependency cycle. The comment-submit path,
+    /// which CAN see both modules, is where the two are composed
+    /// (`RecipeDetailViewModel.isAuthorNameValid`).
     public static func isValidName(_ name: String) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (1...40).contains(trimmed.count)
+        return (1...maxNameLength).contains(trimmed.count)
     }
 
-    /// Basic structural check: trimmed, contains `@` and `.`, no spaces.
-    /// Intentionally lax — final-of-truth validation happens server-side.
+    /// DUT-647 — the SINGLE strong email rule shared by the guest/comment path
+    /// and the profile editor. Enforces the profile editor's locked shape
+    /// `^[^@\s]+@[^@\s]+\.[^@\s]+$` (rejecting `"a.b@c"`, `"@.com"`,
+    /// `"foo@.com"`), replacing the old lax `contains("@") && contains(".")`
+    /// that let malformed addresses through.
+    ///
+    /// Implemented as the same character-class scan as
+    /// `UserProfile.matchesEmailPattern` rather than delegating to it: that
+    /// type lives in `DODFeatureProfile`, which depends on this module, so a
+    /// literal delegate would create a dependency cycle. The two are kept
+    /// byte-for-byte identical so both surfaces accept/reject exactly the same
+    /// inputs. Final-of-truth validation still happens server-side.
     public static func isValidEmail(_ email: String) -> Bool {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.contains(" ") else { return false }
-        return trimmed.contains("@") && trimmed.contains(".")
+        matchesEmailPattern(email.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// `^[^@\s]+@[^@\s]+\.[^@\s]+$`. Mirror of
+    /// `UserProfile.matchesEmailPattern` (see ``isValidEmail(_:)`` for why it's
+    /// duplicated rather than shared). Pure, allocation-free, branch-only.
+    private static func matchesEmailPattern(_ input: String) -> Bool {
+        guard let atIndex = input.firstIndex(of: "@") else { return false }
+        let local = input[..<atIndex]
+        let remainder = input[input.index(after: atIndex)...]
+        guard !local.isEmpty, !remainder.isEmpty else { return false }
+        guard !remainder.contains("@") else { return false }
+        let whitespace: CharacterSet = .whitespacesAndNewlines
+        if local.unicodeScalars.contains(where: whitespace.contains) { return false }
+        if remainder.unicodeScalars.contains(where: whitespace.contains) { return false }
+        guard let dotIndex = remainder.firstIndex(of: ".") else { return false }
+        let domainHead = remainder[..<dotIndex]
+        let domainTail = remainder[remainder.index(after: dotIndex)...]
+        return !domainHead.isEmpty && !domainTail.isEmpty
     }
 }
 

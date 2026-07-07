@@ -67,23 +67,34 @@ public struct UserProfile: Codable, Equatable, Sendable {
 
     // MARK: - Validation
 
+    /// DUT-647 — the upper bound on a trimmed display name, symmetric with the
+    /// guest/comment path's `GuestIdentitySheet.maxNameLength`. Both surfaces
+    /// now enforce the same 1–``maxDisplayNameLength`` window so a name that
+    /// clears one path can't be over-length on the other.
+    public static let maxDisplayNameLength = 40
+
     /// Failure modes for ``UserProfile`` validation. Surfaced to the
     /// caller so the edit view can render a humane prompt instead of
     /// silently dropping a save.
     public enum ValidationError: Error, Equatable {
 
         case displayNameEmpty
+        case displayNameTooLong
         case emailEmpty
         case emailInvalid
     }
 
-    /// Returns the trimmed display name if non-empty; throws
-    /// ``ValidationError/displayNameEmpty`` otherwise. Used both by the
-    /// edit form's Done-button gate and by ``ProfileStore/save(_:)``'s
-    /// pre-flight check so a bypass at one layer is caught at the other.
+    /// Returns the trimmed display name if non-empty and within
+    /// ``maxDisplayNameLength``; throws ``ValidationError/displayNameEmpty``
+    /// when blank or ``ValidationError/displayNameTooLong`` when over the cap.
+    /// Used both by the edit form's Done-button gate and by
+    /// ``ProfileStore/save(_:)``'s pre-flight check so a bypass at one layer is
+    /// caught at the other. DUT-647: the length cap makes this symmetric with
+    /// the guest/comment path (`GuestIdentitySheet.isValidName`).
     public static func validateDisplayName(_ value: String) throws -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw ValidationError.displayNameEmpty }
+        guard trimmed.count <= maxDisplayNameLength else { throw ValidationError.displayNameTooLong }
         return trimmed
     }
 
@@ -113,6 +124,12 @@ public struct UserProfile: Codable, Equatable, Sendable {
     /// validation cost is a couple of `String.Index` walks rather than
     /// regex engine startup. The function is pure + branch-only — no
     /// allocations beyond the input string's borrowed view.
+    ///
+    /// DUT-647: this is the canonical email rule. `GuestIdentitySheet`
+    /// (in `DODDesignSystem`, upstream of this module) mirrors it byte-for-byte
+    /// so the guest/comment path and the profile editor accept exactly the same
+    /// inputs; they can't literally share this method without a dependency
+    /// cycle. Keep the two implementations in sync when either changes.
     private static func matchesEmailPattern(_ input: String) -> Bool {
         guard let atIndex = input.firstIndex(of: "@") else { return false }
         let local = input[..<atIndex]
