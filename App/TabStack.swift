@@ -81,6 +81,12 @@ struct TabStack: View {
     /// TabStack + its local `path`, dropping any pushed detail. Hoisting to
     /// `RootView` (which survives the flip) keeps the pushed stack alive.
     @Binding var path: [RecipeRoute]
+    /// DUT-693 (PR7) — transient toast copy shown when a long-press card save
+    /// fails to persist (`saveFromCard` returned `false`). Nil when hidden;
+    /// surfaced via the reused ``DeepLinkErrorSnackbar`` overlay on `body`.
+    /// Mirrors the DUT-549 deep-link failure snackbar so a silent catch no
+    /// longer leaves the user without feedback.
+    @State private var saveErrorMessage: String?
 
     init(
         tab: AppTab,
@@ -134,6 +140,15 @@ struct TabStack: View {
             guard tab == .feed, let link = pendingDeepLink else { return }
             await consume(link: link)
         }
+        // DUT-693 (PR7) — surface the card-save failure toast (reuses the
+        // DUT-549 snackbar overlay with its own a11y id). Set by the card
+        // `onSave` sinks below when the store write doesn't persist.
+        .modifier(
+            DeepLinkErrorSnackbar(
+                message: $saveErrorMessage,
+                accessibilityID: "card-save-error-snackbar"
+            )
+        )
         .task(id: externalRoute) {
             // External route sink. `.task(id:)` (not `.onChange`) so a queue
             // already non-empty when this tab is first instantiated — iPad
@@ -185,6 +200,7 @@ struct TabStack: View {
                             publisher: dependencies.savedWidgetPublisher()
                         )
                         report(didSave)  // DUT-629 — revert optimistic flip on failure
+                        if !didSave { saveErrorMessage = Self.saveFailedMessage }  // DUT-693
                     }
                 },
                 // DUT-534 Part 2 — the card snackbar's "View" opens the Shopping
@@ -209,6 +225,7 @@ struct TabStack: View {
                             publisher: dependencies.savedWidgetPublisher()
                         )
                         report(didSave)  // DUT-629 — revert optimistic flip on failure
+                        if !didSave { saveErrorMessage = Self.saveFailedMessage }  // DUT-693
                     }
                 },
                 // T-799 / CL-193: browse-category tap → push the category's
@@ -235,6 +252,7 @@ struct TabStack: View {
                             publisher: dependencies.savedWidgetPublisher()
                         )
                         report(didSave)  // DUT-629 — restore the row on failure
+                        if !didSave { saveErrorMessage = Self.saveFailedMessage }  // DUT-693
                     }
                 },
                 onOpenSettings: onOpenSettings  // DUT-551 (CL-306) — header gear
@@ -305,6 +323,7 @@ struct TabStack: View {
                             publisher: dependencies.savedWidgetPublisher()
                         )
                         report(didSave)  // DUT-629 — revert optimistic flip on failure
+                        if !didSave { saveErrorMessage = Self.saveFailedMessage }  // DUT-693
                     }
                 }
             )

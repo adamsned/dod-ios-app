@@ -8,6 +8,11 @@ import DODSupport
 // `file_length` cap.
 extension TabStack {
 
+    /// DUT-693 (PR7) — copy for the transient toast shown when a long-press card
+    /// save fails to persist (`saveFromCard` returned `false`). Mirrors the
+    /// DUT-549 deep-link failure snackbar: plain and non-blaming. No em dashes.
+    static let saveFailedMessage = "Couldn't save that recipe. Please try again."
+
     /// US-34 / AC-34.2 / AC-34.3 — execute the same save side-effect as
     /// the recipe-detail nav-bar bookmark tap (AC-4.7 / AC-5.1), invoked
     /// from a `RecipeCard`'s long-press context menu. Caches the listItem
