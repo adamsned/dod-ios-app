@@ -204,6 +204,12 @@ public struct CookModeView: View {
         }
         .onReceive(timerTicker) { _ in viewModel.tickTimers() }
         .sensoryFeedback(.success, trigger: viewModel.timerCompletionTick)
+        // DUT-693 (PR3) — buzz when the cook completes (Done card flip).
+        .sensoryFeedback(.success, trigger: viewModel.isFinished)
+        // DUT-693 (PR3) — light selection tick on every step change; keyed on
+        // the current-step index so it covers the Next/Back buttons, the swipe
+        // gesture, and the mini-nav arrows with one modifier.
+        .sensoryFeedback(.selection, trigger: viewModel.currentStepIndex)
         // DUT-401 — a step timer reaching 00:00 had only visual + haptic
         // feedback; announce it so a cook who set the phone down (or a
         // VoiceOver user) hears it. Paired with the same completion trigger the
