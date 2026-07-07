@@ -204,6 +204,12 @@ struct CookingToolsHubView: View {
             switch pendingTool.tool {
             case .shoppingList:
                 if path.last != .shoppingList { path.append(.shoppingList) }
+                // DUT-676 — Shopping List is a nav PUSH; an external route (Control
+                // Center / dod:// deep link) arriving while a hub sheet is up would
+                // hide the just-pushed list UNDER it. Dismiss any open sheet (tool or
+                // celebration, mirroring `activeHubSheet`'s setter) to reveal the list.
+                if feedViewModel.celebration != nil { feedViewModel.dismissCelebration() }
+                activeToolSheet = nil
             case .heatCoach(let seed):
                 activeToolSheet = .heatCoach(seed: seed)
             case .cookingJournal:
