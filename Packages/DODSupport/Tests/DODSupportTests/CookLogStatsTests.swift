@@ -144,4 +144,71 @@ struct CookLogStatsTests {
         #expect(entry(1, "R", at: date(2026, 1, 1), rating: 3).personalRating == 3)
         #expect(entry(1, "R", at: date(2026, 1, 1)).personalRating == nil)
     }
+
+    // MARK: - Rank ladder cook count (DUT-625 / DUT-685)
+
+    private var dumpCakeID: Int { DumpCake.all[0].id }
+    private var otherDumpCakeID: Int { DumpCake.all[1].id }
+
+    /// A journal of N path cooks + M dump cakes counts N for the rank ladder,
+    /// even though `totalCooks` counts N + M.
+    @Test func rankLadderCountExcludesDumpCakes() {
+        let pathIDs = [1001, 1002, 1003]  // none are dump cakes
+        let entries =
+            pathIDs.map { entry($0, "Path", at: date(2026, 1, 5)) }
+            + [
+                entry(dumpCakeID, "Dump", at: date(2026, 1, 6)),
+                entry(otherDumpCakeID, "Dump", at: date(2026, 1, 7)),
+                entry(dumpCakeID, "Dump", at: date(2026, 1, 8)),
+            ]
+        // 3 path + 3 dump cakes.
+        #expect(CookLogStats.totalCooks(entries) == 6)
+        #expect(CookLogStats.rankLadderCookCount(entries) == 3)
+    }
+
+    @Test func rankLadderCountEqualsTotalWhenNoDumpCakes() {
+        let entries = [
+            entry(1001, "Path", at: date(2026, 1, 5)),
+            entry(1002, "Path", at: date(2026, 1, 6)),
+        ]
+        #expect(CookLogStats.rankLadderCookCount(entries) == CookLogStats.totalCooks(entries))
+    }
+
+    @Test func rankLadderCountIsZeroForOnlyDumpCakes() {
+        let entries = DumpCake.all.map { entry($0.id, $0.title, at: date(2026, 1, 5)) }
+        #expect(CookLogStats.totalCooks(entries) == DumpCake.all.count)
+        #expect(CookLogStats.rankLadderCookCount(entries) == 0)
+    }
+
+    /// DUT-685 — the rank DISPLAY (derived from `rankLadderCookCount`) and the
+    /// rank-up CELEBRATION (which counts the same path-only population) must never
+    /// diverge for the same journal. A cook with 2 path + 3 dump cakes shows the
+    /// Fire Starter rung (based on 2), not a higher rung it hasn't celebrated.
+    @Test func rankDisplayMatchesCelebrationPopulation() {
+        let entries = [
+            entry(1001, "Path", at: date(2026, 1, 5)),
+            entry(1002, "Path", at: date(2026, 1, 6)),
+            entry(dumpCakeID, "Dump", at: date(2026, 1, 7)),
+            entry(otherDumpCakeID, "Dump", at: date(2026, 1, 8)),
+            entry(dumpCakeID, "Dump", at: date(2026, 1, 9)),
+        ]
+        let rankCooks = CookLogStats.rankLadderCookCount(entries)  // 2
+        #expect(rankCooks == 2)
+        // Display rank derives from the path-only count → Fire Starter (thr 1),
+        // NOT Lid Lifter (thr 5) that the raw total (5) would show.
+        let displayRank = CookProgression.currentRank(totalCooks: rankCooks)
+        #expect(displayRank?.title == "Fire Starter")
+        let totalRank = CookProgression.currentRank(totalCooks: CookLogStats.totalCooks(entries))
+        #expect(totalRank?.title == "Lid Lifter")  // the OLD (wrong) display
+        #expect(displayRank != totalRank)
+
+        // The celebration for logging one more path cook fires the same population
+        // the display now shows — climbing from 2 → 3 crosses the Coal Tender rung.
+        let before = rankCooks
+        let after = CookLogStats.rankLadderCookCount(
+            entries + [entry(1003, "Path", at: date(2026, 1, 10))]
+        )
+        #expect(after == 3)
+        #expect(CookProgression.rankUp(from: before, to: after)?.title == "Coal Tender")
+    }
 }

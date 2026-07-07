@@ -185,11 +185,16 @@ public struct CookJournalView: View {
     /// not just a count. Only rendered with >= 1 cook (journalList is gated on a
     /// non-empty list), so `currentRank` is non-nil — the fallbacks are defensive.
     private var journeyHeader: some View {
-        let total = CookLogStats.totalCooks(cooks)
-        let current = CookProgression.currentRank(totalCooks: total)
-        let next = CookProgression.nextRank(totalCooks: total)
-        let toNext = CookProgression.cooksToNextRank(totalCooks: total)
-        let progress = CookProgression.progressToNextRank(totalCooks: total)
+        // DUT-685 — the RANK must count the SAME path-only population the rank-up
+        // celebration counts (journal minus off-path dump cakes), not the raw
+        // `totalCooks`. Both now go through `CookLogStats.rankLadderCookCount`, so
+        // the visible rank and the next celebration can never contradict. The
+        // "total cooks" stat tile in `statsHeader` still uses `totalCooks`.
+        let rankCooks = CookLogStats.rankLadderCookCount(cooks)
+        let current = CookProgression.currentRank(totalCooks: rankCooks)
+        let next = CookProgression.nextRank(totalCooks: rankCooks)
+        let toNext = CookProgression.cooksToNextRank(totalCooks: rankCooks)
+        let progress = CookProgression.progressToNextRank(totalCooks: rankCooks)
         return VStack(spacing: DODSpacing.xs) {
             Text(current?.emoji ?? "🔥")
                 .font(.system(size: 44))

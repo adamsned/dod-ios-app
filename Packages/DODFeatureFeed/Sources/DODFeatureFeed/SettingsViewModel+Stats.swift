@@ -15,9 +15,10 @@ extension SettingsViewModel {
     public var profileStatsAvailable: Bool { cloudSyncDependency != nil }
 
     /// Load + compute the current `ProfileStats`. The cook-derived figures use
-    /// `CookLogStats` (DODSupport); the view derives the Cook Rank from
-    /// `totalCooks`. A failing/absent dependency degrades each figure to zero
-    /// rather than throwing.
+    /// `CookLogStats` (DODSupport); the view derives the Cook Rank from the
+    /// path-only `rankLadderCooks` (DUT-685 — the same population the rank-up
+    /// celebration counts), while `totalCooks` stays the true total-cooks stat. A
+    /// failing/absent dependency degrades each figure to zero rather than throwing.
     public func loadProfileStats() async -> ProfileStats {
         guard let deps = cloudSyncDependency else { return .empty }
         let logs = (try? await deps.cookLogs()) ?? []
@@ -25,6 +26,9 @@ extension SettingsViewModel {
         let reviews = try? await deps.userRatingCount()
         return ProfileStats(
             totalCooks: CookLogStats.totalCooks(logs),
+            // DUT-685 — path-only count (total minus off-path dump cakes) so the
+            // profile Cook Rank matches the celebration's population.
+            rankLadderCooks: CookLogStats.rankLadderCookCount(logs),
             // DUT-427: use the same pinned calendar the Cooking Journal uses so the
             // streak reads identically in both places (locale-independent) — the
             // default `Calendar.current` follows device locale and diverges.

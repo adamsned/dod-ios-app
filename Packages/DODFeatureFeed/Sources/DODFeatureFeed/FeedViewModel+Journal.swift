@@ -29,15 +29,13 @@ extension FeedViewModel {
         try? await dependencies.deleteCookLog(id: entry.id)
     }
 
-    /// DUT-625 — the cook count that feeds the RANK ladder: the journal minus
-    /// off-path dump-cake cooks. Product assumption: dump cakes are "Anytime
-    /// Treats" off the guided path, and graduation is path-only, so a first-ever
-    /// dump cake must NOT fire a rank-up the path population wouldn't earn. This
-    /// keeps the rank branch and the graduation check counting the same set.
-    /// `nonisolated` (with the dump-cake id set built locally from the static,
-    /// Sendable `DumpCake.all`) so it's callable off the main actor.
+    /// DUT-625 / DUT-685 — the cook count that feeds the RANK ladder (journal
+    /// minus off-path dump-cake cooks). Forwards to ``CookLogStats/rankLadderCookCount(_:)``
+    /// (DODSupport), the single source of truth shared by the rank-up CELEBRATION
+    /// here and the rank DISPLAY (Cooking Journal + Settings profile), so the two
+    /// can never diverge again. `nonisolated` so it stays callable off the main
+    /// actor from `logCook`'s background log fetches.
     nonisolated static func rankLadderCookCount(_ logs: [CookLogEntry]) -> Int {
-        let dumpCakeRecipeIDs = Set(DumpCake.all.map(\.id))
-        return logs.filter { !dumpCakeRecipeIDs.contains($0.recipeID) }.count
+        CookLogStats.rankLadderCookCount(logs)
     }
 }
