@@ -129,6 +129,10 @@ public struct ShoppingListView: View {
                         }
                 }
             }
+            // DUT-698 — drive the toast's transition (present + auto-dismiss);
+            // without this the `.move`/`.opacity` transition has no animation in
+            // scope and the toast pops in/out. Mirrors `DeepLinkErrorSnackbar`.
+            .animation(.easeInOut, value: buildFailureMessage)
     }
 
     /// DUT-487 — subtle progress overlay shown while ``build(from:)`` hydrates
