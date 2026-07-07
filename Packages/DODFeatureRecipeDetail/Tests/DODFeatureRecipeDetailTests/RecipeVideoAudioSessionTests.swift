@@ -2,6 +2,10 @@ import Testing
 
 @testable import DODFeatureRecipeDetail
 
+#if os(iOS)
+import AVFoundation
+#endif
+
 /// L1 unit coverage for `RecipeVideoAudioSession.Configuration` — the pure,
 /// platform-free decision of which audio-session posture a recipe video needs.
 ///
@@ -50,4 +54,30 @@ struct RecipeVideoAudioSessionTests {
     func doesNotActivateWhileWaiting() {
         #expect(RecipeVideoAudioSession.shouldActivate(for: .waitingToPlay) == false)
     }
+
+    // DUT-683 — the video path now releases the shared `.playback` session when
+    // the clip pauses/ends so the user's background audio resumes. The real
+    // `AVAudioSession` release is iOS-only and can't run hermetically on the
+    // macOS host, so we test the platform-free decision: the `timeControlStatus`
+    // → `PlaybackState` mapping the section switches on to activate vs. release.
+
+    #if os(iOS)
+    @Test("paused status maps to .paused (the release trigger)")
+    func pausedStatusMapsToPaused() {
+        #expect(RecipeVideoAudioSession.playbackState(from: .paused) == .paused)
+    }
+
+    @Test("playing status maps to .playing (the activate trigger)")
+    func playingStatusMapsToPlaying() {
+        #expect(RecipeVideoAudioSession.playbackState(from: .playing) == .playing)
+    }
+
+    @Test("buffering status maps to .waitingToPlay (neither grab nor release)")
+    func waitingStatusMapsToWaiting() {
+        #expect(
+            RecipeVideoAudioSession.playbackState(from: .waitingToPlayAtSpecifiedRate)
+                == .waitingToPlay
+        )
+    }
+    #endif
 }
