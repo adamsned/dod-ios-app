@@ -24,10 +24,15 @@ final class FakeCookStepTimerNotifier: CookStepTimerNotifying {
 
     private(set) var scheduled: [Scheduled] = []
     private(set) var cancelled: [Cancelled] = []
+    private(set) var cancelledPending: [Cancelled] = []
     private(set) var cancelledAll: [Int] = []
 
     func scheduleStepDone(after seconds: TimeInterval, recipeID: Int, stepIndex: Int) async {
         scheduled.append(Scheduled(seconds: seconds, recipeID: recipeID, stepIndex: stepIndex))
+    }
+
+    func cancelPendingStepDone(recipeID: Int, stepIndex: Int) async {
+        cancelledPending.append(Cancelled(recipeID: recipeID, stepIndex: stepIndex))
     }
 
     func cancelStepDone(recipeID: Int, stepIndex: Int) async {
@@ -81,7 +86,10 @@ struct CookModeStepTimerNotificationTests {
         vm.pauseTimer(forStep: 0, now: t0.addingTimeInterval(40))
         await drain()
 
-        #expect(notifier.cancelled.contains { $0.stepIndex == 0 && $0.recipeID == vm.recipe.id })
+        // DUT-686: pause cancels PENDING only — it must not yank an already-
+        // delivered banner the cook hasn't acknowledged.
+        #expect(notifier.cancelledPending.contains { $0.stepIndex == 0 && $0.recipeID == vm.recipe.id })
+        #expect(notifier.cancelled.isEmpty)
     }
 
     @Test func resumingReschedulesFromTheRemainingTime() async {
@@ -108,7 +116,7 @@ struct CookModeStepTimerNotificationTests {
         #expect(notifier.cancelled.contains { $0.stepIndex == 0 })
     }
 
-    @Test func foregroundCompletionCancelsTheRedundantBanner() async {
+    @Test func foregroundCompletionCancelsOnlyThePendingBanner() async {
         let notifier = FakeCookStepTimerNotifier()
         let vm = CookModeViewModelTests.makeViewModel(stepCount: 1, stepTimerNotifier: notifier)
 
@@ -116,8 +124,25 @@ struct CookModeStepTimerNotificationTests {
         vm.tickTimers(now: t0.addingTimeInterval(6))  // completes in the foreground
         await drain()
 
-        // The in-app buzzer covers a foreground finish, so the pending system
-        // banner is cancelled to avoid a redundant alert.
+        // DUT-604: the in-app buzzer covers a foreground finish, so the PENDING
+        // system banner is cancelled to avoid a redundant alert. DUT-686: it's a
+        // PENDING-only cancel — if the banner already fired (app was backgrounded
+        // past the deadline, then returned), the delivered banner stays so the
+        // cook isn't robbed of an alert they haven't acknowledged.
+        #expect(notifier.cancelledPending.contains { $0.stepIndex == 0 })
+        #expect(notifier.cancelled.isEmpty)
+    }
+
+    @Test func resettingATimerClearsDeliveredBanners() async {
+        // DUT-686 counterpart: an explicit user-driven reset DOES acknowledge the
+        // alert, so it uses the full pending-and-delivered cancel path.
+        let notifier = FakeCookStepTimerNotifier()
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1, stepTimerNotifier: notifier)
+
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 100, now: t0)
+        vm.resetTimer(forStep: 0, now: t0.addingTimeInterval(10))
+        await drain()
+
         #expect(notifier.cancelled.contains { $0.stepIndex == 0 })
     }
 
