@@ -31,6 +31,12 @@ public struct CategoryRecipesView: View {
             .background(DODColor.surface)
             .navigationTitle(viewModel.category.name)
             .task { await viewModel.onAppear() }
+            // DUT-693 (PR6) — haptics parity with Feed. A `.success` tap on a
+            // clean pull-to-refresh / retry (see `refreshCount`), and a
+            // `.selection` tap whenever the saved-id set flips from a card
+            // long-press Save/Unsave (mirrors the Feed's sensoryFeedback wiring).
+            .sensoryFeedback(.success, trigger: viewModel.refreshCount)
+            .sensoryFeedback(.selection, trigger: viewModel.savedRecipeIDs)
     }
 
     @ViewBuilder
@@ -86,6 +92,9 @@ public struct CategoryRecipesView: View {
                         .padding(.vertical, DODSpacing.lg)
                 }
             }
+            // DUT-693 (PR6) — pull-to-refresh parity with Feed / Saved. Reloads
+            // page 1 without breaking the DUT load-more pagination.
+            .refreshable { await viewModel.refresh() }
         }
     }
 
