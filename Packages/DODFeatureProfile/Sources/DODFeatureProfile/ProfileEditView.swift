@@ -84,6 +84,8 @@ public struct ProfileEditView: View {
     /// split).
     @State var emailValidationError: String?
     @State var saveError: String?
+    @State var saveSuccessTick = 0  // DUT-693 PR4 — save-success signal: .success haptic + snackbar token
+    @State var savedConfirmationMessage: String?  // DUT-693 PR4 — in-place "Profile saved." snackbar; nil hides
     /// Non-private so `ProfileEditView+SignOut.swift`'s Delete button can set it.
     @State var showDeleteConfirmation = false
     /// DUT-429 — gates Sign Out behind a confirmation, mirroring Delete (the
@@ -246,6 +248,7 @@ public struct ProfileEditView: View {
         // gate-CTA path). No-op on push (push has no swipe-down
         // gesture); safe to apply unconditionally.
         .interactiveDismissDisabled(isDirty)
+        .profileSavedConfirmation(message: $savedConfirmationMessage, token: saveSuccessTick)
         .alert("Delete your profile?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task { await handleDelete() }

@@ -101,6 +101,10 @@ extension ProfileEditView {
         displayName = initialDisplayName
         email = initialEmail
         inFlightPhotoFilename = initialPhotoFilename
+        // DUT-693 PR4 — clear any non-blocking save/photo-degradation footer so a
+        // stale "Couldn't save the original photo…" message doesn't linger into
+        // read-only view mode after the user backs out of editing.
+        saveError = nil
         isEditing = false
     }
 
@@ -185,7 +189,9 @@ extension ProfileEditView {
         Button("Save") {
             Task { await handleSave() }
         }
-        .disabled(!isFormValid || isSubmitting)
+        // DUT-693 PR4 — also disable when nothing changed (`!isDirty`) so a
+        // redundant tap doesn't trigger another Keychain write.
+        .disabled(!isFormValid || isSubmitting || !isDirty)
         .accessibilityIdentifier("profile-edit-save")
     }
 }

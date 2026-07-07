@@ -88,6 +88,9 @@ public struct ProfileSection<Destination: View>: View {
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.label)
                     .lineLimit(1)
+                    // DUT-693 PR4: shrink before truncating (mirrors the email line
+                    // below) so the name stays readable at large Dynamic Type sizes.
+                    .minimumScaleFactor(0.7)
                 Text(profile.email)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)

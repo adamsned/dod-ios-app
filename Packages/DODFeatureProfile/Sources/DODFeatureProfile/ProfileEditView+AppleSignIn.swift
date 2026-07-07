@@ -79,6 +79,10 @@ extension ProfileEditView {
                 .foregroundStyle(DODColor.label)
                 .textContentType(.name)
                 .accessibilityIdentifier("profile-edit-displayname")
+                // DUT-693 PR4 — mirror the email field (DUT-410): bind the inline
+                // validation error to the field so VoiceOver reads it on focus
+                // instead of leaving it orphaned below the TextField.
+                .accessibilityValue(displayNameFieldError ?? "")
                 #if os(iOS)
             .autocapitalization(.words)
                 #endif
