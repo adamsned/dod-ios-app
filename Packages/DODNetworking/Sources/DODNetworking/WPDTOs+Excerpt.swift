@@ -21,9 +21,14 @@ extension WPDTO {
         }
         // Belt-and-suspenders: a leftover bare "Continue reading …" / "[…]"
         // trailer (some themes emit it outside the anchor) also gets trimmed,
-        // tolerating trailing close tags.
+        // tolerating trailing close tags. The ellipsis may arrive as the literal
+        // `…` character or as an un-decoded entity (`&hellip;` / `&#8230;`), so
+        // match all three forms — otherwise a `[&hellip;]` bracket is left
+        // dangling once "Continue reading" is stripped (DUT-688).
+        let ellipsis = #"(?:…|&hellip;|&#8230;)"#
+        let trailer = #"\s*(?:\[\s*\#(ellipsis)\s*\]\s*)?Continue reading\s*\#(ellipsis)?\s*(?:</[a-zA-Z][^>]*>\s*)*$"#
         if let range = result.range(
-            of: #"\s*(?:\[\s*…\s*\]\s*)?Continue reading\s*…?\s*(?:</[a-zA-Z][^>]*>\s*)*$"#,
+            of: trailer,
             options: [.regularExpression, .caseInsensitive]
         ) {
             result.removeSubrange(range)
