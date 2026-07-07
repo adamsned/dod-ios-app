@@ -390,8 +390,7 @@ extension CookJournalView {
         }
     }
 
-    /// The cached, downsampled thumbnail for `id` as a SwiftUI `Image`, or nil
-    /// when it hasn't decoded yet (or the photo is missing).
+    /// The cached, downsampled thumbnail for `id`, or nil if not yet decoded.
     private func decodedThumbnail(for id: String) -> Image? {
         #if canImport(UIKit)
         if let uiImage = thumbnails.cachedImage(for: id) { return Image(uiImage: uiImage) }
