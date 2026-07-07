@@ -51,6 +51,10 @@ public struct CookActivityLockScreenView: View {
             HStack(alignment: .center, spacing: DODSpacing.xs) {
                 Image(systemName: "frying.pan.fill")
                     .foregroundStyle(DODColor.burntOrange)
+                    // DUT-694: decorative here — VO already reads the title next to
+                    // it, so "frying pan, <title>" is noise. Hide only this
+                    // title-row glyph; the compact/minimal pan stays (sole element).
+                    .accessibilityHidden(true)
                 Text(recipeTitle)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
@@ -104,6 +108,9 @@ public struct CookActivityLockScreenView: View {
                         )
                         .progressViewStyle(.linear)
                         .tint(DODColor.accent)
+                        // DUT-694: the self-ticking bar echoes the numeral as an
+                        // unlabeled a11y element — decorative, so hide it from VO.
+                        .accessibilityHidden(true)
                     }
                 }
                 Spacer(minLength: 0)
@@ -125,7 +132,8 @@ public struct CookActivityLockScreenView: View {
     /// when backgrounded), falling back to the static snapshot when paused or
     /// when no `endDate` is supplied (snapshot tests).
     private var countdownText: Text {
-        if let endDate, !isPaused, endDate > Date() {
+        // DUT-694: this is exactly `isSelfTicking` — derive it once, in one place.
+        if isSelfTicking, let endDate {
             return Text(timerInterval: Date()...endDate, countsDown: true)
         }
         return Text(formattedCookActivityCountdown(remainingSeconds))
@@ -184,6 +192,10 @@ public struct CookActivityProgressArc: View {
             countdown
                 .dodFont(DODType.heading)
                 .monospacedDigit()
+                // DUT-694: an `H:MM:SS` countdown ("1:15:00") overflows the fixed
+                // 88pt ring at large Dynamic Type — shrink to fit one line.
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
                 .foregroundStyle(DODColor.label)
         }
     }

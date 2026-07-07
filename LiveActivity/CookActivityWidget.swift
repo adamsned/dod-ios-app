@@ -71,7 +71,16 @@ struct CookActivityWidget: Widget {
                     isCompleted: context.state.isCompleted
                 )
             } minimal: {
-                CookActivityCompactLeadingView()
+                // DUT-694: the minimal pill is the only always-on glimpse of a
+                // running timer — show the live (self-ticking) countdown instead
+                // of the static pan so the collapsed slot reads as a timer. The
+                // compact-trailing view already shrinks `H:MM:SS` to fit one line.
+                CookActivityCompactTrailingView(
+                    remainingSeconds: context.state.remainingSeconds,
+                    endDate: context.state.endDate,
+                    isPaused: context.state.isPaused,
+                    isCompleted: context.state.isCompleted
+                )
             }
         }
     }
