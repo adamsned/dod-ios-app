@@ -155,6 +155,9 @@ extension RootView {
     /// hub. A `nil` (nothing pending) is a no-op.
     func consumePendingControlRoute() {
         guard let pending = ControlRouteStore()?.takePending() else { return }
+        // DUT-690 — diagnostic: confirms the Control Center hand-off reached the
+        // app and which tool it routed (pair with the widget-side "tapped" log).
+        DODLog.app.notice("Consuming Control Center pending route = \(pending.rawValue, privacy: .public)")
         route(control: pending)
     }
 

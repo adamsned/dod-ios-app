@@ -112,18 +112,21 @@ struct OpenCookingToolIntent: AppIntent {
 
     init(toolToken: String) { self.toolToken = toolToken }
 
-    func perform() async throws -> some IntentResult & OpensIntent {
+    func perform() async throws -> some IntentResult {
         // A nil store (unopenable App Group suite) or an unrecognized token just
         // foregrounds the app; fall back to the Shopping List so the tap still
         // lands somewhere sensible rather than crashing.
         let route = ControlRouteStore.Route(rawValue: toolToken) ?? .shoppingList
-        ControlRouteStore()?.setPending(route)  // signed-build path (unchanged)
-        // DUT-674 — cross-build fallback: adhoc/dev builds strip the App Group,
-        // so also hand the app the route as a dod:// URL (routed via onOpenURL).
-        // The token is a fixed `Route` raw value, so `URL(string:)` never fails;
-        // the `??` keeps SwiftLint's force_unwrapping rule happy without a bang.
-        let url = URL(string: "dod://\(route.rawValue)") ?? URL(fileURLWithPath: "/")
-        return .result(opensIntent: OpenURLIntent(url))
+        ControlRouteStore()?.setPending(route)
+        // DUT-690 — `openAppWhenRun` foregrounds the app; the App Group flag above
+        // is how the app learns WHICH tool to open (app + widget both carry the
+        // App Group entitlement on signed builds). We deliberately do NOT return
+        // an `opensIntent: OpenURLIntent`: a `dod://` custom scheme opens
+        // unreliably from a Control AND returning it suppressed the openAppWhenRun
+        // foreground, so the tap opened NOTHING (the DUT-674 regression). The
+        // dod:// grammar still exists for deep links; the control just skips it.
+        DODLog.app.notice("CookingToolControl tapped; pending route = \(route.rawValue, privacy: .public)")
+        return .result()
     }
 }
 
