@@ -163,10 +163,8 @@ public struct CookJournalView: View {
     }
 }
 
-// DUT-694 (PR-D) — the rendering helpers live in a same-file extension so the
-// primary `CookJournalView` declaration stays under SwiftLint's `type_body_length`
-// cap after the delete/edit failure-surfacing additions landed. Same file, so the
-// `private` state (`cooks`, `thumbnails`) stays reachable.
+// DUT-694 (PR-D) — rendering helpers live in a same-file extension (keeping the
+// `private` state reachable) so the primary type body stays under `type_body_length`.
 extension CookJournalView {
 
     private var emptyState: some View {
