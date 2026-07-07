@@ -126,6 +126,7 @@ public struct CookJournalView: View {
             Image(systemName: "book.closed")
                 .font(.system(size: 48))
                 .foregroundStyle(DODColor.burntOrange)
+                .accessibilityHidden(true)
             Text("No Cooks Logged Yet")
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)

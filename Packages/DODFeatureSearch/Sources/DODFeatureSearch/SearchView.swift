@@ -193,11 +193,10 @@ public struct SearchView: View {
         }
     }
 
-    /// US-12 amendment / US-29 amendment / CL-127 (T-649): the
-    /// "did you mean?" tappable banner. Brand accent + underline so
-    /// it reads as a one-tap rescue affordance over the sparse result
-    /// list. Combined accessibility element so VoiceOver announces
-    /// the full intent in one swipe.
+    /// US-12 amendment / US-29 amendment / CL-127 (T-649): the "did you mean?"
+    /// tappable banner. Brand accent + underline so it reads as a one-tap rescue
+    /// affordance over the sparse result list. Combined accessibility element +
+    /// `.isButton` trait so VoiceOver announces the full intent as a button.
     private func didYouMeanBanner(suggestion: String) -> some View {
         HStack(spacing: DODSpacing.xs) {
             Text("Did you mean:")
@@ -216,6 +215,7 @@ public struct SearchView: View {
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.sm)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel("Did you mean \(suggestion)? Tap to search.")
         .accessibilityIdentifier("dod.search.didYouMean")
     }
