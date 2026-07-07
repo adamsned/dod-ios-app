@@ -1,4 +1,5 @@
 import DODDomain
+import DODNetworking
 import DODSupport
 import Foundation
 import Observation
@@ -10,7 +11,10 @@ import Observation
 public final class CategoryRecipesViewModel {
 
     public enum LoadState: Equatable {
-        case idle, loadingInitial, loaded, loadingMore, empty, error
+        // DUT-695 — `.offline` splits a connectivity failure out of the generic
+        // `.error` so an offline user on the initial load gets a "reconnect"
+        // hint (mirroring Search / Feed) instead of the generic "Couldn't load".
+        case idle, loadingInitial, loaded, loadingMore, empty, error, offline
     }
 
     public let category: DODDomain.Category
@@ -150,8 +154,27 @@ public final class CategoryRecipesViewModel {
             if append || keepStateWhilePopulated, !items.isEmpty {
                 loadState = .loaded
             } else {
-                loadState = .error
+                // DUT-695 — a failed INITIAL load: distinguish a connectivity
+                // failure (offline / lost connection / timeout) from a generic
+                // error so the view can show a "reconnect" hint with Retry
+                // instead of the generic "Couldn't load". Reuses the shared
+                // `WPClientError.wrap` classifier (same mapping Search / Feed use).
+                loadState = isOfflineError(error) ? .offline : .error
             }
+            return false
+        }
+    }
+
+    /// DUT-695 — classify a thrown load error as a connectivity failure. Uses
+    /// the shared `WPClientError.wrap` (the same URLError mapping Search / Feed
+    /// rely on) so "offline" here means the exact set the networking layer
+    /// treats as no-connectivity: no connection, a dropped connection, or a
+    /// timeout.
+    private func isOfflineError(_ error: Error) -> Bool {
+        switch WPClientError.wrap(error) {
+        case .networkUnavailable, .timeout:
+            return true
+        default:
             return false
         }
     }

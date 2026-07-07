@@ -1,4 +1,5 @@
 import DODDomain
+import DODNetworking
 import Foundation
 import Testing
 
@@ -109,6 +110,51 @@ import Testing
         #expect(viewModel.refreshCount == 0)  // no reward on failure
     }
 
+    @Test func initialLoadOfflineShowsOfflineState() async {
+        // DUT-695: a connectivity failure on the INITIAL load routes to the
+        // `.offline` state (a reconnect hint + Retry), not the generic `.error`.
+        // The fake throws `URLError(.notConnectedToInternet)`, which the shared
+        // `WPClientError.wrap` classifies as `.networkUnavailable`.
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.failOnPage = 1
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 5)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.loadState == .offline)
+    }
+
+    @Test func initialLoadGenericErrorShowsErrorState() async {
+        // DUT-695: a NON-connectivity failure on the initial load stays on the
+        // generic `.error` state (not `.offline`), so the offline split doesn't
+        // swallow real server/decoding failures.
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.errorForPage1 = WPClientError.httpStatus(500)
+        dependencies.failOnPage = 1
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 5)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .error)
+    }
+
+    @Test func offlineRetryRecovers() async {
+        // DUT-695: the offline EmptyState's Retry re-runs the load; once back
+        // online the grid loads and the state clears off `.offline`.
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.failOnPage = 1
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 5)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .offline)
+
+        // Reconnect: clear the forced failure and seed page 1.
+        dependencies.failOnPage = nil
+        dependencies.posts[1] = (1...5).map(Self.makeItem)
+        await viewModel.retry()
+        #expect(viewModel.items.count == 5)
+        #expect(viewModel.loadState == .loaded)
+    }
+
     @Test func saveToggleCountFiresOnlyOnGenuineToggleNotOnAppearOrRefresh() async {
         // DUT-697: the `.selection` save haptic must fire ONLY on a genuine
         // long-press Save/Unsave — never on appear/refresh reconciliation of the
@@ -161,6 +207,10 @@ final class FakeCategoriesDependencies: CategoriesDependencies, @unchecked Senda
     /// DUT-282: make `fetchPosts` throw for this page (to exercise a loadMore
     /// failure on a specific append).
     var failOnPage: Int?
+    /// DUT-695: override the error thrown for page 1 (defaults to an offline
+    /// `URLError` so existing failure tests are unchanged). Lets a test assert
+    /// the offline-vs-generic-error split.
+    var errorForPage1: Error?
 
     func fetchCategories() async throws -> [DODDomain.Category] {
         if fetchShouldFail { throw URLError(.notConnectedToInternet) }
@@ -171,7 +221,10 @@ final class FakeCategoriesDependencies: CategoriesDependencies, @unchecked Senda
         categoryID: Int,
         page: Int
     ) async throws -> (items: [RecipeListItem], totalPages: Int) {
-        if page == failOnPage { throw URLError(.notConnectedToInternet) }
+        if page == failOnPage {
+            if page == 1, let errorForPage1 { throw errorForPage1 }
+            throw URLError(.notConnectedToInternet)
+        }
         let totalPages = totalPagesOverride ?? max(posts.keys.max() ?? 1, 1)
         return (posts[page] ?? [], totalPages)
     }

@@ -23,8 +23,16 @@ public actor NetworkMonitor {
     /// sub-millisecond window before `start()` seeds the truth.
     private(set) public var isOnline: Bool = true
 
-    public init() {
+    /// Test seam (hardens the flaky DUT-522 seed test): overrides the initial
+    /// `start()` seed status so a test can assert the "seed from the real path,
+    /// not the hardcoded default" contract deterministically — instead of racing
+    /// two live `NWPathMonitor`s against the CI host's actual connectivity. `nil`
+    /// (production) reads the real started monitor's `currentPath` as before.
+    private let seedStatusOverride: (@Sendable () -> Bool)?
+
+    public init(seedStatusOverride: (@Sendable () -> Bool)? = nil) {
         self.pathMonitor = NWPathMonitor()
+        self.seedStatusOverride = seedStatusOverride
     }
 
     /// Start observing connectivity. Idempotent.
@@ -55,7 +63,7 @@ public actor NetworkMonitor {
         // state now. Routed through `handle(_:)` so the DUT-206 de-dup holds and
         // any subsequent first `pathUpdateHandler` carrying the SAME status is
         // coalesced — while a DIFFERENT later status still fires a notification.
-        handle(isOnline: pathMonitor.currentPath.status == .satisfied)
+        handle(isOnline: seedStatusOverride?() ?? (pathMonitor.currentPath.status == .satisfied))
     }
 
     /// AsyncStream of connectivity changes. The first value emitted is the
