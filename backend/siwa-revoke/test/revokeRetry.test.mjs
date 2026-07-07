@@ -49,17 +49,21 @@ async function fetchApple(fetchImpl) {
 async function revoke(fetchImpl) {
   try {
     let resp
+    let retried = false
     try {
       resp = await fetchApple(fetchImpl)
     } catch (err) {
       if (err instanceof UpstreamTimeoutError) {
         await sleep(REVOKE_RETRY_BACKOFF_MS)
+        retried = true
         resp = await fetchApple(fetchImpl) // a throw here propagates -> 504
       } else {
         throw err
       }
     }
-    if (resp.status >= 500) {
+    // DUT-689: cap total Apple calls at 2 — skip the 5xx retry if we already
+    // retried after a first-attempt timeout.
+    if (!retried && resp.status >= 500) {
       await sleep(REVOKE_RETRY_BACKOFF_MS)
       resp = await fetchApple(fetchImpl)
     }
@@ -105,6 +109,17 @@ test("first attempt times out -> retried once -> success", async () => {
   assert.equal(resp.status, 200)
   assert.deepEqual(JSON.parse(await resp.text()), { revoked: true })
   assert.equal(fetchImpl.callCount(), 2, "one retry after the timeout")
+})
+
+test("DUT-689: timeout THEN 5xx -> capped at 2 Apple calls, surfaces 502", async () => {
+  // Regression: the timeout retry and the 5xx retry used to both fire, making
+  // a THIRD Apple call. The retried-guard now caps the total at 2.
+  const fetchImpl = mockFetch(["throw", 503])
+  const resp = await revoke(fetchImpl)
+
+  assert.equal(fetchImpl.callCount(), 2, "timeout retry consumes the single allowed retry; no extra 5xx retry")
+  assert.equal(resp.status, 502)
+  assert.deepEqual(JSON.parse(await resp.text()), { revoked: false, appleStatus: 503 })
 })
 
 test("both attempts time out -> clean 504 upstream_timeout (secrets-free)", async () => {

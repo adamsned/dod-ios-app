@@ -146,20 +146,25 @@ async function handleRevoke(request: Request, env: Env, clientSecret: string): P
   // permanent client error (bad token / bad secret); never retry that. This is
   // the compliance-critical path (App Store 5.1.1(v)).
   let resp: Response
+  let retried = false
   try {
     resp = await fetchApple(APPLE_REVOKE_URL, form)
   } catch (err) {
     // First attempt timed out / threw — treat as transient and retry once.
     if (err instanceof UpstreamTimeoutError) {
       await sleep(REVOKE_RETRY_BACKOFF_MS)
+      retried = true
       resp = await fetchApple(APPLE_REVOKE_URL, form) // a throw here -> 504 (top-level catch)
     } else {
       throw err
     }
   }
 
-  // Retry once on an Apple 5xx (transient). Leave 4xx alone (permanent).
-  if (resp.status >= 500) {
+  // Retry once on an Apple 5xx (transient). Leave 4xx alone (permanent). Skip
+  // if we already retried after a first-attempt timeout, so the total number of
+  // Apple calls is capped at 2 (the documented "retry ONCE" bound) even in the
+  // timeout-then-5xx path (DUT-689).
+  if (!retried && resp.status >= 500) {
     await sleep(REVOKE_RETRY_BACKOFF_MS)
     resp = await fetchApple(APPLE_REVOKE_URL, form) // a throw here -> 504 (top-level catch)
   }
