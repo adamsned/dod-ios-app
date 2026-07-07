@@ -64,6 +64,9 @@ targets:
     platform: iOS
     sources:
       - path: App
+      # DUT-692 — the Control Center action intent is compiled into the APP too
+      # (not just the widget) so `openAppWhenRun` can run it in the app process.
+      - path: Shared/CookingToolIntents.swift
     info:
       path: App/Info.plist
       # These keys MUST live here in project.yml. `xcodegen generate`
@@ -227,6 +230,9 @@ targets:
         excludes:
           - "DODAppWidget.entitlements"
           - "Info.plist"
+      # DUT-692 — shared with the app target; the widget needs the intent + enum
+      # types to build the control button.
+      - path: Shared/CookingToolIntents.swift
     info:
       path: Widget/Info.plist
       properties:
