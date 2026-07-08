@@ -56,6 +56,10 @@ public struct HeatCoachView: View {
     /// DUT-584 — expands the coal-management + wind tips group (default collapsed
     /// — reachable, but not competing with the answer).
     @State var showTips = false
+    /// v2 redesign — the single expanded cook-by-feel cue (accordion; nil = all
+    /// collapsed). Progressive disclosure keeps that section a scannable column
+    /// of sensory cues instead of a wall of always-open rows.
+    @State var expandedFeelCue: String?
 
     /// DUT-584 — the recipe's target temperature, for the answer card's context
     /// line ("For this recipe at 350°F"). `nil` on a standalone open.
@@ -65,6 +69,9 @@ public struct HeatCoachView: View {
     /// step + the per-recipe nudge), so it needs an explicit Done like the other
     /// tools, not just swipe-to-dismiss.
     @Environment(\.dismiss) private var dismiss
+
+    /// Honor Reduce Motion for the section-expand + cue-accordion transitions.
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
 
     /// Standalone open — 12" / even default, no recipe context.
     public init() {
@@ -106,8 +113,9 @@ public struct HeatCoachView: View {
             }
             .padding(DODSpacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .animation(.easeInOut(duration: 0.2), value: showConditions)
-            .animation(.easeInOut(duration: 0.2), value: showTips)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: showConditions)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: showTips)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: expandedFeelCue)
         }
         .background(DODColor.surface)
         .navigationTitle("Heat Coach")

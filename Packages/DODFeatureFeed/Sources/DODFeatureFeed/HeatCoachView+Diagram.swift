@@ -33,11 +33,16 @@ extension HeatCoachView {
         .accessibilityIdentifier("heat-coach-diagram")
     }
 
-    /// One row of decorative coal dots — one glowing ember per coal. Hidden from
+    /// One row of decorative coal dots — one coal per dot. Hidden from
     /// VoiceOver — the count is spoken once by the diagram's combined label,
     /// never as N separate dots.
     private func coalDotRow(count: Int) -> some View {
-        HStack(spacing: DODSpacing.xs) {
+        // A wrapping flow, not an HStack: dots pack left-to-right and wrap to the
+        // next centered row when they'd exceed the card width. A plain HStack
+        // overflowed and stretched the whole answer card for baking splits, whose
+        // lid is 3/4 of the total — 18 dots at 12", 24 at 16" (DUT bugfix). Even
+        // splits (lid = half) never got wide enough to trip it.
+        CoalDotFlowLayout(spacing: DODSpacing.xs) {
             ForEach(0..<max(0, count), id: \.self) { _ in
                 coalDot
             }
@@ -46,23 +51,16 @@ extension HeatCoachView {
         .accessibilityHidden(true)
     }
 
-    /// A single lit coal: a warm radial ember (gold-hot core, offset toward the
-    /// top-left, cooling to a burnt-orange rim) with a soft accent glow — so the
-    /// row reads as glowing charcoal, not flat bullets. Now that the answer card
-    /// is a calm `surfaceElevated` surface (not a filled accent hero), the dots
-    /// carry the fire palette directly instead of `labelOnAccent`.
+    /// A single coal: a flat warm-orange fill with a thin cast-iron rim for
+    /// definition. v2 dropped the earlier radial-gradient specular highlight so
+    /// the dots read as coals calmly, without the glossy sheen.
     private var coalDot: some View {
         Circle()
-            .fill(
-                RadialGradient(
-                    colors: [DODColor.warmGold, DODColor.accent, DODColor.burntOrange],
-                    center: UnitPoint(x: 0.35, y: 0.32),
-                    startRadius: 0,
-                    endRadius: 7
-                )
-            )
+            .fill(DODColor.accent)
             .frame(width: 12, height: 12)
-            .shadow(color: DODColor.accent.opacity(0.35), radius: 2, y: 0.5)
+            .overlay(
+                Circle().strokeBorder(DODColor.castIronBrown.opacity(0.35), lineWidth: 0.5)
+            )
     }
 
     /// The oven body: a small "Starting Coals" caption, the big total, then the
@@ -108,4 +106,56 @@ extension HeatCoachView {
     static func coalDiagramAccessibilityLabel(_ split: CoalSplit) -> String {
         "Starting coals: about \(split.total) — \(split.lid) on the lid, \(split.bottom) underneath."
     }
+}
+
+/// A minimal flow layout for the coal dots: identical fixed-size items packed
+/// left-to-right, wrapping to a new centered row when they'd exceed the proposed
+/// width. Keeps a large baking lid split (up to 24 dots) from overflowing and
+/// stretching the answer card. iOS 16+ `Layout`.
+private struct CoalDotFlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let item = subviews.first?.sizeThatFits(.unspecified) else { return .zero }
+        let maxWidth = proposal.width ?? .infinity
+        let perRow = maxPerRow(maxWidth: maxWidth, itemWidth: item.width)
+        let rows = Int(ceil(Double(subviews.count) / Double(perRow)))
+        let width =
+            maxWidth.isFinite
+            ? maxWidth
+            : CGFloat(subviews.count) * item.width + CGFloat(max(0, subviews.count - 1)) * spacing
+        let height = CGFloat(rows) * item.height + CGFloat(max(0, rows - 1)) * spacing
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let item = subviews.first?.sizeThatFits(.unspecified) else { return }
+        let perRow = maxPerRow(maxWidth: bounds.width, itemWidth: item.width)
+        var index = 0
+        var y = bounds.minY
+        while index < subviews.count {
+            let rowCount = min(perRow, subviews.count - index)
+            let rowWidth = CGFloat(rowCount) * item.width + CGFloat(rowCount - 1) * spacing
+            var x = bounds.minX + (bounds.width - rowWidth) / 2
+            for _ in 0..<rowCount {
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(item)
+                )
+                x += item.width + spacing
+                index += 1
+            }
+            y += item.height + spacing
+        }
+    }
+
+    /// How many identical items fit across `maxWidth` with `spacing` between.
+    private func maxPerRow(maxWidth: CGFloat, itemWidth: CGFloat) -> Int {
+        guard maxWidth.isFinite, itemWidth > 0 else { return subviewCountUpperBound }
+        return max(1, Int((maxWidth + spacing) / (itemWidth + spacing)))
+    }
+
+    /// A safe "all on one row" fallback for an unbounded proposal.
+    private var subviewCountUpperBound: Int { .max }
 }
