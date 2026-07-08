@@ -143,6 +143,17 @@ extension RootView {
     /// unified `route(toHubTool:)`.
     func routeToShoppingList() { route(toHubTool: .shoppingList) }
 
+    /// DUT — the Cooking Tools hub's Cook Mode "Find a Recipe" hand-off. Arm the
+    /// one-shot "we came here to cook" flag, then switch to the Feed (Recipes) tab
+    /// to pick a recipe; the next Feed card tap consumes the arm so that recipe
+    /// opens ALREADY in Cook Mode (via `TabStack.recipeRoute(for:cookModeArmed:)`),
+    /// mirroring the `StartCookMode` deep link. A plain Feed browse never arms it,
+    /// so every other recipe-open path keeps today's plain-detail behavior.
+    func findRecipeToCook() {
+        cookModeFindRecipeArmed = true
+        selectedTab = .feed
+    }
+
     /// T-912 / DUT-551 (CL-306) — route to Heat Coach (the hub's row #3 sheet).
     /// The per-recipe Heat Coach nudge (Recipe Detail) taps this. Kept as a named
     /// function for its callers; delegates to the unified `route(toHubTool:)`.
