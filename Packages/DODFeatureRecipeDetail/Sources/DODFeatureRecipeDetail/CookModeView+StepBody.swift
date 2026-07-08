@@ -34,6 +34,7 @@ extension CookModeView {
                 .foregroundStyle(DODColor.label)
                 .lineSpacing(DODSpacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Step \(step.step). \(displayText)")
             if let duration = StepTimerParser.firstDuration(in: step.text) {
                 CookTimer(
                     stepIndex: viewModel.currentStepIndex,
@@ -44,8 +45,6 @@ extension CookModeView {
             heatCoachShortcut(for: step)
         }
         .padding(.horizontal, DODSpacing.md)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(step.step). \(displayText)")
     }
 
     /// T-912 / DUT-551 (CL-306) — a compact "Open Heat Coach" shortcut, shown
