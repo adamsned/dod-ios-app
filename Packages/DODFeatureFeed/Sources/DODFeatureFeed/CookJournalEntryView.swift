@@ -31,7 +31,7 @@ struct CookJournalEntryView: View {
     /// simply doesn't appear for callers (previews/tests) that don't wire it.
     let onDelete: (() async -> Void)?
 
-    private let photoStore = CookPhotoStore()
+    private let photoWriter: CookPhotoWriting = SystemCookPhotoWriter()
     /// DUT-611 — decode the existing entry photo OFF the main thread, downsampled,
     /// via the same ``CookThumbnailLoader`` DUT-588 introduced for the journal
     /// list. The detail slot renders larger than a 56pt list thumbnail, so it's
@@ -261,12 +261,20 @@ extension CookJournalEntryView {
     }
 
     private func loadPicked(_ item: PhotosPickerItem?) async {
-        guard let item, let data = try? await item.loadTransferable(type: Data.self) else { return }
-        pendingImageData = data
-        photoCleared = false
-        #if canImport(UIKit)
-        if let uiImage = UIImage(data: data) { displayImage = Image(uiImage: uiImage) }
-        #endif
+        guard let item else { return }
+        do {
+            if let data = try await item.loadTransferable(type: Data.self) {
+                pendingImageData = data
+                photoCleared = false
+                #if canImport(UIKit)
+                if let uiImage = UIImage(data: data) { displayImage = Image(uiImage: uiImage) }
+                #endif
+            } else {
+                photoSaveError = "We couldn't load your photo. Please try again."
+            }
+        } catch {
+            photoSaveError = "We couldn't load your photo. Please try again."
+        }
     }
 
     private func clearPhoto() {
@@ -281,7 +289,7 @@ extension CookJournalEntryView {
         var photoID = entry.photoLocalID
         if let data = pendingImageData {
             do {
-                photoID = try photoStore.save(data)
+                photoID = try await photoWriter.save(data, id: UUID().uuidString)
             } catch {
                 // DUT-340: don't swallow the write failure with `try?`. Surface it
                 // and bail so the user keeps the photo in the slot and can retry,
