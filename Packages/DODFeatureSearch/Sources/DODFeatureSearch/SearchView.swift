@@ -66,14 +66,9 @@ public struct SearchView: View {
                     DODHeaderGearButton { onOpenSettings() }
                 }
             }
-            // US-3 / AC-3.5 amendment / CL-126 / REG-32 (T-648, 2026-05-30):
-            // the inline `searchField` `HStack`-with-`RoundedRectangle` is
-            // replaced by the shared `DODSearchField` so this bar and the
-            // Categories-tab bar both render `DODColor.surfaceElevated`
-            // brand brown inside a `Capsule(style: .continuous)` shape.
-            // The `onClear` closure routes to `viewModel.clear()` so the
-            // clear button preserves the full VM-side state/items/lastQuery/
-            // debounce-cancel cleanup, not just the query-string clear.
+            // US-3 / AC-3.5 / CL-126 / REG-32 (T-648): the shared `DODSearchField`
+            // (brand-brown `Capsule`, matching the Categories bar) replaces the inline
+            // field; `onClear` routes to `viewModel.clear()` for full VM-side cleanup.
             DODSearchField(
                 text: $viewModel.query,
                 placeholder: "Search Recipes",
@@ -339,7 +334,11 @@ public struct SearchView: View {
                     title: item.title,
                     excerpt: item.excerpt,
                     heroImageURL: item.heroImage,
-                    highlightQuery: viewModel.query
+                    // Highlight the COMMITTED query (`lastQuery`), not the live
+                    // `query` keystroke: the debounced fetch leaves stale cards
+                    // on screen, so the live term re-highlighted every card each
+                    // keystroke over the wrong substring ("chick" vs "chic").
+                    highlightQuery: viewModel.lastQuery
                 )
                 .recipeCardTap { onSelect(item) }
                 .recipeCardContextMenu(
@@ -376,7 +375,8 @@ public struct SearchView: View {
                     title: item.title,
                     excerpt: item.excerpt,
                     heroImageURL: item.heroImage,
-                    highlightQuery: viewModel.query
+                    // Committed query — see the gallery call site's rationale.
+                    highlightQuery: viewModel.lastQuery
                 )
                 .recipeCardTap { onSelect(item) }
                 .recipeCardContextMenu(
