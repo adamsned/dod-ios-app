@@ -37,6 +37,12 @@ public final class CategoryRecipesViewModel {
     private let dependencies: CategoriesDependencies
     private var currentPage: Int = 0
     private var reachedEnd: Bool = false
+    // DUT-706 — reentrancy guard: `refresh()`'s keepStateWhilePopulated branch
+    // leaves `loadState == .loaded` while awaiting the network, so a near-bottom
+    // card's load-more `.task` could start a concurrent `load` on the stale
+    // `currentPage`. Set for the whole of `load` (before its first await) so
+    // `loadMoreIfNeeded` bails while any load is in flight.
+    private var isLoadInFlight = false
 
     public init(category: DODDomain.Category, dependencies: CategoriesDependencies) {
         self.category = category
@@ -63,14 +69,28 @@ public final class CategoryRecipesViewModel {
     /// Optimistically flip a recipe's saved membership on a long-press toggle
     /// so the menu label is correct on re-open; the next refresh reconciles.
     public func applyOptimisticSaveToggle(id: Int) {
+        toggleSavedMembership(id: id)
+        // DUT-697 — signal the view to fire the `.selection` haptic on this
+        // genuine user toggle only (not on appear/refresh set reconciliation).
+        saveToggleCount &+= 1
+    }
+
+    /// Shared membership flip for the optimistic Save/Unsave paths. Only mutates
+    /// `savedRecipeIDs` — never touches `saveToggleCount`, so callers decide
+    /// whether the flip is a genuine user toggle (haptic) or a rollback (silent).
+    private func toggleSavedMembership(id: Int) {
         if savedRecipeIDs.contains(id) {
             savedRecipeIDs.remove(id)
         } else {
             savedRecipeIDs.insert(id)
         }
-        // DUT-697 — signal the view to fire the `.selection` haptic on this
-        // genuine user toggle only (not on appear/refresh set reconciliation).
-        saveToggleCount &+= 1
+    }
+
+    /// DUT-721 — failed-write rollback path. Re-inverts the optimistic flip
+    /// WITHOUT bumping `saveToggleCount`, so a save that failed does not fire the
+    /// positive `.selection` haptic reserved for genuine user toggles.
+    func revertOptimisticSaveToggle(id: Int) {
+        toggleSavedMembership(id: id)
     }
 
     public func retry() async {
@@ -100,7 +120,8 @@ public final class CategoryRecipesViewModel {
     }
 
     public func loadMoreIfNeeded(currentItem: RecipeListItem) async {
-        guard !reachedEnd,
+        guard !isLoadInFlight,
+            !reachedEnd,
             loadState == .loaded,
             items.suffix(3).contains(where: { $0.id == currentItem.id })
         else { return }
@@ -113,6 +134,8 @@ public final class CategoryRecipesViewModel {
     /// state alone can't distinguish success from a preserved-grid failure).
     @discardableResult
     private func load(page: Int, append: Bool = false, keepStateWhilePopulated: Bool = false) async -> Bool {
+        isLoadInFlight = true
+        defer { isLoadInFlight = false }
         if append {
             loadState = .loadingMore
         } else if keepStateWhilePopulated, !items.isEmpty {
