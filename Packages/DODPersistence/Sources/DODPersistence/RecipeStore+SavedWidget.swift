@@ -160,7 +160,11 @@ extension RecipeStore {
     /// Saved widget's bookmark badge; the entry list there is capped at 5, so
     /// this is the only accurate total.
     public func savedRecipeCount() throws -> Int {
-        let descriptor = FetchDescriptor<SyncedSavedRecipe>()
+        var descriptor = FetchDescriptor<SyncedSavedRecipe>()
+        // DUT: this is a dedupe-by-id count, so only the `id` column is needed —
+        // restrict `propertiesToFetch` so counting doesn't fault the other
+        // (heavier) synced columns for every saved row.
+        descriptor.propertiesToFetch = [\.id]
         var seen = Set<Int>()
         for row in try modelContext.fetch(descriptor) {
             seen.insert(row.id)

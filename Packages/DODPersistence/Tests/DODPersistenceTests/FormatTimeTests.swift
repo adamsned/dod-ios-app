@@ -35,4 +35,20 @@ struct FormatTimeTests {
         #expect(formatTime(seconds: 90 * 60) == "1 hr 30 min")
         #expect(formatTime(seconds: 75 * 60) == "1 hr 15 min")
     }
+
+    /// DUT — `formatTime` is now `public` so the App's `RecipeRouteResolver`
+    /// can share it instead of keeping a byte-identical private copy. This
+    /// asserts the exact `Duration`→whole-seconds conversion the call site
+    /// performs (`Int(duration.components.seconds)`) yields the same chip, so
+    /// the shared helper can't silently drift the rendered cache-hit time chip.
+    @Test func durationSecondsConversionMatchesChip() {
+        func chip(_ duration: Duration) -> String? {
+            formatTime(seconds: Int(duration.components.seconds))
+        }
+        #expect(chip(.seconds(0)) == nil)
+        #expect(chip(.seconds(45)) == "<1 min")
+        #expect(chip(.seconds(30 * 60)) == "30 min")
+        #expect(chip(.seconds(60 * 60)) == "1 hr")
+        #expect(chip(.seconds(75 * 60)) == "1 hr 15 min")
+    }
 }
