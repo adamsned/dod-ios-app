@@ -54,11 +54,14 @@ public enum FractionRenderer {
             let gap = consumedSpaceBeforeTrailing(in: ingredientText, at: parsed.afterIndex)
             return rendered + gap + range.separator + range.renderedHigh + range.rest
         }
-        // `parseLeadingQuantity` consumes one trailing space so the rewrite
-        // glues `<rendered> <trailing>` with a single space — re-add it
-        // here unless the trailing slice is empty (quantity-only input).
+        // `parseLeadingQuantity` consumes AT MOST one trailing space, so re-add
+        // exactly what it swallowed rather than hardcoding a space — the same
+        // seam the range path uses. Hardcoding " " injected a spurious space when
+        // the quantity abuts a non-space char: "1-inch piece" ×2 → "2 -inch
+        // piece", "2(15-ounce) cans" → "4 (15-ounce) cans".
         if trailing.isEmpty { return rendered }
-        return rendered + " " + trailing
+        let gap = consumedSpaceBeforeTrailing(in: ingredientText, at: parsed.afterIndex)
+        return rendered + gap + trailing
     }
 
     /// Renders a positive numeric quantity as a cook-friendly string.

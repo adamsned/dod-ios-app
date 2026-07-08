@@ -47,14 +47,30 @@ extension RecipeStore {
         for ingredient in ingredients {
             modelContext.delete(ingredient)
         }
+        // DUT-439: a `CachedComment.isPendingFromThisDevice == true` row is the
+        // user's OWN submitted-but-unapproved comment. It never comes back from
+        // the public GET until WP approves it, so evicting it here would silently
+        // destroy device-authoritative state that is NOT re-fetchable. Sweep only
+        // the re-fetchable public rows (`isPendingFromThisDevice == false`); the
+        // pending row survives eviction and ages out on its own DUT-439 window.
         let comments = try modelContext.fetch(
-            FetchDescriptor<CachedComment>(predicate: #Predicate { $0.postID == id })
+            FetchDescriptor<CachedComment>(
+                predicate: #Predicate { $0.postID == id && $0.isPendingFromThisDevice == false }
+            )
         )
         for comment in comments {
             modelContext.delete(comment)
         }
+        // DUT-417: a `CachedRating.userRating != nil` row carries the user's own
+        // star rating, which backs the profile "Ratings" count via
+        // `userRatingCount()` and is NOT re-fetchable from WP. Sweep only the
+        // aggregate-only rows (`userRating == nil`, cached from a recipe's public
+        // average); the device-authored rating survives even though its
+        // `CachedRecipe` is evicted.
         let ratings = try modelContext.fetch(
-            FetchDescriptor<CachedRating>(predicate: #Predicate { $0.recipeID == id })
+            FetchDescriptor<CachedRating>(
+                predicate: #Predicate { $0.recipeID == id && $0.userRating == nil }
+            )
         )
         for rating in ratings {
             modelContext.delete(rating)

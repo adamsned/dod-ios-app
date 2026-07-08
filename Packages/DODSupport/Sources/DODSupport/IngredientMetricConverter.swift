@@ -84,16 +84,25 @@ public enum IngredientMetricConverter {
     /// Render a base-unit magnitude (millilitres or grams) as its cooking-ready
     /// display string, rolling up to the larger unit at the 1000 threshold.
     private static func format(_ magnitude: Double, as dimension: Dimension) -> String {
-        if magnitude >= 1000 {
+        // Roll up to litres / kilograms at the 1000 threshold. The guard checks
+        // BOTH the raw magnitude AND its cooking-friendly rounded value: a value
+        // like 996 ml is < 1000 raw, but `roundBase` snaps it to 1000, so
+        // deciding the roll-up on the raw magnitude alone printed a nonsensical
+        // "1000 ml" instead of "1 L". Firing on `roundBase(magnitude) >= 1000`
+        // too closes that gap.
+        if magnitude >= 1000 || roundBase(magnitude) >= 1000 {
             let large = magnitude / 1000
             return "\(trimDecimal(large)) \(dimension.largeSymbol)"
         }
         let rounded = roundBase(magnitude)
-        // A real positive amount must never render as "0 ml" / "0 g": when the
-        // cooking-friendly rounding collapses a tiny measure to a whole 0 (e.g.
-        // 1/4 tsp → 1.25 ml), fall back to one decimal place so the true amount
-        // is shown accurately (1.25 → "1.3 ml", trailing ".0" trimmed).
-        if rounded == 0 {
+        // A real positive amount must never render as "0 ml" / "0 g", and a small
+        // measure must not lose its distinction to nearest-5 snapping: `roundBase`
+        // rounds 2.5 ml (½ tsp) up to 5, colliding it with 1 tsp's genuine 5 ml.
+        // Route any nonzero magnitude BELOW the 5-unit rounding step through the
+        // same one-decimal fallback used when rounding collapses to 0 — so ½ tsp
+        // reads "2.5 ml" and ¼ tsp (1.25 ml) still reads "1.3 ml". 1 tsp is
+        // magnitude == 5 (not < 5), so it is untouched and still reads "5 ml".
+        if rounded == 0 || magnitude < 5 {
             let oneDecimal = trimDecimal(magnitude)
             // Even one decimal collapses to "0" for a true micro-amount (any
             // magnitude < 0.05, e.g. 1/200 tsp → 0.025 ml). Rendering "0.0 ml"

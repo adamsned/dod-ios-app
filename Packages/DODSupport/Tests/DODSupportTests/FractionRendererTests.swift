@@ -230,6 +230,26 @@ import Testing
         #expect(FractionRenderer.scale("2-3", by: 2.0) == "4-6")
     }
 
+    // MARK: - No spurious space when the quantity abuts a non-space char
+
+    /// A quantity that runs straight into its unit ("1-inch") must not gain an
+    /// injected space when scaled: "1-inch piece" ×2 → "2-inch piece", not
+    /// "2 -inch piece". The single-quantity path now re-adds only the space the
+    /// parser actually consumed (there was none here).
+    @Test func hyphenatedUnitDoesNotGainSpuriousSpace() {
+        #expect(
+            FractionRenderer.scale("1-inch piece of ginger", by: 2.0)
+                == "2-inch piece of ginger"
+        )
+    }
+
+    /// A normal spaced quantity keeps its single space: "1 cup flour" ×2 →
+    /// "2 cup flour" (the renderer does not pluralize; the point is the space
+    /// between quantity and unit is preserved, not doubled or dropped).
+    @Test func spacedQuantityPreservesSingleSpace() {
+        #expect(FractionRenderer.scale("1 cup flour", by: 2.0) == "2 cup flour")
+    }
+
     // MARK: - Display fallback locale (DUT-320)
 
     /// The DISPLAY fallback formatter is NOT pinned to en_US_POSIX. A
