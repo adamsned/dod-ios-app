@@ -35,7 +35,7 @@ public struct FirstCookoutView: View {
     /// (which tears this view down + rebuilds it with a fresh `hasLoggedCook`).
     /// Aligns with DUT-484/547's per-recipe keying on the shared engine: the log
     /// guard is now keyed by `cookout.recipeID`, not a per-view boolean. `nil`
-    /// in unwired hosts (DumpCakeFlow / previews / standalone) → the legacy
+    /// in unwired hosts (previews / standalone) → the legacy
     /// per-view `hasLoggedCook` guard.
     @Binding var loggedRecipeIDs: Set<Int>
     /// DUT-209 — the off-main celebration-photo writer. Injected so the atomic
@@ -66,7 +66,7 @@ public struct FirstCookoutView: View {
     /// DUT-484: injectable so the guided-path host (`CookChooserFlow`) can OWN
     /// the engine and keep a running bake alive across a "Back to the path" →
     /// re-enter cycle (which tears this view down + rebuilds it). When not
-    /// injected (DumpCakeFlow / previews) the view owns its own.
+    /// injected (previews / standalone) the view owns its own.
     @State var timerEngine: CookTimerEngine
     @State var showingHeatCoach = false
     /// DUT-626 — flips true the moment the cook actually starts the bake timer
@@ -120,7 +120,7 @@ public struct FirstCookoutView: View {
         // DUT-548: adopt the host-owned "already logged" set when provided (so a
         // logged cook survives a Back → re-enter cycle); otherwise a throwaway
         // constant binding — the per-view `hasLoggedCook` still guards a single
-        // lifecycle for the unwired hosts (DumpCakeFlow / previews) that can't
+        // lifecycle for the unwired hosts (previews / standalone) that can't
         // re-enter the same rung anyway.
         _loggedRecipeIDs = loggedRecipeIDs ?? .constant([])
         // DUT-484: adopt the host-owned engine when provided (so a bake timer

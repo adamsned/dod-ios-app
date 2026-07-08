@@ -8,8 +8,9 @@ import SwiftUI
 /// connected path of tappable dish cards (each node showing the cook's progress
 /// — done / current / upcoming, derived from the recommended rung), and the
 /// off-path dump cakes as an "Anytime Treats" section. Picking any card swaps
-/// this screen in place for the full paged ``FirstCookoutView`` (mirrors
-/// ``DumpCakeFlow``). Reads ``GuidedCookout/path`` dynamically, so new rungs
+/// this screen in place for the full paged ``FirstCookoutView`` (a dump cake
+/// uses the generic `GuidedCookout.dumpCake` template). Reads
+/// ``GuidedCookout/path`` dynamically, so new rungs
 /// appear on the path for free.
 ///
 /// T-912 / DUT-551 (CL-306) — `public` so the app-level Cooking Tools hub
