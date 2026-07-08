@@ -282,17 +282,9 @@ public struct SettingsView: View {
                 .disabled(isClearingCache)
                 .accessibilityIdentifier("settings-button-clear-cache")
 
-                // DUT-679 — App Store Guideline 5.1.1(i) in-app Privacy Policy
-                // link (see `SettingsViewModel+Privacy.swift`).
-                if let privacyPolicyURL = URL(string: SettingsViewModel.privacyPolicyURLString) {
-                    Link(destination: privacyPolicyURL) {
-                        Text("Privacy Policy")
-                            .dodFont(DODType.body)
-                            .foregroundStyle(DODColor.accent)
-                    }
-                    .accessibilityIdentifier("settings-privacy-policy-link")
-                    .accessibilityLabel("Privacy Policy, opens in browser")
-                }
+                // DUT-679 / DUT-502 — App Store Guideline 5.1.1(i) in-app Privacy
+                // Policy + Terms of Use links (see `SettingsView+PolicyLinks.swift`).
+                dataPrivacyPolicyLinks
             } header: {
                 sectionHeader("Data & Privacy")
             } footer: {
@@ -317,6 +309,10 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-link-about")
+
+                // DUT-502 — a published Contact / Support affordance in-app
+                // (Guideline 1.2). See `SettingsView+PolicyLinks.swift`.
+                contactSupportLink
             }
             .listRowBackground(DODColor.surfaceElevated)
 

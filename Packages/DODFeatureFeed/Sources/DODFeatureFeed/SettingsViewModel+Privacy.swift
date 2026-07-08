@@ -21,4 +21,20 @@ extension SettingsViewModel {
     /// suite can pin the literal; the row builds the `URL` with `if let`.
     public nonisolated static let privacyPolicyURLString =
         "https://dutchovendaddy.com/privacy-policy/"
+
+    /// The public Terms of Use page the Settings → Data & Privacy row opens.
+    ///
+    /// DUT-502 — pairs with the Privacy Policy link so the account/data-collection
+    /// disclosures App Review expects (Guideline 5.1.1) are both reachable in-app.
+    /// Same `String`-not-`URL` convention as `privacyPolicyURLString` above.
+    public nonisolated static let termsOfUseURLString =
+        "https://dutchovendaddy.com/terms/"
+
+    /// The public Contact / Support page the Settings → About row opens.
+    ///
+    /// DUT-502 — a reachable, published contact affordance in-app helps satisfy
+    /// App Review Guideline 1.2 (published developer contact) alongside the
+    /// privacy/terms disclosures.
+    public nonisolated static let contactSupportURLString =
+        "https://dutchovendaddy.com/contact/"
 }
