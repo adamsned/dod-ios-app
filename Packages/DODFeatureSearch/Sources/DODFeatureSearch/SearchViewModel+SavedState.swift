@@ -16,10 +16,26 @@ extension SearchViewModel {
         }
     }
 
-    /// Optimistically flip a recipe's saved membership on a long-press toggle
-    /// so the menu label is correct on re-open without waiting for the async
-    /// store round-trip; the next ``refreshSavedRecipeIDs()`` reconciles.
+    /// Optimistically flip a recipe's saved membership on a genuine long-press
+    /// toggle so the menu label is correct on re-open without waiting for the
+    /// async store round-trip; the next ``refreshSavedRecipeIDs()`` reconciles.
+    /// Bumps ``saveToggleCount`` so `SearchView` fires the `.selection` haptic on
+    /// this real user toggle only (not on appear/refresh reconciliation).
     public func applyOptimisticSaveToggle(id: Int) {
+        toggleSavedMembership(id: id)
+        saveToggleCount &+= 1
+    }
+
+    /// Failed-write rollback: re-invert the optimistic flip WITHOUT bumping
+    /// ``saveToggleCount``, so a save that failed to persist does not fire the
+    /// positive `.selection` haptic reserved for genuine user toggles.
+    public func revertOptimisticSaveToggle(id: Int) {
+        toggleSavedMembership(id: id)
+    }
+
+    /// Shared membership flip. Only mutates `savedRecipeIDs`; callers decide
+    /// whether the flip counts as a genuine toggle (haptic) or a silent rollback.
+    private func toggleSavedMembership(id: Int) {
         if savedRecipeIDs.contains(id) {
             savedRecipeIDs.remove(id)
         } else {

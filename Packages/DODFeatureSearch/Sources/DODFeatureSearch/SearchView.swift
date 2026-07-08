@@ -91,10 +91,8 @@ public struct SearchView: View {
             // US-12 / AC-12.2 amendment / CL-106 (T-637): hide the filter
             // chip row while idle — the `IdleSuggestionsView` "Try" /
             // "Recent" layout below already serves as the discovery
-            // surface, and an above-it chip row crowded the layout. The
-            // row renders the moment a search transitions to .searching
-            // / .results / .noResults / .offline so the user can refine
-            // narrowing while results are coming back.
+            // surface, and an above-it chip row crowded the layout. The row
+            // renders the moment a search leaves idle so the user can refine.
             if viewModel.state != .idle {
                 FilterChipRow(filters: $viewModel.filters)
             }
@@ -130,6 +128,9 @@ public struct SearchView: View {
             await viewModel.loadCategoriesIfNeeded()
             await viewModel.refreshSavedRecipeIDs()  // T-765: state-aware menu on appear
         }
+        // US-34 / AC-34.6 — `.selection` tap on a genuine card Save/Unsave, keyed
+        // to `saveToggleCount` so appear/refresh recon never buzzes (cf. Categories).
+        .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
     /// DUT-527 — announce the result count once the search settles, so a
@@ -347,7 +348,7 @@ public struct SearchView: View {
                         // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
                         onSave?(item) { didSave in
-                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
                         }
                     },
                     // DUT-534 Part 2 — Search opts into the shared helper's
@@ -384,7 +385,7 @@ public struct SearchView: View {
                         // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
                         onSave?(item) { didSave in
-                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
                         }
                     },
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
@@ -396,5 +397,4 @@ public struct SearchView: View {
 }
 
 // `FlowLayout`, `FilterChipRow`, `IdleSuggestionsView`, and the DUT-25
-// search-field affordance each live in their own file to keep this one under
-// SwiftLint's 400-line cap. None depend on `SearchView`'s source.
+// search-field affordance each live in their own file (400-line cap).
