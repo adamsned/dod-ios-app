@@ -33,18 +33,36 @@ extension HeatCoachView {
         .accessibilityIdentifier("heat-coach-diagram")
     }
 
-    /// One row of decorative coal dots. Hidden from VoiceOver — the count is
-    /// spoken once by the diagram's combined label, never as N separate dots.
+    /// One row of decorative coal dots — one glowing ember per coal. Hidden from
+    /// VoiceOver — the count is spoken once by the diagram's combined label,
+    /// never as N separate dots.
     private func coalDotRow(count: Int) -> some View {
-        HStack(spacing: DODSpacing.xxs) {
+        HStack(spacing: DODSpacing.xs) {
             ForEach(0..<max(0, count), id: \.self) { _ in
-                Circle()
-                    .fill(DODColor.labelOnAccent.opacity(0.9))
-                    .frame(width: 10, height: 10)
+                coalDot
             }
         }
         .frame(maxWidth: .infinity)
         .accessibilityHidden(true)
+    }
+
+    /// A single lit coal: a warm radial ember (gold-hot core, offset toward the
+    /// top-left, cooling to a burnt-orange rim) with a soft accent glow — so the
+    /// row reads as glowing charcoal, not flat bullets. Now that the answer card
+    /// is a calm `surfaceElevated` surface (not a filled accent hero), the dots
+    /// carry the fire palette directly instead of `labelOnAccent`.
+    private var coalDot: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [DODColor.warmGold, DODColor.accent, DODColor.burntOrange],
+                    center: UnitPoint(x: 0.35, y: 0.32),
+                    startRadius: 0,
+                    endRadius: 7
+                )
+            )
+            .frame(width: 12, height: 12)
+            .shadow(color: DODColor.accent.opacity(0.35), radius: 2, y: 0.5)
     }
 
     /// The oven body: a small "Starting Coals" caption, the big total, then the
@@ -55,22 +73,31 @@ extension HeatCoachView {
         VStack(spacing: DODSpacing.xxs) {
             Text("Starting Coals")
                 .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.85))
+                .foregroundStyle(DODColor.labelSecondary)
                 .textCase(.uppercase)
+            // The big total is where burnt orange earns its one bold moment on
+            // the calm card — the number, not the whole surface.
             Text("~\(split.total)")
                 .dodFont(DODType.displayLarge)
-                .foregroundStyle(DODColor.labelOnAccent)
+                .foregroundStyle(DODColor.accent)
                 .fixedSize(horizontal: false, vertical: true)
             Text("\(split.lid) on the lid · \(split.bottom) underneath")
                 .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
+                .foregroundStyle(DODColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, DODSpacing.md)
         .frame(maxWidth: .infinity)
+        // A recessed well between the two ember rows — `surface` inside the
+        // elevated card with a hairline, the same idiom as the segmented-control
+        // track. Reads as the oven the coals sit on, in both light + dark.
         .background(
             RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
-                .strokeBorder(DODColor.labelOnAccent.opacity(0.35), lineWidth: 2)
+                .fill(DODColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous)
+                .strokeBorder(DODColor.surfaceDivider, lineWidth: 1)
         )
         .accessibilityHidden(true)
     }

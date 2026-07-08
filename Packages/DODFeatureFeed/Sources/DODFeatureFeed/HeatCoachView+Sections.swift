@@ -26,7 +26,7 @@ extension HeatCoachView {
         VStack(spacing: DODSpacing.sm) {
             Text("A Starting Point. Then Cook by Feel.")
                 .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.9))
+                .foregroundStyle(DODColor.labelSecondary)
                 .textCase(.uppercase)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -43,7 +43,7 @@ extension HeatCoachView {
             if coachModel.conditionCoalDelta != 0...0 {
                 Text("Already adjusted for your conditions.")
                     .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelOnAccent.opacity(0.85))
+                    .foregroundStyle(DODColor.labelSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("heat-coach-adjusted-note")
@@ -51,11 +51,11 @@ extension HeatCoachView {
 
             // DUT-601 — elevation adjusts cook TIME (not coals, per the DOD
             // method), so surface it live in the answer so the Elevation input
-            // also visibly moves the recommendation. Divider reads on accent.
-            Divider().overlay(DODColor.labelOnAccent.opacity(0.25))
+            // also visibly moves the recommendation.
+            Divider().overlay(DODColor.surfaceDivider)
             Text(coachModel.elevationCookTimeLine)
                 .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
+                .foregroundStyle(DODColor.labelSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("heat-coach-cook-time")
@@ -63,7 +63,7 @@ extension HeatCoachView {
             if let context = recipeContextLine {
                 Text(context)
                     .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelOnAccent.opacity(0.95))
+                    .foregroundStyle(DODColor.labelSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("heat-coach-recipe-context")
@@ -71,10 +71,11 @@ extension HeatCoachView {
         }
         .padding(DODSpacing.lg)
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                .fill(DODColor.accent)
-        )
+        // DUT — the answer card was the one full-accent slab in the whole app.
+        // It now uses the shared elevated-card treatment like every sibling
+        // section; burnt orange survives only where it earns attention: the coal
+        // embers and the big total. See `cardSurface()`.
+        .cardSurface()
         .accessibilityIdentifier("heat-coach-result")
     }
 
