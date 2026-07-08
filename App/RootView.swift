@@ -94,24 +94,21 @@ struct RootView: View {
     @State var tabPaths: [AppTab: [RecipeRoute]] = [:]
     /// DUT-546 (gap 3) — ONE app-level moderation store injected into every
     /// `RecipeDetailViewModel` (via `TabStack`), so a block on one open recipe
-    /// screen updates an already-open second one live (the `@Observable` set is
-    /// process-wide) instead of each screen reading its own `UserDefaults` copy.
-    /// Owned here (survives the iPad flip like `selectedTab`). Non-private for
-    /// the `TabStack` construction sites.
+    /// screen updates an already-open second one live. Survives the iPad flip.
     @State var commentModeration = CommentModerationStore()
     /// T-912 / DUT-551 (CL-306) — Settings left the tab bar; it's presented as a
     /// sheet from the Feed header gear (iPhone) / iPad sidebar Settings row.
     @State var showSettingsSheet = false
-    /// DUT-560 — the hub's UNIFIED tool reroute request (replaces the per-tool
-    /// `hubShoppingListToken` / `hubHeatCoachToken`). `route(toHubTool:)` selects
-    /// `.cookingTools` + mints a fresh `HubToolRoute`; the hub opens the tool via
-    /// `.task(id:)`. Owned here so it survives the iPad flip. Mirrors CL-301.
+    /// DUT-560 — the hub's UNIFIED tool reroute request. `route(toHubTool:)`
+    /// mints a fresh `HubToolRoute`; the hub opens the tool via `.task(id:)`.
     @State var hubPendingTool: HubToolRoute?
-    /// DUT-461 (revised) — the hub's Cooking Tip token. The Cooking Tip widget's
-    /// `dod://tip/<index>` tap mints it (via `handle(widgetLink: .tip)`); the hub
-    /// consumes it via `.task(id:)` to pop to its root so the persistent tip banner
-    /// at the top is visible. Owned here so it survives the iPad flip.
+    /// DUT-461 (revised) — the hub's Cooking Tip token. The widget tap mints it;
+    /// the hub consumes it via `.task(id:)` to pop to its root so the tip shows.
     @State var hubTipToken: UUID?
+    /// DUT — one-shot "we came here to cook" arm. The hub's Cook Mode "Find a
+    /// Recipe" sets it before selecting `.feed`; the next Feed card tap consumes
+    /// it, routing with `autoStartCookMode: true`, then disarms. Bound only to Feed.
+    @State var cookModeFindRecipeArmed = false
     @State private var dispatcher = DeepLinkDispatcher.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The system `openURL`, captured before RootView overrides it for its
@@ -297,12 +294,13 @@ struct RootView: View {
                     // hub; the gear opens Settings; Cook Mode routes to Recipes.
                     openShoppingList: { routeToShoppingList() },
                     onOpenSettings: { showSettingsSheet = true },
-                    onFindRecipe: { selectedTab = .feed },
+                    onFindRecipe: { findRecipeToCook() },
                     // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                     openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
                     startFirstCookout: { route(toHubTool: .firstCookout) },  // DUT-571 hero → guided path
                     hubPendingTool: tab == .cookingTools ? $hubPendingTool : .constant(nil),
                     hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
+                    cookModeFindRecipeArmed: tab == .feed ? $cookModeFindRecipeArmed : .constant(false),
                     // DUT-546 — one shared moderation store across every recipe screen.
                     commentModeration: commentModeration
                 )
@@ -381,12 +379,13 @@ struct RootView: View {
                 openShoppingList: { routeToShoppingList() },
                 // DUT-563 — wire the header gear on iPad too (else it's a dead button).
                 onOpenSettings: { showSettingsSheet = true },
-                onFindRecipe: { selectedTab = .feed },
+                onFindRecipe: { findRecipeToCook() },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                 openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
                 startFirstCookout: { route(toHubTool: .firstCookout) },  // DUT-571
                 hubPendingTool: selectedTab == .cookingTools ? $hubPendingTool : .constant(nil),
                 hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
+                cookModeFindRecipeArmed: selectedTab == .feed ? $cookModeFindRecipeArmed : .constant(false),
                 // DUT-546 — one shared moderation store across every recipe screen.
                 commentModeration: commentModeration
             )

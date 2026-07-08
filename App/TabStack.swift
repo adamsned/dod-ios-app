@@ -69,6 +69,11 @@ struct TabStack: View {
     /// hub consumes it via `.task(id:)` to pop to its root so the tip banner shows.
     /// Inert for other tabs.
     @Binding var hubTipToken: UUID?
+    /// DUT — the one-shot "we came here to cook" arm (owned by `RootView`, bound
+    /// only into the Feed tab). The hub's Cook Mode "Find a Recipe" sets it; the
+    /// next Feed card tap consumes it so that recipe opens ALREADY in Cook Mode
+    /// (like the StartCookMode deep link). `.constant(false)` for every other tab.
+    @Binding var cookModeFindRecipeArmed: Bool
     /// DUT-546 (gap 3) — the single app-level ``CommentModerationStore`` owned by
     /// `RootView`, injected into every `RecipeDetailViewModel` this stack builds so
     /// a block applied on one recipe screen hides that author on an already-open
@@ -101,6 +106,7 @@ struct TabStack: View {
         startFirstCookout: @escaping () -> Void = {},
         hubPendingTool: Binding<HubToolRoute?> = .constant(nil),
         hubTipToken: Binding<UUID?> = .constant(nil),
+        cookModeFindRecipeArmed: Binding<Bool> = .constant(false),
         commentModeration: CommentModerationStore = CommentModerationStore()
     ) {
         self.tab = tab
@@ -115,6 +121,7 @@ struct TabStack: View {
         self.startFirstCookout = startFirstCookout
         self._hubPendingTool = hubPendingTool
         self._hubTipToken = hubTipToken
+        self._cookModeFindRecipeArmed = cookModeFindRecipeArmed
         self.commentModeration = commentModeration
     }
 
@@ -191,7 +198,14 @@ struct TabStack: View {
         case .feed:
             FeedView(
                 viewModel: FeedViewModel(dependencies: dependencies.feedDependencies()),
-                onSelect: { item in path.append(.recipe(item: item)) },
+                // DUT — a pick made after the hub's Cook Mode "Find a Recipe"
+                // (which armed the flag) opens already in Cook Mode; a plain Feed
+                // browse leaves it false. One-shot: disarm as we consume it.
+                onSelect: { item in
+                    let armed = cookModeFindRecipeArmed
+                    if armed { cookModeFindRecipeArmed = false }
+                    path.append(Self.recipeRoute(for: item, cookModeArmed: armed))
+                },
                 onSave: { item, report in
                     Task {
                         let didSave = await Self.saveFromCard(

@@ -46,6 +46,18 @@ extension TabStack {
         return true
     }
 
+    /// DUT — build the ``RecipeRoute`` a Feed card tap pushes. `cookModeArmed` is
+    /// the one-shot "we came here to cook" flag the Cooking Tools hub's Cook Mode
+    /// "Find a Recipe" sets before routing to the Feed: when armed, the route
+    /// carries `autoStartCookMode: true` so the recipe opens ALREADY in Cook Mode
+    /// (the same effect as the StartCookMode deep link, honored downstream by
+    /// `RecipeDetailView`); a normal Feed tap leaves it `false`. Pure, so the
+    /// "hub Cook Mode pick auto-starts, plain pick doesn't" invariant is
+    /// unit-testable without a SwiftUI host.
+    static func recipeRoute(for item: RecipeListItem, cookModeArmed: Bool) -> RecipeRoute {
+        .recipe(item: item, autoStartCookMode: cookModeArmed)
+    }
+
     static func listItem(from recipe: Recipe) -> RecipeListItem {
         RecipeListItem(
             id: recipe.id,
