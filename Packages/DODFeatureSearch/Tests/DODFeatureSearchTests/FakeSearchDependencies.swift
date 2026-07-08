@@ -181,6 +181,12 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
 
     func isOnline() async -> Bool { online }
 
+    /// T-765 / CL-162 — the saved-id set the card long-press menu reconciles on
+    /// appear/refresh. Tests seed this to prove the save haptic (keyed to
+    /// `saveToggleCount`) does NOT fire on reconciliation of a populated set.
+    var savedIDs: Set<Int> = []
+    func savedRecipeIDs() async throws -> Set<Int> { savedIDs }
+
     // DUT-534 Part 2 — the Shopping List append seam. `shoppingListResult`
     // stubs what the appender returns; `appendedRecipes` records the (minimal,
     // list-item-derived) recipes the view model handed over.

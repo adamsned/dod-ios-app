@@ -95,16 +95,16 @@ public final class SearchViewModel {
     /// `SearchViewModel+T637.swift` extension can write the
     /// Latest-Recipes branch's result set directly. Read surface unchanged.
     public internal(set) var items: [RecipeListItem] = []
-    /// DUT-11: the "Recipes using <term>" tier — recipes whose *ingredient
-    /// list* contains the query but that did NOT already match by title or
-    /// category (never duplicated in `items`). Sourced from the local
-    /// `CachedIngredient` index (so it populates offline) and rendered as a
-    /// labeled section beneath the title results in ``SearchView``, which is
-    /// what tells the user why a title-less recipe matched. Filter chips do
-    /// NOT narrow this discovery tier in v1.
+    /// DUT-11: the "Recipes using <term>" tier — recipes whose *ingredient list*
+    /// contains the query but that did NOT already match by title or category
+    /// (never duplicated in `items`). Sourced from the local `CachedIngredient`
+    /// index (offline-capable), shown as a labeled section in ``SearchView``.
     public internal(set) var ingredientItems: [RecipeListItem] = []
     /// T-765 / CL-162 — saved recipe ids for the card menu (see `SearchViewModel+SavedState`).
     public internal(set) var savedRecipeIDs: Set<Int> = []
+    /// DUT — bumped only on a genuine Save/Unsave (see `+SavedState`); drives
+    /// `SearchView`'s `.selection` haptic. Mirrors Categories' `saveToggleCount`.
+    public internal(set) var saveToggleCount: Int = 0
     /// DUT-534 Part 2 — Shopping List snackbar copy + optional trailing action
     /// title ("View"), driven by `SearchViewModel+ShoppingList`, rendered by
     /// `SearchView`. `nil` message hides the snackbar.

@@ -176,6 +176,7 @@ struct IdleSuggestionsView: View {
                         Divider()
                             .overlay(DODColor.surfaceDivider)
                             .padding(.leading, DODSpacing.md)
+                            .padding(.trailing, DODSpacing.md)
                     }
                 }
             }

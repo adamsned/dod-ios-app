@@ -94,7 +94,7 @@ extension SearchView {
                         // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
                         onSave?(item) { didSave in
-                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
                         }
                     },
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
@@ -122,7 +122,7 @@ extension SearchView {
                         // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
                         onSave?(item) { didSave in
-                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
                         }
                     },
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
