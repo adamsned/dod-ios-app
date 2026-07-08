@@ -174,6 +174,7 @@ public struct CookModeView: View {
         .sheet(isPresented: $ingredientsDrawerVisible) {
             ingredientsDrawer
                 .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isJournalLogPresented) {
             // DUT-326 — self-contained capture sheet (equivalent to the Feed
@@ -326,6 +327,18 @@ public struct CookModeView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            // Nav-consistency sweep: the drawer is a sheet, so it gets the app's
+            // standard trailing "Done" dismissal (plus a drag indicator on the
+            // sheet itself) instead of being a swipe-only dead end.
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        ingredientsDrawerVisible = false
+                    }
+                    .tint(DODColor.burntOrange)
+                    .accessibilityIdentifier("cook-mode-ingredients-done")
+                }
+            }
         }
     }
 

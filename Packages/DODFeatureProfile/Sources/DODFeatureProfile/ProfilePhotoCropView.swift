@@ -148,6 +148,7 @@ public struct ProfilePhotoCropView: View {
                 let cropped = renderCroppedImage()
                 onComplete(cropped)
             }
+            .tint(DODColor.burntOrange)
             .accessibilityIdentifier("profile-photo-crop-done")
         }
     }

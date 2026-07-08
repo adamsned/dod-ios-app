@@ -89,17 +89,17 @@ public struct SettingsView: View {
         .navigationTitle("Settings")
         .dodInlineNavTitle()
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                // `.cancellationAction` (not `.topBarLeading`) is cross-platform,
-                // so this compiles on the macOS L1 `swift test` for this package.
-                Button {
+            ToolbarItem(placement: .confirmationAction) {
+                // Nav-consistency sweep: Settings is a sheet, so it closes with the
+                // app's standard trailing text button ("Done"), not a custom leading
+                // chevron. `.confirmationAction` is cross-platform, so this compiles
+                // on the macOS L1 `swift test` for this package.
+                Button("Done") {
                     dismiss()
-                } label: {
-                    Label("Back", systemImage: "chevron.left")
                 }
                 .tint(DODColor.burntOrange)
                 .keyboardShortcut(.cancelAction)  // DUT-695 — Esc dismisses on iPad
-                .accessibilityIdentifier("settings-back")
+                .accessibilityIdentifier("settings-done")
             }
         }
         // T-756 / CL-153 (DUT-62 bug 2) — give the Settings surface its OWN live
