@@ -5,7 +5,7 @@ import Foundation
 /// form. Extracted from `RecipeStore.swift` (a free function, no actor coupling)
 /// so that file stays under the SwiftLint 400-line `file_length` cap after the
 /// DUT-373/413 additions pushed it to 403.
-func formatTime(seconds: Int) -> String? {
+public func formatTime(seconds: Int) -> String? {
     guard seconds > 0 else { return nil }
     let minutes = seconds / 60
     if minutes == 0 { return "<1 min" }

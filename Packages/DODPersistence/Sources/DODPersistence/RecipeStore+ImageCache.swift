@@ -91,8 +91,15 @@ extension RecipeStore {
             predicate: #Predicate { $0.urlString == urlString }
         )
         guard let row = try modelContext.fetch(descriptor).first else { return nil }
+        // DUT: bump the in-memory LRU timestamp but do NOT `save()` per read. This
+        // is the failure-only offline data provider, so a fully-offline Saved-tab
+        // scroll would otherwise trigger N synchronous store saves just to touch
+        // `lastUsedAt`. Keeping it in-memory preserves this session's eviction
+        // ordering; SwiftData persists it on the next natural save, and losing a
+        // flush on app-kill is harmless for an eviction heuristic. Parity with the
+        // sibling reads `imageBytesWithoutTouching` / `hasBridgedImage`, which
+        // already avoid the touch+save.
         row.lastUsedAt = .now
-        try modelContext.save()
         return row.bytes
     }
 

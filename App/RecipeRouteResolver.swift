@@ -1,4 +1,5 @@
 import DODDomain
+import DODPersistence
 import DODSupport
 import Foundation
 
@@ -98,23 +99,16 @@ enum RecipeRouteResolver {
             excerpt: recipe.excerpt,
             heroImage: recipe.heroImage,
             publishedAt: recipe.publishedAt,
-            totalTimeDisplay: recipe.totalTime.flatMap(Self.timeDisplay),
+            // DUT-670 — mirror a fresh REST list item's time chip on a cache hit.
+            // Uses the shared DODPersistence `formatTime` (previously a byte-for-byte
+            // private copy here); the `Duration`→whole-seconds conversion matches the
+            // persistence layer's `Int(duration.components.seconds)` exactly, so the
+            // rendered chip ("30 min" / "1 hr 15 min") is unchanged.
+            totalTimeDisplay: recipe.totalTime.flatMap {
+                formatTime(seconds: Int($0.components.seconds))
+            },
             canonicalURL: recipe.canonicalURL
         )
-    }
-
-    /// DUT-670 — format a `Duration` as the recipe time-chip string ("30 min" /
-    /// "1 hr 15 min"), mirroring the persistence layer's `formatTime` mapping so
-    /// a cache-hit route reads the same chip a fresh REST list item would.
-    private static func timeDisplay(_ duration: Duration) -> String? {
-        let seconds = Int(duration.components.seconds)
-        guard seconds > 0 else { return nil }
-        let minutes = seconds / 60
-        if minutes == 0 { return "<1 min" }
-        if minutes < 60 { return "\(minutes) min" }
-        let hours = minutes / 60
-        let remainder = minutes % 60
-        return remainder == 0 ? "\(hours) hr" : "\(hours) hr \(remainder) min"
     }
 
     /// DUT-549 — the caller-facing outcome of a resolve: a route to push, or an
