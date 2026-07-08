@@ -32,7 +32,7 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
                     // text *is* tintable rather than chrome.
                     .widgetAccentable()
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel(Self.accessibilityLabel(for: recipe))
+                    .accessibilityLabel(Self.accessibilityLabel(for: recipe, mode: entry.content))
             } else {
                 // DUT-504 — mode-aware empty state: `.articles` (no article yet)
                 // names the article surface rather than reusing the recipe copy.
@@ -114,10 +114,11 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
         }
     }
 
-    static func accessibilityLabel(for recipe: WidgetSnapshot.Entry) -> String {
+    static func accessibilityLabel(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
+        let eyebrow = Self.eyebrow(for: recipe, mode: mode).lowercased()
         if recipe.excerpt.isEmpty {
-            return "Latest recipe: \(recipe.title)."
+            return "\(eyebrow): \(recipe.title)."
         }
-        return "Latest recipe: \(recipe.title). \(recipe.excerpt)"
+        return "\(eyebrow): \(recipe.title). \(recipe.excerpt)"
     }
 }
