@@ -72,7 +72,7 @@ struct CookTimer: View {
             RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .strokeBorder(DODColor.burntOrange.opacity(0.25), lineWidth: 1)
         )
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     /// Thin brand progress bar showing elapsed fraction of the countdown.
@@ -111,7 +111,7 @@ struct CookTimer: View {
             }
             .buttonStyle(.plain)
             .disabled(didComplete)
-            .accessibilityLabel(isRunning ? "Pause timer" : "Start timer")
+            .accessibilityLabel(didComplete ? "Timer complete" : isRunning ? "Pause timer" : "Start timer")
 
             Button {
                 viewModel.resetTimer(forStep: stepIndex)
