@@ -204,9 +204,12 @@ struct RecipeDetailRatingsConsolidationTests {
         #expect(rated == false, "A comment with no stars must not record a rating")
     }
 
-    /// DUT-31: even if recording the rating fails, the comment still posts and
-    /// keeps its own success snackbar — a rating hiccup must not surface a
-    /// scary error or block the comment the user actually wrote.
+    /// DUT-31 / DUT-738: even if recording the rating fails, the comment still
+    /// posts and is never blocked by a rating hiccup. DUT-738 supersedes the
+    /// original "stay silent" choice: the star vote is genuinely lost when the
+    /// WPRM rating POST fails (the comment meta doesn't carry it), so the
+    /// snackbar now tells the user their rating didn't save — comment-success
+    /// first — mirroring the DUT-395 inverse (rating-saved-but-comment-failed).
     @Test func submitCommentAndRatingStillPostsCommentWhenRatingRecordingFails() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(id: 816, withDetail: true)
@@ -225,7 +228,12 @@ struct RecipeDetailRatingsConsolidationTests {
         viewModel.setCommentDraft("Rating endpoint is down but the comment still lands.")
         await viewModel.submitRatingAndComment()
 
-        #expect(viewModel.snackbarMessage == "Comment posted.")
+        // DUT-738: comment posted, but the rating POST failed — the vote is lost,
+        // so the user is told (instead of a bare "Comment posted." that hides it).
+        #expect(
+            viewModel.snackbarMessage
+                == "Your comment posted, but your rating didn't save — try the stars again."
+        )
         #expect(viewModel.comments.first?.id == 5003)
         let commented = dependencies.telemetryEvents.contains { event in
             if case .recipeCommentSubmitted = event { return true }
