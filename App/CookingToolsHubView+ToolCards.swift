@@ -98,6 +98,13 @@ extension CookingToolsHubView {
                 Image(systemName: icon)
                     .font(.title2)
                     .foregroundStyle(DODColor.burntOrange)
+                    // Fix-width the glyph so the six differently-sized SF Symbols
+                    // (flame.fill, cart.fill, thermometer.medium, flame.circle.fill,
+                    // book.closed.fill, bag.fill) don't start their titles at
+                    // slightly different x positions — 28pt clears the widest of
+                    // them at `.title2` without clipping (mirrors the
+                    // `.frame(width:)` icon-alignment pattern in CookChooserFlow).
+                    .frame(width: 28)
                     .accessibilityHidden(true)  // DUT-693 — decorative glyph
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                     Text(title)
