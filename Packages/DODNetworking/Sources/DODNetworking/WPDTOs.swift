@@ -230,8 +230,12 @@ enum WPDTO {
             if let value = try? container.decodeIfPresent(Int.self, forKey: key) {
                 return value
             }
-            if let value = try? container.decodeIfPresent(Double.self, forKey: key) {
-                return Int(value)
+            // DUT-713: `Int(exactly:)` is failable (never trapping) and
+            // `.towardZero` preserves `Int(Double)` truncation — a huge or
+            // non-finite count from untrusted JSON falls through to 0.
+            let doubleValue = try? container.decodeIfPresent(Double.self, forKey: key)
+            if let doubleValue, let intValue = Int(exactly: doubleValue.rounded(.towardZero)) {
+                return intValue
             }
             if let value = try? container.decodeIfPresent(String.self, forKey: key) {
                 return Int(value) ?? 0
