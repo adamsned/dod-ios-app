@@ -372,6 +372,8 @@ extension FirstCookoutView {
                     .font(.title2)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(DODColor.labelSecondary)
+                    .frame(minWidth: 44, minHeight: 44)  // DUT-291: 44pt tap target
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Back to the path")
             .accessibilityIdentifier("first-cookout-back")

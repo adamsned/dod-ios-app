@@ -34,6 +34,8 @@ struct VoiceRows: View {
             } label: {
                 Image(systemName: "speaker.wave.2")
                     .foregroundStyle(DODColor.accent)
+                    .frame(minWidth: 44, minHeight: 44)  // DUT-694: 44pt tap target
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings-voice-preview")
