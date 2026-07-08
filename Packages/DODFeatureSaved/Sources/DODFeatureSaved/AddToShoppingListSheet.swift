@@ -72,6 +72,7 @@ public struct AddToShoppingListSheet: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(confirmTitle) { confirm() }
                             .disabled(selection.selectedCount == 0 || isSubmitting)
+                            .tint(DODColor.burntOrange)
                             .accessibilityIdentifier("dod.detail.addToShoppingList.confirm")
                     }
                 }
