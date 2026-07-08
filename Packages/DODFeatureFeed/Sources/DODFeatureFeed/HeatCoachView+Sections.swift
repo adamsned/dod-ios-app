@@ -179,13 +179,21 @@ extension HeatCoachView {
                 )
             }
 
-            Toggle(isOn: $windy) {
+            // Label left, switch flush to the same trailing edge as the
+            // Elevation stepper's − / +. A default full-width Toggle drifted its
+            // switch past that edge and clipped the card; a labels-hidden Toggle
+            // pushed right by a Spacer sits inside the padding and lines up.
+            HStack(spacing: DODSpacing.sm) {
                 Text("Windy Day")
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.label)
+                    .accessibilityHidden(true)
+                Spacer(minLength: DODSpacing.sm)
+                Toggle("Windy Day", isOn: $windy)
+                    .labelsHidden()
+                    .tint(DODColor.accent)
+                    .accessibilityIdentifier("heat-coach-wind")
             }
-            .tint(DODColor.accent)
-            .accessibilityIdentifier("heat-coach-wind")
 
             let notes = adjustmentNotes(coachModel)
             if !notes.isEmpty {
