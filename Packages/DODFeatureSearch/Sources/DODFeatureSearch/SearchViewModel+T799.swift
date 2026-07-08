@@ -21,7 +21,7 @@ extension SearchViewModel {
     /// fetch — no extra network call.
     public var browseCategories: [DODDomain.Category] {
         availableCategories
-            .filter { $0.id != 1590 && !Self.excludedTryPoolSlugs.contains($0.slug.lowercased()) }
+            .filter { !Self.isLatestRecipesCategory($0) && !Self.excludedTryPoolSlugs.contains($0.slug.lowercased()) }
             .sorted { $0.count > $1.count }
     }
 }
