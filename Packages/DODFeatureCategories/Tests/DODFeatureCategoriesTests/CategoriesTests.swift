@@ -211,6 +211,32 @@ final class FakeCategoriesDependencies: CategoriesDependencies, @unchecked Senda
     /// `URLError` so existing failure tests are unchanged). Lets a test assert
     /// the offline-vs-generic-error split.
     var errorForPage1: Error?
+    /// DUT-706: records every page `fetchPosts` was asked for, in call order, so
+    /// the refresh-vs-load-more race test can assert a page-2 append never fires
+    /// while a refresh (page 1) is in flight.
+    var fetchedPages: [Int] = []
+    /// DUT-706: per-page gate mirroring `FakeFeedDependencies` — an armed page's
+    /// `fetchPosts` suspends until `openGate(page:)` and signals `gateReached`,
+    /// so a test can hold a refresh (page 1) mid-flight and prove a concurrent
+    /// `loadMoreIfNeeded` no-ops on the `isLoadInFlight` latch.
+    private var gates: [Int: CheckedContinuation<Void, Never>] = [:]
+    private var pendingGatePages: Set<Int> = []
+    var gateReached: (@Sendable (Int) -> Void)?
+
+    /// Arm a gate so the next `fetchPosts(page:)` for `page` suspends until
+    /// `openGate(page:)` is called.
+    func armGate(page: Int) {
+        pendingGatePages.insert(page)
+    }
+
+    /// Resume a held `fetchPosts(page:)` (or disarm it if it hasn't parked yet).
+    func openGate(page: Int) {
+        if let continuation = gates.removeValue(forKey: page) {
+            continuation.resume()
+        } else {
+            pendingGatePages.remove(page)
+        }
+    }
 
     func fetchCategories() async throws -> [DODDomain.Category] {
         if fetchShouldFail { throw URLError(.notConnectedToInternet) }
@@ -221,6 +247,13 @@ final class FakeCategoriesDependencies: CategoriesDependencies, @unchecked Senda
         categoryID: Int,
         page: Int
     ) async throws -> (items: [RecipeListItem], totalPages: Int) {
+        fetchedPages.append(page)
+        if pendingGatePages.remove(page) != nil {
+            gateReached?(page)
+            await withCheckedContinuation { continuation in
+                gates[page] = continuation
+            }
+        }
         if page == failOnPage {
             if page == 1, let errorForPage1 { throw errorForPage1 }
             throw URLError(.notConnectedToInternet)
