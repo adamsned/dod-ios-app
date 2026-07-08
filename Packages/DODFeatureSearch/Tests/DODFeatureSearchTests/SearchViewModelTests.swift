@@ -81,6 +81,29 @@ import Testing
         #expect(viewModel.query.isEmpty)
     }
 
+    @Test func lastQueryTracksTheCommittedSearchNotTheLiveKeystroke() async {
+        // The result cards highlight `lastQuery` (the query that produced
+        // `items`), never the live `query`. This guards the perf + correct-
+        // substring fix: while the user keeps typing past a settled search,
+        // the highlight term must stay pinned to what was actually fetched,
+        // so a half-typed "chick" never highlights over results for "chic".
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["chic"] = [Self.makeItem(1, title: "Chic Bistro")]
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+        viewModel.query = "chic"
+        await viewModel.runImmediateSearch()
+        #expect(viewModel.state == .results)
+        #expect(viewModel.lastQuery == "chic")
+
+        // Simulate a further keystroke before the next fetch settles: the live
+        // query advances but the committed one (used for highlighting) does not.
+        viewModel.query = "chick"
+        #expect(viewModel.lastQuery == "chic")
+    }
+
     @Test func telemetrySendsHashedQueryNotRaw() async {
         let dependencies = FakeSearchDependencies()
         dependencies.results["secret query"] = []
