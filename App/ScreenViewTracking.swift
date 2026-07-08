@@ -25,7 +25,7 @@ struct ScreenViewTracking: ViewModifier {
     /// double-counting a `screen_view` no human navigation produced. Deduping on
     /// the last-emitted tab makes the layout swap a no-op while a genuine tab
     /// change still emits (the new tab differs from the last one recorded).
-    @State private var lastEmittedTab: AppTab?
+    @Binding var lastEmittedTab: AppTab?
 
     func body(content: Content) -> some View {
         content

@@ -31,6 +31,8 @@ struct RootView: View {
     // Non-private so the `+LinkRouting.swift` extension can route into the
     // currently-selected tab (DUT-243).
     @State var selectedTab: AppTab = .feed
+    // DUT-703 — hoisted (like `selectedTab`) so dedup survives the layout swap.
+    @State private var lastEmittedTab: AppTab?
     /// T-762 / CL-159 (DUT-68) — drives the single first-launch welcome sheet
     /// (US-8). The former second sheet (the iCloud-Sync opt-in, AC-41.2) is
     /// removed; sync is opt-in only from Settings (AC-41.3) now, and the
@@ -316,7 +318,7 @@ struct RootView: View {
         }
         .tint(DODColor.accent)
         .sensoryFeedback(.selection, trigger: selectedTab)
-        .modifier(ScreenViewTracking(selectedTab: selectedTab))
+        .modifier(ScreenViewTracking(selectedTab: selectedTab, lastEmittedTab: $lastEmittedTab))
     }
 
     private var iPadSplit: some View {
@@ -377,8 +379,7 @@ struct RootView: View {
                 externalRoute: externalRouteBinding(for: selectedTab),
                 // T-912/DUT-551 — Shopping List reroute + hub Cook Mode → Recipes.
                 openShoppingList: { routeToShoppingList() },
-                // DUT-563 — wire the header gear on iPad too (else the detail
-                // `TabStack` took the no-op default and the gear was a dead button).
+                // DUT-563 — wire the header gear on iPad too (else it's a dead button).
                 onOpenSettings: { showSettingsSheet = true },
                 onFindRecipe: { selectedTab = .feed },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
@@ -392,9 +393,8 @@ struct RootView: View {
             .id(selectedTab)
         }
         .tint(DODColor.accent)
-        .modifier(ScreenViewTracking(selectedTab: selectedTab))
+        .modifier(ScreenViewTracking(selectedTab: selectedTab, lastEmittedTab: $lastEmittedTab))
     }
 
-    // Deep-link routing lives in `RootView+LinkRouting.swift`; appearance helpers
-    // in `RootView+Appearance.swift` (keeps this file under the `file_length` cap).
+    // Deep-link routing → `RootView+LinkRouting.swift`; appearance → `RootView+Appearance.swift`.
 }
