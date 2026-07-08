@@ -28,6 +28,21 @@ struct InMemoryAppleAuthSessionStoreTests {
         #expect(try InMemoryAppleAuthSessionStore().load() == nil)
     }
 
+    /// DUT-701 — a session created without an explicit provider defaults to
+    /// `.apple`, so every existing call site and every legacy persisted session
+    /// (written before the field existed) keeps behaving as an Apple session.
+    @Test func providerDefaultsToApple() {
+        #expect(AppleAuthSession(userIdentifier: "u1").provider == .apple)
+    }
+
+    /// DUT-701 — a `.google`-tagged session round-trips through the store so the
+    /// Apple credential-revocation validator can recognise and skip it.
+    @Test func googleProviderRoundTrips() throws {
+        let store = InMemoryAppleAuthSessionStore()
+        try store.save(AppleAuthSession(userIdentifier: "g1", provider: .google))
+        #expect(try store.load()?.provider == .google)
+    }
+
     /// Apple releases name + email only on the FIRST authorization; every
     /// subsequent credential carries just the stable user identifier. A
     /// session with only `userIdentifier` is valid and must round-trip.
