@@ -56,8 +56,12 @@ extension CookModeView {
                 .foregroundStyle(DODColor.burntOrange)
                 .frame(maxWidth: .infinity)
                 .frame(height: 28)
-                .contentShape(Rectangle())
                 .background(DODColor.surface)
+                // DUT — 44pt minimum hit target (HIG) for this interactive
+                // toggle, WITHOUT enlarging the 28pt visual bar: a taller
+                // transparent tappable frame around it.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("cook-mode-controls-grabber")

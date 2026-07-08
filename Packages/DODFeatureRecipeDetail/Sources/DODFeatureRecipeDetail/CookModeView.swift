@@ -211,6 +211,9 @@ public struct CookModeView: View {
         // the current-step index so it covers the Next/Back buttons, the swipe
         // gesture, and the mini-nav arrows with one modifier.
         .sensoryFeedback(.selection, trigger: viewModel.currentStepIndex)
+        // DUT — Cook Mode haptics: ingredient check/uncheck impact + play/pause tick.
+        .sensoryFeedback(.impact(weight: .light), trigger: viewModel.checkedIngredientIDs.count)
+        .sensoryFeedback(.selection, trigger: viewModel.isPlaying)
         // DUT-401 — a step timer reaching 00:00 had only visual + haptic
         // feedback; announce it so a cook who set the phone down (or a
         // VoiceOver user) hears it. Paired with the same completion trigger the

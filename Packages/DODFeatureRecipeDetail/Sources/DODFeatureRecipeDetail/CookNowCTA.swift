@@ -23,7 +23,7 @@ struct CookNowCTA: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Cook Mode")
                         .dodFont(DODType.bodyEmphasized)
-                    Text("Step by step spoken instructions")
+                    Text("Step-by-step, spoken instructions.")
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.cream.opacity(0.85))
                 }

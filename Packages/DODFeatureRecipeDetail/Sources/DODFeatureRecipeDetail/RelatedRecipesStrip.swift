@@ -24,7 +24,9 @@ public struct RelatedRecipesStrip: View {
                     .foregroundStyle(DODColor.label)
                     .padding(.horizontal, DODSpacing.md)
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: DODSpacing.sm) {
+                    // DUT — pin cards to a common top so 1-line vs 2-line
+                    // (`lineLimit(2)`) titles never stair-step the hero thumbnails.
+                    HStack(alignment: .top, spacing: DODSpacing.sm) {
                         ForEach(items) { item in
                             relatedCard(item)
                                 .contentShape(Rectangle())

@@ -185,7 +185,7 @@ struct CookModePlayerControls: View {
                 .dodFont(DODType.bodyEmphasized)
                 .monospacedDigit()
                 .foregroundStyle(DODColor.accent)
-                .frame(minWidth: 56, minHeight: 40)
+                .frame(minWidth: 56, minHeight: 44)
                 .contentShape(Capsule())
                 .overlay(
                     Capsule().strokeBorder(DODColor.accent.opacity(0.6), lineWidth: 1.5)
