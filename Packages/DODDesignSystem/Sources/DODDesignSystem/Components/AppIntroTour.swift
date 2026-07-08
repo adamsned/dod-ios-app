@@ -171,6 +171,12 @@ public struct AppIntroTour: View {
             Text(title)
                 .dodFont(DODType.bodyEmphasized)
                 .foregroundStyle(DODColor.accent)
+                // DUT: grow the hit region to the 44pt HIG minimum (the glyph is
+                // only ~22pt tall). Frame the label content, not the button, so
+                // the hidden end-slide button below (opacity 0 + a11y-hidden)
+                // stays out of reach.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(disabled)
