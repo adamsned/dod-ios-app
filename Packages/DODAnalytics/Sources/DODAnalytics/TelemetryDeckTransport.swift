@@ -141,8 +141,12 @@ public final class TelemetryDeckTransport: TelemetryTransport, @unchecked Sendab
             initializeSDK(appID)
             initialized = true
         }
-        lock.unlock()
+        // DUT-704: emit while still holding `lock` so a concurrent opt-out
+        // `purgeIfInitialized()` (which terminates the SDK under the same lock)
+        // cannot interleave between the initialized check and the emit — no
+        // signal-after-terminate crash, and no signal leaves after opt-out.
         emitSignal(event.name, event.payload)
+        lock.unlock()
     }
 
     /// DUT-665: on an opt-out where the SDK is already live, stop and deinit it
@@ -156,8 +160,10 @@ public final class TelemetryDeckTransport: TelemetryTransport, @unchecked Sendab
             return
         }
         initialized = false
-        lock.unlock()
+        // DUT-704: tear the SDK down while still holding `lock` so terminate()
+        // is mutually exclusive with `send(_:)`'s emit — the two can never overlap.
         purgeSDK()
+        lock.unlock()
     }
 
     /// Read the user's privacy toggle, defaulting to `true` when absent.
