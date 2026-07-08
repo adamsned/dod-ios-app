@@ -99,12 +99,18 @@ public enum TemperatureConverter {
     /// its free-text steps without a UI or feature-package dependency.
     public static func fahrenheitValues(in text: String) -> [Int] {
         scan(text).flatMap { match -> [Int] in
-            match.values.map { value in
+            match.values.compactMap { value in
                 switch match.scale {
                 case .fahrenheit:
                     // Already Fahrenheit — round to a whole degree; sources are
                     // integers in practice, this just drops any decimal look.
-                    return Int(value.magnitude.rounded())
+                    // `Int(exactly:)` is failable (never trapping), so a huge
+                    // externally-sourced magnitude is dropped, not a crash.
+                    if let intValue = Int(exactly: value.magnitude.rounded()) {
+                        return intValue
+                    } else {
+                        return nil
+                    }
                 case .celsius:
                     // Convert C→F with the shared nearest-5°F rounding.
                     return convert(value.magnitude, to: .fahrenheit)
