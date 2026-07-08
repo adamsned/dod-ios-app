@@ -94,9 +94,24 @@ struct IngredientMetricConverterTests {
         #expect(IngredientMetricConverter.metric("1/8 teaspoon baking soda") == "0.6 ml baking soda")
     }
 
-    @Test func halfTeaspoonRoundsToWholeFive() {
-        // "1/2 teaspoon" → 0.5 × 5 = 2.5 ml → nearest 5 → 5 (already non-zero).
-        #expect(IngredientMetricConverter.metric("1/2 teaspoon vanilla") == "5 ml vanilla")
+    @Test func halfTeaspoonKeepsOneDecimalNotFive() {
+        // "1/2 teaspoon" → 0.5 × 5 = 2.5 ml. Nearest-5 rounding would snap this to
+        // "5 ml", colliding it with a genuine 1 tsp — instead the sub-5 fallback
+        // prints "2.5 ml", preserving the distinction.
+        let result = IngredientMetricConverter.metric("1/2 teaspoon vanilla")
+        #expect(result != "5 ml vanilla")
+        #expect(result == "2.5 ml vanilla")
+    }
+
+    @Test func oneTeaspoonStillRoundsToWholeFive() {
+        // 1 tsp is magnitude == 5 (not < 5), so it is NOT diverted to the sub-5
+        // decimal fallback — it still reads the clean "5 ml".
+        #expect(IngredientMetricConverter.metric("1 teaspoon salt") == "5 ml salt")
+    }
+
+    @Test func quarterTeaspoonUnchangedByHalfTeaspoonFix() {
+        // ¼ tsp (1.25 ml) already used the fallback and must be unchanged: "1.3 ml".
+        #expect(IngredientMetricConverter.metric("1/4 teaspoon salt") == "1.3 ml salt")
     }
 
     // MARK: - Micro-amounts below one-decimal resolution: never "0 ml"/"0 g" (DUT-540)
@@ -141,6 +156,15 @@ struct IngredientMetricConverterTests {
     @Test func largeVolumeStaysOneDecimalLiters() {
         // "4 quarts" → 4 × 950 = 3800 ml → 3.8 L (one decimal, no trailing zero).
         #expect(IngredientMetricConverter.metric("4 quarts water") == "3.8 L water")
+    }
+
+    @Test func justUnderThousandMillilitersRollsUpNotThousandMl() {
+        // "4.15 cups" → 4.15 × 240 = 996 ml. Raw magnitude is < 1000, but
+        // `roundBase` snaps it to 1000, which used to print a nonsensical
+        // "1000 ml". The roll-up now fires on the rounded value too → "1 L".
+        let result = IngredientMetricConverter.metric("4.15 cups water")
+        #expect(result != "1000 ml water")
+        #expect(result == "1 L water")
     }
 
     @Test func gramsRollUpToKilograms() {
