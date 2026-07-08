@@ -49,8 +49,8 @@ public struct CategoryRecipesView: View {
         case .error:
             EmptyState(
                 systemImage: "exclamationmark.triangle",
-                title: "Couldn't load",
-                message: "Tap retry to try again.",
+                title: "Couldn't Load Recipes",
+                message: "Something went wrong. Please try again.",
                 action: .init(title: "Retry") {
                     Task { await viewModel.retry() }
                 }

@@ -145,6 +145,19 @@ public final class CookThumbnailLoader {
 #if canImport(UIKit)
 /// The concrete image the loader caches — `UIImage` on iOS.
 public typealias DODImage = UIImage
+
+extension UIImage {
+    /// Pixel-dimension shim so cross-platform code and tests can read
+    /// `.width` / `.height` uniformly on a `DODImage`. On the non-UIKit
+    /// `swift test` slice `DODImage` is a `CGImage`, which exposes these
+    /// natively as `Int` pixel counts; `UIImage` only offers `.size`
+    /// (points). These bridge to the backing `CGImage`'s pixel dimensions
+    /// (what the downsampler actually caps), falling back to point-size ×
+    /// scale when there is no backing bitmap — so `.width` / `.height`
+    /// compile and mean the same thing on both platforms.
+    var width: Int { cgImage?.width ?? Int((size.width * scale).rounded()) }
+    var height: Int { cgImage?.height ?? Int((size.height * scale).rounded()) }
+}
 #else
 /// On non-UIKit hosts (the `swift test` slice) the cache holds the raw
 /// `CGImage`, so the downsampler + cache are still exercised cross-platform.

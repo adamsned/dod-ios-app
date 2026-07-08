@@ -33,6 +33,12 @@ struct IdleSuggestionsView: View {
     /// (`CategoryRecipesView`); `TabStack` wires it to `path.append(.category)`.
     let onCategorySelect: (DODDomain.Category) -> Void
 
+    /// DUT — "Clear All" wipes the persisted recent-searches store, an
+    /// irreversible destructive action. Gate it behind a confirmation, mirroring
+    /// the Shopping List's "Clear List" flow (`ShoppingListView`), rather than
+    /// firing `onClearRecents` on the first tap.
+    @State private var isConfirmingClearRecents = false
+
     var body: some View {
         if recents.isEmpty && topCategories.isEmpty && categories.isEmpty {
             EmptyState(
@@ -102,10 +108,25 @@ struct IdleSuggestionsView: View {
                     .foregroundStyle(DODColor.label)
                 Spacer()
                 // US-33 / AC-33.1 / CL-57: orange matches gear icon.
-                Button("Clear All", action: onClearRecents)
+                // DUT — confirm before the irreversible wipe (see
+                // `isConfirmingClearRecents`), mirroring Shopping List's
+                // "Clear List". `onClearRecents` now fires only on confirm.
+                Button("Clear All") { isConfirmingClearRecents = true }
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.accent)
                     .accessibilityLabel("Clear all recent searches")
+            }
+            // DUT — destructive confirmation for the recents wipe. Same roles
+            // as `ShoppingListView`'s dialog: a destructive confirm + Cancel.
+            .confirmationDialog(
+                "Clear recent searches?",
+                isPresented: $isConfirmingClearRecents,
+                titleVisibility: .visible
+            ) {
+                Button("Clear All", role: .destructive, action: onClearRecents)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes all of your recent searches.")
             }
             FlowLayout(spacing: DODSpacing.xs) {
                 // DUT-693 — key by the string, not the array offset: recents

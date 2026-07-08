@@ -76,7 +76,7 @@ export default {
     if (request.method !== "POST") {
       return json({ error: "method_not_allowed" }, 405)
     }
-    if (request.headers.get("X-DOD-App-Key") !== env.APP_SHARED_SECRET) {
+    if (!(await isAuthorized(request.headers.get("X-DOD-App-Key"), env.APP_SHARED_SECRET))) {
       return json({ error: "unauthorized" }, 401)
     }
 
@@ -221,6 +221,35 @@ function pemToDer(pem: string): ArrayBuffer {
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return bytes.buffer
+}
+
+// MARK: - shared-secret gate (constant-time)
+
+// The app-key check must not short-circuit on the first mismatching byte — a
+// raw `header !== secret` leaks, via timing, how many leading bytes matched,
+// which lets an attacker recover the shared secret byte-by-byte. Compare the
+// SHA-256 digests instead: the comparison then always runs over fixed-length
+// (32-byte) buffers with no early exit, so it reveals nothing about the input.
+async function isAuthorized(provided: string | null, secret: string): Promise<boolean> {
+  const [providedHash, secretHash] = await Promise.all([
+    sha256(provided ?? ""),
+    sha256(secret),
+  ])
+  return timingSafeEqualBytes(providedHash, secretHash)
+}
+
+async function sha256(input: string): Promise<Uint8Array> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input))
+  return new Uint8Array(digest)
+}
+
+// Constant-time byte-array equality: XOR-accumulate over every byte and only
+// then check the result, so no comparison short-circuits early.
+function timingSafeEqualBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]
+  return diff === 0
 }
 
 // MARK: - helpers
