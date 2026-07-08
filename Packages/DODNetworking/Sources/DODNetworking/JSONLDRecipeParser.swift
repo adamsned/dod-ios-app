@@ -189,7 +189,7 @@ public enum JSONLDRecipeParser {
         }
         let card = WPRMRecipeCardParser.parse(html: html)
         if ingredients.isEmpty {
-            ingredients = card.ingredients.map { RecipeIngredient(text: $0) }
+            ingredients = RecipeIngredient.list(from: card.ingredients)
         }
         if instructions.isEmpty {
             instructions = card.instructions.enumerated().map { index, text in
@@ -204,7 +204,12 @@ public enum JSONLDRecipeParser {
         // stray markup that sanitize to empty don't become garbage Shopping List
         // rows (DUT-587). Mirrors the WPRM card parser's non-empty guard.
         guard let array = raw as? [String] else { return [] }
-        return array.compactMap { RecipeIngredient(nonBlank: HTMLSanitizer.plainText(from: $0)) }
+        // DUT-705: enumerate so a legitimately repeated ingredient line gets an
+        // index-salted, distinct-but-stable id (equal text at different
+        // positions must not collide on one `id`).
+        return array.enumerated().compactMap {
+            RecipeIngredient(nonBlank: HTMLSanitizer.plainText(from: $0.element), index: $0.offset)
+        }
     }
 
     /// Handle the three shapes WPRM/Schema.org can emit:
@@ -338,8 +343,8 @@ extension RecipeIngredient {
     /// Failable init used by ``JSONLDRecipeParser/mapIngredients(_:)`` to drop
     /// blank/whitespace-only ingredient lines (DUT-587) — returns nil when the
     /// text trims to empty so a garbage Shopping List row is never created.
-    fileprivate init?(nonBlank text: String) {
+    fileprivate init?(nonBlank text: String, index: Int) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        self.init(text: text)
+        self.init(text: text, index: index)
     }
 }

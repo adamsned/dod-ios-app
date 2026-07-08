@@ -203,7 +203,7 @@ extension RecipeDetailViewModel {
             heroImageLargeURL: nil,
             categoryIDs: listItem.categoryIDs ?? [],
             publishedAt: listItem.publishedAt,
-            ingredients: card.ingredients.map { RecipeIngredient(text: $0) },
+            ingredients: RecipeIngredient.list(from: card.ingredients),  // DUT-705 — index-aware ids
             instructions: card.instructions.enumerated().map { index, text in
                 RecipeInstruction(step: index + 1, text: text)
             }

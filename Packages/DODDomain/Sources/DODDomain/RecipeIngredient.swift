@@ -22,11 +22,32 @@ public struct RecipeIngredient: Sendable, Hashable, Identifiable, Codable {
         self.text = text
     }
 
+    /// DUT-705: index-aware init. `init(text:)` derives `id` from `text` alone,
+    /// so a legitimately repeated ingredient line (e.g. "Salt" in two
+    /// sub-sections) collides on one `id` — checking one line then toggles all
+    /// identical lines and `ForEach` sees duplicate identities. Folding the
+    /// line's positional `index` into the deterministic hash keeps ids stable
+    /// across re-parses (DUT-641) while making equal text at different
+    /// positions distinct. The `U+0001` separator can't occur in real
+    /// ingredient text, so it can't be forged by the text itself.
+    public init(text: String, index: Int) {
+        self.id = DeterministicUUID.from("\(index)\u{1}\(text)")
+        self.text = text
+    }
+
     /// Explicit-id init (unchanged behaviour). Kept so existing call sites that
     /// pass `id:` — e.g. Codable decode, fixtures — still compile and honour the
     /// supplied id rather than re-deriving it.
     public init(id: UUID, text: String) {
         self.id = id
         self.text = text
+    }
+
+    /// DUT-705: build a list of ingredients from raw text lines, salting each
+    /// line's deterministic `id` with its positional index so duplicate lines
+    /// get distinct-but-stable ids. Parse call sites should use this instead of
+    /// `texts.map { RecipeIngredient(text: $0) }`.
+    public static func list(from texts: [String]) -> [RecipeIngredient] {
+        texts.enumerated().map { RecipeIngredient(text: $0.element, index: $0.offset) }
     }
 }
