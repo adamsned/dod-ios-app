@@ -65,11 +65,18 @@ extension RecipeDetailRatingsSection {
     var commentCharacterCounter: some View {
         let limit = RecipeDetailViewModel.commentDraftCharacterLimit
         let count = viewModel.commentDraft.count
+        // DUT-694 — the visible counter signals "at the cap" with color alone
+        // (`DODColor.accent`), which VoiceOver can't perceive. Enrich the a11y
+        // label (only) so the same warning reaches non-sighted users, matching
+        // `DODDesignSystem/CommentComposer`.
+        let atLimit = count >= limit
         return Text("\(count) / \(limit)")
             .dodFont(DODType.caption)
-            .foregroundStyle(count >= limit ? DODColor.accent : DODColor.labelSecondary)
+            .foregroundStyle(atLimit ? DODColor.accent : DODColor.labelSecondary)
             .frame(maxWidth: .infinity, alignment: .trailing)
-            .accessibilityLabel("\(count) of \(limit) characters used")
+            .accessibilityLabel(
+                "\(count) of \(limit) characters used\(atLimit ? ", at limit" : "")"
+            )
     }
 
     /// The one and only Submit control for the section. Enabled when the
