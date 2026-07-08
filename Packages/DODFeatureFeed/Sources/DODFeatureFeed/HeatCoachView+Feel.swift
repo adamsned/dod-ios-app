@@ -50,11 +50,6 @@ extension HeatCoachView {
                 expandedFeelCue = isOpen ? nil : cue.title
             } label: {
                 HStack(spacing: DODSpacing.sm) {
-                    Image(systemName: Self.feelCueIcon(cue.title))
-                        .font(.title3)
-                        .foregroundStyle(DODColor.accent)
-                        .frame(width: 28)
-                        .accessibilityHidden(true)
                     Text(cue.title)
                         .dodFont(DODType.bodyEmphasized)
                         .foregroundStyle(DODColor.label)
@@ -72,44 +67,30 @@ extension HeatCoachView {
             .accessibilityHint(isOpen ? "Collapse" : "Expand")
 
             if isOpen {
-                VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                    feelGuidanceRow(icon: "checkmark.seal.fill", tint: DODColor.accent, text: cue.onTrack)
-                    feelGuidanceRow(icon: "slider.horizontal.3", tint: DODColor.labelSecondary, text: cue.adjust)
+                VStack(alignment: .leading, spacing: DODSpacing.md) {
+                    feelGuidanceRow(label: "On Track", tint: DODColor.accent, text: cue.onTrack)
+                    feelGuidanceRow(label: "Adjust", tint: DODColor.labelSecondary, text: cue.adjust)
                 }
-                .padding(.leading, 28 + DODSpacing.sm)  // align the text under the title
+                .padding(.top, DODSpacing.xxs)
             }
         }
         .padding(DODSpacing.md)
         .cardSurface()
     }
 
-    /// One line inside an expanded cue: a leading intent icon (a positive seal
-    /// for "on track", a slider for the adjustment) + the copy.
-    private func feelGuidanceRow(icon: String, tint: Color, text: String) -> some View {
-        HStack(alignment: .top, spacing: DODSpacing.sm) {
-            Image(systemName: icon)
-                .font(.footnote)
+    /// One line inside an expanded cue: a small uppercase intent LABEL ("On
+    /// Track" in accent, "Adjust" in secondary) over the copy — labels instead
+    /// of icons, so the expanded card stays calm and reads at a glance.
+    private func feelGuidanceRow(label: String, tint: Color, text: String) -> some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+            Text(label)
+                .dodFont(DODType.caption)
                 .foregroundStyle(tint)
-                .padding(.top, 2)
-                .accessibilityHidden(true)
+                .textCase(.uppercase)
             Text(text)
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    /// A distinct SF Symbol per sense, so the cue column reads by icon at a
-    /// glance instead of six identical rows. Keyed by the (test-pinned) title.
-    static func feelCueIcon(_ title: String) -> String {
-        switch title {
-        case "Coal Color": return "flame.fill"
-        case "Steam at the Lid Rim": return "smoke.fill"
-        case "Hand Test": return "hand.raised.fill"
-        case "Sound": return "ear.fill"
-        case "Smell": return "nose.fill"
-        case "Lid Condensation": return "drop.fill"
-        default: return "sparkles"
         }
     }
 
