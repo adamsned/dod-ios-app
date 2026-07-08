@@ -222,6 +222,10 @@ extension FirstCookoutView {
                 .accessibilityIdentifier("first-cookout-clear-timer")
             }
             .padding(.top, DODSpacing.xs)
+            // DUT — crossfade the countdown→"Timer's Up!" swap (previously an
+            // un-animated jump); the animation transaction is driven + reduce-
+            // motion-gated at the `cookTimerCard` call site in `stepScreen`.
+            .transition(.opacity)
             // DUT-401 — announce the silent finished swap (DUT-297 covers only
             // the backgrounded case). SwiftUI API → macOS test slice compiles.
             .onAppear {
@@ -348,6 +352,9 @@ extension FirstCookoutView {
                     .frame(width: 7, height: 7)
             }
         }
+        // DUT — back the bare `Circle()`s with a single element so the label
+        // actually announces position (mirrors `AppIntroTour`'s custom dots).
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Step \(index + 1) of \(lastIndex + 1)")
     }
 

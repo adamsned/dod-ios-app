@@ -75,8 +75,6 @@ public final class FeedViewModel {
     /// `addToShoppingList(_:)` in `+ShoppingList`); main-actor-isolated.
     var addingIDs = Set<Int>()
 
-    private static let listKey = "home"
-
     public init(dependencies: FeedDependencies) {
         self.dependencies = dependencies
     }

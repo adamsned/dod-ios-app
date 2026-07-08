@@ -21,6 +21,7 @@ struct FirstCookoutHeroCard: View {
             HStack(spacing: DODSpacing.xs) {
                 Image(systemName: "flame.fill")
                     .foregroundStyle(DODColor.burntOrange)
+                    .accessibilityHidden(true)  // DUT — decorative eyebrow glyph
                 Text(heroEyebrow)
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.burntOrange)
@@ -30,6 +31,10 @@ struct FirstCookoutHeroCard: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(DODColor.labelSecondary)
                         .padding(DODSpacing.xxs)
+                        // DUT — a ~20pt glyph+padding is below the 44pt minimum;
+                        // enlarge the hit target without changing the visual.
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Dismiss")
                 .accessibilityIdentifier("feed-first-cookout-hero-dismiss")
@@ -52,7 +57,10 @@ struct FirstCookoutHeroCard: View {
                 Text("Or Cook a Dump Cake")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.burntOrange)
-                    .frame(maxWidth: .infinity)
+                    // DUT — a bare caption row is a ~20pt target; give it a full
+                    // 44pt height so the tap area meets the a11y minimum.
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("feed-hero-dump-cake")
