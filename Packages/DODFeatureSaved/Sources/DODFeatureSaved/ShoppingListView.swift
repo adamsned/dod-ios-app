@@ -61,6 +61,10 @@ public struct ShoppingListView: View {
     /// Surfacing this toast tells them why nothing appeared and what to do.
     @State private var buildFailureMessage: String?
 
+    /// DUT — gate the new empty↔list crossfade so it's skipped under Reduce
+    /// Motion (the mutation still applies instantly, just without the animation).
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     public init(
         viewModel: ShoppingListViewModel,
         recipes: [Recipe] = [],
@@ -92,7 +96,11 @@ public struct ShoppingListView: View {
                 titleVisibility: .visible
             ) {
                 Button("Clear List", role: .destructive) {
-                    viewModel.clearAll()
+                    // DUT — crossfade the list→EmptyState swap instead of a hard
+                    // cut (skipped under Reduce Motion).
+                    withAnimation(reduceMotion ? nil : .default) {
+                        viewModel.clearAll()
+                    }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -133,6 +141,17 @@ public struct ShoppingListView: View {
             // without this the `.move`/`.opacity` transition has no animation in
             // scope and the toast pops in/out. Mirrors `DeepLinkErrorSnackbar`.
             .animation(.easeInOut, value: buildFailureMessage)
+            // DUT — a single body-level "something left the list" haptic. The
+            // swipe "I already have this" removes the row from the model, so its
+            // OWN view is gone before any feedback could fire — the count-keyed
+            // trigger here is what catches it. Closure form fires `.impact` only
+            // when the still-need count DROPS (swipe removal, the last item
+            // leaving, or Clear List), never on an append. Reads `visibleItems`
+            // (not `checkedIDs`), so it adds no dependency the body didn't already
+            // have — a toggle still doesn't re-run this body.
+            .sensoryFeedback(trigger: viewModel.visibleItems.count) { old, new in
+                new < old ? .impact : nil
+            }
     }
 
     /// DUT-487 — subtle progress overlay shown while ``build(from:)`` hydrates
@@ -167,7 +186,12 @@ public struct ShoppingListView: View {
                 }
                 return out
             }
-            viewModel.add(recipes: hydrated)
+            // DUT — crossfade EmptyState→list when the first build populates
+            // the list, mirroring the clear/last-item removal transitions
+            // (skipped under Reduce Motion).
+            withAnimation(reduceMotion ? nil : .default) {
+                viewModel.add(recipes: hydrated)
+            }
             // DUT-693 — `hydrate` never throws; a failed detail fetch (offline /
             // never-opened) comes back with empty `ingredients`, so `add` appends
             // zero rows and the list would silently stay empty. When EVERY picked
@@ -281,7 +305,15 @@ public struct ShoppingListView: View {
                             item: item,
                             checked: viewModel.isChecked(item),
                             onToggle: { viewModel.toggleChecked(item) },
-                            onMarkAlreadyHave: { viewModel.markAlreadyHave(item) }
+                            // DUT — crossfade when the LAST still-need row leaves
+                            // and the list falls back to EmptyState, instead of a
+                            // hard cut (skipped under Reduce Motion). A mid-list
+                            // removal just animates the row out as before.
+                            onMarkAlreadyHave: {
+                                withAnimation(reduceMotion ? nil : .default) {
+                                    viewModel.markAlreadyHave(item)
+                                }
+                            }
                         )
                     }
                 } header: {
@@ -303,52 +335,6 @@ public struct ShoppingListView: View {
     /// `internal` so it is unit-tested directly for both states.
     static func checkOffLabel(checked: Bool) -> String {
         checked ? "Uncheck" : "Check off"
-    }
-}
-
-// MARK: - Inline aisle section header (T-680c hoists this to a DesignSystem primitive)
-
-// DUT-535 — `internal` (was `private`) so `AddToShoppingListSheet` reuses the
-// same aisle display-name + glyph mapping, keeping the selection sheet's section
-// headers identical to the Shopping List's.
-struct AisleHeader: View {
-    let aisle: IngredientAisleClassifier.Aisle
-
-    var body: some View {
-        Label {
-            Text(Self.displayName(aisle))
-                .dodFont(DODType.bodyEmphasized)
-                .foregroundStyle(DODColor.label)
-        } icon: {
-            Image(systemName: Self.glyph(aisle))
-                .foregroundStyle(DODColor.accent)
-        }
-        .textCase(nil)
-        .accessibilityAddTraits(.isHeader)
-    }
-
-    /// AC-39.4 display names for the six shipped aisles. `meat` renders as
-    /// "Meat & Seafood" per AC-39.4 (the logic core folds seafood into `.meat`
-    /// per CL-80). DUT-693 — the switch lives once on ``ShoppingListFormatter``
-    /// (the pure, unit-tested home); this delegates so the header + the share
-    /// text can never drift.
-    static func displayName(_ aisle: IngredientAisleClassifier.Aisle) -> String {
-        ShoppingListFormatter.displayName(aisle)
-    }
-
-    /// AC-39.4 per-aisle SF Symbol glyphs (mapped for the six shipped cases).
-    /// Pantry uses `archivebox` rather than AC-39.4's `cabinet` because
-    /// `cabinet` is not a valid SF Symbol (it would render blank); T-680c can
-    /// revisit if a real pantry glyph ships.
-    static func glyph(_ aisle: IngredientAisleClassifier.Aisle) -> String {
-        switch aisle {
-        case .produce: "leaf"
-        case .meat: "fish"
-        case .dairy: "drop"
-        case .pantry: "archivebox"
-        case .spices: "flame"
-        case .other: "cart"
-        }
     }
 }
 

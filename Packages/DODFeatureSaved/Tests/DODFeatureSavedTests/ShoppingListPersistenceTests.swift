@@ -268,6 +268,46 @@ import Testing
         #expect(viewModel.items.count == 18)
     }
 
+    // MARK: - Legacy masked-row purge on load (DUT)
+
+    @Test func legacyMaskedRowIsPurgedOnLoadSoReAddSurfaces() throws {
+        // A PRE-DUT-589 snapshot could leave an "already have" row IN `items`
+        // with its id merely masked by `alreadyHaveIDs` (current builds remove
+        // the row outright). That masked row is invisible but still counted by
+        // `add(recipes:)`'s de-dup against the full `items`, so re-adding the
+        // same line was silently suppressed. Loading must purge it.
+        let store = try Self.freshStore()
+        let masked = Self.item("1 onion", "Pot Roast", .produce)
+        store.save(items: [masked], checked: [], alreadyHave: [masked.id])
+
+        let viewModel = ShoppingListViewModel(store: store)
+        // The masked row is dropped and the set cleared, so `items` matches the
+        // (empty) visible list — no lingering row to collide with a re-add.
+        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.alreadyHaveIDs.isEmpty)
+        #expect(viewModel.isEmpty)
+
+        // Re-adding that same ingredient now surfaces (was suppressed before the
+        // purge, because the masked row's de-dup key collided with it).
+        viewModel.add(recipes: [Self.recipe(id: 1, title: "Pot Roast", ingredients: ["1 onion"])])
+        #expect(viewModel.visibleItems.map(\.ingredientText) == ["1 onion"])
+    }
+
+    @Test func reloadFromStorePurgesLegacyMaskedRows() throws {
+        // The same purge runs on the appear-time reload, so a legacy snapshot
+        // written by another process is cleaned up too.
+        let store = try Self.freshStore()
+        let viewModel = ShoppingListViewModel(store: store)  // starts empty
+
+        let masked = Self.item("1 onion", "Pot Roast", .produce)
+        store.save(items: [masked], checked: [], alreadyHave: [masked.id])
+        viewModel.reloadFromStore()
+
+        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.alreadyHaveIDs.isEmpty)
+        #expect(viewModel.visibleItems.isEmpty)
+    }
+
     // MARK: - Fixtures
 
     private static func freshStore() throws -> ShoppingListStore {
