@@ -73,6 +73,7 @@ extension RecipeDetailView {
                 }
                 .simultaneousGesture(
                     TapGesture().onEnded {
+                        shareTapCount += 1  // fires the `.sensoryFeedback` tick on the body
                         Task { await viewModel.didShare() }
                     }
                 )

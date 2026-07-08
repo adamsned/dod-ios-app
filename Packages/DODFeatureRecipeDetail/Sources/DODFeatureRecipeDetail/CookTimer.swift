@@ -24,6 +24,10 @@ struct CookTimer: View {
     let totalSeconds: Int
     let viewModel: CookModeViewModel
 
+    /// Gates the completion color/glyph transition — no motion when the user
+    /// asked for reduced motion (mirrors `CookModeView` / `CookModeView+Controls`).
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     init(stepIndex: Int, duration: Duration, viewModel: CookModeViewModel) {
         self.stepIndex = stepIndex
         self.totalSeconds = max(Int(duration.components.seconds), 0)
@@ -72,6 +76,9 @@ struct CookTimer: View {
             RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
                 .strokeBorder(DODColor.burntOrange.opacity(0.25), lineWidth: 1)
         )
+        // Ease the hard color+glyph cut when the countdown hits 00:00
+        // (mirrors `IngredientCheckRow`); no motion under Reduce Motion.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: didComplete)
         .accessibilityElement(children: .contain)
     }
 
@@ -124,6 +131,13 @@ struct CookTimer: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Reset timer")
+        }
+        // Light selection tick on Start/Pause (matches the app's `.selection`
+        // vocabulary for discrete controls, e.g. Cook Mode step changes).
+        // Suppressed at 00:00 so it doesn't double up with the `.success`
+        // completion haptic `CookModeView` already fires on `timerCompletionTick`.
+        .sensoryFeedback(trigger: isRunning) { _, _ in
+            didComplete ? nil : .selection
         }
     }
 
