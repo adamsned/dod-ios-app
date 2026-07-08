@@ -114,6 +114,7 @@ public final class ShoppingListViewModel {
     public init(items: [Item], store: ShoppingListStore? = ShoppingListStore()) {
         self.store = store
         self.items = items
+        rebuildVisibleItems()
     }
 
     /// The production Shopping List entry point (used by ``ShoppingListView`` /
@@ -131,6 +132,8 @@ public final class ShoppingListViewModel {
         } else {
             self.items = []
         }
+        purgeMaskedRows()
+        rebuildVisibleItems()
     }
 
     /// DUT-534 — re-read the persisted snapshot so an EXTERNAL append (a
@@ -156,6 +159,8 @@ public final class ShoppingListViewModel {
         items = snapshot.items
         checkedIDs = Set(snapshot.checkedIDs)
         alreadyHaveIDs = Set(snapshot.alreadyHaveIDs)
+        purgeMaskedRows()
+        rebuildVisibleItems()
     }
 
     // MARK: - Derived render model
@@ -169,9 +174,15 @@ public final class ShoppingListViewModel {
 
     /// Rows still on the list — everything not marked "already have". Checked
     /// rows stay visible (struck through), only already-have rows drop out.
-    public var visibleItems: [Item] {
-        items.filter { !alreadyHaveIDs.contains($0.id) }
-    }
+    ///
+    /// **Cached (perf).** Formerly a computed property that re-ran
+    /// `items.filter { !alreadyHaveIDs.contains($0.id) }` on EVERY access, and a
+    /// single render reads several derived surfaces off it (`isEmpty`,
+    /// `remainingCount`, `uncheckedCount`, `sections`) — so the same filter ran
+    /// 4-5× per render. It is now recomputed once, only when `items` /
+    /// `alreadyHaveIDs` actually change (see ``rebuildVisibleItems()``), and the
+    /// derived surfaces read this stored array. Behavior is identical.
+    public private(set) var visibleItems: [Item] = []
 
     /// Count of still-need rows (the list badge / "N items" surfaces).
     public var remainingCount: Int {
@@ -192,6 +203,32 @@ public final class ShoppingListViewModel {
             guard let rows = grouped[aisle], !rows.isEmpty else { return nil }
             return Section(aisle: aisle, items: rows)
         }
+    }
+
+    /// Recompute the cached ``visibleItems``. Called from every path that
+    /// mutates `items` or `alreadyHaveIDs` (the inits, `reloadFromStore`, `add`,
+    /// `markAlreadyHave`, `clearAll`) so the one filter runs on change instead of
+    /// per-access. `toggleChecked` is deliberately NOT a caller — it touches only
+    /// `checkedIDs`, which doesn't affect which rows are visible.
+    private func rebuildVisibleItems() {
+        visibleItems = items.filter { !alreadyHaveIDs.contains($0.id) }
+    }
+
+    /// Clean up legacy "already have" rows from a PRE-DUT-589 persisted snapshot.
+    /// Current builds REMOVE an already-have row from `items` outright (see
+    /// ``markAlreadyHave(_:)``), so `alreadyHaveIDs` is normally empty and this is
+    /// a no-op. But an OLD blob could still carry masked rows: rows left in
+    /// `items` with their ids in `alreadyHaveIDs`. Those are invisible (filtered
+    /// out of ``visibleItems``) yet still counted by ``add(recipes:)``'s de-dup
+    /// against the FULL `items` — so a masked "1 onion" from Recipe A silently
+    /// SUPPRESSES a genuine re-add of that same line. Dropping the masked rows and
+    /// clearing the set on load makes `items` match the visible list again, so
+    /// re-adds surface. Only called on the load paths (`init(store:)` /
+    /// `reloadFromStore`).
+    private func purgeMaskedRows() {
+        guard !alreadyHaveIDs.isEmpty else { return }
+        items.removeAll { alreadyHaveIDs.contains($0.id) }
+        alreadyHaveIDs.removeAll()
     }
 
     // MARK: - Mutations (persisted — DUT-488)
@@ -223,6 +260,7 @@ public final class ShoppingListViewModel {
         items.removeAll { $0.id == item.id }
         alreadyHaveIDs.remove(item.id)
         checkedIDs.remove(item.id)
+        rebuildVisibleItems()
         persist()
     }
 
@@ -238,6 +276,7 @@ public final class ShoppingListViewModel {
     /// Persists.
     public func add(recipes: [Recipe]) {
         items = Self.dedupedAppend(existing: items, adding: Self.rows(from: recipes))
+        rebuildVisibleItems()
         persist()
     }
 
@@ -248,6 +287,7 @@ public final class ShoppingListViewModel {
         items.removeAll()
         checkedIDs.removeAll()
         alreadyHaveIDs.removeAll()
+        rebuildVisibleItems()
         persist()
     }
 
@@ -303,69 +343,7 @@ extension ShoppingListViewModel {
     }
 
     // DUT-648: the append de-dup (`dedupedAppend` / `occurrenceKeys` / `RowKey`)
-    // lives in `ShoppingListViewModel+Dedup.swift` to keep this file under
+    // lives in `ShoppingListViewModel+Dedup.swift`, and the CL-82 mock fixture
+    // lives in `ShoppingListViewModel+Mock.swift`, to keep this file under
     // SwiftLint's `file_length` cap.
-}
-
-// MARK: - Mock fixture (CL-82 — drives the view ahead of the entry surfaces)
-
-extension ShoppingListViewModel {
-
-    /// Three recipes' worth of ingredient lines, classified through the live
-    /// ``IngredientAisleClassifier``, so ``ShoppingListView`` is self-contained
-    /// and previewable ahead of T-680c's entry wiring. The fixture deliberately
-    /// includes a duplicate ("yellow onion" in two recipes) to demonstrate the
-    /// per-recipe-row behavior (CL-77) and at least one `.other`-bucket line.
-    /// Passes `store: nil` (DUT-488) so previews / snapshot fixtures never read
-    /// or write the real App Group suite — the mock stays a pure in-memory list.
-    public static var mock: ShoppingListViewModel {
-        ShoppingListViewModel(items: mockItems, store: nil)
-    }
-
-    /// The mock rows as plain values (so tests can assert against them without
-    /// reaching through the `@Observable` instance).
-    public static var mockItems: [Item] {
-        func rows(_ recipe: String, _ lines: [String]) -> [Item] {
-            lines.map { line in
-                Item(
-                    ingredientText: line,
-                    recipeTitle: recipe,
-                    aisle: IngredientAisleClassifier.classify(line)
-                )
-            }
-        }
-        return rows(
-            "Dutch Oven Pot Roast",
-            [
-                "3 lb beef chuck roast",
-                "1 yellow onion, quartered",
-                "4 carrots, peeled",
-                "3 cloves garlic, minced",
-                "2 cups beef broth",
-                "1 tsp salt",
-            ]
-        )
-            + rows(
-                "Skillet Chicken Tacos",
-                [
-                    "1 lb chicken thighs",
-                    "1 yellow onion, diced",
-                    "2 limes",
-                    "1 cup shredded cheddar",
-                    "1 tsp cumin",
-                    "8 corn tortillas",
-                ]
-            )
-            + rows(
-                "Weeknight Veggie Pasta",
-                [
-                    "12 oz pasta",
-                    "2 zucchini, sliced",
-                    "1 cup heavy cream",
-                    "½ cup parmesan",
-                    "2 tbsp olive oil",
-                    "black pepper to taste",
-                ]
-            )
-    }
 }

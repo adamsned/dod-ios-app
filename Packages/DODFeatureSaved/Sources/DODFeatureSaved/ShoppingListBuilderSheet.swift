@@ -121,6 +121,9 @@ struct ShoppingListBuilderSheet: View {
         }
         .buttonStyle(.plain)
         .listRowBackground(DODColor.surfaceElevated)
+        // DUT — match the Shopping List row's check-off tap (`.selection`); keyed
+        // to THIS row's own `selected` so the haptic fires on the tap that flips it.
+        .sensoryFeedback(.selection, trigger: selected)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(recipe.title)
         .accessibilityValue(selected ? "Selected" : "Not selected")
