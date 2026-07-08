@@ -200,7 +200,19 @@ public struct CookActivityProgressArc: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .foregroundStyle(DODColor.label)
+                // DUT-694 a11y: without a label VoiceOver reads a bare ticking
+                // "1:15:00" with no meaning. Labeling a `Text(timerInterval:)`
+                // keeps it announcing its live value alongside the context.
+                .accessibilityLabel(countdownAccessibilityLabel)
         }
+    }
+
+    /// DUT-694 a11y: give the bare countdown numeral spoken context, reflecting
+    /// the done/paused state the numeral's tint already conveys visually.
+    private var countdownAccessibilityLabel: String {
+        if isCompleted { return "Timer complete" }
+        if isPaused { return "Time remaining, paused" }
+        return "Time remaining"
     }
 
     private var arcColor: Color {
@@ -244,6 +256,19 @@ public struct CookActivityCompactTrailingView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .foregroundStyle(countdownColor)
+            // DUT-694 a11y: this is the always-on `minimal` pill (the sole glimpse
+            // of a running timer) as well as compact-trailing / expanded trailing.
+            // Without a label VoiceOver reads a bare ticking "1:15:00"; labeling a
+            // `Text(timerInterval:)` keeps its live value announced with context.
+            .accessibilityLabel(countdownAccessibilityLabel)
+    }
+
+    /// DUT-694 a11y: spoken context for the bare countdown numeral, mirroring the
+    /// done/paused state the numeral's tint conveys visually.
+    private var countdownAccessibilityLabel: String {
+        if isCompleted { return "Timer complete" }
+        if isPaused { return "Time remaining, paused" }
+        return "Time remaining"
     }
 
     /// DUT-218: self-updating while running (survives backgrounding), static
