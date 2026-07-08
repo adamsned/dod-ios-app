@@ -107,6 +107,32 @@ public struct ProfilePhotoCropView: View {
                                     }
                             )
                         )
+                        // VoiceOver can't perceive the image or drive the
+                        // pinch/drag gestures, so expose the image with a
+                        // label and make zoom an adjustable value. Swipe-up
+                        // (`.increment`) zooms in, swipe-down (`.decrement`)
+                        // zooms out, both re-clamped via the unit-tested
+                        // `clampScale`. Pan stays gesture-only: an element
+                        // supports a single adjustable action, and zoom is
+                        // the primary reframing control (the default center
+                        // crop already frames the image sensibly). Keeping
+                        // `committedScale` in sync means a subsequent pinch
+                        // continues from the VoiceOver-set zoom.
+                        .accessibilityLabel("Photo to crop")
+                        .accessibilityIdentifier("profile-photo-crop-image")
+                        .accessibilityValue("Zoom \(Int(scale * 100)) percent")
+                        .accessibilityAdjustableAction { direction in
+                            let step: CGFloat = 0.1
+                            switch direction {
+                            case .increment:
+                                scale = Self.clampScale(scale + step)
+                            case .decrement:
+                                scale = Self.clampScale(scale - step)
+                            @unknown default:
+                                break
+                            }
+                            committedScale = scale
+                        }
 
                     // Dim everything outside the crop frame so the user
                     // can see exactly what will be kept. `.allowsHitTesting`
