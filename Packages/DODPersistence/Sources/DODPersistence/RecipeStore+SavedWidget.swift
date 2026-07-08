@@ -126,6 +126,31 @@ extension RecipeStore {
                 )
             )
         }
+        // DUT-735: pre-backfill, also surface local-only provisional pins so the
+        // widget matches the Saved tab / Settings stat / Spotlight (which all
+        // union `provisionalSavedPins()`). Self-gates to `[]` once the first
+        // import reconciles; projected from the `CachedRecipe` pin with `savedAt`
+        // proxied by `lastViewedAt` (the pin carries no synced save timestamp).
+        for pin in try provisionalSavedPins() {
+            if rows.count >= limit { break }
+            guard seen.insert(pin.id).inserted,
+                !pin.canonicalURLString.isEmpty,
+                let canonical = URL(string: pin.canonicalURLString)
+            else { continue }
+            let heroImageURL = pin.heroImageURLString.flatMap { URL(string: $0) }
+            let cached =
+                try heroImageURL.map { try hasBridgedImage(url: $0) } ?? false
+            rows.append(
+                SavedRecipeWidgetRow(
+                    recipeID: pin.id,
+                    title: pin.title,
+                    canonicalURL: canonical,
+                    heroImageURL: heroImageURL,
+                    heroImageCached: cached,
+                    savedAt: pin.lastViewedAt
+                )
+            )
+        }
         return rows
     }
 
@@ -140,6 +165,10 @@ extension RecipeStore {
         for row in try modelContext.fetch(descriptor) {
             seen.insert(row.id)
         }
+        // DUT-735: include pre-backfill provisional pins so the lock-screen
+        // bookmark badge matches the Saved tab / Settings stat / Spotlight.
+        // Self-gates to `[]` post-backfill.
+        seen.formUnion(try provisionalSavedPins().map(\.id))
         return seen.count
     }
 }

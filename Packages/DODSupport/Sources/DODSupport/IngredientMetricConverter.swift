@@ -127,8 +127,26 @@ public enum IngredientMetricConverter {
         if rounded == rounded.rounded() {
             return String(Int(rounded.rounded()))
         }
-        return String(format: "%.1f", rounded)
+        // DUT-737: render the one-decimal fraction through a locale-aware
+        // formatter so a comma-decimal-locale cook reads "1,2 L", not the POSIX
+        // "1.2 L". `String(format: "%.1f")` always pins the C-locale period —
+        // the same bug DUT-320 fixed for `FractionRenderer`, and metric mode is
+        // exactly the surface a non-US cook enables.
+        return Self.decimalFormatter.string(from: NSNumber(value: rounded))
+            ?? String(rounded)
     }
+
+    /// DUT-737 — locale-aware one-decimal formatter for the L/kg rollup, mirroring
+    /// `FractionRenderer.fallbackFormatter`. Grouping off (magnitudes are small
+    /// post-rollup); the integer path is handled separately by `formatInteger`.
+    private static let decimalFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = false
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 1
+        return formatter
+    }()
 
     // MARK: - Tables
 

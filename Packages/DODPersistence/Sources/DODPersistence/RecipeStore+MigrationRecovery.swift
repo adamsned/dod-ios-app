@@ -161,8 +161,19 @@ extension RecipeStore {
                 // CloudKit mirror is active (opt-in ON) so a re-import can restore
                 // it; otherwise leave the intact synced store in place and reopen
                 // it as-is.
-                let cloudSyncOn = cloudKitSyncOptIn(in: defaults)
-                resetOnDiskStores(includingSyncedStore: cloudSyncOn)
+                //
+                // DUT-733: opt-in ON is NOT proof the mirror is live. An opted-in
+                // user whose CloudKit is unavailable (no iCloud account, or the
+                // Production schema not yet deployed) runs on a LOCAL-ONLY fallback
+                // `SyncedSaved` store with no remote copy — sweeping it on the flag
+                // alone would destroy their only Saved list. Require a CONFIRMED
+                // import (`backfillDidComplete`) too: that flag only flips once a
+                // real CloudKit import reconciles, proving a remote copy exists to
+                // re-hydrate. Absent that, protect the possibly-local-only store
+                // exactly like the opted-out branch.
+                let mirrorConfirmed =
+                    cloudKitSyncOptIn(in: defaults) && backfillDidComplete(in: defaults)
+                resetOnDiskStores(includingSyncedStore: mirrorConfirmed)
                 return try ModelContainer(
                     for: Schema(SchemaV6.models),
                     migrationPlan: MigrationPlan.self,
