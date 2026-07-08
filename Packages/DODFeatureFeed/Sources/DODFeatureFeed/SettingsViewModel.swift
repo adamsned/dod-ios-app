@@ -324,15 +324,12 @@ public final class SettingsViewModel {
 
     // MARK: - Clear cached recipe images (AC-36.4)
 
-    /// Calls through the supplied closure (which routes to
-    /// `RecipeStore.clearImageCache()` in production) and surfaces a
-    /// snackbar with the freed-byte total formatted as MB. The
-    /// zero-byte branch shows "Cache was already clear." so the user
-    /// always sees feedback for the tap (no silent no-op). The
-    /// view-model stays free of a hard `DODPersistence` dependency —
-    /// the call-site (composition root) supplies the store-backed
-    /// closure; tests can inject a stub closure to exercise the
-    /// freed-MB formatter and error path independently.
+    /// Calls through the supplied closure (routes to `RecipeStore.clearImageCache()`
+    /// in production) and surfaces a snackbar with the freed-byte total formatted
+    /// as MB; the zero-byte branch shows "Cache was already clear." so the tap is
+    /// never a silent no-op. Keeps the view-model free of a hard `DODPersistence`
+    /// dependency — the call-site supplies the store-backed closure; tests inject a
+    /// stub to exercise the formatter and error path independently.
     public func clearImageCache(onClear: () async throws -> Int) async {
         do {
             let freedBytes = try await onClear()
@@ -341,10 +338,9 @@ public final class SettingsViewModel {
             // dedicated ``cacheClearSuccessCount`` trigger (see the Settings list).
             cacheClearSuccessCount += 1
         } catch {
-            // Best-effort — the store actor's SwiftData writes are
-            // already wrapped in `try modelContext.save()` which surfaces
-            // here on persistence failure. Surface a humane error rather
-            // than silently failing.
+            // Best-effort — the store actor's SwiftData writes are wrapped in
+            // `try modelContext.save()`, which surfaces here on a persistence
+            // failure. Surface a humane error rather than silently failing.
             snackbarMessage = "Couldn't clear cache — try again."
         }
     }
@@ -357,6 +353,11 @@ public final class SettingsViewModel {
             return "Cache was already clear."
         }
         let megabytes = Double(freedBytes) / (1024.0 * 1024.0)
+        // DUT — a nonzero free below 0.1 MB rounds to "0.0 MB", which reads as
+        // "freed nothing" and contradicts the `freedBytes > 0` zero-case above.
+        guard megabytes >= 0.1 else {
+            return "Freed less than 0.1 MB of cached images."
+        }
         let formatter = NumberFormatter()
         formatter.minimumFractionDigits = 1
         formatter.maximumFractionDigits = 1

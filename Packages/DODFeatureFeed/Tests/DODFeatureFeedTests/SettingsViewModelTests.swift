@@ -183,6 +183,12 @@ import os
         let fortySevenPointTwoMB = Int(47.2 * 1024.0 * 1024.0)
         #expect(SettingsViewModel.cacheClearMessage(freedBytes: fortySevenPointTwoMB).contains("47.2 MB"))
         #expect(SettingsViewModel.cacheClearMessage(freedBytes: fortySevenPointTwoMB).hasPrefix("Freed "))
+        // DUT — a nonzero free below 0.1 MB must NOT render "Freed 0.0 MB" (reads as
+        // "freed nothing"). 40 KB / 1 byte get the "less than" line; 0.1 MB does not.
+        let lessThanTenth = "Freed less than 0.1 MB of cached images."
+        #expect(SettingsViewModel.cacheClearMessage(freedBytes: 40 * 1024) == lessThanTenth)
+        #expect(SettingsViewModel.cacheClearMessage(freedBytes: 1) == lessThanTenth)
+        #expect(SettingsViewModel.cacheClearMessage(freedBytes: Int(0.1 * 1024.0 * 1024.0)).contains("0.1 MB"))
     }
 
     @Test func clearImageCacheRoutesThroughClosureAndSetsSnackbar() async throws {
