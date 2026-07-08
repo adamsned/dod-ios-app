@@ -123,7 +123,7 @@ extension RecipeStore {
             predicate: #Predicate { row in idSet.contains(row.id) }
         )
         let rows = try modelContext.fetch(descriptor)
-        return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.categoryIDs) })
+        return Dictionary(rows.map { ($0.id, $0.categoryIDs) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Return `recipeID -> total time in seconds` for the given ids.
