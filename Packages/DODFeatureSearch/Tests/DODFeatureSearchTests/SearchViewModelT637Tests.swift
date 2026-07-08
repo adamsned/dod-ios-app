@@ -103,12 +103,12 @@ import Testing
 
         await viewModel.surfaceLatestRecipes()
 
-        #expect(viewModel.items.count == 5, "Default limit=5 trims after over-fetch")
+        #expect(viewModel.items.count == 5, "Default limit=5")
         #expect(viewModel.items.map(\.id) == [101, 102, 103, 104, 105])
         #expect(viewModel.state == .results)
         #expect(
-            dependencies.latestRecipesCalls.first == 8,
-            "Over-fetch ceil(5 * 1.5) = 8"
+            dependencies.latestRecipesCalls.first == 5,
+            "DUT-730 — fetches exactly limit=5 (the misleading 1.5x over-fetch was removed)"
         )
         #expect(viewModel.recentSearches.isEmpty)
         #expect(scratch.recent().isEmpty)
