@@ -39,6 +39,11 @@ public struct CookJournalView: View {
     /// entry is still there rather than seeing it silently reappear after
     /// confirming a can't-be-undone delete.
     @State private var actionError: JournalActionError?
+    /// DUT — the three header stats (total / weekly streak / most-cooked) derived
+    /// ONCE whenever `cooks` changes, not on every `body` eval. `statsHeader` is a
+    /// computed `View` property, so the old inline computation re-ran `totalCooks`
+    /// + `currentWeeklyStreak` + `mostCooked` over the whole history every render.
+    @State private var stats = JournalStats()
     @Environment(\.dismiss) private var dismiss
 
     /// DUT-694 (PR-D) — a titled failure message for the delete/edit error alert.
@@ -143,6 +148,10 @@ public struct CookJournalView: View {
                 loaded = true
             }
         }
+        // DUT — recompute the header stats only when the history actually changes
+        // (initial load, a delete, or an entry edit that reloads `cooks`), rather
+        // than on every `body` re-render inside `statsHeader`.
+        .onChange(of: cooks) { stats = Self.computeStats(cooks) }
     }
 
     /// DUT-514 — run the delete, then reload so the list AND the stats header
@@ -286,21 +295,12 @@ extension CookJournalView {
     }
 
     private var statsHeader: some View {
-        let total = CookLogStats.totalCooks(cooks)
-        // DUT-346: a fixed-firstWeekday Gregorian calendar so a locale's week-start
-        // (Sun vs Mon) can't bucket the same cook history into a different streak
-        // across devices.
-        // DUT-528: pin the timezone explicitly (matches `SettingsViewModel.streakCalendar`)
-        // so week/month buckets never drift under an implicit device-timezone change.
-        var weekCalendar = Calendar(identifier: .gregorian)
-        weekCalendar.firstWeekday = 1
-        weekCalendar.timeZone = TimeZone.current
-        let streak = CookLogStats.currentWeeklyStreak(cooks, asOf: .now, calendar: weekCalendar)
-        let mostCooked = CookLogStats.mostCooked(cooks)
-        return HStack(spacing: DODSpacing.sm) {
-            statTile("\(total)", total == 1 ? "cook" : "cooks")
-            statTile("\(streak)", "week streak")
-            if let mostCooked {
+        // DUT — read the pre-derived stats (recomputed in `.onChange(of: cooks)`)
+        // instead of recomputing over the whole history on every render.
+        HStack(spacing: DODSpacing.sm) {
+            statTile("\(stats.total)", stats.total == 1 ? "cook" : "cooks")
+            statTile("\(stats.streak)", "week streak")
+            if let mostCooked = stats.mostCooked {
                 statTile("\(mostCooked.count)×", "top: \(mostCooked.title)")
             }
         }

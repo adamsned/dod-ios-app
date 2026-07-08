@@ -60,6 +60,9 @@ extension FirstCookoutView {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, DODSpacing.xs)
+        // DUT — a light selection tick when a row is checked/unchecked, matching
+        // the haptic every sibling checklist in the app already gives.
+        .sensoryFeedback(.selection, trigger: checkedItems)
     }
 
     private func checklistSection(_ title: String, items: [String]) -> some View {
@@ -262,7 +265,7 @@ extension FirstCookoutView {
                     message: Text(shareCaption),
                     preview: SharePreview(sharePreviewTitle, image: photo)
                 ) {
-                    Label("Share / Post, tags Dutch Oven Daddy", systemImage: "square.and.arrow.up")
+                    Label("Share Your Cook", systemImage: "square.and.arrow.up")
                 }
                 .dodProminentButton()
                 .tint(DODColor.burntOrange)

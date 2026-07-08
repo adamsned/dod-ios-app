@@ -29,6 +29,11 @@ public struct CookCelebrationView: View {
     let celebration: CookCelebration
     let onDismiss: () -> Void
 
+    /// DUT — bump on appear to fire a one-shot success haptic (mirrors the
+    /// `Snackbar` appear-trigger pattern). Graduating the First Cookout path is
+    /// the app's emotional peak, so the moment should be *felt*, not just seen.
+    @State private var appearTick = 0
+
     public init(celebration: CookCelebration, onDismiss: @escaping () -> Void) {
         self.celebration = celebration
         self.onDismiss = onDismiss
@@ -68,6 +73,8 @@ public struct CookCelebrationView: View {
         .padding(DODSpacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DODColor.surface.ignoresSafeArea())
+        .sensoryFeedback(.success, trigger: appearTick)
+        .onAppear { appearTick &+= 1 }
     }
 
     private var emoji: String {
