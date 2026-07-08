@@ -23,6 +23,10 @@ extension RootView {
         switch link {
         case .saved:
             selectedTab = .saved
+            // DUT-734: land on the Saved list ROOT, like the Feed path — not a
+            // stale recipe detail a prior session left pushed on the Saved stack
+            // (tabPaths persist across tab switches by DUT-250).
+            tabPaths[.saved] = []
         case .feed:
             selectedTab = .feed
             pendingDeepLink = link
@@ -73,6 +77,8 @@ extension RootView {
         switch intent {
         case .openSaved:
             selectedTab = .saved
+            // DUT-734: land on the Saved list root (see `handle(widgetLink:)`).
+            tabPaths[.saved] = []
         case .openRecipe(let id):
             selectedTab = .feed
             Task { @MainActor in

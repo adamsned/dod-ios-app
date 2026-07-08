@@ -130,6 +130,14 @@ extension RecipeDetailViewModel {
             if ratingRecorded, commentFailed {
                 snackbarMessage =
                     "Your rating was saved, but the comment didn't post — try again."
+            } else if hasRating, !ratingRecorded, !commentFailed {
+                // DUT-738: the inverse half-state — the comment posted but the
+                // WPRM rating POST failed. The stars are NOT persisted (comment
+                // meta doesn't carry them), so the vote is silently lost behind a
+                // "Comment posted." confirmation. Tell the user their rating
+                // didn't save, mirroring the DUT-395 message above.
+                snackbarMessage =
+                    "Your comment posted, but your rating didn't save — try the stars again."
             }
         } else {
             await submitRating(stars: pendingUserRating)

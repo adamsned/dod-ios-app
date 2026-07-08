@@ -9,7 +9,16 @@ extension RecipeStore {
     @discardableResult
     public func toggleSaved(id: Int) throws -> Bool {
         guard let row = try fetchRecipe(id: id) else { return false }
-        row.isSaved.toggle()
+        // DUT-732: decide save-vs-unsave from the SYNCED source of truth, not the
+        // local `isSaved` pin. A recipe saved on another device and imported via
+        // CloudKit surfaces in the Saved tab with its local pin still `false` (the
+        // pin is only reconciled when its detail is opened on this device), so
+        // toggling the pin alone would RE-SAVE it instead of removing it. Treat
+        // "currently saved" as "a synced row exists OR the local pin is set", then
+        // flip that — `isSaved(id:)` already unions the pre-backfill provisional
+        // pins, matching every other saved surface.
+        let currentlySaved = try isSaved(id: id) || row.isSaved
+        row.isSaved = !currentlySaved
         // DUT-35: mirror the local pin into the synced source of truth (only
         // `SyncedSavedRecipe` leaves the device; the recipe cache stays local).
         if row.isSaved {

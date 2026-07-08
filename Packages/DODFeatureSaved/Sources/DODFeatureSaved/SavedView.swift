@@ -198,7 +198,14 @@ public struct SavedView: View {
                         withAnimation { viewModel.optimisticallyRemove(id: recipe.id) }
                         // DUT-629 — restore the row if the store write failed.
                         onSave?(recipe) { didSave in
-                            if !didSave { Task { await viewModel.refresh() } }
+                            if !didSave {
+                                // DUT-736: clear the optimistic-removal suppression
+                                // FIRST — otherwise `refresh()` re-hides the still-
+                                // saved card within the 2s `pendingRemovals` TTL and
+                                // the restore is a silent no-op.
+                                viewModel.clearPendingRemoval(id: recipe.id)
+                                Task { await viewModel.refresh() }
+                            }
                         }
                     },
                     onRemoveDownload: {
@@ -245,7 +252,14 @@ public struct SavedView: View {
                         withAnimation { viewModel.optimisticallyRemove(id: recipe.id) }
                         // DUT-629 — restore the row if the store write failed.
                         onSave?(recipe) { didSave in
-                            if !didSave { Task { await viewModel.refresh() } }
+                            if !didSave {
+                                // DUT-736: clear the optimistic-removal suppression
+                                // FIRST — otherwise `refresh()` re-hides the still-
+                                // saved card within the 2s `pendingRemovals` TTL and
+                                // the restore is a silent no-op.
+                                viewModel.clearPendingRemoval(id: recipe.id)
+                                Task { await viewModel.refresh() }
+                            }
                         }
                     },
                     onRemoveDownload: {
