@@ -2,21 +2,18 @@ import DODDesignSystem
 import DODSupport
 import SwiftUI
 
-// The section compositions for ``HeatCoachView`` (DUT-48; DUT-584 answer-first
-// redesign), split out of `HeatCoachView.swift` so each file stays under the
-// `file_length` cap and the struct body stays under `type_body_length`.
+// The answer + setup + conditions compositions for ``HeatCoachView`` (DUT-48;
+// DUT-584 answer-first; v2 de-listed redesign), split out of `HeatCoachView.swift`
+// so each file stays under the `file_length` cap. The cook-by-feel cues and the
+// coal-management / wind reference live in `HeatCoachView+Feel`.
 //
 //   - ``answerCard`` — the answer first: the coal-split diagram (in `+Diagram`)
 //     under the "starting point, then cook by feel" framing + optional recipe
 //     context line.
-//   - ``primaryInputsCard`` — the two minimal inputs (Oven Size + Cooking Style).
+//   - ``primaryInputsCard`` — the two minimal inputs (Oven Size + Cooking Style),
+//     laid out with air rather than stacked rows behind a divider.
 //   - ``conditionsGroup`` — the optional collapsed "Adjust for Conditions"
 //     expander (elevation / air temp / wind + the adjustment notes).
-//   - ``feelReferenceSection`` — the cook-by-feel cues, always visible (the point).
-//   - ``tipsGroup`` — coal-management habits + wind guidance, collapsed.
-//
-// The cue / habit / wind copy is one source of truth in ``DutchOvenHeatCoach``
-// (DODSupport) and is pinned by `DutchOvenHeatCoachTests`.
 
 extension HeatCoachView {
 
@@ -71,10 +68,6 @@ extension HeatCoachView {
         }
         .padding(DODSpacing.lg)
         .frame(maxWidth: .infinity)
-        // DUT — the answer card was the one full-accent slab in the whole app.
-        // It now uses the shared elevated-card treatment like every sibling
-        // section; burnt orange survives only where it earns attention: the coal
-        // embers and the big total. See `cardSurface()`.
         .cardSurface()
         .accessibilityIdentifier("heat-coach-result")
     }
@@ -91,41 +84,43 @@ extension HeatCoachView {
     // MARK: - Minimal primary inputs (live-update the answer)
 
     var primaryInputsCard: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.md) {
-            // Oven Size as a compact stepper row: the current size reads large on
-            // the left, the − / + control sits inline on the right. Tighter and
-            // more tactile than a dropdown, and it never covers the answer.
-            labeledRow("Oven Size") {
-                Stepper(
-                    value: $ovenDiameterInches,
-                    in: sizeRange,
-                    step: 2
-                ) {
-                    Text("\(ovenDiameterInches)\" Diameter")
-                        .dodFont(DODType.bodyEmphasized)
+        VStack(alignment: .leading, spacing: DODSpacing.lg) {
+            // Oven Size — the current size reads large on the left, the − / +
+            // control sits inline on the right. Just the number + inches; the
+            // "Oven Size" caption already says what it is (no "Diameter" clutter).
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                    Text("Oven Size")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                    Text("\(ovenDiameterInches)\"")
+                        .dodFont(DODType.displayMedium)
                         .foregroundStyle(DODColor.label)
                 }
-                .tint(DODColor.accent)
-                .accessibilityIdentifier("heat-coach-oven-size")
+                Spacer()
+                Stepper("Oven Size", value: $ovenDiameterInches, in: sizeRange, step: 2)
+                    .labelsHidden()
+                    .tint(DODColor.accent)
+                    .accessibilityIdentifier("heat-coach-oven-size")
             }
 
-            Divider().overlay(DODColor.surfaceDivider)
-
-            labeledRow("Cooking Style") {
+            // Cooking Style — the two pills with the split note as one quiet line
+            // right beneath, at the point of choice.
+            VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                Text("Cooking Style")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
                 accentSelector(
                     selection: $style,
                     options: [(.even, "Even"), (.baking, "Baking")],
                     accessibilityID: "heat-coach-style"
                 )
+                Text(coachModel.styleNote)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("heat-coach-style-note")
             }
-
-            // The style note explains the split at the point of choice — moved
-            // out of the hero so the result stays a clean number.
-            Text(coachModel.styleNote)
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("heat-coach-style-note")
         }
         .padding(DODSpacing.md)
         .cardSurface()
@@ -195,12 +190,19 @@ extension HeatCoachView {
             let notes = adjustmentNotes(coachModel)
             if !notes.isEmpty {
                 Divider().overlay(DODColor.surfaceDivider)
-                VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                VStack(alignment: .leading, spacing: DODSpacing.sm) {
                     Text("What Changes")
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)
+                        .textCase(.uppercase)
+                    // Plain, well-spaced lines — no per-line bullet dot. The
+                    // caption above already frames them as the adjustments.
                     ForEach(notes, id: \.self) { note in
-                        adjustmentLine(note)
+                        Text(note)
+                            .dodFont(DODType.body)
+                            .foregroundStyle(DODColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -218,131 +220,5 @@ extension HeatCoachView {
         if let windCoalNote = coachModel.windCoalNote { notes.append(windCoalNote) }
         if let windNote = coachModel.windNote { notes.append(windNote) }
         return notes
-    }
-
-    private func adjustmentLine(_ text: String) -> some View {
-        HStack(alignment: .top, spacing: DODSpacing.xs) {
-            Image(systemName: "circle.fill")
-                .font(.system(size: 6))
-                .foregroundStyle(DODColor.accent)
-                .padding(.top, DODSpacing.xs)
-                .accessibilityHidden(true)
-            Text(text)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    // MARK: - Cook-by-feel cues (the heart of the feature — always visible)
-
-    var feelReferenceSection: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.sm) {
-            sectionHeader("Cook by Feel")
-
-            Text(
-                "The estimate just gets your coals going. From there, your eyes, ears, and nose run the cook. "
-                    + "That's the Dutch Oven Daddy way."
-            )
-            .dodFont(DODType.body)
-            .foregroundStyle(DODColor.labelSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-
-            // DUT-598 — the six cues were six floating cards (a wall). They now
-            // live as compact rows inside ONE card, hairline-divided, so the
-            // section reads as a single reference the eye can scan.
-            VStack(spacing: 0) {
-                ForEach(Array(DutchOvenHeatCoach.feelCues.enumerated()), id: \.element.id) { index, cue in
-                    if index > 0 {
-                        Divider().overlay(DODColor.surfaceDivider)
-                    }
-                    feelCueRow(cue)
-                }
-            }
-            .padding(.vertical, DODSpacing.xxs)
-            .cardSurface()
-        }
-        .accessibilityIdentifier("heat-coach-feel")
-    }
-
-    private func feelCueRow(_ cue: FeelCue) -> some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text(cue.title)
-                .dodFont(DODType.bodyEmphasized)
-                .foregroundStyle(DODColor.label)
-
-            signalRow(symbol: "checkmark.circle.fill", tint: DODColor.accent, text: cue.onTrack)
-            signalRow(symbol: "arrow.triangle.2.circlepath", tint: DODColor.labelSecondary, text: cue.adjust)
-        }
-        .padding(DODSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func signalRow(symbol: String, tint: Color, text: String) -> some View {
-        HStack(alignment: .top, spacing: DODSpacing.xs) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(tint)
-                .padding(.top, 2)
-                .accessibilityHidden(true)
-            Text(text)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    // MARK: - Coal-management habits + wind guidance (collapsed)
-
-    @ViewBuilder
-    var tipsGroup: some View {
-        DisclosureGroup(isExpanded: $showTips) {
-            tipsContent
-                .padding(.top, DODSpacing.sm)
-        } label: {
-            Text("Coal Management & Wind")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-                .frame(minHeight: 44, alignment: .leading)  // DUT-291: 44pt tap target
-        }
-        .tint(DODColor.accent)
-        .padding(DODSpacing.md)
-        .cardSurface()
-        .accessibilityIdentifier("heat-coach-coal-management")
-    }
-
-    @ViewBuilder
-    private var tipsContent: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.md) {
-            VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                ForEach(DutchOvenHeatCoach.coalManagementHabits, id: \.self) { habit in
-                    habitLine(habit)
-                }
-            }
-
-            Text("Wind")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-
-            VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                ForEach(DutchOvenHeatCoach.windGuidance, id: \.self) { tip in
-                    habitLine(tip)
-                }
-            }
-        }
-    }
-
-    private func habitLine(_ text: String) -> some View {
-        HStack(alignment: .top, spacing: DODSpacing.xs) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(DODColor.accent)
-                .padding(.top, 2)
-                .accessibilityHidden(true)
-            Text(text)
-                .dodFont(DODType.body)
-                .foregroundStyle(DODColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 }

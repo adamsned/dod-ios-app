@@ -33,7 +33,7 @@ extension HeatCoachView {
         .accessibilityIdentifier("heat-coach-diagram")
     }
 
-    /// One row of decorative coal dots — one glowing ember per coal. Hidden from
+    /// One row of decorative coal dots — one coal per dot. Hidden from
     /// VoiceOver — the count is spoken once by the diagram's combined label,
     /// never as N separate dots.
     private func coalDotRow(count: Int) -> some View {
@@ -46,23 +46,16 @@ extension HeatCoachView {
         .accessibilityHidden(true)
     }
 
-    /// A single lit coal: a warm radial ember (gold-hot core, offset toward the
-    /// top-left, cooling to a burnt-orange rim) with a soft accent glow — so the
-    /// row reads as glowing charcoal, not flat bullets. Now that the answer card
-    /// is a calm `surfaceElevated` surface (not a filled accent hero), the dots
-    /// carry the fire palette directly instead of `labelOnAccent`.
+    /// A single coal: a flat warm-orange fill with a thin cast-iron rim for
+    /// definition. v2 dropped the earlier radial-gradient specular highlight so
+    /// the dots read as coals calmly, without the glossy sheen.
     private var coalDot: some View {
         Circle()
-            .fill(
-                RadialGradient(
-                    colors: [DODColor.warmGold, DODColor.accent, DODColor.burntOrange],
-                    center: UnitPoint(x: 0.35, y: 0.32),
-                    startRadius: 0,
-                    endRadius: 7
-                )
-            )
+            .fill(DODColor.accent)
             .frame(width: 12, height: 12)
-            .shadow(color: DODColor.accent.opacity(0.35), radius: 2, y: 0.5)
+            .overlay(
+                Circle().strokeBorder(DODColor.castIronBrown.opacity(0.35), lineWidth: 0.5)
+            )
     }
 
     /// The oven body: a small "Starting Coals" caption, the big total, then the
