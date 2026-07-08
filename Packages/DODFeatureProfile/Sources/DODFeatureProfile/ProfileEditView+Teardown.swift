@@ -50,6 +50,11 @@ extension ProfileEditView {
                 googleTeardown: googleTeardown,
                 extraTeardown: extraTeardown
             )
+            // DUT — confirm the completed Sign Out / Delete with a `.success` tap
+            // (both funnel through here) so the teardown doesn't finish silently.
+            // Bump before `dismiss()` — the Save path proves the trigger still
+            // fires as the view dismisses.
+            authSuccessTick &+= 1
             await onProfileChanged()
             dismiss()
         } catch {

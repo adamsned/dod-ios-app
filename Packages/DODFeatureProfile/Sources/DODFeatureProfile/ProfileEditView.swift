@@ -86,6 +86,9 @@ public struct ProfileEditView: View {
     @State var saveError: String?
     @State var saveSuccessTick = 0  // DUT-693 PR4 — save-success signal: .success haptic + snackbar token
     @State var savedConfirmationMessage: String?  // DUT-693 PR4 — in-place "Profile saved." snackbar; nil hides
+    /// DUT — auth-success haptic signal, bumped by the `+AppleSignIn` / `+Teardown`
+    /// handlers (non-private for that); drives the body's `.sensoryFeedback`.
+    @State var authSuccessTick = 0
     /// Non-private so `ProfileEditView+SignOut.swift`'s Delete button can set it.
     @State var showDeleteConfirmation = false
     /// DUT-429 — gates Sign Out behind a confirmation, mirroring Delete (the
@@ -165,6 +168,7 @@ public struct ProfileEditView: View {
     /// Non-private so `ProfileEditView+DirtyState.swift` can call it
     /// from the back-chevron tap closure (T-743 / CL-140 / AC-44.16).
     @Environment(\.dismiss) var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion  // DUT — gates the edit-mode cross-fade
 
     #if canImport(UIKit)
     public init(
@@ -249,6 +253,10 @@ public struct ProfileEditView: View {
         // gesture); safe to apply unconditionally.
         .interactiveDismissDisabled(isDirty)
         .profileSavedConfirmation(message: $savedConfirmationMessage, token: saveSuccessTick)
+        // DUT — cross-fade the view/edit swap (stats section pops in/out on `isEditing`),
+        // value-scoped so only `isEditing` animates; auth-event success tap (sign-in/out/delete).
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isEditing)
+        .sensoryFeedback(.success, trigger: authSuccessTick)
         .alert("Delete your profile?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task { await handleDelete() }
@@ -352,46 +360,13 @@ public struct ProfileEditView: View {
         #endif
     }
 
-    // `isDirty` + `computeIsDirty(...)` + `toolbarContent` live in
-    // `ProfileEditView+DirtyState.swift` (T-743 / CL-140 file_length
-    // split); the cross-file split is why the `initial*` snapshots +
-    // `showLeaveConfirmation` `@State` vars above are non-`private`.
-
-    // MARK: - Sections
-    //
-    // `signOutSection` (Sign Out + Delete Profile) lives in
-    // `ProfileEditView+SignOut.swift`; `profileStatsSection` (DUT-417) lives in
-    // `ProfileEditView+Stats.swift` — both extracted for the file_length cap.
-
-    // MARK: - Toolbar
-    //
-    // `toolbarContent` (back chevron + Save) lives in
-    // `ProfileEditView+DirtyState.swift` so this file stays under the
-    // SwiftLint caps. See that file for the AC-44.16 contract.
-
-    // MARK: - Validation
-    //
-    // `isFormValid` (the Save gate) + the live per-field error messages
-    // (`displayNameFieldError` / `emailFieldError`, DUT-414 / DUT-415) live in
-    // `ProfileEditView+Validation.swift` to keep this file under the 400-line cap.
-
-    // MARK: - Actions
-    //
-    // `handleSave()` lives in `ProfileEditView+Save.swift` so this file
-    // stays under the SwiftLint file_length cap after the T-745 / CL-142
-    // additions (two-file storage + post-save cleanup for both cropped +
-    // original).
-
-    // DUT-217: `handleSignOut()` / `handleDelete()` + the shared
-    // `teardown(revoke:)` live in `ProfileEditView+Teardown.swift` (keeps this
-    // file under the SwiftLint `file_length` cap). They clear BOTH the profile
-    // AND the AppleAuthSession; Delete additionally revokes the refresh token.
-
-    // MARK: - Phase b — Photo handlers
-    //
-    // The photo-pipeline handlers (`loadPickedImage`, `handleCroppedImage`,
-    // `handleRemovePhoto`) live in `ProfileEditView+Photo.swift` so this
-    // file stays under the SwiftLint file_length + type_body_length caps.
-    // The cross-file split is why several Phase b `@State` vars above
-    // are declared without a `private` access modifier.
+    // Cross-file splits (all for the SwiftLint file_length / type_body_length
+    // caps; the non-`private` `@State` vars above exist so these satellites can
+    // read/write them):
+    // - `isDirty` / `computeIsDirty(...)` / `toolbarContent` → `+DirtyState.swift` (T-743 / CL-140).
+    // - `signOutSection` + `profileStatsSection` (DUT-417) → `+SignOut.swift` / `+Stats.swift`.
+    // - `isFormValid` + per-field errors (DUT-414 / DUT-415) → `+Validation.swift`.
+    // - `handleSave()` → `+Save.swift` (T-745 / CL-142).
+    // - `handleSignOut()` / `handleDelete()` / `teardown(revoke:)` → `+Teardown.swift` (DUT-217).
+    // - Photo handlers (`loadPickedImage` / `handleCroppedImage` / `handleRemovePhoto`) → `+Photo.swift`.
 }

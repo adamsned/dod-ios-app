@@ -171,6 +171,10 @@ extension ProfileEditView {
             saveError = "Couldn't Save Your Profile. Try Again."
             return
         }
+        // DUT — confirm the successful sign-in with a `.success` tap (mirrors the
+        // Save path). Bump before `dismiss()` — the Save path proves the trigger
+        // fires even when the view is dismissing (`+Save.swift`).
+        authSuccessTick &+= 1
         Task {
             await onProfileChanged()
             dismiss()
@@ -201,6 +205,9 @@ extension ProfileEditView {
                 saveError = "Couldn't Save Your Profile. Try Again."
                 return
             }
+            // DUT — mirror the Apple handler: a `.success` tap confirms the
+            // successful Google sign-in before dismissing.
+            authSuccessTick &+= 1
             await onProfileChanged()
             dismiss()
         }
