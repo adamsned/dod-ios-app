@@ -105,8 +105,8 @@ public struct LiveShoppingListAppender: ShoppingListAppender {
         // user isn't told the row landed when it didn't.
         guard let store else { return .couldntLoad }
 
-        store.append(rows: rows)
-        return .added(count: rows.count)
+        let appendedCount = store.append(rows: rows)
+        return .added(count: appendedCount)
     }
 
     /// DUT-535 — append a caller-selected subset of pre-built rows. The sheet
@@ -118,7 +118,7 @@ public struct LiveShoppingListAppender: ShoppingListAppender {
     public func addToShoppingList(rows: [ShoppingListViewModel.Item]) async -> AddToShoppingListResult {
         guard !rows.isEmpty else { return .couldntLoad }
         guard let store else { return .couldntLoad }
-        store.append(rows: rows)
-        return .added(count: rows.count)
+        let appendedCount = store.append(rows: rows)
+        return .added(count: appendedCount)
     }
 }

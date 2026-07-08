@@ -113,8 +113,12 @@ public struct ShoppingListStore: @unchecked Sendable {
     ///   De-duped against the existing list on the `(recipeTitle, ingredientText)`
     ///   pair (DUT-589) so re-appending the same recipe doesn't re-stack its rows
     ///   and grow the blob without bound.
-    public func append(rows: [ShoppingListViewModel.Item]) {
+    /// - Returns: the number of rows actually appended after dedup (0 when every
+    ///   row was already present).
+    @discardableResult
+    public func append(rows: [ShoppingListViewModel.Item]) -> Int {
         let current = load()
+        let existingCount = current?.items.count ?? 0
         let merged = ShoppingListViewModel.dedupedAppend(
             existing: current?.items ?? [],
             adding: rows
@@ -124,6 +128,7 @@ public struct ShoppingListStore: @unchecked Sendable {
             checked: Set(current?.checkedIDs ?? []),
             alreadyHave: Set(current?.alreadyHaveIDs ?? [])
         )
+        return merged.count - existingCount
     }
 
     /// Test-only accessor for the backing `UserDefaults`, so tests can assert on
