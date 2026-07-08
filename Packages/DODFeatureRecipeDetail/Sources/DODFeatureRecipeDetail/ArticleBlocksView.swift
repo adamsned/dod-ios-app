@@ -60,6 +60,7 @@ public struct ArticleBlocksView: View {
                 .foregroundStyle(DODColor.label)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, DODSpacing.sm)
+                .accessibilityAddTraits(.isHeader)
 
         case .paragraph(let text):
             Text(text)
@@ -78,11 +79,13 @@ public struct ArticleBlocksView: View {
                         Text(ordered ? "\(index + 1)." : "•")
                             .dodFont(DODType.body)
                             .foregroundStyle(DODColor.labelSecondary)
+                            .accessibilityHidden(!ordered)
                         Text(item)
                             .dodFont(DODType.body)
                             .foregroundStyle(DODColor.label)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .accessibilityElement(children: .combine)
                 }
             }
         }
