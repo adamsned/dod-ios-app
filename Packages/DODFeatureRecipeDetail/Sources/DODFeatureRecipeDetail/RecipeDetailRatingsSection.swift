@@ -306,7 +306,15 @@ public struct RecipeDetailRatingsSection: View {
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
         case .ready:
-            if viewModel.visibleComments.isEmpty {
+            // Evaluate the moderation filter + threading ONCE per render.
+            // `visibleComments` is a `comments.filter { … }` and
+            // `CommentThreader.thread` is O(n log n); the pre-fix body read
+            // `visibleComments` for the empty check AND again inside `thread`,
+            // rebuilding the whole thread on every render. `thread` never drops
+            // rows (it hoists orphans/cycles), so an empty result ⟺ no visible
+            // comments — the empty check reads the threaded list directly.
+            let threaded = CommentThreader.thread(viewModel.visibleComments)
+            if threaded.isEmpty {
                 Text("No comments yet. Be the first to share your tips.")
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.labelSecondary)
@@ -314,7 +322,7 @@ public struct RecipeDetailRatingsSection: View {
                 LazyVStack(alignment: .leading, spacing: DODSpacing.md) {
                     // DUT-392: render threaded — replies nest indented beneath
                     // the comment they answer. DUT-501: reported/blocked filtered.
-                    ForEach(CommentThreader.thread(viewModel.visibleComments)) { threaded in
+                    ForEach(threaded) { threaded in
                         commentRow(for: threaded.comment)
                             .padding(.leading, threaded.isReply ? DODSpacing.lg : 0)
                     }
@@ -330,13 +338,22 @@ public struct RecipeDetailRatingsSection: View {
 
     // MARK: - Helpers
 
-    /// Cheap relative-date formatter shared by every row. Uses
-    /// `RelativeDateTimeFormatter` so output respects the device locale
-    /// (e.g. "il y a 3 jours" on a French locale).
-    static func relativeDateString(_ date: Date) -> String {
+    /// One `RelativeDateTimeFormatter` shared across every comment row rather
+    /// than allocated per call (mirrors `PublishedDateCaption` /
+    /// `FractionRenderer.fallbackFormatter`). `RelativeDateTimeFormatter` is
+    /// expensive to build, and `relativeDateString(_:)` runs once per row on
+    /// every render of the thread. `unitsStyle = .full` set once here.
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return formatter.localizedString(for: date, relativeTo: .now)
+        return formatter
+    }()
+
+    /// Cheap relative-date string shared by every row. Uses the shared
+    /// ``relativeDateFormatter`` so output respects the device locale
+    /// (e.g. "il y a 3 jours" on a French locale).
+    static func relativeDateString(_ date: Date) -> String {
+        relativeDateFormatter.localizedString(for: date, relativeTo: .now)
     }
 }
 

@@ -248,6 +248,10 @@ struct RecipeInfoCard: View {
                 break
             }
         }
+        // Light selection tick on each servings change (SwiftUI's `Stepper`
+        // ships no haptic of its own). Matches the app's `.selection` vocabulary
+        // for discrete controls and also covers the VoiceOver adjustable path.
+        .sensoryFeedback(.selection, trigger: value)
     }
 
     /// DUT-572 / CL-312 — prettify a `suitableForDiet` value. The parser stores

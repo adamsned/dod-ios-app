@@ -33,6 +33,10 @@ public struct RecipeDetailView: View {
     // sibling file).
     @State var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
+    /// Share has no toggle state (unlike Save / Download), so this counter is the
+    /// `.sensoryFeedback` trigger, bumped in the ShareLink tap gesture (see
+    /// `RecipeDetailView+Toolbar.swift`). `internal` so the extension bumps it.
+    @State var shareTapCount: Int = 0
     // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
     // extension's relocated Cook Mode CTA tap can present the cover (DUT-631).
     @State var isCookModePresented: Bool = false
@@ -143,7 +147,10 @@ public struct RecipeDetailView: View {
         // overlay anchored to `.bottomTrailing` here. Removed by T-410 /
         // CL-42 — the nav-bar Save + Share (AC-4.7 + AC-4.8) are the
         // single in-recipe affordance for both actions. See US-26 / AC-26.1.
+        // Toolbar haptics: Save + Download success ticks; Share light tick (DUT).
         .sensoryFeedback(.success, trigger: viewModel.isSaved)
+        .sensoryFeedback(.success, trigger: viewModel.isDownloaded)
+        .sensoryFeedback(.impact(weight: .light), trigger: shareTapCount)
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.checkedIngredientIDs.count)
         #if os(iOS)
         .fullScreenCover(isPresented: $isCookModePresented) {
