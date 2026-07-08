@@ -132,9 +132,12 @@ public struct CookActivityLockScreenView: View {
     /// when backgrounded), falling back to the static snapshot when paused or
     /// when no `endDate` is supplied (snapshot tests).
     private var countdownText: Text {
-        // DUT-694: this is exactly `isSelfTicking` — derive it once, in one place.
-        if isSelfTicking, let endDate {
-            return Text(timerInterval: Date()...endDate, countsDown: true)
+        // DUT-720: sample the clock once so the guard and the range use the same
+        // instant — avoids a fatalError if the wall clock crosses `endDate`
+        // between two separate `Date()` samplings.
+        let now = Date()
+        if !isPaused, let endDate, now < endDate {
+            return Text(timerInterval: now...endDate, countsDown: true)
         }
         return Text(formattedCookActivityCountdown(remainingSeconds))
     }
@@ -247,8 +250,11 @@ public struct CookActivityCompactTrailingView: View {
     /// snapshot when no `endDate` (snapshots), already elapsed, or paused — a
     /// paused timer must freeze rather than keep ticking (DUT-662).
     private var countdownText: Text {
-        if let endDate, !isPaused, endDate > Date() {
-            return Text(timerInterval: Date()...endDate, countsDown: true)
+        // DUT-720: sample the clock once so the guard and the range share the
+        // same instant, preventing a fatalError at the expiry boundary.
+        let now = Date()
+        if let endDate, !isPaused, now < endDate {
+            return Text(timerInterval: now...endDate, countsDown: true)
         }
         return Text(formattedCookActivityCountdown(remainingSeconds))
     }
