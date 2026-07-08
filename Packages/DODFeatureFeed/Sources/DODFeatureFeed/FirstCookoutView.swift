@@ -51,6 +51,10 @@ public struct FirstCookoutView: View {
     /// dead interval while the resolve is in flight). `nil` in unwired hosts
     /// (previews/tests) → the legacy openURL + dismiss path.
     @Environment(\.recipeLinkOpener) var recipeLinkOpener
+    /// DUT — gates the guided-bake "Timer's Up!" crossfade so a Reduce Motion
+    /// cook gets an instant swap. Read here (stored on the struct) so the
+    /// `cookTimerCard` builder in `+Stages.swift` can reach it across the extension.
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     /// 0 = intro; 1...steps.count = each coached step; steps.count + 1 = celebration.
     /// Internal (not private) so the swipe handler in `+Stages.swift` can page it.
     @State var index = 0
@@ -70,6 +74,11 @@ public struct FirstCookoutView: View {
     /// progress (not merely paging to the celebration). Internal so the Start
     /// action in `+Stages.swift` can set it.
     @State var didStartBake = false
+    /// DUT — a monotonic tick bumped once each time THIS rung's guided bake timer
+    /// finishes (in the `onFinished` hook), so a `.sensoryFeedback(.success)` on
+    /// the flow buzzes at "Timer's Up!" just like Cook Mode's completion tick.
+    /// Internal so the `onFinished` closure wired in `body`'s `.task` can bump it.
+    @State var bakeTimerFinishTick = 0
     /// Items the cook has ticked off the *gather* checklist.
     @State var checkedItems: Set<String> = []
     @State var cookPhotoItem: PhotosPickerItem?
@@ -173,6 +182,10 @@ public struct FirstCookoutView: View {
         .padding(DODSpacing.lg)
         .background(DODColor.surface)
         .animation(.easeInOut(duration: 0.25), value: index)
+        // DUT — a `.success` haptic the moment this rung's guided bake timer hits
+        // zero (mirrors CookModeView's `timerCompletionTick`); the tick only
+        // increments, so it never mis-fires on clear/restart.
+        .sensoryFeedback(.success, trigger: bakeTimerFinishTick)
         .task {
             // DUT-297: if the bake finishes while we're on screen, drop the
             // pending notification — the cook is already looking at "Timer's up!".
@@ -181,6 +194,11 @@ public struct FirstCookoutView: View {
             // shared engine (DUT-484) can have another rung's bake queued.
             timerEngine.onFinished = { timer in
                 Task { await notifier.cancelBakeDone(for: timer.recipeID) }
+                // DUT — buzz a `.success` when THIS rung's bake finishes (the
+                // guided timer was previously silent, unlike Cook Mode). Scoped
+                // by recipeID so a shared-engine sibling rung (DUT-484) can't
+                // trigger this flow's haptic.
+                if timer.recipeID == cookout.recipeID { bakeTimerFinishTick += 1 }
             }
             await runTimerTick()
         }
@@ -274,6 +292,13 @@ public struct FirstCookoutView: View {
             case .cook:
                 rotationReminder
                 cookTimerCard
+                    // DUT — animate the countdown→"Timer's Up!" swap (keyed on the
+                    // finish tick so only that transition fires), gated on Reduce
+                    // Motion so an accessibility cook gets an instant swap.
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 0.25),
+                        value: bakeTimerFinishTick
+                    )
                 recipeButton
             case .celebrate:
                 EmptyView()

@@ -1,5 +1,7 @@
+import DODDesignSystem
 import DODSupport
 import Foundation
+import SwiftUI
 
 // DUT — the cook-journal header stats, derived ONCE whenever `cooks` changes
 // (via `.onChange(of:)`) rather than recomputed on every `body` eval inside the
@@ -33,5 +35,30 @@ extension CookJournalView {
             streak: CookLogStats.currentWeeklyStreak(cooks, asOf: .now, calendar: weekCalendar),
             mostCooked: CookLogStats.mostCooked(cooks)
         )
+    }
+
+    /// A single header stat tile (value over label). Lives here (not the main
+    /// file) purely for `file_length` relief — it holds no instance state, so
+    /// `statsHeader` in the main file calls it across the extension boundary.
+    func statTile(_ value: String, _ label: String) -> some View {
+        VStack(spacing: DODSpacing.xxs) {
+            Text(value)
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.burntOrange)
+            Text(label)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(DODSpacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                .fill(DODColor.surfaceElevated)
+        )
+        // DUT — merge the value + label so VoiceOver reads "5 cooks" as one element,
+        // not a contextless "5" then "cooks" (mirrors `journeyHeader`).
+        .accessibilityElement(children: .combine)
     }
 }

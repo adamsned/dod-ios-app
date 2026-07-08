@@ -58,6 +58,9 @@ struct CookJournalEntryView: View {
     @State var photoSaveError: String?
     /// DUT-514 — drives the delete-confirmation alert.
     @State var showingDeleteConfirm = false
+    /// DUT — bumped on a successful save to fire the `.success` haptic before the
+    /// page pops (mirrors `ProfileEditView`'s `saveSuccessTick`).
+    @State var saveSuccessTick = 0
 
     init(
         entry: CookLogEntry,
@@ -113,6 +116,9 @@ extension CookJournalEntryView {
             }
         }
         .task(id: entry.photoLocalID) { await loadExistingPhoto() }
+        // DUT — confirm a successful save with a `.success` haptic (matches the
+        // profile-save + first-cookout completion feedback).
+        .sensoryFeedback(.success, trigger: saveSuccessTick)
         .photosPicker(isPresented: $showingPhotosPicker, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in Task { await loadPicked(item) } }
         .confirmationDialog("Photo", isPresented: $showingPhotoOptions, titleVisibility: .hidden) {
@@ -312,6 +318,7 @@ extension CookJournalEntryView {
             photoLocalID: photoID
         )
         await onSave(updated)
+        saveSuccessTick &+= 1  // DUT — fire the success haptic before the page pops.
         dismiss()
     }
 

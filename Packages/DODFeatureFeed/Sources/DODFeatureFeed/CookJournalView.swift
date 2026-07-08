@@ -306,25 +306,6 @@ extension CookJournalView {
         }
     }
 
-    private func statTile(_ value: String, _ label: String) -> some View {
-        VStack(spacing: DODSpacing.xxs) {
-            Text(value)
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.burntOrange)
-            Text(label)
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(DODSpacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                .fill(DODColor.surfaceElevated)
-        )
-    }
-
     private func cookRow(_ cook: CookLogEntry) -> some View {
         HStack(spacing: DODSpacing.md) {
             photoThumbnail(cook.photoLocalID)
