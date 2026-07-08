@@ -120,6 +120,18 @@ public struct WPRMRatingsClient: Sendable {
         // blanking the user's vote.
         do {
             let updated = try await summary(forRecipeID: recipeID)
+            // DUT-714: summary() graceful-degrades to a zeroed rating (not a
+            // throw) for 401/403/offline/decode, so the catch below never
+            // fires on an auth-gated public GET. Treat a zeroed aggregate as a
+            // failed refresh and hand back the star-derived fallback instead.
+            if updated.count < 1 && updated.average == 0 {
+                return RecipeRating(
+                    recipeID: recipeID,
+                    average: Double(stars),
+                    count: 1,
+                    userRating: stars
+                )
+            }
             return RecipeRating(
                 recipeID: updated.recipeID,
                 average: updated.average,

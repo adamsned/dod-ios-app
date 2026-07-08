@@ -16,13 +16,14 @@ import Foundation
 extension SearchViewModel {
 
     /// US-29 / AC-29.1 amendment / CL-106 (T-637): the "Latest Recipes"
-    /// Try-pill special case. Fetches the N most-recent posts via
+    /// Try-pill special case. Fetches exactly the N most-recent posts via
     /// `dependencies.fetchLatestRecipes(limit:)` and renders the result
     /// set directly — bypassing the text-search path which would search
     /// for the literal string "Latest Recipes" and return garbage (the
-    /// phrase appears in many unrelated articles' boilerplate). The
-    /// fetch over-fetches by ~1.5x so a few latest-articles-being-articles
-    /// still leaves ~N recipes after the post-fetch drop.
+    /// phrase appears in many unrelated articles' boilerplate). No
+    /// over-fetch happens: there is no recipe/article classification at
+    /// this layer, so recipe-vs-article classification is deferred to the
+    /// detail screen (US-37 / AC-37.2).
     ///
     /// Does NOT persist the term to the recent-searches store (mirrors
     /// the curated-tap exclusion intent from REG-19 / CL-66 / T-670 —
@@ -49,8 +50,7 @@ extension SearchViewModel {
             items = []
             return
         }
-        let overFetch = Int((Double(limit) * 1.5).rounded(.up))
-        guard let fetched = await fetchLatestOrFail(overFetch: overFetch, generation: generation)
+        guard let fetched = await fetchLatestOrFail(overFetch: limit, generation: generation)
         else { return }
         try? await dependencies.cache(listItems: fetched)
         guard generation == searchGeneration else { return }

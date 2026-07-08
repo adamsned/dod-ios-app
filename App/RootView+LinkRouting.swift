@@ -189,7 +189,13 @@ extension RootView {
             get: { selectedTab },
             set: { newValue in
                 if newValue == selectedTab {
-                    tabPaths[newValue] = []
+                    // DUT-718 — the Cooking Tools hub owns a private nav stack, not a
+                    // `tabPaths` slot, so mint its pop token (DUT-461) to pop to root.
+                    if newValue == .cookingTools {
+                        hubTipToken = UUID()
+                    } else {
+                        tabPaths[newValue] = []
+                    }
                 } else {
                     selectedTab = newValue
                 }

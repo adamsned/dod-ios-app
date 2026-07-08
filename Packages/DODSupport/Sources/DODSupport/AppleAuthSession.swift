@@ -16,6 +16,15 @@ import Security
 ///
 /// Spec trace: US-46 (Authentication — Phase a, Sign in with Apple),
 /// constitution §9 (Keychain-only, never sent to TelemetryDeck), CL-189.
+/// DUT-701 — which auth provider issued a persisted session. ``AppleAuthSession``
+/// is a provider-neutral model reused by both Sign in with Apple and Sign in with
+/// Google; the Apple credential-state validator must only poll Apple-issued
+/// sessions, so the provider is recorded here.
+public enum AuthProvider: String, Sendable, Hashable {
+    case apple
+    case google
+}
+
 public struct AppleAuthSession: Sendable, Hashable {
 
     /// The stable, opaque Apple user identifier
@@ -42,16 +51,24 @@ public struct AppleAuthSession: Sendable, Hashable {
     /// reused the existing session). Device-local, like the rest of the session.
     public let refreshToken: String?
 
+    /// DUT-701 — which auth provider issued this session. Defaults to `.apple`
+    /// so every existing call site and legacy persisted session (which predate
+    /// this field) keeps behaving as an Apple session; only the Google sign-in
+    /// path passes `.google` explicitly.
+    public let provider: AuthProvider
+
     public init(
         userIdentifier: String,
         displayName: String? = nil,
         email: String? = nil,
-        refreshToken: String? = nil
+        refreshToken: String? = nil,
+        provider: AuthProvider = .apple
     ) {
         self.userIdentifier = userIdentifier
         self.displayName = displayName
         self.email = email
         self.refreshToken = refreshToken
+        self.provider = provider
     }
 }
 
@@ -135,6 +152,7 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
     static let displayNameAccount = "display-name"
     static let emailAccount = "email"
     static let refreshTokenAccount = "refresh-token"
+    static let providerAccount = "auth-provider"
 
     private let service: String
     private let accessGroup: String?
@@ -158,11 +176,16 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
         guard !userIdentifier.isBlankAppleIdentifier else {
             return nil
         }
+        // DUT-701 — a missing provider row is a legacy session written before the
+        // field existed; those are Apple sessions, so default to `.apple`.
+        let providerRaw = try readString(account: Self.providerAccount)
+        let provider = providerRaw.flatMap(AuthProvider.init(rawValue:)) ?? .apple
         return AppleAuthSession(
             userIdentifier: userIdentifier,
             displayName: try readString(account: Self.displayNameAccount),
             email: try readString(account: Self.emailAccount),
-            refreshToken: try readString(account: Self.refreshTokenAccount)
+            refreshToken: try readString(account: Self.refreshTokenAccount),
+            provider: provider
         )
     }
 
@@ -177,6 +200,7 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
         try writeOptional(session.displayName, account: Self.displayNameAccount)
         try writeOptional(session.email, account: Self.emailAccount)
         try writeOptional(session.refreshToken, account: Self.refreshTokenAccount)
+        try writeString(session.provider.rawValue, account: Self.providerAccount)
     }
 
     public func clear() throws {
@@ -184,6 +208,7 @@ public struct KeychainAppleAuthSessionStore: AppleAuthSessionStoring {
         try delete(account: Self.displayNameAccount)
         try delete(account: Self.emailAccount)
         try delete(account: Self.refreshTokenAccount)
+        try delete(account: Self.providerAccount)
     }
 
     // MARK: - SecItem plumbing

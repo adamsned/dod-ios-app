@@ -147,7 +147,9 @@ public struct CategoryRecipesView: View {
                 // DUT-629 — optimistic flip, re-inverted on write failure.
                 viewModel.applyOptimisticSaveToggle(id: item.id)
                 onSave?(item) { didSave in
-                    if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                    // DUT-721 — silent rollback: re-invert without the `.selection`
+                    // haptic, which is reserved for the genuine user toggle above.
+                    if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
                 }
             }
             // T-610 — stable L5 handle for the category → recipe journey.

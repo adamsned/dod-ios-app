@@ -133,23 +133,23 @@ public struct SearchView: View {
     }
 
     /// DUT-527 — announce the result count once the search settles, so a
-    /// VoiceOver user hears how many recipes came back (or that none did) rather
-    /// than landing silently. Gated on the two terminal states (no `.searching`).
+    /// VoiceOver user hears how many recipes came back (or that none did).
     private func announceSearchState(_ state: SearchViewModel.State) {
         let message: String
         switch state {
         case .results:
-            // DUT-693 — `.results` covers title-tier OR ingredient-tier hits, so
-            // count both (`items.count` alone announced "0 recipes found").
+            // DUT-693 — `.results` covers title- OR ingredient-tier hits; count both.
             let count = viewModel.items.count + viewModel.ingredientItems.count
             message = "\(count) \(count == 1 ? "recipe" : "recipes") found."
         case .noResults:
             message = "No recipes found."
         case .error:
-            // DUT-622: announce the failure so a VoiceOver user isn't left in
-            // silence at the Retry screen.
+            // DUT-622: announce the failure so a VoiceOver user isn't left in silence.
             message = "Search couldn't load. Try again."
-        case .idle, .searching, .offline:
+        case .offline:
+            // DUT-729: terminal user-facing offline state — announce like `.error`.
+            message = "Search needs internet. Reconnect to try again."
+        case .idle, .searching:
             return
         }
         AccessibilityNotification.Announcement(message).post()

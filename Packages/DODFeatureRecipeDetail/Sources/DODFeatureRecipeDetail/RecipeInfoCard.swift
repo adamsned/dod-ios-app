@@ -57,19 +57,21 @@ struct RecipeInfoCard: View {
 
     /// A single time row: Title-Case label over a big centered value.
     private struct TimeRow: Identifiable {
-        let id = UUID()
         let label: String
         let value: String
+
+        var id: String { label }
     }
 
     /// A single metadata cell: caption label over a body value. `isServings`
     /// flags the cell that becomes the interactive stepper when a
     /// `servingsBinding` is supplied (DUT-573 / CL-313).
     private struct MetaCell: Identifiable {
-        let id = UUID()
         let label: String
         let value: String
         var isServings = false
+
+        var id: String { label }
     }
 
     private var timeRows: [TimeRow] {

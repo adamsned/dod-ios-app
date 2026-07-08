@@ -285,15 +285,12 @@ public struct ProfileEditView: View {
             }
         }
         .profileEditPhotoFlow(view: self)
-        // DUT-417 — load the view-mode stats once (when a provider is wired).
-        .task {
-            if let statsHooks, loadedStats == nil {
-                loadedStats = await statsHooks.load()
-            }
-        }
         // DUT-424: reload on every appear so the Cook Rank + counts aren't stale
         // after cooking (or editing a journal rating) and returning to this
-        // still-mounted screen — `.task` only fires once per view identity.
+        // still-mounted screen. This is the sole stats loader — it also covers
+        // the first appear (DUT-417's "load once when a provider is wired"), so
+        // a separate `.task` first-load is intentionally omitted to avoid a
+        // double load on the first appear (DUT-725).
         .onAppear {
             if let statsHooks { Task { loadedStats = await statsHooks.load() } }
         }

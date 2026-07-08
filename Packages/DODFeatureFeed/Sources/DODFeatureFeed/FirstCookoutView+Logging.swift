@@ -25,13 +25,25 @@ extension FirstCookoutView {
     }
 
     func loadPhoto(_ item: PhotosPickerItem?) async {
-        guard let item, let data = try? await item.loadTransferable(type: Data.self) else { return }
-        cookPhotoData = data
-        #if canImport(UIKit)
-        if let uiImage = UIImage(data: data) {
-            cookPhoto = Image(uiImage: uiImage)
+        guard let item else { return }
+        do {
+            if let data = try await item.loadTransferable(type: Data.self) {
+                #if canImport(UIKit)
+                if let uiImage = UIImage(data: data) {
+                    cookPhotoData = data
+                    cookPhoto = Image(uiImage: uiImage)
+                } else {
+                    photoSaveError = "We couldn't load your photo. Please try again."
+                }
+                #else
+                cookPhotoData = data
+                #endif
+            } else {
+                photoSaveError = "We couldn't load your photo. Please try again."
+            }
+        } catch {
+            photoSaveError = "We couldn't load your photo. Please try again."
         }
-        #endif
     }
 
     /// Log the completed cook exactly once (DUT-104) — fired on "Done" so the

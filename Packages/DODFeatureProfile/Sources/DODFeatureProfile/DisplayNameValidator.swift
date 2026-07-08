@@ -61,8 +61,9 @@ public enum DisplayNameValidator {
     // MARK: - Normalization
 
     /// Lowercase, fold diacritics, de-leetspeak, drop non-letters, and collapse
-    /// 3+ repeated letters to two — so "Ⓗɇllⓞ", "h e l l o", and "heeeello"
-    /// converge, defeating the most common filter-evasion tricks.
+    /// every run of repeated letters down to a single letter — so "Ⓗɇllⓞ",
+    /// "h e l l o", and "heeeello" all converge to "helo", defeating the most
+    /// common filter-evasion tricks.
     static func normalize(_ input: String) -> String {
         let folded = input.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .lowercased()
@@ -71,21 +72,18 @@ public enum DisplayNameValidator {
         return collapseRuns(lettersOnly)
     }
 
-    /// Collapse any run of 3+ identical letters down to two (keeps real doubles
-    /// like "ll" intact while killing "fuuuuck" / "niiice"-style padding).
+    /// Collapse any run of 2+ identical consecutive letters down to a single
+    /// letter. This is used ONLY for moderation matching (never for display),
+    /// and the blocklists are built through this same `normalize`, so collapsing
+    /// fully de-duplicates on both sides — killing "fuuuuck" / "niiice"-style
+    /// padding *and* the doubled-interior-letter evasion ("fuuck") that a
+    /// collapse-to-two would let slip past a blocklisted substring (DUT-708).
     private static func collapseRuns(_ input: String) -> String {
         var out = ""
         var last: Character?
-        var runLen = 0
-        for ch in input {
-            if ch == last {
-                runLen += 1
-                if runLen <= 2 { out.append(ch) }
-            } else {
-                out.append(ch)
-                last = ch
-                runLen = 1
-            }
+        for ch in input where ch != last {
+            out.append(ch)
+            last = ch
         }
         return out
     }

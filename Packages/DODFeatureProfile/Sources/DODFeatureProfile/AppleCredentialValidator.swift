@@ -81,6 +81,11 @@ public struct AppleCredentialValidator: Sendable {
     @discardableResult
     public func validateOnLaunchOrForeground() async -> Bool {
         guard let session = try? sessionStore.load() else { return false }
+        // DUT-701 — the session model is provider-neutral and is reused for Sign
+        // in with Google. Never poll a non-Apple session against Apple's
+        // credential state: Apple returns `.notFound` for an id it never issued,
+        // which would wrongly tear down every Google user's session.
+        guard session.provider == .apple else { return false }
         let userID = session.userIdentifier
         guard !userID.isBlankAppleIdentifier else { return false }
         switch await credentialStatus(userID) {

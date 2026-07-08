@@ -67,12 +67,36 @@ public enum IngredientAisleClassifier {
     public static func classify(_ ingredientName: String) -> Aisle {
         let haystack = ingredientName.lowercased()  // DUT-244: locale-independent (ASCII table)
         guard !haystack.isEmpty else { return .other }
-        for keyword in sortedKeywords where haystack.contains(keyword) {
+        for keyword in sortedKeywords {
+            // DUT-716: short generic stems (<= 4 chars) must begin at a word
+            // boundary, so a fragment like "ham" no longer matches inside
+            // "graham" (and "salt" no longer matches "unsalted"). Longer
+            // keywords keep the plain substring test.
+            let matched =
+                keyword.count <= 4
+                ? matchesAtWordStart(keyword, in: haystack)
+                : haystack.contains(keyword)
             // `keywordMap[keyword]` is guaranteed present — `sortedKeywords`
             // is derived from the map's keys.
-            if let aisle = keywordMap[keyword] { return aisle }
+            if matched, let aisle = keywordMap[keyword] { return aisle }
         }
         return .other
+    }
+
+    /// True when `keyword` occurs in `haystack` beginning at a word boundary —
+    /// the match is preceded by the start of the string or a non-letter. Only
+    /// the START boundary is checked, so plural/suffixed forms ("eggs") still
+    /// match while mid-word fragments ("ham" in "graham") do not.
+    private static func matchesAtWordStart(_ keyword: String, in haystack: String) -> Bool {
+        var searchRange = haystack.startIndex..<haystack.endIndex
+        while let found = haystack.range(of: keyword, options: [], range: searchRange) {
+            let atStart = found.lowerBound == haystack.startIndex
+            let afterNonLetter =
+                !atStart && !haystack[haystack.index(before: found.lowerBound)].isLetter
+            if atStart || afterNonLetter { return true }
+            searchRange = found.upperBound..<haystack.endIndex
+        }
+        return false
     }
 
     // MARK: - Keyword map
@@ -126,6 +150,10 @@ public enum IngredientAisleClassifier {
         "celery": .produce,
         "cilantro": .produce,
         "cucumber": .produce,
+        // DUT-716: explicit whole word so it outranks the "egg" (.dairy) stem
+        // under longest-first — "egg" is word-initial in "eggplant", so the
+        // word-boundary check alone can't shadow it.
+        "eggplant": .produce,
         "garlic": .produce,
         "ginger": .produce,
         "green onion": .produce,

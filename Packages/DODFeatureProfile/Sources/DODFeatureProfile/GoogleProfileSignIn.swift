@@ -111,10 +111,20 @@ public struct GoogleProfileSignIn: Sendable {
         if let orphanedToken, let revoker {
             try? await revoker.revoke(refreshToken: orphanedToken)
         }
-        // DUT-375: `resolve` now preserves any token already on file for the same
-        // user (Google brings none of its own), so we persist `resolved` directly
+        // DUT-375: `resolve` preserves any token already on file for the same
+        // user (Google brings none of its own), so we persist `resolved`'s fields
         // rather than re-merging the token here.
-        try? sessionStore.save(resolved)
+        // DUT-701: tag the persisted session as `.google` so the Apple
+        // credential-revocation validator skips it (polling Apple for a Google id
+        // returns `.notFound` and would force-sign-out the user).
+        let googleSession = AppleAuthSession(
+            userIdentifier: resolved.userIdentifier,
+            displayName: resolved.displayName,
+            email: resolved.email,
+            refreshToken: resolved.refreshToken,
+            provider: .google
+        )
+        try? sessionStore.save(googleSession)
 
         var profileSaved = false
         if let name = resolved.displayName, let mail = resolved.email {

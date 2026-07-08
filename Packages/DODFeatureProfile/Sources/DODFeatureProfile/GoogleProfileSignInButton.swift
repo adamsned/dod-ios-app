@@ -15,6 +15,7 @@ public struct GoogleProfileSignInButton: View {
 
     private let provider: any GoogleSignInProviding
     private let onComplete: @MainActor (GoogleSignInResult) -> Void
+    @State private var isSigningIn = false
 
     public init(
         provider: any GoogleSignInProviding = GIDSignInProvider(),
@@ -26,7 +27,10 @@ public struct GoogleProfileSignInButton: View {
 
     public var body: some View {
         Button {
+            guard !isSigningIn else { return }
+            isSigningIn = true
             Task { @MainActor in
+                defer { isSigningIn = false }
                 onComplete(await provider.signIn())
             }
         } label: {
@@ -35,6 +39,7 @@ public struct GoogleProfileSignInButton: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
         }
+        .disabled(isSigningIn)
         .dodBorderedButton()
         .tint(DODColor.label)
         .accessibilityIdentifier("profile-sign-in-google")

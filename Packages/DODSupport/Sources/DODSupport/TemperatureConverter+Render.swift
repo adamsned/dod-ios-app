@@ -21,7 +21,13 @@ extension TemperatureConverter {
                 // the previous one (a range separator like "-" or " to ").
                 rendered += match.separator ?? ""
             }
-            rendered += format(convert(value.magnitude, to: target))
+            if let convertedValue = convert(value.magnitude, to: target) {
+                rendered += format(convertedValue)
+            } else {
+                // A magnitude out of Int range / non-finite — leave the whole
+                // source span untouched rather than crash or emit a partial.
+                return source(of: match)
+            }
         }
         rendered += convertedSuffix(of: match, to: target)
         return rendered
@@ -32,13 +38,18 @@ extension TemperatureConverter {
     /// Convert a single magnitude to the target unit, rounded to the nearest
     /// 5 degrees (cooking-friendly). F→C and C→F both land on a multiple of
     /// five; the round-trip is intentionally not exact.
-    static func convert(_ magnitude: Double, to target: TemperatureUnit) -> Int {
+    /// Returns `nil` when the converted value is non-finite or out of `Int`
+    /// range — `Int(exactly:)` is failable (never trapping) on an arbitrary
+    /// externally-sourced magnitude.
+    static func convert(_ magnitude: Double, to target: TemperatureUnit) -> Int? {
         let exact: Double
         switch target {
         case .celsius: exact = (magnitude - 32) * 5 / 9
         case .fahrenheit: exact = magnitude * 9 / 5 + 32
         }
-        return Int((exact / 5).rounded()) * 5
+        guard !exact.isInfinite, !exact.isNaN else { return nil }
+        let rounded = (exact / 5).rounded()
+        return Int(exactly: rounded * 5)
     }
 
     /// Integer rendering — every conversion rounds to a whole multiple of

@@ -110,6 +110,9 @@ public struct ProfilePhotoView: View {
         }
         // Same filename, already loaded — no-op.
         if loadAttemptedFilename == filename, loadedImage != nil { return }
+        // Filename changed to a different photo — drop the stale cached image so
+        // the placeholder shows during the load, not the previous profile's photo.
+        if loadAttemptedFilename != filename { loadedImage = nil }
         loadAttemptedFilename = filename
         guard let photoStore else {
             // No store wired (preview / test host) — graceful fallback.

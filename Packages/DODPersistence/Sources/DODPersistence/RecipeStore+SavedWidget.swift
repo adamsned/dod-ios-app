@@ -108,8 +108,13 @@ extension RecipeStore {
                 let canonical = URL(string: row.canonicalURLString)
             else { continue }
             let heroImageURL = row.heroImageURLString.flatMap { URL(string: $0) }
+            // DUT-715: gate on the bridged FILE, not just the CachedImage row — a
+            // best-effort `writeImage` can leave a row with no App Group file, and
+            // the row-only check would mark that hero cached, skip the prefetch, and
+            // strand the widget on its gradient placeholder. `hasBridgedImage`
+            // requires both the row and the file and does not bump the LRU.
             let cached =
-                heroImageURL.map { imageBytesAreCached(forURLString: $0.absoluteString) } ?? false
+                try heroImageURL.map { try hasBridgedImage(url: $0) } ?? false
             rows.append(
                 SavedRecipeWidgetRow(
                     recipeID: row.id,
@@ -136,17 +141,5 @@ extension RecipeStore {
             seen.insert(row.id)
         }
         return seen.count
-    }
-
-    /// Probe whether the bytes for `urlString` are already present in the
-    /// `CachedImage` table. Avoids the public ``image(url:)`` accessor
-    /// here because it bumps `lastUsedAt` — widget-snapshot generation
-    /// should not promote a row in the image LRU (parity with
-    /// `recipeWithoutTouching` for the recipe LRU).
-    private func imageBytesAreCached(forURLString urlString: String) -> Bool {
-        let descriptor = FetchDescriptor<CachedImage>(
-            predicate: #Predicate { $0.urlString == urlString }
-        )
-        return (try? modelContext.fetch(descriptor).first) != nil
     }
 }
