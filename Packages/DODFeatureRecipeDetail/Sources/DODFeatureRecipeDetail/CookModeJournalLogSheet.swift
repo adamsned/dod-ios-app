@@ -38,6 +38,9 @@ struct CookModeJournalLogSheet: View {
     /// Newly picked/snapped bytes, held until Save so a cancel leaves no orphan.
     @State var pendingImageData: Data?
     @State var photoItem: PhotosPickerItem?
+    /// Set when a picked photo can't be materialized (un-downloaded iCloud
+    /// asset / transient transfer failure) so the slot can surface a retry cue.
+    @State var photoLoadFailed = false
     @State var showingPhotosPicker = false
     @State var showingCamera = false
     @State var showingPhotoOptions = false
@@ -109,34 +112,41 @@ extension CookModeJournalLogSheet {
     // MARK: - Sections
 
     private var photoSection: some View {
-        Button {
-            showingPhotoOptions = true
-        } label: {
-            ZStack {
-                if let displayImage {
-                    displayImage
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                        .fill(DODColor.burntOrange.opacity(0.1))
-                    VStack(spacing: DODSpacing.xs) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(DODColor.burntOrange)
-                        Text("Add a photo of your cook")
-                            .dodFont(DODType.caption)
-                            .foregroundStyle(DODColor.labelSecondary)
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            Button {
+                showingPhotoOptions = true
+            } label: {
+                ZStack {
+                    if let displayImage {
+                        displayImage
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                            .fill(DODColor.burntOrange.opacity(0.1))
+                        VStack(spacing: DODSpacing.xs) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(DODColor.burntOrange)
+                            Text("Add a photo of your cook")
+                                .dodFont(DODType.caption)
+                                .foregroundStyle(DODColor.labelSecondary)
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
+            .buttonStyle(.plain)
+            .accessibilityLabel(displayImage == nil ? "Add a photo" : "Change photo")
+            .accessibilityIdentifier("cook-mode-journal-photo")
+            if photoLoadFailed {
+                Text("Couldn't load that photo — try again.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.accent)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(displayImage == nil ? "Add a photo" : "Change photo")
-        .accessibilityIdentifier("cook-mode-journal-photo")
     }
 
     private var headerSection: some View {
@@ -195,11 +205,21 @@ extension CookModeJournalLogSheet {
     // MARK: - Photo + save logic
 
     private func loadPicked(_ item: PhotosPickerItem?) async {
-        guard let item, let data = try? await item.loadTransferable(type: Data.self) else { return }
-        pendingImageData = data
-        #if canImport(UIKit)
-        if let uiImage = UIImage(data: data) { displayImage = Image(uiImage: uiImage) }
-        #endif
+        guard let item else { return }
+        do {
+            if let data = try await item.loadTransferable(type: Data.self) {
+                photoLoadFailed = false
+                pendingImageData = data
+                #if canImport(UIKit)
+                if let uiImage = UIImage(data: data) { displayImage = Image(uiImage: uiImage) }
+                #endif
+            } else {
+                photoLoadFailed = true
+            }
+        } catch {
+            DODLog.persistence.error("cook journal photo load failed: \(String(describing: error))")
+            photoLoadFailed = true
+        }
     }
 
     private func clearPhoto() {
