@@ -1,6 +1,10 @@
 import DODDesignSystem
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// DUT-582 (CL-315) — Cook Mode's music/podcast-style transport bar.
 ///
 /// A single row of circular brand-colored controls, laid out like a media
@@ -35,6 +39,21 @@ struct CookModePlayerControls: View {
     /// row. No-op default for previews.
     var onIngredients: () -> Void = {}
 
+    /// DUT — iPad scales the transport up for the larger canvas. On iPad the
+    /// glyphs, circles, speed pill, and spacing enlarge ~1.3–1.4×; on iPhone
+    /// every size below returns the exact shipped value, so ALL iPhones render
+    /// byte-identically. Gated on the DEVICE IDIOM (not the width class) so an
+    /// iPhone Pro Max in landscape — which reports a `.regular` width class —
+    /// keeps the iPhone sizes; only genuine iPads scale up. The idiom is fixed
+    /// for the process, so reading it once here is fine.
+    private var isPad: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
+    }
+
     private var showsPrevious: Bool {
         viewModel.currentStepIndex > 0 || viewModel.isFinished
     }
@@ -53,7 +72,7 @@ struct CookModePlayerControls: View {
     // MARK: - Transport row (Prev / Voice play-pause / Next)
 
     private var transportRow: some View {
-        HStack(spacing: DODSpacing.lg) {
+        HStack(spacing: transportSpacing) {
             Spacer(minLength: 0)
             previousButton
             centerButton
@@ -93,7 +112,7 @@ struct CookModePlayerControls: View {
     private var centerButton: some View {
         Button(action: centerAction) {
             Image(systemName: centerSymbol)
-                .font(.system(size: 30, weight: .bold))
+                .font(.system(size: centerIconSize, weight: .bold))
                 .foregroundStyle(DODColor.cream)
                 // DUT-583 — crisp play↔pause swap; no lingering fade/delay.
                 .contentTransition(.symbolEffect(.replace))
@@ -136,7 +155,7 @@ struct CookModePlayerControls: View {
     // MARK: - Secondary row (Ingredients + Replay + speed)
 
     private var secondaryRow: some View {
-        HStack(spacing: DODSpacing.xl) {
+        HStack(spacing: secondarySpacing) {
             Spacer(minLength: 0)
             ingredientsButton
             replayButton
@@ -182,13 +201,13 @@ struct CookModePlayerControls: View {
             viewModel.cycleVoiceSpeed()
         } label: {
             Text(viewModel.voiceSpeedLabel)
-                .dodFont(DODType.bodyEmphasized)
+                .dodFont(speedFont)
                 .monospacedDigit()
                 .foregroundStyle(DODColor.accent)
-                .frame(minWidth: 56, minHeight: 44)
+                .frame(minWidth: speedPillMinWidth, minHeight: speedPillMinHeight)
                 .contentShape(Capsule())
                 .overlay(
-                    Capsule().strokeBorder(DODColor.accent.opacity(0.6), lineWidth: 1.5)
+                    Capsule().strokeBorder(DODColor.accent.opacity(0.6), lineWidth: speedPillStroke)
                 )
         }
         .buttonStyle(.plain)
@@ -214,10 +233,25 @@ struct CookModePlayerControls: View {
         }
     }
 
-    // MARK: - Reusable button shapes
+    // MARK: - Control sizing (iPad-scaled)
+    //
+    // DUT — compact (iPhone) returns the exact shipped literals; regular (iPad)
+    // scales the transport glyphs + circles ~1.35–1.4×, and bumps the speed pill
+    // and row spacing proportionally. Tap targets stay >=44pt on both.
+    private var centerDiameter: CGFloat { isPad ? 100 : 72 }
+    private var flankDiameter: CGFloat { isPad ? 74 : 54 }
+    private var centerIconSize: CGFloat { isPad ? 42 : 30 }
+    private var flankIconSize: CGFloat { isPad ? 30 : 22 }
+    private var secondaryIconSize: CGFloat { isPad ? 27 : 20 }
+    private var secondaryTapTarget: CGFloat { isPad ? 56 : 44 }
+    private var speedPillMinWidth: CGFloat { isPad ? 76 : 56 }
+    private var speedPillMinHeight: CGFloat { isPad ? 56 : 44 }
+    private var speedPillStroke: CGFloat { isPad ? 2 : 1.5 }
+    private var speedFont: Font { isPad ? DODType.displayMedium : DODType.bodyEmphasized }
+    private var transportSpacing: CGFloat { isPad ? DODSpacing.xl : DODSpacing.lg }
+    private var secondarySpacing: CGFloat { isPad ? 40 : DODSpacing.xl }
 
-    private let centerDiameter: CGFloat = 72
-    private let flankDiameter: CGFloat = 54
+    // MARK: - Reusable button shapes
 
     private func flankButton(
         symbol: String,
@@ -226,7 +260,7 @@ struct CookModePlayerControls: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: flankIconSize, weight: .semibold))
                 .foregroundStyle(DODColor.cream)
                 .frame(width: flankDiameter, height: flankDiameter)
                 .background(Circle().fill(DODColor.accent))
@@ -242,9 +276,9 @@ struct CookModePlayerControls: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: secondaryIconSize, weight: .semibold))
                 .foregroundStyle(DODColor.accent)
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: secondaryTapTarget, minHeight: secondaryTapTarget)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -1,6 +1,10 @@
 import DODDesignSystem
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// DUT-596 (was DUT-582 / CL-315) — Cook Mode's slim brand progress bar, shown
 /// at the bottom of the player (below the ingredients pull tab).
 ///
@@ -16,9 +20,26 @@ struct CookModeStepIndicator: View {
 
     let viewModel: CookModeViewModel
 
+    /// DUT — iPad enlarges the progress bar, star, width, and caption for the
+    /// larger canvas; ALL iPhones keep the shipped sizes byte-for-byte. Gated on
+    /// the DEVICE IDIOM (not the width class) so an iPhone Pro Max in landscape —
+    /// which reports a `.regular` width class — stays iPhone-sized.
+    private var isPad: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
+    }
+
     /// Diameter of the trailing star glyph, and the horizontal room reserved for
     /// it so the fill never runs under the star.
-    private let starSize: CGFloat = 18
+    private var starSize: CGFloat { isPad ? 24 : 18 }
+
+    /// Height of the progress track, and the max width the whole indicator claims.
+    private var barHeight: CGFloat { isPad ? 8 : 6 }
+    private var indicatorMaxWidth: CGFloat { isPad ? 420 : 280 }
+    private var counterFont: Font { isPad ? DODType.detail : DODType.caption }
 
     private var progress: CookModeProgress {
         CookModeProgress(
@@ -32,7 +53,7 @@ struct CookModeStepIndicator: View {
         VStack(spacing: DODSpacing.xs) {
             progressBar
             Text(progress.counterLabel)
-                .dodFont(DODType.caption)
+                .dodFont(counterFont)
                 .foregroundStyle(DODColor.labelSecondary)
                 .monospacedDigit()
         }
@@ -54,10 +75,10 @@ struct CookModeStepIndicator: View {
                         .fill(DODColor.surfaceDivider)
                     Capsule()
                         .fill(DODColor.burntOrange)
-                        .frame(width: max(6, geo.size.width * fraction))
+                        .frame(width: max(barHeight, geo.size.width * fraction))
                 }
             }
-            .frame(height: 6)
+            .frame(height: barHeight)
 
             Image(systemName: progress.isFinished ? "star.fill" : "star")
                 .font(.system(size: starSize * 0.8, weight: .semibold))
@@ -65,7 +86,7 @@ struct CookModeStepIndicator: View {
                 .frame(width: starSize, height: starSize)
                 .accessibilityHidden(true)
         }
-        .frame(maxWidth: 280)
+        .frame(maxWidth: indicatorMaxWidth)
     }
 }
 
