@@ -35,7 +35,17 @@ public final class FeedViewModel {
     /// T-765 / CL-162 (DUT-71) — saved recipe ids for the card long-press
     /// Save/Unsave label. Hydrated on every appear; optimistically flipped on
     /// a long-press toggle so the menu is correct on re-open.
-    public private(set) var savedRecipeIDs: Set<Int> = []
+    /// DUT — `internal(set)` (was `private(set)`) so the save-toggle helpers
+    /// extracted to `FeedViewModel+SaveToggle.swift` (file-length relief) can
+    /// flip membership, mirroring `shoppingListSnackbarMessage`'s widening for
+    /// the `+ShoppingList` split.
+    public internal(set) var savedRecipeIDs: Set<Int> = []
+    /// DUT — bumped only on a genuine long-press Save/Unsave so the view can
+    /// fire a `.sensoryFeedback(.selection, trigger:)` haptic. Keyed to this
+    /// (not `savedRecipeIDs`) so appear/refresh reconciliation of the id set
+    /// doesn't mis-fire the haptic (mirrors `CategoryRecipesViewModel`).
+    /// `internal(set)` for the same `+SaveToggle` extension-file reason.
+    public internal(set) var saveToggleCount: Int = 0
 
     /// DUT-534 Part 2 — Shopping List snackbar copy + optional trailing action
     /// title ("View"), driven by `FeedViewModel+ShoppingList`, rendered by
@@ -107,29 +117,6 @@ public final class FeedViewModel {
         // Refresh on every appear (not gated on `items.isEmpty`) so a save
         // made on another surface reflects in the card long-press menu.
         await refreshSavedRecipeIDs()
-    }
-
-    /// T-765 / CL-162 (DUT-71) — reload the saved-id set from the store. Cheap
-    /// (a single id projection); called on every appear so a save made on
-    /// another surface (recipe detail, the Saved tab, CloudKit sync) reflects
-    /// in the card long-press menu's Save/Unsave label.
-    public func refreshSavedRecipeIDs() async {
-        if let ids = try? await dependencies.savedRecipeIDs() {
-            savedRecipeIDs = ids
-        }
-    }
-
-    /// Optimistically flip a recipe's saved membership the instant the user
-    /// taps the long-press Save/Unsave item, so the menu label is correct on
-    /// re-open without waiting for the async store toggle to round-trip
-    /// (mirrors ``SavedViewModel``'s optimistic removal). The next
-    /// ``refreshSavedRecipeIDs()`` reconciles with the store.
-    public func applyOptimisticSaveToggle(id: Int) {
-        if savedRecipeIDs.contains(id) {
-            savedRecipeIDs.remove(id)
-        } else {
-            savedRecipeIDs.insert(id)
-        }
     }
 
     /// DUT-323 — the celebration the view is presenting; nil otherwise. Set only

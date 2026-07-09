@@ -39,6 +39,11 @@ struct IdleSuggestionsView: View {
     /// firing `onClearRecents` on the first tap.
     @State private var isConfirmingClearRecents = false
 
+    /// DUT — cap the idle suggestions to a centered reading column on iPad so the
+    /// list doesn't stretch across the split-view pane (matches Recipe Detail /
+    /// hub convention). Compact (iPhone) is byte-identical.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     var body: some View {
         if recents.isEmpty && topCategories.isEmpty && categories.isEmpty {
             EmptyState(
@@ -96,6 +101,10 @@ struct IdleSuggestionsView: View {
                     }
                 }
                 .padding(DODSpacing.md)
+                // DUT — bound the idle content to a comfortable reading column on
+                // iPad (regular width) instead of stretching edge-to-edge across
+                // the split-view pane; compact returns self → iPhone unchanged.
+                .readableContentColumn(horizontalSizeClass)
             }
         }
     }
@@ -218,6 +227,10 @@ struct IdleSuggestionsView: View {
         .accessibilityLabel("\(category.name), \(category.count) \(category.count == 1 ? "recipe" : "recipes")")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("dod.search.categoryRow")
+        // DUT — trackpad/pointer lift on iPad (mirrors `recipeCardTap`). A no-op
+        // without a pointer so iPhone is unaffected; `.hoverEffect` is
+        // unavailable on the macOS L1 `swift test` slice, so it's guarded.
+        .pointerHoverHighlight()
     }
 
     private func section<Content: View>(
@@ -254,5 +267,23 @@ struct IdleSuggestionsView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(text), suggestion")
+        // DUT — pointer lift on iPad (see `categoryRow`); no-op on iPhone.
+        .pointerHoverHighlight()
+    }
+}
+
+extension View {
+    /// DUT — apply the iPad trackpad/pointer highlight lift, guarded off the
+    /// macOS L1 `swift test` slice (where `.hoverEffect` is unavailable) and a
+    /// no-op without a pointer, so iPhone / snapshots are unaffected. Mirrors the
+    /// DesignSystem `recipeCardTap` treatment for surfaces (idle suggestion pills
+    /// + category rows) that don't route through that modifier.
+    @ViewBuilder
+    func pointerHoverHighlight() -> some View {
+        #if os(iOS)
+        hoverEffect(.highlight)
+        #else
+        self
+        #endif
     }
 }
