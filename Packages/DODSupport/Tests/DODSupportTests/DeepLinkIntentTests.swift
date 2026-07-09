@@ -59,6 +59,16 @@ import Testing
         #expect(DeepLinkIntent.parse(url) == nil)
     }
 
+    /// DUT — cook-mode ids must be positive, mirroring the recipe/article
+    /// branches. `?id=0` / `?id=-5` fetch post 0 downstream and dead-end in a
+    /// "Couldn't open that recipe" toast, so they must parse to nil.
+    @Test func cookModeURLWithNonPositiveIDReturnsNil() throws {
+        let zero = try #require(URL(string: "dod://recipe/cook?id=0"))
+        #expect(DeepLinkIntent.parse(zero) == nil)
+        let negative = try #require(URL(string: "dod://recipe/cook?id=-5"))
+        #expect(DeepLinkIntent.parse(negative) == nil)
+    }
+
     @Test func unknownSchemeReturnsNil() throws {
         let url = try #require(URL(string: "https://example.com/recipe?id=1"))
         #expect(DeepLinkIntent.parse(url) == nil)

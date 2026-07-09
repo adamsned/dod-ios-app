@@ -45,7 +45,11 @@ public enum DeepLinkIntent: Equatable, Sendable {
         case (nil, "/saved"):
             return .openSaved
         case ("recipe", "/cook"):
-            guard let id else { return nil }
+            // DUT — reject non-positive ids, mirroring the `("recipe", _)`
+            // branch. `?id=0` / `?id=-5` would otherwise route to a cook mode
+            // that fetches post 0 and dead-ends in a "Couldn't open that
+            // recipe" toast.
+            guard let id, id > 0 else { return nil }
             return .startCookMode(recipeID: id)
         case ("recipe", _):
             // DUT-603 — mirror the `article` branch: the id may ride the
