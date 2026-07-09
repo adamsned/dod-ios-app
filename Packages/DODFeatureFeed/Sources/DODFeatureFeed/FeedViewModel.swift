@@ -160,10 +160,14 @@ public final class FeedViewModel {
         let isGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedAfter) == nil
         if isGraduate && !wasGraduate {
             pendingCelebration = .graduatedFirstCookout
-        } else if let reached = CookProgression.rankUp(
-            from: Self.rankLadderCookCount(logsBefore),
-            to: Self.rankLadderCookCount(logsAfter)
-        ) {
+        } else if !OwnerGate.isCurrentUserOwner(),
+            let reached = CookProgression.rankUp(
+                from: Self.rankLadderCookCount(logsBefore),
+                to: Self.rankLadderCookCount(logsAfter)
+            ) {
+            // Daddy Mode (owner rank) — the owner's rank is fixed at "The Dutch Oven
+            // Daddy", so he never "ranks up". Suppress the rank-up celebration for
+            // him (a "You're a Cast Iron Legend" beat would contradict his rank).
             pendingCelebration = .rankUp(reached)
         }
         promoteCelebrationIfReady()

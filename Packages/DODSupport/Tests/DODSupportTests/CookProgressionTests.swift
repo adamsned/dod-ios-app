@@ -52,4 +52,31 @@ import Testing
         #expect(CookProgression.rankUp(from: 49, to: 50)?.title == "Cast Iron Legend")
         #expect(CookProgression.rankUp(from: 50, to: 51) == nil)  // already at the top
     }
+
+    // MARK: - Owner rank (Daddy Mode)
+
+    @Test func ownerAlwaysDisplaysTheDutchOvenDaddyRank() {
+        // Auto-applied from the very start (0 cooks) and unchanged at any count —
+        // the owner's rank is fixed, not earned.
+        let atStart = CookProgression.displayRank(totalCooks: 0, isOwner: true)
+        #expect(atStart?.title == "The Dutch Oven Daddy")
+        #expect(atStart?.emoji == "👑")
+        let deepIn = CookProgression.displayRank(totalCooks: 100, isOwner: true)
+        #expect(deepIn?.title == "The Dutch Oven Daddy")
+        #expect(deepIn == CookProgression.dutchOvenDaddy)
+    }
+
+    @Test func nonOwnerDisplaysTheNormalLadderRank() {
+        // Non-owner falls through to the earned ladder result at every count.
+        #expect(CookProgression.displayRank(totalCooks: 0, isOwner: false) == nil)
+        #expect(CookProgression.displayRank(totalCooks: 1, isOwner: false)?.title == "Fire Starter")
+        #expect(CookProgression.displayRank(totalCooks: 100, isOwner: false)?.title == "Cast Iron Legend")
+    }
+
+    @Test func ownerRankIsNotARungOnTheEarnableLadder() {
+        // The owner rank is an override, never inserted into `ranks`, so no cook
+        // count can ever produce it via `currentRank` / `rankUp`.
+        #expect(!CookProgression.ranks.contains(CookProgression.dutchOvenDaddy))
+        #expect(CookProgression.currentRank(totalCooks: 999) != CookProgression.dutchOvenDaddy)
+    }
 }

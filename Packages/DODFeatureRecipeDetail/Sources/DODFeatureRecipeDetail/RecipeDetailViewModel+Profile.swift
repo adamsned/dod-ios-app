@@ -60,12 +60,14 @@ extension RecipeDetailViewModel {
             commentAuthorName = profile.displayName
             commentAuthorEmail = profile.email
         }
-        // Daddy Mode (Phase 1, cosmetic) — resolve the current user's Cook Rank +
-        // owner status so their OWN comment rows can show them. Display-only; the
-        // populate site (`RecipeDetailRatingsSection+PhaseD`) gates on own-comment.
+        // Daddy Mode (owner rank) — resolve the current user's Cook Rank + owner
+        // status so their OWN comment rows can show them. The owner's rank IS "The
+        // Dutch Oven Daddy" (folds the old separate owner badge into the rank);
+        // everyone else shows their earned ladder rank. Display-only; the populate
+        // site (`RecipeDetailRatingsSection+PhaseD`) gates on own-comment.
         let rankCooks = await dependencies.loadRankLadderCookCount()
-        ownCommentRank = CookProgression.currentRank(totalCooks: rankCooks)
-            .map { ($0.title, $0.emoji) }
         isCurrentUserOwner = OwnerGate.isOwner(dependencies.currentUserIdentifier)
+        ownCommentRank = CookProgression.displayRank(totalCooks: rankCooks, isOwner: isCurrentUserOwner)
+            .map { ($0.title, $0.emoji) }
     }
 }

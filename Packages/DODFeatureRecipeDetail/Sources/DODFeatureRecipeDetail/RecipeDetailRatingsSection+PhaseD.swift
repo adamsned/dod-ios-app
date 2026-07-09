@@ -44,12 +44,15 @@ extension RecipeDetailRatingsSection {
             // awaiting a moderator.
             isPendingModeration: comment.status == .hold,
             avatarOverride: ownCommentAvatarOverride(for: comment),
-            // Daddy Mode (Phase 1, cosmetic) — attach the current user's Cook Rank
-            // (+ owner badge) to their OWN comment rows only. Other users' rows
-            // pass nil/false. Phase 5: server-attached ranks/badges for every
-            // author's comment arrive with the backend that can vouch for them.
+            // Daddy Mode (owner rank) — attach the current user's Cook Rank to their
+            // OWN comment rows only. For the owner that rank IS "The Dutch Oven
+            // Daddy": `isOwnerRank` makes CommentRow render it as the standout crown
+            // badge (a single element — not a rank plus a separate badge). Other
+            // users' rows pass nil/false.
+            // Phase 5: server-attested ranks/owner status for every author's comment
+            // arrive with the backend that can vouch for them.
             rank: viewModel.isOwnComment(comment) ? viewModel.ownCommentRank : nil,
-            showsOwnerBadge: viewModel.isOwnComment(comment) && viewModel.isCurrentUserOwner
+            isOwnerRank: viewModel.isOwnComment(comment) && viewModel.isCurrentUserOwner
         )
         // DUT-501 (Guideline 1.2) — report/block another user's comment. Report
         // hides it locally at once and opens a prefilled moderation email;
