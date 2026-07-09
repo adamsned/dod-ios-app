@@ -12,14 +12,14 @@ import Testing
         #expect(CookProgression.currentRank(totalCooks: 1)?.title == "Fire Starter")
         #expect(CookProgression.currentRank(totalCooks: 4)?.title == "Coal Tender")  // 3..4
         #expect(CookProgression.currentRank(totalCooks: 5)?.title == "Lid Lifter")
-        #expect(CookProgression.currentRank(totalCooks: 50)?.title == "Dutch Oven Daddy")
-        #expect(CookProgression.currentRank(totalCooks: 999)?.title == "Dutch Oven Daddy")  // caps
+        #expect(CookProgression.currentRank(totalCooks: 50)?.title == "Cast Iron Legend")
+        #expect(CookProgression.currentRank(totalCooks: 999)?.title == "Cast Iron Legend")  // caps
     }
 
     @Test func nextRankPullsForwardThenEndsAtTheTop() {
         #expect(CookProgression.nextRank(totalCooks: 0)?.title == "Fire Starter")
         #expect(CookProgression.nextRank(totalCooks: 1)?.title == "Coal Tender")
-        #expect(CookProgression.nextRank(totalCooks: 49)?.title == "Dutch Oven Daddy")
+        #expect(CookProgression.nextRank(totalCooks: 49)?.title == "Cast Iron Legend")
         #expect(CookProgression.nextRank(totalCooks: 50) == nil)  // top rung reached
     }
 
@@ -40,7 +40,7 @@ import Testing
     }
 
     @Test func theTopRungIsTheBrand() {
-        #expect(CookProgression.ranks.last?.title == "Dutch Oven Daddy")
+        #expect(CookProgression.ranks.last?.title == "Cast Iron Legend")
         #expect(CookProgression.ranks.map(\.threshold) == CookProgression.ranks.map(\.threshold).sorted())
     }
 
@@ -49,7 +49,7 @@ import Testing
         #expect(CookProgression.rankUp(from: 2, to: 3)?.title == "Coal Tender")  // crosses 3
         #expect(CookProgression.rankUp(from: 1, to: 2) == nil)  // still Fire Starter
         #expect(CookProgression.rankUp(from: 5, to: 5) == nil)  // no new cook
-        #expect(CookProgression.rankUp(from: 49, to: 50)?.title == "Dutch Oven Daddy")
+        #expect(CookProgression.rankUp(from: 49, to: 50)?.title == "Cast Iron Legend")
         #expect(CookProgression.rankUp(from: 50, to: 51) == nil)  // already at the top
     }
 }

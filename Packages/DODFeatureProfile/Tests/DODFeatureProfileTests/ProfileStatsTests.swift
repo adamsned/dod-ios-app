@@ -30,8 +30,8 @@ struct ProfileStatsTests {
     }
 
     @Test func topRankIsCelebrated() {
-        // 50+ cooks → Dutch Oven Daddy, the top rank; no next rung.
+        // 50+ cooks → Cast Iron Legend, the top rank; no next rung.
         let caption = ProfileEditView.rankProgressCaption(totalCooks: 50)
-        #expect(caption == "Top rank reached. You're a true Dutch Oven Daddy.")
+        #expect(caption == "Top rank reached. You're a true Cast Iron Legend.")
     }
 }
