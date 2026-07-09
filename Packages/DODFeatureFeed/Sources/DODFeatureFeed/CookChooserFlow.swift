@@ -24,6 +24,12 @@ public struct CookChooserFlow: View {
     /// DUT-381 — recipe ids the cook has actually logged, so a rung they cooked
     /// out of order still renders as done (the roadmap is freely tappable).
     var cookedRecipeIDs: Set<Int> = []
+    /// DUT — when `true`, the chooser scrolls straight to the "Anytime Treats"
+    /// (dump cakes) section on appear, instead of landing at the roadmap top.
+    /// Set only by the Feed hero's "Or Cook a Dump Cake" CTA, which asks for the
+    /// dump cakes directly; the primary "Start" CTA + every other entry point
+    /// leave it `false` and keep today's top-of-roadmap landing.
+    var scrollToDumpCakes: Bool = false
     let onLogCook: (CookLogEntry) -> Void
 
     /// T-912 / DUT-551 (CL-306) — `public` initializer so the app-level Cooking
@@ -32,12 +38,18 @@ public struct CookChooserFlow: View {
     public init(
         recommended: GuidedCookout?,
         cookedRecipeIDs: Set<Int> = [],
+        scrollToDumpCakes: Bool = false,
         onLogCook: @escaping (CookLogEntry) -> Void
     ) {
         self.recommended = recommended
         self.cookedRecipeIDs = cookedRecipeIDs
+        self.scrollToDumpCakes = scrollToDumpCakes
         self.onLogCook = onLogCook
     }
+
+    /// DUT — the scroll anchor stamped on the "Anytime Treats" section so the
+    /// dump-cake CTA can jump the chooser to it via `ScrollViewReader`.
+    private static let anytimeTreatsAnchorID = "cook-chooser-anytime-treats"
 
     @State private var selected: GuidedCookout?
     /// DUT-484: the guided path OWNS the bake-timer engine so a running
@@ -54,6 +66,9 @@ public struct CookChooserFlow: View {
     /// re-enter sails past → an inflated cook count + a false rank-up.
     @State private var loggedRecipeIDs: Set<Int> = []
     @Environment(\.dismiss) private var dismiss
+    /// DUT — honor Reduce Motion when auto-scrolling to the Anytime Treats
+    /// section: animate the jump for everyone else, snap instantly if set.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public var body: some View {
         Group {
@@ -96,24 +111,37 @@ public struct CookChooserFlow: View {
 
     private var picker: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                    header
-                    pathSection
-                    dumpCakeSection
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                        header
+                        pathSection
+                        dumpCakeSection
+                    }
+                    .padding(.horizontal, DODSpacing.md)
+                    .padding(.top, DODSpacing.sm)
+                    .padding(.bottom, DODSpacing.xl)
                 }
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.top, DODSpacing.sm)
-                .padding(.bottom, DODSpacing.xl)
-            }
-            .scrollContentBackground(.hidden)
-            .background(DODColor.surface)
-            .navigationTitle("")
-            .dodInlineNavTitle()
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .tint(DODColor.burntOrange)
+                .scrollContentBackground(.hidden)
+                .background(DODColor.surface)
+                .navigationTitle("")
+                .dodInlineNavTitle()
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                            .tint(DODColor.burntOrange)
+                    }
+                }
+                // DUT — the Feed hero's "Or Cook a Dump Cake" CTA opens this
+                // chooser asking to land on the dump cakes, not the roadmap top.
+                // Jump to the Anytime Treats anchor once the picker appears; the
+                // primary "Start" CTA leaves `scrollToDumpCakes` false and keeps
+                // the top-of-roadmap landing untouched.
+                .onAppear {
+                    guard scrollToDumpCakes else { return }
+                    withAnimation(reduceMotion ? nil : .default) {
+                        proxy.scrollTo(Self.anytimeTreatsAnchorID, anchor: .top)
+                    }
                 }
             }
         }
@@ -200,6 +228,8 @@ public struct CookChooserFlow: View {
                 Text("Anytime Treats")
                     .dodFont(DODType.displayMedium)
                     .foregroundStyle(DODColor.labelStrong)
+                    // DUT — scroll anchor for the dump-cake CTA's jump-on-appear.
+                    .id(Self.anytimeTreatsAnchorID)
                 Text("Sweet, foolproof dump cakes. Off the path, ready whenever you want an easy win.")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)

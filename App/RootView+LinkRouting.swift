@@ -63,7 +63,8 @@ extension RootView {
         case .shoppingList: routeToShoppingList()
         case .heatCoach: routeToHeatCoach()  // DUT-584 — standalone coach, no seed.
         case .cookingJournal: self.route(toHubTool: .cookingJournal)
-        case .firstCookout: self.route(toHubTool: .firstCookout)
+        // DUT — the control opens the guided path at the roadmap top (not dump cakes).
+        case .firstCookout: self.route(toHubTool: .firstCookout(scrollToDumpCakes: false))
         case .cookMode: self.route(toHubTool: .cookMode)
         case .buyBuzzyWaxx:
             if let url = URL(string: SettingsViewModel.buyBuzzyWaxxURLString) { systemOpenURL(url) }
