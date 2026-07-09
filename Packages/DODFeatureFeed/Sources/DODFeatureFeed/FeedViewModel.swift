@@ -164,7 +164,8 @@ public final class FeedViewModel {
             let reached = CookProgression.rankUp(
                 from: Self.rankLadderCookCount(logsBefore),
                 to: Self.rankLadderCookCount(logsAfter)
-            ) {
+            )
+        {
             // Daddy Mode (owner rank) — the owner's rank is fixed at "The Dutch Oven
             // Daddy", so he never "ranks up". Suppress the rank-up celebration for
             // him (a "You're a Cast Iron Legend" beat would contradict his rank).
