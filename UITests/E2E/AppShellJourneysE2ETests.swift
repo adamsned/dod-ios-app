@@ -152,7 +152,7 @@ final class AppShellJourneysE2ETests: XCTestCase {
         // Visit every other tab, asserting each lands on its own surface.
         tabBar.buttons["Saved"].tap()
         XCTAssertTrue(
-            app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 8),
+            app.staticTexts["saved.emptyState"].firstMatch.waitForExistence(timeout: 8),
             "the Saved tab should show its empty state on a fresh launch"
         )
         tabBar.buttons["Tools"].tap()

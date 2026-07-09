@@ -5,10 +5,13 @@ import XCTest
 /// CI triggers and the "skipped is success" policy live in `.github/
 /// workflows/ci.yml`'s `test-e2e` job + the audit doc.
 ///
-/// Phase 1 of the L5 rollout (T-602/T-603): journeys drive against the
-/// production code paths the same way today's L3 smoke does — no host-side
-/// `FakeAppDependencies` swap yet. T-610 follow-up wires the fake-deps
-/// switch and makes the journeys hermetic. See
+/// T-610 landed the always-on hermetic stub: every `launchForE2E()` boots the
+/// host with `FakeAppDependencies` + `E2EStubHTTPClient` serving the canned
+/// `E2EFixtures`, so these journeys run deterministically against the real
+/// code paths (no live-blog dependency). A few journeys here still carry
+/// generous timeouts and "probe any recipe" heuristics from the Phase-1
+/// (T-602/T-603) live-blog era; the newer `DeterministicJourneysE2ETests`
+/// asserts on the exact fixture content. See
 /// `specs/dod-ios-app/test-pyramid-audit.md` for the gap analysis.
 final class CoreUserJourneysE2ETests: XCTestCase {
 
@@ -371,8 +374,11 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let anyRemainingCard = app.buttons
             .matching(identifier: "dod.saved.card").firstMatch
         if !anyRemainingCard.waitForExistence(timeout: 1) {
+            // CL-305 Title Case renamed the title ("No saved recipes yet" → "No
+            // Saved Recipes Yet"); query the stable `saved.emptyState` identifier
+            // (propagates to the empty-state static texts) instead of the copy.
             XCTAssertTrue(
-                app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 3),
+                app.staticTexts["saved.emptyState"].firstMatch.waitForExistence(timeout: 3),
                 "Unsaving the last recipe must surface AC-5.8 empty state (CL-104)"
             )
         }
@@ -439,16 +445,24 @@ final class CoreUserJourneysE2ETests: XCTestCase {
 
     /// T-638 / CL-107 / REG-21 — the load-bearing Search-tab test that
     /// catches the T-632-pattern bug class (a cache-only lookup hiding a
-    /// real feature). Pins CL-106 part 2: the cook-time filter hydrates
-    /// `totalSeconds` from the network on cache miss via
-    /// `SearchViewModel.hydrateMissingTotalSeconds()`. If the hydration
-    /// path regresses, the filter rejects every uncached row and the count
-    /// stays at zero (or whatever the cache-only baseline is, typically 0).
+    /// real feature). Pins CL-106 part 2: the cook-time filter consults
+    /// `totalSeconds` per recipe; a recipe with no known cook time is a MISS
+    /// (`SearchFilters.apply` returns `false` when `totalSecondsByRecipe[id]`
+    /// is nil), so applying a max-time filter can only ever shrink the set —
+    /// never grow it.
     ///
-    /// Polling-wait pattern (per CL-107's canonicalization): use
-    /// `expectation(for: NSPredicate, evaluatedWith:, handler: nil)` against
-    /// a runtime-evaluable predicate so the test correctly waits for an
-    /// async UI state change without a deterministic completion signal.
+    /// T-610 hermetic port: the fixture recipes (`E2EFixtures`) carry no
+    /// JSON-LD cook-time, so applying "30 min or less" removes the matched
+    /// row deterministically (`initial >= 1` → `filtered == 0`). The stale
+    /// pre-port version searched "chicken" (absent from the 3-recipe fixture)
+    /// and counted results with a loose chrome-exclusion predicate that swept
+    /// up idle-suggestion buttons — a nondeterministic 7/8 count. We now
+    /// search a fixture term and count the `dod.search.card` result rows only.
+    ///
+    /// Polling-wait pattern (per CL-107's canonicalization): use an
+    /// `XCTNSPredicateExpectation` against a runtime-evaluable predicate so
+    /// the test correctly waits for the async filter-apply UI change without a
+    /// deterministic completion signal.
     func test_search_cook_time_filter_narrows_results() {
         app.launchForE2E()
         let tabBar = app.tabBars.firstMatch
@@ -459,37 +473,29 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
         searchField.tap()
-        // "chicken" reliably returns multiple results on the live blog and
-        // spans cook-time buckets — picked over "cake" (Journey 2) because
-        // "chicken" recipes vary more in time. If this query goes flaky on
-        // the live API, the documented escalation in CL-107 is to pin to a
-        // stable query, NOT to XCTSkip.
-        searchField.typeText("chicken")
+        // "corn" matches exactly one fixture recipe by title ("Garlic Butter
+        // Skillet Corn"). The other two fixture titles ("Dutch Oven Lasagna",
+        // "Peach Dump Cake") don't contain "corn", so the result set is a
+        // deterministic single card.
+        searchField.typeText("corn")
 
-        // Wait for results. Re-use the standard exclusion predicate.
-        let filterChrome: Set<String> = [
-            "All categories", "Any time", "Recently viewed",
-            "Search filters", "Clear",
-        ]
-        let exclude = E2ETestSupport.tabLabels.union(filterChrome)
-        let resultPredicate = NSPredicate(
-            format: "NOT (label IN %@) AND NOT (label BEGINSWITH 'Try')",
-            Array(exclude)
-        )
-        let resultButtons = app.buttons.matching(resultPredicate)
+        // Count only the real search-result rows via the stable
+        // `dod.search.card` identifier — never the idle-suggestion chrome the
+        // old loose predicate counted.
+        let resultCards = app.buttons.matching(identifier: "dod.search.card")
         XCTAssertTrue(
-            resultButtons.firstMatch.waitForExistence(timeout: 30),
-            "Search should surface at least one result for 'chicken'"
+            resultCards.firstMatch.waitForExistence(timeout: 15),
+            "Search should surface the corn fixture card"
         )
 
-        // Capture initial count. The 1s sleep is to let any in-flight
-        // pagination settle; `count` is a snapshot at the moment of access.
-        Thread.sleep(forTimeInterval: 1.0)
-        let initialCount = resultButtons.count
+        // Capture initial count. The short settle lets the result render fully;
+        // `count` is a snapshot at the moment of access.
+        Thread.sleep(forTimeInterval: 0.5)
+        let initialCount = resultCards.count
         XCTAssertGreaterThan(
             initialCount,
             0,
-            "Initial result count for 'chicken' should be > 0"
+            "Initial result count for 'corn' should be > 0"
         )
 
         // CL-122 / REG-31 (T-644): the chip now opens an Apple-Timer-style
@@ -539,28 +545,25 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         )
         applyButton.tap()
 
-        // Polling-wait for hydration. The result count should change (in
-        // either direction — almost always narrows, but a chicken query
-        // that happens to return only short-time recipes could leave it
-        // equal). The narrowing assertion is `filtered <= initial`.
+        // Polling-wait for the filter to apply. The result count should drop
+        // (the single corn card has no cook time, so it's filtered out). The
+        // narrowing assertion is `filtered <= initial`.
         let countChangedPredicate = NSPredicate { _, _ in
-            resultButtons.count != initialCount
+            resultCards.count != initialCount
         }
         let changeExpectation = XCTNSPredicateExpectation(
             predicate: countChangedPredicate,
             object: nil
         )
-        // 15s timeout: hydration fan-out is capped at 20 items per CL-106
-        // part 2; each item is one REST page round-trip. Live blog ~500ms
-        // per fetch → ~10s worst case, 15s gives margin.
-        let result = XCTWaiter().wait(for: [changeExpectation], timeout: 15)
+        // 8s timeout: the hermetic stub applies the filter locally after the
+        // (fixture-empty) hydration fan-out settles.
+        let result = XCTWaiter().wait(for: [changeExpectation], timeout: 8)
 
-        // The filtered count must be ≤ initial. If the count never changed
+        // The filtered count must be <= initial. If the count never changed
         // (`result == .timedOut`), the narrowing assertion still holds when
-        // filtered == initial — a chicken query returning only short-time
-        // recipes is a legitimate live-data state. The failure mode is
-        // `filtered > initial` (a narrowing filter never grows the set).
-        let filteredCount = resultButtons.count
+        // filtered == initial. The failure mode is `filtered > initial` (a
+        // narrowing filter must never grow the set).
+        let filteredCount = resultCards.count
         XCTAssertLessThanOrEqual(
             filteredCount,
             initialCount,
@@ -670,7 +673,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
 
     // MARK: - Journey 4: Cook Mode walks two steps and exits
 
-    /// Open recipe → tap "Cook Now" → see "Step 1 of M" → tap "Next" → see
+    /// Open recipe → tap "Cook Mode" → see "Step 1 of M" → tap "Next" → see
     /// "Step 2 of M" → tap "Done" → back at recipe detail (Ingredients
     /// header).
     ///
@@ -700,12 +703,15 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let ingredientsHeader = app.staticTexts["Ingredients"]
         XCTAssertTrue(
             ingredientsHeader.waitForExistence(timeout: 45),
-            "Recipe detail should land before tapping Cook Now"
+            "Recipe detail should land before tapping Cook Mode"
         )
 
-        let cookNow = app.buttons["Cook Now"]
-        XCTAssertTrue(cookNow.waitForExistence(timeout: 5), "Cook Now CTA should be visible")
-        cookNow.tap()
+        // DUT-572 — the CTA was renamed "Cook Now" → "Cook Mode"; query the
+        // stable `recipe.cookMode.cta` identifier instead of the visible label
+        // so future copy changes don't break this journey.
+        let cookMode = app.buttons["recipe.cookMode.cta"]
+        XCTAssertTrue(cookMode.waitForExistence(timeout: 5), "Cook Mode CTA should be visible")
+        cookMode.tap()
 
         // AC-7.2: "Step 1 of M" appears in the top bar.
         let stepOne = app.staticTexts.matching(
@@ -716,11 +722,12 @@ final class CoreUserJourneysE2ETests: XCTestCase {
             "Cook Mode should render 'Step 1 of M' on entry"
         )
 
-        // Try to advance to Step 2. If the recipe only has 1 step, the
-        // "Next" button is labeled "Done Cooking" instead, and tapping it
-        // exits — we then re-assert detail. Both code paths end at the
-        // same end-state.
-        let nextButton = app.buttons["Next"]
+        // Try to advance to Step 2. The advance control was renamed "Next" →
+        // "Next Step" and carries the stable `cook-mode-next` identifier; it is
+        // hidden on the final step, so a 1-step recipe skips this block and
+        // exits straight from step 1. Both code paths end at the same
+        // end-state.
+        let nextButton = app.buttons["cook-mode-next"]
         if nextButton.waitForExistence(timeout: 3) {
             nextButton.tap()
             let stepTwo = app.staticTexts.matching(
