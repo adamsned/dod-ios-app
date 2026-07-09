@@ -68,6 +68,12 @@ public struct AppIntroTour: View {
                 ctaButton
             }
             .padding(.bottom, DODSpacing.lg)
+            // DUT — cap the slide content to a centered reading column so the
+            // `.fullScreenCover` tour doesn't stretch body text to an unreadable
+            // measure (and fling the nav buttons to the far corners) on iPad. The
+            // 500pt cap exceeds the widest iPhone content region, so compact /
+            // iPhone stays byte-identical.
+            .frame(maxWidth: 500)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(DODColor.surface.ignoresSafeArea())
         }

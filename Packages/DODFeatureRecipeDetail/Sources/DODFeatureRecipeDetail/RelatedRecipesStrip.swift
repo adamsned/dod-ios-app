@@ -30,6 +30,13 @@ public struct RelatedRecipesStrip: View {
                         ForEach(items) { item in
                             relatedCard(item)
                                 .contentShape(Rectangle())
+                                // DUT — trackpad/pointer lift on iPad, matching
+                                // `recipeCardTap`'s `.hoverEffect` (RecipeCard.swift)
+                                // so a related card feels alive under the pointer.
+                                // A no-op without a pointer (iPhone / snapshots
+                                // unaffected); unavailable on the macOS L1 test
+                                // slice, so guarded.
+                                .relatedCardHoverHighlight()
                                 .onTapGesture { onSelect(item) }
                                 // T-610 — stable handle for the L5 related-recipes
                                 // journey (tap a sibling → its detail).
@@ -83,5 +90,21 @@ public struct RelatedRecipesStrip: View {
                 .lineLimit(2)
                 .frame(width: 160, alignment: .leading)
         }
+    }
+}
+
+extension View {
+    /// DUT — apply the iPad trackpad/pointer highlight lift to a related-recipe
+    /// card, guarded off the macOS L1 `swift test` slice (`.hoverEffect` is
+    /// unavailable there) and a no-op without a pointer, so iPhone / snapshots
+    /// stay unaffected. Mirrors `recipeCardTap`'s treatment for this strip, whose
+    /// cards tap via a bare `.onTapGesture` rather than that modifier.
+    @ViewBuilder
+    func relatedCardHoverHighlight() -> some View {
+        #if os(iOS)
+        hoverEffect(.highlight)
+        #else
+        self
+        #endif
     }
 }

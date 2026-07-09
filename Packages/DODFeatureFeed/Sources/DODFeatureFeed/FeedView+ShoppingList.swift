@@ -26,7 +26,7 @@ extension FeedView {
                             // write reported failure via the completion.
                             viewModel.applyOptimisticSaveToggle(id: item.id)
                             onSave?(item) { didSave in
-                                if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                                if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
                             }
                         },
                         // DUT-534 Part 2 — Feed opts into the shared helper's
@@ -71,7 +71,7 @@ extension FeedView {
                         // DUT-629 — optimistic flip, re-inverted on write failure.
                         viewModel.applyOptimisticSaveToggle(id: item.id)
                         onSave?(item) { didSave in
-                            if !didSave { viewModel.applyOptimisticSaveToggle(id: item.id) }
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
                         }
                     },
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }

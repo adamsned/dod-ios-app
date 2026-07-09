@@ -126,6 +126,11 @@ public struct FeedView: View {
         .refreshable { await refreshAndAnnounce() }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: viewModel.isOffline)
         .sensoryFeedback(.success, trigger: viewModel.refreshCount)
+        // DUT — a `.selection` tap only on a genuine card long-press Save/Unsave
+        // (keyed to `saveToggleCount`, not `savedRecipeIDs`, so the appear/refresh
+        // reconciliation of the id set doesn't mis-fire the haptic, and a failed
+        // write's silent rollback stays silent). Mirrors Categories (DUT-697).
+        .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
     /// T-912 / DUT-551 (CL-306) — the Settings gear in the Feed header trailing
