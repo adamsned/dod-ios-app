@@ -1,6 +1,10 @@
 import DODDesignSystem
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// Compact inline countdown timer offered by Cook Mode when a step's text
 /// contains a parseable duration (see `StepTimerParser`). One-shot, visual only.
 ///
@@ -27,6 +31,22 @@ struct CookTimer: View {
     /// Gates the completion color/glyph transition — no motion when the user
     /// asked for reduced motion (mirrors `CookModeView` / `CookModeView+Controls`).
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// DUT — iPad scales the Start/Pause + Reset circles up for the larger
+    /// canvas; ALL iPhones keep the shipped 44pt buttons byte-for-byte. Gated on
+    /// the DEVICE IDIOM (not the width class) so an iPhone Pro Max in landscape —
+    /// which reports a `.regular` width class — stays iPhone-sized.
+    private var isPad: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
+    }
+    private var buttonDiameter: CGFloat { isPad ? 56 : 44 }
+    private var startIconSize: CGFloat { isPad ? 24 : 18 }
+    private var resetIconSize: CGFloat { isPad ? 22 : 16 }
+    private var resetStroke: CGFloat { isPad ? 2 : 1.5 }
 
     init(stepIndex: Int, duration: Duration, viewModel: CookModeViewModel) {
         self.stepIndex = stepIndex
@@ -111,9 +131,9 @@ struct CookTimer: View {
                 }
             } label: {
                 Image(systemName: didComplete ? "checkmark" : (isRunning ? "pause.fill" : "play.fill"))
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: startIconSize, weight: .bold))
                     .foregroundStyle(DODColor.cream)
-                    .frame(width: 44, height: 44)
+                    .frame(width: buttonDiameter, height: buttonDiameter)
                     .background(Circle().fill(DODColor.burntOrange))
             }
             .buttonStyle(.plain)
@@ -124,10 +144,10 @@ struct CookTimer: View {
                 viewModel.resetTimer(forStep: stepIndex)
             } label: {
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: resetIconSize, weight: .semibold))
                     .foregroundStyle(DODColor.accent)
-                    .frame(width: 44, height: 44)
-                    .overlay(Circle().strokeBorder(DODColor.accent, lineWidth: 1.5))
+                    .frame(width: buttonDiameter, height: buttonDiameter)
+                    .overlay(Circle().strokeBorder(DODColor.accent, lineWidth: resetStroke))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Reset timer")
