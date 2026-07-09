@@ -28,7 +28,7 @@ extension CookingToolsHubView {
                     description: "New to Dutch oven cooking? Get coached through a whole cook, "
                         + "start to finish.",
                     accessibilityID: "hub-first-cookout"
-                ) { activeToolSheet = .firstCookout }
+                ) { activeToolSheet = .firstCookout(scrollToDumpCakes: false) }
 
                 toolCard(
                     icon: "cart.fill",

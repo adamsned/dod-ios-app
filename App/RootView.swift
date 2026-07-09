@@ -297,7 +297,8 @@ struct RootView: View {
                     onFindRecipe: { findRecipeToCook() },
                     // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                     openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
-                    startFirstCookout: { route(toHubTool: .firstCookout) },  // DUT-571 hero → guided path
+                    // DUT-571 hero → guided path; DUT — $0 = scrollToDumpCakes (dump-cake CTA).
+                    startFirstCookout: { route(toHubTool: .firstCookout(scrollToDumpCakes: $0)) },
                     hubPendingTool: tab == .cookingTools ? $hubPendingTool : .constant(nil),
                     hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
                     cookModeFindRecipeArmed: tab == .feed ? $cookModeFindRecipeArmed : .constant(false),
@@ -382,7 +383,7 @@ struct RootView: View {
                 onFindRecipe: { findRecipeToCook() },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                 openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
-                startFirstCookout: { route(toHubTool: .firstCookout) },  // DUT-571
+                startFirstCookout: { route(toHubTool: .firstCookout(scrollToDumpCakes: $0)) },
                 hubPendingTool: selectedTab == .cookingTools ? $hubPendingTool : .constant(nil),
                 hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
                 cookModeFindRecipeArmed: selectedTab == .feed ? $cookModeFindRecipeArmed : .constant(false),
