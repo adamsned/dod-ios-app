@@ -328,8 +328,8 @@ public struct SettingsView: View {
                     // copy the current user's diagnostic ID (SIWA `sub`). Neutral
                     // wording; the raw value is never shown. See `+Feedback.swift`.
                     #if canImport(UIKit)
-                    .accessibilityHint("Long press to copy your diagnostic ID")
-                    .onLongPressGesture { copyDiagnosticIdentifier() }
+                .accessibilityHint("Long press to copy your diagnostic ID")
+                .onLongPressGesture { copyDiagnosticIdentifier() }
                     #endif
             }
             .listRowBackground(DODColor.surfaceElevated)
