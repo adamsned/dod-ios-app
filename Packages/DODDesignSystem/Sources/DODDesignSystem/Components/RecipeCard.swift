@@ -177,7 +177,7 @@ public struct RecipeCard: View {
         }
         .dodFont(DODType.caption)
         .foregroundStyle(DODColor.cream)
-        .padding(.horizontal, DODSpacing.xxs)
+        .padding(.horizontal, DODSpacing.xs)
         .padding(.vertical, DODSpacing.xxs)
         .background(
             Capsule().fill(DODColor.castIronBrown.opacity(0.85))

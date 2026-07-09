@@ -109,6 +109,7 @@ public struct StarRatingInput: View {
                     Image(systemName: value >= star ? "star.fill" : "star")
                         .font(.system(size: starSize))
                         .foregroundStyle(DODColor.warmGold)
+                        .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
