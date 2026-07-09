@@ -76,7 +76,7 @@ extension ProfileEditView {
             return "Log your first cook to start climbing the ranks."
         }
         guard let next = CookProgression.nextRank(totalCooks: totalCooks) else {
-            return "Top rank reached. You're a true Dutch Oven Daddy."
+            return "Top rank reached. You're a true Cast Iron Legend."
         }
         // `nextRank` non-nil ⇒ `cooksToNextRank` non-nil (both nil only at top).
         let remaining = CookProgression.cooksToNextRank(totalCooks: totalCooks) ?? 0

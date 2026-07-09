@@ -36,7 +36,7 @@ public enum CookProgression {
         CookRank(title: "Cast Iron Convert", emoji: "🛡️", threshold: 10),
         CookRank(title: "Coal Whisperer", emoji: "💨", threshold: 20),
         CookRank(title: "Pit Boss", emoji: "🔱", threshold: 35),
-        CookRank(title: "Dutch Oven Daddy", emoji: "👑", threshold: 50),
+        CookRank(title: "Cast Iron Legend", emoji: "🏆", threshold: 50),
     ]
 
     /// The highest rank the cook currently holds — `nil` before the first cook.
