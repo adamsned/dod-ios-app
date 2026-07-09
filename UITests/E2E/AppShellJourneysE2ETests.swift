@@ -59,9 +59,9 @@ final class AppShellJourneysE2ETests: XCTestCase {
         )
     }
 
-    /// Save a recipe → Saved tab → "Make Shopping List" → the builder lists the
-    /// saved recipe → select it → "Build List" → the Shopping List screen
-    /// renders (US-39 shopping-list flow).
+    /// Save a recipe → Cooking Tools hub → "Shopping List" → "Build List" → the
+    /// builder lists the saved recipe → select it → "Build List" → the Shopping
+    /// List screen renders (US-39 shopping-list flow).
     ///
     /// The end-state is reaching the aisle-grouped Shopping List screen. We do
     /// NOT assert on specific ingredient rows: whether the saved recipe carries
@@ -84,22 +84,20 @@ final class AppShellJourneysE2ETests: XCTestCase {
         save.tap()
         XCTAssertTrue(app.buttons["Unsave recipe"].waitForExistence(timeout: 8), "Save should flip to Unsave")
 
-        // Saved tab → Make Shopping List. T-912 / DUT-551 (CL-306) — the cart now
-        // selects the Cooking Tools hub tab AND mints a token that PUSHES the
-        // Shopping List onto the hub's stack (the Grocery tab retired; the list
-        // folded into the hub). The cart is a small (~23pt) header icon; tap its
-        // center coordinate so the hit-point resolves even under simulator load
-        // (label taps occasionally miss on iOS 26).
-        tabBar.buttons["Saved"].tap()
-        let makeList = app.buttons["saved-make-shopping-list"]
+        // Cooking Tools hub → Shopping List. DUT-536 / #424 retired the Saved-tab
+        // "Make Shopping List" cart; the Shopping List now lives in the Cooking
+        // Tools hub (bottom-tab label "Tools"), reached by tapping its
+        // `hub-shopping-list` tool card, which PUSHES the Shopping List onto the
+        // hub's nav stack (T-912 / DUT-551 / CL-306).
+        tabBar.buttons["Tools"].tap()
+        let makeList = app.buttons["hub-shopping-list"]
         XCTAssertTrue(
             makeList.waitForExistence(timeout: 8),
-            "the Saved tab should expose 'Make Shopping List' once a recipe is saved"
+            "the Cooking Tools hub should expose the 'Shopping List' tool card"
         )
-        makeList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        // T-912 / DUT-551 — the reroute pushes the (empty) Shopping List onto the
-        // Cooking Tools hub stack, which offers its primary "Build List"
-        // empty-state button, which presents the picker.
+        makeList.tap()
+        // The pushed Shopping List opens empty (DUT-487 / T-906) and offers its
+        // primary "Build List" empty-state button, which presents the picker.
         let openBuilder = app.buttons["shopping-list-build"]
         XCTAssertTrue(
             openBuilder.waitForExistence(timeout: 8),
