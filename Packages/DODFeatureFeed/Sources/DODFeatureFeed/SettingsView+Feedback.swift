@@ -2,6 +2,10 @@ import DODDesignSystem
 import DODSupport
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 // DUT-694 (PR-D) — the Settings cache-clear feedback (snackbar overlay + the
 // Clear Cache action) lives here so `SettingsView.swift` stays under the
 // SwiftLint 400-line `file_length` cap once the DUT-694 in-flight guard + success
@@ -59,4 +63,26 @@ extension SettingsView {
         }
         await viewModel.clearImageCache(onClear: onClearImageCache)
     }
+
+    #if canImport(UIKit)
+    /// **Daddy Mode (Phase 1) — activation aid.** Discreet, release-safe
+    /// diagnostic on the version footer: a long-press copies the CURRENT
+    /// signed-in user's Sign in with Apple `sub` (``AppleAuthSession/userIdentifier``,
+    /// read through the same on-device store the rest of the app uses) to the
+    /// pasteboard so the owner can send it to us to configure
+    /// `OwnerGate.ownerUserIdentifier`. Not `#if DEBUG`-gated (Dad runs
+    /// TestFlight) and NOT owner-gated (we don't know his `sub` yet — that is
+    /// the whole point). The raw value is never shown on screen — only a neutral
+    /// "Diagnostic ID copied" confirmation. No session ⇒ copy nothing + prompt to
+    /// sign in.
+    func copyDiagnosticIdentifier() {
+        let sub = (try? KeychainAppleAuthSessionStore().load())?.userIdentifier
+        guard let sub, !sub.isBlankAppleIdentifier else {
+            viewModel.snackbarMessage = "Sign in first"
+            return
+        }
+        UIPasteboard.general.string = sub
+        viewModel.snackbarMessage = "Diagnostic ID copied"
+    }
+    #endif
 }

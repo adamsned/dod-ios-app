@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODSupport
 import SwiftUI
 
 // DUT-189 / DUT-238 — the profile editor's unified sign-in menu: provider
@@ -8,6 +9,17 @@ import SwiftUI
 // Settings ▸ Account section. Split from `ProfileEditView.swift` to keep that
 // file under SwiftLint's 400-line `file_length` cap.
 extension ProfileEditView {
+
+    /// **Daddy Mode (Phase 1, cosmetic).** Whether the current signed-in session
+    /// belongs to the app owner, resolved through the same `sessionStore` the
+    /// editor already loads the session from (the app's current-session
+    /// accessor). Gated OFF by the `OwnerGate` placeholder — returns `false` for
+    /// everyone until Dad's real `sub` is configured, so the owner-only surfaces
+    /// (the "Daddy status confirmed" caption + the profile ``OwnerBadge``) stay
+    /// hidden. Display-only; authorizes nothing.
+    var isCurrentUserOwner: Bool {
+        OwnerGate.isOwner((try? sessionStore.load())?.userIdentifier)
+    }
 
     /// DUT-238 — the unified sign-in menu: the provider buttons (Sign in with
     /// Apple; Sign in with Google when configured) sit in the SAME section as the
@@ -37,6 +49,15 @@ extension ProfileEditView {
                     value: email,
                     identifier: "profile-view-email"
                 )
+                // Daddy Mode (Phase 1, cosmetic) — owner-only confirmation caption
+                // below the email in view mode. Display-only: does nothing, gated
+                // OFF for everyone until `OwnerGate.ownerUserIdentifier` is set.
+                if isCurrentUserOwner {
+                    Text("Authentication successful. Daddy status confirmed.")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .accessibilityIdentifier("profile-view-daddy-status")
+                }
             }
         } footer: {
             if isEditing { signInSectionFooter }
