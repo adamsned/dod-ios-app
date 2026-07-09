@@ -47,7 +47,7 @@ permissions:
 jobs:
   testflight:
     name: Archive + upload to TestFlight
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 45
     env:
       # --- App identity (mirrors project.yml; kept here so the steps read

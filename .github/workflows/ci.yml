@@ -73,7 +73,7 @@ jobs:
     name: Lint
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -99,7 +99,7 @@ jobs:
     name: Format check
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -127,7 +127,7 @@ jobs:
     name: L1 Unit · all packages
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -196,7 +196,7 @@ jobs:
     name: L4 Snapshots · DODDesignSystem
     needs: [changes, lint, format]
     if: needs.changes.outputs.ios_sim == 'true'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     # 30 (was 15): the ensure-ios-simulator action now downloads the iOS
     # runtime on cold runners (Xcode 26 on macos-15 ships without it), which
     # needs headroom on top of the snapshot build+test.
@@ -249,7 +249,7 @@ jobs:
     name: Build app (iOS Simulator)
     needs: [changes, lint, format]
     if: needs.changes.outputs.ios_sim == 'true'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -319,7 +319,7 @@ jobs:
     name: L1 Unit · DODApp
     needs: [changes, build-app]
     if: needs.changes.outputs.ios_sim == 'true'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -362,7 +362,7 @@ jobs:
     name: L3 UI Smoke (${{ matrix.device }})
     needs: [changes, build-app]
     if: needs.changes.outputs.ios_sim == 'true'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 30
     # Per-leg best-effort: only matrix legs that set `continue_on_error` (the
     # flaky M5 iPad) are non-blocking; the iPhone legs stay strict and still
@@ -489,7 +489,7 @@ jobs:
       || github.event_name == 'push'
       || github.event_name == 'workflow_dispatch'
       || github.event_name == 'schedule'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4

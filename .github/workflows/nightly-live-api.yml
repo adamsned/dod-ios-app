@@ -9,7 +9,7 @@ on:
 jobs:
   test-live-api:
     name: L2 Live API · dutchovendaddy.com
-    runs-on: macos-14
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
