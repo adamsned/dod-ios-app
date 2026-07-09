@@ -67,6 +67,13 @@ public struct FeedView: View {
     /// DUT-571 — flips true once `loadFirstCookoutHeroState()` has run, so the
     /// hero never flashes before the real cook state is known.
     @State var heroCookStateLoaded = false
+    /// Daddy Mode (Phase 1, cosmetic) — whether the signed-in user is the app
+    /// owner, resolved once on appear (avoids a Keychain read per body
+    /// recompute). Gates the owner-only compose button; OFF for everyone until
+    /// Dad's real `sub` is configured in `OwnerGate`.
+    @State private var isOwnerComposer = false
+    /// Daddy Mode (Phase 1, cosmetic) — presents the honest compose placeholder.
+    @State private var showingComposeSheet = false
     /// DUT-571 — persisted dismissal (a once-per-install "x" tap). `.standard`
     /// mirrors the Feed's existing `RecipeListLayout` layout-toggle store.
     @AppStorage(FeedView.firstCookoutHeroDismissedKey) var firstCookoutHeroDismissed = false
@@ -100,7 +107,7 @@ public struct FeedView: View {
                 // (CL-306) — the trailing slot now hosts the Settings gear (the
                 // old Cooking Tools menu + its onboarding callout are retired; the
                 // tools moved to the first-class Cooking Tools hub tab).
-                DODScreenHeader("Recipes & Articles") { settingsGear }
+                DODScreenHeader("Recipes & Articles") { headerTrailing }
                 content
             }
             // Offline shifts the whole stack below the OfflineBanner overlay.
@@ -116,6 +123,12 @@ public struct FeedView: View {
         // height is reserved and the title sits at the same top Y as every other
         // tab. Pushed detail screens keep their own nav bar.
         .dodHidesNavBar()
+        // Daddy Mode (Phase 1, cosmetic) — resolve owner status once for the
+        // compose button gate. OFF for everyone until Dad's real `sub` is set.
+        .task { isOwnerComposer = OwnerGate.isCurrentUserOwner() }
+        // Daddy Mode (Phase 1, cosmetic) — the compose entry point's honest
+        // placeholder sheet (owner-only; the button that sets this is gated).
+        .sheet(isPresented: $showingComposeSheet) { ComposePlaceholderView() }
         .task { await viewModel.onAppear() }
         // DUT-571 — load the cook's real next rung for the top-of-feed hero card,
         // off the feed's own load so it never blocks the list. A separate `.task`
@@ -139,6 +152,40 @@ public struct FeedView: View {
     /// only when wired, so tests / previews that omit the closure show no gear.
     /// Uses the shared, bigger ``DODHeaderGearButton`` so the gear matches the
     /// Saved / Cooking Tools / Search headers exactly.
+    /// The Feed header's trailing slot. Groups the owner-only compose button
+    /// (Daddy Mode, Phase 1) with the long-standing Settings gear in one HStack
+    /// (`DODScreenHeader`'s trailing is a single `@ViewBuilder`). The compose
+    /// button self-gates on owner status, so non-owners see only the gear —
+    /// byte-identical to the pre-Daddy-Mode header.
+    @ViewBuilder
+    private var headerTrailing: some View {
+        HStack(spacing: DODSpacing.xs) {
+            composeButton
+            settingsGear
+        }
+    }
+
+    /// Daddy Mode (Phase 1, cosmetic) — the owner-only compose entry point.
+    /// Mirrors ``DODHeaderGearButton``'s styling (44pt hit target, burnt-orange
+    /// tint). Tapping presents the honest ``ComposePlaceholderView`` sheet;
+    /// authorizes nothing. Hidden entirely for non-owners.
+    @ViewBuilder
+    private var composeButton: some View {
+        if isOwnerComposer {
+            Button {
+                showingComposeSheet = true
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.title2)
+                    .accessibilityLabel("Compose Post")
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .tint(DODColor.burntOrange)
+            .accessibilityIdentifier("feed-compose-button")
+        }
+    }
+
     @ViewBuilder
     private var settingsGear: some View {
         // DUT-572 — gear only in compact width (iPhone). On iPad (regular width)

@@ -23,6 +23,16 @@ public struct CommentRow: View {
     /// out of the box). `nil` (the default) preserves the pre-Phase-d
     /// rendering for backward compatibility. AC-44.13.
     public let avatarOverride: AnyView?
+    /// **Daddy Mode (Phase 1, cosmetic).** The commenter's Cook Rank, rendered
+    /// as a small emoji + title line directly under the author name. `nil` (the
+    /// default) renders NOTHING extra, so every existing call site + snapshot is
+    /// byte-identical. Phase 1 populates this only for the current user's own
+    /// comments; server-attached ranks for other users are a later phase.
+    public let rank: (title: String, emoji: String)?
+    /// **Daddy Mode (Phase 1, cosmetic).** When `true`, renders the standout
+    /// ``OwnerBadge`` under the author name. `false` (the default) renders
+    /// nothing extra — existing calls + snapshots stay byte-identical.
+    public let showsOwnerBadge: Bool
 
     public init(
         authorName: String,
@@ -31,7 +41,9 @@ public struct CommentRow: View {
         bodyText: String,
         ratingValue: Int? = nil,
         isPendingModeration: Bool = false,
-        avatarOverride: AnyView? = nil
+        avatarOverride: AnyView? = nil,
+        rank: (title: String, emoji: String)? = nil,
+        showsOwnerBadge: Bool = false
     ) {
         self.authorName = authorName
         self.avatarURL = avatarURL
@@ -40,6 +52,8 @@ public struct CommentRow: View {
         self.ratingValue = ratingValue
         self.isPendingModeration = isPendingModeration
         self.avatarOverride = avatarOverride
+        self.rank = rank
+        self.showsOwnerBadge = showsOwnerBadge
     }
 
     public var body: some View {
@@ -48,6 +62,7 @@ public struct CommentRow: View {
 
             VStack(alignment: .leading, spacing: DODSpacing.xs) {
                 header
+                ownerAndRankLine
                 Text(bodyText)
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.label)
@@ -113,6 +128,27 @@ public struct CommentRow: View {
             .frame(width: 40, height: 40)
     }
 
+    /// **Daddy Mode (Phase 1, cosmetic).** The optional Cook Rank line + owner
+    /// badge shown under the author name. Renders nothing (and takes no vertical
+    /// space — SwiftUI collapses an empty `@ViewBuilder`) when neither `rank`
+    /// nor `showsOwnerBadge` is supplied, so the default row is byte-identical.
+    @ViewBuilder
+    private var ownerAndRankLine: some View {
+        if rank != nil || showsOwnerBadge {
+            HStack(spacing: DODSpacing.xs) {
+                if let rank {
+                    Text("\(rank.emoji) \(rank.title)")
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                }
+                if showsOwnerBadge {
+                    OwnerBadge()
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
     private var header: some View {
         HStack(spacing: DODSpacing.xs) {
             Text(authorName)
@@ -130,6 +166,13 @@ public struct CommentRow: View {
     /// Collapsed VoiceOver label: identity + date + rating (if any) + body.
     private var accessibilityLabel: String {
         var parts: [String] = ["\(authorName), \(relativeDate)"]
+        // Daddy Mode (Phase 1, cosmetic) — additive: absent by default.
+        if showsOwnerBadge {
+            parts.append("The Dutch Oven Daddy, app owner")
+        }
+        if let rank {
+            parts.append("\(rank.title) rank")
+        }
         if let ratingValue, ratingValue > 0 {
             parts.append("rated \(ratingValue) star\(ratingValue == 1 ? "" : "s")")
         }

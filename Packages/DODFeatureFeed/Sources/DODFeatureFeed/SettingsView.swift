@@ -324,6 +324,13 @@ public struct SettingsView: View {
                     .foregroundStyle(DODColor.labelSecondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .accessibilityIdentifier("settings-version-footer")
+                    // Daddy Mode (Phase 1) activation aid — discreet long-press to
+                    // copy the current user's diagnostic ID (SIWA `sub`). Neutral
+                    // wording; the raw value is never shown. See `+Feedback.swift`.
+                    #if canImport(UIKit)
+                    .accessibilityHint("Long press to copy your diagnostic ID")
+                    .onLongPressGesture { copyDiagnosticIdentifier() }
+                    #endif
             }
             .listRowBackground(DODColor.surfaceElevated)
         }

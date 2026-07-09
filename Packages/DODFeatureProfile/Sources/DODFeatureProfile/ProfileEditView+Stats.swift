@@ -64,6 +64,13 @@ extension ProfileEditView {
                     ProgressView(value: CookProgression.progressToNextRank(totalCooks: rankCooks))
                         .tint(DODColor.accent)
                 }
+                // Daddy Mode (Phase 1, cosmetic) — the standout owner badge under
+                // the name/rank area. Gated OFF for everyone until Dad's real
+                // `sub` is configured in `OwnerGate`; display-only.
+                if isCurrentUserOwner {
+                    OwnerBadge()
+                        .padding(.top, DODSpacing.xxs)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

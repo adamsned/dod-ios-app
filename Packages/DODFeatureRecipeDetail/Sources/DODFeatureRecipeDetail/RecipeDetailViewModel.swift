@@ -139,6 +139,14 @@ public final class RecipeDetailViewModel {
     /// read-only.
     public internal(set) var profile: UserProfile?
 
+    /// Daddy Mode (Phase 1, cosmetic) — the current user's Cook Rank, resolved in
+    /// ``refreshProfile()``, attached only to their OWN comment rows. Display-only.
+    public internal(set) var ownCommentRank: (title: String, emoji: String)?
+    /// Daddy Mode (Phase 1, cosmetic) — whether the current user is the app owner
+    /// (`OwnerGate`); gates the owner badge on their own comment rows. `false`
+    /// until Dad's real `sub` is set. Both set by the `+Profile` extension.
+    public internal(set) var isCurrentUserOwner: Bool = false
+
     /// US-44 / CL-138 — derived from ``profile``. `true` when the user
     /// has set up a profile and the Ratings & Reviews WRITE composer is
     /// interactive; `false` when the composer is blurred + overlaid
