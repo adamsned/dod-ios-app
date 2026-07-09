@@ -3,31 +3,39 @@ import Testing
 
 @testable import DODSupport
 
-// Daddy Mode (Phase 1, cosmetic) — `OwnerGate` gate coverage. Proves the two
-// load-bearing safety properties: (1) while `ownerUserIdentifier` is the shipped
-// placeholder, the gate matches NOBODY (owner UI stays hidden for every user),
-// and (2) once a real `sub` is configured, the gate flips true for exactly that
-// `sub` and false for everyone else (nil / empty / mismatch).
+// Daddy Mode (Phase 1, cosmetic) — `OwnerGate` gate coverage. As of 2026-07-09
+// the gate is CONFIGURED with the owner's real `sub`, so these prove the two
+// load-bearing properties in their live state: (1) the gate flips true for
+// exactly the configured owner `sub`, and (2) it stays false for everyone else
+// (nil / empty / whitespace / any other `sub`, including the old placeholder).
 @Suite("OwnerGate (Daddy Mode Phase 1)")
 struct OwnerGateTests {
 
-    // MARK: - Safe default: placeholder matches nobody
+    // MARK: - Configured owner: the gate is live and flips true for the owner
 
-    @Test func placeholderShipsUnset() {
-        // Guards against accidentally committing a real `sub` — the placeholder
-        // is the safe default and must stay in place until Dad's device is read.
-        #expect(OwnerGate.ownerUserIdentifier == OwnerGate.placeholderIdentifier)
+    @Test func ownerIsConfigured() {
+        // Daddy Mode is activated: the shipped identifier is no longer the
+        // unset placeholder, so the gate actually matches someone.
+        #expect(OwnerGate.ownerUserIdentifier != OwnerGate.placeholderIdentifier)
+        #expect(!OwnerGate.ownerUserIdentifier.isEmpty)
     }
 
-    @Test func placeholderMatchesNobody() {
-        // Even a `sub` byte-equal to the placeholder string must NOT be treated
-        // as the owner while the gate is unconfigured.
+    @Test func configuredOwnerSubIsOwner() {
+        // The exact configured `sub` is the owner...
+        #expect(OwnerGate.isOwner(OwnerGate.ownerUserIdentifier) == true)
+        // ...and surrounding whitespace is trimmed before the compare.
+        #expect(OwnerGate.isOwner("  \(OwnerGate.ownerUserIdentifier)\n") == true)
+    }
+
+    // MARK: - Everyone else → false
+
+    @Test func nonOwnerSubsAreNotOwner() {
+        // The old placeholder string, a real-looking-but-different `sub`, and an
+        // arbitrary string are all NOT the owner.
         #expect(OwnerGate.isOwner(OwnerGate.placeholderIdentifier) == false)
         #expect(OwnerGate.isOwner("001234.some-real-looking-sub.5678") == false)
         #expect(OwnerGate.isOwner("anyone") == false)
     }
-
-    // MARK: - nil / empty / whitespace → false
 
     @Test func nilSubIsNotOwner() {
         #expect(OwnerGate.isOwner(nil) == false)
@@ -39,42 +47,20 @@ struct OwnerGateTests {
         #expect(OwnerGate.isOwner("\n\t ") == false)
     }
 
-    // MARK: - Configured owner: the gate flips correctly
-
-    // The production `ownerUserIdentifier` is a `let`, so these exercise the
-    // pure match logic through a stubbed configured value to prove the gate
-    // would flip correctly once Dad's real `sub` is filled in.
-    private static let stubOwnerSub = "001234.0a1b2c3d4e5f6a7b8c9d.1234"
-
-    /// Mirror of `OwnerGate.isOwner`'s match logic against a stubbed configured
-    /// owner `sub` (stands in for a real, non-placeholder `ownerUserIdentifier`).
-    private func isOwnerAgainstStub(_ sub: String?) -> Bool {
-        guard let sub else { return false }
-        let candidate = sub.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !candidate.isEmpty else { return false }
-        return candidate == Self.stubOwnerSub
-    }
-
-    @Test func matchingSubIsOwner() {
-        #expect(isOwnerAgainstStub(Self.stubOwnerSub) == true)
-        // Surrounding whitespace is trimmed before the compare.
-        #expect(isOwnerAgainstStub("  \(Self.stubOwnerSub)\n") == true)
-    }
-
-    @Test func mismatchedSubIsNotOwner() {
-        #expect(isOwnerAgainstStub("001234.DIFFERENT.9999") == false)
-        #expect(isOwnerAgainstStub(nil) == false)
-        #expect(isOwnerAgainstStub("") == false)
-    }
-
     // MARK: - Session convenience
 
-    @Test func isCurrentUserOwnerReadsSessionSub() {
-        // With the placeholder unset, even a fully-populated session is not the
-        // owner — proves the convenience routes the session `sub` through the
-        // same safe-default gate.
+    @Test func isCurrentUserOwnerTrueForOwnerSession() {
+        // A session whose `sub` is the configured owner resolves to owner.
         let store = InMemoryAppleAuthSessionStore(
-            initial: AppleAuthSession(userIdentifier: Self.stubOwnerSub)
+            initial: AppleAuthSession(userIdentifier: OwnerGate.ownerUserIdentifier)
+        )
+        #expect(OwnerGate.isCurrentUserOwner(sessionStore: store) == true)
+    }
+
+    @Test func isCurrentUserOwnerFalseForOtherSession() {
+        // Any other signed-in user is not the owner.
+        let store = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "009999.not-the-owner.0001")
         )
         #expect(OwnerGate.isCurrentUserOwner(sessionStore: store) == false)
     }
