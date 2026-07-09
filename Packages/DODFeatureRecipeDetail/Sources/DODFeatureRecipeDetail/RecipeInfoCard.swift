@@ -238,6 +238,12 @@ struct RecipeInfoCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Servings")
         .accessibilityValue("\(value)")
+        // Stable test handle for the L5 E2E servings-scaler journey. The old
+        // `Text("Serves 4")` + inner `Stepper` buttons the test drove no longer
+        // exist (DUT-573 / DUT-614 collapsed this into one adjustable element);
+        // the test now locates this element by identifier, reads its value, and
+        // drives the adjustable increment action.
+        .accessibilityIdentifier("recipe.servings")
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment:

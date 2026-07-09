@@ -87,7 +87,7 @@ final class RecipeInteractionJourneysE2ETests: XCTestCase {
         )
     }
 
-    /// Open a recipe → Cook Now → "Step 1 of N" → Next → "Step 2 of N" →
+    /// Open a recipe → Cook Mode → "Step 1 of N" → Next → "Step 2 of N" →
     /// exit → back on detail. Uses the corn recipe (3 fixture steps).
     func test_cook_mode_walks_steps_and_exits() {
         app.launchForE2E()
@@ -100,15 +100,19 @@ final class RecipeInteractionJourneysE2ETests: XCTestCase {
         let ingredients = app.staticTexts["Ingredients"]
         XCTAssertTrue(ingredients.waitForExistence(timeout: 15), "detail should open")
 
-        let cookNow = app.buttons["Cook Now"]
-        XCTAssertTrue(cookNow.waitForExistence(timeout: 5), "Cook Now CTA should be visible")
-        cookNow.tap()
+        // DUT-572 — the CTA was renamed "Cook Now" → "Cook Mode"; query the
+        // stable `recipe.cookMode.cta` identifier instead of the visible label.
+        let cookMode = app.buttons["recipe.cookMode.cta"]
+        XCTAssertTrue(cookMode.waitForExistence(timeout: 5), "Cook Mode CTA should be visible")
+        cookMode.tap()
 
         let stepOne = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Step 1 of'")).firstMatch
         XCTAssertTrue(stepOne.waitForExistence(timeout: 5), "Cook Mode should render 'Step 1 of N' on entry")
 
-        let next = app.buttons["Next"]
-        XCTAssertTrue(next.waitForExistence(timeout: 3), "the corn recipe has 3 steps so 'Next' should exist")
+        // The advance control was renamed "Next" → "Next Step" and carries the
+        // stable `cook-mode-next` identifier (hidden only on the final step).
+        let next = app.buttons["cook-mode-next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 3), "the corn recipe has 3 steps so the Next Step control should exist")
         next.tap()
         let stepTwo = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Step 2 of'")).firstMatch
         XCTAssertTrue(stepTwo.waitForExistence(timeout: 8), "Cook Mode should advance to 'Step 2 of N'")
@@ -119,10 +123,21 @@ final class RecipeInteractionJourneysE2ETests: XCTestCase {
         XCTAssertTrue(ingredients.waitForExistence(timeout: 5), "after exiting Cook Mode, detail should re-render")
     }
 
-    /// Open a recipe → the servings scaler shows "Serves 4" → tap the
-    /// stepper's increment → "Serves 8" (or higher) renders and a scaled
-    /// ingredient quantity changes (US-31). Uses the corn recipe
-    /// ("4 servings", "4 cups corn kernels").
+    /// Open a recipe → the collapsed servings control reads 4 (recipe yield) →
+    /// increment it to 8 → the control's value updates to 8 and the
+    /// "4 cups corn kernels" ingredient scales to "8 cups corn kernels"
+    /// (US-31). Uses the corn recipe ("4 servings", "4 cups corn kernels").
+    ///
+    /// DUT-573 / DUT-614 — the old standalone "Serves 4" label + a plainly
+    /// queryable inner Stepper were folded into ONE collapsed element:
+    /// `Text("Servings")` caption + `Text("4")` value, wrapped in
+    /// `.accessibilityElement(children: .ignore)` with an adjustable action and
+    /// the stable `recipe.servings` identifier. That element surfaces as an
+    /// `otherElement` whose `.value` mirrors the count. XCUITest cannot invoke
+    /// a *custom* adjustable action directly, but the underlying SwiftUI
+    /// `Stepper` remains a queryable element whose "Increment" button IS
+    /// drivable — so we read the state off `recipe.servings` and drive it via
+    /// that button.
     func test_servings_scaler_scales_ingredient_quantity() {
         app.launchForE2E()
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 10), "tab bar should appear")
@@ -132,32 +147,57 @@ final class RecipeInteractionJourneysE2ETests: XCTestCase {
         feedCards.firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Ingredients"].waitForExistence(timeout: 15), "detail should open")
 
-        // The scaler starts at the recipe yield (4 servings).
-        let servesFour = app.staticTexts["Serves 4"]
-        for _ in 0..<8 where !servesFour.exists {
+        // Scroll the collapsed servings control into view.
+        let servings = app.otherElements["recipe.servings"]
+        for _ in 0..<8 where !servings.exists {
             app.swipeUp()
         }
-        XCTAssertTrue(servesFour.waitForExistence(timeout: 5), "the servings scaler should start at 'Serves 4'")
-        // The unscaled ingredient quantity is present.
+        XCTAssertTrue(servings.waitForExistence(timeout: 5), "the servings control should exist")
+        XCTAssertEqual(
+            "\(servings.value ?? "")", "4",
+            "the servings control should start at the recipe yield (4)"
+        )
+        // The unscaled ingredient quantity is present at 4 servings.
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(format: "label CONTAINS '4 cups corn'")).firstMatch.exists,
             "the unscaled ingredient '4 cups corn kernels' should render at 4 servings"
         )
 
-        // The Stepper exposes an Increment button under the "Servings" element.
+        // Drive the count 4 → 8 via the Stepper's "+" button (the collapsed
+        // element's custom adjustable action isn't XCUITest-drivable). NOTE:
+        // for this collapsed Stepper, XCUITest's button *labels* are inverted
+        // (it labels the "−" as "Increment" and the "+" as "Decrement"); the
+        // position order is stable though — boundBy 0 is "−", boundBy 1 is "+".
+        // Verified on-sim: tapping boundBy 1 raises the value. Tap-until-target
+        // rather than a fixed 4 taps: rapid consecutive taps on a Stepper can
+        // be coalesced, so we tap, wait for the value to advance, and stop at 8
+        // (bounded so a stuck control fails fast).
         let stepper = app.steppers.firstMatch
-        XCTAssertTrue(stepper.waitForExistence(timeout: 5), "a servings stepper should exist")
+        XCTAssertTrue(stepper.waitForExistence(timeout: 3), "a servings Stepper should exist")
         let increment = stepper.buttons.element(boundBy: 1)
-        XCTAssertTrue(increment.waitForExistence(timeout: 3), "the stepper should expose an increment button")
-        // Scale up to 8 servings (4 taps → doubles the corn to 8 cups).
-        for _ in 0..<4 {
-            increment.tap()
-        }
-
         XCTAssertTrue(
-            app.staticTexts["Serves 8"].waitForExistence(timeout: 5),
-            "scaling up 4 steps should read 'Serves 8'"
+            increment.waitForExistence(timeout: 3),
+            "the servings Stepper should expose an increment (\"+\") button"
         )
+        func servingsCount() -> Int { Int("\(servings.value ?? "")") ?? -1 }
+        var taps = 0
+        while servingsCount() < 8, taps < 12 {
+            let before = servingsCount()
+            increment.tap()
+            taps += 1
+            _ = XCTWaiter().wait(
+                for: [XCTNSPredicateExpectation(
+                    predicate: NSPredicate { _, _ in servingsCount() > before },
+                    object: nil
+                )],
+                timeout: 2
+            )
+        }
+        XCTAssertEqual(
+            servingsCount(), 8,
+            "incrementing should bring the servings control to 8 (got \(servingsCount()) after \(taps) taps)"
+        )
+        // Doubling servings scales the corn quantity 4 cups → 8 cups.
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(format: "label CONTAINS '8 cups corn'")).firstMatch
                 .waitForExistence(timeout: 5),

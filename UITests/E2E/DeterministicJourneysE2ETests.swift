@@ -2,9 +2,11 @@ import XCTest
 
 /// T-610 — comprehensive journeys that assert on the exact canned fixtures
 /// (``E2EFixtures``), now that the hermetic stub makes the app deterministic.
-/// Unlike the Phase-1 `CoreUserJourneysE2ETests` (live blog, generous timeouts,
-/// "state persists across runs" caveats), these can assert precise content and
-/// a CLEAN starting state (the in-memory store resets every launch).
+/// Every L5 launch now boots the hermetic stub, so `CoreUserJourneysE2ETests`
+/// runs against the same canned fixtures; the journeys here differ in intent —
+/// they assert on precise fixture content and a CLEAN starting state (the
+/// in-memory store resets every launch), where the Core suite keeps some
+/// broader, timeout-tolerant heuristics inherited from the Phase-1 rollout.
 @MainActor
 final class DeterministicJourneysE2ETests: XCTestCase {
 
@@ -73,7 +75,7 @@ final class DeterministicJourneysE2ETests: XCTestCase {
         // Saved tab starts empty (in-memory store reset on launch).
         tabBar.buttons["Saved"].tap()
         XCTAssertTrue(
-            app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 8),
+            app.staticTexts["saved.emptyState"].firstMatch.waitForExistence(timeout: 8),
             "Saved tab should start empty on a fresh hermetic launch"
         )
 
@@ -92,7 +94,7 @@ final class DeterministicJourneysE2ETests: XCTestCase {
         // Saved tab now has exactly one row (the empty state is gone).
         tabBar.buttons["Saved"].tap()
         XCTAssertFalse(
-            app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 3),
+            app.staticTexts["saved.emptyState"].firstMatch.waitForExistence(timeout: 3),
             "Saved tab should no longer be empty after saving"
         )
 
@@ -104,7 +106,7 @@ final class DeterministicJourneysE2ETests: XCTestCase {
         XCTAssertTrue(app.buttons["Save recipe"].waitForExistence(timeout: 5), "Unsave should flip back to Save")
         tabBar.buttons["Saved"].tap()
         XCTAssertTrue(
-            app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 8),
+            app.staticTexts["saved.emptyState"].firstMatch.waitForExistence(timeout: 8),
             "Saved tab should be empty again after the unsave"
         )
     }
