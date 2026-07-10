@@ -146,6 +146,51 @@ struct AppleCredentialValidatorTests {
         await validator.handleCredentialRevoked()
         #expect(guest.clearCalls == 0)  // nothing to tear down
     }
+
+    /// DUT-701 — a Google-issued session (`provider != .apple`) must NEVER be
+    /// polled against Apple's credential state: Apple returns `.notFound` for an
+    /// id it never issued, which previously tore down every Google user's session
+    /// + profile on launch/foreground. The validator must skip it entirely — no
+    /// poll, no teardown.
+    @Test func googleProviderSessionIsNeverPolledOrCleared() async {
+        let lookupRan = Flag()
+        let sessionStore = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "google-123", provider: .google)
+        )
+        let profileStore = InMemoryProfileStore(
+            initial: UserProfile(id: UUID(), displayName: "Ned", email: "ned@dod.com")
+        )
+        let guest = SpyGuest()
+        let validator = AppleCredentialValidator(
+            sessionStore: sessionStore,
+            profileStore: profileStore,
+            revoker: nil,
+            guestIdentity: guest,
+            credentialStatus: { _ in
+                lookupRan.set()
+                return .notFound  // would tear down an *Apple* session
+            }
+        )
+
+        let didClear = await validator.validateOnLaunchOrForeground()
+
+        #expect(!didClear)
+        #expect(!lookupRan.value)  // the Apple credential poll is skipped for Google
+        #expect((try? sessionStore.load())?.userIdentifier == "google-123")  // kept
+        #expect(await profileStore.load() != nil)  // profile NOT deleted
+        #expect(guest.clearCalls == 0)  // guest identity NOT torn down
+    }
+
+    /// DUT-701 — the provider guard must not weaken DUT-635: an explicitly
+    /// Apple-issued session with a `.notFound` credential is still cleared.
+    @Test func appleProviderSessionStillClearsOnNotFound() async {
+        let fixture = makeFixture(
+            session: AppleAuthSession(userIdentifier: "u1", provider: .apple),
+            status: .notFound
+        )
+        #expect(await fixture.validator.validateOnLaunchOrForeground())
+        #expect((try? fixture.sessionStore.load()) == nil)
+    }
 }
 
 /// Records `clear()` calls so a test can assert the guest-identity row was torn
