@@ -181,21 +181,33 @@ extension ProfileEditView {
     /// completion; the session is persisted regardless (the user is signed in).
     @MainActor
     func handleAppleSignIn(_ outcome: AppleProfileSignIn.Outcome) {
+        // DUT-506 — a blank-id credential persisted no session (a non-event); stay
+        // silent, exactly like the button's own guard.
+        guard outcome.signedIn else { return }
         hasSession = true  // DUT-281 — a session was persisted; keep Sign Out reachable
         if let name = outcome.displayName { displayName = name }
         if let mail = outcome.email { email = mail }
-        // DUT-695 — auth succeeded but the Keychain/profile WRITE failed (the
-        // "Couldn't Save Your Profile" case). Surface it via the editor's
-        // existing error row instead of silently no-oping; the fields stay
-        // filled so the user can retry the manual Save.
-        guard outcome.profileSaved else {
+        // DUT-891b — surface an error ONLY on a genuine write failure (the
+        // credential carried a name + email but the Keychain/profile save failed —
+        // the "Couldn't Save Your Profile" case). Do NOT treat a plain
+        // `profileSaved == false` as an error: on a re-auth (Apple releases the
+        // name/email only on the FIRST authorization) or a second device, the
+        // fields come back nil with nothing on file to carry forward, so there is
+        // simply nothing to write. The user IS signed in — that's a success, not
+        // the "Couldn't Save Your Profile" failure DUT-695 previously reported here.
+        guard !outcome.profileWriteFailed else {
             saveError = "Couldn't Save Your Profile. Try Again."
             return
         }
         // DUT — confirm the successful sign-in with a `.success` tap (mirrors the
-        // Save path). Bump before `dismiss()` — the Save path proves the trigger
-        // fires even when the view is dismissing (`+Save.swift`).
+        // Save path). Bump before any `dismiss()` — the Save path proves the
+        // trigger fires even when the view is dismissing (`+Save.swift`).
         authSuccessTick &+= 1
+        // Apple withheld the name/email and nothing was on file: the user is
+        // signed in, but there's nothing to auto-fill, so keep the editor open for
+        // manual completion (no error, no dismiss). Only auto-dismiss when a full
+        // profile was written in one tap.
+        guard outcome.profileSaved else { return }
         Task {
             await onProfileChanged()
             dismiss()
@@ -219,16 +231,18 @@ extension ProfileEditView {
             )
             if let name = outcome.displayName { self.displayName = name }
             if let mail = outcome.email { self.email = mail }
-            // DUT-695 — mirror the Apple handler: auth succeeded but the
-            // profile WRITE failed, so surface the error row instead of a
-            // silent no-op (the fields stay filled for a manual Save retry).
-            guard outcome.profileSaved else {
+            // DUT-891b — mirror the Apple handler: surface the error row ONLY on a
+            // genuine write failure (fields present, save failed), never on a plain
+            // `profileSaved == false` (nothing to write is not a failure).
+            guard !outcome.profileWriteFailed else {
                 saveError = "Couldn't Save Your Profile. Try Again."
                 return
             }
             // DUT — mirror the Apple handler: a `.success` tap confirms the
-            // successful Google sign-in before dismissing.
+            // successful Google sign-in.
             authSuccessTick &+= 1
+            // Nothing to auto-fill → keep the editor open for manual entry.
+            guard outcome.profileSaved else { return }
             await onProfileChanged()
             dismiss()
         }

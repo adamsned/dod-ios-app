@@ -127,6 +127,7 @@ public struct GoogleProfileSignIn: Sendable {
         try? sessionStore.save(googleSession)
 
         var profileSaved = false
+        var profileWriteFailed = false
         if let name = resolved.displayName, let mail = resolved.email {
             // DUT-371: don't inherit a DIFFERENT signed-in user's profile id/photo
             // on a shared device (see AppleProfileSignIn). Merge a residual profile
@@ -143,12 +144,17 @@ public struct GoogleProfileSignIn: Sendable {
                 photoOriginalFilename: existingProfile?.photoOriginalFilename
             )
             profileSaved = (try? await profileStore.save(profile)) != nil
+            // DUT-891b — mirror the Apple path: both fields were present, so a
+            // save that didn't land is a genuine write failure worth surfacing.
+            profileWriteFailed = !profileSaved
         }
 
         return AppleProfileSignIn.Outcome(
             displayName: resolved.displayName,
             email: resolved.email,
-            profileSaved: profileSaved
+            profileSaved: profileSaved,
+            signedIn: true,
+            profileWriteFailed: profileWriteFailed
         )
     }
 }

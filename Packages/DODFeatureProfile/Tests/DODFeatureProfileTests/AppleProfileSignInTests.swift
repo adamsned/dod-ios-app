@@ -68,6 +68,12 @@ struct AppleProfileSignInTests {
         let profile = await profileStore.load()
         #expect(profile == nil)
         #expect(outcome.profileSaved == false)
+        // DUT-891b — the KEY regression: a re-auth / second-device sign-in where
+        // Apple withheld the name/email is a genuine SUCCESS (a session was
+        // persisted), NOT the "Couldn't Save Your Profile" write failure. The host
+        // keys its error off `profileWriteFailed`, which must stay `false` here.
+        #expect(outcome.signedIn == true)
+        #expect(outcome.profileWriteFailed == false)
     }
 
     @Test func reSignIn_carriesFirstAuthNameForwardIntoProfile() async {
