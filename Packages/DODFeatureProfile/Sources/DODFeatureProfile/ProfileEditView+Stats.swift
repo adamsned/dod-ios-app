@@ -44,19 +44,31 @@ extension ProfileEditView {
         // the next celebration can't contradict. `totalCooks` still feeds the
         // "Total Cooks" cell below.
         let rankCooks = stats.rankLadderCooks
-        let rank = CookProgression.currentRank(totalCooks: rankCooks)
+        // Daddy Mode (owner rank) — the owner's Cook Rank IS "The Dutch Oven Daddy",
+        // auto-applied from the start regardless of cook count. The old separate
+        // owner badge is folded INTO the rank here: for the owner the rank line is
+        // the standout crown-capsule `OwnerBadge`, and there is no climb.
+        let isOwner = isCurrentUserOwner
+        let rank = CookProgression.displayRank(totalCooks: rankCooks, isOwner: isOwner)
         let climbing =
-            rankCooks > 0
+            !isOwner
+            && rankCooks > 0
             && CookProgression.nextRank(totalCooks: rankCooks) != nil
         return HStack(spacing: DODSpacing.md) {
             Text(rank?.emoji ?? "🍳")
                 .font(.system(size: 44))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                Text(rank?.title ?? "Your Cook Rank")
-                    .dodFont(DODType.heading)
-                    .foregroundStyle(DODColor.labelStrong)
-                Text(Self.rankProgressCaption(totalCooks: rankCooks))
+                if isOwner {
+                    // The rank itself carries the owner identity — reuse the
+                    // OwnerBadge crown-capsule as the rank's badge.
+                    OwnerBadge()
+                } else {
+                    Text(rank?.title ?? "Your Cook Rank")
+                        .dodFont(DODType.heading)
+                        .foregroundStyle(DODColor.labelStrong)
+                }
+                Text(rankCaption(totalCooks: rankCooks, isOwner: isOwner))
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -69,6 +81,13 @@ extension ProfileEditView {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// The rank hero caption. The owner's rank is fixed, so they get an identity
+    /// caption rather than the cook-progress line (no "top rank reached" — his rank
+    /// isn't earned).
+    private func rankCaption(totalCooks: Int, isOwner: Bool) -> String {
+        isOwner ? "The one and only." : Self.rankProgressCaption(totalCooks: totalCooks)
+    }
+
     /// Pure copy helper for the rank hero's caption — `static` so the L1 suite
     /// can pin the three states (no cooks / climbing / top rank) without a host.
     static func rankProgressCaption(totalCooks: Int) -> String {
@@ -76,7 +95,7 @@ extension ProfileEditView {
             return "Log your first cook to start climbing the ranks."
         }
         guard let next = CookProgression.nextRank(totalCooks: totalCooks) else {
-            return "Top rank reached. You're a true Dutch Oven Daddy."
+            return "Top rank reached. You're a true Cast Iron Legend."
         }
         // `nextRank` non-nil ⇒ `cooksToNextRank` non-nil (both nil only at top).
         let remaining = CookProgression.cooksToNextRank(totalCooks: totalCooks) ?? 0

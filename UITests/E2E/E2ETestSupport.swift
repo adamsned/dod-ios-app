@@ -11,11 +11,12 @@ import XCTest
 ///
 /// - `-DOD_E2E_MODE=1` (launch arg) + `DOD_E2E_MODE=1` (env) — read by
 ///   `App/DODApp.swift` `applyTestLaunchOverrides()` and stashed into
-///   `DODEnvironment.isE2EMode`. Phase 1 (T-602) records the flag but does
-///   NOT swap dependencies; the journeys drive against the live blog the
-///   same way today's L3 smoke does. Phase 2 (T-610 follow-up) wires a
-///   `FakeAppDependencies` that reads the flag and returns canned fixtures
-///   so the suite runs hermetically.
+///   `DODEnvironment.isE2EMode`. T-610 wired the always-on hermetic path: in
+///   this mode the host swaps in `FakeAppDependencies` + `E2EStubHTTPClient`,
+///   which serve the canned `E2EFixtures`, so the whole suite runs
+///   deterministically against the real code paths with NO live-blog
+///   dependency. (The original Phase-1 rollout, T-602, only recorded the flag
+///   and drove the live blog; that era is over.)
 /// - `DOD_FORCE_NO_TELEMETRY_APPID=1` (env) — REG-1 regression guard; same
 ///   shape `UITests/SmokeTests.swift` uses.
 /// - `DOD_SUPPRESS_ONBOARDING=1` (env, default) — boots straight into the

@@ -23,6 +23,19 @@ public struct CommentRow: View {
     /// out of the box). `nil` (the default) preserves the pre-Phase-d
     /// rendering for backward compatibility. AC-44.13.
     public let avatarOverride: AnyView?
+    /// **Daddy Mode (Phase 1, cosmetic).** The commenter's Cook Rank, rendered
+    /// as a small emoji + title line directly under the author name. `nil` (the
+    /// default) renders NOTHING extra, so every existing call site + snapshot is
+    /// byte-identical. Phase 1 populates this only for the current user's own
+    /// comments; server-attached ranks for other users are a later phase.
+    public let rank: (title: String, emoji: String)?
+    /// **Daddy Mode (owner rank).** When `true`, the commenter's Cook Rank IS "The
+    /// Dutch Oven Daddy": the rank line renders as the standout crown-capsule
+    /// ``OwnerBadge`` (a SINGLE element, in place of the plain `rank` line — never
+    /// a rank line PLUS a separate badge). `false` (the default) renders the plain
+    /// `rank` line (or nothing when `rank` is nil), so existing calls + snapshots
+    /// stay byte-identical.
+    public let isOwnerRank: Bool
 
     public init(
         authorName: String,
@@ -31,7 +44,9 @@ public struct CommentRow: View {
         bodyText: String,
         ratingValue: Int? = nil,
         isPendingModeration: Bool = false,
-        avatarOverride: AnyView? = nil
+        avatarOverride: AnyView? = nil,
+        rank: (title: String, emoji: String)? = nil,
+        isOwnerRank: Bool = false
     ) {
         self.authorName = authorName
         self.avatarURL = avatarURL
@@ -40,6 +55,8 @@ public struct CommentRow: View {
         self.ratingValue = ratingValue
         self.isPendingModeration = isPendingModeration
         self.avatarOverride = avatarOverride
+        self.rank = rank
+        self.isOwnerRank = isOwnerRank
     }
 
     public var body: some View {
@@ -48,6 +65,7 @@ public struct CommentRow: View {
 
             VStack(alignment: .leading, spacing: DODSpacing.xs) {
                 header
+                ownerAndRankLine
                 Text(bodyText)
                     .dodFont(DODType.body)
                     .foregroundStyle(DODColor.label)
@@ -113,6 +131,30 @@ public struct CommentRow: View {
             .frame(width: 40, height: 40)
     }
 
+    /// **Daddy Mode (owner rank).** The Cook Rank line shown under the author name.
+    /// The owner's rank IS "The Dutch Oven Daddy", rendered as the standout
+    /// crown-capsule ``OwnerBadge`` (a single element — the rank carries the owner
+    /// identity, there is no separate badge). Everyone else gets the plain
+    /// emoji + title rank line. Renders nothing (and takes no vertical space —
+    /// SwiftUI collapses an empty `@ViewBuilder`) when this is a non-owner row with
+    /// no `rank`, so the default row is byte-identical.
+    @ViewBuilder
+    private var ownerAndRankLine: some View {
+        if isOwnerRank {
+            HStack(spacing: DODSpacing.xs) {
+                OwnerBadge()
+                Spacer(minLength: 0)
+            }
+        } else if let rank {
+            HStack(spacing: DODSpacing.xs) {
+                Text("\(rank.emoji) \(rank.title)")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
     private var header: some View {
         HStack(spacing: DODSpacing.xs) {
             Text(authorName)
@@ -130,6 +172,13 @@ public struct CommentRow: View {
     /// Collapsed VoiceOver label: identity + date + rating (if any) + body.
     private var accessibilityLabel: String {
         var parts: [String] = ["\(authorName), \(relativeDate)"]
+        // Daddy Mode (owner rank) — additive: absent by default. The owner's rank
+        // IS "The Dutch Oven Daddy", so announce it in place of a plain rank.
+        if isOwnerRank {
+            parts.append("The Dutch Oven Daddy, app owner")
+        } else if let rank {
+            parts.append("\(rank.title) rank")
+        }
         if let ratingValue, ratingValue > 0 {
             parts.append("rated \(ratingValue) star\(ratingValue == 1 ? "" : "s")")
         }
@@ -161,6 +210,20 @@ public struct CommentRow: View {
         bodyText: "Question — can I sub butter for the oil?",
         ratingValue: 4,
         isPendingModeration: true
+    )
+    .padding(DODSpacing.md)
+}
+
+#Preview("Owner rank") {
+    // Daddy Mode (owner rank): the rank line IS the crown badge — a single element.
+    CommentRow(
+        authorName: "Ned A.",
+        avatarURL: nil,
+        relativeDate: "2 hours ago",
+        bodyText: "This is the one. Get the coals white-hot and don't peek.",
+        ratingValue: 5,
+        rank: ("The Dutch Oven Daddy", "👑"),
+        isOwnerRank: true
     )
     .padding(DODSpacing.md)
 }

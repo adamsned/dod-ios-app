@@ -26,7 +26,8 @@ enum HubTool: Equatable {
     /// 12"/even default.
     case heatCoach(seed: HeatCoachSeed?)
     case cookingJournal
-    case firstCookout
+    /// `scrollToDumpCakes` opens the chooser on its dump-cake (Anytime Treats) section.
+    case firstCookout(scrollToDumpCakes: Bool)
     case cookMode
 }
 
@@ -41,16 +42,14 @@ struct HubToolRoute: Equatable {
 }
 
 /// DUT-615 — the single sheet the hub can have up at any moment. The hub used to
-/// declare FIVE independent `.sheet` presenters (First Cookout, Celebration,
-/// Heat Coach, Journal, Cook Mode explainer); asking to present a second while
-/// one was already up dropped it silently (SwiftUI only honors one sheet per
-/// presenting anchor). Folding them into one `.sheet(item:)` bound to this enum
-/// means exactly one presenter exists, so a new request always replaces (never
-/// races) whatever is showing. The `heatCoach` case carries the DUT-584 seed and
-/// the `celebration` case carries the DUT-104 payload, preserving each sheet's
-/// content verbatim.
+/// declare FIVE independent `.sheet` presenters; asking to present a second while
+/// one was already up dropped it silently (SwiftUI honors one sheet per anchor).
+/// Folding them into one `.sheet(item:)` bound to this enum means exactly one
+/// presenter exists, so a new request always replaces (never races) whatever is
+/// showing. `heatCoach` carries the DUT-584 seed and `celebration` the DUT-104
+/// payload, preserving each sheet's content verbatim.
 enum ActiveHubSheet: Identifiable {
-    case firstCookout
+    case firstCookout(scrollToDumpCakes: Bool)
     case celebration(CookCelebration)
     case heatCoach(seed: HeatCoachSeed?)
     case cookingJournal
@@ -214,8 +213,8 @@ struct CookingToolsHubView: View {
                 activeToolSheet = .heatCoach(seed: seed)
             case .cookingJournal:
                 activeToolSheet = .cookingJournal
-            case .firstCookout:
-                activeToolSheet = .firstCookout
+            case .firstCookout(let scrollToDumpCakes):
+                activeToolSheet = .firstCookout(scrollToDumpCakes: scrollToDumpCakes)
             case .cookMode:
                 activeToolSheet = .cookModeExplainer
             }
@@ -282,7 +281,7 @@ struct CookingToolsHubView: View {
     @ViewBuilder
     private func hubSheet(for sheet: ActiveHubSheet) -> some View {
         switch sheet {
-        case .firstCookout:
+        case .firstCookout(let scrollToDumpCakes):
             CookChooserFlow(
                 // DUT-559 / DUT-212 — hand the real recommended rung only once
                 // the cook state has loaded (the cold-launch gate); before then
@@ -293,6 +292,7 @@ struct CookingToolsHubView: View {
                     ? GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
                     : nil,
                 cookedRecipeIDs: cookedRecipeIDs,
+                scrollToDumpCakes: scrollToDumpCakes,
                 onLogCook: { entry in
                     Task { await feedViewModel.logCook(entry) }
                 }

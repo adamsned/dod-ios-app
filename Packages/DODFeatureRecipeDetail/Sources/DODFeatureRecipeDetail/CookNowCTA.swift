@@ -47,6 +47,10 @@ struct CookNowCTA: View {
         .accessibilityLabel("Cook Mode")
         .accessibilityHint("Opens a hands-free cooking surface with step-by-step instructions.")
         .accessibilityAddTraits(.isButton)
+        // Stable test handle for the L5 E2E Cook Mode journeys — decoupled from
+        // the visible/accessibility label so the DUT-572 "Cook Now" → "Cook
+        // Mode" rename (and any future copy change) doesn't break the tests.
+        .accessibilityIdentifier("recipe.cookMode.cta")
         .padding(.horizontal, DODSpacing.md)
     }
 }

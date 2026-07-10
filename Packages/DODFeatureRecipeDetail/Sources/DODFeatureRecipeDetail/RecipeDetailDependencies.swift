@@ -161,6 +161,20 @@ public protocol RecipeDetailDependencies: Sendable {
     var profilePhotoStoreForGate: (any ProfilePhotoStoring)? { get }
     #endif
 
+    // MARK: - Daddy Mode (Phase 1, cosmetic) — own-comment Cook Rank + owner
+    //
+    // Two narrow reads that let the ratings section attach the CURRENT user's
+    // Cook Rank (+ owner badge) to their OWN comment rows. Defaults + live impls
+    // live in `RecipeDetailDependencies+Profile.swift`. Both are safe no-ops by
+    // default so existing fakes keep compiling; display-only, authorize nothing.
+
+    /// The local rank-ladder cook count (`CookLogStats.rankLadderCookCount`),
+    /// which `CookProgression.currentRank` maps to the user's Cook Rank.
+    func loadRankLadderCookCount() async -> Int
+    /// The current signed-in user's Sign in with Apple `sub`, fed to
+    /// `OwnerGate.isOwner` to decide the owner badge.
+    var currentUserIdentifier: String? { get }
+
     // MARK: - Add to Shopping List (US-39 / DUT-534)
 
     /// DUT-534 — append this recipe's ingredients to the Shopping List. Recipe

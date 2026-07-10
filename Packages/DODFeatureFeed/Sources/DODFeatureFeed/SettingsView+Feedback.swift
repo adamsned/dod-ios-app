@@ -1,5 +1,4 @@
 import DODDesignSystem
-import DODSupport
 import SwiftUI
 
 // DUT-694 (PR-D) — the Settings cache-clear feedback (snackbar overlay + the

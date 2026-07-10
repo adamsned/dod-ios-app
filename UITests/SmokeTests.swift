@@ -158,7 +158,7 @@ final class SmokeTests: XCTestCase {
         // strongest "we're really on Saved" signal on fresh install.
         tabButtons[1].tap()
         XCTAssertTrue(
-            app.staticTexts["No saved recipes yet"].waitForExistence(timeout: 6),
+            app.staticTexts["saved.emptyState"].firstMatch.waitForExistence(timeout: 6),
             "Second tab should land on the Saved screen (empty state visible on fresh install)"
         )
 
@@ -279,33 +279,35 @@ final class SmokeTests: XCTestCase {
 
     func test_savedTabEmptyStateOnFreshInstall() {
         goToTab(phoneLabel: "Saved", padTitle: "Saved")
-        // Spec AC-5.8 verbatim.
-        let emptyTitle = app.staticTexts["No saved recipes yet"]
+        // AC-5.8 empty state — queried via the stable `saved.emptyState`
+        // identifier (CL-305 Title Case renamed the visible title).
+        let emptyTitle = app.staticTexts["saved.emptyState"].firstMatch
         XCTAssertTrue(
             emptyTitle.waitForExistence(timeout: 6),
             "Saved tab should show empty state on fresh install"
         )
     }
 
-    /// US-7 / AC-7.1, AC-7.2, AC-7.4, AC-7.6: tapping the Cook Now CTA on
+    /// US-7 / AC-7.1, AC-7.2, AC-7.4, AC-7.6: tapping the Cook Mode CTA on
     /// recipe detail presents the full-screen Cook Mode surface, "Step 1 of M"
     /// is visible, Next advances to step 2, and Done dismisses back to detail.
     func test_cookModeOpensAndAdvances() {
         // Step 1: open a real recipe detail from the feed (the helper skips
-        // roundup articles, which have no Cook Now CTA).
+        // roundup articles, which have no Cook Mode CTA).
         XCTAssertTrue(
             openRecipeDetailFromFeed(),
-            "A feed recipe card should push a recipe detail before tapping Cook Now"
+            "A feed recipe card should push a recipe detail before tapping Cook Mode"
         )
         let ingredientsHeader = app.staticTexts["Ingredients"]
 
-        // Step 2: tap Cook Now. The CTA has the accessibility label "Cook Now".
-        let cookNow = app.buttons["Cook Now"]
+        // Step 2: tap Cook Mode. DUT-572 renamed the CTA "Cook Now" → "Cook
+        // Mode"; query the stable `recipe.cookMode.cta` identifier.
+        let cookMode = app.buttons["recipe.cookMode.cta"]
         XCTAssertTrue(
-            cookNow.waitForExistence(timeout: 5),
-            "Cook Now CTA should be visible on recipe detail (AC-7.1)"
+            cookMode.waitForExistence(timeout: 5),
+            "Cook Mode CTA should be visible on recipe detail (AC-7.1)"
         )
-        cookNow.tap()
+        cookMode.tap()
 
         // Step 3: full-screen cover with "Step 1 of M" — AC-7.2.
         let stepOnePredicate = NSPredicate(format: "label BEGINSWITH 'Step 1 of'")
@@ -319,8 +321,10 @@ final class SmokeTests: XCTestCase {
         // Some recipes have only one step — guard so the test doesn't flake.
         let stepOneLabel = stepOne.label
         if let total = Self.totalStepsCount(from: stepOneLabel), total >= 2 {
-            let nextButton = app.buttons["Next"]
-            XCTAssertTrue(nextButton.waitForExistence(timeout: 6), "Next button should be present mid-flow")
+            // The advance control was renamed "Next" → "Next Step"; query the
+            // stable `cook-mode-next` identifier.
+            let nextButton = app.buttons["cook-mode-next"]
+            XCTAssertTrue(nextButton.waitForExistence(timeout: 6), "Next Step button should be present mid-flow")
             nextButton.tap()
             let stepTwoPredicate = NSPredicate(format: "label BEGINSWITH 'Step 2 of'")
             let stepTwo = app.staticTexts.matching(stepTwoPredicate).firstMatch

@@ -297,7 +297,8 @@ struct RootView: View {
                     onFindRecipe: { findRecipeToCook() },
                     // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                     openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
-                    startFirstCookout: { route(toHubTool: .firstCookout) },  // DUT-571 hero → guided path
+                    // DUT-571 hero → guided path; DUT — $0 = scrollToDumpCakes (dump-cake CTA).
+                    startFirstCookout: { route(toHubTool: .firstCookout(scrollToDumpCakes: $0)) },
                     hubPendingTool: tab == .cookingTools ? $hubPendingTool : .constant(nil),
                     hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
                     cookModeFindRecipeArmed: tab == .feed ? $cookModeFindRecipeArmed : .constant(false),
@@ -347,23 +348,23 @@ struct RootView: View {
                         Label(tab.title, systemImage: tab.systemImage)
                             .tag(tab)
                     }
-                    // T-912 / DUT-551 (CL-306) — Settings is an UNTAGGED sidebar
-                    // row on iPad (not a tab target, like `SidebarProfileRow`);
-                    // its Button opens the same sheet the iPhone gear does.
+                    // Untagged Settings row (T-912/DUT-551, like `SidebarProfileRow`) → gear's sheet.
                     Button {
                         showSettingsSheet = true
                     } label: {
-                        Label("Settings", systemImage: "gearshape")
-                            .foregroundStyle(DODColor.label)
+                        // DUT — accent on the gear ICON only (icon/pill/small-fill); text stays default.
+                        Label {
+                            Text("Settings")
+                        } icon: {
+                            Image(systemName: "gearshape").foregroundStyle(DODColor.accent)
+                        }
                     }
                     .accessibilityIdentifier("sidebar-settings-row")
                 }
             }
-            // T-784 / DUT-90 — no brand title in the sidebar. The Profile row
-            // (pinned above) reads as the header, so a separate "Dutch Oven
-            // Daddy" large title just crowds an already-busy sidebar. Empty +
-            // inline collapses the large-title band so the Profile row rises to
-            // the top.
+            // T-784 / DUT-90 — no brand title in the sidebar. The pinned Profile
+            // row reads as the header, so a "Dutch Oven Daddy" large title just
+            // crowds it; empty + inline collapses the band so Profile rises to top.
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .listStyle(.sidebar)
@@ -382,7 +383,7 @@ struct RootView: View {
                 onFindRecipe: { findRecipeToCook() },
                 // T-912/DUT-551 — the per-recipe Heat Coach nudge routes here.
                 openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
-                startFirstCookout: { route(toHubTool: .firstCookout) },  // DUT-571
+                startFirstCookout: { route(toHubTool: .firstCookout(scrollToDumpCakes: $0)) },
                 hubPendingTool: selectedTab == .cookingTools ? $hubPendingTool : .constant(nil),
                 hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
                 cookModeFindRecipeArmed: selectedTab == .feed ? $cookModeFindRecipeArmed : .constant(false),

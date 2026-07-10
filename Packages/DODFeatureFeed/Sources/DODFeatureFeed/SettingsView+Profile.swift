@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODFeatureProfile
+import DODSupport
 import SwiftUI
 
 // US-44 Phase b (T-740) — Profile row at the top of Settings.
@@ -119,12 +120,32 @@ struct ProfileSettingsSection: View {
     /// true the section renders nothing (Profile lives in the sidebar on iPad).
     let hidesProfile: Bool
 
+    /// Daddy Mode (Phase 1, cosmetic) — resolved once on appear so the body
+    /// doesn't hit the Keychain on every recompute. Gated OFF for everyone until
+    /// Dad's real `sub` is configured in `OwnerGate`.
+    @State private var isOwner = false
+
     var body: some View {
         if !hidesProfile {
             Section {
                 ProfileSettingsRow(viewModel: viewModel)
+
+                // Daddy Mode (Phase 1, cosmetic) — owner-only "Daddy's Tools"
+                // entry point to the honest placeholder screen. Hidden entirely
+                // for non-owners; display-only, authorizes nothing.
+                if isOwner {
+                    NavigationLink {
+                        OwnerToolsPlaceholderView()
+                    } label: {
+                        Label("Daddy's Tools", systemImage: "key.shield.fill")
+                            .dodFont(DODType.body)
+                            .foregroundStyle(DODColor.label)
+                    }
+                    .accessibilityIdentifier("settings-link-daddys-tools")
+                }
             }
             .listRowBackground(DODColor.surfaceElevated)
+            .task { isOwner = OwnerGate.isCurrentUserOwner() }
         }
     }
 }

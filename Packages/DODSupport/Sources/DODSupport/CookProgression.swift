@@ -27,6 +27,25 @@ public struct CookRank: Equatable, Sendable, Identifiable {
 
 public enum CookProgression {
 
+    /// **Daddy Mode (owner rank).** The app owner's fixed Cook Rank — "The Dutch
+    /// Oven Daddy". This is NOT a rung on the earnable ``ranks`` ladder: it's an
+    /// owner override, held from the very first launch regardless of cook count,
+    /// and never celebrated as a "rank up". Resolve a user's shown rank through
+    /// ``displayRank(totalCooks:isOwner:)`` — the owner always gets this; everyone
+    /// else climbs ``ranks``. Its ``CookRank/threshold`` is the sentinel
+    /// ``ownerRankThreshold`` (below every real rung), so it can never be produced
+    /// by ``currentRank(totalCooks:)`` / ``rankUp(from:to:)`` from a cook count.
+    public static let dutchOvenDaddy = CookRank(
+        title: "The Dutch Oven Daddy",
+        emoji: "👑",
+        threshold: ownerRankThreshold
+    )
+
+    /// Sentinel ``CookRank/threshold`` for the owner rank — deliberately below
+    /// every real rung so the owner rank stays out of all ladder math and is never
+    /// inserted into ``ranks``.
+    public static let ownerRankThreshold = -1
+
     /// The rank ladder, ascending by threshold. EDIT HERE to retune the journey's
     /// names / pacing — every other value derives from this single source.
     public static let ranks: [CookRank] = [
@@ -36,12 +55,22 @@ public enum CookProgression {
         CookRank(title: "Cast Iron Convert", emoji: "🛡️", threshold: 10),
         CookRank(title: "Coal Whisperer", emoji: "💨", threshold: 20),
         CookRank(title: "Pit Boss", emoji: "🔱", threshold: 35),
-        CookRank(title: "Dutch Oven Daddy", emoji: "👑", threshold: 50),
+        CookRank(title: "Cast Iron Legend", emoji: "🏆", threshold: 50),
     ]
 
     /// The highest rank the cook currently holds — `nil` before the first cook.
     public static func currentRank(totalCooks: Int) -> CookRank? {
         ranks.last { totalCooks >= $0.threshold }
+    }
+
+    /// The rank to DISPLAY for a user everywhere a rank appears (profile hero,
+    /// their own comments): the owner always shows the fixed ``dutchOvenDaddy``
+    /// rank — auto-applied from the start, at any cook count — while everyone else
+    /// shows their earned ladder rank (`nil` before their first cook). Folds the
+    /// old separate owner badge INTO the rank: the owner's rank IS "The Dutch Oven
+    /// Daddy", not a ladder rank plus a badge.
+    public static func displayRank(totalCooks: Int, isOwner: Bool) -> CookRank? {
+        isOwner ? dutchOvenDaddy : currentRank(totalCooks: totalCooks)
     }
 
     /// The next rank to climb toward — `nil` once the top rung is reached.

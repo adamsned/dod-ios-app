@@ -101,6 +101,13 @@ public struct SavedView: View {
                 title: "No Saved Recipes Yet",
                 message: "Tap the bookmark on any recipe to find it again later."
             )
+            // Stable test handle for the L5 E2E empty-state assertions —
+            // decoupled from the visible title so the CL-305 Title Case copy
+            // change ("No saved recipes yet" → "No Saved Recipes Yet"), and any
+            // future copy change, doesn't break the tests. `accessibilityIdentifier`
+            // propagates to the descendant static texts, so they're queryable
+            // via `app.staticTexts["saved.emptyState"]`.
+            .accessibilityIdentifier("saved.emptyState")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .error:
             EmptyState(

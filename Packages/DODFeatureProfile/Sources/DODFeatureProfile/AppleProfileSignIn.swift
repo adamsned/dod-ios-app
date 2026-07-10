@@ -50,6 +50,34 @@ public struct AppleProfileSignIn: Sendable {
         /// fill, so the host should keep the editor open for manual completion
         /// (the session is still persisted — the user IS signed in).
         public let profileSaved: Bool
+        /// `true` when a session was actually persisted — i.e. the sign-in itself
+        /// succeeded. `false` only for the DUT-506 blank-id early return (a
+        /// non-event the host stays silent about). This lets the host tell a
+        /// *successful* re-auth where Apple withheld the name/email (keep the
+        /// editor open for manual entry, NO error) apart from a real failure.
+        public let signedIn: Bool
+        /// DUT-891b — `true` only when the credential DID carry a name + email but
+        /// the profile / Keychain WRITE failed (the genuine "Couldn't Save Your
+        /// Profile" case — e.g. a missing keychain entitlement). This is distinct
+        /// from the common re-auth path where Apple withholds the fields and there
+        /// is simply nothing to write, which is NOT an error. The host surfaces an
+        /// error only when this is `true`, never merely because `profileSaved` is
+        /// `false`.
+        public let profileWriteFailed: Bool
+
+        public init(
+            displayName: String?,
+            email: String?,
+            profileSaved: Bool,
+            signedIn: Bool = true,
+            profileWriteFailed: Bool = false
+        ) {
+            self.displayName = displayName
+            self.email = email
+            self.profileSaved = profileSaved
+            self.signedIn = signedIn
+            self.profileWriteFailed = profileWriteFailed
+        }
     }
 
     /// Persist the session, write the profile when the credential carries both
@@ -70,7 +98,12 @@ public struct AppleProfileSignIn: Sendable {
         // DUT-503 revoke never fires on a `""` id). Mirrors the GIDSignInProvider
         // guard on the Google side (DUT-285), which drops an empty id to `.failed`.
         guard !userIdentifier.isBlankAppleIdentifier else {
-            return Outcome(displayName: nil, email: nil, profileSaved: false)
+            return Outcome(
+                displayName: nil,
+                email: nil,
+                profileSaved: false,
+                signedIn: false
+            )
         }
 
         // 1. Session — resolve (carrying first-auth name/email forward for the
@@ -98,27 +131,17 @@ public struct AppleProfileSignIn: Sendable {
         try? sessionStore.save(resolved)
 
         // 2. Profile — the new half. Only write when BOTH fields are known
-        //    (a `UserProfile` save validates non-empty name + a real email);
-        //    merge into the existing profile to preserve its id + photo.
-        var profileSaved = false
-        if let name = resolved.displayName, let mail = resolved.email {
-            // DUT-371: don't inherit a DIFFERENT signed-in user's profile id/photo
-            // on a shared device. A residual profile is mergeable only when it's
-            // the same Apple user, or when there's no prior session at all (a guest
-            // / manually-created profile this first sign-in is legitimately claiming
-            // — so we don't discard their photo). A different user's session present
-            // means the on-file profile is theirs: start fresh.
-            let differentUserSignedIn = existingSession != nil && !sameUser
-            let existingProfile = differentUserSignedIn ? nil : await profileStore.load()
-            let profile = UserProfile(
-                id: existingProfile?.id ?? UUID(),
-                displayName: name,
-                email: mail,
-                photoFilename: existingProfile?.photoFilename,
-                photoOriginalFilename: existingProfile?.photoOriginalFilename
-            )
-            profileSaved = (try? await profileStore.save(profile)) != nil
-        }
+        //    (a `UserProfile` save validates non-empty name + a real email).
+        let profileSaved = await writeProfile(
+            resolved: resolved,
+            existingSession: existingSession,
+            sameUser: sameUser
+        )
+        // DUT-891b — a write failure is ONLY the "both fields present but the save
+        // failed" case. `profileSaved == false` with no fields to write (the common
+        // re-auth path) is not a failure — the user is still signed in.
+        let credentialCarriedBothFields = resolved.displayName != nil && resolved.email != nil
+        let profileWriteFailed = credentialCarriedBothFields && !profileSaved
 
         // 3. Refresh-token exchange — fire-and-forget so sign-in feels instant
         //    (the token only matters later, for deletion revocation). See
@@ -136,8 +159,37 @@ public struct AppleProfileSignIn: Sendable {
         return Outcome(
             displayName: resolved.displayName,
             email: resolved.email,
-            profileSaved: profileSaved
+            profileSaved: profileSaved,
+            signedIn: true,
+            profileWriteFailed: profileWriteFailed
         )
+    }
+
+    /// Write the local ``UserProfile`` from the resolved credential, returning
+    /// whether a valid profile was persisted. Only writes when BOTH name + email
+    /// are known; merges into the existing profile to preserve its id + photo.
+    private func writeProfile(
+        resolved: AppleAuthSession,
+        existingSession: AppleAuthSession?,
+        sameUser: Bool
+    ) async -> Bool {
+        guard let name = resolved.displayName, let mail = resolved.email else { return false }
+        // DUT-371: don't inherit a DIFFERENT signed-in user's profile id/photo on a
+        // shared device. A residual profile is mergeable only when it's the same
+        // Apple user, or when there's no prior session at all (a guest / manually-
+        // created profile this first sign-in is legitimately claiming — so we don't
+        // discard their photo). A different user's session present means the on-file
+        // profile is theirs: start fresh.
+        let differentUserSignedIn = existingSession != nil && !sameUser
+        let existingProfile = differentUserSignedIn ? nil : await profileStore.load()
+        let profile = UserProfile(
+            id: existingProfile?.id ?? UUID(),
+            displayName: name,
+            email: mail,
+            photoFilename: existingProfile?.photoFilename,
+            photoOriginalFilename: existingProfile?.photoOriginalFilename
+        )
+        return (try? await profileStore.save(profile)) != nil
     }
 
     /// DUT-266: the async auth-code → refresh-token exchange, fire-and-forget.

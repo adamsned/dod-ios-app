@@ -279,7 +279,7 @@ extension CookJournalView {
                     .foregroundStyle(DODColor.labelSecondary)
                     .multilineTextAlignment(.center)
             } else {
-                Text("Top of the path. You're a certified Dutch Oven Daddy. 👑")
+                Text("Top of the path. You're a certified Cast Iron Legend. 🏆")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.burntOrange)
                     .multilineTextAlignment(.center)

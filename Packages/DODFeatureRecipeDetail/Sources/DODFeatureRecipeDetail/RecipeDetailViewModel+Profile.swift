@@ -1,4 +1,5 @@
 import DODFeatureProfile
+import DODSupport
 import Foundation
 
 // US-44 / CL-138 / DUT-36 Phase c — profile-gate surface for
@@ -59,5 +60,14 @@ extension RecipeDetailViewModel {
             commentAuthorName = profile.displayName
             commentAuthorEmail = profile.email
         }
+        // Daddy Mode (owner rank) — resolve the current user's Cook Rank + owner
+        // status so their OWN comment rows can show them. The owner's rank IS "The
+        // Dutch Oven Daddy" (folds the old separate owner badge into the rank);
+        // everyone else shows their earned ladder rank. Display-only; the populate
+        // site (`RecipeDetailRatingsSection+PhaseD`) gates on own-comment.
+        let rankCooks = await dependencies.loadRankLadderCookCount()
+        isCurrentUserOwner = OwnerGate.isOwner(dependencies.currentUserIdentifier)
+        ownCommentRank = CookProgression.displayRank(totalCooks: rankCooks, isOwner: isCurrentUserOwner)
+            .map { ($0.title, $0.emoji) }
     }
 }
