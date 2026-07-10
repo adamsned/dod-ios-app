@@ -12,6 +12,17 @@ extension RecipeDetailView {
     /// renders only the non-nil rows / cells and no-ops when everything is nil.
     var infoCardModel: RecipeInfoCard.Model {
         let recipe = viewModel.recipe
+        // DUT-895 — nutrition scales by the SAME ratio the ingredient list
+        // already applies (`servingsScaleFactor`), so doubling servings
+        // doubles calories too. `NutritionScaler` is a pure, view-model-free
+        // function; this is its only call site today (`calories` is the
+        // only nutrition field the info card currently renders), but it
+        // scales the whole `RecipeNutrition` so a future protein/carbs/fat
+        // cell picks up already-scaled values for free.
+        let scaledNutrition = NutritionScaler.scaledNutrition(
+            recipe?.nutrition,
+            by: viewModel.servingsScaleFactor
+        )
         return RecipeInfoCard.Model(
             prepTime: recipe?.prepTime.map { format(duration: $0) },
             cookTime: recipe?.cookTime.map { format(duration: $0) },
@@ -20,7 +31,7 @@ extension RecipeDetailView {
             cuisine: joinedOrNil(recipe?.recipeCuisine),
             diet: joinedOrNil(recipe?.suitableForDiet.map(RecipeInfoCard.prettifyDiet)),
             servings: recipe?.servings.map { "\($0)" },
-            calories: recipe?.nutrition?.calories,
+            calories: scaledNutrition?.calories,
             author: recipe?.author
         )
     }
