@@ -132,25 +132,24 @@ extension ArticleHTMLParser {
 
     // MARK: - Images
 
-    /// Build an `.image` from a `<figure>` (caption = `<figcaption>` else `alt`).
+    /// Build an `.image` from a `<figure>` (visible caption = `<figcaption>` only).
     private static func figureBlock<S: StringProtocol>(inner: S, baseURL: URL?) -> ArticleBlock? {
         guard let imgTag = firstTagBody(named: "img", in: inner) else { return nil }
         guard let url = imageURL(fromTag: imgTag, baseURL: baseURL) else { return nil }
-        let caption = figcaptionText(in: inner)
-        return .image(url: url, caption: caption ?? altCaption(in: imgTag))
+        // DUT-918: a visible caption comes from `<figcaption>` ONLY. The old
+        // `?? alt` fallback surfaced the image's `alt` — which the DOD content
+        // team writes as internal Pinterest / "social media" production notes —
+        // as on-screen caption text, leaking across ~40 recipes. `alt` is
+        // accessibility text, never a reader caption.
+        return .image(url: url, caption: figcaptionText(in: inner))
     }
 
-    /// Build an `.image` from a standalone `<img>` (caption = `alt` else nil).
+    /// Build an `.image` from a standalone `<img>`. DUT-918: no `<figcaption>`
+    /// context, so no visible caption (the old `alt` fallback leaked internal
+    /// social-media notes — see ``figureBlock``).
     private static func imageBlock<S: StringProtocol>(fromTag tagBody: S, baseURL: URL?) -> ArticleBlock? {
         guard let url = imageURL(fromTag: tagBody, baseURL: baseURL) else { return nil }
-        return .image(url: url, caption: altCaption(in: tagBody))
-    }
-
-    /// The `alt` attribute, decoded + edge-trimmed, as a caption (nil if empty).
-    private static func altCaption<S: StringProtocol>(in tagBody: S) -> String? {
-        let alt = HTMLSanitizer.decodingEntities(attributeValue("alt", in: tagBody))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return alt.isEmpty ? nil : alt
+        return .image(url: url, caption: nil)
     }
 
     /// Extract the inline text of the first `<figcaption>` in `inner`, or nil.
