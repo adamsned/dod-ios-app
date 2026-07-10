@@ -13,10 +13,12 @@ import UIKit
 // cap. This file owns the entire picker → crop → save pipeline so the
 // host's body stays compact and the per-topic split mirrors the
 // `+Voice.swift` + `+CloudSync.swift` pattern in the Feed package.
+//
 // State assigned here is declared `internal` (no `private`) on the
 // host so this cross-file extension can mutate it; SwiftUI's `@State`
 // indirection still ensures the assignments drive view updates via the
 // parent's runtime state graph.
+//
 // Spec trace: US-44 AC-44.3, AC-44.8; CL-137.
 
 extension ProfileEditView {
@@ -54,8 +56,6 @@ extension ProfileEditView {
                         .foregroundStyle(DODColor.labelSecondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
-
-                    gravatarNudge
                 } else {
                     photoHeaderAvatar
                 }
