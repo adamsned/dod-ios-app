@@ -265,10 +265,10 @@ public final class RecipeDetailViewModel {
 
         do {
             let page = try await dependencies.fetchComments(postID: listItem.id, page: 1)
-            // AC-14.2 approved-only; DUT-433 keeps own pending visible (see helper).
             let approved = page.comments.filter { $0.status == .approved }
-            comments = approved + Self.stillPendingComments(in: cachedComments, approved: approved)
-            await dependencies.cacheComments(approved, postID: listItem.id)
+            let merged = Self.reconcileComments(approved: approved, cached: cachedComments)
+            comments = merged.visible  // DUT-742: keeps own held comment+rating, dedupes on approval
+            await dependencies.cacheComments(merged.toCache, postID: listItem.id)
             commentsLoadState = .ready
         } catch {
             DODLog.network.error("comments fetch failed: \(String(describing: error))")
