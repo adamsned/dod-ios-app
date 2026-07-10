@@ -49,6 +49,20 @@ struct GoogleProfileSignInTests {
         #expect(revoker.revokedTokens.isEmpty)
         #expect((try? sessionStore.load())?.refreshToken == "rt-1")  // carried forward
     }
+
+    /// DUT-701 — a Google sign-in must persist the session tagged `.google` so the
+    /// Apple credential-revocation validator skips it (the other half of the fix:
+    /// see `AppleCredentialValidatorTests.googleProviderSessionIsNeverPolledOrCleared`).
+    @Test func googleSignInTagsSessionAsGoogleProvider() async {
+        let sessionStore = InMemoryAppleAuthSessionStore()
+        let signIn = GoogleProfileSignIn(
+            profileStore: NoopProfileStore(),
+            sessionStore: sessionStore,
+            revoker: SpyRevoker()
+        )
+        _ = await signIn.apply(userIdentifier: "google-123", displayName: "Ned", email: "n@x.com")
+        #expect((try? sessionStore.load())?.provider == .google)
+    }
 }
 
 private final class NoopProfileStore: ProfileStoring, @unchecked Sendable {
