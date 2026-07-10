@@ -204,6 +204,27 @@ import Testing
         let names = categories.map { $0.name }
         #expect(names == ["Desserts", "Sides"])
     }
+
+    /// One malformed row (a taxonomy entry missing the required `slug` field —
+    /// seen from misconfigured category plugins) must not nuke the whole
+    /// Categories screen. `[WPDTO.Category]` is ONE atomic Codable array: a
+    /// single row that fails to decode throws for the ENTIRE list, dropping
+    /// every valid category. Mirrors the `LossyArray` fix already applied to
+    /// `posts()` / `search()` / comments (DUT-575) — that fix covered posts and
+    /// comments but missed the categories endpoint.
+    @Test func dropsOnlyTheMalformedRowNotTheWholeList() async throws {
+        let mixedFixture = """
+            [
+              { "id": 336, "name": "Desserts", "slug": "desserts", "count": 42 },
+              { "id": 501, "name": "Broken" },
+              { "id": 334, "name": "Sides",    "slug": "sides",    "count": 27 }
+            ]
+            """
+        let client = await makeClient(stubURL: "categories", json: mixedFixture)
+        let categories = try await client.categories()
+        let names = categories.map { $0.name }
+        #expect(names == ["Desserts", "Sides"])
+    }
 }
 
 @Suite("WPRestClient.media") struct WPRestClientMediaTests {
