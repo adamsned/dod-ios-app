@@ -99,6 +99,55 @@ struct CategoryRecipesRefreshRaceTests {
         #expect(viewModel.items.map(\.id) == Array(1...60))
     }
 
+    @Test func refreshNoOpsWhileLoadMoreInFlight() async throws {
+        // Reverse ordering of the race above: a load-more (page 2) is already
+        // in flight when a pull-to-refresh fires. `.refreshable` is attached
+        // for BOTH `.loaded` and `.loadingMore` (see `CategoryRecipesView`), so
+        // this is just as reachable as the refresh-first ordering DUT-706
+        // covers — but before this fix only `loadMoreIfNeeded`'s caller-side
+        // check respected `isLoadInFlight`; `refresh()` called straight into
+        // `load` with no check of its own. That let a concurrent page-1
+        // refresh resolve after the page-2 append had already committed,
+        // rewinding `currentPage` to 1 and replacing `items` back down to the
+        // page-1 set — silently dropping the just-shown page-2 recipes.
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.posts[1] = (1...20).map(Self.makeItem)
+        dependencies.posts[2] = (21...40).map(Self.makeItem)
+        dependencies.totalPagesOverride = 3
+        let category = DODDomain.Category(id: 9, name: "Big", slug: "big", count: 60)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+        #expect(viewModel.items.map(\.id) == Array(1...20))
+
+        // Arm the page-2 gate and kick off a load-more that parks mid-flight.
+        dependencies.armGate(page: 2)
+        let last = try #require(viewModel.items.last)  // id 20 — in the last 3
+        let loadMoreTask = Task { await viewModel.loadMoreIfNeeded(currentItem: last) }
+        await withCheckedContinuation { reached in
+            dependencies.gateReached = { @Sendable page in
+                if page == 2 { reached.resume() }
+            }
+        }
+        #expect(viewModel.loadState == .loadingMore)
+
+        // A pull-to-refresh fires while the load-more is still in flight. It
+        // must no-op (bail on the `isLoadInFlight` latch) rather than starting
+        // a second, concurrent `load(page: 1)`.
+        await viewModel.refresh()
+        #expect(
+            dependencies.fetchedPages.filter { $0 == 1 }.count == 1,
+            "a refresh racing an in-flight load-more must not fetch page 1 again"
+        )
+        #expect(viewModel.refreshCount == 0, "a no-op refresh must not fire the success haptic")
+
+        // Release the load-more. It must complete cleanly — the page-2 items
+        // land and the cursor advances — with nothing rewound by the refresh.
+        dependencies.openGate(page: 2)
+        await loadMoreTask.value
+        #expect(viewModel.items.map(\.id) == Array(1...40))
+        #expect(viewModel.loadState == .loaded)
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
