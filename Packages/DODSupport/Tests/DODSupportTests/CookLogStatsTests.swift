@@ -211,4 +211,50 @@ struct CookLogStatsTests {
         #expect(after == 3)
         #expect(CookProgression.rankUp(from: before, to: after)?.title == "Coal Tender")
     }
+
+    // MARK: - Average rating / last-30-days (DUT-882 iOS parity)
+
+    @Test func averageRatingIgnoresUnratedEntries() {
+        let entries = [
+            entry(1, "Bread", at: date(2026, 1, 5), rating: 5),
+            entry(1, "Bread", at: date(2026, 1, 6), rating: 3),
+            entry(2, "Chili", at: date(2026, 1, 7), rating: 4),
+            entry(3, "Stew", at: date(2026, 1, 8)),  // unrated — must not count
+            entry(3, "Stew", at: date(2026, 1, 9)),  // unrated — must not count
+        ]
+        // (5 + 3 + 4) / 3 rated entries = 4.0 — the 2 unrated entries are excluded,
+        // not averaged in as zeros.
+        #expect(CookLogStats.averageRating(entries) == 4.0)
+    }
+
+    @Test func averageRatingIsNilWhenNothingIsRated() {
+        let entries = [
+            entry(1, "Bread", at: date(2026, 1, 5)),
+            entry(2, "Chili", at: date(2026, 1, 6)),
+        ]
+        #expect(CookLogStats.averageRating(entries) == nil)
+        #expect(CookLogStats.averageRating([]) == nil)
+    }
+
+    @Test func cooksInLast30DaysCountsTheTrailingWindow() {
+        let now = date(2026, 2, 4)
+        let entries = [
+            entry(1, "R", at: date(2026, 2, 4), rating: 5),  // today — counts
+            entry(2, "R", at: date(2026, 1, 6)),  // exactly 29 days ago — counts
+            entry(3, "R", at: date(2026, 1, 4)),  // 31 days ago — does NOT count
+            entry(4, "R", at: date(2026, 1, 1)),  // well outside — does NOT count
+        ]
+        // 2 of the 4 entries fall inside the 30-day window (today + prior 29 days).
+        #expect(CookLogStats.cooksInLast30Days(entries, asOf: now, calendar: calendar) == 2)
+    }
+
+    @Test func cooksInLast30DaysExcludesFutureDatedEntries() {
+        let now = date(2026, 2, 4)
+        let entries = [entry(1, "R", at: date(2026, 2, 5))]  // one day in the future
+        #expect(CookLogStats.cooksInLast30Days(entries, asOf: now, calendar: calendar) == 0)
+    }
+
+    @Test func cooksInLast30DaysIsZeroForAnEmptyJournal() {
+        #expect(CookLogStats.cooksInLast30Days([], asOf: date(2026, 2, 4), calendar: calendar) == 0)
+    }
 }

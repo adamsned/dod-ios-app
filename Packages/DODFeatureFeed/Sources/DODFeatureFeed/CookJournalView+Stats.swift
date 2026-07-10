@@ -12,11 +12,18 @@ import SwiftUI
 // main file where they can reach `CookJournalView`'s private state.
 extension CookJournalView {
 
-    /// The three derived header stats (total / weekly streak / most-cooked).
+    /// The derived header stats (total / weekly streak / most-cooked), plus the
+    /// DUT-882 iOS-parity additions (average rating / cooks in the last 30 days)
+    /// that back the summary card below the header.
     struct JournalStats: Equatable {
         var total = 0
         var streak = 0
         var mostCooked: CookLogStats.RecipeFrequency?
+        /// DUT-882 — nil when nothing has been rated yet (shows a placeholder
+        /// rather than a misleading "0.0").
+        var averageRating: Double?
+        /// DUT-882 — cooks logged in the trailing 30-calendar-day window.
+        var last30Days = 0
     }
 
     /// Derive the header stats from a cook history. Pure + static so the
@@ -33,7 +40,9 @@ extension CookJournalView {
         return JournalStats(
             total: CookLogStats.totalCooks(cooks),
             streak: CookLogStats.currentWeeklyStreak(cooks, asOf: .now, calendar: weekCalendar),
-            mostCooked: CookLogStats.mostCooked(cooks)
+            mostCooked: CookLogStats.mostCooked(cooks),
+            averageRating: CookLogStats.averageRating(cooks),
+            last30Days: CookLogStats.cooksInLast30Days(cooks, asOf: .now, calendar: weekCalendar)
         )
     }
 
@@ -60,5 +69,32 @@ extension CookJournalView {
         // DUT — merge the value + label so VoiceOver reads "5 cooks" as one element,
         // not a contextless "5" then "cooks" (mirrors `journeyHeader`).
         .accessibilityElement(children: .combine)
+    }
+
+    /// DUT-882 — the iOS-parity stats summary card (Android's Cook Journal
+    /// stats: total cooks, average rating, most-cooked recipe, cooks in the
+    /// last 30 days), laid out as a 2×2 grid of ``statTile``s below the
+    /// existing habit-streak header. Takes plain values (not private state) so
+    /// it can live in this file alongside `statTile`, mirroring the existing
+    /// split between pure rendering helpers here and stateful views in the
+    /// main `CookJournalView` file.
+    func statsSummaryCard(stats: JournalStats) -> some View {
+        VStack(spacing: DODSpacing.sm) {
+            HStack(spacing: DODSpacing.sm) {
+                statTile("\(stats.total)", stats.total == 1 ? "total cook" : "total cooks")
+                statTile(Self.averageRatingText(stats.averageRating), "avg rating")
+            }
+            HStack(spacing: DODSpacing.sm) {
+                statTile(stats.mostCooked?.title ?? "—", "most cooked")
+                statTile("\(stats.last30Days)", "cooks (30d)")
+            }
+        }
+    }
+
+    /// "4.3"-style formatting for the average-rating tile, or an em dash when
+    /// nothing has been rated yet (DUT-882 — no ratings shouldn't read as "0.0").
+    private static func averageRatingText(_ average: Double?) -> String {
+        guard let average else { return "—" }
+        return String(format: "%.1f", average)
     }
 }
