@@ -203,11 +203,19 @@ public enum JSONLDRecipeParser {
         // Drop blank/whitespace-only entries so comments, section headers, and
         // stray markup that sanitize to empty don't become garbage Shopping List
         // rows (DUT-587). Mirrors the WPRM card parser's non-empty guard.
-        guard let array = raw as? [String] else { return [] }
+        //
+        // `raw as? [String]` succeeds only when EVERY element is a String, so a
+        // single malformed entry (a stray JSON `null`/number/object some WPRM
+        // configs emit, e.g. an ingredient-group header) failed the whole-array
+        // cast and silently dropped ALL ingredients. Cast to `[Any]` and keep
+        // only the elements that are Strings, mirroring the `mapVideo` DUT-214
+        // fix for the identical all-or-nothing cast failure mode.
+        guard let array = raw as? [Any] else { return [] }
+        let strings = array.compactMap { $0 as? String }
         // DUT-705: enumerate so a legitimately repeated ingredient line gets an
         // index-salted, distinct-but-stable id (equal text at different
         // positions must not collide on one `id`).
-        return array.enumerated().compactMap {
+        return strings.enumerated().compactMap {
             RecipeIngredient(nonBlank: HTMLSanitizer.plainText(from: $0.element), index: $0.offset)
         }
     }
