@@ -10,6 +10,10 @@ let package = Package(
     dependencies: [
         .package(path: "../DODDomain"),
         .package(path: "../DODNetworking"),
+        // DUT-917: the display audit renders each post's body through the same
+        // `ArticleBodyExtractor` + `ArticleHTMLParser` pipeline the app uses in
+        // `RecipeDetailViewModel+Classify`, so the audit needs DODSupport.
+        .package(path: "../DODSupport"),
         // REG-16 / T-420: the live newest-post test caches the fetched list
         // through `RecipeStore.cache(listItems:)` and reads it back via
         // `RecipeStore.listItems(forIDs:)`, exercising the exact same
@@ -28,6 +32,7 @@ let package = Package(
                 "DODDomain",
                 "DODNetworking",
                 "DODPersistence",
+                "DODSupport",
             ]
         ),
     ]
