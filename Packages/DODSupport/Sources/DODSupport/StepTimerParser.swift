@@ -31,10 +31,24 @@ public enum StepTimerParser {
         guard let primary = nextQuantityUnit(in: text, from: text.startIndex) else {
             return nil
         }
-        let baseSeconds = Int((primary.quantity * Double(primary.unit.seconds)).rounded())
+        // DUT-914: `RecipeInstruction.text` is untrusted JSON-LD; a malformed
+        // 20+ digit quantity makes `quantity × seconds` exceed `Int.max`, and a
+        // trapping `Int(Double)` would crash Cook Mode (same class as
+        // FractionRenderer's DUT-609). An absurd multi-billion-second value is
+        // not a usable timer, so bail to nil via the guarded `safeSeconds`.
+        guard let baseSeconds = safeSeconds(primary.quantity, primary.unit) else { return nil }
         let mixedExtra = mixedFollowUp(in: text, from: primary.afterIndex, currentUnit: primary.unit)
         let total = baseSeconds + mixedExtra
         return total > 0 ? .seconds(total) : nil
+    }
+
+    /// Whole seconds for `quantity × unit.seconds`, or `nil` when the product is
+    /// non-finite or overflows `Int` (DUT-914 — untrusted JSON-LD can carry a
+    /// pathological digit run; a bare `Int(Double)` traps on overflow).
+    private static func safeSeconds(_ quantity: Double, _ unit: Unit) -> Int? {
+        let product = (quantity * Double(unit.seconds)).rounded()
+        guard product.isFinite else { return nil }
+        return Int(exactly: product)
     }
 
     // MARK: - Internals
@@ -115,7 +129,9 @@ public enum StepTimerParser {
         guard skipped < text.endIndex, text[skipped].isNumber else { return 0 }
         guard let next = nextQuantityUnit(in: text, from: skipped) else { return 0 }
         guard next.unit.seconds < currentUnit.seconds else { return 0 }
-        return Int((next.quantity * Double(next.unit.seconds)).rounded())
+        // DUT-914: guard the same Int-overflow trap as the primary path; an
+        // overflowing follow-up simply contributes nothing.
+        return safeSeconds(next.quantity, next.unit) ?? 0
     }
 
     /// Read one numeric quantity starting at `index`. Dispatches to the
