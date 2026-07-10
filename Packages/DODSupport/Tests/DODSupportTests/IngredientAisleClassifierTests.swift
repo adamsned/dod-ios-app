@@ -223,4 +223,46 @@ struct IngredientAisleClassifierTests {
         #expect(Aisle.allCases.count == 6)
         #expect(Set(Aisle.allCases.map(\.rawValue)).count == 6)
     }
+
+    // MARK: - DUT-716 word-boundary regressions
+
+    /// Short stems (<= 4 chars) must not match inside a longer word where the
+    /// match begins mid-word (preceded by a letter). "eggplant" wins via the
+    /// explicit whole-word entry in the keyword map (longest-first), so even
+    /// before the boundary guard fires, it resolves to `.produce`.
+    @Test func eggplantIsProduce() {
+        #expect(IngredientAisleClassifier.classify("1 large eggplant, diced") == .produce)
+    }
+
+    /// "ham" (3 chars) appears inside "graham" preceded by 'a' (a letter), so
+    /// `matchesAtWordStart` blocks the mid-word hit and the line falls through
+    /// to `.other` (no "graham" or "graham cracker" entry in the keyword map).
+    @Test func grahamCrackerCrumbsIsNotMeat() {
+        #expect(IngredientAisleClassifier.classify("1 cup graham cracker crumbs") == .other)
+    }
+
+    /// "graham flour" must NOT fire on "ham" but MUST fire on "flour" (5 chars,
+    /// plain substring) → `.pantry`.
+    @Test func grahamFlourIsPantry() {
+        #expect(IngredientAisleClassifier.classify("2 cups graham flour") == .pantry)
+    }
+
+    /// A real "egg" at a word boundary (preceded by space in "eggs") must still
+    /// classify → `.dairy` so we haven't over-blocked the legitimate case.
+    @Test func eggsAtWordStartAreStillDairy() {
+        #expect(IngredientAisleClassifier.classify("3 large eggs, beaten") == .dairy)
+    }
+
+    /// "salt" (4 chars) inside "unsalted" is preceded by 'n' (a letter), so
+    /// `matchesAtWordStart` blocks it; "butter" (6 chars, plain substring) then
+    /// wins → `.dairy`.
+    @Test func saltInsideUnsaltedIsBlocked() {
+        #expect(IngredientAisleClassifier.classify("4 tablespoons unsalted butter") == .dairy)
+    }
+
+    /// "salt" at a genuine word start ("kosher salt") must still resolve →
+    /// `.spices` so the boundary guard doesn't over-block the real case.
+    @Test func saltAtWordStartIsStillSpices() {
+        #expect(IngredientAisleClassifier.classify("1 tsp kosher salt") == .spices)
+    }
 }
