@@ -18,7 +18,13 @@ struct VoiceRows: View {
     @Bindable var viewModel: SettingsViewModel
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: DODSpacing.sm) {
+        // DUT — center-align the trailing speaker icon against the
+        // title+subtitle stack. `.firstTextBaseline` pinned the icon's baseline
+        // to the title's first baseline, which reserved extra vertical space
+        // above the stack (the icon extends above line 1 while the subtitle
+        // extends below), inflating the row's height past its siblings. Center
+        // alignment makes the row only as tall as the two-line text stack.
+        HStack(spacing: DODSpacing.sm) {
             VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                 Text("Cook Mode Voice")
                     .dodFont(DODType.body)
