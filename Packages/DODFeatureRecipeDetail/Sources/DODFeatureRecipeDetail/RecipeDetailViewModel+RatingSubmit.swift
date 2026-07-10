@@ -46,7 +46,7 @@ extension RecipeDetailViewModel {
             snackbarMessage = "Thanks for rating."
         } catch {
             DODLog.network.error("post rating failed: \(String(describing: error))")
-            snackbarMessage = "Couldn't save your rating — try again."
+            snackbarMessage = "Couldn't save your rating. Try again."
         }
     }
 

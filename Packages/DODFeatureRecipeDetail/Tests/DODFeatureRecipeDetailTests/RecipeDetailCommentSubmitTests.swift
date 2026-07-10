@@ -90,7 +90,7 @@ struct RecipeDetailCommentSubmitTests {
         viewModel.setCommentDraft("I love this recipe!")
         await viewModel.submitComment()
 
-        #expect(viewModel.snackbarMessage == "Comment submitted — it will appear after approval.")
+        #expect(viewModel.snackbarMessage == "Comment submitted. It will appear after approval.")
         // Draft cleared so the field reads "submitted", reducing re-submits.
         #expect(viewModel.commentDraft.isEmpty)
         // Optimistically inserted, and still flagged pending so the row shows
@@ -190,7 +190,7 @@ struct RecipeDetailCommentSubmitTests {
         await viewModel.submitComment()
 
         #expect(
-            viewModel.snackbarMessage == "Looks like you already posted this — it may be awaiting approval."
+            viewModel.snackbarMessage == "Looks like you already posted this. It may be awaiting approval."
         )
         #expect(viewModel.snackbarMessage?.contains("409") == false)
         // Draft preserved (the user might be trying to edit + repost).
@@ -211,7 +211,7 @@ struct RecipeDetailCommentSubmitTests {
         await viewModel.submitComment()
 
         #expect(
-            viewModel.snackbarMessage == "Looks like you already posted this — it may be awaiting approval."
+            viewModel.snackbarMessage == "Looks like you already posted this. It may be awaiting approval."
         )
     }
 

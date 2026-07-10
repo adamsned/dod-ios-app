@@ -48,7 +48,7 @@ struct RecipeDetailRatingsHalfStateTests {
         // The bare comment-error snackbar is replaced with the half-state copy.
         #expect(
             viewModel.snackbarMessage
-                == "Your rating was saved, but the comment didn't post — try again."
+                == "Your rating was saved, but the comment didn't post. Try again."
         )
         // The rating aggregate reflects the successful rating POST.
         #expect(viewModel.ratingSummary?.userRating == 4)

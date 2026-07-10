@@ -19,14 +19,14 @@ struct CommentErrorSnackbarTests {
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
             for: WPClientError.networkUnavailable
         )
-        #expect(snackbar == "You're offline — reconnect and try again.")
+        #expect(snackbar == "You're offline. Reconnect and try again.")
     }
 
     @Test func timeoutSurfacesServerTookTooLongMessage() {
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
             for: WPClientError.timeout
         )
-        #expect(snackbar == "The server took too long — try again.")
+        #expect(snackbar == "The server took too long. Try again.")
     }
 
     @Test func httpStatusSurfacesServerSaidStatusCode() {
@@ -43,7 +43,7 @@ struct CommentErrorSnackbarTests {
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
             for: WPClientError.httpStatus(409)
         )
-        #expect(snackbar == "Looks like you already posted this — it may be awaiting approval.")
+        #expect(snackbar == "Looks like you already posted this. It may be awaiting approval.")
     }
 
     /// DUT-27 (build 8): the exact shape from the report — a 409 carrying the
@@ -56,7 +56,7 @@ struct CommentErrorSnackbarTests {
                 message: "Duplicate comment detected; it looks as though you\u{2019}ve already said that!"
             )
         )
-        #expect(snackbar == "Looks like you already posted this — it may be awaiting approval.")
+        #expect(snackbar == "Looks like you already posted this. It may be awaiting approval.")
     }
 
     /// DUT-7 / AC-14.4: when WordPress hands back a reason, the snackbar
@@ -73,14 +73,14 @@ struct CommentErrorSnackbarTests {
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
             for: WPClientError.decoding(message: "bad JSON")
         )
-        #expect(snackbar == "Couldn't read the server's reply — try again.")
+        #expect(snackbar == "Couldn't read the server's reply. Try again.")
     }
 
     @Test func underlyingSurfacesGenericMessage() {
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(
             for: WPClientError.underlying(message: "anything")
         )
-        #expect(snackbar == "Couldn't post your comment — try again.")
+        #expect(snackbar == "Couldn't post your comment. Try again.")
     }
 
     @Test func nonWPErrorIsWrappedThenMapped() {
@@ -88,6 +88,6 @@ struct CommentErrorSnackbarTests {
         // WPClientError.wrap then mapped — proves the safety net.
         let urlError = URLError(.notConnectedToInternet)
         let snackbar = RecipeDetailViewModel.commentErrorSnackbar(for: urlError)
-        #expect(snackbar == "You're offline — reconnect and try again.")
+        #expect(snackbar == "You're offline. Reconnect and try again.")
     }
 }

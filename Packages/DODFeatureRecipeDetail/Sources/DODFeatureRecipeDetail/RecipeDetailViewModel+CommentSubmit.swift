@@ -129,7 +129,7 @@ extension RecipeDetailViewModel {
             // comment needs a retry.
             if ratingRecorded, commentFailed {
                 snackbarMessage =
-                    "Your rating was saved, but the comment didn't post — try again."
+                    "Your rating was saved, but the comment didn't post. Try again."
             } else if hasRating, !ratingRecorded, !commentFailed {
                 // DUT-738: the inverse half-state — the comment posted but the
                 // WPRM rating POST failed. The stars are NOT persisted (comment
@@ -137,7 +137,7 @@ extension RecipeDetailViewModel {
                 // "Comment posted." confirmation. Tell the user their rating
                 // didn't save, mirroring the DUT-395 message above.
                 snackbarMessage =
-                    "Your comment posted, but your rating didn't save — try the stars again."
+                    "Your comment posted, but your rating didn't save. Try the stars again."
             }
         } else {
             await submitRating(stars: pendingUserRating)
@@ -257,7 +257,7 @@ extension RecipeDetailViewModel {
                 // rejects it — stuck forever. The pending bucket is filtered from
                 // the public reader and flips to approved when a fetch returns it.
                 await dependencies.cachePendingComment(stamped, postID: listItem.id)
-                snackbarMessage = "Comment submitted — it will appear after approval."
+                snackbarMessage = "Comment submitted. It will appear after approval."
             }
             commentDraft = ""
         } catch {

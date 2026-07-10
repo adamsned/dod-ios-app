@@ -25,9 +25,9 @@ extension RecipeDetailViewModel {
             // DUT-521: there is no comment outbox — an offline POST is dropped
             // (only the draft text is retained). Don't imply a queued send;
             // tell the user to reconnect and retry.
-            return "You're offline — reconnect and try again."
+            return "You're offline. Reconnect and try again."
         case .timeout:
-            return "The server took too long — try again."
+            return "The server took too long. Try again."
         case .httpStatus(let code):
             // DUT-27: a bare 409 on this path is WordPress's duplicate-comment
             // verdict (the first post already landed and is in moderation).
@@ -49,13 +49,13 @@ extension RecipeDetailViewModel {
             // (DUT-27), so no raw "&#8217;" leaks into the chip.
             return "Couldn't post your comment (server said \(code)): \(message)"
         case .decoding:
-            return "Couldn't read the server's reply — try again."
+            return "Couldn't read the server's reply. Try again."
         case .underlying:
-            return "Couldn't post your comment — try again."
+            return "Couldn't post your comment. Try again."
         case .cancelled:
             // DUT-391: the submit was cancelled (view dismissed mid-request). Rare on
             // this path, but the case must be handled; a benign retry prompt.
-            return "Couldn't post your comment — try again."
+            return "Couldn't post your comment. Try again."
         }
     }
 
@@ -64,5 +64,5 @@ extension RecipeDetailViewModel {
     /// the goal is to stop the user re-submitting, not to flag a failure.
     /// DUT-27.
     nonisolated static let duplicateCommentSnackbar =
-        "Looks like you already posted this — it may be awaiting approval."
+        "Looks like you already posted this. It may be awaiting approval."
 }

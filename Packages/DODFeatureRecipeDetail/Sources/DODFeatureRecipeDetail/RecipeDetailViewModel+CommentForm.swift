@@ -59,7 +59,7 @@ extension RecipeDetailViewModel {
             try await dependencies.saveGuestIdentity(name: name, email: email)
         } catch {
             DODLog.persistence.error("save guest identity failed: \(String(describing: error))")
-            snackbarMessage = "Couldn't save your name — we'll still post your comment."
+            snackbarMessage = "Couldn't save your name. We'll still post your comment."
         }
     }
 }

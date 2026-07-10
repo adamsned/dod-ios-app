@@ -280,7 +280,7 @@ import Testing
         // prepended" behavior that left the user unsure the post landed.
         let inserted = try #require(viewModel.comments.first { $0.id == 1000 })
         #expect(inserted.status == .hold)
-        #expect(viewModel.snackbarMessage == "Comment submitted — it will appear after approval.")
+        #expect(viewModel.snackbarMessage == "Comment submitted. It will appear after approval.")
         let submitted = dependencies.telemetryEvents.compactMap { event -> Bool? in
             if case .recipeCommentSubmitted(_, let awaiting) = event { return awaiting }
             return nil
