@@ -37,9 +37,10 @@ public enum OwnerGate {
     /// Not a secret (see the type doc): it identifies an account but authorizes
     /// nothing on the client.
     ///
-    /// Configured 2026-07-09 with the owner's real `sub`, captured from his
-    /// signed-in device via the Settings version-footer diagnostic. Daddy Mode
-    /// (Phase 1, cosmetic) is now live for this account only.
+    /// Configured 2026-07-09 with the owner's real `sub`. Daddy Mode
+    /// (Phase 1, cosmetic) is now live for this account only. (The one-off
+    /// capture mechanism that read this value off his signed-in device has
+    /// since been removed now that the value is configured.)
     public static let ownerUserIdentifier = "000180.c66be46df96a445d9987936216a97e66.1856"
 
     /// Whether `sub` identifies the configured app owner.
