@@ -292,7 +292,12 @@ public actor RecipeStore {
             }
         )
         let rows = try modelContext.fetch(descriptor)
-        let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+        // `CachedRecipe.id` has NO `@Attribute(.unique)` (CloudKit mirroring
+        // forbids unique constraints), so two rows can share an id and
+        // `Dictionary(uniqueKeysWithValues:)` would trap. Use the
+        // duplicate-tolerant first-wins form instead, mirroring the DUT-702
+        // fix applied to the sibling `categoryIDs(forRecipeIDs:)`.
+        let byID = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         // Preserve caller's ordering.
         return ids.compactMap { id in byID[id].map(Self.toListItem) }
     }
