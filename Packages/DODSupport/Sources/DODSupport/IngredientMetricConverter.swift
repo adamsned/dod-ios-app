@@ -64,6 +64,30 @@ public enum IngredientMetricConverter {
         return name.isEmpty ? unitText : "\(unitText) \(name)"
     }
 
+    /// DUT-737 — locale-injectable entry point for unit testing. Same
+    /// conversion logic as ``metric(_:)`` but uses a formatter built from
+    /// `locale` so tests can pin a comma-decimal locale (e.g. `fr_FR`) and
+    /// verify the decimal separator independently of the host machine's
+    /// setting. Production callers use the public ``metric(_:)`` overload,
+    /// which reaches the cached ``decimalFormatter`` via the private helpers.
+    internal static func metric(_ text: String, locale: Locale) -> String {
+        let parsed = IngredientLineParser.parse(text)
+        guard
+            let quantity = parsed.quantity,
+            let unit = parsed.unit,
+            let conversion = conversions[unit]
+        else {
+            return text
+        }
+        let magnitude = quantity * conversion.factor
+        guard magnitude.isFinite, magnitude > 0 else { return text }
+
+        let formatter = makeDecimalFormatter(locale: locale)
+        let unitText = format(magnitude, as: conversion.dimension, formatter: formatter)
+        let name = parsed.name ?? ""
+        return name.isEmpty ? unitText : "\(unitText) \(name)"
+    }
+
     // MARK: - Shared preference contract
 
     /// Canonical `UserDefaults` key for the "Use Metric Units" ingredient
@@ -84,6 +108,17 @@ public enum IngredientMetricConverter {
     /// Render a base-unit magnitude (millilitres or grams) as its cooking-ready
     /// display string, rolling up to the larger unit at the 1000 threshold.
     private static func format(_ magnitude: Double, as dimension: Dimension) -> String {
+        format(magnitude, as: dimension, formatter: Self.decimalFormatter)
+    }
+
+    /// Formatter-parameterised core used by the locale-injectable
+    /// ``metric(_:locale:)`` path. Keeps the rollup/rounding logic in one
+    /// place while letting the caller supply a locale-specific formatter.
+    private static func format(
+        _ magnitude: Double,
+        as dimension: Dimension,
+        formatter: NumberFormatter
+    ) -> String {
         // Roll up to litres / kilograms at the 1000 threshold. The guard checks
         // BOTH the raw magnitude AND its cooking-friendly rounded value: a value
         // like 996 ml is < 1000 raw, but `roundBase` snaps it to 1000, so
@@ -92,7 +127,7 @@ public enum IngredientMetricConverter {
         // too closes that gap.
         if magnitude >= 1000 || roundBase(magnitude) >= 1000 {
             let large = magnitude / 1000
-            return "\(trimDecimal(large)) \(dimension.largeSymbol)"
+            return "\(trimDecimal(large, formatter: formatter)) \(dimension.largeSymbol)"
         }
         let rounded = roundBase(magnitude)
         // A real positive amount must never render as "0 ml" / "0 g", and a small
@@ -103,7 +138,7 @@ public enum IngredientMetricConverter {
         // reads "2.5 ml" and ¼ tsp (1.25 ml) still reads "1.3 ml". 1 tsp is
         // magnitude == 5 (not < 5), so it is untouched and still reads "5 ml".
         if rounded == 0 || magnitude < 5 {
-            let oneDecimal = trimDecimal(magnitude)
+            let oneDecimal = trimDecimal(magnitude, formatter: formatter)
             // Even one decimal collapses to "0" for a true micro-amount (any
             // magnitude < 0.05, e.g. 1/200 tsp → 0.025 ml). Rendering "0.0 ml"
             // would still read as nothing, so show an honest "less than a tenth"
@@ -130,8 +165,16 @@ public enum IngredientMetricConverter {
     }
 
     /// Format a litre / kilogram magnitude to one decimal, trimming a trailing
-    /// `.0` so `2.0` reads as `"2"`.
+    /// `.0` so `2.0` reads as `"2"`. Uses the shared ``decimalFormatter`` which
+    /// inherits `Locale.current`.
     private static func trimDecimal(_ value: Double) -> String {
+        trimDecimal(value, formatter: Self.decimalFormatter)
+    }
+
+    /// Formatter-parameterised core — used by the locale-injectable path so
+    /// tests can pin a specific decimal separator without affecting the cached
+    /// static formatter.
+    private static func trimDecimal(_ value: Double, formatter: NumberFormatter) -> String {
         let rounded = (value * 10).rounded() / 10
         if rounded == rounded.rounded() {
             return String(Int(rounded.rounded()))
@@ -141,7 +184,7 @@ public enum IngredientMetricConverter {
         // "1.2 L". `String(format: "%.1f")` always pins the C-locale period —
         // the same bug DUT-320 fixed for `FractionRenderer`, and metric mode is
         // exactly the surface a non-US cook enables.
-        return Self.decimalFormatter.string(from: NSNumber(value: rounded))
+        return formatter.string(from: NSNumber(value: rounded))
             ?? String(rounded)
     }
 
@@ -156,6 +199,19 @@ public enum IngredientMetricConverter {
         formatter.maximumFractionDigits = 1
         return formatter
     }()
+
+    /// Build a one-decimal formatter with an explicit locale — used by
+    /// ``metric(_:locale:)`` so tests can pin a locale without mutating the
+    /// shared ``decimalFormatter``.
+    private static func makeDecimalFormatter(locale: Locale) -> NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = false
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 1
+        formatter.locale = locale
+        return formatter
+    }
 
     // MARK: - Tables
 
