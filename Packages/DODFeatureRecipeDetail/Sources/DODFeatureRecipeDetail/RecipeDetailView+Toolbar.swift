@@ -66,17 +66,41 @@ extension RecipeDetailView {
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
 
-                ShareLink(item: viewModel.canonicalURL) {
+                // DUT-889 — iOS parity twin of Android's DUT-886 "Share as
+                // Text". A bare `ShareLink` can only carry one payload, so
+                // the URL-only share (unchanged behavior) and the new
+                // formatted plain-text share now live behind a `Menu` on
+                // the same toolbar glyph rather than adding a 6th icon.
+                // Each option gets its own `simultaneousGesture` so the
+                // haptic + `didShare()` telemetry still fires regardless of
+                // which format the user picked.
+                Menu {
+                    ShareLink(item: viewModel.canonicalURL) {
+                        Label("Share Link", systemImage: "link")
+                    }
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            shareTapCount += 1  // fires the `.sensoryFeedback` tick on the body
+                            Task { await viewModel.didShare() }
+                        }
+                    )
+
+                    if let recipe = viewModel.recipe {
+                        ShareLink(item: RecipeShareTextFormatter.format(recipe: recipe)) {
+                            Label("Share as Text", systemImage: "doc.plaintext")
+                        }
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                shareTapCount += 1
+                                Task { await viewModel.didShare() }
+                            }
+                        )
+                    }
+                } label: {
                     Image(systemName: "square.and.arrow.up")
                         .foregroundStyle(DODColor.label)
                         .shadow(color: .black.opacity(0.35), radius: 3)
                 }
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        shareTapCount += 1  // fires the `.sensoryFeedback` tick on the body
-                        Task { await viewModel.didShare() }
-                    }
-                )
                 .accessibilityLabel("Share recipe")
             }
         }
