@@ -15,7 +15,7 @@ extension RecipeDetailRatingsSection {
     /// look is unchanged from the old composer, minus its duplicate stars.
     var commentField: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            Text("Add a comment (optional)")
+            Text("Add a Comment (Optional)")
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
             ZStack(alignment: .topLeading) {

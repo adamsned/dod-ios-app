@@ -39,7 +39,7 @@ public struct GuestIdentitySheet: View {
 
                 Text(
                     "Your name appears next to your comments. Your email is only used by "
-                        + "dutchovendaddy.com to moderate and reply — it's never shared with anyone else."
+                        + "dutchovendaddy.com to moderate and reply. It's never shared with anyone else."
                 )
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)

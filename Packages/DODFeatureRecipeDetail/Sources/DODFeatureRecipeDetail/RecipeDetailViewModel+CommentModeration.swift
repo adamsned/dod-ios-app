@@ -36,7 +36,7 @@ extension RecipeDetailViewModel {
     /// report landed so the affordance isn't a silent success either.
     public func acknowledgeReport(of comment: RecipeComment, mailtoOpened: Bool) {
         if mailtoOpened {
-            snackbarMessage = "Reported. Thanks — we'll review it."
+            snackbarMessage = "Reported. Thanks, we'll review it."
         } else {
             snackbarMessage = """
                 No mail app is set up. Email \(Self.moderationContactEmail) \
@@ -82,7 +82,7 @@ extension RecipeDetailViewModel {
 
                     "\(comment.body)"
 
-                    — by \(comment.authorName)
+                    by \(comment.authorName)
                     Recipe post ID: \(comment.postID)
                     Comment ID: \(comment.id)
                     """

@@ -232,7 +232,7 @@ struct RecipeDetailRatingsConsolidationTests {
         // so the user is told (instead of a bare "Comment posted." that hides it).
         #expect(
             viewModel.snackbarMessage
-                == "Your comment posted, but your rating didn't save — try the stars again."
+                == "Your comment posted, but your rating didn't save. Try the stars again."
         )
         #expect(viewModel.comments.first?.id == 5003)
         let commented = dependencies.telemetryEvents.contains { event in
