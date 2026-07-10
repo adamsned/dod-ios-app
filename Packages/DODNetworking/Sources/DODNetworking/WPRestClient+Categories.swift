@@ -11,9 +11,14 @@ extension WPRestClient {
             URLQueryItem(name: "hide_empty", value: "true"),
             URLQueryItem(name: "_fields", value: "id,name,slug,count"),
         ]
-        let dtos: [WPDTO.Category] = try await get(path: "categories", queryItems: queryItems)
+        // A single malformed row (e.g. a taxonomy entry missing a required
+        // field) otherwise fails the ENTIRE `[WPDTO.Category]` decode,
+        // dropping every valid category. `LossyArray` skips just the bad row,
+        // mirroring the `posts()` / `search()` / comments fix (DUT-575) —
+        // that fix covered posts and comments but missed this endpoint.
+        let lossy: LossyArray<WPDTO.Category> = try await get(path: "categories", queryItems: queryItems)
         return
-            dtos
+            lossy.elements
             .filter { $0.count >= 1 }
             .map { $0.toDomain() }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
