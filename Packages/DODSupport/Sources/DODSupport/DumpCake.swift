@@ -30,6 +30,7 @@ extension DumpCake {
     /// automatically) is the noted follow-up.
     public static let all: [DumpCake] = [
         DumpCake(id: 16370, slug: "lemon-blueberry-dump-cake", title: "Lemon Blueberry Dump Cake"),
+        DumpCake(id: 22294, slug: "peach-dump-cake", title: "Peach Dump Cake"),
         DumpCake(id: 19904, slug: "dutch-oven-peach-cobbler", title: "Dutch Oven Peach Cobbler"),
         DumpCake(id: 23570, slug: "peach-blueberry-cobbler", title: "Peach Blueberry Cobbler"),
         DumpCake(
