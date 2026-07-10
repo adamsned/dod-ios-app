@@ -171,9 +171,9 @@ extension RecipeStore {
                 // real CloudKit import reconciles, proving a remote copy exists to
                 // re-hydrate. Absent that, protect the possibly-local-only store
                 // exactly like the opted-out branch.
-                let mirrorConfirmed =
-                    cloudKitSyncOptIn(in: defaults) && backfillDidComplete(in: defaults)
-                resetOnDiskStores(includingSyncedStore: mirrorConfirmed)
+                resetOnDiskStores(
+                    includingSyncedStore: shouldSweepSyncedStore(defaults: defaults)
+                )
                 return try ModelContainer(
                     for: Schema(SchemaV6.models),
                     migrationPlan: MigrationPlan.self,
@@ -182,6 +182,17 @@ extension RecipeStore {
                 )
             }
         )
+    }
+
+    /// DUT-733: the `SyncedSaved` store is swept ONLY when the user is opted-in
+    /// to iCloud sync AND a CloudKit import has been confirmed (`backfillDidComplete`).
+    /// Opt-in alone is not sufficient: an opted-in user whose CloudKit is unavailable
+    /// (no iCloud account, or the Production schema not yet deployed) runs on a
+    /// LOCAL-ONLY fallback store with no remote copy — sweeping on the flag alone
+    /// would destroy the sole copy of their Saved list. Extracted from the recover
+    /// closure so the three-way gate is unit-testable by injection.
+    internal static func shouldSweepSyncedStore(defaults: UserDefaults) -> Bool {
+        cloudKitSyncOptIn(in: defaults) && backfillDidComplete(in: defaults)
     }
 
     /// Move on-disk SwiftData store files aside so the next open starts from a
