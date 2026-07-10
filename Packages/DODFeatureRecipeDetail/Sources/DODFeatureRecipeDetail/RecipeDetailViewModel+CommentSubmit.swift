@@ -182,14 +182,40 @@ extension RecipeDetailViewModel {
             await applyRatingRefresh(updated)
             return true
         } catch {
-            // Quiet on failure: the comment POST owns the user-facing result,
-            // and the rating can be re-submitted from the stars control. Log
-            // for the on-device diagnostic trail (DUT-7 parity).
+            // Quiet on the SNACKBAR (the comment POST owns the user-facing
+            // result), but never a silent DATA loss: the WPRM aggregate POST
+            // failed, yet the user did choose a star. DUT-742: persist that
+            // vote locally so it survives the revisit + relaunch (and the
+            // stars control shows their choice for a one-tap retry) instead of
+            // dropping it. The comment's own copy carries the same star via
+            // `stampRating` on the optimistic/pending row. Log for the
+            // on-device diagnostic trail (DUT-7 parity).
             DODLog.network.error(
                 "rating-alongside-comment failed: \(String(describing: error))"
             )
+            pendingUserRating = stars
+            await persistLocalUserRating(stars)
             return false
         }
+    }
+
+    /// DUT-742 — persist THIS device's chosen star locally without touching
+    /// the aggregate average/count, preserving whatever cached aggregate we
+    /// already trust. Used when the WPRM rating POST fails during a combined
+    /// comment+rating submit so the vote isn't lost; the cached `userRating`
+    /// re-seeds the stars control on the next open for a one-tap retry.
+    func persistLocalUserRating(_ stars: Int) async {
+        let base =
+            ratingSummary
+            ?? RecipeRating(recipeID: listItem.id, average: 0, count: 0, userRating: nil)
+        let withVote = RecipeRating(
+            recipeID: base.recipeID,
+            average: base.average,
+            count: base.count,
+            userRating: stars
+        )
+        ratingSummary = withVote
+        await dependencies.cacheRatingSummary(withVote)
     }
 
     /// Submit the in-progress comment draft (and the pending rating, if
@@ -232,7 +258,16 @@ extension RecipeDetailViewModel {
             // case-insensitively. WordPress's GET response doesn't
             // include `author_email`, so the local stamp is the only
             // way the row picks up the profile photo in-session.
-            let stamped = Self.stampAuthorEmail(posted, email: trimmedEmail)
+            // DUT-742: stamp the star the user attached onto the optimistic
+            // copy. WordPress drops `meta.wprm_comment_rating` on REST comment
+            // create and omits it from the public GET, so `posted.ratingValue`
+            // is nil — without this stamp the star vanishes from the local +
+            // cached (pending) comment even when the WPRM aggregate POST
+            // succeeded, and would be lost entirely if it failed.
+            let stamped = Self.stampRating(
+                Self.stampAuthorEmail(posted, email: trimmedEmail),
+                rating: ratingToSend
+            )
             let awaitingApproval = stamped.status != .approved
             if !awaitingApproval {
                 // Prepend the approved comment so the user sees it land.
@@ -266,29 +301,14 @@ extension RecipeDetailViewModel {
         }
     }
 
-    /// Prepend a freshly-posted comment to the visible list, skipping it if a
-    /// comment with the same WP id is already present. Guarding on id keeps
-    /// the `ForEach` (keyed by `RecipeComment.id`) free of duplicate-key
-    /// glitches if a submit is somehow retried, and avoids a double row when a
-    /// later refresh returns the now-approved comment. DUT-27.
+    /// Prepend a freshly-posted comment to the visible list, skipping it if
+    /// the same logical comment is already present. DUT-742: match by CONTENT
+    /// (or a real shared id) via ``isSameComment(_:_:)`` — not id alone — so a
+    /// background refresh that returns the now-approved copy under a different
+    /// id than the moderation-time echo doesn't produce a duplicate row. DUT-27.
     func insertPostedCommentIfNew(_ comment: RecipeComment) {
-        guard !comments.contains(where: { $0.id == comment.id }) else { return }
+        guard !comments.contains(where: { Self.isSameComment($0, comment) }) else { return }
         comments.insert(comment, at: 0)
-    }
-
-    /// DUT-433 — the cached comments this device is still waiting on. The
-    /// public comments GET never returns `hold` rows, so a refresh that
-    /// adopted the fetched page verbatim wiped the author's own
-    /// awaiting-approval comment from the thread on every online re-open —
-    /// recreating the build-8 "did my comment post?" re-submit loop DUT-27 /
-    /// DUT-387 exist to prevent. Pending rows come back from the cache with a
-    /// non-approved status; keep the ones the fresh page didn't supersede.
-    static func stillPendingComments(
-        in cached: [RecipeComment],
-        approved: [RecipeComment]
-    ) -> [RecipeComment] {
-        let approvedIDs = Set(approved.map(\.id))
-        return cached.filter { $0.status != .approved && !approvedIDs.contains($0.id) }
     }
 
     /// CL-139 / DUT-36 Phase d — return a copy of the just-posted
