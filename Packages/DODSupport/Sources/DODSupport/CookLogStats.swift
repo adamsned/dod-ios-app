@@ -41,6 +41,42 @@ public enum CookLogStats {
         return entries.filter { !dumpCakeRecipeIDs.contains($0.recipeID) }.count
     }
 
+    /// Average of the user's own 1–5 personal ratings across cook-log entries
+    /// (DUT-882 — iOS parity: Android's cook journal stats summary). Only
+    /// entries that carry a personal rating count; an un-rated cook doesn't
+    /// drag the average toward zero. `nil` when nothing has been rated yet, so
+    /// the UI can show a placeholder rather than a misleading "0.0".
+    public static func averageRating(_ entries: [CookLogEntry]) -> Double? {
+        let ratings = entries.compactMap(\.personalRating)
+        guard !ratings.isEmpty else { return nil }
+        return Double(ratings.reduce(0, +)) / Double(ratings.count)
+    }
+
+    /// Number of cooks logged in the trailing 30-calendar-day window ending
+    /// "today" — today plus the previous 29 days (DUT-882 — iOS parity:
+    /// Android's cook journal stats summary). The window start is calendar-day
+    /// based (via `startOfDay`) so time-of-day can't shift an entry in or out,
+    /// and entries after `now` (clock skew / bad data) are excluded rather than
+    /// over-counted.
+    public static func cooksInLast30Days(
+        _ entries: [CookLogEntry],
+        asOf now: Date,
+        calendar: Calendar = .current
+    ) -> Int {
+        guard
+            let windowStart = calendar.date(
+                byAdding: .day,
+                value: -29,
+                to: calendar.startOfDay(for: now)
+            )
+        else {
+            return 0
+        }
+        return entries.reduce(into: 0) { count, entry in
+            if entry.cookedAt >= windowStart && entry.cookedAt <= now { count += 1 }
+        }
+    }
+
     /// How many times a specific recipe has been cooked ("made 4×").
     public static func timesCooked(recipeID: Int, in entries: [CookLogEntry]) -> Int {
         entries.reduce(into: 0) { count, entry in
