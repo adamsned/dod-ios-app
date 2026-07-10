@@ -37,4 +37,16 @@ struct DumpCakeTests {
         #expect(cookout.isFirstRung == false)
         #expect(GuidedCookout.path.contains { $0.recipeID == cookout.recipeID } == false)
     }
+
+    @Test("Peach Dump Cake (DUT-284)") func peachDumpCakeIsAvailable() {
+        let peachDumpCake = DumpCake(
+            id: 22294,
+            slug: "peach-dump-cake",
+            title: "Peach Dump Cake"
+        )
+        #expect(DumpCake.all.contains(peachDumpCake))
+        #expect(peachDumpCake.id == 22294)
+        #expect(peachDumpCake.slug == "peach-dump-cake")
+        #expect(peachDumpCake.title == "Peach Dump Cake")
+    }
 }
