@@ -24,6 +24,44 @@ import Testing
         #expect(viewModel.loadState == .loaded)
     }
 
+    @Test func initialLoadDedupesADuplicateIDWithinTheSamePage() async {
+        // A WP category/tag join can hand back the same post id twice within
+        // one page (e.g. a query joining term relationships without DISTINCT
+        // for a post tagged under overlapping terms). The append (load-more)
+        // branch already guards against a repeated id with its own `seen`
+        // set; the initial-load / refresh branch shares the same
+        // `cachedListItems(forIDs:)` cache lookup but, pre-fix, passed the raw
+        // (possibly-duplicated) id list straight through — turning one
+        // duplicated id into a duplicated recipe card.
+        let dependencies = FakeCategoriesDependencies()
+        let first = Self.makeItem(1)
+        let second = Self.makeItem(2)
+        dependencies.posts[1] = [first, second, first]  // id 1 appears twice
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 2)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+
+        let ids = viewModel.items.map(\.id)
+        #expect(ids == [1, 2])  // exactly one card per unique id, order preserved
+    }
+
+    @Test func refreshDedupesADuplicateIDWithinTheSamePage() async {
+        // Same defect on the pull-to-refresh path, which reuses the identical
+        // non-append branch of `load`.
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.posts[1] = (1...5).map(Self.makeItem)
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 5)
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+
+        let repeated = Self.makeItem(10)
+        dependencies.posts[1] = [repeated, Self.makeItem(11), repeated]  // id 10 appears twice
+        await viewModel.refresh()
+
+        let ids = viewModel.items.map(\.id)
+        #expect(ids == [10, 11])
+    }
+
     @Test func emptyPageShowsEmptyState() async {
         let dependencies = FakeCategoriesDependencies()
         dependencies.posts[1] = []
