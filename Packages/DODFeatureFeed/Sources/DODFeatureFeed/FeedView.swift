@@ -177,7 +177,7 @@ public struct FeedView: View {
         Button {
             viewModel.surpriseMe(onSelect: onSelect)
         } label: {
-            Image(systemName: "shuffle")
+            Image(systemName: "dice.fill")
                 .font(.title2)
                 .accessibilityLabel("Surprise Me")
                 .frame(minWidth: 44, minHeight: 44)
