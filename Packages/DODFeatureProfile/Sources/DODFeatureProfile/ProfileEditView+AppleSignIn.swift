@@ -181,9 +181,19 @@ extension ProfileEditView {
     /// completion; the session is persisted regardless (the user is signed in).
     @MainActor
     func handleAppleSignIn(_ outcome: AppleProfileSignIn.Outcome) {
-        // DUT-506 — a blank-id credential persisted no session (a non-event); stay
-        // silent, exactly like the button's own guard.
-        guard outcome.signedIn else { return }
+        // DUT-506 — a blank-id credential persisted no session (a silent
+        // non-event). But DUT-928: a genuine session-save FAILURE (the Keychain
+        // write threw) must NOT be silent — that's the "signs in but never
+        // actually signed in" bug where a swallowed error left the user believing
+        // they were logged in. Surface it (with the raw OSStatus for on-device
+        // diagnosis) so they know to retry, instead of a dead-end no-op.
+        guard outcome.signedIn else {
+            if outcome.sessionSaveFailed {
+                let code = outcome.sessionSaveStatus.map { " (\($0))" } ?? ""
+                saveError = "Couldn't Sign In With Apple. Try Again.\(code)"
+            }
+            return
+        }
         hasSession = true  // DUT-281 — a session was persisted; keep Sign Out reachable
         if let name = outcome.displayName { displayName = name }
         if let mail = outcome.email { email = mail }

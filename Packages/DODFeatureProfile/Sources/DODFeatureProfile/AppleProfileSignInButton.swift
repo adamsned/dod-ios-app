@@ -113,6 +113,16 @@ final class AppleSignInCoordinator: NSObject {
     /// Retain the in-flight controller so the delegate callbacks fire — a
     /// released controller silently drops the whole flow.
     private var activeController: ASAuthorizationController?
+    /// DUT-928 — a strong self-reference held ONLY for the duration of an
+    /// in-flight request, so the coordinator (and thus its delegate +
+    /// presentation-context provider) survives even if SwiftUI tears down the
+    /// owning view's `@State` while the auth sheet is up. On iPad the profile
+    /// editor is a form sheet: completing Sign in with Apple re-renders that
+    /// sheet, which can release the `@State`-held coordinator before the async
+    /// callback lands — and `ASAuthorizationController.delegate` is `weak`, so
+    /// the credential is silently dropped and the app never sees the sign-in
+    /// ("signs in but never actually signed in"). Cleared when the flow ends.
+    private var retainedSelf: AppleSignInCoordinator?
 
     func start(
         profileStore: any ProfileStoring,
@@ -128,6 +138,7 @@ final class AppleSignInCoordinator: NSObject {
         controller.delegate = self
         controller.presentationContextProvider = self
         activeController = controller
+        retainedSelf = self
         controller.performRequests()
     }
 }
@@ -155,6 +166,11 @@ extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
         didCompleteWithAuthorization authorization: ASAuthorization
     ) {
         activeController = nil
+        // DUT-928 — release the in-flight self-retention at scope exit. The
+        // credential fields + `onComplete` are captured strongly by the `Task`
+        // below, so the sign-in still completes even if the coordinator itself
+        // is deallocated the instant this method returns.
+        defer { retainedSelf = nil }
         guard
             let credential = authorization.credential as? ASAuthorizationAppleIDCredential
         else { return }
@@ -186,6 +202,7 @@ extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
         didCompleteWithError error: any Error
     ) {
         activeController = nil
+        retainedSelf = nil  // DUT-928 — end of flow; drop the in-flight retention.
         // DUT-636: a user-initiated cancel stays silent; a real error surfaces.
         if let message = AppleProfileSignInButton.userFacingErrorMessage(for: error) {
             onError?(message)
