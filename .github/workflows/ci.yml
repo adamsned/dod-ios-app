@@ -56,6 +56,13 @@ jobs:
               # PR (the extensions link against those packages anyway).
               - 'Widget/**'
               - 'LiveActivity/**'
+              # Test sources (DODAppUnitTests / L3 smoke / L5 E2E) are code too —
+              # a PR that only adds or edits a test must still run the pipeline
+              # that exercises it. Without these, a test-only change was treated
+              # as docs-only and EVERY job skipped, so the new/changed test never
+              # ran in CI (DUT-930).
+              - 'AppTests/**'
+              - 'UITests/**'
               - 'project.yml'
               - '.swift-format'
               - '.swiftlint.yml'
@@ -65,6 +72,11 @@ jobs:
             ios_sim:
               - 'App/**'
               - 'Packages/**'
+              # See the `code` filter note: L3 smoke + L5 E2E live under UITests
+              # and the App-target unit tests under AppTests, so a test-only
+              # change must boot the simulator pipeline that runs them (DUT-930).
+              - 'AppTests/**'
+              - 'UITests/**'
               - 'project.yml'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
