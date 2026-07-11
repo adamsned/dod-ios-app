@@ -342,9 +342,15 @@ public enum JSONLDRecipeParser {
         }
         guard let dict else { return nil }
 
-        // contentUrl is preferred; fall back to embedUrl.
-        let urlString = (dict["contentUrl"] as? String) ?? (dict["embedUrl"] as? String)
-        guard let urlString, let url = URL(string: urlString) else { return nil }
+        // contentUrl is preferred; fall back to embedUrl. Resolve each
+        // candidate to a `URL` before falling back — a scraped `contentUrl`
+        // that is present but blank/malformed (e.g. `"contentUrl": ""`) must
+        // not win the `??` and swallow a perfectly good `embedUrl`, dropping
+        // the whole video for a field that only LOOKS populated.
+        let url =
+            (dict["contentUrl"] as? String).flatMap { URL(string: $0) }
+            ?? (dict["embedUrl"] as? String).flatMap { URL(string: $0) }
+        guard let url else { return nil }
 
         let thumbnail =
             (dict["thumbnailUrl"] as? String).flatMap { URL(string: $0) }

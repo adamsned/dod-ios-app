@@ -47,4 +47,20 @@ import Testing
     @Test func returnsNilWhenVideoArrayHasNoDictionaries() {
         #expect(JSONLDRecipeParser.mapVideo(["#video", 7, "https://x"] as [Any]) == nil)
     }
+
+    /// Regression: a `contentUrl` that is PRESENT but blank must not win the
+    /// `contentUrl ?? embedUrl` fallback and swallow a perfectly good
+    /// `embedUrl` — pre-fix, `(dict["contentUrl"] as? String)` succeeded on
+    /// the empty string (it IS a `String`), so the `??` never reached
+    /// `embedUrl` and `URL(string: "")` (which is `nil`) dropped the whole
+    /// video even though a valid embed URL was right there.
+    @Test func blankContentUrlFallsBackToEmbedUrl() {
+        let raw: [String: Any] = [
+            "@type": "VideoObject",
+            "contentUrl": "",
+            "embedUrl": "https://cdn.example.com/embed",
+        ]
+        let video = JSONLDRecipeParser.mapVideo(raw)
+        #expect(video?.url.absoluteString == "https://cdn.example.com/embed")
+    }
 }
