@@ -29,6 +29,12 @@ extension RecipeDetailViewModel {
         isSubmittingRating = true
         defer { isSubmittingRating = false }
 
+        // Bump the generation before the await so a still-in-flight
+        // background `loadRatingsAndComments()` refresh that resolves after
+        // this POST is detected as stale and doesn't clobber the aggregate
+        // this submit is about to apply — see ``ratingRefreshGeneration``.
+        ratingRefreshGeneration &+= 1
+        let ratingGeneration = ratingRefreshGeneration
         do {
             let updated = try await dependencies.postRating(
                 recipeID: listItem.id,
@@ -42,7 +48,9 @@ extension RecipeDetailViewModel {
             // `applyRatingRefresh` keeps the existing/cached rating rather than
             // blanking the user's just-submitted vote.
             pendingUserRating = stars
-            await applyRatingRefresh(updated)
+            if ratingGeneration == ratingRefreshGeneration {
+                await applyRatingRefresh(updated)
+            }
             snackbarMessage = "Thanks for rating."
         } catch {
             DODLog.network.error("post rating failed: \(String(describing: error))")

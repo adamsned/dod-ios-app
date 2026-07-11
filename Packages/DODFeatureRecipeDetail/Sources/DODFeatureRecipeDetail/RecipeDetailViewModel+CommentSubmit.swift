@@ -167,6 +167,12 @@ extension RecipeDetailViewModel {
         let name = commentAuthorName.trimmingCharacters(in: .whitespacesAndNewlines)
         let email = commentAuthorEmail.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, !email.isEmpty else { return false }
+        // Bump the generation before the await so a still-in-flight
+        // background `loadRatingsAndComments()` refresh that resolves after
+        // this POST is detected as stale and doesn't clobber the aggregate
+        // this submit is about to apply — see ``ratingRefreshGeneration``.
+        ratingRefreshGeneration &+= 1
+        let ratingGeneration = ratingRefreshGeneration
         do {
             let updated = try await dependencies.postRating(
                 recipeID: listItem.id,
@@ -179,7 +185,9 @@ extension RecipeDetailViewModel {
             // aggregate (the client's summary GET failed after a successful
             // POST) never blanks the user's just-submitted vote.
             pendingUserRating = stars
-            await applyRatingRefresh(updated)
+            if ratingGeneration == ratingRefreshGeneration {
+                await applyRatingRefresh(updated)
+            }
             return true
         } catch {
             // Quiet on the SNACKBAR (the comment POST owns the user-facing
