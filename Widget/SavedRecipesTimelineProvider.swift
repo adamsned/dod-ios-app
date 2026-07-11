@@ -19,25 +19,34 @@ struct SavedRecipesEntry: TimelineEntry {
 
     /// WidgetKit gallery / redacted-preview entry. Three sample rows so
     /// the medium-size preview looks populated; small picks the first.
+    ///
+    /// DUT — the ids are non-positive (distinct, so `Identifiable`/`ForEach`
+    /// still tell the rows apart) because these titles are fabricated and do
+    /// NOT correspond to any real post — mirroring `FeaturedRecipeEntry.placeholder`'s
+    /// `id: 0` fabricated recipe (DUT-652). A real, positive id here would
+    /// build a genuine `dod://recipe/<id>` deep link via
+    /// `SavedRecipesWidgetSnapshot.Entry.deepLinkURL`, so a tap during this
+    /// transient preview state would silently open whatever unrelated real
+    /// post happens to share that id instead of falling back to Saved.
     static let placeholder = SavedRecipesEntry(
         date: Date(timeIntervalSince1970: 1_700_000_000),
         entries: [
             .init(
-                recipeID: 1,
+                recipeID: -1,
                 title: "Garlic Butter Skillet Corn",
                 canonicalURL: URL(fileURLWithPath: "/"),
                 heroImageFilename: nil,
                 savedAt: Date(timeIntervalSince1970: 1_700_000_300)
             ),
             .init(
-                recipeID: 2,
+                recipeID: -2,
                 title: "Sourdough Bread",
                 canonicalURL: URL(fileURLWithPath: "/"),
                 heroImageFilename: nil,
                 savedAt: Date(timeIntervalSince1970: 1_700_000_200)
             ),
             .init(
-                recipeID: 3,
+                recipeID: -3,
                 title: "Cast Iron Pizza",
                 canonicalURL: URL(fileURLWithPath: "/"),
                 heroImageFilename: nil,

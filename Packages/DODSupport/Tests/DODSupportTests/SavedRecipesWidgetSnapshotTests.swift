@@ -175,3 +175,43 @@ import Testing
         )
     }
 }
+
+/// DUT — `SavedRecipesWidgetSnapshot.Entry.deepLinkURL` backs
+/// `SavedRecipesWidgetEntryView`'s tap-through URL. WidgetKit's
+/// `placeholder(in:)` / `getSnapshot(in:)` calls can render
+/// `SavedRecipesEntry.placeholder`'s fabricated preview rows (fictional
+/// titles like "Garlic Butter Skillet Corn") in a tappable transient state
+/// before the real snapshot loads; those rows must never resolve to a real,
+/// well-formed `dod://recipe/<id>` link, or a tap would silently open
+/// whatever unrelated real post happens to share that id instead of falling
+/// back to the Saved tab. Mirrors the `id > 0` guard
+/// `FeaturedRecipeWidgetEntryView.deepLink(for:)` already applies to its own
+/// placeholder (DUT-652).
+@Suite("SavedRecipesWidgetSnapshot.Entry.deepLinkURL")
+struct SavedRecipesEntryDeepLinkURLTests {
+
+    private func entry(recipeID: Int) -> SavedRecipesWidgetSnapshot.Entry {
+        SavedRecipesWidgetSnapshot.Entry(
+            recipeID: recipeID,
+            title: "Some Recipe",
+            canonicalURL: URL(fileURLWithPath: "/"),
+            heroImageFilename: nil,
+            savedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+    }
+
+    @Test func positiveIDBuildsARecipeLinkWithSavedSource() throws {
+        let url = try #require(entry(recipeID: 4641).deepLinkURL)
+        #expect(WidgetDeepLinkParser.parse(url) == .recipe(id: 4641, source: .saved))
+    }
+
+    /// A non-positive id — the shape `SavedRecipesEntry.placeholder`'s
+    /// fabricated rows use — must not resolve to any deep link at all, so
+    /// callers fall through to their own `dod://saved` fallback instead of
+    /// silently opening whatever real post happens to share that id.
+    @Test func nonPositiveIDReturnsNil() {
+        #expect(entry(recipeID: 0).deepLinkURL == nil)
+        #expect(entry(recipeID: -1).deepLinkURL == nil)
+        #expect(entry(recipeID: -3).deepLinkURL == nil)
+    }
+}
