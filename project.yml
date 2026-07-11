@@ -169,8 +169,22 @@ targets:
         # regenerated `App/Info.plist` — the REG-INFO-PLIST-CLOBBER fix
         # established that `xcodegen generate` rewrites `Info.plist`
         # from this `properties:` block on every run.
+        # DUT-938 — `fetch` is what lets `BGTaskScheduler` actually wake the
+        # process to run the new-post-notification poll registered in
+        # `AppDelegate` (App/DODApp.swift); without it the OS never grants
+        # the background execution time and `BGAppRefreshTaskRequest.submit`
+        # requests are accepted but never run.
         UIBackgroundModes:
           - remote-notification
+          - fetch
+        # DUT-938 — must list every identifier passed to
+        # `BGTaskScheduler.shared.register(forTaskWithIdentifier:...)`
+        # (App/DODApp.swift `AppDelegate`) or registration is refused at
+        # runtime. Same REG-INFO-PLIST-CLOBBER note as `UIBackgroundModes`
+        # above applies: this key MUST live here, not hand-edited into
+        # `App/Info.plist`.
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.dutchovendaddy.DODApp.newposts
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.dutchovendaddy.DODApp
