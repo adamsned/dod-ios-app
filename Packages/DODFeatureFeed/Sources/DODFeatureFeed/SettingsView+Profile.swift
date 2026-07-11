@@ -119,6 +119,10 @@ struct ProfileSettingsSection: View {
     /// Injected from `RootView`'s real device size class (see type doc). When
     /// true the section renders nothing (Profile lives in the sidebar on iPad).
     let hidesProfile: Bool
+    /// DUT-941 — threaded down to `OwnerToolsPlaceholderView`'s "Send Test
+    /// New-Post Notification" button. `nil` (button hidden) unless the App
+    /// target's composition root injects it.
+    var sendTestNotification: (() async -> Void)?
 
     /// Daddy Mode (Phase 1, cosmetic) — resolved once on appear so the body
     /// doesn't hit the Keychain on every recompute. Gated OFF for everyone until
@@ -135,7 +139,7 @@ struct ProfileSettingsSection: View {
                 // for non-owners; display-only, authorizes nothing.
                 if isOwner {
                     NavigationLink {
-                        OwnerToolsPlaceholderView()
+                        OwnerToolsPlaceholderView(sendTestNotification: sendTestNotification)
                     } label: {
                         Label("Daddy's Tools", systemImage: "key.shield.fill")
                             .dodFont(DODType.body)

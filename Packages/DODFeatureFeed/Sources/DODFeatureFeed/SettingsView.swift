@@ -54,6 +54,11 @@ public struct SettingsView: View {
     /// real device size class because this sheet always reports `.compact` on iPad
     /// (see ``ProfileSettingsSection``); hides on iPad, shows on iPhone.
     private let hidesProfile: Bool
+    /// DUT-941 — threaded down through `ProfileSettingsSection` to
+    /// `OwnerToolsPlaceholderView`'s owner-only "Send Test New-Post
+    /// Notification" button. `nil` by default so existing callers/previews
+    /// compile unchanged (button hidden).
+    private let sendTestNotification: (() async -> Void)?
     /// DUT-694 (PR-D) — in-flight guard for the Clear Cache row. Set while a clear
     /// runs so a double-tap can't kick off two overlapping clears (which showed
     /// contradictory snackbars). Also `.disabled`-s the button. `internal` so the
@@ -64,7 +69,8 @@ public struct SettingsView: View {
         viewModel: SettingsViewModel? = nil,
         onClearImageCache: (() async throws -> Int)? = nil,
         settingsDependencies: (any SettingsDependencies)? = nil,
-        hidesProfile: Bool = false
+        hidesProfile: Bool = false,
+        sendTestNotification: (() async -> Void)? = nil
     ) {
         // Construct a default view-model when none is injected,
         // honoring the optional `settingsDependencies` so the iCloud
@@ -75,6 +81,7 @@ public struct SettingsView: View {
         _viewModel = State(initialValue: resolved)
         self.onClearImageCache = onClearImageCache
         self.hidesProfile = hidesProfile
+        self.sendTestNotification = sendTestNotification
     }
 
     public var body: some View {
@@ -138,7 +145,11 @@ public struct SettingsView: View {
             // `.compact` on iPad). DUT-238 — account + sign-in (Sign in with
             // Apple, Sign Out, Delete) all live inside the Profile flow now; the
             // former standalone Settings ▸ Account section (US-46) is removed.
-            ProfileSettingsSection(viewModel: viewModel, hidesProfile: hidesProfile)
+            ProfileSettingsSection(
+                viewModel: viewModel,
+                hidesProfile: hidesProfile,
+                sendTestNotification: sendTestNotification
+            )
 
             // MARK: T-750 / CL-147 — Measurements & Units group
             // (T-647 / CL-125 — every Section gets `.listRowBackground(DODColor.surfaceElevated)`.)
