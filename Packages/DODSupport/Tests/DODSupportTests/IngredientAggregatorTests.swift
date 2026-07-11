@@ -131,6 +131,34 @@ struct IngredientAggregatorTests {
         #expect(result[0].displayText == "3 cups rice")
     }
 
+    /// A summed quantity just over 1 (`1.05`) falls into
+    /// `FractionRenderer.renderQuantity`'s sub-tolerance fallback and prints
+    /// as the bare whole number `"1"` (the `0.05` remainder is too small to
+    /// snap to any canonical fraction and isn't close enough to `1.0` to
+    /// bump to `"2"`). The unit must stay singular to match — `"1 cups
+    /// sugar"` is ungrammatical even though the raw un-rounded quantity
+    /// (1.05) is technically greater than 1.
+    @Test func sumThatRoundsDownToBareOneStaysSingular() {
+        let result = IngredientAggregator.aggregate(
+            ingredients("1 cup sugar", "0.05 cup sugar")
+        )
+        #expect(result.count == 1)
+        #expect(result[0].quantity == 1.05)
+        #expect(result[0].displayText == "1 cup sugar")
+    }
+
+    /// Contrast case: a summed quantity that renders as a genuine MIXED
+    /// number greater than one (`"1 ⅛"`) must still pluralize — only the
+    /// bare-"1" collapse from the test above is special-cased.
+    @Test func sumThatRendersAsMixedNumberStaysPlural() {
+        let result = IngredientAggregator.aggregate(
+            ingredients("1 cup sugar", "1/8 cup sugar")
+        )
+        #expect(result.count == 1)
+        #expect(result[0].quantity == 1.125)
+        #expect(result[0].displayText == "1 ⅛ cups sugar")
+    }
+
     // MARK: - No-merge cases
 
     @Test func differentUnitsStaySeparate() {

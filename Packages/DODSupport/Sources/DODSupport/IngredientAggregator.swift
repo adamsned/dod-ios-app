@@ -185,7 +185,7 @@ public enum IngredientAggregator {
             }
             let qty = FractionRenderer.renderQuantity(quantity)
             if let unit = parsed.unit, !unit.isEmpty {
-                let unitText = IngredientAggregator.pluralizedUnit(unit, for: quantity)
+                let unitText = IngredientAggregator.pluralizedUnit(unit, for: quantity, renderedAs: qty)
                 return "\(qty) \(unitText) \(name)"
             }
             return "\(qty) \(name)"
@@ -195,8 +195,21 @@ public enum IngredientAggregator {
     /// Pluralize the canonical singular unit for display: `1 → "cup"`,
     /// `3 → "cups"`. Units that don't pluralize with a bare `s` (the
     /// abbreviations) are returned unchanged.
-    private static func pluralizedUnit(_ singular: String, for quantity: Double) -> String {
-        guard quantity > 1 else { return singular }
+    ///
+    /// Bug fix: the plural decision must agree with what's actually printed,
+    /// not the raw un-rounded `quantity`. `FractionRenderer.renderQuantity`
+    /// has a sub-tolerance fallback that silently truncates a small
+    /// fractional remainder to a bare whole number (e.g. `1.05` → `"1"`, a
+    /// summed "1 cup" + "0.05 cup" shopping-list line) — so a raw quantity
+    /// just over 1 can still *render* as the bare singular `"1"`. Deciding
+    /// plurality from `quantity > 1` alone produced the ungrammatical
+    /// `"1 cups sugar"`. `renderedAs` is the same string handed to the
+    /// caller, so checking it against the literal `"1"` keeps the unit in
+    /// lockstep with the printed number — while a mixed number that still
+    /// reads as more than one whole unit (`"1 ⅛"`, from `quantity == 1.125`)
+    /// correctly keeps its plural.
+    private static func pluralizedUnit(_ singular: String, for quantity: Double, renderedAs qty: String) -> String {
+        guard quantity > 1, qty != "1" else { return singular }
         guard pluralizableUnits.contains(singular) else { return singular }
         return singular + "s"
     }
