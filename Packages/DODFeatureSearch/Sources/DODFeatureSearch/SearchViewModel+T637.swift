@@ -44,6 +44,16 @@ extension SearchViewModel {
         // so there's no ingredient term — clear any tier left from a prior
         // search so it doesn't bleed into the latest-recipes surface.
         ingredientItems = []
+        // CL-127 (T-649) parity: also wipe a stale "did you mean?" banner
+        // left from a prior sparse typed search. Without this, the banner
+        // (computed for the OLD, now-irrelevant query) survives onto this
+        // unrelated feed surface — `shouldShowDidYouMeanBanner` in
+        // `SearchView` gates only on `state == .results || .noResults`,
+        // both of which this method sets, so the stale suggestion would
+        // render on top of the Latest-Recipes list, and tapping it
+        // (`applyDidYouMean()`) would silently discard the feed and
+        // re-run the old query instead.
+        didYouMean = nil
         guard await dependencies.isOnline() else {
             guard generation == searchGeneration else { return }
             state = .offline
