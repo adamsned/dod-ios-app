@@ -494,36 +494,53 @@ final class SmokeTests: XCTestCase {
         )
     }
 
-    /// US-46 / AC-46.2; amended by DUT-189: the Settings → Account section
-    /// renders, and signed-out (the default) shows a pointer to the profile
-    /// editor — the Sign in with Apple button itself moved there. Runs on both
-    /// iPhone and iPad in CI (and locally) — the section is at the top of
-    /// Settings, so it's visible without scrolling on either.
+    /// US-46 / AC-46.2 — the user can reach account / Sign in with Apple from
+    /// Settings. Guards the CURRENT surface: DUT-238 retired the standalone
+    /// Settings ▸ Account section and moved every account + sign-in control
+    /// (Sign in with Apple, Sign Out, Delete) into the Profile flow. The
+    /// signed-out Settings list now shows a "Set Up Your Profile" row at the top
+    /// (`settings-link-profile`); tapping it pushes `ProfileEditView`, which — on
+    /// a fresh install (no profile) — renders the Sign in with Apple button
+    /// (`profile-sign-in-apple`). So the US-46 reachability contract holds via
+    /// the profile row rather than a top-level Account section.
+    ///
+    /// (Pre-DUT-238 this asserted a Settings ▸ "Account" header + a
+    /// `settings-account-signin-pointer` — both of which no longer exist, which
+    /// is why the old assertion was permanently red on `main`.)
     ///
     /// The credential→session+profile sign-in is unit-tested
-    /// (AppleProfileSignInTests / AccountViewModelTests / AppleCredentialResolverTests);
-    /// the interactive Apple sheet needs a device signed into an Apple ID and is
-    /// verified manually. This guards the contract XCUITest can: the section +
-    /// pointer are present.
+    /// (AppleProfileSignInButtonErrorTests / AppleCredentialResolverTests /
+    /// AppleAuthSessionStoreTests); the interactive Apple sheet needs a device
+    /// signed into an Apple ID and is verified manually. This guards the contract
+    /// XCUITest can: sign-in is reachable from Settings via the Profile row.
+    /// Runs on both iPhone and iPad — the Profile row is at the top of Settings
+    /// on iPhone and in the sidebar on iPad, reached via the shared helpers.
     func test_settingsAccountSectionIsPresent() {
-        // Device-agnostic: iPhone uses a bottom tab bar, iPad a sidebar
-        // (NavigationSplitView, US-38 / DUT-89). Settings is a first-class
-        // destination on both since T-823 / DUT-187 (promoted from the old
-        // per-tab gear), so reach it via the shared tab/sidebar helper.
         XCTAssertTrue(waitForAppReady(), "App should reach its first screen")
         openSettings()
 
-        // The Account section header (US-46) sits at the top of Settings.
+        // DUT-238 — sign-in lives in the Profile flow now. The signed-out
+        // (fresh-install) Settings list shows the "Set Up Your Profile" row at
+        // the top; it carries a stable id regardless of its visible copy.
+        let profileRow = app.buttons["settings-link-profile"]
         XCTAssertTrue(
-            app.staticTexts["Account"].waitForExistence(timeout: 12),
-            "Settings should expose the Account section (US-46)"
+            profileRow.waitForExistence(timeout: 12),
+            "Settings should expose the Profile row that hosts account / sign-in (US-46)"
         )
+        profileRow.tap()
 
-        // DUT-189 — the Sign in with Apple button moved to the profile editor.
-        // Signed out, the Account section points there instead of hosting it.
+        // Tapping the row pushes ProfileEditView; on a fresh install (no profile)
+        // it opens in setup mode and renders the Sign in with Apple button — the
+        // successor to the retired Account section's sign-in surface. A
+        // SignInWithAppleButton can surface as a button or an opaque other-element
+        // in the XCUI tree, so probe both by its stable id.
+        let signInButton = app.buttons["profile-sign-in-apple"]
+        let signInOther = app.otherElements["profile-sign-in-apple"]
+        let signInVisible =
+            signInButton.waitForExistence(timeout: 8) || signInOther.waitForExistence(timeout: 4)
         XCTAssertTrue(
-            app.staticTexts["settings-account-signin-pointer"].waitForExistence(timeout: 6),
-            "Signed-out Account section should point to the Profile for Sign in with Apple"
+            signInVisible,
+            "Profile editor reached from Settings should expose Sign in with Apple (US-46)"
         )
     }
 }
