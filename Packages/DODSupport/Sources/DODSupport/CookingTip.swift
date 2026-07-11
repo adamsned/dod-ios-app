@@ -17,7 +17,6 @@ public enum CookingTip {
         "Season iron after each wash",
         "Ring your coals for baking",
         "Lift the lid less, hold heat",
-        "A dry lid crisps the top",
         "Salt early, taste often",
         "Deglaze for a richer sauce",
         "Low and slow usually wins",
