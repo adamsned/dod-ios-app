@@ -78,6 +78,25 @@ import Testing
         #expect(imageURLs(from: html).isEmpty)
     }
 
+    @Test func displayNoneImportantYieldsNoImageBlock() {
+        // DUT-957: a share div force-hidden with `!important` (the common form
+        // for beating theme CSS) must be stripped — pre-fix it leaked in-app.
+        let html = """
+            <div style="display:none !important"><img src="https://example.com/collage.jpg"></div>
+            """
+        #expect(imageURLs(from: html).isEmpty)
+    }
+
+    @Test func displayNoneImportantAmongOtherPropertiesYieldsNoImageBlock() {
+        // DUT-957: `!important` `display:none` sitting among other properties,
+        // with the plugin-typical spacing.
+        let html = """
+            <div style="position:absolute; display: none !important; left:-9999px">\
+            <img src="https://example.com/pin-important.jpg"></div>
+            """
+        #expect(imageURLs(from: html).isEmpty)
+    }
+
     // MARK: - Nested content inside hidden div
 
     @Test func hiddenDivContainingFigureYieldsNoBlock() {
@@ -187,10 +206,21 @@ import Testing
         #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="color:red;display:none""#))
     }
 
+    @Test func styleHasDisplayNoneMatchesImportantFlag() {
+        // DUT-957: the `!important` priority flag (with or without a space, any
+        // case) must not defeat the match.
+        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display:none !important""#))
+        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display:none!important""#))
+        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display : none ! IMPORTANT""#))
+        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="color:red; display:none !important""#))
+    }
+
     @Test func styleHasDisplayNoneDoesNotMatchOtherValues() {
         #expect(!ArticleHTMLParser.styleHasDisplayNone(#" style="display:block""#))
         #expect(!ArticleHTMLParser.styleHasDisplayNone(#" style="visibility:hidden""#))
         #expect(!ArticleHTMLParser.styleHasDisplayNone(#" class="display:none""#))
         #expect(!ArticleHTMLParser.styleHasDisplayNone(""))
+        // DUT-957: `!important` on a NON-none display must not falsely match.
+        #expect(!ArticleHTMLParser.styleHasDisplayNone(#" style="display:block !important""#))
     }
 }

@@ -83,12 +83,24 @@ extension ArticleHTMLParser {
     /// style="display: none"
     /// style="display : none"
     /// style="color:red; display : none ; font-size:12px"
+    /// style="display:none !important"
     /// ```
+    ///
+    /// DUT-957: a trailing `!important` priority flag is tolerated. A hidden
+    /// share `<div>` very commonly force-hides its image with
+    /// `display:none !important` (to beat the theme's CSS); that compacts to
+    /// `display:none!important`, which is not equal to `display:none`, so the
+    /// pre-DUT-957 exact match let the image leak in-app — the same DUT-918
+    /// hidden-Pinterest-collage defect in a sibling CSS form. The flag is
+    /// stripped before the comparison so this hide form is caught too.
     static func styleHasDisplayNone<S: StringProtocol>(_ attributes: S) -> Bool {
         let styleValue = ArticleHTMLParser.attributeValue("style", in: attributes)
         guard !styleValue.isEmpty else { return false }
         for property in styleValue.components(separatedBy: ";") {
-            let compact = property.filter { !$0.isWhitespace }.lowercased()
+            var compact = property.filter { !$0.isWhitespace }.lowercased()
+            if compact.hasSuffix("!important") {
+                compact = String(compact.dropLast("!important".count))
+            }
             if compact == "display:none" {
                 return true
             }
