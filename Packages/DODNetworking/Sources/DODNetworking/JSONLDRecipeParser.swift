@@ -117,7 +117,12 @@ public enum JSONLDRecipeParser {
     /// `@type` can be a string or an array of strings.
     static func matchesRecipeType(_ raw: Any?) -> Bool {
         if let single = raw as? String { return single == "Recipe" }
-        if let multi = raw as? [String] { return multi.contains("Recipe") }
+        // DUT-916: `@type` may be a MIXED array (a stray null/number alongside
+        // the strings some WPRM/plugin configs emit). A whole-array
+        // `as? [String]` fails on one non-string element, dropping the match so
+        // a genuine recipe renders as a plain article — mirror the #606/DUT-214
+        // fix and check each element that IS a string.
+        if let array = raw as? [Any] { return array.contains { ($0 as? String) == "Recipe" } }
         return false
     }
 
@@ -241,7 +246,11 @@ public enum JSONLDRecipeParser {
             return
         }
         guard let dict = element as? [String: Any] else { return }
-        let type = (dict["@type"] as? String) ?? (dict["@type"] as? [String])?.first ?? ""
+        // DUT-916: tolerate a mixed `@type` array (per-element, not whole-cast).
+        let type =
+            (dict["@type"] as? String)
+            ?? (dict["@type"] as? [Any])?.compactMap { $0 as? String }.first
+            ?? ""
         switch type {
         case "HowToStep":
             if let text = dict["text"] as? String {
@@ -339,7 +348,8 @@ public enum JSONLDRecipeParser {
 
         let thumbnail =
             (dict["thumbnailUrl"] as? String).flatMap { URL(string: $0) }
-            ?? ((dict["thumbnailUrl"] as? [String])?.first).flatMap { URL(string: $0) }
+            ?? ((dict["thumbnailUrl"] as? [Any])?.compactMap { $0 as? String }.first)
+            .flatMap { URL(string: $0) }
 
         let duration = parseISO8601Duration(dict["duration"] as? String)
 
