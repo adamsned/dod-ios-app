@@ -147,6 +147,29 @@ public enum HTMLSanitizer {
         "divide": "÷",
         "middot": "·",
         "frasl": "⁄",
+        // DUT-961: WordPress named-encodes accented Latin letters too (confirmed
+        // on live pages: "saut&eacute;ed", "Jalape&ntilde;o Poppers"), and the
+        // named forms passed through raw into blurb/article text. Accented words
+        // are ubiquitous in recipes (sauté, purée, jalapeño, crème, flambé), so
+        // decode the common Latin-1 accented set — lower + uppercase (titles).
+        // The numeric forms (`&#233;`) already decode via `decodeNumeric`; this
+        // adds only the NAMED forms. Same DUT-550 rationale as the fractions.
+        "agrave": "à", "aacute": "á", "acirc": "â", "atilde": "ã", "auml": "ä", "aring": "å", "aelig": "æ",
+        "Agrave": "À", "Aacute": "Á", "Acirc": "Â", "Atilde": "Ã", "Auml": "Ä", "Aring": "Å", "AElig": "Æ",
+        "ccedil": "ç", "Ccedil": "Ç",
+        "egrave": "è", "eacute": "é", "ecirc": "ê", "euml": "ë",
+        "Egrave": "È", "Eacute": "É", "Ecirc": "Ê", "Euml": "Ë",
+        "igrave": "ì", "iacute": "í", "icirc": "î", "iuml": "ï",
+        "Igrave": "Ì", "Iacute": "Í", "Icirc": "Î", "Iuml": "Ï",
+        "ntilde": "ñ", "Ntilde": "Ñ",
+        "ograve": "ò", "oacute": "ó", "ocirc": "ô", "otilde": "õ", "ouml": "ö", "oslash": "ø", "oelig": "œ",
+        "Ograve": "Ò", "Oacute": "Ó", "Ocirc": "Ô", "Otilde": "Õ", "Ouml": "Ö", "Oslash": "Ø", "OElig": "Œ",
+        "ugrave": "ù", "uacute": "ú", "ucirc": "û", "uuml": "ü",
+        "Ugrave": "Ù", "Uacute": "Ú", "Ucirc": "Û", "Uuml": "Ü",
+        "yacute": "ý", "yuml": "ÿ", "szlig": "ß",
+        // Punctuation observed on the same live pages: guillemets (breadcrumb
+        // arrows) and prime marks (used for oven-size inch/foot notation, 12″).
+        "laquo": "«", "raquo": "»", "prime": "′", "Prime": "″",
     ]
 
     /// DUT-466 (mirrors DUT-394 in `HTMLEntityDecoder`) — WP REST bodies

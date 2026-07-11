@@ -47,6 +47,33 @@ import Testing
         #expect(result == "Bake at 350°F. Use a 9×13 pan. Serves 4÷2.")
     }
 
+    // DUT-961: WordPress named-encodes accented Latin letters (confirmed on live
+    // pages: "saut&eacute;ed", "Jalape&ntilde;o Poppers"). The named forms must
+    // decode like the numeric ones do, or they render as literal `&eacute;`.
+    @Test func decodesAccentedLatinEntitiesFromLivePages() {
+        #expect(HTMLSanitizer.plainText(from: "sweet corn saut&eacute;ed in butter") == "sweet corn sautéed in butter")
+        #expect(HTMLSanitizer.plainText(from: "Dutch Oven Jalape&ntilde;o Poppers") == "Dutch Oven Jalapeño Poppers")
+    }
+
+    @Test func decodesCommonAccentedRecipeWords() {
+        let result = HTMLSanitizer.plainText(
+            from: "pur&eacute;e, cr&egrave;me br&ucirc;l&eacute;e, fa&ccedil;on, &agrave; la mode, jalape&ntilde;o"
+        )
+        #expect(result == "purée, crème brûlée, façon, à la mode, jalapeño")
+    }
+
+    @Test func decodesUppercaseAccentedEntitiesInTitles() {
+        // Recipe titles capitalize the first letter: "&Eacute;clairs", "&Ntilde;".
+        #expect(HTMLSanitizer.plainText(from: "&Eacute;clairs and Cr&egrave;pes") == "Éclairs and Crèpes")
+        #expect(HTMLSanitizer.plainText(from: "&Ccedil;a va") == "Ça va")
+    }
+
+    @Test func decodesGuillemetAndPrimeEntities() {
+        // Observed on the same live pages: breadcrumb guillemets + inch prime marks.
+        #expect(HTMLSanitizer.plainText(from: "Home &raquo; Recipes &laquo; Back") == "Home » Recipes « Back")
+        #expect(HTMLSanitizer.plainText(from: "a 12&Prime; oven, 6&prime; away") == "a 12″ oven, 6′ away")
+    }
+
     @Test func collapsesWhitespace() {
         let result = HTMLSanitizer.plainText(from: "  one    two\n\nthree  ")
         #expect(result == "one two three")
