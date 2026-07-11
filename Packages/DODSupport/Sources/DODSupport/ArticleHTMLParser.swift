@@ -29,6 +29,9 @@ public enum ArticleHTMLParser {
         // `removeFeastSEOBlocks`. Runs after the svg removal so the Trusted-
         // Source block's inline icon is already gone before the div walk.
         content = removeFeastSEOBlocks(from: content)
+        // Strip hidden `<div>` wrappers — display:none and dpsp Pinterest
+        // share-cards (DUT-918b) — so the images inside never reach scanBlocks.
+        content = removeHiddenBlocks(from: content)
         return scanBlocks(content, baseURL: baseURL)
     }
 }
