@@ -66,4 +66,18 @@ extension LatestContent {
             return snapshot.latestArticle
         }
     }
+
+    /// Maps to the plain, `AppIntents`-free mode DODSupport's eyebrow
+    /// resolver understands, so both "Latest" widgets' eyebrow +
+    /// accessibility-label copy stay routed through one tested function
+    /// (``LatestWidgetEyebrowKind/resolve(isArticle:mode:)``) instead of each
+    /// re-deriving the recipe-vs-article decision (and risking drifting back
+    /// out of sync the way DUT-567's fix once did between the two widgets).
+    var eyebrowMode: LatestWidgetContentMode {
+        switch self {
+        case .auto: return .auto
+        case .recipes: return .recipes
+        case .articles: return .articles
+        }
+    }
 }
