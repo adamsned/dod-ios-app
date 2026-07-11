@@ -110,7 +110,9 @@ struct RootView: View {
     /// it, routing with `autoStartCookMode: true`, then disarms. Bound only to Feed.
     @State var cookModeFindRecipeArmed = false
     @State private var dispatcher = DeepLinkDispatcher.shared
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // Non-private (like `systemOpenURL` below) so the `+Settings.swift`
+    // extension's `settingsSheet` can read the TRUE device size class (DUT-941).
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     /// The system `openURL`, captured before RootView overrides it for its
     /// descendants — used to defer non-recipe article links to the browser
     /// (DOD-ART-2). Non-private for the `+LinkRouting.swift` extension.
@@ -235,22 +237,9 @@ struct RootView: View {
             content: { onboardingCover }
         )
         // T-912 / DUT-551 (CL-306) — Settings sheet. The iPhone gear + iPad
-        // sidebar row both flip `showSettingsSheet`.
-        .sheet(isPresented: $showSettingsSheet) {
-            NavigationStack {
-                SettingsView(
-                    viewModel: dependencies.settingsSheetViewModel(
-                        accountTeardownExtras: accountTeardownExtras
-                    ),
-                    onClearImageCache: { try await dependencies.store.clearImageCache() },
-                    // DUT-572 — hide the Profile row on iPad. This reads RootView's
-                    // TRUE device size class (the same signal that selects iPadSplit
-                    // vs phoneTabs); the sheet itself always reports `.compact`, so
-                    // the flag must be resolved here and injected.
-                    hidesProfile: horizontalSizeClass == .regular
-                )
-            }
-        }
+        // sidebar row both flip `showSettingsSheet`. Content in
+        // `RootView+Settings.swift` (file_length split, DUT-941).
+        .sheet(isPresented: $showSettingsSheet) { settingsSheet }
         .alert("Turn On iCloud Sync?", isPresented: $showCloudSyncPrompt) {
             Button("Turn On Sync") {
                 // DUT-280 — both prompts answered; mark complete so they never re-run.
