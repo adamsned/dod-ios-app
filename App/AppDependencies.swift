@@ -66,6 +66,17 @@ final class AppDependencies {
     /// run loop / import) so the async CloudKit import can't poison the seed.
     let processStartSyncedIDs: Set<Int>
 
+    /// DUT-920 — follows a tapped article link's redirect chain and returns the
+    /// final URL. URLSession follows 301s by default, so this is a plain GET
+    /// whose `response.url` is the resolved permalink. `resolveRecipe(forArticleLink:)`
+    /// calls it only when the exact-slug lookup misses, to recover a **renamed**
+    /// recipe whose old slug 301-redirects to the new one. Injectable (a stored
+    /// closure) so `ArticleLinkResolver` can be driven in unit tests with no network.
+    var redirectResolver: @Sendable (URL) async -> URL? = { url in
+        guard let (_, response) = try? await URLSession.shared.data(from: url) else { return nil }
+        return response.url
+    }
+
     /// DUT-657 — `bootstrap()` is called from the launch `.task`, which SwiftUI
     /// can re-run if the hosting view is re-created (a spurious relaunch of the
     /// `.task`). Its side effects — the `.appOpen` telemetry, `networkMonitor.start()`,
@@ -362,27 +373,8 @@ final class AppDependencies {
         try await restClient.post(id: id)
     }
 
-    /// Resolve a tapped article link (a `dutchovendaddy.com` canonical URL) to
-    /// a ``RecipeListItem`` by its slug — backs the in-app article recipe-link
-    /// deep-link (DOD-ART-2). Returns `nil` for an off-site URL, or a
-    /// `dutchovendaddy.com` URL whose slug matches no recipe/article post (a WP
-    /// *page* like `/about-me/`), so `RootView` falls back to the browser.
-    /// Best-effort: a network failure also yields `nil`.
-    func resolveRecipe(forArticleLink url: URL) async -> RecipeListItem? {
-        guard let slug = Self.recipeSlug(fromDODURL: url) else { return nil }
-        return try? await restClient.post(slug: slug)
-    }
-
-    /// Extract the post slug from a `https://(www.)dutchovendaddy.com/<slug>/`
-    /// permalink (DOD uses flat `/<slug>/` permalinks), or `nil` for any other
-    /// host. The slug is the first non-empty path component.
-    static func recipeSlug(fromDODURL url: URL) -> String? {
-        guard
-            let host = url.host()?.lowercased(),
-            host == "dutchovendaddy.com" || host == "www.dutchovendaddy.com"
-        else {
-            return nil
-        }
-        return url.pathComponents.first { $0 != "/" && !$0.isEmpty }
-    }
+    // `resolveRecipe(forArticleLink:)` + `recipeSlug(fromDODURL:)` (the in-app
+    // article recipe-link resolve, DOD-ART-2 / DUT-920) live in
+    // `AppDependencies+ArticleLink.swift` (keeps this file under the SwiftLint
+    // `file_length` cap).
 }
