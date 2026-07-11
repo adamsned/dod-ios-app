@@ -118,17 +118,32 @@ public struct ShoppingListStore: @unchecked Sendable {
     @discardableResult
     public func append(rows: [ShoppingListViewModel.Item]) -> Int {
         let current = load()
-        let existingCount = current?.items.count ?? 0
-        let merged = ShoppingListViewModel.dedupedAppend(
-            existing: current?.items ?? [],
-            adding: rows
-        )
+        let existingItems = current?.items ?? []
+
+        // DUT — a PRE-DUT-589 persisted snapshot can still carry a legacy
+        // "masked" row: an item left IN `items` whose id is ALSO in
+        // `alreadyHaveIDs` (current builds remove the row outright instead —
+        // see `ShoppingListViewModel.markAlreadyHave` — but old on-disk data
+        // can still have one). `ShoppingListViewModel`'s load path purges
+        // these, but THIS path — the store-side seam `LiveShoppingListAppender`
+        // writes through from Recipe Detail / a card, entirely bypassing a
+        // view model — never does. Left unhandled, that invisible masked
+        // row's de-dup key still collides with a genuine external re-add of
+        // the same line and silently swallows it (reports 0 appended). This
+        // excludes masked rows from the de-dup CHECK only; the masked row
+        // itself and `alreadyHaveIDs` are left untouched here, exactly as
+        // before — the next view-model load purges them as usual.
+        let maskedIDs = Set(current?.alreadyHaveIDs ?? [])
+        let dedupBase = existingItems.filter { !maskedIDs.contains($0.id) }
+        let newRows = ShoppingListViewModel.newRows(existing: dedupBase, adding: rows)
+        let merged = existingItems + newRows
+
         save(
             items: merged,
             checked: Set(current?.checkedIDs ?? []),
-            alreadyHave: Set(current?.alreadyHaveIDs ?? [])
+            alreadyHave: maskedIDs
         )
-        return merged.count - existingCount
+        return newRows.count
     }
 
     /// Test-only accessor for the backing `UserDefaults`, so tests can assert on
