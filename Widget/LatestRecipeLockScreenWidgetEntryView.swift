@@ -101,15 +101,20 @@ struct LatestRecipeLockScreenWidgetEntryView: View {
         )
     }
 
-    /// DUT-485 — eyebrow copy. `.auto` keys off the shown post's own kind; the
-    /// explicit modes key off the user's chosen surface.
+    /// DUT-485 / DUT-567 — eyebrow copy. `.auto` keys off the shown post's own
+    /// kind. `.recipes` also keys off the resolved entry's own kind (via the
+    /// shared ``LatestWidgetEyebrowKind/resolve(isArticle:mode:)`` resolver,
+    /// which the sibling `FeaturedRecipeWidgetEntryView.eyebrow(for:mode:)`
+    /// already uses) rather than the fixed mode: `LatestContent.entry(from:)`'s
+    /// `.recipes` case falls back to `entries.first` when the split scan
+    /// didn't classify a recipe (legacy payload / no classifier), and that
+    /// fallback entry can be an article — which must never be mislabeled
+    /// "Latest Recipe" here on the lock screen either.
     static func eyebrow(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
-        switch mode {
-        case .auto:
-            return recipe.isArticle ? "Latest Article" : "Latest Recipe"
-        case .recipes:
+        switch LatestWidgetEyebrowKind.resolve(isArticle: recipe.isArticle, mode: mode.eyebrowMode) {
+        case .recipe:
             return "Latest Recipe"
-        case .articles:
+        case .article:
             return "Latest Article"
         }
     }

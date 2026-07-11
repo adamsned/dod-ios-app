@@ -103,36 +103,33 @@ struct FeaturedRecipeWidgetEntryView: View {
         )
     }
 
-    /// DUT-460 / DUT-485 — the eyebrow copy. In `.auto` mode it stays adaptive,
-    /// keyed off the shown post's own kind (was hardcoded "New on DOD"). In the
-    /// explicit `.recipes` / `.articles` modes the user has fixed the surface,
-    /// so we key the eyebrow off the selected mode instead.
+    /// DUT-460 / DUT-485 / DUT-567 — the eyebrow copy. In `.auto` mode it stays
+    /// adaptive, keyed off the shown post's own kind (was hardcoded
+    /// "New on DOD"). `.recipes` also keys off the resolved entry's own kind
+    /// (via the shared ``LatestWidgetEyebrowKind/resolve(isArticle:mode:)``
+    /// resolver) rather than the fixed mode, because its
+    /// `latestRecipe ?? entries.first` fallback can resolve to an article when
+    /// the split scan didn't classify a recipe (legacy payload / no
+    /// classifier) — an article must never be mislabeled "Latest Recipe."
     static func eyebrow(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
-        switch mode {
-        case .auto:
-            return recipe.isArticle ? "Latest Article" : "Latest Recipe"
-        case .recipes:
-            // DUT-567 — the `.recipes` fallback (`latestRecipe ?? entries.first`)
-            // can resolve to an article when the split scan didn't classify a
-            // recipe (legacy payload / no classifier). Key the eyebrow off the
-            // resolved entry's own kind so an article is never mislabeled
-            // "Latest Recipe."
-            return recipe.isArticle ? "Latest Article" : "Latest Recipe"
-        case .articles:
+        switch LatestWidgetEyebrowKind.resolve(isArticle: recipe.isArticle, mode: mode.eyebrowMode) {
+        case .recipe:
+            return "Latest Recipe"
+        case .article:
             return "Latest Article"
         }
     }
 
     /// DUT-507 — the spoken prefix mirrors the visible `eyebrow(for:mode:)`
-    /// branch so VoiceOver says "Latest article" in `.articles` mode instead of
-    /// hardcoding "Today's recipe" (matching the lock-screen widget's approach).
+    /// branch (same shared resolver, so the visible and spoken copy can't
+    /// drift out of sync with each other) so VoiceOver says "Latest article"
+    /// whenever the eyebrow does, instead of hardcoding "Latest recipe" for
+    /// `.recipes` regardless of the resolved entry's actual kind.
     static func spokenPrefix(for recipe: WidgetSnapshot.Entry, mode: LatestContent) -> String {
-        switch mode {
-        case .auto:
-            return recipe.isArticle ? "Latest article" : "Latest recipe"
-        case .recipes:
+        switch LatestWidgetEyebrowKind.resolve(isArticle: recipe.isArticle, mode: mode.eyebrowMode) {
+        case .recipe:
             return "Latest recipe"
-        case .articles:
+        case .article:
             return "Latest article"
         }
     }
