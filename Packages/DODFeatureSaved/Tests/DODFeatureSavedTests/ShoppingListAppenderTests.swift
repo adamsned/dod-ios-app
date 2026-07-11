@@ -194,6 +194,45 @@ struct ShoppingListAppenderTests {
         #expect(store.load()?.items.count == 2)
     }
 
+    /// DUT — a PRE-DUT-589 persisted snapshot can still carry a legacy masked
+    /// row: an "already have" item left IN `items` with its id merely masked
+    /// by `alreadyHaveIDs` (current builds remove the row outright instead —
+    /// see `ShoppingListViewModel.markAlreadyHave`). The `ShoppingListViewModel`
+    /// load path purges these on the way in (see
+    /// `ShoppingListPersistenceTests.legacyMaskedRowIsPurgedOnLoadSoReAddSurfaces`),
+    /// but `ShoppingListStore.append(rows:)` — the path `LiveShoppingListAppender`
+    /// writes through from Recipe Detail / a Feed card, entirely bypassing the
+    /// view model — never purges before de-duping. So the invisible masked row's
+    /// de-dup key still collides with a legitimate external re-add of the same
+    /// line, silently dropping it (reports 0 appended) even though the cook just
+    /// tapped "Add to Shopping List".
+    @Test func externalAppendIsNotSuppressedByALegacyMaskedRow() {
+        let store = Self.freshStore()
+        let masked = ShoppingListViewModel.rows(
+            from: [Self.recipe(id: 1, ingredients: ["1 onion"])]
+        )[0]
+        store.save(items: [masked], checked: [], alreadyHave: [masked.id])
+
+        // The cook re-adds the same recipe from Recipe Detail — a genuine
+        // re-add, not a duplicate of anything they can currently see (the
+        // masked row is invisible). Before the fix this silently reported 0
+        // appended, because the ghost masked row's de-dup key collided with
+        // the new one.
+        let reAdded = ShoppingListViewModel.rows(
+            from: [Self.recipe(id: 1, ingredients: ["1 onion"])]
+        )
+        let appendedCount = store.append(rows: reAdded)
+        #expect(appendedCount == 1)
+
+        // The next view-model load purges the ghost masked row (DUT-589's
+        // existing purge), so the cook actually sees the ingredient they just
+        // added — proving the fix is visible end-to-end, not just a count.
+        let viewModel = ShoppingListViewModel(store: store)
+        #expect(viewModel.visibleItems.map(\.ingredientText) == ["1 onion"])
+        #expect(viewModel.items.count == 1)
+        #expect(viewModel.alreadyHaveIDs.isEmpty)
+    }
+
     // MARK: - Reload-on-appear lost-update guard
 
     /// The core DUT-534 guard: a Saved-tab `ShoppingListViewModel` that loaded

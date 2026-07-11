@@ -19,8 +19,21 @@ extension ShoppingListViewModel {
     /// tells those two cases apart, and it matches what `init(recipes:)` produces
     /// implicitly — so build and append now follow ONE rule.
     nonisolated static func dedupedAppend(existing: [Item], adding: [Item]) -> [Item] {
+        existing + newRows(existing: existing, adding: adding)
+    }
+
+    /// The subset of `adding` that survives the de-dup check against
+    /// `existing` (see ``dedupedAppend(existing:adding:)``), WITHOUT the
+    /// `existing` prefix. Exposed so a caller can run the de-dup CHECK against
+    /// a narrower/filtered view of its existing rows while still merging the
+    /// result onto its full, unfiltered list — see
+    /// ``ShoppingListStore/append(rows:)``, which checks against a
+    /// legacy-masked-row-excluded view so an invisible masked row can't
+    /// silently swallow a genuine re-add, while leaving that masked row (and
+    /// every other existing row) untouched in what it persists.
+    nonisolated static func newRows(existing: [Item], adding: [Item]) -> [Item] {
         let existingKeys = Set(occurrenceKeys(for: existing))
-        var result = existing
+        var result: [Item] = []
         for (row, key) in zip(adding, occurrenceKeys(for: adding)) where !existingKeys.contains(key) {
             result.append(row)
         }
