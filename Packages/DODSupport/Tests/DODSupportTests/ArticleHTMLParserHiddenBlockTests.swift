@@ -97,6 +97,24 @@ import Testing
         #expect(imageURLs(from: html).isEmpty)
     }
 
+    @Test func visibilityHiddenYieldsNoImageBlock() {
+        // DUT-958: a div hidden with `visibility:hidden` is invisible to web
+        // visitors, so its image must not render in-app either.
+        let html = """
+            <div style="visibility:hidden"><img src="https://example.com/vis-hidden.jpg"></div>
+            """
+        #expect(imageURLs(from: html).isEmpty)
+    }
+
+    @Test func opacityZeroImageIsStillEmitted() {
+        // DUT-958 (negative): opacity:0 is NOT treated as hidden — it's used for
+        // fade/transparent content, so its image must still be emitted.
+        let html = """
+            <div style="opacity:0"><img src="https://example.com/fade.jpg"></div>
+            """
+        #expect(imageURLs(from: html) == [URL(string: "https://example.com/fade.jpg")])
+    }
+
     // MARK: - Nested content inside hidden div
 
     @Test func hiddenDivContainingFigureYieldsNoBlock() {
@@ -196,31 +214,44 @@ import Testing
         #expect(stripped == html)
     }
 
-    // MARK: - styleHasDisplayNone unit-level
+    // MARK: - styleHidesElement unit-level
 
-    @Test func styleHasDisplayNoneMatchesVariants() {
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display:none""#))
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display: none""#))
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display : none""#))
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="DISPLAY:NONE""#))
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="color:red;display:none""#))
+    @Test func styleHidesElementMatchesDisplayNoneVariants() {
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="display:none""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="display: none""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="display : none""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="DISPLAY:NONE""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="color:red;display:none""#))
     }
 
-    @Test func styleHasDisplayNoneMatchesImportantFlag() {
+    @Test func styleHidesElementMatchesImportantFlag() {
         // DUT-957: the `!important` priority flag (with or without a space, any
         // case) must not defeat the match.
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display:none !important""#))
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display:none!important""#))
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="display : none ! IMPORTANT""#))
-        #expect(ArticleHTMLParser.styleHasDisplayNone(#" style="color:red; display:none !important""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="display:none !important""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="display:none!important""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="display : none ! IMPORTANT""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="color:red; display:none !important""#))
     }
 
-    @Test func styleHasDisplayNoneDoesNotMatchOtherValues() {
-        #expect(!ArticleHTMLParser.styleHasDisplayNone(#" style="display:block""#))
-        #expect(!ArticleHTMLParser.styleHasDisplayNone(#" style="visibility:hidden""#))
-        #expect(!ArticleHTMLParser.styleHasDisplayNone(#" class="display:none""#))
-        #expect(!ArticleHTMLParser.styleHasDisplayNone(""))
-        // DUT-957: `!important` on a NON-none display must not falsely match.
-        #expect(!ArticleHTMLParser.styleHasDisplayNone(#" style="display:block !important""#))
+    @Test func styleHidesElementMatchesVisibilityHidden() {
+        // DUT-958: visibility:hidden is a second full-hide CSS value (invisible
+        // to web visitors), with the same whitespace/case/!important tolerance.
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="visibility:hidden""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="visibility: hidden""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="VISIBILITY:HIDDEN""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="visibility:hidden !important""#))
+        #expect(ArticleHTMLParser.styleHidesElement(#" style="color:red; visibility : hidden""#))
+    }
+
+    @Test func styleHidesElementDoesNotMatchOtherValues() {
+        #expect(!ArticleHTMLParser.styleHidesElement(#" style="display:block""#))
+        #expect(!ArticleHTMLParser.styleHidesElement(#" style="visibility:visible""#))
+        // DUT-958: opacity:0 is deliberately NOT a hide (fade/transparent content).
+        #expect(!ArticleHTMLParser.styleHidesElement(#" style="opacity:0""#))
+        #expect(!ArticleHTMLParser.styleHidesElement(#" class="display:none""#))
+        #expect(!ArticleHTMLParser.styleHidesElement(""))
+        // `!important` on a NON-hiding value must not falsely match.
+        #expect(!ArticleHTMLParser.styleHidesElement(#" style="display:block !important""#))
+        #expect(!ArticleHTMLParser.styleHidesElement(#" style="visibility:visible !important""#))
     }
 }

@@ -46,7 +46,7 @@ extension ArticleHTMLParser {
             let isHidden =
                 hiddenDivClassTokens.contains {
                     ArticleBodyExtractor.hasClassToken(attributes: attributes, token: $0)
-                } || styleHasDisplayNone(attributes)
+                } || styleHidesElement(attributes)
             guard
                 isHidden,
                 let inner = ArticleBodyExtractor.sliceUntilMatchingClose(
@@ -70,8 +70,18 @@ extension ArticleHTMLParser {
         return output
     }
 
-    /// Whether an opening-tag attribute string has a `style` attribute whose
-    /// `display` property is `none` (whitespace- and case-tolerant).
+    /// Whether an opening-tag attribute string has a `style` attribute that
+    /// fully hides the element (whitespace- and case-tolerant).
+    ///
+    /// Two CSS values count as a full hide — both make the element invisible to
+    /// web visitors, so its image must not render in-app:
+    ///   - `display:none` (removes the box), and
+    ///   - `visibility:hidden` (keeps the box but paints nothing) — DUT-958.
+    ///
+    /// `opacity:0` is deliberately NOT treated as hidden: it's commonly used for
+    /// present-but-transparent / fade-in content, so stripping it would risk
+    /// removing legitimate images. `aria-hidden` is an accessibility hint (the
+    /// content IS shown to sighted users), not a visual hide, so it's ignored too.
     ///
     /// The `style` value is parsed via ``ArticleHTMLParser/attributeValue(_:in:)``
     /// so the check never fires on other attributes that happen to contain the
@@ -84,6 +94,8 @@ extension ArticleHTMLParser {
     /// style="display : none"
     /// style="color:red; display : none ; font-size:12px"
     /// style="display:none !important"
+    /// style="visibility:hidden"
+    /// style="visibility: hidden !important"
     /// ```
     ///
     /// DUT-957: a trailing `!important` priority flag is tolerated. A hidden
@@ -93,7 +105,7 @@ extension ArticleHTMLParser {
     /// pre-DUT-957 exact match let the image leak in-app — the same DUT-918
     /// hidden-Pinterest-collage defect in a sibling CSS form. The flag is
     /// stripped before the comparison so this hide form is caught too.
-    static func styleHasDisplayNone<S: StringProtocol>(_ attributes: S) -> Bool {
+    static func styleHidesElement<S: StringProtocol>(_ attributes: S) -> Bool {
         let styleValue = ArticleHTMLParser.attributeValue("style", in: attributes)
         guard !styleValue.isEmpty else { return false }
         for property in styleValue.components(separatedBy: ";") {
@@ -101,7 +113,7 @@ extension ArticleHTMLParser {
             if compact.hasSuffix("!important") {
                 compact = String(compact.dropLast("!important".count))
             }
-            if compact == "display:none" {
+            if compact == "display:none" || compact == "visibility:hidden" {
                 return true
             }
         }
