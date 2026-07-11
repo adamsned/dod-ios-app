@@ -45,6 +45,9 @@ public enum SchemaV2: VersionedSchema {
 ///   skipped — see the SchemaV4 / SchemaV5 headers. DUT-35 / DUT-6.
 /// - V5 → V6: lightweight (V6 = V5 + `CachedCookLogEntry`, the local-only
 ///   "I Made This" cook journal). DUT-104.
+/// - V6 → V7: lightweight (V7 = V6 + `SyncedProfile`, the SECOND
+///   CloudKit-mirrored model — profile name/email/avatar sync, iOS ↔ iOS
+///   only). DUT-943 Scope A.
 ///
 /// **SchemaV4 note (US-41 / T-702).** `SchemaV4` exists as a real
 /// `VersionedSchema` in `SchemaV4.swift` and is the schema the
@@ -100,10 +103,13 @@ public enum SchemaV2: VersionedSchema {
 /// - `SchemaV6Tests.recipeEditorialColumnsInferAdditively` (the four
 ///   DUT-572 / CL-310 `CachedRecipe` columns added via same-version
 ///   inference — no new schema stage; back-compat + round-trip proven).
+/// - `SchemaV7Tests.v6ToV7LightweightMigrationOpensCleanly` (additive
+///   `SyncedProfile` entity, the SECOND CloudKit-mirrored model; DUT-943
+///   Scope A).
 public enum MigrationPlan: SchemaMigrationPlan {
 
     public static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self, SchemaV3.self, SchemaV5.self, SchemaV6.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self, SchemaV5.self, SchemaV6.self, SchemaV7.self]
     }
 
     public static var stages: [MigrationStage] {
@@ -126,6 +132,12 @@ public enum MigrationPlan: SchemaMigrationPlan {
             // pattern). A SchemaV7 with no new entity would collide fingerprints
             // with V6 and trip "Duplicate version checksums detected"; see the
             // header note above.
+            // V6 -> V7 (DUT-943 Scope A): additive — adds `SyncedProfile`, the
+            // SECOND CloudKit-mirrored model (profile name/email/avatar, iOS ↔
+            // iOS only). No existing field changes; the new table starts empty
+            // and only mirrors to CloudKit for a signed-in user with iCloud
+            // Sync on.
+            .lightweight(fromVersion: SchemaV6.self, toVersion: SchemaV7.self),
         ]
     }
 }

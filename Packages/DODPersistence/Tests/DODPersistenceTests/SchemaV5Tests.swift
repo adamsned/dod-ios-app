@@ -22,35 +22,39 @@ import Testing
 @Suite("SchemaV5 (DUT-35)", .serialized) struct SchemaV5Tests {
 
     @Test func v3ToV5LightweightMigrationOpensCleanly() throws {
-        // Step 1: a V3 store still accepts a V3-era row.
-        let v3Container = try RecipeStore.inMemoryContainerV3()
-        let v3Context = ModelContext(v3Container)
-        v3Context.insert(
-            CachedRecipe(
-                id: 7,
-                slug: "v3",
-                title: "V3 Recipe",
-                excerptText: "Excerpt",
-                canonicalURLString: "https://example.com/7",
-                publishedAt: .now
+        // DUT-943 — serialized against the other version-specific container
+        // tests in this target; see `OnDiskSchemaContainerTestLock`.
+        try OnDiskSchemaContainerTestLock.withLock {
+            // Step 1: a V3 store still accepts a V3-era row.
+            let v3Container = try RecipeStore.inMemoryContainerV3()
+            let v3Context = ModelContext(v3Container)
+            v3Context.insert(
+                CachedRecipe(
+                    id: 7,
+                    slug: "v3",
+                    title: "V3 Recipe",
+                    excerptText: "Excerpt",
+                    canonicalURLString: "https://example.com/7",
+                    publishedAt: .now
+                )
             )
-        )
-        try v3Context.save()
+            try v3Context.save()
 
-        // Step 2: the V5 container is an additive superset — all six prior
-        // entities PLUS the new SyncedSavedRecipe.
-        let v5Container = try RecipeStore.inMemoryContainer()
-        let entities = v5Container.schema.entitiesByName
-        for name in [
-            "CachedRecipe", "CachedListPage", "CachedImage",
-            "CachedIngredient", "CachedComment", "CachedRating",
-        ] {
-            #expect(entities[name] != nil, "V5 must still expose \(name)")
+            // Step 2: the V5 container is an additive superset — all six prior
+            // entities PLUS the new SyncedSavedRecipe.
+            let v5Container = try RecipeStore.inMemoryContainer()
+            let entities = v5Container.schema.entitiesByName
+            for name in [
+                "CachedRecipe", "CachedListPage", "CachedImage",
+                "CachedIngredient", "CachedComment", "CachedRating",
+            ] {
+                #expect(entities[name] != nil, "V5 must still expose \(name)")
+            }
+            #expect(
+                entities["SyncedSavedRecipe"] != nil,
+                "V5 must add the SyncedSavedRecipe CloudKit-mirror entity"
+            )
         }
-        #expect(
-            entities["SyncedSavedRecipe"] != nil,
-            "V5 must add the SyncedSavedRecipe CloudKit-mirror entity"
-        )
     }
 
     @Test func syncedSavedRecipeRoundTripsInV5Container() throws {
@@ -87,47 +91,51 @@ import Testing
     /// container). The backfill is covered against an in-memory two-config
     /// container by `SyncedSavedRecipeTests`.
     @Test func v4OnDiskStoreUpgradesToV5PreservingSaves() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dut35-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let defaultStoreURL = dir.appendingPathComponent("default.store")
-        let syncedStoreURL = dir.appendingPathComponent("SyncedSaved.store")
+        // DUT-943 — serialized against the other on-disk version-specific
+        // container tests in this target; see `OnDiskSchemaContainerTestLock`.
+        try OnDiskSchemaContainerTestLock.withLock {
+            let dir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("dut35-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let defaultStoreURL = dir.appendingPathComponent("default.store")
+            let syncedStoreURL = dir.appendingPathComponent("SyncedSaved.store")
 
-        // Step 1: write the pre-V5 on-disk store (all six models, one saved
-        // recipe) exactly as builds <= 13 left it.
-        try seedLegacyV4Store(at: defaultStoreURL)
+            // Step 1: write the pre-V5 on-disk store (all six models, one saved
+            // recipe) exactly as builds <= 13 left it.
+            try seedLegacyV4Store(at: defaultStoreURL)
 
-        // Step 2: open the SAME default.store under the V5 two-configuration
-        // layout + migration plan, with the new SyncedSaved store alongside.
-        // This is the build-14 upgrade and must NOT throw.
-        let localConfig = ModelConfiguration(
-            schema: Schema(SchemaV5.localModels),
-            url: defaultStoreURL,
-            cloudKitDatabase: .none
-        )
-        let syncedConfig = ModelConfiguration(
-            schema: Schema(SchemaV5.syncedModels),
-            url: syncedStoreURL,
-            cloudKitDatabase: .none
-        )
-        let upgraded = try ModelContainer(
-            for: Schema(SchemaV5.models),
-            migrationPlan: MigrationPlan.self,
-            configurations: localConfig,
-            syncedConfig
-        )
+            // Step 2: open the SAME default.store under the V5 two-configuration
+            // layout + migration plan, with the new SyncedSaved store alongside.
+            // This is the build-14 upgrade and must NOT throw.
+            let localConfig = ModelConfiguration(
+                schema: Schema(SchemaV5.localModels),
+                url: defaultStoreURL,
+                cloudKitDatabase: .none
+            )
+            let syncedConfig = ModelConfiguration(
+                schema: Schema(SchemaV5.syncedModels),
+                url: syncedStoreURL,
+                cloudKitDatabase: .none
+            )
+            let upgraded = try ModelContainer(
+                for: Schema(SchemaV5.models),
+                migrationPlan: MigrationPlan.self,
+                configurations: localConfig,
+                syncedConfig
+            )
 
-        let verify = ModelContext(upgraded)
-        // The legacy saved recipe survives the upgrade in default.store.
-        let legacy = try verify.fetch(
-            FetchDescriptor<CachedRecipe>(predicate: #Predicate { $0.id == 808 })
-        ).first
-        #expect(legacy?.isSaved == true, "Legacy saved recipe must survive the V4 -> V5 upgrade")
-        // The newly-created synced store opened and is queryable (empty until
-        // the launch backfill seeds it).
-        let synced = try verify.fetch(FetchDescriptor<SyncedSavedRecipe>())
-        #expect(synced.isEmpty, "SyncedSaved store must open empty and queryable post-upgrade")
+            let verify = ModelContext(upgraded)
+            // The legacy saved recipe survives the upgrade in default.store.
+            let legacy = try verify.fetch(
+                FetchDescriptor<CachedRecipe>(predicate: #Predicate { $0.id == 808 })
+            ).first
+            #expect(legacy?.isSaved == true, "Legacy saved recipe must survive the V4 -> V5 upgrade")
+            // The newly-created synced store opened and is queryable (empty until
+            // the launch backfill seeds it).
+            let synced = try verify.fetch(FetchDescriptor<SyncedSavedRecipe>())
+            #expect(synced.isEmpty, "SyncedSaved store must open empty and queryable post-upgrade")
+        }
     }
 
     /// Write a pre-V5 store at `url` in the OLD single-configuration layout

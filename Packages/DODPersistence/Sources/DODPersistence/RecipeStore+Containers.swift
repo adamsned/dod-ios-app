@@ -88,9 +88,9 @@ extension RecipeStore {
         defaults.bool(forKey: didBackfillSyncedSavedKey)
     }
 
-    /// Create the on-disk container for production use. Pinned to
-    /// `SchemaV5` — older on-disk stores migrate via `MigrationPlan` at
-    /// open (V1 → V2 → V3 → V5, all lightweight; the phantom V4 is skipped).
+    /// Create the on-disk container for production use. Pinned to `SchemaV7`
+    /// — older on-disk stores migrate via `MigrationPlan` at open (V1 → V2 →
+    /// V3 → V5 → V6 → V7, all lightweight; the phantom V4 is skipped).
     ///
     /// **CloudKit gating per CL-86 / CL-88 / CL-89 / CL-93.** When the
     /// `cloudKitSyncOptInKey` `UserDefaults` flag is `true` (set by
@@ -176,10 +176,9 @@ extension RecipeStore {
         inMemory: Bool = false,
         cloudKitAvailable: Bool = cloudKitMirroringAvailable
     ) throws -> ContainerBuildResult {
-        let schema = Schema(SchemaV6.models)
-        // DUT-35: the six cache models are local-only; ONLY `SyncedSavedRecipe`
-        // is a CloudKit-mirror candidate. Both stores live in the same
-        // container, so the `@ModelActor`'s single `ModelContext` reaches both.
+        let schema = Schema(SchemaV7.models)
+        // DUT-35 / DUT-943: the seven cache models are local-only; ONLY
+        // `SyncedSavedRecipe` + `SyncedProfile` are CloudKit-mirror candidates.
         let local = localCacheConfiguration(inMemory: inMemory)
         let optedIn = cloudKitSyncOptIn(in: defaults)
         // DUT-630 — build a local store when the user is opted out OR CloudKit
@@ -256,18 +255,19 @@ extension RecipeStore {
     /// the fresh recovery container with the same local layout.
     static func localCacheConfiguration(inMemory: Bool) -> ModelConfiguration {
         ModelConfiguration(
-            schema: Schema(SchemaV6.localModels),
+            schema: Schema(SchemaV7.localModels),
             isStoredInMemoryOnly: inMemory,
             cloudKitDatabase: .none
         )
     }
 
-    /// The single `SyncedSavedRecipe` model, in its own *named* store
-    /// (`"SyncedSaved"`) so introducing the entity never rewrites
-    /// `default.store`. Mirrors to the CloudKit private DB only when `cloudKit`
-    /// is true (the opt-in path); `.none` otherwise — the opt-out path, the
-    /// DOD-CRASH-1 fallback, and every in-memory test. This is the ONLY store
-    /// that ever leaves the device (DUT-35 / DUT-6).
+    /// The synced models — `SyncedSavedRecipe` (DUT-35) and, as of DUT-943,
+    /// `SyncedProfile` too — sharing one *named* store (`"SyncedSaved"`) so
+    /// introducing either entity never rewrites `default.store`. Mirrors to
+    /// the CloudKit private DB only when `cloudKit` is true (the opt-in
+    /// path); `.none` otherwise — the opt-out path, the DOD-CRASH-1
+    /// fallback, and every in-memory test. This is the ONLY store that ever
+    /// leaves the device (DUT-35 / DUT-6 / DUT-943).
     ///
     /// DUT-525 — non-private so `RecipeStore+MigrationRecovery.swift` can build
     /// the fresh recovery container's synced store.
@@ -277,7 +277,7 @@ extension RecipeStore {
     ) -> ModelConfiguration {
         ModelConfiguration(
             "SyncedSaved",
-            schema: Schema(SchemaV6.syncedModels),
+            schema: Schema(SchemaV7.syncedModels),
             isStoredInMemoryOnly: inMemory,
             cloudKitDatabase: cloudKit ? .private(cloudKitContainerIdentifier) : .none
         )
@@ -362,7 +362,7 @@ extension RecipeStore {
         // reaches this via the `-DODUseInMemoryStore` UI-test hook in
         // `AppDependencies`; the L1 suite reaches it directly.
         try ModelContainer(
-            for: Schema(SchemaV6.models),
+            for: Schema(SchemaV7.models),
             configurations: localCacheConfiguration(inMemory: true),
             syncedSavedConfiguration(inMemory: true, cloudKit: false)
         )
