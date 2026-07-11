@@ -127,7 +127,15 @@ public struct WPCommentsClient: Sendable {
         }
         return CommentsPage(
             comments: dtos.map { $0.toDomain() },
-            totalPages: Self.parseHeader(response, key: "X-WP-TotalPages") ?? 1,
+            // DUT-397 parity: WP's comments controller computes this header as
+            // `ceil(total / per_page)`, which is literally `0` for a
+            // zero-comment post — clamp to 1 so callers never see the
+            // self-contradictory "page 1 of 0" (mirrors
+            // `WPRestClient.parseTotalPages`, which guards the identical
+            // header on the posts/categories paths). `X-WP-Total` (the raw
+            // count, not a page count) is left unclamped: 0 comments really
+            // is a valid total.
+            totalPages: max(Self.parseHeader(response, key: "X-WP-TotalPages") ?? 1, 1),
             totalCount: Self.parseHeader(response, key: "X-WP-Total") ?? dtos.count
         )
     }
