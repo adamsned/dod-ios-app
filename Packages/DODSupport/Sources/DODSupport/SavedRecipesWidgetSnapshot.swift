@@ -85,6 +85,34 @@ public struct SavedRecipesWidgetSnapshot: Codable, Sendable, Equatable {
     }
 }
 
+extension SavedRecipesWidgetSnapshot.Entry {
+
+    /// Build the `dod://recipe/<id>?source=saved` tap-through URL for this
+    /// entry, or `nil` for a non-positive id.
+    ///
+    /// DUT — `SavedRecipesEntry.placeholder` (the WidgetKit gallery /
+    /// redacted-preview fixture the widget extension shows before the real
+    /// snapshot loads) fabricates rows with made-up titles ("Garlic Butter
+    /// Skillet Corn", etc.) that don't correspond to any real post. Without
+    /// this guard, `SavedRecipesWidgetEntryView` built a real, well-formed
+    /// `dod://recipe/<id>?source=saved` link for those rows — so a tap during
+    /// that transient state silently opened WHATEVER real post happens to
+    /// have that id (or dead-ended), never the fictional recipe shown.
+    /// Mirrors the `id > 0` guard `FeaturedRecipeWidgetEntryView.deepLink(for:)`
+    /// / `LatestRecipeLockScreenWidgetEntryView.deepLink(for:)` already apply
+    /// to their own placeholder rows (DUT-652); this closes the same gap for
+    /// the Saved Recipes widget's fabricated preview ids.
+    public var deepLinkURL: URL? {
+        guard recipeID > 0 else { return nil }
+        var components = URLComponents()
+        components.scheme = "dod"
+        components.host = "recipe"
+        components.path = "/\(recipeID)"
+        components.queryItems = [URLQueryItem(name: "source", value: "saved")]
+        return components.url
+    }
+}
+
 /// Identifiers shared by the app and the saved-recipes widget extension.
 ///
 /// Kept separate from ``WidgetSnapshotConfig`` so the two widgets'

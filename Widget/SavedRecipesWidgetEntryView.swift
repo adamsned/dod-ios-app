@@ -123,21 +123,19 @@ struct SavedRecipesWidgetEntryView: View {
 
     // MARK: - Helpers
 
-    /// Build a `dod://recipe/<id>?source=saved` URL for tap-through.
-    /// Mirrors `FeaturedRecipeWidgetEntryView.deepLink(for:)` so both
-    /// widgets emit recipe URLs in the same shape; the `source` query
-    /// parameter is the discriminator the host app uses to fire the
-    /// correct `widgetOpened(kind:)` analytics event (T-323 / AC-17.9).
-    /// The recipe-detail nav contract is unaffected: the parser still
-    /// resolves the URL to `.recipe(id:)` and ignores the source on
-    /// the navigation path.
+    /// Build a `dod://recipe/<id>?source=saved` URL for tap-through, or
+    /// `nil` for a non-positive id (the `SavedRecipesEntry.placeholder`
+    /// preview rows) so a tap during that transient state falls through to
+    /// the chrome's `dod://saved` fallback at both call sites above instead
+    /// of silently opening whatever real post happens to share that id.
+    /// Delegates to ``SavedRecipesWidgetSnapshot/Entry/deepLinkURL`` (DODSupport)
+    /// so the id>0 guard is unit-tested without a WidgetKit host. Mirrors
+    /// `FeaturedRecipeWidgetEntryView.deepLink(for:)` so both widgets emit
+    /// recipe URLs in the same shape; the `source` query parameter is the
+    /// discriminator the host app uses to fire the correct
+    /// `widgetOpened(kind:)` analytics event (T-323 / AC-17.9).
     static func deepLink(for entry: SavedRecipesWidgetSnapshot.Entry) -> URL? {
-        var components = URLComponents()
-        components.scheme = "dod"
-        components.host = "recipe"
-        components.path = "/\(entry.recipeID)"
-        components.queryItems = [URLQueryItem(name: "source", value: "saved")]
-        return components.url
+        entry.deepLinkURL
     }
 
     static func row(from snapshotEntry: SavedRecipesWidgetSnapshot.Entry?) -> WidgetCard.SavedRow {
