@@ -65,6 +65,17 @@ jobs:
             ios_sim:
               - 'App/**'
               - 'Packages/**'
+              # Embedded app-extension sources (DODAppWidget, DODAppLiveActivity).
+              # The DODApp scheme builds both as dependencies of the host app, so
+              # an extension-only change must still run build-app + the L1/L3/L4/L5
+              # iOS jobs. These dirs were missing here, so PR #198 (a Widget-only
+              # Swift change) skipped EVERY iOS job — a build break or behavior
+              # regression in an extension could merge unverified. Deliberately
+              # NOT in `code`: lint/format/L1-packages don't scan these dirs
+              # (.swiftlint.yml `included` + the format job both target App/
+              # AppTests/Packages only), so adding them there only burns minutes.
+              - 'Widget/**'
+              - 'LiveActivity/**'
               - 'project.yml'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
