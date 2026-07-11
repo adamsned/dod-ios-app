@@ -173,9 +173,13 @@ public actor RecipeStore {
             // DUT-413: pin the hero too — `isSaved` alone leaves the just-cached
             // bytes evictable (`toggleSaved` pins via `pinHeroImage`; missed here).
             try pinHeroImage(heroURLString: target.heroImageURLString, toRecipeID: recipe.id)
-        } else if didBackfillSyncedSaved {
+        } else if didBackfillSyncedSaved && target.isSaved {
+            // DUT-512: mirror the explicit-unsave teardown for a genuine
+            // cross-device unsave. Gated on `target.isSaved`'s PRE-merge value
+            // so a download-only recipe (US-35 / DUT-67: download/save are
+            // independent — no synced row, never had one) isn't mistaken for
+            // one — else every re-open/refresh wiped its download + hero pin.
             target.isSaved = false
-            // DUT-512: mirror the explicit-unsave teardown (drop download + pins).
             try tearDownUnsavedPins(target)
         }
 
