@@ -210,20 +210,17 @@ extension ProfileEditView {
             return
         }
         // DUT — confirm the successful sign-in with a `.success` tap (mirrors the
-        // Save path). Bump before any `dismiss()` — the Save path proves the
+        // Save path). Bump before the `dismiss()` — the Save path proves the
         // trigger fires even when the view is dismissing (`+Save.swift`).
         authSuccessTick &+= 1
-        // Apple withheld the name/email and nothing was on file: the user is
-        // signed in, but there's nothing to auto-fill, so keep the editor open for
-        // manual completion. DUT-928 — CONFIRM the sign-in explicitly so it's not
-        // silently indistinguishable from a failure (Apple only sends name/email
-        // on the FIRST-ever authorization, so a re-auth legitimately lands here
-        // and the editor otherwise looks unchanged). Only auto-dismiss when a full
-        // profile was written in one tap.
-        guard outcome.profileSaved else {
-            savedConfirmationMessage = "Signed in. Add your name and email, then Save."
-            return
-        }
+        // DUT-935 — "sign in & close" (name optional). A successful sign-in ALWAYS
+        // dismisses now. When Apple provided the name/email we saved a full profile
+        // in one tap; when it withheld them — every re-auth, since Apple releases
+        // those fields only on the FIRST-ever authorization — the user is still
+        // signed in and can add their name later from the profile editor. We no
+        // longer trap them on the sheet with empty "required" fields demanding
+        // manual entry, which read as "sign-in didn't work." Being signed in is
+        // enough to use the app; the display name is optional and set later.
         Task {
             await onProfileChanged()
             dismiss()
