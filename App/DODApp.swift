@@ -1,3 +1,6 @@
+import BackgroundTasks
+import DODNetworking
+import DODSupport
 import Foundation
 import SwiftUI
 import UserNotifications
@@ -106,16 +109,34 @@ enum DODEnvironment {
 }
 
 /// UIKit application delegate bridged into the SwiftUI lifecycle via
-/// `@UIApplicationDelegateAdaptor` (see `DODApp`). Its sole job in v1 is to
-/// install the `UNUserNotificationCenterDelegate` at launch so tapped
-/// local notifications route their deep link (US-42 / AC-42.3) and
-/// foreground notifications surface a banner (AC-42.5).
+/// `@UIApplicationDelegateAdaptor` (see `DODApp`). Two jobs:
+///
+/// 1. Install the `UNUserNotificationCenterDelegate` at launch so tapped
+///    local notifications route their deep link (US-42 / AC-42.3) and
+///    foreground notifications surface a banner (AC-42.5).
+/// 2. DUT-938 — register + (re)schedule the `BGAppRefreshTask` that is the
+///    missing TRIGGER for new-post notifications: the notification
+///    infrastructure above already existed, but nothing ever detected a
+///    new post and called `NotificationService.scheduleNewPostNotification`.
+///    `NewPostsPoller` is that trigger; this delegate is only the OS-level
+///    plumbing that wakes it up periodically.
 ///
 /// The `NotificationCoordinator` is retained here for the process lifetime
 /// — `UNUserNotificationCenter.delegate` is a `weak` reference, so a
 /// non-retained coordinator would be deallocated and tap routing would
 /// silently stop working.
 final class AppDelegate: NSObject, UIApplicationDelegate {
+
+    /// Must exactly match the `BGTaskSchedulerPermittedIdentifiers` entry in
+    /// `project.yml` (the source of truth `xcodegen generate` writes into
+    /// `Info.plist`) — a mismatch makes `register(forTaskWithIdentifier:)`
+    /// silently refuse the task at runtime.
+    static let newPostsTaskIdentifier = "com.dutchovendaddy.DODApp.newposts"
+
+    /// BGAppRefreshTask is opportunistic (iOS decides the real cadence from
+    /// battery, Background App Refresh settings, and usage patterns) — this
+    /// is only the EARLIEST the next refresh may run, not a guarantee.
+    private static let refreshInterval: TimeInterval = 4 * 60 * 60
 
     private let notificationCoordinator = NotificationCoordinator()
 
@@ -124,6 +145,62 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = notificationCoordinator
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.newPostsTaskIdentifier,
+            using: nil
+        ) { [weak self] task in
+            guard let refreshTask = task as? BGAppRefreshTask else { return }
+            self?.handleNewPostsRefresh(refreshTask)
+        }
+        scheduleAppRefresh()
         return true
+    }
+
+    /// Also re-arms the next refresh every time the app backgrounds — the OS
+    /// discards a pending request once its task runs, so re-submitting here
+    /// (in addition to at launch) keeps the chain alive across sessions that
+    /// never get killed-and-relaunched.
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        scheduleAppRefresh()
+    }
+
+    /// Submits (or re-submits) the next opportunistic new-posts refresh.
+    /// `BGTaskScheduler` de-dupes by identifier, so calling this from both
+    /// launch and backgrounding never double-books a task.
+    func scheduleAppRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.newPostsTaskIdentifier)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: Self.refreshInterval)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            DODLog.app.error("BGAppRefreshTask submit failed: \(String(describing: error))")
+        }
+    }
+
+    /// Runs the poll, reschedules the NEXT refresh immediately (so an
+    /// expired/killed run doesn't silently end the chain), and reports
+    /// completion back to the OS. `expirationHandler` cancels the in-flight
+    /// poll if iOS revokes background time before it finishes.
+    private func handleNewPostsRefresh(_ task: BGAppRefreshTask) {
+        scheduleAppRefresh()
+        // Fresh, lightweight `WPRestClient` + `NotificationService` rather
+        // than a full `AppDependencies()` — this handler can run in a
+        // background-launched process with no SwiftUI scene, and the
+        // composition root's SwiftData/CloudKit setup is unrelated to
+        // fetching + notifying about new posts. `AppDependencies.makeHTTPClient()`
+        // is reused so this still respects the E2E stub swap (no live
+        // network calls under the L5 harness) — the exact seam
+        // `AppDependencies.init` uses for `restClient`.
+        let poller = NewPostsPoller(
+            restClient: WPRestClient(httpClient: AppDependencies.makeHTTPClient()),
+            notificationService: NotificationService()
+        )
+        let pollTask = Task {
+            await poller.poll()
+            task.setTaskCompleted(success: true)
+        }
+        task.expirationHandler = {
+            pollTask.cancel()
+        }
     }
 }
