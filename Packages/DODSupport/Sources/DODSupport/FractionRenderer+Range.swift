@@ -32,13 +32,16 @@ extension FractionRenderer {
         in trailing: Substring,
         by factor: Double
     ) -> ScaledRange? {
-        // Scan optional spaces, one range dash, optional spaces — capturing
-        // the literal so the re-emit preserves the source's spacing style.
-        let beforeDash = scanSpaces(in: trailing, from: trailing.startIndex)
-        guard beforeDash < trailing.endIndex, isRangeSeparator(trailing[beforeDash]) else {
+        // Scan optional spaces, one range separator (dash glyph OR the words
+        // "to"/"or"), optional spaces — capturing the literal so the re-emit
+        // preserves the source's spacing style.
+        let beforeSep = scanSpaces(in: trailing, from: trailing.startIndex)
+        guard beforeSep < trailing.endIndex,
+            let sepEnd = rangeSeparatorEnd(in: trailing, at: beforeSep)
+        else {
             return nil
         }
-        let afterDash = scanSpaces(in: trailing, from: trailing.index(after: beforeDash))
+        let afterDash = scanSpaces(in: trailing, from: sepEnd)
         let separator = String(trailing[trailing.startIndex..<afterDash])
         // Parse the upper bound off whatever follows the separator. Copy the
         // slice to a fresh `String` so `parseLeadingQuantity`'s indices belong
@@ -77,10 +80,50 @@ extension FractionRenderer {
         return text[priorIndex] == " " ? " " : ""
     }
 
-    /// Hyphen / en-dash / em-dash — the range separators we re-emit between
-    /// scaled bounds.
+    /// Hyphen / en-dash / em-dash — the dash range separators we re-emit
+    /// between scaled bounds.
     private static func isRangeSeparator(_ character: Character) -> Bool {
         character == "-" || character == "\u{2013}" || character == "\u{2014}"
+    }
+
+    /// DUT-912: the whole words recipes use for ranges alongside dashes —
+    /// "2 to 3 cloves", "3 or 4 cups". Space-bounded (see ``matchRangeWord``)
+    /// so "tomato" / "orange" can't be mistaken for a separator.
+    private static let rangeWords = ["to", "or"]
+
+    /// Detect a range separator at `index` (the first non-space char of the
+    /// trailing slice): a dash glyph, or a whole "to"/"or" word. Returns the
+    /// index just past the separator token, or `nil` when `index` isn't one.
+    private static func rangeSeparatorEnd(
+        in text: Substring,
+        at index: Substring.Index
+    ) -> Substring.Index? {
+        if isRangeSeparator(text[index]) {
+            return text.index(after: index)
+        }
+        for word in rangeWords {
+            if let end = matchRangeWord(word, in: text, at: index) { return end }
+        }
+        return nil
+    }
+
+    /// Match `word` (case-insensitively) at `index`, requiring a trailing
+    /// whitespace boundary so a range word ("2 to 3") matches but a longer
+    /// word that merely starts with it ("2 tomatoes") does not. Returns the
+    /// index just past the word (at the boundary space), or `nil`.
+    private static func matchRangeWord(
+        _ word: String,
+        in text: Substring,
+        at index: Substring.Index
+    ) -> Substring.Index? {
+        guard let end = text.index(index, offsetBy: word.count, limitedBy: text.endIndex),
+            text[index..<end].lowercased() == word,
+            end < text.endIndex,
+            text[end].isWhitespace
+        else {
+            return nil
+        }
+        return end
     }
 
     private static func scanSpaces(
