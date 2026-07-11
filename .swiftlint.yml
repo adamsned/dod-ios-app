@@ -75,6 +75,18 @@ custom_rules:
     excluded: ".*Tests\\.swift"
     severity: error
 
+  # DUT-609/914/915: bare Int(<Double>) TRAPS (SIGTRAP) on a huge/NaN value —
+  # e.g. a 20+ digit quantity from untrusted JSON-LD. Prefer Int(exactly:) with
+  # a fallback. The known bounded-input sites (timer/image/charcoal/playback,
+  # not untrusted) are excluded; add `// swiftlint:disable:this` with a
+  # bounded-input justification for any other genuinely-safe use.
+  int_from_double_traps:
+    name: "Int(Double) can trap"
+    regex: 'Int\((?!exactly:)[^\n]*\.rounded\(\)'
+    message: "Int(Double) traps on a huge/NaN value (DUT-609/914/915). Use Int(exactly:) with a fallback."
+    excluded: ".*(FirstCookoutView\\+TimerFormat|CookThumbnailLoader|CookStepTimer|CookModeViewModel\\+Voice|DutchOvenHeatCoach|CharcoalRecipeConverter|Tests)\\.swift"
+    severity: warning
+
 # Tunables
 identifier_name:
   min_length:
