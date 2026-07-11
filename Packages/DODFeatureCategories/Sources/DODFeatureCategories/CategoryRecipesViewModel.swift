@@ -170,7 +170,16 @@ public final class CategoryRecipesViewModel {
                 var seen = Set(items.map(\.id))
                 items += result.items.filter { seen.insert($0.id).inserted }
             } else {
-                items = try await dependencies.cachedListItems(forIDs: result.items.map(\.id))
+                // A WP category/tag join can hand back the same post id twice
+                // within a single page (e.g. a query joining term relationships
+                // without DISTINCT for a post tagged under overlapping terms).
+                // Dedup the id list before the cache lookup so a duplicated id
+                // doesn't turn into a duplicated card — mirrors the append
+                // branch's protection above, which this initial/refresh branch
+                // was missing.
+                var seen = Set<Int>()
+                let uniqueIDs = result.items.map(\.id).filter { seen.insert($0).inserted }
+                items = try await dependencies.cachedListItems(forIDs: uniqueIDs)
             }
             currentPage = page
             // DUT-265: stop at the real last page (X-WP-TotalPages), not at a
