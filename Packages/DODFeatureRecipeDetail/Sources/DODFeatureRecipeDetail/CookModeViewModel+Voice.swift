@@ -228,7 +228,15 @@ extension CookModeViewModel {
     public func pauseVoice() {
         // DUT-620 — with Voice Mode off there's no utterance to pause; mutating
         // playbackState here flipped the transport state spuriously (Siri).
-        guard isVoiceModeEnabled else { return }
+        // Also gate on the transport actually being `.speaking`: a stray
+        // "Pause" command (Siri can fire this any time, independent of
+        // on-screen taps) after a step already finished reading on its own
+        // would otherwise force `.paused` with nothing playing to pause. The
+        // next "Resume" would then force `.speaking` with nothing to resume
+        // (`voiceReader.resume()` is a no-op against an idle engine),
+        // permanently sticking the play/pause button on "pause" while the
+        // reader stays silent.
+        guard isVoiceModeEnabled, playbackState == .speaking else { return }
         voiceReader.pause()
         // DUT-583 — keep the position; the button flips to "play" (resumable).
         playbackState = .paused
@@ -240,8 +248,11 @@ extension CookModeViewModel {
     /// so "Pause" was a hands-free dead-end.
     public func resumeVoice() {
         // DUT-620 — mirror pauseVoice(): don't touch the transport state when
-        // Voice Mode is off (there's nothing to resume).
-        guard isVoiceModeEnabled else { return }
+        // Voice Mode is off (there's nothing to resume). Also require the
+        // transport to actually be `.paused` — see the note on `pauseVoice()`
+        // for why an ungated resume can strand the button on a "speaking"
+        // state the reader never actually enters.
+        guard isVoiceModeEnabled, playbackState == .paused else { return }
         voiceReader.resume()
         // DUT-583 — continue from the pause point (no restart); button → pause.
         playbackState = .speaking

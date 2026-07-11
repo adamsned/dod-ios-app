@@ -200,6 +200,58 @@ import Testing
         #expect(viewModel.playbackState == .idle)
     }
 
+    /// Regression — a stray Siri "Resume" fired while Voice Mode is ON but
+    /// nothing is actually paused (the common case: a step finished reading on
+    /// its own, so the transport is `.idle`, not `.paused`) must be a no-op.
+    /// Before the fix, `resumeVoice()` only checked `isVoiceModeEnabled` and
+    /// unconditionally forced `playbackState = .speaking`, even though
+    /// `voiceReader.resume()` was a no-op against an idle engine — stranding
+    /// the play/pause button on "pause" forever with no audio actually
+    /// playing (only a step change or a Voice Mode toggle could unstick it).
+    @Test func resumeVoiceIsANoOpWhenNothingIsActuallyPaused() {
+        let mock = MockSpeechSynthesizer()
+        let reader = VoiceReader(synthesizer: mock)
+        let viewModel = CookModeViewModelTests.makeViewModel(
+            stepCount: 3,
+            voiceReader: reader
+        )
+        viewModel.setVoiceMode(true)  // -> .speaking
+        #expect(viewModel.playbackState == .speaking)
+
+        // The step finishes reading on its own (mirrors the reader's real
+        // onQueueDidEmpty -> onDidFinishSpeaking path exercised elsewhere).
+        reader.onDidFinishSpeaking?()
+        #expect(viewModel.playbackState == .idle)
+
+        // A stray "Resume" with nothing paused must not claim we're speaking,
+        // and must not forward a resume to a reader that has nothing paused.
+        viewModel.resumeVoice()
+
+        #expect(viewModel.playbackState == .idle)
+        #expect(!mock.calls.contains(.continueSpeaking))
+    }
+
+    /// Regression companion — a stray Siri "Pause" fired while Voice Mode is
+    /// ON but nothing is actually speaking (transport already `.idle`) must
+    /// likewise be a no-op, so it can never manufacture a `.paused` state with
+    /// nothing playing to pause.
+    @Test func pauseVoiceIsANoOpWhenNothingIsActuallySpeaking() {
+        let mock = MockSpeechSynthesizer()
+        let reader = VoiceReader(synthesizer: mock)
+        let viewModel = CookModeViewModelTests.makeViewModel(
+            stepCount: 3,
+            voiceReader: reader
+        )
+        viewModel.setVoiceMode(true)  // -> .speaking
+        reader.onDidFinishSpeaking?()  // step finished on its own -> .idle
+        #expect(viewModel.playbackState == .idle)
+
+        viewModel.pauseVoice()
+
+        #expect(viewModel.playbackState == .idle)
+        #expect(!mock.isPaused)
+    }
+
     /// AC-40.1 — toggling Voice Mode off stops the reader and disables the flag.
     @Test func turningVoiceModeOffStopsTheReader() {
         let mock = MockSpeechSynthesizer()
