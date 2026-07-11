@@ -44,7 +44,18 @@ public enum DisplayNameValidator {
 
         // 3. Whole-word blocklist — short terms that WOULD false-positive as a
         //    substring (the "Scunthorpe problem": Cassandra, Dick, Hancock...).
-        //    Matched only as a standalone normalized token.
+        //    Matched only as a standalone normalized token — including when the
+        //    entire name IS one blocked word once fully normalized ("a s s" /
+        //    "f.a.g"), which the per-token check alone misses: tokenizing splits
+        //    on every space/punctuation mark BEFORE normalizing, so spacing out
+        //    a short blocked word turns it into single-letter tokens that never
+        //    match. Checking the already-computed `normalized` (spaces and all
+        //    non-letters stripped) against the same set closes that gap without
+        //    affecting genuine multi-word names (their fully-concatenated form
+        //    is longer than any entry here, so it can't collide).
+        if Self.blockedWholeWords.contains(normalized) {
+            return .inappropriate
+        }
         let tokens = Set(
             trimmed.lowercased()
                 .components(separatedBy: CharacterSet.alphanumerics.inverted)
