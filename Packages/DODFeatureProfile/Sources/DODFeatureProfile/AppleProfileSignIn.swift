@@ -196,22 +196,24 @@ public struct AppleProfileSignIn: Sendable {
             try sessionStore.save(resolved)
             return nil
         } catch {
-            let status: OSStatus? = {
-                if let authError = error as? AppleAuthError,
-                    case .keychainFailed(let code) = authError {
-                    return code
-                }
-                return nil
-            }()
             return Outcome(
                 displayName: resolved.displayName,
                 email: resolved.email,
                 profileSaved: false,
                 signedIn: false,
                 sessionSaveFailed: true,
-                sessionSaveStatus: status
+                sessionSaveStatus: Self.keychainStatus(from: error)
             )
         }
+    }
+
+    /// DUT-928 — the raw `OSStatus` behind a session-save error, when it was a
+    /// Keychain failure (`nil` otherwise), for the on-device diagnostic.
+    private static func keychainStatus(from error: any Error) -> OSStatus? {
+        guard let authError = error as? AppleAuthError,
+            case .keychainFailed(let code) = authError
+        else { return nil }
+        return code
     }
 
     /// Write the local ``UserProfile`` from the resolved credential, returning
