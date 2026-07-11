@@ -126,7 +126,15 @@ public enum IngredientMetricConverter {
 
     /// Format a whole-number base magnitude without a trailing decimal.
     private static func formatInteger(_ value: Double) -> String {
-        String(Int(value.rounded()))
+        // DUT-915: `Int(exactly:)` so a pathological untrusted magnitude can't
+        // trap; fall back to the formatter (renders a large Double without
+        // trapping). This path only sees < 1000 in practice, but stays
+        // defensive alongside `trimDecimal`.
+        guard let intValue = Int(exactly: value.rounded()) else {
+            return Self.decimalFormatter.string(from: NSNumber(value: value.rounded()))
+                ?? String(value)
+        }
+        return String(intValue)
     }
 
     /// Format a litre / kilogram magnitude to one decimal, trimming a trailing
@@ -134,7 +142,13 @@ public enum IngredientMetricConverter {
     private static func trimDecimal(_ value: Double) -> String {
         let rounded = (value * 10).rounded() / 10
         if rounded == rounded.rounded() {
-            return String(Int(rounded.rounded()))
+            // DUT-915: guard the Int() overflow trap on a pathological untrusted
+            // quantity (magnitude → L/kg rollup can exceed Int.max); fall back to
+            // the formatter, which renders a large Double without trapping.
+            if let intValue = Int(exactly: rounded.rounded()) {
+                return String(intValue)
+            }
+            return Self.decimalFormatter.string(from: NSNumber(value: rounded)) ?? String(rounded)
         }
         // DUT-737: render the one-decimal fraction through a locale-aware
         // formatter so a comma-decimal-locale cook reads "1,2 L", not the POSIX
