@@ -118,21 +118,24 @@ import Testing
         #expect(blocks.first == .image(url: expectedURL, caption: "A hearty spread."))
     }
 
-    @Test func figureFallsBackToAltWhenNoFigcaption() throws {
+    @Test func figureWithoutFigcaptionHasNilCaptionNotAlt() throws {
+        // DUT-918: a `<figure>` with no `<figcaption>` has NO visible caption —
+        // the old `?? alt` fallback leaked internal social-media alt notes.
         let html = """
             <figure class="wp-block-image"><img src="https://example.com/a.jpg" alt="The Best Dutch Oven Recipes. ">\
             </figure>
             """
         let blocks = ArticleHTMLParser.parse(html: html)
-        // alt is used as caption; src is taken from src= (never srcset).
+        // src is taken from src= (never srcset); alt is NOT used as a caption.
         let url = try #require(URL(string: "https://example.com/a.jpg"))
-        #expect(blocks == [.image(url: url, caption: "The Best Dutch Oven Recipes.")])
+        #expect(blocks == [.image(url: url, caption: nil)])
     }
 
     @Test func parsesStandaloneImage() throws {
+        // DUT-918: standalone `<img>` has no visible caption (alt is not one).
         let blocks = ArticleHTMLParser.parse(html: "<img src=\"https://example.com/solo.png\" alt=\"Solo\">")
         let url = try #require(URL(string: "https://example.com/solo.png"))
-        #expect(blocks == [.image(url: url, caption: "Solo")])
+        #expect(blocks == [.image(url: url, caption: nil)])
     }
 
     @Test func standaloneImageWithoutAltHasNilCaption() throws {

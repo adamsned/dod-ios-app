@@ -17,6 +17,10 @@ let package = Package(
         // uses. Only the new test method needs SwiftData wiring; the other
         // five `LiveAPITests` methods don't depend on these.
         .package(path: "../DODPersistence"),
+        // DUT-920: the catalog link audit slices each post's article body via
+        // `ArticleBodyExtractor.extractContentHTML` before scanning `<a href>`s,
+        // so nav/footer/sidebar chrome links are excluded from the crawl.
+        .package(path: "../DODSupport"),
     ],
     targets: [
         // Empty source target so the package is valid; everything lives in Tests/.
@@ -28,6 +32,7 @@ let package = Package(
                 "DODDomain",
                 "DODNetworking",
                 "DODPersistence",
+                "DODSupport",
             ]
         ),
     ]
