@@ -173,12 +173,20 @@ extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
         defer { retainedSelf = nil }
         guard
             let credential = authorization.credential as? ASAuthorizationAppleIDCredential
-        else { return }
+        else {
+            // DUT-928 diagnostic (TEMPORARY): surface a normally-silent drop.
+            onError?("Sign-in diagnostic: no Apple ID credential returned.")
+            return
+        }
         // Capture the credential fields up front (the credential isn't Sendable).
         let userIdentifier = credential.user
         // DUT-506: an empty / whitespace-only id is not a real sign-in — bail
         // before flipping `hasSession`, matching the Google side (DUT-285).
-        guard !userIdentifier.isBlankAppleIdentifier else { return }
+        guard !userIdentifier.isBlankAppleIdentifier else {
+            // DUT-928 diagnostic (TEMPORARY): surface a normally-silent drop.
+            onError?("Sign-in diagnostic: Apple returned an empty user id.")
+            return
+        }
         let displayName = AppleCredentialResolver.displayName(from: credential.fullName)
         let email = credential.email
         let authorizationCode = credential.authorizationCode.flatMap {
@@ -203,10 +211,14 @@ extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
     ) {
         activeController = nil
         retainedSelf = nil  // DUT-928 — end of flow; drop the in-flight retention.
-        // DUT-636: a user-initiated cancel stays silent; a real error surfaces.
-        if let message = AppleProfileSignInButton.userFacingErrorMessage(for: error) {
-            onError?(message)
-        }
+        // DUT-928 diagnostic (TEMPORARY): the iPad flow completes Face ID but the
+        // app never reflects a sign-in and shows NO error — so surface the RAW
+        // error for EVERY code here, including `.canceled` / `.unknown` which
+        // `userFacingErrorMessage` normally swallows as a user back-out. This tells
+        // us exactly what the delegate receives on device. Revert to
+        // `userFacingErrorMessage` once the root cause is identified.
+        let nsError = error as NSError
+        onError?("Sign-in diagnostic: error [\(nsError.domain) \(nsError.code)] \(nsError.localizedDescription)")
     }
 }
 #endif

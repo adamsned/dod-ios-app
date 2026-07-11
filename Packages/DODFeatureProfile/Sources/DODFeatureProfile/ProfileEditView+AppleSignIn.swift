@@ -215,9 +215,15 @@ extension ProfileEditView {
         authSuccessTick &+= 1
         // Apple withheld the name/email and nothing was on file: the user is
         // signed in, but there's nothing to auto-fill, so keep the editor open for
-        // manual completion (no error, no dismiss). Only auto-dismiss when a full
+        // manual completion. DUT-928 — CONFIRM the sign-in explicitly so it's not
+        // silently indistinguishable from a failure (Apple only sends name/email
+        // on the FIRST-ever authorization, so a re-auth legitimately lands here
+        // and the editor otherwise looks unchanged). Only auto-dismiss when a full
         // profile was written in one tap.
-        guard outcome.profileSaved else { return }
+        guard outcome.profileSaved else {
+            savedConfirmationMessage = "Signed in. Add your name and email, then Save."
+            return
+        }
         Task {
             await onProfileChanged()
             dismiss()
