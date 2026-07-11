@@ -52,7 +52,12 @@ extension RecipeDetailRatingsSection {
             // Phase 5: server-attested ranks/owner status for every author's comment
             // arrive with the backend that can vouch for them.
             rank: viewModel.isOwnComment(comment) ? viewModel.ownCommentRank : nil,
-            isOwnerRank: viewModel.isOwnComment(comment) && viewModel.isCurrentUserOwner
+            isOwnerRank: viewModel.isOwnComment(comment) && viewModel.isCurrentUserOwner,
+            // DUT-956 — tapping another user's avatar/name opens the commenter
+            // profile card (Block/Report). Only for OTHERS' comments: `canModerate`
+            // is `!isOwnComment`, so own-comment rows pass `nil` (no tap) and never
+            // surface Block/Report for yourself — same rule the context menu uses.
+            onTapAuthor: viewModel.canModerate(comment) ? { commenterForSheet = comment } : nil
         )
         // DUT-501 (Guideline 1.2) — report/block another user's comment. Report
         // hides it locally at once and opens a prefilled moderation email;
