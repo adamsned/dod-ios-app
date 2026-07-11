@@ -50,6 +50,37 @@ struct RecipeStoreMergeDetailUnsaveTests {
         #expect(try await store.image(url: heroURL) == nil)
     }
 
+    /// DUT-512 follow-up: the cross-device-unsave teardown above must NOT fire
+    /// for a recipe that was explicitly DOWNLOADED but never saved (US-35 /
+    /// DUT-67 — download and save are independent states). Before this fix,
+    /// the reconcile branch keyed only on "no synced row + backfill complete",
+    /// which is also true for every download-only recipe (it never had a
+    /// synced row to begin with) — so an ordinary re-open or pull-to-refresh
+    /// (any `mergeDetail` call, not just a migration-window race) silently
+    /// cleared `downloadedAt` and unpinned the hero, destroying the offline
+    /// download the user never asked to remove.
+    @Test func downloadOnlyRecipeSurvivesMergeDetailReconcile() async throws {
+        let store = try await makeStore()
+        try await store.cache(listItem: makeListItem(id: 9001, title: "Dutch Baby"))
+
+        // Explicitly download without ever saving.
+        _ = try await store.markDownloaded(id: 9001)
+        #expect(try await store.isDownloaded(id: 9001))
+        #expect(!(try await store.localIsSavedPinForTesting(id: 9001)))
+
+        // Steady-state backfill-complete — the normal state for essentially
+        // every real user, not just mid-migration.
+        await store.markSyncedSavedBackfillComplete()
+
+        // Re-open the recipe (or pull-to-refresh): mergeDetail runs again, as it
+        // does on every detail fetch (`RecipeDetailViewModel+Fetch.apply`).
+        try await store.mergeDetail(makeRecipe(id: 9001, withDetail: true))
+
+        // The explicit download must survive — this was never a saved row, so
+        // it's not a cross-device unsave.
+        #expect(try await store.isDownloaded(id: 9001))
+    }
+
     @Test func upwardReconcileStillPinsHeroNoRegression() async throws {
         // Regression guard: the same-user / upward path (a synced saved row
         // present) must still pin the hero on merge, keeping it eviction-proof.
