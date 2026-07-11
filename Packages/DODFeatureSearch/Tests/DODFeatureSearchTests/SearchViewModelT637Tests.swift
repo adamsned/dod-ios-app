@@ -143,6 +143,41 @@ import Testing
         #expect(viewModel.items.map(\.id) == [201])
     }
 
+    /// CL-127 (T-649) / CL-106 (T-637) interaction: a sparse text search
+    /// seeds the "did you mean?" banner (`didYouMean`), then the user taps
+    /// the "Latest Recipes" Try-pill. `surfaceLatestRecipes()` already wipes
+    /// the stale `ingredientItems` tier left from the prior search (DUT-11)
+    /// but was missing the equivalent wipe for `didYouMean` — so the banner
+    /// (computed for the OLD, unrelated typed query) survived onto the
+    /// Latest-Recipes feed. `shouldShowDidYouMeanBanner` in `SearchView`
+    /// only gates on `state == .results || .noResults`, both of which
+    /// `applyLatestRecipes` sets, so the stale banner would render on top
+    /// of the Latest-Recipes list — and tapping it (`applyDidYouMean()`)
+    /// would silently discard the feed and re-run the old, unrelated query.
+    @Test func surfaceLatestRecipesClearsStaleDidYouMeanBanner() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["naxxos"] = [Self.makeItem(1, title: "Naxxos")]
+        dependencies.cachedTitlesArray = ["Cast Iron Skillet Nachos"]
+        dependencies.latestRecipes = (101...105).map { Self.makeItem($0, title: "Newest") }
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+
+        viewModel.query = "naxxos"
+        await viewModel.runImmediateSearch()
+        #expect(viewModel.didYouMean == "nachos", "Sparse result seeds the banner")
+
+        await viewModel.surfaceLatestRecipes()
+
+        #expect(viewModel.state == .results, "Latest-Recipes feed loaded")
+        #expect(viewModel.items.map(\.id) == [101, 102, 103, 104, 105])
+        #expect(
+            viewModel.didYouMean == nil,
+            "A stale did-you-mean banner from the prior typed search must not survive onto the unrelated Latest-Recipes surface"
+        )
+    }
+
     // MARK: - Helpers
 
     static func makeItem(_ id: Int, title: String = "Match") -> RecipeListItem {
