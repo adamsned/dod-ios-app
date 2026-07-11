@@ -94,6 +94,17 @@ public final class RecipeDetailViewModel {
     // `internal(set)` so the `+CommentSubmit` extension can refresh the
     // aggregate after recording a rating alongside a comment (DUT-31).
     public internal(set) var ratingSummary: RecipeRating?
+    /// Generation token guarding writes to ``ratingSummary`` from a rating
+    /// network round trip. The ratings UI is tappable before
+    /// `loadRatingsAndComments()`'s own `fetchRatingSummary` resolves, so a
+    /// user's rating submit can land first; without this guard that
+    /// earlier, slower fetch would overwrite the fresher post-submit
+    /// aggregate on the other side of its `await`. Bumped before the
+    /// `await` in `loadRatingsAndComments()`, `submitRating(stars:)`, and
+    /// `recordRatingAlongsideComment(stars:)`; a mismatch after the await
+    /// means a newer call superseded this one, so its result is dropped.
+    /// Same pattern as `FeedViewModel.loadGeneration` (DUT-511).
+    var ratingRefreshGeneration = 0
     // `internal(set)` (not `private(set)`) so the comment-submit path in
     // `RecipeDetailViewModel+CommentSubmit.swift` can mutate the visible
     // thread + draft + in-flight flag after extraction (DUT-7). Public
@@ -101,7 +112,10 @@ public final class RecipeDetailViewModel {
     public internal(set) var comments: [RecipeComment] = []
     /// DUT-501 report/block moderation; DUT-546 gap 3 injectable to share one store across screens.
     public var commentModeration: CommentModerationStore
-    public private(set) var commentsLoadState: CommentsLoadState = .idle
+    // `internal(set)` (not `private(set)`) so `loadRatingsAndComments()` in
+    // `RecipeDetailViewModel+RatingsLoad.swift` can mutate it across the
+    // file split; the public read-only contract is unchanged.
+    public internal(set) var commentsLoadState: CommentsLoadState = .idle
     /// Current selection in the `StarRatingInput` before the user taps
     /// "Submit rating". 0 means "no selection". `internal(set)` so the
     /// combined comment + rating submit (DUT-31) can reaffirm the value.
@@ -230,56 +244,9 @@ public final class RecipeDetailViewModel {
 
     // MARK: - Comments + ratings (US-13/14/15)
 
-    /// Populate `ratingSummary` and `comments` from the local cache
-    /// immediately for the offline-first read, then refresh from the
-    /// network in the background. Network failures leave the cached
-    /// state in place per REG-14 / AC-14.6.
-    public func loadRatingsAndComments() async {
-        // DUT-28: pre-fill the on-form name + email from any saved guest
-        // identity so a returning commenter sees their details already
-        // populated (and can edit them). No hidden pop-up gate any more.
-        await prefillAuthorIdentity()
-
-        commentsLoadState = .loading
-
-        // Step 1: fast path — cached values.
-        if let cachedRating = await dependencies.cachedRatingSummary(recipeID: listItem.id) {
-            ratingSummary = cachedRating
-            // If the cache already remembers this device's userRating,
-            // seed the input so the user can "Edit" without retyping.
-            if let userRating = cachedRating.userRating, pendingUserRating == 0 {
-                pendingUserRating = userRating
-            }
-        }
-        let cachedComments = await dependencies.cachedComments(postID: listItem.id)
-        if !cachedComments.isEmpty {
-            comments = cachedComments
-            commentsLoadState = .ready
-        }
-
-        // Step 2: network refresh (best-effort). DUT-216: don't blindly adopt
-        // `fresh` — `applyRatingRefresh` carries the remembered userRating
-        // forward and never zeros a good cached aggregate on a failure.
-        let fresh = await dependencies.fetchRatingSummary(recipeID: listItem.id)
-        await applyRatingRefresh(fresh)
-
-        do {
-            let page = try await dependencies.fetchComments(postID: listItem.id, page: 1)
-            let approved = page.comments.filter { $0.status == .approved }
-            let merged = Self.reconcileComments(approved: approved, cached: cachedComments)
-            comments = merged.visible  // DUT-742: keeps own held comment+rating, dedupes on approval
-            await dependencies.cacheComments(merged.toCache, postID: listItem.id)
-            commentsLoadState = .ready
-        } catch {
-            DODLog.network.error("comments fetch failed: \(String(describing: error))")
-            // If we already hydrated from cache, stay in `.ready` so the
-            // user keeps seeing the cached thread (AC-14.6). Only surface
-            // `.error` when we have nothing to show.
-            if comments.isEmpty {
-                commentsLoadState = .error("Couldn't load comments.")
-            }
-        }
-    }
+    // `loadRatingsAndComments()` lives in
+    // `RecipeDetailViewModel+RatingsLoad.swift` to keep this file under the
+    // SwiftLint 400-line `file_length` cap.
 
     public func setPendingRating(_ stars: Int) {
         pendingUserRating = stars
