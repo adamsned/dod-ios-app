@@ -179,10 +179,10 @@ public actor RecipeStore {
             try tearDownUnsavedPins(target)
         }
 
-        // US-12 / AC-12.1: keep the local ingredient index in sync.
-        // Article rows have empty `ingredients`, so this clears any
-        // stale entries from a prior recipe-kind merge.
-        try replaceIngredientIndexRows(forRecipeID: recipe.id, with: recipe.ingredients)
+        // US-12 / AC-12.1: index what landed on `target.ingredientsJSON`, not
+        // the raw (possibly DUT-592-suppressed-empty) `recipe.ingredients` —
+        // else a preserved-cache re-parse still wipes the search index.
+        try replaceIngredientIndexRows(forRecipeID: recipe.id, with: indexIngredients(from: target))
 
         try modelContext.save()
     }
