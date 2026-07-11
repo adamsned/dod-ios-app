@@ -76,6 +76,22 @@ public final class SavedViewModel {
     /// shrink it.
     @ObservationIgnored var pendingRemovalTTL: Duration = .seconds(2)
 
+    /// DUT — monotonic refresh token (mirrors `FeedViewModel.loadGeneration` /
+    /// DUT-511). `refresh()` can be — and in production routinely is — in
+    /// flight from more than one caller at once: the Saved tab's `.task` fires
+    /// on every appear, `.refreshable` drives a pull-to-refresh, `SavedView`'s
+    /// post-unsave/undo handlers fire an unstructured `Task { await
+    /// viewModel.refresh() }`, and the debounced remote-change refresh can
+    /// land in the middle of any of those. Without an ordering guard,
+    /// whichever fetch RESOLVES LAST wins — NOT whichever STARTED last — so a
+    /// refresh kicked off before a save landed can resolve after a later
+    /// refresh already surfaced that save and silently clobber `recipes` /
+    /// `downloadedIDs` / `loadState` back to the stale snapshot. `refresh()`
+    /// bumps this at the start and re-checks it after every `await` before
+    /// committing state, so a superseded call's stale response is dropped
+    /// instead of overwriting a newer one.
+    private var refreshGeneration = 0
+
     public init(dependencies: SavedDependencies) {
         self.dependencies = dependencies
     }
@@ -87,12 +103,21 @@ public final class SavedViewModel {
     /// Re-runs every time the view appears so changes from the detail screen
     /// surface immediately.
     public func refresh() async {
+        // DUT: stamp this call's generation before the first `await` so a
+        // concurrently-started refresh (see `refreshGeneration`'s doc) gets a
+        // higher token and can supersede this one.
+        refreshGeneration += 1
+        let generation = refreshGeneration
+
         // DUT-369: never blank a populated grid to a full-screen spinner on a
         // background remote-change refresh — only show the loading state on the
         // true first load (mirrors FeedViewModel's DUT-313 fix).
         if recipes.isEmpty { loadState = .loading }
         do {
             let fetchedWithSavedAt = try await dependencies.savedRecipesWithSavedAt()
+            // DUT: a newer refresh committed while this one was in flight —
+            // drop this stale response instead of overwriting it.
+            guard generation == refreshGeneration else { return }
             // Newest synced `savedAt` per id, for the DUT-513 re-save check below.
             var savedAtByID: [Int: Date] = [:]
             for entry in fetchedWithSavedAt {
@@ -122,7 +147,11 @@ public final class SavedViewModel {
             recipes = fetched
             // Best-effort: a download-state read failure just means no badges,
             // never a failed Saved-tab load (T-774 / DUT-80).
-            downloadedIDs = (try? await dependencies.downloadedRecipeIDs()) ?? []
+            let downloaded = (try? await dependencies.downloadedRecipeIDs()) ?? []
+            // DUT: re-check after the second `await` too — a newer refresh may
+            // have committed while this one was fetching the download-id set.
+            guard generation == refreshGeneration else { return }
+            downloadedIDs = downloaded
             loadState = recipes.isEmpty ? .empty : .loaded
             // DUT-365: republish the home-screen widget so a cross-device
             // save/unsave (which reaches us via the remote-change refresh) updates
@@ -130,6 +159,9 @@ public final class SavedViewModel {
             await dependencies.publishSavedWidget()
         } catch {
             DODLog.persistence.error("saved load failed: \(String(describing: error))")
+            // DUT: a superseded call's failure must not stomp a newer,
+            // already-committed success (or a newer call's own error state).
+            guard generation == refreshGeneration else { return }
             // DUT-369: keep the existing grid on a refresh failure; only surface
             // the error state when there's nothing already on screen.
             if recipes.isEmpty { loadState = .error }
