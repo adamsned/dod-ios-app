@@ -231,11 +231,9 @@ public final class SearchViewModel {
         queryFromCuratedTap = true
     }
 
-    // US-29 / AC-29.1 amendment / CL-106 (T-637): the "Latest Recipes"
-    // Try-pill special case (`surfaceLatestRecipes(limit:)`) lives in
-    // `SearchViewModel+T637.swift` so this file stays under SwiftLint's
-    // `file_length` cap. The branch is wired from `SearchView` when the
-    // tapped category matches "Latest Recipes" by name or id 1590.
+    // US-29 / AC-29.1 amendment / CL-106 (T-637): the "Latest Recipes" Try-pill special case
+    // (`surfaceLatestRecipes(limit:)`) lives in `SearchViewModel+T637.swift` for the `file_length` cap; wired from
+    // `SearchView` when the tapped category matches "Latest Recipes" by name or id 1590.
 
     /// Wipe the persisted recent-searches store and update the
     /// view-bound `recentSearches` array so the "Recent" section
@@ -298,7 +296,9 @@ public final class SearchViewModel {
         // The local ingredient index works offline; the REST pass does not. We
         // try both and gracefully degrade (see the DUT-11 tier below).
         let online = await dependencies.isOnline()
-
+        // H1: a newer search may have settled to `.results` mid-await; without
+        // this, `state = .searching` below strands the UI in a spinner.
+        guard generation == searchGeneration else { return }
         state = .searching
         let fanOut = await fanOutSearchPaths(trimmed: trimmed, online: online)
 

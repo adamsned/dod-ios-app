@@ -145,6 +145,59 @@ import Testing
         #expect(viewModel.didYouMean == nil, "Idle reset clears the rescue banner")
     }
 
+    /// H1 (this session) — `performSearch()` bumps `searchGeneration` BEFORE
+    /// awaiting `dependencies.isOnline()`, but historically resumed from that
+    /// await and wrote `state = .searching` unconditionally, with no re-check
+    /// that this call's generation was still current. A slow earlier search's
+    /// connectivity check resolving AFTER a faster later search had already
+    /// settled to `.results` would silently strand the UI at `.searching`
+    /// forever: `finishTextSearch`'s own H1 guard correctly bails on the
+    /// stale generation (so `items` is untouched), but nothing ever restored
+    /// `state` back to `.results` because the clobber happened before that
+    /// guard was ever reached. Reproduced end-to-end (not white-box) via the
+    /// `isOnlineGate` seam: park the stale "chick" search's FIRST `isOnline()`
+    /// call, let the newer "chicken" search run to completion, then release
+    /// the stale call and assert `state` is still `.results`.
+    @Test func staleIsOnlineResolutionDoesNotStrandStateInSearching() async {
+        let dependencies = FakeSearchDependencies()
+        dependencies.results["chick"] = [Self.makeItem(1, title: "Chick Pea Stew")]
+        dependencies.results["chicken"] = [Self.makeItem(2, title: "Chicken")]
+        let viewModel = SearchViewModel(
+            dependencies: dependencies,
+            recentSearches: Self.scratchRecents()
+        )
+
+        let gate = SearchGate()
+        dependencies.isOnlineGate = { await gate.wait() }
+
+        // Stale search #1 ("chick") parks inside its `isOnline()` check.
+        viewModel.query = "chick"
+        let staleTask = Task { @MainActor in
+            await viewModel.runImmediateSearch()
+        }
+        while await !gate.isWaiting { await Task.yield() }
+
+        // Newer search #2 ("chicken") runs to completion unimpeded — its
+        // `isOnline()` call is the SECOND call, so the gate does not apply.
+        viewModel.query = "chicken"
+        await viewModel.runImmediateSearch()
+        #expect(viewModel.state == .results)
+        #expect(viewModel.items.map(\.id) == [2])
+
+        // Release the stale search. Its finalize hop correctly bails on the
+        // generation check (items stay [2]) — `state` must stay `.results`
+        // too, not get stranded at `.searching` by the earlier unconditional
+        // write.
+        await gate.release()
+        await staleTask.value
+
+        #expect(viewModel.items.map(\.id) == [2], "stale finalize must not touch items")
+        #expect(
+            viewModel.state == .results,
+            "stale isOnline() resumption must not strand state at .searching"
+        )
+    }
+
     static func makeItem(_ id: Int, title: String) -> RecipeListItem {
         RecipeListItem(
             id: id,
