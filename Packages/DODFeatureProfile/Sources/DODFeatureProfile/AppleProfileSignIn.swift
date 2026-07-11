@@ -1,5 +1,6 @@
 import DODSupport
 import Foundation
+import Security
 
 /// Full "Sign in with Apple" for the **profile-login surfaces** (DUT-189 / US-46
 /// amendment). One tap does two things:
@@ -65,18 +66,34 @@ public struct AppleProfileSignIn: Sendable {
         /// `false`.
         public let profileWriteFailed: Bool
 
+        /// DUT-928 — `true` when the Keychain WRITE of the session itself failed
+        /// (a signed-device Keychain error). Distinct from ``profileWriteFailed``
+        /// (the profile row, not the session): a session-save failure means the
+        /// user is NOT actually signed in, so ``signedIn`` is `false` and the host
+        /// must surface an error rather than silently pretending success — the
+        /// "signs in but doesn't stick" bug, where `try?` swallowed the write
+        /// error and the outcome still claimed `signedIn: true`.
+        public let sessionSaveFailed: Bool
+        /// DUT-928 — the raw `OSStatus` from the failed session Keychain write,
+        /// carried for on-device diagnosis (`nil` when the save succeeded).
+        public let sessionSaveStatus: OSStatus?
+
         public init(
             displayName: String?,
             email: String?,
             profileSaved: Bool,
             signedIn: Bool = true,
-            profileWriteFailed: Bool = false
+            profileWriteFailed: Bool = false,
+            sessionSaveFailed: Bool = false,
+            sessionSaveStatus: OSStatus? = nil
         ) {
             self.displayName = displayName
             self.email = email
             self.profileSaved = profileSaved
             self.signedIn = signedIn
             self.profileWriteFailed = profileWriteFailed
+            self.sessionSaveFailed = sessionSaveFailed
+            self.sessionSaveStatus = sessionSaveStatus
         }
     }
 
@@ -128,7 +145,11 @@ public struct AppleProfileSignIn: Sendable {
         // DUT-375: `resolve` now carries the refresh token forward itself (same
         // user) / nils it (different user), so we persist `resolved` directly
         // rather than re-merging the token here.
-        try? sessionStore.save(resolved)
+        // DUT-928: a Keychain WRITE failure here means the user is NOT actually
+        // signed in — do NOT fall through returning `signedIn: true` (the silent
+        // "signs in but doesn't stick" bug). `persistSession` returns a failure
+        // Outcome (carrying the raw OSStatus) the host surfaces as a real error.
+        if let failure = persistSession(resolved) { return failure }
 
         // 2. Profile — the new half. Only write when BOTH fields are known
         //    (a `UserProfile` save validates non-empty name + a real email).
@@ -163,6 +184,36 @@ public struct AppleProfileSignIn: Sendable {
             signedIn: true,
             profileWriteFailed: profileWriteFailed
         )
+    }
+
+    /// DUT-928 — persist the resolved session. Returns `nil` on success, or the
+    /// "not signed in" failure ``Outcome`` (carrying the raw `OSStatus`) when the
+    /// Keychain WRITE throws — so the caller returns it directly instead of the
+    /// former silent `try?`-swallowed success that left the user believing they
+    /// were signed in while nothing persisted.
+    private func persistSession(_ resolved: AppleAuthSession) -> Outcome? {
+        do {
+            try sessionStore.save(resolved)
+            return nil
+        } catch {
+            return Outcome(
+                displayName: resolved.displayName,
+                email: resolved.email,
+                profileSaved: false,
+                signedIn: false,
+                sessionSaveFailed: true,
+                sessionSaveStatus: Self.keychainStatus(from: error)
+            )
+        }
+    }
+
+    /// DUT-928 — the raw `OSStatus` behind a session-save error, when it was a
+    /// Keychain failure (`nil` otherwise), for the on-device diagnostic.
+    private static func keychainStatus(from error: any Error) -> OSStatus? {
+        guard let authError = error as? AppleAuthError,
+            case .keychainFailed(let code) = authError
+        else { return nil }
+        return code
     }
 
     /// Write the local ``UserProfile`` from the resolved credential, returning

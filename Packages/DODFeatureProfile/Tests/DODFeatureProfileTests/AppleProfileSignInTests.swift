@@ -1,5 +1,6 @@
 import DODSupport
 import Foundation
+import Security
 import Testing
 
 @testable import DODFeatureProfile
@@ -301,6 +302,49 @@ struct AppleProfileSignInTests {
         #expect((try? sessionStore.load())?.userIdentifier == "user-b")
         #expect(outcome.profileSaved == true)
     }
+
+    /// DUT-928 — a Keychain WRITE failure at sign-in must NOT masquerade as
+    /// success. Before this fix `apply` did `try? sessionStore.save(...)` and
+    /// still returned `signedIn: true`, so a signed-device write failure left the
+    /// user believing they were logged in while nothing persisted (the iPad
+    /// "signs in but doesn't stick" bug). The outcome now reports
+    /// `signedIn == false` + `sessionSaveFailed == true` (carrying the raw
+    /// OSStatus) so the host surfaces a real error, and no profile is written
+    /// when the session itself didn't persist.
+    @Test func sessionSaveFailure_reportsNotSignedIn() async {
+        let sessionStore = ThrowingSessionStore(status: errSecMissingEntitlement)
+        let profileStore = InMemoryProfileStore()
+        let signIn = AppleProfileSignIn(
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            revoker: nil
+        )
+
+        let outcome = await signIn.apply(
+            userIdentifier: "u1",
+            displayName: "Ned Adams",
+            email: "ned@example.com",
+            authorizationCode: nil
+        )
+
+        #expect(outcome.signedIn == false)
+        #expect(outcome.sessionSaveFailed == true)
+        #expect(outcome.sessionSaveStatus == errSecMissingEntitlement)
+        // The early return happens before the profile write, so nothing is saved.
+        #expect(await profileStore.load() == nil)
+        #expect(outcome.profileSaved == false)
+    }
+}
+
+/// A session store whose `save` always throws a Keychain error, to prove a
+/// device-side write failure surfaces as a NOT-signed-in outcome (DUT-928)
+/// rather than the former silent `try?`-swallowed success.
+private final class ThrowingSessionStore: AppleAuthSessionStoring, @unchecked Sendable {
+    private let status: OSStatus
+    init(status: OSStatus) { self.status = status }
+    func load() throws -> AppleAuthSession? { nil }
+    func save(_ session: AppleAuthSession) throws { throw AppleAuthError.keychainFailed(status) }
+    func clear() throws {}
 }
 
 /// A revoker whose `revoke` always throws, to prove a revoke failure doesn't block
