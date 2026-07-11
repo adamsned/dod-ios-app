@@ -53,6 +53,20 @@ import Testing
         #expect(DisplayNameValidator.validate("Big Ass Joe") == .inappropriate)
     }
 
+    @Test func spacedOutShortSlursAreBlocked() {
+        // Letter-spacing (or punctuation between every letter) used to split a
+        // short blocked word into single-character tokens ("a", "s", "s"),
+        // none of which matched the whole-word blocklist — bypassing it
+        // entirely even though normalization is supposed to defeat exactly
+        // this kind of evasion (same trick as "h e l l o" for the substring
+        // list, just against the whole-word list instead).
+        #expect(DisplayNameValidator.validate("a s s") == .inappropriate)
+        #expect(DisplayNameValidator.validate("f.a.g") == .inappropriate)
+        // A genuine multi-word name must still be unaffected.
+        #expect(DisplayNameValidator.validate("Big Ass Joe") == .inappropriate)
+        #expect(DisplayNameValidator.validate("Cassandra") == .ok)
+    }
+
     // MARK: - Barred figures
 
     @Test func notoriousFiguresAreBlocked() {
