@@ -574,11 +574,22 @@ jobs:
   # required upstream job failed; succeeds if they passed OR were
   # skipped because path filters / label gating excluded them.
   #
-  # The advisory UI/E2E jobs (test-ui-smoke = L3, test-e2e = L5) are
-  # deliberately NOT in this gate: they are slow and flaky, so blocking
-  # the merge on them stalls PRs long after the real required checks
-  # (lint/format/L1/L4/build-app) are green. They still run on every PR
-  # (advisory) and on main, where `report-failures` rolls up any reds.
+  # The advisory jobs (test-ui-smoke = L3, test-e2e = L5, AND
+  # test-snapshots-designsystem = L4) are deliberately NOT in this gate:
+  # they are slow and/or flaky, so blocking the merge on them stalls PRs
+  # long after the real required checks (lint/format/L1/build-app) are green.
+  # They still run on every PR (advisory) and on main, where
+  # `report-failures` rolls up any reds.
+  #
+  # L4 Snapshots was MOVED to advisory here: on a cold macos-15 runner the
+  # `ensure-ios-simulator` action must download the iOS 26 runtime (Xcode 26
+  # ships without it), which intermittently HANGS in_progress for the full
+  # 30-min timeout — repeatedly stalling every merge behind a snapshot job
+  # that rarely finds a regression (baselines only change on deliberate
+  # DODDesignSystem design edits, which are Spencer's domain and show the
+  # advisory red). It still runs advisory on every PR and required-red-free
+  # on main via `report-failures`, so a genuine snapshot regression is caught
+  # post-merge; it just no longer holds the merge hostage to a runtime download.
   #
   # test-unit-app (L1 · DODApp) is likewise advisory and NOT in this gate
   # (DUT-32): it needs build-app first, so the chain build-app (~3 min) +
@@ -591,8 +602,7 @@ jobs:
   # AppTab) lose merge-blocking coverage.
   ci-required:
     name: CI required
-    needs: [changes, lint, format, test-unit-packages,
-            test-snapshots-designsystem, build-app]
+    needs: [changes, lint, format, test-unit-packages, build-app]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -601,8 +611,7 @@ jobs:
           # Each input is "success", "failure", "cancelled", or "skipped".
           # Skipped is fine (path filter or label gating excluded the
           # job); failure is not.
-          for name in changes lint format test-unit-packages \
-                     test-snapshots-designsystem build-app; do
+          for name in changes lint format test-unit-packages build-app; do
             result_var="${name//-/_}_RESULT"
             echo "$name: ${!result_var:-not-run}"
           done
@@ -610,7 +619,6 @@ jobs:
              || "${{ needs.lint.result }}" == "failure" \
              || "${{ needs.format.result }}" == "failure" \
              || "${{ needs.test-unit-packages.result }}" == "failure" \
-             || "${{ needs.test-snapshots-designsystem.result }}" == "failure" \
              || "${{ needs.build-app.result }}" == "failure" ]]; then
             echo "::error::At least one required CI job failed."
             exit 1
