@@ -134,6 +134,19 @@ public final class CategoryRecipesViewModel {
     /// state alone can't distinguish success from a preserved-grid failure).
     @discardableResult
     private func load(page: Int, append: Bool = false, keepStateWhilePopulated: Bool = false) async -> Bool {
+        // The `isLoadInFlight` latch is only useful if EVERY entry point
+        // respects it. `loadMoreIfNeeded` checks it before calling in, but
+        // `refresh()` / `retry()` call straight into `load` with no check of
+        // their own — so a pull-to-refresh (reachable while `.loadingMore` is
+        // on screen, since `.refreshable` is attached for both `.loaded` and
+        // `.loadingMore`) could start a second, concurrent `load` while a
+        // load-more's fetch is still in flight. Two overlapping calls race on
+        // `items` / `currentPage` / `reachedEnd`: whichever resolves last wins,
+        // which can rewind `currentPage` and silently drop the just-appended
+        // page after a load-more already committed it. Guarding here — inside
+        // `load` itself, before the flag is set — makes the latch a true
+        // mutex regardless of which caller reaches it second.
+        guard !isLoadInFlight else { return false }
         isLoadInFlight = true
         defer { isLoadInFlight = false }
         if append {
