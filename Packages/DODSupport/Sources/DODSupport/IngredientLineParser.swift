@@ -69,6 +69,24 @@ public enum IngredientLineParser {
         )
     }
 
+    /// DUT-913 — like ``parse(_:)`` but keeps a recovered `(quantity, unit)`
+    /// even when NO ingredient name follows (e.g. a bare `"2 cups"`).
+    /// ``parse(_:)`` deliberately returns all-`nil` for a nameless line because
+    /// the shopping-list ``IngredientAggregator`` treats it as unmergeable
+    /// verbatim text — but ``IngredientMetricConverter`` still wants to convert
+    /// `"2 cups"` → `"480 ml"`. This shares the exact same leading-quantity +
+    /// unit scan and simply drops the name requirement. `parse(_:)` and the
+    /// aggregator are untouched.
+    public static func parseQuantityAndUnit(_ text: String) -> (quantity: Double, unit: String)? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let (quantity, afterQuantity) = readLeadingQuantity(trimmed) else { return nil }
+        let afterQuantityText = trimmed[afterQuantity...].trimmingCharacters(in: .whitespaces)
+        let remainder = strippingLeadingParenthetical(afterQuantityText)
+        let (unit, _) = readUnit(remainder)
+        guard let unit else { return nil }
+        return (quantity, unit)
+    }
+
     // MARK: - Quantity
 
     /// Read a leading numeric quantity. Returns the value and the index just

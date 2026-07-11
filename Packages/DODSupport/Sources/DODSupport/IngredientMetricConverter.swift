@@ -49,19 +49,34 @@ public enum IngredientMetricConverter {
     /// contract).
     public static func metric(_ text: String) -> String {
         let parsed = IngredientLineParser.parse(text)
-        guard
-            let quantity = parsed.quantity,
-            let unit = parsed.unit,
-            let conversion = conversions[unit]
-        else {
-            return text
+        if let quantity = parsed.quantity, let unit = parsed.unit, let conversion = conversions[unit] {
+            return rendered(quantity: quantity, conversion: conversion, name: parsed.name, original: text)
         }
-        let magnitude = quantity * conversion.factor
-        guard magnitude.isFinite, magnitude > 0 else { return text }
+        // DUT-913: a bare `"2 cups"` / `"1 pound"` line (no trailing food name)
+        // makes `parse(_:)` return all-nil — correct for the shopping-list
+        // aggregator, but it left these lines UNCONVERTED in metric mode even
+        // though the quantity + unit are recoverable. Fall back to the
+        // name-optional scan and emit just the metric unit ("480 ml"). Two
+        // single-line guards keep the multi-line-condition brace off the
+        // swift-format ⟂ swiftlint `opening_brace` collision.
+        guard let bare = IngredientLineParser.parseQuantityAndUnit(text) else { return text }
+        guard let conversion = conversions[bare.unit] else { return text }
+        return rendered(quantity: bare.quantity, conversion: conversion, name: nil, original: text)
+    }
 
+    /// Shared render: apply the conversion + roll-up, appending the name when
+    /// present. Returns `original` unchanged for a zero / non-finite magnitude.
+    private static func rendered(
+        quantity: Double,
+        conversion: Conversion,
+        name: String?,
+        original: String
+    ) -> String {
+        let magnitude = quantity * conversion.factor
+        guard magnitude.isFinite, magnitude > 0 else { return original }
         let unitText = format(magnitude, as: conversion.dimension)
-        let name = parsed.name ?? ""
-        return name.isEmpty ? unitText : "\(unitText) \(name)"
+        let trimmedName = name ?? ""
+        return trimmedName.isEmpty ? unitText : "\(unitText) \(trimmedName)"
     }
 
     // MARK: - Shared preference contract
