@@ -80,7 +80,14 @@ final class NewPostsPoller {
             lastSeen: lastSeen
         )
 
-        let titlesByID = Dictionary(uniqueKeysWithValues: latestPosts.map { ($0.id, $0.title) })
+        // `uniquingKeysWith` (NOT `uniqueKeysWithValues:`, which traps on a
+        // duplicate key) — WP post ids are untrusted here; a malformed page
+        // repeating an id would SIGSEGV the whole background poll otherwise
+        // (the dup-id trap class, cf. RecipeStore #605). Keep the first title.
+        let titlesByID = Dictionary(
+            latestPosts.map { ($0.id, $0.title) },
+            uniquingKeysWith: { first, _ in first }
+        )
         for postID in diff.toNotify.prefix(Self.maxNotificationsPerPoll) {
             guard let title = titlesByID[postID] else { continue }
             await notificationService.scheduleNewPostNotification(
