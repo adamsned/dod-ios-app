@@ -121,86 +121,21 @@ public final class FeedViewModel {
 
     /// DUT-323 — the celebration the view is presenting; nil otherwise. Set only
     /// via ``promoteCelebrationIfReady()`` once the cookout flow's sheet has
-    /// dismissed — never directly from `logCook` (DUT-339).
-    public private(set) var celebration: CookCelebration?
+    /// dismissed — never directly from `logCook` (DUT-339). `internal(set)` (was
+    /// `private(set)`) so the celebration logic extracted to
+    /// `FeedViewModel+Celebration.swift` (file-length relief, mirroring the
+    /// `+Journal` / `+SaveToggle` / `+ShoppingList` splits) can set it.
+    public internal(set) var celebration: CookCelebration?
 
     /// DUT-339 — a celebration earned by a just-logged cook, held until the
     /// cookout flow's sheet has actually dismissed. Presenting a `.sheet` on the
     /// same view that is mid-dismissing another sheet makes iOS silently swallow
     /// it, so the celebration was intermittently lost on device. We promote
     /// pending → `celebration` only when the cookout sheet is gone, triggered by
-    /// whichever of {log completes, sheet dismisses} happens last.
-    private var pendingCelebration: CookCelebration?
-    private var cookoutSheetVisible = false
-
-    /// DUT-104 — record a completed cook in the private journal (called when the
-    /// "Your First Cookout" flow reaches "Done"). Best-effort: a journal write
-    /// failing must never block dismissing the celebration. DUT-323: if the cook
-    /// graduates the path or bumps the cook up a rank, queue the celebration.
-    public func logCook(_ entry: CookLogEntry) async {
-        let logsBefore = (try? await dependencies.cookLogs()) ?? []
-        do {
-            try await dependencies.logCook(entry)
-        } catch {
-            // The journal is a nicety, not a blocker — swallow + move on.
-            // DUT-208: the caller wrote the photo JPEG to disk before this call,
-            // so a failed write would orphan it (no row ever references its
-            // `photoLocalID`). Delete it here, mirroring the DUT-423 dedup-branch
-            // cleanup in RecipeStore+CookLog.
-            if let photoID = entry.photoLocalID {
-                await dependencies.deleteCookPhoto(id: photoID)
-            }
-            return
-        }
-        let logsAfter = (try? await dependencies.cookLogs()) ?? logsBefore
-        let cookedBefore = Set(logsBefore.map(\.recipeID))
-        let cookedAfter = Set(logsAfter.map(\.recipeID))
-        // Graduating the whole First Cookout path is the bigger beat → priority.
-        let wasGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedBefore) == nil
-        let isGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedAfter) == nil
-        if isGraduate && !wasGraduate {
-            pendingCelebration = .graduatedFirstCookout
-        } else if !OwnerGate.isCurrentUserOwner() {
-            // Daddy Mode (owner rank) — the owner's rank is fixed at "The Dutch Oven
-            // Daddy", so he never "ranks up". Suppress the rank-up celebration for
-            // him (a "You're a Cast Iron Legend" beat would contradict his rank).
-            let reached = CookProgression.rankUp(
-                from: Self.rankLadderCookCount(logsBefore),
-                to: Self.rankLadderCookCount(logsAfter)
-            )
-            if let reached {
-                pendingCelebration = .rankUp(reached)
-            }
-        }
-        promoteCelebrationIfReady()
-    }
-
-    /// DUT-339 — the cookout flow's sheet is presenting; defer any pending
-    /// celebration until it dismisses so the two sheets never overlap.
-    public func cookoutFlowWillPresent() {
-        cookoutSheetVisible = true
-    }
-
-    /// DUT-339 — the cookout flow's sheet finished dismissing; a queued
-    /// celebration can present now without a sheet-over-sheet conflict.
-    public func cookoutFlowDidDismiss() {
-        cookoutSheetVisible = false
-        promoteCelebrationIfReady()
-    }
-
-    /// Promote a queued celebration once the cookout sheet is gone — called from
-    /// both `logCook` and `cookoutFlowDidDismiss`, so whichever finishes last
-    /// triggers the present (DUT-339).
-    private func promoteCelebrationIfReady() {
-        guard !cookoutSheetVisible, let pending = pendingCelebration else { return }
-        celebration = pending
-        pendingCelebration = nil
-    }
-
-    /// Dismiss the celebration (DUT-323).
-    public func dismissCelebration() {
-        celebration = nil
-    }
+    /// whichever of {log completes, sheet dismisses} happens last. `internal`
+    /// (not `private`) so `+Celebration` can reach it.
+    var pendingCelebration: CookCelebration?
+    var cookoutSheetVisible = false
 
     /// Pull-to-refresh (AC-1.4 + clears blocklist per AC-1.7).
     public func refresh() async {
@@ -264,18 +199,16 @@ public final class FeedViewModel {
         currentPage = 0
         reachedEnd = false
         do {
-            let page = try await dependencies.fetchPosts(page: 1)
-            try await dependencies.cache(listItems: page.items)
-            let fetched = try await dependencies.cachedListItems(forIDs: page.items.map(\.id))
-            // DUT-511: a newer load (e.g. a second refresh) superseded us while
-            // we awaited — drop our writes rather than clobber the fresh list.
-            guard generation == loadGeneration else { return }
-            resetItems(fetched)
-            currentPage = 1
+            // A blocklist can filter a fetched page down to zero VISIBLE items
+            // even though the raw page wasn't empty and more pages remain — see
+            // `fetchFirstVisiblePage`. `nil` means a newer load superseded us.
+            guard let firstVisible = try await fetchFirstVisiblePage(generation: generation) else {
+                return
+            }
+            resetItems(firstVisible.items)
+            currentPage = firstVisible.page
+            reachedEnd = firstVisible.reachedEnd
             loadState = items.isEmpty ? .empty : .loaded
-            // DUT-237: stop at the real last page (X-WP-TotalPages), not at the
-            // first page that returns fewer than a full batch.
-            reachedEnd = currentPage >= page.totalPages
             // Hand the freshly-loaded top-of-feed to the home-screen widget
             // (spec.md US-9, AC-9.3). Fire-and-forget; failures inside the
             // dependency are logged there, never thrown.
@@ -316,6 +249,40 @@ public final class FeedViewModel {
             // zero-result success (see the success path above).
             loadState = isOffline ? .firstLaunchOffline : .firstLaunchFailed
             errorMessage = "Couldn't load recipes."
+        }
+    }
+
+    /// The outcome of paging forward (from page 1) until a page yields visible
+    /// items or the real last page is reached.
+    private struct FirstVisiblePage {
+        var items: [RecipeListItem]
+        var page: Int
+        var reachedEnd: Bool
+    }
+
+    /// Fetch page 1, then keep advancing while the page is filtered down to
+    /// zero VISIBLE items (a blocklist wipeout) but more pages remain, so
+    /// `loadInitial` never dead-ends into `.empty` while real content sits one
+    /// page away — `loadMore` already tolerates the same situation for page 2+
+    /// (it just advances the cursor and stays `.loaded`). Returns `nil` when a
+    /// newer load (DUT-511) superseded this one mid-fetch; the caller should
+    /// drop its writes rather than clobber the fresher list.
+    private func fetchFirstVisiblePage(generation: Int) async throws -> FirstVisiblePage? {
+        var page = 1
+        while true {
+            let result = try await dependencies.fetchPosts(page: page)
+            try await dependencies.cache(listItems: result.items)
+            let fetched = try await dependencies.cachedListItems(forIDs: result.items.map(\.id))
+            // DUT-511: a newer load (e.g. a second refresh) superseded us while
+            // we awaited — drop our writes rather than clobber the fresh list.
+            guard generation == loadGeneration else { return nil }
+            // DUT-237: stop at the real last page (X-WP-TotalPages), not at the
+            // first page that returns fewer than a full batch.
+            let landedOnLastPage = page >= result.totalPages
+            if !fetched.isEmpty || landedOnLastPage {
+                return FirstVisiblePage(items: fetched, page: page, reachedEnd: landedOnLastPage)
+            }
+            page += 1
         }
     }
 
