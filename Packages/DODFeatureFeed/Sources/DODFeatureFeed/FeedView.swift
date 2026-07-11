@@ -160,9 +160,32 @@ public struct FeedView: View {
     @ViewBuilder
     private var headerTrailing: some View {
         HStack(spacing: DODSpacing.xs) {
+            surpriseMeButton
             composeButton
             settingsGear
         }
+    }
+
+    /// DUT-939 — "Surprise Me" (Android parity: Android already ships a
+    /// random-recipe entry point, iOS didn't). Mirrors ``composeButton``'s
+    /// styling (44pt hit target, burnt-orange tint) so it reads as the same
+    /// family of header affordance as the gear/compose buttons. Disabled
+    /// (not hidden) while the feed has no items yet, so the header layout
+    /// never shifts as the initial load resolves.
+    @ViewBuilder
+    private var surpriseMeButton: some View {
+        Button {
+            viewModel.surpriseMe(onSelect: onSelect)
+        } label: {
+            Image(systemName: "shuffle")
+                .font(.title2)
+                .accessibilityLabel("Surprise Me")
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .tint(DODColor.burntOrange)
+        .accessibilityIdentifier("feed-surprise-me")
+        .disabled(viewModel.items.isEmpty)
     }
 
     /// Daddy Mode (Phase 1, cosmetic) — the owner-only compose entry point.
