@@ -85,6 +85,11 @@ public final class FeedViewModel {
     /// `addToShoppingList(_:)` in `+ShoppingList`); main-actor-isolated.
     var addingIDs = Set<Int>()
 
+    /// DUT-939 — the id last handed out by `surpriseMe(onSelect:)`, so the
+    /// next tap avoids an immediate repeat via `RandomRecipePicker`.
+    /// `private(set)` (not `private`) so tests can assert it advances.
+    public private(set) var lastSurpriseID: Int?
+
     public init(dependencies: FeedDependencies) {
         self.dependencies = dependencies
     }
@@ -158,6 +163,26 @@ public final class FeedViewModel {
             lastFew.id == currentItem.id
         else { return }
         await loadMore()
+    }
+
+    /// DUT-939 — "Surprise Me" (Android parity): pick a random loaded recipe
+    /// and hand it to the feed's EXISTING recipe-open path, `onSelect`
+    /// (`FeedView`'s own closure — the same one every card tap already
+    /// calls, per `FeedView+ShoppingList.recipeCardTap`). The view model
+    /// doesn't own navigation itself, so the caller (the button's action in
+    /// `FeedView`) threads its own `onSelect` through rather than this type
+    /// inventing a second, parallel navigation seam.
+    ///
+    /// No-op when the feed has no items. Tracks `lastSurpriseID` so back-to-
+    /// back taps don't show the same recipe twice in a row (`RandomRecipePicker`
+    /// filters it out of the candidate pool).
+    public func surpriseMe(onSelect: (RecipeListItem) -> Void) {
+        guard
+            let id = RandomRecipePicker.pick(from: items.map(\.id), excluding: lastSurpriseID),
+            let item = items.first(where: { $0.id == id })
+        else { return }
+        lastSurpriseID = id
+        onSelect(item)
     }
 
     // MARK: - Private
