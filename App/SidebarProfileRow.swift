@@ -1,15 +1,18 @@
 import DODDesignSystem
 import DODFeatureFeed
 import DODFeatureProfile
+import DODSupport
 import SwiftUI
 
 /// T-783 / DUT-89 — Profile entry pinned at the top of the iPad sidebar.
 ///
 /// On iPad the Settings → Profile section is hidden (the profile "moves" here);
 /// the sidebar is iPad-only (`RootView.iPadSplit`), so this never touches the
-/// iPhone Settings flow. Shows the avatar + display name — or a "Set up your
-/// profile" placeholder when none exists yet — and opens ``ProfileEditView`` as
-/// a sheet on tap, reloading the row when the editor saves.
+/// iPhone Settings flow. Shows the avatar + title/subtitle resolved by
+/// ``SidebarProfileDisplay`` — a named profile, a "Signed In" state for a
+/// signed-in user with no name yet (DUT-935), or a "Set up your profile"
+/// guest placeholder — and opens ``ProfileEditView`` as a sheet on tap,
+/// reloading the row when the editor saves.
 struct SidebarProfileRow: View {
 
     let profileStore: (any ProfileStoring)?
@@ -25,8 +28,14 @@ struct SidebarProfileRow: View {
     /// WITHOUT `statsHooks`, so the whole stats section silently vanished on iPad).
     /// `nil` in previews / unwired hosts, which just hides the section.
     var settingsViewModel: SettingsViewModel?
+    /// DUT-935 — read alongside `profile` so the row can tell "signed in, no
+    /// name yet" (Apple only returns the name on the very first
+    /// authorization) apart from a true guest. Defaults to the real Keychain
+    /// store so previews/hosts that don't override it keep working.
+    var sessionStore: (any AppleAuthSessionStoring) = KeychainAppleAuthSessionStore()
 
     @State private var profile: UserProfile?
+    @State private var session: AppleAuthSession?
     @State private var showingEditor = false
     @State private var showingJournal = false
 
@@ -37,13 +46,13 @@ struct SidebarProfileRow: View {
             HStack(spacing: DODSpacing.sm) {
                 ProfilePhotoView(profile: profile, diameter: 40, photoStore: profilePhotoStore)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(profile?.displayName ?? "Set Up Your Profile")
+                    Text(displayCopy.title)
                         .dodFont(DODType.heading)
                         .foregroundStyle(DODColor.label)
                         .lineLimit(1)
                         // DUT-695 — shrink rather than clip at large Dynamic Type.
                         .minimumScaleFactor(0.8)
-                    Text(profile == nil ? "Add Your Name and Photo" : "View profile")
+                    Text(displayCopy.subtitle)
                         .dodFont(DODType.caption)
                         .foregroundStyle(DODColor.labelSecondary)
                         .lineLimit(1)
@@ -73,6 +82,12 @@ struct SidebarProfileRow: View {
             }
         }
         .sheet(isPresented: $showingJournal) { cookJournalSheet }
+    }
+
+    /// DUT-935 — the row's title/subtitle, resolved from the loaded profile
+    /// + auth session by the pure ``SidebarProfileDisplay`` resolver.
+    private var displayCopy: (title: String, subtitle: String) {
+        SidebarProfileDisplay.resolve(profile: profile, session: session)
     }
 
     /// DUT-607 — composition hooks for the profile stats section, built from the
@@ -108,5 +123,6 @@ struct SidebarProfileRow: View {
 
     private func reload() async {
         profile = await profileStore?.load()
+        session = try? sessionStore.load()
     }
 }
