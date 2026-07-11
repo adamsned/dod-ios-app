@@ -50,6 +50,13 @@ public struct RecipeDetailRatingsSection: View {
     /// the gate.
     @State private var showProfileSheet: Bool = false
 
+    /// DUT-956 — the commenter whose profile card (``CommenterProfileSheet``) is
+    /// presented. Set by tapping another user's avatar/name in `commentRow(for:)`
+    /// (own comments pass no tap, so this only ever holds another user's comment).
+    /// Non-private so the `+PhaseD` row builder in the sibling file can set it,
+    /// mirroring the `openURL` access pattern above.
+    @State var commenterForSheet: RecipeComment?
+
     public init(viewModel: RecipeDetailViewModel) {
         self.viewModel = viewModel
     }
@@ -83,6 +90,25 @@ public struct RecipeDetailRatingsSection: View {
         .sheet(isPresented: $showProfileSheet) {
             profileEditSheet
         }
+        // DUT-956 — tap a commenter's avatar/name → the commenter profile card.
+        // Presents the SAME moderation actions as the long-press context menu
+        // (which stays), reusing `reportAndOpenMail(for:)` + `blockAuthor(of:)`.
+        .sheet(item: $commenterForSheet) { comment in
+            commenterProfileSheet(for: comment)
+        }
+    }
+
+    /// DUT-956 — build the commenter profile card, wiring its Report/Block hooks
+    /// to the exact methods the context menu uses so behavior is identical.
+    @ViewBuilder
+    private func commenterProfileSheet(for comment: RecipeComment) -> some View {
+        let trimmed = comment.authorName.trimmingCharacters(in: .whitespacesAndNewlines)
+        CommenterProfileSheet(
+            comment: comment,
+            displayName: trimmed.isEmpty ? "Anonymous" : trimmed,
+            onReport: { reportAndOpenMail(for: comment) },
+            onBlock: { viewModel.blockAuthor(of: comment) }
+        )
     }
 
     // MARK: - Section header

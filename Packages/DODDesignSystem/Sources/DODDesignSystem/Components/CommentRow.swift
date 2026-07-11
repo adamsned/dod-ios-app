@@ -36,6 +36,14 @@ public struct CommentRow: View {
     /// `rank` line (or nothing when `rank` is nil), so existing calls + snapshots
     /// stay byte-identical.
     public let isOwnerRank: Bool
+    /// DUT-956 — optional "open this commenter's profile" hook. When non-nil,
+    /// tapping the avatar OR the author name fires it (the caller presents the
+    /// commenter profile sheet), and VoiceOver gains a "View <name>'s profile"
+    /// action on the row. `nil` (the default) leaves the row a plain, non-
+    /// interactive presentation — no tap target, no extra a11y action — so every
+    /// existing call site + snapshot renders byte-identical. Wired only for OTHER
+    /// users' comments (you don't open a profile-with-Block/Report on yourself).
+    public let onTapAuthor: (() -> Void)?
 
     public init(
         authorName: String,
@@ -46,7 +54,8 @@ public struct CommentRow: View {
         isPendingModeration: Bool = false,
         avatarOverride: AnyView? = nil,
         rank: (title: String, emoji: String)? = nil,
-        isOwnerRank: Bool = false
+        isOwnerRank: Bool = false,
+        onTapAuthor: (() -> Void)? = nil
     ) {
         self.authorName = authorName
         self.avatarURL = avatarURL
@@ -57,11 +66,12 @@ public struct CommentRow: View {
         self.avatarOverride = avatarOverride
         self.rank = rank
         self.isOwnerRank = isOwnerRank
+        self.onTapAuthor = onTapAuthor
     }
 
     public var body: some View {
         HStack(alignment: .top, spacing: DODSpacing.sm) {
-            avatar
+            tappableAuthor(avatar)
 
             VStack(alignment: .leading, spacing: DODSpacing.xs) {
                 header
@@ -92,6 +102,23 @@ public struct CommentRow: View {
         .padding(.vertical, DODSpacing.xs)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityAuthorAction(name: authorName, onTap: onTapAuthor)
+    }
+
+    /// DUT-956 — make the avatar / author name open the commenter profile when a
+    /// tap hook is wired. `nil` returns the content untouched (no gesture, no
+    /// `contentShape`) so the default row is byte-identical to the pre-DUT-956
+    /// rendering. The tap is a plain `.onTapGesture`, which coexists with the
+    /// row's caller-supplied long-press `.contextMenu` rather than swallowing it.
+    @ViewBuilder
+    private func tappableAuthor(_ content: some View) -> some View {
+        if let onTapAuthor {
+            content
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onTapAuthor)
+        } else {
+            content
+        }
     }
 
     @ViewBuilder
@@ -157,9 +184,11 @@ public struct CommentRow: View {
 
     private var header: some View {
         HStack(spacing: DODSpacing.xs) {
-            Text(authorName)
-                .dodFont(DODType.bodyEmphasized)
-                .foregroundStyle(DODColor.label)
+            tappableAuthor(
+                Text(authorName)
+                    .dodFont(DODType.bodyEmphasized)
+                    .foregroundStyle(DODColor.label)
+            )
             Text("·")
                 .foregroundStyle(DODColor.labelSecondary)
             Text(relativeDate)
@@ -190,6 +219,23 @@ public struct CommentRow: View {
     }
 }
 
+extension View {
+    /// DUT-956 — attach a named "View <name>'s profile" VoiceOver action to the
+    /// combined comment element ONLY when a tap hook is wired. A combined
+    /// accessibility element flattens its children, so the avatar/name
+    /// `.onTapGesture`s aren't independently reachable by VoiceOver; the named
+    /// action gives non-sighted users the same "open this commenter" affordance.
+    /// `nil` returns `self` untouched so default rows expose no extra action.
+    @ViewBuilder
+    func accessibilityAuthorAction(name: String, onTap: (() -> Void)?) -> some View {
+        if let onTap {
+            accessibilityAction(named: Text("View \(name)'s profile"), onTap)
+        } else {
+            self
+        }
+    }
+}
+
 #Preview("With avatar + rating") {
     CommentRow(
         authorName: "Jamie L.",
@@ -210,6 +256,19 @@ public struct CommentRow: View {
         bodyText: "Question — can I sub butter for the oil?",
         ratingValue: 4,
         isPendingModeration: true
+    )
+    .padding(DODSpacing.md)
+}
+
+#Preview("Tappable author (DUT-956)") {
+    // Another user's comment: avatar + name open the commenter profile sheet.
+    CommentRow(
+        authorName: "Jamie L.",
+        avatarURL: nil,
+        relativeDate: "3 days ago",
+        bodyText: "Made this last night and it was incredible.",
+        ratingValue: 5,
+        onTapAuthor: {}
     )
     .padding(DODSpacing.md)
 }
