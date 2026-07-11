@@ -179,7 +179,20 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         searchHashes.append(queryHash)
     }
 
-    func isOnline() async -> Bool { online }
+    /// H1 — an optional gate so a test can hold the FIRST `isOnline()` call in
+    /// flight (simulating a slow connectivity check for an earlier, now-
+    /// superseded search) while a second, faster search runs to completion.
+    /// `nil` (default) = every call resolves immediately.
+    var isOnlineGate: (@Sendable () async -> Void)?
+    var isOnlineCallCount = 0
+
+    func isOnline() async -> Bool {
+        isOnlineCallCount += 1
+        if isOnlineCallCount == 1, let isOnlineGate {
+            await isOnlineGate()
+        }
+        return online
+    }
 
     /// T-765 / CL-162 — the saved-id set the card long-press menu reconciles on
     /// appear/refresh. Tests seed this to prove the save haptic (keyed to
