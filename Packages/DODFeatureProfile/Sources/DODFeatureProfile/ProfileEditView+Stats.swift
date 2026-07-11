@@ -108,9 +108,13 @@ extension ProfileEditView {
     /// 2-column grid of stat cells. The Ratings cell is omitted when
     /// `reviewsWritten` is nil (not locally countable).
     private func countsGrid(stats: ProfileStats) -> some View {
+        let isOwner = isCurrentUserOwner
         let columns = [GridItem(.flexible()), GridItem(.flexible())]
         return LazyVGrid(columns: columns, spacing: DODSpacing.sm) {
-            statCell(value: stats.totalCooks, label: "Total Cooks")
+            statCell(
+                displayValue: Self.totalCooksDisplay(totalCooks: stats.totalCooks, isOwner: isOwner),
+                label: "Total Cooks"
+            )
             statCell(value: stats.weeklyStreak, label: "Weekly Streak")
             statCell(value: stats.savedRecipes, label: "Saved Recipes")
             if let reviews = stats.reviewsWritten {
@@ -119,9 +123,23 @@ extension ProfileEditView {
         }
     }
 
+    /// Pure copy helper for the "Total Cooks" cell — `static` so it's L1-testable
+    /// without a host. The owner's Total Cooks is always shown as the infinity
+    /// symbol (U+221E, "∞") regardless of the actual count, since Daddy Mode's
+    /// cook count isn't a meaningful/bounded stat (mirrors the fixed-rank
+    /// treatment in `rankCaption`). Non-owners get the decimal string of their
+    /// count.
+    static func totalCooksDisplay(totalCooks: Int, isOwner: Bool) -> String {
+        isOwner ? "∞" : "\(totalCooks)"
+    }
+
     private func statCell(value: Int, label: String) -> some View {
+        statCell(displayValue: "\(value)", label: label)
+    }
+
+    private func statCell(displayValue: String, label: String) -> some View {
         VStack(spacing: DODSpacing.xxs) {
-            Text("\(value)")
+            Text(displayValue)
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
             Text(label)
