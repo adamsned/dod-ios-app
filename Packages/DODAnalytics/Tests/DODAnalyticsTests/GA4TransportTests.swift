@@ -118,6 +118,8 @@ import Testing
         #expect(events[0]["name"] as? String == "recipe_open")
         let params = try #require(events[0]["params"] as? [String: String])
         #expect(params["post_id"] == "42")
+        // Native-app marker so GA4 can segment app opens from web gtag traffic.
+        #expect(params["app_platform"] == "ios")
         // Canonical URL host/path — no PII, no user input.
         #expect(params["page_host"] == "dutchovendaddy.com")
         #expect(params["page_path"] == "/recipe/42")

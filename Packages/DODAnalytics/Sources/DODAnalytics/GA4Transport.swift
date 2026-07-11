@@ -158,7 +158,11 @@ public final class GA4Transport: TelemetryTransport, @unchecked Sendable {
             return nil
         }
 
-        var params: [String: String] = ["post_id": String(recipeID)]
+        // `app_platform` marks these as NATIVE-APP opens so GA4 can filter /
+        // segment them out of the website's gtag traffic even in a busy
+        // property (register it as a custom dimension in GA4). No PII — a
+        // constant platform tag, same privacy posture as the rest of the event.
+        var params: [String: String] = ["post_id": String(recipeID), "app_platform": "ios"]
         // Canonical URL host + path for the content (no query, no PII). Lets
         // GA4 line the in-app open up with the same page on the website.
         if let components = canonicalURLComponents(recipeID: recipeID) {
