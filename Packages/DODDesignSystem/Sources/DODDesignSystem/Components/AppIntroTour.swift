@@ -18,12 +18,23 @@ public struct AppIntroTour: View {
         /// Short, informative blurb (a sentence or two — not a wall of text).
         public let description: String
         public let placeholderSymbol: String
+        /// Optional looping clip for the media area. When `nil` (the default),
+        /// the slide falls back to the ``placeholderSymbol`` SF Symbol — so
+        /// video and symbol slides can freely mix as real clips land per slide.
+        public let video: IntroVideoSource?
 
-        public init(id: Int, title: String, description: String, placeholderSymbol: String) {
+        public init(
+            id: Int,
+            title: String,
+            description: String,
+            placeholderSymbol: String,
+            video: IntroVideoSource? = nil
+        ) {
             self.id = id
             self.title = title
             self.description = description
             self.placeholderSymbol = placeholderSymbol
+            self.video = video
         }
     }
 
@@ -87,7 +98,7 @@ public struct AppIntroTour: View {
             // so selection / dots / "current page" stay consistent even if a
             // caller ever supplies non-contiguous Page ids.
             ForEach(Array(pages.enumerated()), id: \.offset) { offset, page in
-                slide(page).tag(offset)
+                slide(page, offset: offset).tag(offset)
             }
         }
         // `.page` (PageTabViewStyle) is iOS-only — guard so DODDesignSystem still
@@ -97,9 +108,9 @@ public struct AppIntroTour: View {
         #endif
     }
 
-    private func slide(_ page: Page) -> some View {
+    private func slide(_ page: Page, offset: Int) -> some View {
         VStack(spacing: DODSpacing.xl) {
-            imagePlaceholder(page.placeholderSymbol)
+            media(for: page, offset: offset)
             VStack(spacing: DODSpacing.sm) {
                 Text(page.title)
                     .dodFont(DODType.displayLarge)
@@ -119,6 +130,22 @@ public struct AppIntroTour: View {
         }
         .padding(.horizontal, DODSpacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    /// The slide's media area: a gapless looping clip when the page carries a
+    /// ``Page/video`` (playing only while it's the current slide), otherwise the
+    /// SF-symbol placeholder. Keeps video + symbol slides mixable (DUT-336).
+    @ViewBuilder
+    private func media(for page: Page, offset: Int) -> some View {
+        if let video = page.video {
+            LoopingVideoView(
+                source: video,
+                isActive: offset == index,
+                posterSymbol: page.placeholderSymbol
+            )
+        } else {
+            imagePlaceholder(page.placeholderSymbol)
+        }
     }
 
     /// Reserved image area — a placeholder until real screenshots land (DUT-335).

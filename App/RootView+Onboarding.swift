@@ -57,7 +57,12 @@ extension RootView {
                 title: "Welcome to Dutch Oven Daddy",
                 description:
                     "Browse cast iron recipes and articles, save your favorites, and cook them step by step with built-in coaching, even offline.",
-                placeholderSymbol: "flame.fill"
+                placeholderSymbol: "flame.fill",
+                // DUT-336 prototype: slide 1 plays a bundled looping placeholder
+                // clip; the rest use SF-symbol placeholders. Swap
+                // `.placeholder` for a real per-slide `.mov` here (see
+                // `IntroVideoSource` for how to point at your own file).
+                video: .placeholder
             ),
             .init(
                 id: 1,
