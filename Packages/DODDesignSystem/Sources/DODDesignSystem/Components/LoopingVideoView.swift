@@ -34,8 +34,17 @@ public struct IntroVideoSource: Sendable {
     /// The resolved clip location. `nil` → the view shows its poster fallback.
     public let url: URL?
 
-    public init(url: URL?) {
+    /// `true` for an **HEVC-with-alpha** clip whose background is transparent
+    /// (e.g. a device-framed screen recording floating on the slide). The view
+    /// then drops its card fill and composites the clip over the slide's OWN
+    /// background — Flour in light, Cocoa in dark — so one clip works in both
+    /// modes. Transparent clips are shown aspect-fit (not fill) so the whole
+    /// floating subject stays visible and uncropped.
+    public let isTransparent: Bool
+
+    public init(url: URL?, isTransparent: Bool = false) {
         self.url = url
+        self.isTransparent = isTransparent
     }
 
     /// The bundled burnt-orange → warm-cream placeholder clip shipped inside
@@ -92,15 +101,22 @@ public struct LoopingVideoView: View {
     }
 
     public var body: some View {
-        RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-            .fill(DODColor.surfaceElevated)
-            .aspectRatio(0.62, contentMode: .fit)
-            .overlay { media }
-            .frame(maxWidth: 260)
-            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
-            // Matches the SF-symbol placeholder: decorative, so hide it from
-            // VoiceOver (the slide's title + description carry the meaning).
-            .accessibilityHidden(true)
+        ZStack {
+            // Opaque clips sit on an elevated card. A transparent (HEVC-alpha)
+            // clip drops the fill so the slide's own background shows through the
+            // alpha and the framed subject floats.
+            if !source.isTransparent {
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                    .fill(DODColor.surfaceElevated)
+            }
+            media
+        }
+        .aspectRatio(0.62, contentMode: .fit)
+        .frame(maxWidth: 260)
+        .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
+        // Matches the SF-symbol placeholder: decorative, so hide it from
+        // VoiceOver (the slide's title + description carry the meaning).
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -111,7 +127,11 @@ public struct LoopingVideoView: View {
                 .foregroundStyle(DODColor.accent)
         } else {
             #if canImport(UIKit)
-            LoopingPlayerRepresentable(url: source.url, isActive: isActive)
+            LoopingPlayerRepresentable(
+                url: source.url,
+                isActive: isActive,
+                isTransparent: source.isTransparent
+            )
             #endif
         }
     }
@@ -124,9 +144,10 @@ public struct LoopingVideoView: View {
 private struct LoopingPlayerRepresentable: UIViewRepresentable {
     let url: URL?
     let isActive: Bool
+    let isTransparent: Bool
 
     func makeUIView(context: Context) -> LoopingPlayerUIView {
-        LoopingPlayerUIView(url: url)
+        LoopingPlayerUIView(url: url, isTransparent: isTransparent)
     }
 
     func updateUIView(_ uiView: LoopingPlayerUIView, context: Context) {
@@ -146,7 +167,7 @@ private final class LoopingPlayerUIView: UIView {
     private let queuePlayer = AVQueuePlayer()
     private var looper: AVPlayerLooper?
 
-    init(url: URL?) {
+    init(url: URL?, isTransparent: Bool) {
         super.init(frame: .zero)
 
         // Muted + never touching AVAudioSession → strictly ambient; the clip
@@ -155,7 +176,17 @@ private final class LoopingPlayerUIView: UIView {
         queuePlayer.isMuted = true
         queuePlayer.preventsDisplaySleepDuringVideoPlayback = false
         playerLayer.player = queuePlayer
-        playerLayer.videoGravity = .resizeAspectFill
+        // Transparent (HEVC-alpha) clips: fit the whole framed subject and let
+        // the slide background composite through the alpha (needs a non-opaque,
+        // clear-backed layer). Opaque clips fill the media box.
+        if isTransparent {
+            playerLayer.videoGravity = .resizeAspect
+            isOpaque = false
+            backgroundColor = .clear
+            playerLayer.backgroundColor = UIColor.clear.cgColor
+        } else {
+            playerLayer.videoGravity = .resizeAspectFill
+        }
         layer.addSublayer(playerLayer)
 
         if let url {
