@@ -55,6 +55,27 @@ import Testing
         }
     }
 
+    @Test func singleItemFeedAlwaysPicksThatItem() async throws {
+        let dependencies = FakeFeedDependencies()
+        dependencies.pages[1] = [Self.makeItem(42)]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.onAppear()
+
+        // First call: pick the only item
+        var firstSelected: RecipeListItem?
+        viewModel.surpriseMe { firstSelected = $0 }
+        let firstPicked = try #require(firstSelected)
+        #expect(firstPicked.id == 42)
+        #expect(viewModel.lastSurpriseID == 42)
+
+        // Second call: with lastSurpriseID=42, should still pick it (only option)
+        var secondSelected: RecipeListItem?
+        viewModel.surpriseMe { secondSelected = $0 }
+        let secondPicked = try #require(secondSelected)
+        #expect(secondPicked.id == 42)
+        #expect(viewModel.lastSurpriseID == 42, "lastSurpriseID should remain unchanged for single-item feed")
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
