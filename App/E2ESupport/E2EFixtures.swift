@@ -6,6 +6,11 @@ import Foundation
 /// shapes the real parsers expect, so the L5 journeys run deterministically
 /// against the real code paths. Recipe ids/slugs are stable so tests can assert
 /// on titles ("Garlic Butter Skillet Corn"), ingredients, and steps.
+///
+/// DUT-917/918/918b/957/958 — one article fixture ("Dutch Oven Care Guide",
+/// id 99001) provides deterministic E2E coverage for the article-rendering
+/// path: visible figcaption, hidden-Pinterest-block stripping, and the
+/// alt-text-not-as-caption guard.
 enum E2EFixtures {
 
     struct Recipe {
@@ -19,6 +24,41 @@ enum E2EFixtures {
         let categoryID: Int
         let categoryName: String
     }
+
+    /// A WP post whose detail HTML carries NO `@type: Recipe` JSON-LD, so
+    /// `RecipeDetailViewModel` classifies it as an article and renders it
+    /// via `ArticleDetailView` + `ArticleHTMLParser`.
+    struct Article {
+        let id: Int
+        let slug: String
+        let title: String
+        let excerpt: String
+    }
+
+    // MARK: - Article fixtures
+
+    static let articles: [Article] = [
+        // DUT-917/918/918b — one article post for hermetic E2E coverage of the
+        // article-rendering path. The detail HTML (see `articleDetailHTML(for:)`)
+        // carries a visible figcaption, a hidden Pinterest div, and a bare
+        // alt-attributed image — the three surfaces that had production bugs.
+        Article(
+            id: 99001,
+            slug: "dutch-oven-care-guide",
+            title: "Dutch Oven Care Guide",
+            excerpt: "Everything you need to keep your Dutch oven in top condition."
+        )
+    ]
+
+    static func article(forSlug slug: String) -> Article? {
+        articles.first { $0.slug == slug }
+    }
+
+    static func article(forID id: Int) -> Article? {
+        articles.first { $0.id == id }
+    }
+
+    // MARK: - Recipe fixtures
 
     static let recipes: [Recipe] = [
         Recipe(
@@ -86,9 +126,29 @@ enum E2EFixtures {
         ]
     }
 
+    /// Article posts carry no recipe category — `categories` is an empty
+    /// array so category-browsing journeys stay deterministic.
+    static func postJSONObject(_ article: Article) -> [String: Any] {
+        [
+            "id": article.id,
+            "slug": article.slug,
+            "link": "https://www.dutchovendaddy.com/\(article.slug)/",
+            "title": ["rendered": article.title],
+            "excerpt": ["rendered": "<p>\(article.excerpt)</p>"],
+            "date": "2026-05-15T12:00:00",
+            "date_gmt": "2026-05-15T12:00:00",
+            "featured_media": 0,
+            "categories": [Int](),
+        ]
+    }
+
     /// The posts list, honoring `search` (title contains), `categories` (id),
     /// `include`/`slug` filters so the search + category + related journeys are
-    /// deterministic. No filter → every recipe.
+    /// deterministic. No filter → every recipe AND every article.
+    ///
+    /// Articles carry no recipe category, so they are excluded when a
+    /// `categories` query parameter is active — category browsing must not
+    /// surface article posts in the recipe list.
     static func postsListJSONObjects(matching query: [String: String]) -> [[String: Any]] {
         var result = recipes
         if let search = query["search"]?.lowercased(), !search.isEmpty {
@@ -104,7 +164,24 @@ enum E2EFixtures {
             let ids = Set(include.split(separator: ",").compactMap { Int($0) })
             if !ids.isEmpty { result = result.filter { ids.contains($0.id) } }
         }
-        return result.map(postJSONObject)
+        let recipeObjects = result.map { postJSONObject($0) }
+
+        // Articles are appended AFTER recipes (preserving API page order) and
+        // excluded when a `categories` filter is active.
+        var articleResult: [Article] = query["categories"] == nil ? articles : []
+        if let search = query["search"]?.lowercased(), !search.isEmpty {
+            articleResult = articleResult.filter { $0.title.lowercased().contains(search) }
+        }
+        if let slug = query["slug"] {
+            articleResult = articleResult.filter { $0.slug == slug }
+        }
+        if let include = query["include"] {
+            let ids = Set(include.split(separator: ",").compactMap { Int($0) })
+            if !ids.isEmpty { articleResult = articleResult.filter { ids.contains($0.id) } }
+        }
+        let articleObjects = articleResult.map { postJSONObject($0) }
+
+        return recipeObjects + articleObjects
     }
 
     // MARK: - Recipe detail HTML (JSON-LD)
@@ -125,6 +202,49 @@ enum E2EFixtures {
             <!doctype html><html><head><title>\(recipe.title)</title>
             <script type="application/ld+json">\(jsonString)</script>
             </head><body><h1>\(recipe.title)</h1><p>\(recipe.excerpt)</p></body></html>
+            """
+        return Data(html.utf8)
+    }
+
+    // MARK: - Article detail HTML (no JSON-LD — forces article classification)
+
+    /// An article page HTML whose `<div class="entry-content">` carries:
+    ///
+    /// - A paragraph and a `<figure>` with a visible `<figcaption>` (the
+    ///   caption MUST render per DUT-918).
+    /// - A hidden Pinterest/social block marked `dpsp-post-pinterest-image-hidden`
+    ///   AND `style="display:none"` (``ArticleHTMLParser/removeHiddenBlocks``
+    ///   must strip it before the block scan — DUT-918b).
+    /// - A bare `<img alt="Social media image">` with NO figcaption; its `alt`
+    ///   must NOT leak as a visible caption (DUT-917).
+    ///
+    /// No `<script type="application/ld+json">` with `@type: Recipe` is
+    /// present, so `JSONLDRecipeParser.hasRecipeJSONLD` returns `false` and
+    /// `RecipeDetailViewModel.classifyPage` falls through to
+    /// `classifyAsArticle` → `.article`.
+    static func articleDetailHTML(for article: Article) -> Data {
+        let html = """
+            <!doctype html><html>
+            <head><title>\(article.title)</title></head>
+            <body>
+            <div class="entry-content">
+            <h2>About Dutch Oven Care</h2>
+            <p>Seasoning your Dutch oven protects it from rust.</p>
+            <figure>
+            <img src="https://www.dutchovendaddy.com/wp-content/dutch-oven-real.jpg">
+            <figcaption>A seasoned Dutch oven</figcaption>
+            </figure>
+            <p>Re-season after every use for best results.</p>
+            <div class="dpsp-post-pinterest-image-hidden" style="display:none">
+            <figure>
+            <img src="https://www.dutchovendaddy.com/wp-content/dutch-oven-collage.jpg">
+            <figcaption>Collage Caption</figcaption>
+            </figure>
+            </div>
+            <img src="https://www.dutchovendaddy.com/wp-content/dutch-oven-social.jpg"\
+             alt="Social media image">
+            </div>
+            </body></html>
             """
         return Data(html.utf8)
     }

@@ -28,10 +28,11 @@ struct E2EStubHTTPClient: HTTPClient {
             return Self.response(E2EFixtures.ratingsForbiddenJSON, url: url, status: 403)
         }
 
-        // Recipe detail HTML page: a dutchovendaddy.com URL that is NOT a wp-json
+        // Post detail HTML page: a dutchovendaddy.com URL that is NOT a wp-json
         // API call (RecipePageFetcher fetches the post's canonical `link`).
-        if !path.contains("/wp-json/"), let recipe = E2EFixtures.recipe(forSlug: url.slug) {
-            return Self.response(E2EFixtures.detailHTML(for: recipe), contentType: "text/html", url: url)
+        // Check recipes first, then articles (DUT-917/918/918b article fixture).
+        if !path.contains("/wp-json/"), let htmlResp = Self.postDetailHTML(for: url) {
+            return htmlResp
         }
 
         // Images (gravatar avatars, media source URLs) → a 1×1 PNG.
@@ -41,8 +42,7 @@ struct E2EStubHTTPClient: HTTPClient {
 
         // WP REST API.
         if path.contains("/wp/v2/posts/"), let id = Self.trailingID(path) {
-            let post = E2EFixtures.recipe(forID: id).map { E2EFixtures.postJSONObject($0) }
-            return Self.json(post ?? [:], url: url)
+            return Self.postJSONResponse(forID: id, url: url)
         }
         if path.hasSuffix("/wp/v2/posts") || path.contains("/wp/v2/posts") {
             return Self.json(E2EFixtures.postsListJSONObjects(matching: query), url: url)
@@ -66,6 +66,40 @@ struct E2EStubHTTPClient: HTTPClient {
     }
 
     // MARK: - Helpers
+
+    /// Return the detail-HTML response for the recipe or article whose slug
+    /// matches `url`, or nil when the slug is unrecognized (falls through to
+    /// the image check). DUT-917/918/918b: recipes return JSON-LD HTML;
+    /// articles return article-body HTML (no JSON-LD → article classification).
+    private static func postDetailHTML(for url: URL) -> (Data, HTTPURLResponse)? {
+        if let recipe = E2EFixtures.recipe(forSlug: url.slug) {
+            return Self.response(
+                E2EFixtures.detailHTML(for: recipe),
+                contentType: "text/html",
+                url: url
+            )
+        }
+        if let article = E2EFixtures.article(forSlug: url.slug) {
+            return Self.response(
+                E2EFixtures.articleDetailHTML(for: article),
+                contentType: "text/html",
+                url: url
+            )
+        }
+        return nil
+    }
+
+    /// Return the single-post JSON response for `id`, trying recipes then
+    /// articles. An unknown id returns an empty dict (safe decode for callers).
+    private static func postJSONResponse(forID id: Int, url: URL) -> (Data, HTTPURLResponse) {
+        if let recipe = E2EFixtures.recipe(forID: id) {
+            return Self.json(E2EFixtures.postJSONObject(recipe), url: url)
+        }
+        if let article = E2EFixtures.article(forID: id) {
+            return Self.json(E2EFixtures.postJSONObject(article), url: url)
+        }
+        return Self.json([:] as [String: Any], url: url)
+    }
 
     private static func trailingID(_ path: String) -> Int? {
         Int(path.split(separator: "/").last ?? "")
