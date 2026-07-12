@@ -58,11 +58,11 @@ extension RootView {
                 description:
                     "Browse cast iron recipes and articles, save your favorites, and cook them step by step with built-in coaching, even offline.",
                 placeholderSymbol: "flame.fill",
-                // DUT-336 prototype: slide 1 plays a bundled looping placeholder
-                // clip; the rest use SF-symbol placeholders. Swap
-                // `.placeholder` for a real per-slide `.mov` here (see
-                // `IntroVideoSource` for how to point at your own file).
-                video: .placeholder
+                // DUT-336: the opening slide leads with the Dutch Oven Daddy
+                // badge (a bundled transparent PNG) as its clean welcome visual.
+                // Later slides use SF-symbol placeholders until real screenshots
+                // land. Media precedence is video → image → symbol.
+                image: .logo
             ),
             .init(
                 id: 1,

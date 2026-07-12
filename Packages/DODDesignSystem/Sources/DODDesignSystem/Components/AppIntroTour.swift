@@ -19,22 +19,29 @@ public struct AppIntroTour: View {
         public let description: String
         public let placeholderSymbol: String
         /// Optional looping clip for the media area. When `nil` (the default),
-        /// the slide falls back to the ``placeholderSymbol`` SF Symbol — so
-        /// video and symbol slides can freely mix as real clips land per slide.
+        /// the slide falls back to the ``image`` (if any) then the
+        /// ``placeholderSymbol`` SF Symbol — so video, image, and symbol slides
+        /// can freely mix as real media lands per slide.
         public let video: IntroVideoSource?
+        /// Optional still image for the media area. Used when ``video`` is `nil`;
+        /// falls back to ``placeholderSymbol`` when this is `nil` too. Media
+        /// precedence is video → image → SF symbol (DUT-336).
+        public let image: IntroImageSource?
 
         public init(
             id: Int,
             title: String,
             description: String,
             placeholderSymbol: String,
-            video: IntroVideoSource? = nil
+            video: IntroVideoSource? = nil,
+            image: IntroImageSource? = nil
         ) {
             self.id = id
             self.title = title
             self.description = description
             self.placeholderSymbol = placeholderSymbol
             self.video = video
+            self.image = image
         }
     }
 
@@ -132,9 +139,10 @@ public struct AppIntroTour: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
-    /// The slide's media area: a gapless looping clip when the page carries a
-    /// ``Page/video`` (playing only while it's the current slide), otherwise the
-    /// SF-symbol placeholder. Keeps video + symbol slides mixable (DUT-336).
+    /// The slide's media area, in precedence order (DUT-336): a gapless looping
+    /// clip when the page carries a ``Page/video`` (playing only while it's the
+    /// current slide), else a still ``Page/image``, else the SF-symbol
+    /// placeholder. Keeps video, image, and symbol slides mixable.
     @ViewBuilder
     private func media(for page: Page, offset: Int) -> some View {
         if let video = page.video {
@@ -143,9 +151,28 @@ public struct AppIntroTour: View {
                 isActive: offset == index,
                 posterSymbol: page.placeholderSymbol
             )
+        } else if let image = page.image {
+            introImage(image)
         } else {
             imagePlaceholder(page.placeholderSymbol)
         }
+    }
+
+    /// A still image (e.g. the Dutch Oven Daddy badge) shown aspect-fit in the
+    /// media box. Sits on a soft ``DODColor/cream`` circle so the badge reads as
+    /// a self-contained coin on BOTH the light (Flour) and dark (Cocoa) slide
+    /// backgrounds — `cream` stays light in both appearances, so the badge's
+    /// espresso ring keeps a light surround and never loses contrast on dark
+    /// (DUT-336). Decorative: hidden from VoiceOver like the other media, since
+    /// the slide title carries the meaning.
+    private func introImage(_ source: IntroImageSource) -> some View {
+        Image(source.assetName, bundle: .module)
+            .resizable()
+            .scaledToFit()
+            .padding(DODSpacing.md)
+            .background(Circle().fill(DODColor.cream))
+            .frame(maxWidth: 240)
+            .accessibilityHidden(true)
     }
 
     /// Reserved image area — a placeholder until real screenshots land (DUT-335).
