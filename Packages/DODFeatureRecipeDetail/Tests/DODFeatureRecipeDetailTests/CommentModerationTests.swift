@@ -1,4 +1,5 @@
 import DODDomain
+import DODFeatureProfile
 import Foundation
 import Testing
 
@@ -208,5 +209,30 @@ struct CommentModerationTests {
     @Test func canModerateAnotherUsersComment() {
         // No profile signed in → nothing is "own" → every comment is moderatable.
         #expect(makeViewModel().canModerate(comment(id: 1, author: "Other")))
+    }
+
+    @Test func cannotBlockYourOwnNameEvenWhenTheServerRedactsYourEmail() {
+        // Signed in as "Ned Adams". The server redacts author_email on read, so an
+        // OWN older comment comes back with an empty email — email-based
+        // `isOwnComment` misses it, but the name match must still count it as
+        // yours. Otherwise (Block keys on the display name) blocking here would
+        // hide every one of the user's own comments.
+        let viewModel = makeViewModel()
+        viewModel.profile = UserProfile(
+            id: UUID(),
+            displayName: "Ned Adams",
+            email: "ned@dutchovendaddy.com"
+        )
+        let ownRedacted = comment(id: 1, author: "  ned adams  ")  // redacted email + odd casing/space
+
+        // No Block/Report affordance on your own name.
+        #expect(viewModel.canModerate(ownRedacted) == false)
+
+        // And the direct backstop: blockAuthor refuses and doesn't self-block.
+        viewModel.blockAuthor(of: ownRedacted)
+        #expect(viewModel.snackbarMessage?.contains("your own name") == true)
+
+        // Sanity: a different author is still fully moderatable.
+        #expect(viewModel.canModerate(comment(id: 2, author: "Someone Else")))
     }
 }

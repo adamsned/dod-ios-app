@@ -16,7 +16,7 @@ extension RecipeDetailViewModel {
     /// Whether to show the report/block affordance on a row — only for OTHER
     /// people's comments (you don't report or block yourself).
     public func canModerate(_ comment: RecipeComment) -> Bool {
-        !isOwnComment(comment)
+        !isOwnComment(comment) && !isOwnAuthorName(comment)
     }
 
     /// Report a comment: hide it locally immediately (the user stops seeing it)
@@ -56,6 +56,14 @@ extension RecipeDetailViewModel {
     /// row actually disappears. Either way the user gets snackbar feedback —
     /// no moderation action is a silent no-op.
     public func blockAuthor(of comment: RecipeComment) {
+        // Never block your own display name: Block keys on the name, so blocking
+        // yourself would hide every one of your own comments. `canModerate`
+        // already hides the affordance for own-name comments; this is the
+        // belt-and-suspenders backstop for any other caller.
+        guard !isOwnAuthorName(comment) else {
+            snackbarMessage = "That's your own name, so it can't be blocked."
+            return
+        }
         if commentModeration.block(author: comment.authorName) {
             snackbarMessage = "Blocked \(comment.authorName). Their comments are now hidden."
         } else {
@@ -103,6 +111,22 @@ extension RecipeDetailViewModel {
         guard !email.isEmpty else { return false }
         let commentEmail = comment.authorEmail.lowercased().trimmingCharacters(in: charSet)
         return commentEmail == email
+    }
+
+    /// True when a comment's author name matches the signed-in user's own display
+    /// name. Complements ``isOwnComment`` (which matches by email): the user's OWN
+    /// older comments come back from the server with the email redacted, so they'd
+    /// otherwise read as someone else's — and since Block keys on the display NAME,
+    /// that would let the user block their own name and hide every one of their
+    /// comments. Uses the same normalization as `CommentModerationStore.authorKey`.
+    /// (Trade-off: a stranger who happens to share your exact display name also
+    /// can't be blocked — rare, and far better than letting you block yourself.)
+    func isOwnAuthorName(_ comment: RecipeComment) -> Bool {
+        let charSet = CharacterSet.whitespacesAndNewlines
+        let name = (profile?.displayName ?? "").lowercased().trimmingCharacters(in: charSet)
+        guard !name.isEmpty else { return false }
+        let authorName = comment.authorName.lowercased().trimmingCharacters(in: charSet)
+        return authorName == name
     }
 
     /// Moderation contact — also the Guideline 1.2 "published contact" surface.
