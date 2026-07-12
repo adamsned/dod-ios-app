@@ -62,6 +62,22 @@ import Testing
         let result = try #require(RandomRecipePicker.pick(from: ids, excluding: nil))
         #expect(ids.contains(result))
     }
+
+    @Test func degenerate_case_all_items_equal_to_excluded_falls_back_to_full_list() throws {
+        var rng: any RandomNumberGenerator = SeededRandomNumberGenerator(seed: 7)
+        let ids = [7, 7, 7, 7]
+        // All items equal the excluded value; should fall back to full list (line 37-39)
+        let result = try #require(RandomRecipePicker.pick(from: ids, excluding: 7, using: &rng))
+        #expect(result == 7)
+        #expect(ids.contains(result))
+    }
+
+    @Test func degenerate_case_with_different_duplicate_value() throws {
+        var rng: any RandomNumberGenerator = SeededRandomNumberGenerator(seed: 8)
+        let ids = [99, 99, 99]
+        let result = try #require(RandomRecipePicker.pick(from: ids, excluding: 99, using: &rng))
+        #expect(result == 99)
+    }
 }
 
 /// Deterministic RNG for tests — Numerical Recipes LCG constants, pinned so
