@@ -16,6 +16,10 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     /// here surface with `.distantPast` (never read as a fresh re-save).
     var savedAtByID: [Int: Date] = [:]
     var shouldFail = false
+    /// Test-only flag to make ``downloadedRecipeIDs()`` throw (best-effort test).
+    /// T-774 / DUT-80 — verifies that a failed download-id fetch doesn't crash
+    /// the refresh, just falls back to no badges.
+    var shouldFailDownloadedIDs = false
     /// T-774 / DUT-80 — the set ``downloadedRecipeIDs()`` returns, so a test can
     /// assert the view model hydrates `downloadedIDs` for the Saved-tab badge.
     var downloadedIDs: Set<Int> = []
@@ -55,6 +59,11 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     /// leak test confirm the observing task actually started before release.
     private(set) var remoteChangesCallCount = 0
 
+    /// DUT-365 — test hook to track calls to publishSavedWidget() and allow tests
+    /// to inject custom behavior. Defaults to a no-op; tests can assign a closure
+    /// that increments a counter or performs other verification.
+    var publishSavedWidgetImpl: (() async -> Void) = {}
+
     init() {
         (remoteChangeStream, remoteChangeContinuation) = AsyncStream.makeStream()
     }
@@ -80,7 +89,14 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
         return recipes.map { ($0, savedAtByID[$0.id] ?? .distantPast) }
     }
 
-    func downloadedRecipeIDs() async throws -> Set<Int> { downloadedIDs }
+    func downloadedRecipeIDs() async throws -> Set<Int> {
+        if shouldFailDownloadedIDs { throw URLError(.unknown) }
+        return downloadedIDs
+    }
+
+    func publishSavedWidget() async {
+        await publishSavedWidgetImpl()
+    }
 
     func removeDownload(id: Int) async throws {
         removedDownloadIDs.append(id)
