@@ -22,6 +22,7 @@ let package = Package(
         .target(
             name: "DODCookActivity",
             dependencies: ["DODDesignSystem"]
-        )
+        ),
+        .testTarget(name: "DODCookActivityTests", dependencies: ["DODCookActivity"]),
     ]
 )
