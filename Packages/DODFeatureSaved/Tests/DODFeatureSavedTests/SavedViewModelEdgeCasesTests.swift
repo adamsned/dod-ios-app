@@ -50,7 +50,10 @@ import Testing
 
         // The second call's guard must have prevented it, so the count stays at 1.
         #expect(callsAfterFirst == 1, "First startObserving() must call remoteChanges()")
-        #expect(callsAfterSecond == 1, "Second startObserving() must not call remoteChanges() again (guard prevents it)")
+        #expect(
+            callsAfterSecond == 1,
+            "Second startObserving() must not call remoteChanges() again (guard prevents it)"
+        )
     }
 
     /// DUT-369 — a refresh failure must preserve the existing grid when recipes
