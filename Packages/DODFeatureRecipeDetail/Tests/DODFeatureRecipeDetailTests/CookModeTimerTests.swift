@@ -56,6 +56,53 @@ struct CookModeTimerTests {
         #expect(vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(500)) == 60)
     }
 
+    /// DUT-962 regression — a pause tap landing AFTER the deadline has already
+    /// passed but before the next `tickTimers()` poll must complete the timer,
+    /// not strand it at `.paused(remaining: 0)`. Before the fix this froze the
+    /// countdown permanently: `didComplete` stayed false, the haptic tick never
+    /// bumped, and a later `startOrResumeTimer` was a silent no-op (its
+    /// `remaining > 0` guard rejected the 0-remaining paused timer), so only
+    /// Reset could escape it.
+    @Test func pausingAfterTheDeadlineCompletesRatherThanFreezing() {
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1)
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 5, now: t0)
+        let before = vm.timerCompletionTick
+
+        vm.pauseTimer(forStep: 0, now: t0.addingTimeInterval(5.4))  // 0.4s past the deadline
+
+        #expect(vm.timer(forStep: 0)?.didComplete == true)
+        #expect(vm.timerCompletionTick == before + 1)
+
+        // A completed timer can't be "resumed" — the no-op guard in
+        // `startOrResumeTimer` correctly leaves it alone rather than restarting it.
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 5, now: t0.addingTimeInterval(6))
+        #expect(vm.timer(forStep: 0)?.isRunning == false)
+    }
+
+    /// Edge case — pausing exactly AT the deadline (zero remaining, not yet
+    /// past it) must also complete rather than freeze at `paused(remaining: 0)`.
+    @Test func pausingExactlyAtTheDeadlineAlsoCompletes() {
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1)
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 5, now: t0)
+
+        vm.pauseTimer(forStep: 0, now: t0.addingTimeInterval(5))  // exactly 0 remaining
+
+        #expect(vm.timer(forStep: 0)?.didComplete == true)
+    }
+
+    /// Edge case — pausing well before the deadline is unaffected by the fix:
+    /// it still freezes normally at the correct remaining time.
+    @Test func pausingWellBeforeTheDeadlineStillFreezesNormally() {
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1)
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 100, now: t0)
+
+        vm.pauseTimer(forStep: 0, now: t0.addingTimeInterval(10))  // 90s left
+
+        #expect(vm.timer(forStep: 0)?.didComplete == false)
+        #expect(vm.timer(forStep: 0)?.isRunning == false)
+        #expect(vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(10)) == 90)
+    }
+
     /// DUT-354 — when a timer completes while the app is foregrounded, the Live
     /// Activity must NOT vanish the instant it hits zero. It lingers on a frozen
     /// 0:00 "done" state (the buzzer moment) until the cook leaves Cook Mode or

@@ -46,7 +46,24 @@ extension CookModeViewModel {
     /// Pause the countdown for `index`, freezing the remaining time.
     public func pauseTimer(forStep index: Int, now: Date = Date()) {
         guard var timer = stepTimers[index], timer.isRunning else { return }
-        timer.state = .paused(remaining: timer.remaining(at: now))
+        let remaining = timer.remaining(at: now)
+        // DUT-962: a pause tap that lands in the ~1s window after the deadline
+        // has already passed but before the next `tickTimers()` poll (only that
+        // loop flips `.running` -> `.completed`) must NOT freeze at
+        // `.paused(remaining: 0)`. `startOrResumeTimer` guards `remaining > 0`
+        // before resuming, so a 0-remaining pause could never be resumed, and
+        // nothing else ever completes a `.paused` timer — the countdown was
+        // stranded at a dead 0:00 forever (only Reset escaped it). Route it
+        // through the same completion `tickTimers()` would have taken instead.
+        guard remaining > 0 else {
+            timer.state = .completed
+            timerCompletionTick &+= 1
+            stepTimers[index] = timer
+            reconcileLiveActivity(now: now)
+            cancelPendingStepDoneNotification(forStep: index)
+            return
+        }
+        timer.state = .paused(remaining: remaining)
         stepTimers[index] = timer
         reconcileLiveActivity(now: now)
         // DUT-604: a paused timer isn't counting down, so cancel its pending
