@@ -68,33 +68,48 @@ extension RootView {
                 id: 1,
                 title: "Browse Recipes & Articles",
                 description: "Explore fresh cast iron recipes to cook and articles to read, all in one tab.",
-                placeholderSymbol: "square.grid.2x2.fill"
+                placeholderSymbol: "square.grid.2x2.fill",
+                // STILL slide (Browse). Add a device-framed, transparent-background
+                // PNG screenshot to DODDesignSystem `Media.xcassets` as
+                // `intro-still-browse`; it floats on the Flour/Cocoa background.
+                // Until the asset is added, the SF symbol above shows.
+                image: IntroImageSource(assetName: "intro-still-browse", isTransparent: true)
             ),
             .init(
                 id: 2,
                 title: "Save Recipes for Later",
                 description: "Bookmark any recipe to build your own collection and find it again in a tap.",
                 placeholderSymbol: "bookmark.fill"
+                    // VIDEO slide. When the looping clip is ready, add:
+                    // video: IntroVideoSource(url: <bundled HEVC-alpha .mov>, isTransparent: true)
             ),
             .init(
                 id: 3,
                 title: "Cook Mode",
                 description:
                     "Cook one step at a time with large text and voice read-aloud, and the screen stays awake so you never lose your place.",
-                placeholderSymbol: "speaker.wave.2.fill"
+                placeholderSymbol: "speaker.wave.2.fill",
+                // STILL slide (Cook Mode). Asset: `intro-still-cook-mode`
+                // (device-framed transparent PNG). SF symbol shows until added.
+                image: IntroImageSource(assetName: "intro-still-cook-mode", isTransparent: true)
             ),
             .init(
                 id: 4,
                 title: "Cooking Tools",
                 description:
                     "New to cast iron? Your First Cookout walks you to a guaranteed win, and the Heat Coach dials in your coals so every cook comes out right.",
-                placeholderSymbol: "thermometer.medium"
+                placeholderSymbol: "thermometer.medium",
+                // STILL slide (Cooking Tools). Asset: `intro-still-cooking-tools`
+                // (device-framed transparent PNG). SF symbol shows until added.
+                image: IntroImageSource(assetName: "intro-still-cooking-tools", isTransparent: true)
             ),
             .init(
                 id: 5,
                 title: "Download for Offline",
                 description: "Save recipes to your device and cook anywhere, even with no signal at the campsite.",
                 placeholderSymbol: "arrow.down.circle.fill"
+                    // VIDEO slide. When the looping clip is ready, add:
+                    // video: IntroVideoSource(url: <bundled HEVC-alpha .mov>, isTransparent: true)
             ),
         ]
     }

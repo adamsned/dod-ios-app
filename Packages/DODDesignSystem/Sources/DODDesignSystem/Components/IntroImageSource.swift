@@ -21,8 +21,17 @@ public struct IntroImageSource: Sendable {
     /// The name of an image in this module's asset catalog.
     public let assetName: String
 
-    public init(assetName: String) {
+    /// `true` for a **transparent** still (e.g. a device-framed app screenshot
+    /// exported as a PNG with a clear background). The view then floats it
+    /// directly on the slide's own Flour/Cocoa background — no card or circle —
+    /// so it matches the transparent video slides and one PNG works in both
+    /// light and dark. `false` (the default) keeps the badge treatment: a soft
+    /// cream circle so a logo reads as a self-contained coin on both grounds.
+    public let isTransparent: Bool
+
+    public init(assetName: String, isTransparent: Bool = false) {
         self.assetName = assetName
+        self.isTransparent = isTransparent
     }
 
     /// The Dutch Oven Daddy circular badge ("Cast Iron Living"), a transparent
