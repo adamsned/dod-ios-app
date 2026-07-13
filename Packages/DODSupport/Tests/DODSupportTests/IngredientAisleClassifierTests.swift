@@ -216,6 +216,46 @@ struct IngredientAisleClassifierTests {
         #expect(IngredientAisleClassifier.classify("2 diced tomato") == .produce)
     }
 
+    // MARK: - Short-keyword END boundary (a short stem must not match as a
+    // mere PREFIX of a longer, unrelated word)
+
+    /// "ham" (.meat) must not match inside "hamburger" — "buns" isn't a
+    /// mapped keyword either, so the correct result is the `.other` fallback.
+    @Test func hamburgerBunsAreNotMeat() {
+        #expect(IngredientAisleClassifier.classify("4 hamburger buns") == .other)
+    }
+
+    /// "rice" (.pantry) must not match inside "riced" — "cauliflower" isn't
+    /// mapped, so the correct result is `.other`, not a false pantry hit.
+    @Test func ricedCauliflowerIsNotPantry() {
+        #expect(IngredientAisleClassifier.classify("1 cup riced cauliflower") == .other)
+    }
+
+    /// "salt" (.spices) must not match inside "saltine" — a cracker line
+    /// should fall to `.other`, not be misfiled as a spice.
+    @Test func saltineCrackersAreNotSpices() {
+        #expect(IngredientAisleClassifier.classify("1 sleeve saltine crackers") == .other)
+    }
+
+    /// Regression guard: the new END check must not break plain plurals —
+    /// "eggs" still finds the "egg" stem.
+    @Test func pluralEggsStillMatchAfterTheFix() {
+        #expect(IngredientAisleClassifier.classify("2 large eggs") == .dairy)
+    }
+
+    /// Regression guard: another plural, "hams", still finds the "ham" stem.
+    @Test func pluralHamsStillMatchAfterTheFix() {
+        #expect(IngredientAisleClassifier.classify("2 lbs cured hams") == .meat)
+    }
+
+    /// Regression guard for the already-fixed (DUT-716) mid-word cases —
+    /// unrelated to this fix, must keep passing: "ham" doesn't match inside
+    /// "graham", and "salt" doesn't match inside "unsalted".
+    @Test func midWordFragmentsStillExcluded() {
+        #expect(IngredientAisleClassifier.classify("a slice of graham cracker") != .meat)
+        #expect(IngredientAisleClassifier.classify("2 cups unsalted butter") == .dairy)
+    }
+
     // MARK: - Enum completeness
 
     /// Every aisle is reachable — the case set the AC-39.4 render order walks.
