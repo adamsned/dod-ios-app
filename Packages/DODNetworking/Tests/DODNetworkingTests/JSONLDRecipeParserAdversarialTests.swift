@@ -139,7 +139,7 @@ struct AdversarialInstructionTests {
                 "@type": "HowToSection",
                 "name": "Bake",
                 "itemListElement": [
-                    ["@type": "HowToStep", "text": "Bake 30 min."],
+                    ["@type": "HowToStep", "text": "Bake 30 min."]
                 ],
             ],
             "Cool.",
@@ -237,7 +237,7 @@ struct AdversarialYieldVideoIngredientTests {
         let raw: Any = [
             "string reference",
             [
-                "contentUrl": "https://example.com/video.mp4",
+                "contentUrl": "https://example.com/video.mp4"
             ],
             123,
         ]
@@ -337,7 +337,7 @@ struct AdversarialGraphAndDurationTests {
                         ["name": "Item 1"],
                         ["name": "Item 2"],
                     ],
-                ],
+                ]
             ]
         ]
         let found = JSONLDRecipeParser.findRecipeObject(in: object)
