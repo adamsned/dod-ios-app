@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// The first-launch **App Intro**: a horizontally-paged, swipeable feature tour.
 /// Built generic so the hosting app supplies the slide copy + a persistent CTA —
 /// DesignSystem stays decoupled from product strings.
@@ -151,28 +155,57 @@ public struct AppIntroTour: View {
                 isActive: offset == index,
                 posterSymbol: page.placeholderSymbol
             )
-        } else if let image = page.image {
+        } else if let image = page.image, Self.imageAssetExists(image.assetName) {
             introImage(image)
         } else {
+            // No video, and either no image or the image asset hasn't been added
+            // to the catalog yet → the SF-symbol placeholder. Lets a slide be
+            // wired to a still that ships later without blanking the media box.
             imagePlaceholder(page.placeholderSymbol)
         }
     }
 
-    /// A still image (e.g. the Dutch Oven Daddy badge) shown aspect-fit in the
-    /// media box. Sits on a soft ``DODColor/cream`` circle so the badge reads as
-    /// a self-contained coin on BOTH the light (Flour) and dark (Cocoa) slide
-    /// backgrounds — `cream` stays light in both appearances, so the badge's
-    /// espresso ring keeps a light surround and never loses contrast on dark
-    /// (DUT-336). Decorative: hidden from VoiceOver like the other media, since
-    /// the slide title carries the meaning.
+    /// Whether a named image actually resolves in this module's asset catalog —
+    /// so a slide wired to a not-yet-added still gracefully shows its SF-symbol
+    /// placeholder instead of an empty box. (macOS L1 has no UIKit → `false`,
+    /// which is fine: the tour is an iOS surface.)
+    private static func imageAssetExists(_ name: String) -> Bool {
+        #if canImport(UIKit)
+        return UIImage(named: name, in: .module, compatibleWith: nil) != nil
+        #else
+        return false
+        #endif
+    }
+
+    /// A still image shown aspect-fit in the media box. Two treatments:
+    /// - **Transparent** (`source.isTransparent`, e.g. a device-framed
+    ///   screenshot PNG): floats directly on the slide's own Flour/Cocoa
+    ///   background — no card or circle — matching the transparent video slides,
+    ///   so one PNG works in both light and dark.
+    /// - **Badge** (default, e.g. the Dutch Oven Daddy logo): sits on a soft
+    ///   ``DODColor/cream`` circle so it reads as a self-contained coin on BOTH
+    ///   backgrounds — `cream` stays light in both appearances, so an espresso
+    ///   ring never loses contrast on dark (DUT-336).
+    ///
+    /// Decorative: hidden from VoiceOver like the other media (the slide title
+    /// carries the meaning).
+    @ViewBuilder
     private func introImage(_ source: IntroImageSource) -> some View {
-        Image(source.assetName, bundle: .module)
-            .resizable()
-            .scaledToFit()
-            .padding(DODSpacing.md)
-            .background(Circle().fill(DODColor.cream))
-            .frame(maxWidth: 240)
-            .accessibilityHidden(true)
+        if source.isTransparent {
+            Image(source.assetName, bundle: .module)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 260)
+                .accessibilityHidden(true)
+        } else {
+            Image(source.assetName, bundle: .module)
+                .resizable()
+                .scaledToFit()
+                .padding(DODSpacing.md)
+                .background(Circle().fill(DODColor.cream))
+                .frame(maxWidth: 240)
+                .accessibilityHidden(true)
+        }
     }
 
     /// Reserved image area — a placeholder until real screenshots land (DUT-335).
