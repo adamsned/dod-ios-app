@@ -1,0 +1,3 @@
+timestamp	model	label	prompt_tokens	eval_tokens	notes
+2026-07-13T21:00:52Z	qwen2.5-coder:14b	NewPostsDiff-fix-draft	432	135	dedupe-fix function draft, used with minor comment/var-name cleanup
+2026-07-13T21:00:52Z	qwen2.5-coder:14b	NewPostsDiff-tests-draft	465	266	3 regression tests drafted; fixed spurious throws/try, wrong expect() syntax, re-declared suite before splicing in
