@@ -83,20 +83,44 @@ public enum IngredientAisleClassifier {
         return .other
     }
 
-    /// True when `keyword` occurs in `haystack` beginning at a word boundary —
-    /// the match is preceded by the start of the string or a non-letter. Only
-    /// the START boundary is checked, so plural/suffixed forms ("eggs") still
-    /// match while mid-word fragments ("ham" in "graham") do not.
+    /// True when `keyword` occurs in `haystack` beginning AND ending at a word
+    /// boundary — the match is preceded by the start of the string or a
+    /// non-letter, AND followed by the end of the string, a non-letter, or a
+    /// single trailing "s" plural (itself bounded the same way).
+    ///
+    /// Checking only the START boundary let a short stem match as a mere
+    /// PREFIX of an unrelated longer word: "ham" inside "hamburger", "rice"
+    /// inside "riced" (cauliflower), "salt" inside "saltine" (crackers) all
+    /// silently misclassified a real shopping-list line. Requiring the END to
+    /// close cleanly too fixes that, while ``endsCleanly(after:in:)``'s plural
+    /// allowance keeps suffixed forms ("eggs") matching — the mid-word cases
+    /// ("graham", "unsalted") were already excluded by the START check alone.
     private static func matchesAtWordStart(_ keyword: String, in haystack: String) -> Bool {
         var searchRange = haystack.startIndex..<haystack.endIndex
         while let found = haystack.range(of: keyword, options: [], range: searchRange) {
             let atStart = found.lowerBound == haystack.startIndex
             let afterNonLetter =
                 !atStart && !haystack[haystack.index(before: found.lowerBound)].isLetter
-            if atStart || afterNonLetter { return true }
+            if (atStart || afterNonLetter) && endsCleanly(after: found.upperBound, in: haystack) {
+                return true
+            }
             searchRange = found.upperBound..<haystack.endIndex
         }
         return false
+    }
+
+    /// True when a keyword match ending at `end` closes cleanly: at the end of
+    /// `haystack`, right before a non-letter, or right before a single
+    /// trailing "s" plural whose own following character (if any) is itself
+    /// the end of the string or a non-letter. Anything else — the match
+    /// running on into more letters, e.g. "rice" into "riced", "salt" into
+    /// "saltine" — is a false hit on a longer, unrelated word.
+    private static func endsCleanly(after end: String.Index, in haystack: String) -> Bool {
+        guard end < haystack.endIndex else { return true }
+        guard haystack[end].isLetter else { return true }
+        guard haystack[end] == "s" else { return false }
+        let afterPluralS = haystack.index(after: end)
+        return afterPluralS == haystack.endIndex || !haystack[afterPluralS].isLetter
     }
 
     // MARK: - Keyword map
