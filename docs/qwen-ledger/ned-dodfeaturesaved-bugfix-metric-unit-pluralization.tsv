@@ -1,0 +1,3 @@
+timestamp	model	label	prompt_tokens	eval_tokens	notes
+2026-07-13T20:39:50Z	qwen2.5-coder:14b	fix-draft	325	103	Correct fix content (added kilogram/milliliter/liter); reworded doc comment myself before landing.
+2026-07-13T20:39:50Z	qwen2.5-coder:14b	test-draft	600	503	Drafted 4 tests but used XCTAssertEqual (XCTest) despite explicit swift-testing instruction; rewrote all as #expect swift-testing @Test funcs, fixed duplicate-suite-name issue (appended to existing suite instead of new file), added a 5th singular-contrast test myself.

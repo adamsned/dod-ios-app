@@ -234,4 +234,62 @@ struct IngredientAggregatorTests {
         #expect(flour?.quantity == 2)
         #expect(flour?.sourceCount == 2)
     }
+
+    // MARK: - Metric unit pluralization (bug fix)
+
+    /// Regression: `"kilogram"` / `"milliliter"` / `"liter"` were missing from
+    /// `pluralizableUnits`, so a merged metric sum rendered the ungrammatical
+    /// bare singular unit even when the summed quantity was well past 1 (not
+    /// the documented sub-tolerance-collapse-to-"1" case — this was every
+    /// metric merge). `"500 ml milk"` + `"250 ml milk"` sums cleanly to `750`
+    /// (no fraction-rounding ambiguity), yet used to print `"750 milliliter
+    /// milk"`.
+    @Test func mergedMillilitersPluralize() {
+        let result = IngredientAggregator.aggregate(
+            ingredients("500 ml milk", "250 ml milk")
+        )
+        #expect(result.count == 1)
+        #expect(result[0].quantity == 750)
+        #expect(result[0].displayText == "750 milliliters milk")
+    }
+
+    /// Same defect, the `kg` → `"kilogram"` unit.
+    @Test func mergedKilogramsPluralize() {
+        let result = IngredientAggregator.aggregate(
+            ingredients("1 kg flour", "1 kg flour")
+        )
+        #expect(result.count == 1)
+        #expect(result[0].quantity == 2)
+        #expect(result[0].displayText == "2 kilograms flour")
+    }
+
+    /// Same defect, the spelled-out `"liter"` unit (no abbreviation involved,
+    /// so this rules out any unit-alias mixup as the actual cause).
+    @Test func mergedLitersPluralize() {
+        let result = IngredientAggregator.aggregate(
+            ingredients("1 liter broth", "1 liter broth")
+        )
+        #expect(result.count == 1)
+        #expect(result[0].quantity == 2)
+        #expect(result[0].displayText == "2 liters broth")
+    }
+
+    /// Adjacent case: the same singular/plural decision also applies to a
+    /// SINGLE unmerged line whose own leading quantity is already > 1 (no
+    /// aggregation involved) — confirms the fix is in the shared
+    /// pluralization table, not something merge-path-specific.
+    @Test func unmergedMetricLineWithQuantityAboveOnePluralizes() {
+        let result = IngredientAggregator.aggregate(ingredients("2 kg butter"))
+        #expect(result.count == 1)
+        #expect(result[0].sourceCount == 1)
+        #expect(result[0].displayText == "2 kilograms butter")
+    }
+
+    /// Contrast: a single metric unit stays singular, same as every other
+    /// unit already covered above.
+    @Test func singleMetricUnitStaysSingular() {
+        let result = IngredientAggregator.aggregate(ingredients("1 liter broth"))
+        #expect(result.count == 1)
+        #expect(result[0].displayText == "1 liter broth")
+    }
 }
