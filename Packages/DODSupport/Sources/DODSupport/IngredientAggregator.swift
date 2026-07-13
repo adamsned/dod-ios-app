@@ -215,11 +215,21 @@ public enum IngredientAggregator {
     }
 
     /// Long-form units that read naturally with a trailing `s`. Abbreviations
-    /// (`tsp`, `oz`, `lb`) are intentionally excluded — `"3 tsp"` not
-    /// `"3 tsps"`.
+    /// (`tsp`, `oz`, `lb`) never reach this set — `IngredientLineParser`'s
+    /// `unitAliases` always canonicalizes an abbreviation to its spelled-out
+    /// singular first (`"oz"` → `"ounce"`, `"kg"` → `"kilogram"`), so this
+    /// table only ever sees the long form.
+    ///
+    /// Bug fix: `"kilogram"` / `"milliliter"` / `"liter"` were missing even
+    /// though their sibling metric units (`"gram"`, `"ounce"` /  the imperial
+    /// `"pound"`) were included — an oversight, not an intentional exclusion.
+    /// Merging two same-unit metric lines (e.g. `"500 ml milk"` + `"250 ml
+    /// milk"` → `750`) rendered the ungrammatical singular `"750 milliliter
+    /// milk"` instead of `"750 milliliters milk"`.
     private static let pluralizableUnits: Set<String> = [
-        "cup", "tablespoon", "teaspoon", "pound", "ounce", "gram", "clove",
-        "can", "package", "sprig", "stick", "slice", "pinch", "quart", "pint",
+        "cup", "tablespoon", "teaspoon", "pound", "ounce", "gram", "kilogram",
+        "milliliter", "liter", "clove", "can", "package", "sprig", "stick",
+        "slice", "pinch", "quart", "pint",
     ]
 
     /// The merge key: unit + name for parseable lines (so they cluster), or a
