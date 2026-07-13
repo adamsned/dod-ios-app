@@ -43,4 +43,27 @@ struct NewPostsDiffResolveTests {
         #expect(result.toNotify == [9, 7])
         #expect(result.newLastSeen == 9)
     }
+
+    /// Regression for the dup-id bug: a malformed WP page repeating a post
+    /// id (the same untrusted-input class as `NewPostsPoller`'s
+    /// `titlesByID` dictionary, cf. `RecipeStore` #605) used to make that id
+    /// appear TWICE in `toNotify`, so the caller scheduled two separate
+    /// local notifications for the same post.
+    @Test func duplicateIDInLatestPostIDsIsNotifiedOnlyOnce() {
+        let result = NewPostsDiff.resolve(latestPostIDs: [101, 101, 99], lastSeen: 98)
+        #expect(result.toNotify == [101, 99])
+        #expect(result.newLastSeen == 101)
+    }
+
+    @Test func duplicatedIDsAboveAndAtLastSeenCollapseAndExcludeTheBoundary() {
+        let result = NewPostsDiff.resolve(latestPostIDs: [50, 50, 40, 40, 30], lastSeen: 40)
+        #expect(result.toNotify == [50])
+        #expect(result.newLastSeen == 50)
+    }
+
+    @Test func duplicatedIDsEntirelyAtOrBelowLastSeenNotifyNothing() {
+        let result = NewPostsDiff.resolve(latestPostIDs: [20, 20, 20], lastSeen: 25)
+        #expect(result.toNotify.isEmpty)
+        #expect(result.newLastSeen == 25)
+    }
 }

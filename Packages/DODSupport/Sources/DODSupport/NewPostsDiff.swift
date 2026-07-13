@@ -29,10 +29,17 @@ public enum NewPostsDiff {
     ///    install must never be greeted with a backlog of notifications for
     ///    posts published before it existed) and `newLastSeen` becomes the
     ///    maximum of `latestPostIDs` — just a baseline.
-    /// 3. Otherwise → `toNotify` is every id strictly greater than
+    /// 3. Otherwise → `toNotify` is every DISTINCT id strictly greater than
     ///    `lastSeen`, sorted descending; `newLastSeen` is
     ///    `max(lastSeen, max(latestPostIDs))` (never regresses the
     ///    watermark even if a page returns only older ids).
+    ///
+    /// `latestPostIDs` is untrusted (a raw WP API response) and can repeat an
+    /// id (the dup-id class this codebase has hit before, cf. `RecipeStore`
+    /// #605 / `NewPostsPoller`'s `titlesByID` dictionary) — deduping before
+    /// filtering keeps a repeated id from appearing twice in `toNotify`,
+    /// which would otherwise make the caller schedule two separate local
+    /// notifications for the same post.
     public static func resolve(
         latestPostIDs: [Int],
         lastSeen: Int?
@@ -43,7 +50,8 @@ public enum NewPostsDiff {
         guard let lastSeen else {
             return ([], highestFetched)
         }
-        let toNotify = latestPostIDs.filter { $0 > lastSeen }.sorted(by: >)
+        let distinctDescending = Set(latestPostIDs).sorted(by: >)
+        let toNotify = distinctDescending.filter { $0 > lastSeen }
         return (toNotify, max(lastSeen, highestFetched))
     }
 }
