@@ -60,6 +60,16 @@ public protocol FeedDependencies: Sendable {
     /// previews / tests that don't wire it degrade gracefully rather than
     /// claiming a row landed.
     func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
+
+    /// DUT-1062 — fetch ONE truly-random recipe from the full WP catalog
+    /// (server-side `orderby=rand`), backing the Feed's "Surprise Me"
+    /// button. The pre-fix implementation sampled only `items` (whatever's
+    /// currently paged into memory, ~20-40 recipes), so repeated taps
+    /// resurfaced the same handful. Default throws so existing fake
+    /// conformers that don't care about this path get a benign failure —
+    /// `FeedViewModel.surpriseMe` then falls back to the old in-memory
+    /// `RandomRecipePicker` sample rather than leaving the button dead.
+    func fetchRandomRecipe() async throws -> RecipeListItem
 }
 
 extension FeedDependencies {
@@ -71,6 +81,9 @@ extension FeedDependencies {
     public func deleteCookLog(id: UUID) async throws {}
     public func deleteCookPhoto(id: String) async {}
     public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult { .couldntLoad }
+    public func fetchRandomRecipe() async throws -> RecipeListItem {
+        throw WPClientError.underlying(message: "fetchRandomRecipe not wired")
+    }
 }
 
 /// Production wiring. Constructed by the app composition root (T-140).
@@ -159,6 +172,13 @@ public struct LiveFeedDependencies: FeedDependencies {
 
     public func fetchPosts(page: Int) async throws -> (items: [RecipeListItem], totalPages: Int) {
         try await client.postsPage(page: page)
+    }
+
+    /// DUT-1062 — routes to ``WPRestClient/randomPost()`` (server-side
+    /// `orderby=rand`), giving "Surprise Me" a true full-catalog sample
+    /// instead of only whatever's paged into `FeedViewModel.items`.
+    public func fetchRandomRecipe() async throws -> RecipeListItem {
+        try await client.randomPost()
     }
 
     public func cache(listItems: [RecipeListItem]) async throws {

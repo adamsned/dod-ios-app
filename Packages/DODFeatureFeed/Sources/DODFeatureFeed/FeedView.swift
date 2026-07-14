@@ -172,20 +172,32 @@ public struct FeedView: View {
     /// family of header affordance as the gear/compose buttons. Disabled
     /// (not hidden) while the feed has no items yet, so the header layout
     /// never shifts as the initial load resolves.
+    ///
+    /// DUT-1062: `surpriseMe(onSelect:)` is now `async` — it fetches a truly
+    /// random recipe from the full WP catalog (falling back to the old
+    /// in-memory sample only if that fetch fails), so the tap now spawns a
+    /// `Task` and the button shows a spinner in place of the dice glyph
+    /// while `isSurpriseMeLoading`, plus disables re-tapping mid-fetch.
     @ViewBuilder
     private var surpriseMeButton: some View {
         Button {
-            viewModel.surpriseMe(onSelect: onSelect)
+            Task { await viewModel.surpriseMe(onSelect: onSelect) }
         } label: {
-            Image(systemName: "dice.fill")
-                .font(.title2)
-                .accessibilityLabel("Surprise Me")
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+            Group {
+                if viewModel.isSurpriseMeLoading {
+                    ProgressView()
+                } else {
+                    Image(systemName: "dice.fill")
+                        .font(.title2)
+                }
+            }
+            .accessibilityLabel("Surprise Me")
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .tint(DODColor.burntOrange)
         .accessibilityIdentifier("feed-surprise-me")
-        .disabled(viewModel.items.isEmpty)
+        .disabled(viewModel.items.isEmpty || viewModel.isSurpriseMeLoading)
     }
 
     /// Daddy Mode (Phase 1, cosmetic) — the owner-only compose entry point.

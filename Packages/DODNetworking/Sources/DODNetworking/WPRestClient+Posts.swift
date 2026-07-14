@@ -89,6 +89,44 @@ extension WPRestClient {
         return lossy.elements.first.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
     }
 
+    /// Fetch ONE random post via WP REST's `orderby=rand`, projected to a
+    /// ``RecipeListItem`` — same lightweight shape `posts()` / `post(id:)`
+    /// return. Backs the Feed's "Surprise Me" button (DUT-1062): the
+    /// original DUT-939 implementation sampled only `FeedViewModel`'s
+    /// in-memory loaded page (~20-40 recipes scrolled into memory), so
+    /// repeated taps kept resurfacing the same handful. `per_page=1` asks WP
+    /// to do the random sampling server-side over the ENTIRE posts table, so
+    /// repeated taps surface recipes the user hasn't scrolled to yet.
+    /// `_embed=wp:featuredmedia` mirrors every other post-fetch in this file.
+    ///
+    /// The response shape for `orderby=rand` is a normal list/collection
+    /// response (an array), NOT the single-object shape `post(id:)` decodes —
+    /// `orderby` is only meaningful on the collection endpoint — so this
+    /// decodes `LossyArray<WPDTO.Post>` like `posts()`/`search()` (DUT-575: a
+    /// malformed row elsewhere in the response, if WP ever widened
+    /// `per_page`, wouldn't fail the whole call).
+    ///
+    /// Throws ``WPClientError/underlying(message:)`` if WP returns zero posts
+    /// (an empty site) — the view-model caller falls back to sampling the
+    /// in-memory feed rather than leaving the button dead.
+    ///
+    /// Spec trace: DUT-1062.
+    public func randomPost() async throws -> RecipeListItem {
+        let queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "orderby", value: "rand"),
+            URLQueryItem(name: "per_page", value: "1"),
+            // `_embed` and `_fields` interact badly: filtering excludes the
+            // _links field that drives embedding, so omit _fields here.
+            URLQueryItem(name: "_embed", value: "wp:featuredmedia"),
+        ]
+        // DUT-575: lossy decode — a malformed sibling row must not fail the pick.
+        let lossy: LossyArray<WPDTO.Post> = try await get(path: "posts", queryItems: queryItems)
+        guard let post = lossy.elements.first else {
+            throw WPClientError.underlying(message: "WP returned no posts for a random pick")
+        }
+        return post.toRecipeListItem(heroImage: post.inlineHeroURL)
+    }
+
     /// Search posts by query string.
     ///
     /// `perPage` defaults to ``WPRestClient.searchPageSize`` (100, not the
