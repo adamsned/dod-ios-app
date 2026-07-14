@@ -316,14 +316,16 @@ struct MigrationV3Tests {
         // `SyncedSavedRecipe` CloudKit-mirror model), so its fingerprint is
         // distinct and it is safe to register with a lightweight V3 -> V5 stage.
         // DUT-104 then adds SchemaV6 (the additive local-only `CachedCookLogEntry`
-        // cook journal) with a lightweight V5 -> V6 stage. The plan is therefore
-        // V1, V2, V3, V5, V6 with V1->V2, V2->V3, V3->V5, V5->V6 stages; the
-        // phantom V4 stays out of the chain (existing stores carry the V3/V4
-        // fingerprint and land on V5 with one additive entity).
+        // cook journal) with a lightweight V5 -> V6 stage. DUT-943 Scope A then
+        // adds SchemaV7 (the additive `SyncedProfile` CloudKit-mirror model — the
+        // SECOND synced model) with a lightweight V6 -> V7 stage. The plan is
+        // therefore V1, V2, V3, V5, V6, V7 with V1->V2, V2->V3, V3->V5, V5->V6,
+        // V6->V7 stages; the phantom V4 stays out of the chain (existing stores
+        // carry the V3/V4 fingerprint and land on V5 with one additive entity).
         let schemas = MigrationPlan.schemas
-        #expect(schemas.count == 5, "V1, V2, V3, V5, V6 — phantom V4 intentionally absent")
+        #expect(schemas.count == 6, "V1, V2, V3, V5, V6, V7 — phantom V4 intentionally absent")
         let stages = MigrationPlan.stages
-        #expect(stages.count == 4, "V1→V2, V2→V3, V3→V5, V5→V6 — phantom V4 skipped")
+        #expect(stages.count == 5, "V1→V2, V2→V3, V3→V5, V5→V6, V6→V7 — phantom V4 skipped")
     }
 }
 

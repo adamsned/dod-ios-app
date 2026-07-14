@@ -175,7 +175,7 @@ extension RecipeStore {
                     cloudKitSyncOptIn(in: defaults) && backfillDidComplete(in: defaults)
                 resetOnDiskStores(includingSyncedStore: mirrorConfirmed)
                 return try ModelContainer(
-                    for: Schema(SchemaV6.models),
+                    for: Schema(SchemaV7.models),
                     migrationPlan: MigrationPlan.self,
                     configurations: localCacheConfiguration(inMemory: false),
                     syncedSavedConfiguration(inMemory: false, cloudKit: false)

@@ -44,11 +44,19 @@ final class AppDependencies {
     private let ratingsClient: WPRMRatingsClient
     private let guestIdentityStore: any GuestIdentityStoring
     /// US-44 (T-739) — Keychain profile store. Phase b (T-740) — wired with the
-    /// photo store so `clear()` also deletes the on-disk JPG.
-    let profileStore: KeychainProfileStore
+    /// photo store so `clear()` also deletes the on-disk JPG. DUT-943 Scope A —
+    /// widened to `any ProfileStoring`: the value handed out is actually
+    /// `profileSyncCoordinator` (a transparent CloudKit-mirroring decorator);
+    /// every call site already consumed the protocol type, so this is
+    /// source-compatible.
+    let profileStore: any ProfileStoring
     /// US-44 Phase b (T-740) — Documents JPG (512×512 @ 0.85). `nil` if
     /// unavailable; photo flow falls back to the initial-letter avatar (CL-137).
     let profilePhotoStore: ProfilePhotoStore?
+    /// DUT-943 Scope A — backs `profileStore`; kept concretely-typed too so
+    /// `bootstrap()` can call `reconcileFromRemote()` (not part of
+    /// `ProfileStoring`). See `AppDependencies+ProfileSync.swift`.
+    let profileSyncCoordinator: ProfileSyncCoordinator
 
     /// Diagnostic observer for the SwiftData ↔ CloudKit mirror (round-12 backlog
     /// bug). Started from `bootstrap()` only when the iCloud-Sync opt-in is on.
@@ -140,7 +148,16 @@ final class AppDependencies {
         // the flow falls back to the initial-letter avatar.
         let resolvedPhotoStore = try? ProfilePhotoStore()
         self.profilePhotoStore = resolvedPhotoStore
-        self.profileStore = KeychainProfileStore(photoStore: resolvedPhotoStore)
+        let keychainProfileStore = KeychainProfileStore(photoStore: resolvedPhotoStore)
+        // DUT-943 Scope A — wrap the Keychain store in the CloudKit-mirror
+        // coordinator; see `AppDependencies+ProfileSync.swift`.
+        let syncCoordinator = Self.makeProfileSyncCoordinator(
+            profileStore: keychainProfileStore,
+            photoStore: resolvedPhotoStore,
+            recipeStore: store
+        )
+        self.profileSyncCoordinator = syncCoordinator
+        self.profileStore = syncCoordinator
         self.notificationService = NotificationService()
         Self.installBridgedEvictionHook { WidgetCenter.shared.reloadAllTimelines() }  // DUT-475: pre-UI
     }
@@ -205,6 +222,8 @@ final class AppDependencies {
                 cloudKitDiagnostics.markContainerOpenFailed()
             }
             await checkCloudKitAvailability()
+            // DUT-943 Scope A — same opt-in gate; see +ProfileSync.swift.
+            startProfileSyncObserving()
         }
     }
 

@@ -11,11 +11,28 @@ import Testing
 ///
 /// These are additive optional/defaulted attributes absorbed by SwiftData's
 /// same-version inference — the `articleBodyHTML` pattern — NOT a new versioned
-/// schema (a SchemaV7 with no new entity collides fingerprints with V6 and trips
-/// "Duplicate version checksums detected"; see the `MigrationPlan` header). This
-/// suite proves the current container opens cleanly through the migration plan,
-/// an on-disk store round-trips the new columns, and the full store write→read
-/// path preserves the fields (incl. the DUT-399 don't-clobber convention).
+/// schema for THESE four columns (a schema bump with no new entity collides
+/// fingerprints with the prior version and trips "Duplicate version checksums
+/// detected"; see the `MigrationPlan` header). This suite proves the current
+/// container opens cleanly through the migration plan, an on-disk store
+/// round-trips the new columns, and the full store write→read path preserves
+/// the fields (incl. the DUT-399 don't-clobber convention).
+///
+/// **Keep the hardcoded schema below current.** Unlike the other tests in this
+/// file (which call `RecipeStore.inMemoryContainer()` / go through
+/// `RecipeStore`, so they always exercise whatever schema is "current"),
+/// `onDiskStoreReopensCleanlyThroughMigrationPlanWithDefaults` hardcodes an
+/// explicit `Schema(SchemaVn.*)` literal to control the on-disk upgrade
+/// precisely. DUT-943 Scope A bumped production to `SchemaV7` (an ACTUAL new
+/// entity, `SyncedProfile` — unlike DUT-572's four columns above, which
+/// stayed same-version); this file's literal was bumped alongside it
+/// (V6 -> V7) because leaving it pinned to a stale "current" version makes
+/// SwiftData build concurrent `ModelContainer`s that disagree on which
+/// version is current for the SAME `@Model` classes across suites running in
+/// parallel — which reproducibly corrupts the shared `NSEntityDescription`
+/// cache and crashes the test process (`"Can't assign an object to a store
+/// that does not contain the object's entity"`). Bump this literal again the
+/// next time the production schema version changes.
 ///
 /// `.serialized` for the same reason as the other schema suites: version-specific
 /// `ModelContainer`s share one `NSEntityDescription` per `@Model` across
@@ -61,63 +78,80 @@ import Testing
     /// resolution production hits. A row written without the editorial columns
     /// reads back with the defaulted values, proving the additive attributes are
     /// absorbed cleanly (no crash, no duplicate-checksum trap).
-    @Test func onDiskStoreReopensCleanlyThroughMigrationPlanWithDefaults() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dut572-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let defaultStoreURL = dir.appendingPathComponent("default.store")
-        let syncedStoreURL = dir.appendingPathComponent("SyncedSaved.store")
-
-        func open() throws -> ModelContainer {
-            try ModelContainer(
-                for: Schema(SchemaV6.models),
-                migrationPlan: MigrationPlan.self,
-                configurations: ModelConfiguration(
-                    schema: Schema(SchemaV6.localModels),
-                    url: defaultStoreURL,
-                    cloudKitDatabase: .none
-                ),
-                ModelConfiguration(
-                    schema: Schema(SchemaV6.syncedModels),
-                    url: syncedStoreURL,
-                    cloudKitDatabase: .none
-                )
+    /// Builds the V7 two-configuration container for `onDiskStoreReopensCleanlyThroughMigrationPlanWithDefaults`.
+    /// Extracted to a suite-level helper (rather than a nested function
+    /// inside the test) to keep that test under the SwiftLint
+    /// `function_body_length` cap.
+    private func openEditorialColumnsContainer(
+        defaultStoreURL: URL,
+        syncedStoreURL: URL
+    ) throws -> ModelContainer {
+        try ModelContainer(
+            for: Schema(SchemaV7.models),
+            migrationPlan: MigrationPlan.self,
+            configurations: ModelConfiguration(
+                schema: Schema(SchemaV7.localModels),
+                url: defaultStoreURL,
+                cloudKitDatabase: .none
+            ),
+            ModelConfiguration(
+                schema: Schema(SchemaV7.syncedModels),
+                url: syncedStoreURL,
+                cloudKitDatabase: .none
             )
-        }
-
-        // Step 1: create + seed the store through the migration plan (version
-        // stamped), then release it so the file is closed.
-        try autoreleasepool {
-            let container = try open()
-            let context = ModelContext(container)
-            context.insert(
-                CachedRecipe(
-                    id: 909,
-                    slug: "seed",
-                    title: "Seed Saved Recipe",
-                    excerptText: "Seeded without editorial columns.",
-                    canonicalURLString: "https://dutchovendaddy.com/909",
-                    publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                    isSaved: true
-                )
-            )
-            try context.save()
-        }
-
-        // Step 2: reopen the SAME store through the migration plan. Must NOT throw.
-        let reopened = try open()
-        let verify = ModelContext(reopened)
-        let row = try #require(
-            try verify.fetch(
-                FetchDescriptor<CachedRecipe>(predicate: #Predicate { $0.id == 909 })
-            ).first
         )
-        #expect(row.isSaved == true, "Saved recipe must survive the reopen")
-        #expect(row.recipeCategory.isEmpty, "Editorial arrays default to empty")
-        #expect(row.recipeCuisine.isEmpty)
-        #expect(row.suitableForDiet.isEmpty)
-        #expect(row.author == nil, "Author defaults to nil")
+    }
+
+    @Test func onDiskStoreReopensCleanlyThroughMigrationPlanWithDefaults() throws {
+        // DUT-943 — serialized against the other on-disk version-specific
+        // container tests in this target; see `OnDiskSchemaContainerTestLock`.
+        try OnDiskSchemaContainerTestLock.withLock {
+            let dir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("dut572-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let defaultStoreURL = dir.appendingPathComponent("default.store")
+            let syncedStoreURL = dir.appendingPathComponent("SyncedSaved.store")
+
+            // Step 1: create + seed the store through the migration plan (version
+            // stamped), then release it so the file is closed.
+            try autoreleasepool {
+                let container = try openEditorialColumnsContainer(
+                    defaultStoreURL: defaultStoreURL,
+                    syncedStoreURL: syncedStoreURL
+                )
+                let context = ModelContext(container)
+                context.insert(
+                    CachedRecipe(
+                        id: 909,
+                        slug: "seed",
+                        title: "Seed Saved Recipe",
+                        excerptText: "Seeded without editorial columns.",
+                        canonicalURLString: "https://dutchovendaddy.com/909",
+                        publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                        isSaved: true
+                    )
+                )
+                try context.save()
+            }
+
+            // Step 2: reopen the SAME store through the migration plan. Must NOT throw.
+            let reopened = try openEditorialColumnsContainer(
+                defaultStoreURL: defaultStoreURL,
+                syncedStoreURL: syncedStoreURL
+            )
+            let verify = ModelContext(reopened)
+            let row = try #require(
+                try verify.fetch(
+                    FetchDescriptor<CachedRecipe>(predicate: #Predicate { $0.id == 909 })
+                ).first
+            )
+            #expect(row.isSaved == true, "Saved recipe must survive the reopen")
+            #expect(row.recipeCategory.isEmpty, "Editorial arrays default to empty")
+            #expect(row.recipeCuisine.isEmpty)
+            #expect(row.suitableForDiet.isEmpty)
+            #expect(row.author == nil, "Author defaults to nil")
+        }
     }
 
     /// The four editorial fields survive the full write→read round-trip:

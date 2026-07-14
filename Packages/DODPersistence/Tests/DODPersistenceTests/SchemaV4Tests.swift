@@ -40,52 +40,56 @@ import Testing
     }
 
     @Test func v3ToV4LightweightMigrationOpensCleanly() throws {
-        // Step 1: V3 container still works and accepts a V3-era row.
-        let v3Container = try RecipeStore.inMemoryContainerV3()
-        let v3Context = ModelContext(v3Container)
-        let v3Recipe = CachedRecipe(
-            id: 42,
-            slug: "v3-test",
-            title: "V3 Recipe",
-            excerptText: "Excerpt",
-            canonicalURLString: "https://example.com/42",
-            publishedAt: .now
-        )
-        v3Context.insert(v3Recipe)
-        try v3Context.save()
+        // DUT-943 — serialized against the other version-specific container
+        // tests in this target; see `OnDiskSchemaContainerTestLock`.
+        try OnDiskSchemaContainerTestLock.withLock {
+            // Step 1: V3 container still works and accepts a V3-era row.
+            let v3Container = try RecipeStore.inMemoryContainerV3()
+            let v3Context = ModelContext(v3Container)
+            let v3Recipe = CachedRecipe(
+                id: 42,
+                slug: "v3-test",
+                title: "V3 Recipe",
+                excerptText: "Excerpt",
+                canonicalURLString: "https://example.com/42",
+                publishedAt: .now
+            )
+            v3Context.insert(v3Recipe)
+            try v3Context.save()
 
-        // Step 2: V4 container exposes every V3 entity unchanged. The
-        // V3 → V4 migration is intentionally a no-op at the @Model
-        // class level — the bump is for CloudKit identity boundary
-        // only — but the schema must still validate as a superset to
-        // satisfy the additive-only rule (MIGRATION.md R-5).
-        let v4Container = try RecipeStore.inMemoryContainer()
-        let v4Entities = v4Container.schema.entitiesByName
+            // Step 2: V4 container exposes every V3 entity unchanged. The
+            // V3 → V4 migration is intentionally a no-op at the @Model
+            // class level — the bump is for CloudKit identity boundary
+            // only — but the schema must still validate as a superset to
+            // satisfy the additive-only rule (MIGRATION.md R-5).
+            let v4Container = try RecipeStore.inMemoryContainer()
+            let v4Entities = v4Container.schema.entitiesByName
 
-        #expect(
-            v4Entities["CachedRecipe"] != nil,
-            "V4 must still expose CachedRecipe"
-        )
-        #expect(
-            v4Entities["CachedListPage"] != nil,
-            "V4 must still expose CachedListPage"
-        )
-        #expect(
-            v4Entities["CachedImage"] != nil,
-            "V4 must still expose CachedImage"
-        )
-        #expect(
-            v4Entities["CachedIngredient"] != nil,
-            "V4 must still expose the V2-era CachedIngredient"
-        )
-        #expect(
-            v4Entities["CachedComment"] != nil,
-            "V4 must still expose the V3-era CachedComment"
-        )
-        #expect(
-            v4Entities["CachedRating"] != nil,
-            "V4 must still expose the V3-era CachedRating"
-        )
+            #expect(
+                v4Entities["CachedRecipe"] != nil,
+                "V4 must still expose CachedRecipe"
+            )
+            #expect(
+                v4Entities["CachedListPage"] != nil,
+                "V4 must still expose CachedListPage"
+            )
+            #expect(
+                v4Entities["CachedImage"] != nil,
+                "V4 must still expose CachedImage"
+            )
+            #expect(
+                v4Entities["CachedIngredient"] != nil,
+                "V4 must still expose the V2-era CachedIngredient"
+            )
+            #expect(
+                v4Entities["CachedComment"] != nil,
+                "V4 must still expose the V3-era CachedComment"
+            )
+            #expect(
+                v4Entities["CachedRating"] != nil,
+                "V4 must still expose the V3-era CachedRating"
+            )
+        }
     }
 
     @Test func freshV4ContainerOpensCleanly() throws {
