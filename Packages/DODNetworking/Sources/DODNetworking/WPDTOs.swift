@@ -143,8 +143,9 @@ enum WPDTO {
     }
 
     /// Comment meta blob. The only field we read today is the WPRM star
-    /// rating. WP may emit the rating as an Int *or* as a numeric String
-    /// depending on the meta registration; ``CommentMeta`` accepts both.
+    /// rating. WP may emit the rating as an Int, a plain-integer numeric
+    /// String ("4"), or a decimal-formatted String ("4.0") depending on the
+    /// meta registration; ``CommentMeta`` accepts all three.
     struct CommentMeta: Decodable {
         let wprmCommentRating: Int?
 
@@ -166,10 +167,25 @@ enum WPDTO {
             if let intValue = try? container.decodeIfPresent(Int.self, forKey: .wprmCommentRating) {
                 self.wprmCommentRating = intValue
             } else if let stringValue = try? container.decodeIfPresent(String.self, forKey: .wprmCommentRating) {
-                self.wprmCommentRating = Int(stringValue)
+                self.wprmCommentRating = Self.parseRating(stringValue)
             } else {
                 self.wprmCommentRating = nil
             }
+        }
+
+        /// Bug fix: some WP meta registrations format the rating as a decimal
+        /// string ("4.0") rather than a bare integer string ("4") —
+        /// `Int("4.0")` returns `nil`, so the plain `Int(stringValue)` fast path
+        /// alone silently dropped an otherwise-valid star rating. Falls back to
+        /// `Double` + rounding; `Int(exactly:)` is failable (never trapping) so a
+        /// huge/non-finite value falls through to `nil` (DUT-609/914/915
+        /// trap-safety pattern, same guard `WPRMRatingResponse.decodeInt` uses).
+        private static func parseRating(_ stringValue: String) -> Int? {
+            if let intValue = Int(stringValue) {
+                return intValue
+            }
+            guard let doubleValue = Double(stringValue) else { return nil }
+            return Int(exactly: doubleValue.rounded(.toNearestOrAwayFromZero))
         }
     }
 

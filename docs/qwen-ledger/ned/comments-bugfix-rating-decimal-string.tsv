@@ -1,0 +1,3 @@
+timestamp	model	label	prompt_tokens	eval_tokens	notes
+2026-07-14T01:34:22Z	qwen2.5-coder:14b	CommentMeta-decimal-rating-fix-draft	440	178	fix draft was correct as-is (Int→Double.rounded() fallback); reworked into a helper + switched .rounded() to Int(exactly:) with .toNearestOrAwayFromZero to satisfy the int_from_double_traps swiftlint rule, and trimmed comments to fit the 400-line file_length cap
+2026-07-14T01:35:16Z	qwen2.5-coder:14b	CommentMeta-decimal-rating-tests-draft	691	718	3 regression tests drafted; renamed funcs off the "test" prefix to match house style, dropped @Test string labels, swapped optional-chaining asserts for #require() to match sibling suite conventions
