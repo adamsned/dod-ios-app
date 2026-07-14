@@ -368,4 +368,33 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
         if let appendGate { await appendGate() }
         return shoppingListResult
     }
+
+    /// DUT-1062 — the "Surprise Me" full-catalog pick. `nil` (default)
+    /// throws, matching the protocol's "not wired" default, so pre-existing
+    /// tests keep exercising the DUT-939 in-memory FALLBACK path unchanged.
+    var randomRecipeToReturn: RecipeListItem?
+    var randomRecipeCallCount = 0
+    /// DUT-1062: mirrors `armGate`/`gateReached`/`openGate` above, for
+    /// `fetchRandomRecipe()` — lets a test hold a `surpriseMe` fetch in
+    /// flight to prove the re-entrancy guard.
+    var randomRecipeShouldGate = false
+    var randomRecipeGateReached: (@Sendable () -> Void)?
+    private var randomRecipeContinuation: CheckedContinuation<Void, Never>?
+    func openRandomRecipeGate() {
+        randomRecipeContinuation?.resume()
+        randomRecipeContinuation = nil
+    }
+    func fetchRandomRecipe() async throws -> RecipeListItem {
+        randomRecipeCallCount += 1
+        if randomRecipeShouldGate {
+            randomRecipeGateReached?()
+            await withCheckedContinuation { continuation in
+                randomRecipeContinuation = continuation
+            }
+        }
+        guard let randomRecipeToReturn else {
+            throw URLError(.notConnectedToInternet)
+        }
+        return randomRecipeToReturn
+    }
 }

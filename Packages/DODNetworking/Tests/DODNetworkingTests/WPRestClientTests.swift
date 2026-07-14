@@ -135,6 +135,70 @@ import Testing
     }
 }
 
+/// DUT-1062: "Surprise Me" full-catalog random pick. The pre-fix
+/// implementation sampled only the in-memory loaded feed; `randomPost()`
+/// asks WP to do the random sampling server-side (`orderby=rand&per_page=1`)
+/// over the whole catalog instead.
+@Suite("WPRestClient.randomPost") struct WPRestClientRandomPostTests {
+
+    private let fixture = """
+        [
+          {
+            "id": 21238,
+            "slug": "garlic-butter-skillet-corn",
+            "link": "https://www.dutchovendaddy.com/garlic-butter-skillet-corn/",
+            "title": { "rendered": "Garlic Butter Skillet Corn" },
+            "excerpt": { "rendered": "<p>Easy 15-minute side dish.</p>" },
+            "date": "2026-05-01T10:00:00",
+            "featured_media": 23019,
+            "categories": [1590, 334]
+          }
+        ]
+        """
+
+    @Test func decodesTheSingleReturnedPost() async throws {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts", json: Data(fixture.utf8))
+        let client = WPRestClient(httpClient: fake)
+        let item = try await client.randomPost()
+        #expect(item.id == 21238)
+        #expect(item.title == "Garlic Butter Skillet Corn")
+    }
+
+    @Test func requestsServerSideRandomOrderingOfExactlyOnePost() async throws {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts", json: Data(fixture.utf8))
+        let client = WPRestClient(httpClient: fake)
+        _ = try await client.randomPost()
+        let captured = await fake.capturedRequests
+        let url = try #require(captured.first?.url?.absoluteString)
+        #expect(url.contains("orderby=rand"))
+        #expect(url.contains("per_page=1"))
+        #expect(url.contains("_embed=wp%3Afeaturedmedia") || url.contains("_embed=wp:featuredmedia"))
+    }
+
+    @Test func emptyResultArrayThrowsUnderlyingError() async {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts", json: Data("[]".utf8))
+        let client = WPRestClient(httpClient: fake)
+        await #expect {
+            _ = try await client.randomPost()
+        } throws: { error in
+            guard case .underlying = error as? WPClientError else { return false }
+            return true
+        }
+    }
+
+    @Test func httpErrorStatusThrows() async throws {
+        let fake = FakeHTTPClient()
+        await fake.stub(urlContaining: "posts", json: Data("[]".utf8), statusCode: 500)
+        let client = WPRestClient(httpClient: fake)
+        await #expect(throws: WPClientError.httpStatus(500)) {
+            _ = try await client.randomPost()
+        }
+    }
+}
+
 @Suite("WPRestClient.search") struct WPRestClientSearchTests {
 
     @Test func shortQueriesShortCircuitToEmpty() async throws {
