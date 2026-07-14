@@ -54,11 +54,15 @@ struct CookModeViewModelTimersTests {
         let vm = CookModeViewModelTests.makeViewModel(stepCount: 1)
         vm.startOrResumeTimer(forStep: 0, totalSeconds: 100, now: t0)
         vm.startOrResumeTimer(
-            forStep: 0, totalSeconds: 100, now: t0.addingTimeInterval(40)
+            forStep: 0,
+            totalSeconds: 100,
+            now: t0.addingTimeInterval(40)
         )
         // The timer's state unchanged — still running from original start.
-        #expect(vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(40))
-            == 60)
+        #expect(
+            vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(40))
+                == 60
+        )
     }
 
     @Test func startOnCompletedTimerIsANoOp() {
@@ -94,8 +98,10 @@ struct CookModeViewModelTimersTests {
 
         #expect(vm.timer(forStep: 0)?.isRunning == false)
         // Time passes; remaining must NOT change.
-        #expect(vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(999))
-            == 70)
+        #expect(
+            vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(999))
+                == 70
+        )
     }
 
     @Test func pauseWellBeforeDeadlineFreezesNormally() {
@@ -171,11 +177,15 @@ struct CookModeViewModelTimersTests {
         vm.tickTimers(now: t0.addingTimeInterval(50))
 
         // Paused timer stays frozen.
-        #expect(vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(50))
-            == 70)
+        #expect(
+            vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(50))
+                == 70
+        )
         // Idle timer stays at full.
-        #expect(vm.timer(forStep: 1)?.remaining(at: t0.addingTimeInterval(50))
-            == 100)
+        #expect(
+            vm.timer(forStep: 1)?.remaining(at: t0.addingTimeInterval(50))
+                == 100
+        )
     }
 
     @Test func tickAdvancesRunningTimersCorrectly() {
@@ -183,8 +193,10 @@ struct CookModeViewModelTimersTests {
         vm.startOrResumeTimer(forStep: 0, totalSeconds: 100, now: t0)
         vm.tickTimers(now: t0.addingTimeInterval(40))
 
-        #expect(vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(40))
-            == 60)
+        #expect(
+            vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(40))
+                == 60
+        )
     }
 
     @Test func tickCompletesTimersThatReachedZero() {
@@ -237,9 +249,13 @@ struct CookModeViewModelTimersTests {
 
         // Resume MUCH later, from the frozen 60s, not from elapsed time.
         vm.startOrResumeTimer(
-            forStep: 0, totalSeconds: 100, now: t0.addingTimeInterval(500)
+            forStep: 0,
+            totalSeconds: 100,
+            now: t0.addingTimeInterval(500)
         )
-        #expect(vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(500))
-            == 60)
+        #expect(
+            vm.timer(forStep: 0)?.remaining(at: t0.addingTimeInterval(500))
+                == 60
+        )
     }
 }
