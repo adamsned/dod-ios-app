@@ -24,6 +24,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Homebrew's tap-trust check (recent runner-image change) started failing
+# `brew install` for swiftlint / swift-format / xcodegen below with "The
+# following taps are not trusted: aws/tap" — a tap pre-seeded on the
+# macos-15 image, unrelated to anything this workflow installs. None of our
+# jobs need whole-tap trust semantics (we install pinned, well-known
+# formulae by name), so disabling the check is the correct fix rather than
+# trusting/untapping a tap we don't control the contents of. Workflow-level
+# so every current and future `brew install` step here (and any added
+# later) is covered without repeating this per-job.
+env:
+  HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
+
 # Path filtering — docs/spec/marketing-only changes don't need the
 # (expensive) macOS-runner pipeline. The "code-changed" job is the
 # single source of truth: every downstream job reads it.

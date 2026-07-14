@@ -98,7 +98,10 @@ import Testing
         await viewModel.surpriseMe { selected = $0 }
 
         #expect(selected?.id == 9999)
-        #expect(!viewModel.items.map(\.id).contains(9999), "9999 must be outside the loaded feed for this to prove anything")
+        #expect(
+            !viewModel.items.map(\.id).contains(9999),
+            "9999 must be outside the loaded feed for this to prove anything"
+        )
         #expect(viewModel.lastSurpriseID == 9999)
         #expect(viewModel.isSurpriseMeLoading == false)
         #expect(dependencies.randomRecipeCallCount == 1)
