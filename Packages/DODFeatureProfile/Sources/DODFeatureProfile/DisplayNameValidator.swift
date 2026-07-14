@@ -32,8 +32,17 @@ public enum DisplayNameValidator {
         // 1. Substring blocklist — terms long/unambiguous enough that a substring
         //    match rarely catches an innocent name (run against the normalized,
         //    spacing/leet-stripped form so "f.u_c k" and "phuck" are caught).
-        for term in Self.blockedSubstrings where normalized.contains(term) {
-            return .inappropriate
+        //    The allowlist check below is deliberately keyed on the PRE-collapse
+        //    letters-only form, not `normalized`: "niger" (the country, single
+        //    "g") and "nigger" (the slur, doubled "g") collapse to the exact
+        //    same string, so comparing against `normalized` couldn't tell them
+        //    apart and would let the slur back in. Comparing before the
+        //    repeated-letter collapse step keeps that distinction.
+        let preCollapse = Self.lettersOnlyNormalized(trimmed)
+        if !Self.substringFalsePositiveAllowlist.contains(preCollapse) {
+            for term in Self.blockedSubstrings where normalized.contains(term) {
+                return .inappropriate
+            }
         }
 
         // 2. Barred figures — match the normalized full string against notorious
@@ -76,11 +85,20 @@ public enum DisplayNameValidator {
     /// "h e l l o", and "heeeello" all converge to "helo", defeating the most
     /// common filter-evasion tricks.
     static func normalize(_ input: String) -> String {
+        collapseRuns(lettersOnlyNormalized(input))
+    }
+
+    /// The case/diacritic/leet-folded, letters-only form of `input` — the same
+    /// steps as ``normalize(_:)`` minus the final repeated-letter collapse.
+    /// Exposed separately so a caller that needs to tell apart a doubled
+    /// letter (e.g. the slur "nigger") from its single-letter, non-repeating
+    /// counterpart (e.g. the country "Niger") — which both collapse to the
+    /// identical string "niger" — can compare before that distinction is lost.
+    private static func lettersOnlyNormalized(_ input: String) -> String {
         let folded = input.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .lowercased()
         let deLeet = String(folded.map { Self.leetMap[$0] ?? $0 })
-        let lettersOnly = deLeet.filter { $0.isLetter }
-        return collapseRuns(lettersOnly)
+        return deLeet.filter { $0.isLetter }
     }
 
     /// Collapse any run of 2+ identical consecutive letters down to a single
@@ -118,6 +136,19 @@ public enum DisplayNameValidator {
         "nigger", "nigga", "faggot", "retard",
         "tranny", "pedo", "pedophile", "rapist", "molester", "nazi",
     ].map(normalize).reduce(into: Set<String>()) { $0.insert($1) }
+
+    /// False-positive guard: "Niger" the country and its demonyms ("Nigeria",
+    /// "Nigerian", "Nigerien") each contain "niger" as a substring once
+    /// letters-only-normalized, colliding with the blocked slur "nigger"
+    /// once ITS doubled "g" is collapsed by `collapseRuns` down to the same
+    /// "niger". Matched against the PRE-collapse form (see
+    /// `lettersOnlyNormalized(_:)`) so the single-"g" country/demonym is
+    /// exempted from the substring-blocklist loop while the double-"g" slur
+    /// (and evasions of it) still trip it; the figures/whole-word checks
+    /// below still run as normal regardless (they don't match these words).
+    private static let substringFalsePositiveAllowlist: Set<String> = [
+        "niger", "nigeria", "nigerian", "nigerien",
+    ]
 
     /// Short terms matched only as a whole token (avoid Scunthorpe false-positives
     /// like Hancock/Babcock/Hitchcock, Spicer/Spice, Enrique's nickname "Kike").
