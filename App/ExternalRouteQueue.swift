@@ -43,7 +43,21 @@ struct ExternalRouteQueue: Equatable {
 
     /// Append a route without dropping any already-queued one (DUT-464). FIFO —
     /// routes are delivered in the order they landed.
+    ///
+    /// Skips the append when an **equal** route is already queued — a
+    /// double-tap on an in-app recipe link (or any other duplicate resolve
+    /// landing before the first is drained) previously enqueued the same
+    /// `ExternalRoute` twice, and `TabStack.consumeExternalRoutes()` applied
+    /// both: a `.push` appended the identical `RecipeRoute` onto the
+    /// `NavigationStack` path twice, so the user had to tap Back an extra
+    /// time to escape what looked like a single link tap. `ExternalRoute`
+    /// (via `RecipeRoute`'s DUT-617/658 id-based equality) already compares
+    /// cheaply and correctly, so this is a plain containment check — not a
+    /// new identity scheme. Only the `.route` field is compared, not
+    /// `enqueuedAt`, so two genuinely-distinct-but-coincidentally-timed
+    /// enqueues of the same route still collapse to one.
     mutating func enqueue(_ route: ExternalRoute, now: Date = Date()) {
+        guard !pending.contains(where: { $0.route == route }) else { return }
         pending.append(Pending(route: route, enqueuedAt: now))
     }
 
