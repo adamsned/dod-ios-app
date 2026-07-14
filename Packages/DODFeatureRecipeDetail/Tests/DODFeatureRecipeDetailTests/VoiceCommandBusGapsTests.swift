@@ -67,23 +67,30 @@ import Testing
     /// CL-83 — weak handler reference prevents holding a deallocated session
     /// alive. The bus registers the view model as a weak ref, so a dismissed
     /// session is automatically a no-op without explicit endCookMode().
+    ///
+    /// Registration happens inside ``registerAndDrop()`` so `SpyHandler`'s only
+    /// strong owner is that function's local scope — once it returns, ARC
+    /// releases the spy for real, and the bus's `weak var handler` reads nil.
+    /// (The original draft captured the handler into a same-scope `let`, which
+    /// itself became a second strong owner and kept `spy` alive for the rest of
+    /// the test — its final assertion was a tautology that passed regardless of
+    /// whether deallocation actually worked. Fixed during backstop review.)
     @Test func weakHandlerAllowsDeallocatedSessionToBeFreed() {
         VoiceCommandBus.shared.handler = nil
-        let spy = SpyHandler()
-        VoiceCommandBus.shared.handler = spy
-
-        // Capture the weak reference (should be non-nil while spy is alive).
-        let busHandler = VoiceCommandBus.shared.handler
-        #expect(busHandler != nil)
-
-        // After spy is deallocated, the weak ref becomes nil. Defer clears
-        // to prevent lingering refs after the test.
         defer { VoiceCommandBus.shared.handler = nil }
 
-        // The weak var holds a reference but does not prevent ARC from
-        // deallocating spy when its ref count reaches zero. This is the
-        // key guarantee: a forgotten endCookMode() doesn't leak the view model.
-        #expect(busHandler is SpyHandler || busHandler == nil)
+        Self.registerAndDrop()
+
+        #expect(VoiceCommandBus.shared.handler == nil)
+    }
+
+    /// Registers a `SpyHandler` on the bus and returns without keeping any
+    /// strong reference to it, isolating the handler's only strong owner to
+    /// this function so the caller can observe genuine ARC deallocation.
+    private static func registerAndDrop() {
+        let spy = SpyHandler()
+        VoiceCommandBus.shared.handler = spy
+        #expect(VoiceCommandBus.shared.handler != nil)
     }
 
     /// Telemetry mapping completeness: each command must map to a unique
