@@ -58,6 +58,12 @@ jobs:
       # xcodebuild look for it. altool searches $API_PRIVATE_KEYS_DIR for a
       # file literally named AuthKey_<KEY_ID>.p8 (Xcode 26 altool 26.40.x).
       API_PRIVATE_KEYS_DIR: ${{ github.workspace }}/private_keys
+      # Homebrew's tap-trust check (recent macos-15 runner-image change)
+      # fails `brew install` over an untrusted pre-seeded `aws/tap`,
+      # unrelated to xcodegen. See ci.yml's identical fix for the full
+      # writeup — this is CD's copy so a release build isn't newly exposed
+      # to the same breakage.
+      HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
 
     steps:
       - uses: actions/checkout@v4
