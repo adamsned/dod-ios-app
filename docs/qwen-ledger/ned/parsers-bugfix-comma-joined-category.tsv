@@ -1,0 +1,2 @@
+date	branch	model	label	prompt_eval_count	eval_count	notes
+2026-07-13	ned/parsers-bugfix-comma-joined-category	qwen2.5-coder:14b	comma-split-tests-draft	629	223	draft tests only; renamed struct+removed markdown fences+removed XCTest test-prefix naming, production fix written by reviewer

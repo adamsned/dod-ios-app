@@ -54,13 +54,24 @@ extension JSONLDRecipeParser {
     /// `suitableForDiet` values may be schema.org URLs (e.g.
     /// `https://schema.org/LowFatDiet`) — the raw string is preserved;
     /// display-time prettifying is the UI's job (CL-310 / DUT-572).
+    ///
+    /// Schema.org types `recipeCategory` / `recipeCuisine` as `Text`
+    /// (singular), not an array or `ItemList`. When a recipe has MULTIPLE
+    /// categories/cuisines assigned, WPRM (and similar plugins) join them into
+    /// ONE comma-separated `Text` value — e.g.
+    /// `"recipeCategory": "Dinner, Main Course"` — rather than emitting an
+    /// array. Treating that whole joined string as a single tag produced
+    /// `["Dinner, Main Course"]` instead of the two distinct categories. Split
+    /// the bare-string case on commas (sanitizing/trimming + dropping blanks
+    /// from each segment) so a genuinely single-valued field (no comma) is
+    /// unaffected.
     static func mapStringOrArray(_ raw: Any?) -> [String] {
         func sanitize(_ value: String) -> String? {
             let clean = HTMLSanitizer.plainText(from: value)
             return clean.isEmpty ? nil : clean
         }
         if let string = raw as? String {
-            return sanitize(string).map { [$0] } ?? []
+            return string.split(separator: ",").compactMap { sanitize(String($0)) }
         }
         if let array = raw as? [Any] {
             return array.compactMap { element -> String? in
