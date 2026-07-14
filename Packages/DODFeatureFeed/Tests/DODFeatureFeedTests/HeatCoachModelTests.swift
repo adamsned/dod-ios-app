@@ -194,4 +194,102 @@ import Testing
     @Test func ovenSizes_areTheExpectedRange() {
         #expect(HeatCoachModel.ovenSizes == [8, 10, 12, 14, 16])
     }
+
+    // MARK: - Gap fill: coalSplit property across oven sizes
+
+    @Test func coalSplit_8InchEven_yields16Even() {
+        let split = model(diameter: 8, style: .even).coalSplit
+        #expect(split.total == 16)
+        #expect(split.lid == 8)
+        #expect(split.bottom == 8)
+    }
+
+    @Test func coalSplit_10InchBaking_yields20LidHeavy() {
+        let split = model(diameter: 10, style: .baking).coalSplit
+        #expect(split.total == 20)
+        #expect(split.lid == 15)
+        #expect(split.bottom == 5)
+    }
+
+    @Test func coalSplit_14InchEven_yields28Even() {
+        let split = model(diameter: 14, style: .even).coalSplit
+        #expect(split.total == 28)
+        #expect(split.lid == 14)
+        #expect(split.bottom == 14)
+    }
+
+    @Test func coalSplit_16InchBaking_yields32LidHeavy() {
+        let split = model(diameter: 16, style: .baking).coalSplit
+        #expect(split.total == 32)
+        #expect(split.lid == 24)
+        #expect(split.bottom == 8)
+    }
+
+    // MARK: - Gap fill: adjusted splits with different oven sizes and conditions
+
+    @Test func adjustedCoalSplit_8InchEvenCold_addsTwo() {
+        let split = model(diameter: 8, style: .even, ambient: .cold).adjustedCoalSplit
+        // Base 16 + cold delta 2...3 midpoint (2.5 → 2 by nearest-even) = 18
+        #expect(split.total == 18)
+        #expect(split.lid == 9)
+        #expect(split.bottom == 9)
+    }
+
+    @Test func adjustedCoalSplit_14InchBakingElevation5000_addsTwo() {
+        let split = model(diameter: 14, style: .baking, elevationFeet: 5000).adjustedCoalSplit
+        // Base 28 + elevation delta 2 = 30, split baking 3:1 → lid 23, bottom 7
+        #expect(split.total == 30)
+        #expect(split.lid == 23)
+        #expect(split.bottom == 7)
+    }
+
+    @Test func adjustedCoalSplit_10InchEvenHotWindy_pullsAndAdds() {
+        let split = model(diameter: 10, style: .even, ambient: .hot, windy: true).adjustedCoalSplit
+        // Base 20 + hot (-3...-2 → 0 combined with wind) + wind (3...4) = 0...2 → 1
+        // 20 + 1 = 21; even split: lid=10, bottom=11
+        #expect(split.total == 21)
+        #expect(split.lid == 10)
+        #expect(split.bottom == 11)
+    }
+
+    // MARK: - Gap fill: conditionCoalDelta with varied combinations
+
+    @Test func conditionCoalDelta_coldWindy_combinesRanges() {
+        let delta = model(ambient: .cold, windy: true).conditionCoalDelta
+        // cold 2...3 + wind 3...4 = 5...7
+        #expect(delta == 5...7)
+    }
+
+    @Test func conditionCoalDelta_hotWindyElevation5000_complexStack() {
+        let delta = model(elevationFeet: 5000, ambient: .hot, windy: true).conditionCoalDelta
+        // hot -3...-2 + wind 3...4 + elevation 2 = 2...4
+        #expect(delta == 2...4)
+    }
+
+    @Test func conditionCoalDelta_elevation7500_addsThree() {
+        let delta = model(elevationFeet: 7500).conditionCoalDelta
+        // Only elevation at 7500: +3 (1 per 2500)
+        #expect(delta == 3...3)
+    }
+
+    // MARK: - Gap fill: elevation note formatting at boundaries
+
+    @Test func elevationCookTimeLine_5000Feet_displaysCorrectTime() {
+        let line = model(elevationFeet: 5000).elevationCookTimeLine
+        #expect(line.contains("Add"))
+        #expect(line.contains("75–100 min"))  // 5000 ft adds 75-100 min (5 * 15-20)
+        #expect(line.contains("5,000 ft"))
+    }
+
+    @Test func elevationCoalNote_10000Feet_addsCorrectCoalCount() {
+        let note = model(elevationFeet: 10000).elevationCoalNote
+        #expect(note?.contains("add 4 coals") == true)  // 10000 ft = +4 (1 per 2500)
+        #expect(note?.contains("10,000 ft") == true)
+    }
+
+    @Test func elevationNote_10000Feet_displaysCorrectMinutes() {
+        let note = model(elevationFeet: 10000).elevationNote
+        #expect(note?.contains("10,000 ft") == true)
+        #expect(note?.contains("150") == true)  // 10000 ft adds 150-200 min (10 * 15-20)
+    }
 }
