@@ -87,6 +87,106 @@ struct AddToShoppingListSelectionTests {
         #expect(aisles == [.produce, .meat, .dairy, .pantry])
     }
 
+    /// Empty candidates list yields zero selected, isAllSelected false, no groups.
+    @Test func emptyCandidatesList() {
+        let selection = AddToShoppingListSelection(candidates: [])
+
+        #expect(selection.selectedCount == 0)
+        #expect(!selection.isAllSelected)
+        #expect(selection.selectedRows.isEmpty)
+        #expect(selection.groups.isEmpty)
+
+        selection.toggleSelectAll()
+        #expect(selection.selectedCount == 0)
+        #expect(!selection.isAllSelected)
+        #expect(selection.selectedRows.isEmpty)
+        #expect(selection.groups.isEmpty)
+    }
+
+    /// Single item boundary: 1 of 1 selected is all-selected; toggling changes
+    /// isAllSelected state.
+    @Test func singleItemBoundary() {
+        let selection = AddToShoppingListSelection(recipe: Self.recipe(["milk"]))
+
+        #expect(selection.selectedCount == 1)
+        #expect(selection.isAllSelected)  // 1 of 1 is all
+
+        selection.toggle(selection.candidates[0])
+        #expect(selection.selectedCount == 0)
+        #expect(!selection.isAllSelected)  // 0 of 1 is not all
+    }
+
+    /// All six aisles (produce, meat, dairy, pantry, spices, other) are returned
+    /// in Aisle.allCases order when items span every aisle.
+    @Test func allSixAislesPresent() {
+        let selection = AddToShoppingListSelection(
+            recipe: Self.recipe([
+                "2 carrots",  // produce
+                "1 lb chicken",  // meat
+                "1 cup milk",  // dairy
+                "2 cups flour",  // pantry
+                "1 tsp salt",  // spices
+                "xanthan gum",  // other (unmapped keyword)
+            ])
+        )
+
+        let aisles = selection.groups.map(\.aisle)
+        #expect(aisles == [.produce, .meat, .dairy, .pantry, .spices, .other])
+    }
+
+    /// Multiple deselections preserve candidate insertion order in selectedRows
+    /// (not re-sorted).
+    @Test func multipleDeselectionOrder() {
+        let selection = AddToShoppingListSelection(
+            recipe: Self.recipe(["milk", "eggs", "flour", "chicken"])
+        )
+
+        #expect(selection.selectedCount == 4)
+
+        // Deselect 1st and 3rd (milk and flour)
+        selection.toggle(selection.candidates[0])
+        selection.toggle(selection.candidates[2])
+
+        #expect(selection.selectedCount == 2)
+        let rows = selection.selectedRows
+        #expect(rows.map(\.ingredientText) == ["eggs", "chicken"])
+    }
+
+    /// Non-adjacent aisle groups (e.g., produce + spices, skipping meat/dairy
+    /// /pantry) are returned in correct order, omitting empty aisles.
+    @Test func nonAdjacentAisles() {
+        let selection = AddToShoppingListSelection(
+            recipe: Self.recipe([
+                "2 carrots",  // produce
+                "1 tsp salt",  // spices
+            ])
+        )
+
+        let aisles = selection.groups.map(\.aisle)
+        #expect(aisles == [.produce, .spices])
+    }
+
+    /// selectedRows.count always matches selectedCount after any operation
+    /// (toggle, toggleSelectAll).
+    @Test func selectedRowsCountAlwaysMatchesSelectedCount() {
+        let selection = AddToShoppingListSelection(recipe: Self.recipe(["milk", "eggs", "flour"]))
+
+        #expect(selection.selectedRows.count == selection.selectedCount)
+        #expect(selection.selectedCount == 3)
+
+        selection.toggle(selection.candidates[0])
+        #expect(selection.selectedRows.count == selection.selectedCount)
+        #expect(selection.selectedCount == 2)
+
+        selection.toggleSelectAll()  // partial → all
+        #expect(selection.selectedRows.count == selection.selectedCount)
+        #expect(selection.selectedCount == 3)
+
+        selection.toggleSelectAll()  // all → none
+        #expect(selection.selectedRows.count == selection.selectedCount)
+        #expect(selection.selectedCount == 0)
+    }
+
     // MARK: - Fixtures
 
     static func recipe(_ ingredients: [String]) -> Recipe {
