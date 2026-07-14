@@ -33,7 +33,7 @@ import Testing
                 ingredientText: "1 cup flour",
                 recipeTitle: "Apple Pie",
                 aisle: .pantry
-            )
+            ),
         ]
 
         let result = ShoppingListViewModel.dedupedAppend(existing: existing, adding: adding)
@@ -58,7 +58,7 @@ import Testing
                 ingredientText: "1 cup flour",
                 recipeTitle: "Apple Pie",
                 aisle: .pantry
-            )
+            ),
         ]
         let adding = existing
 
@@ -115,7 +115,7 @@ import Testing
                 ingredientText: "2 cups diced yellow onion",
                 recipeTitle: "Soup",
                 aisle: .produce
-            )
+            ),
         ]
 
         let result = ShoppingListViewModel.dedupedAppend(existing: existing, adding: adding)
@@ -146,7 +146,7 @@ import Testing
                 ingredientText: "2 cups diced yellow onion",
                 recipeTitle: "Soup",
                 aisle: .produce
-            )
+            ),
         ]
         let adding = [
             ShoppingListViewModel.Item(
@@ -158,7 +158,7 @@ import Testing
                 ingredientText: "2 cups diced yellow onion",
                 recipeTitle: "Soup",
                 aisle: .produce
-            )
+            ),
         ]
 
         let result = ShoppingListViewModel.dedupedAppend(existing: existing, adding: adding)
@@ -183,7 +183,7 @@ import Testing
                 ingredientText: "2 cups diced apples",
                 recipeTitle: "Apple Cake",
                 aisle: .produce
-            )
+            ),
         ]
 
         let result = ShoppingListViewModel.dedupedAppend(existing: existing, adding: adding)
@@ -248,7 +248,7 @@ import Testing
                 ingredientText: "2 lbs chicken",
                 recipeTitle: "Roast",
                 aisle: .meat
-            )
+            ),
         ]
         let adding = [
             ShoppingListViewModel.Item(
