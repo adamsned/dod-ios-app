@@ -24,7 +24,7 @@ extension FirstCookoutView {
     }
 
     var recipeLinkLabel: String {
-        cookout.isCampfire ? "Open the heat & coals guide" : "Open the \(cookout.dishTitle) recipe"
+        cookout.isCampfire ? "Open the Heat & Coals Guide" : "Open the \(cookout.dishTitle) Recipe"
     }
 
     var bakeTimerLabel: String {

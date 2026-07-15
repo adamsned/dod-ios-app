@@ -7,9 +7,9 @@ import SwiftUI
 // so each file stays under the `file_length` cap. The cook-by-feel cues and the
 // coal-management / wind reference live in `HeatCoachView+Feel`.
 //
-//   - ``answerCard`` — the answer first: the coal-split diagram (in `+Diagram`)
-//     under the "starting point, then cook by feel" framing + optional recipe
-//     context line.
+//   - ``answerCard`` — the answer first: the reusable ``CoalAnswerCard`` (the
+//     coal-split diagram under the "starting point, then cook by feel" framing +
+//     optional recipe context line), fed the condition-adjusted split.
 //   - ``primaryInputsCard`` — the two minimal inputs (Oven Size + Cooking Style),
 //     laid out with air rather than stacked rows behind a divider.
 //   - ``conditionsGroup`` — the optional collapsed "Adjust for Conditions"
@@ -20,56 +20,17 @@ extension HeatCoachView {
     // MARK: - The answer, first + visual
 
     var answerCard: some View {
-        VStack(spacing: DODSpacing.sm) {
-            Text("A Starting Point. Then Cook by Feel.")
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .textCase(.uppercase)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-
-            // DUT-600 — the diagram reflects the CONDITION-adjusted count so a
-            // hot/cold/windy day moves the starting point, not just the notes.
-            coalSplitDiagram(coachModel.adjustedCoalSplit)
-
-            // DUT-653 — when conditions have already shifted the count, say so
-            // right on the diagram. Otherwise the cook double-counts the "What
-            // Changes" ranges (which describe THIS adjustment) on top of a total
-            // that already bakes them in. Hidden at mild + calm (delta 0...0),
-            // where the diagram equals the plain starting point.
-            if coachModel.conditionCoalDelta != 0...0 {
-                Text("Already adjusted for your conditions.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("heat-coach-adjusted-note")
-            }
-
-            // DUT-601 — elevation adjusts cook TIME (not coals, per the DOD
-            // method), so surface it live in the answer so the Elevation input
-            // also visibly moves the recommendation.
-            Divider().overlay(DODColor.surfaceDivider)
-            Text(coachModel.elevationCookTimeLine)
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("heat-coach-cook-time")
-
-            if let context = recipeContextLine {
-                Text(context)
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("heat-coach-recipe-context")
-            }
-        }
-        .padding(DODSpacing.lg)
-        .frame(maxWidth: .infinity)
-        .cardSurface()
-        .accessibilityIdentifier("heat-coach-result")
+        // The reusable ``CoalAnswerCard`` (also embedded in the First Cookout fire
+        // step), fed the CONDITION-adjusted split so a hot/cold/windy day moves the
+        // starting point (DUT-600) and the always-shown elevation cook-time line
+        // (DUT-601). The "Already adjusted…" note (DUT-653) shows only when the
+        // conditions have actually shifted the count off the plain starting point.
+        CoalAnswerCard(
+            split: coachModel.adjustedCoalSplit,
+            conditionsAdjusted: coachModel.conditionCoalDelta != 0...0,
+            cookTimeLine: coachModel.elevationCookTimeLine,
+            recipeContextLine: recipeContextLine
+        )
     }
 
     /// The recipe context line ("For this recipe at 350°F"), shown only when the

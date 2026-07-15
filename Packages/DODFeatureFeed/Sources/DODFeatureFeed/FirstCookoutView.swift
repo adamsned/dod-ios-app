@@ -287,8 +287,8 @@ public struct FirstCookoutView: View {
             case .gather:
                 gatherChecklist
             case .fire:
+                coalAnswerCard
                 heatCoachCallToAction
-                coalStartingPointNote
             case .cook:
                 rotationReminder
                 cookTimerCard
@@ -344,6 +344,8 @@ public struct FirstCookoutView: View {
                     if index > 0 {
                         Button("Back") { index -= 1 }
                             .foregroundStyle(DODColor.labelSecondary)
+                            .frame(minWidth: 44, minHeight: 44)  // DUT-291: 44pt tap target
+                            .contentShape(Rectangle())
                     }
                     Spacer()
                 }
@@ -367,6 +369,8 @@ public struct FirstCookoutView: View {
             }
             .fontWeight(.semibold)
             .foregroundStyle(DODColor.burntOrange)
+            .frame(minHeight: 44)  // DUT-291: 44pt tap target
+            .contentShape(Rectangle())
             Spacer()
         }
     }

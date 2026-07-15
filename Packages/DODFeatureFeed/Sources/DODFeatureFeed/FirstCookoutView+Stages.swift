@@ -94,6 +94,10 @@ extension FirstCookoutView {
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
+            // DUT-291: give each row a full 44pt tap target (a single-line row is
+            // ~20pt) so the whole width — not just the glyph + text — toggles it.
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         // DUT-402: expose the checked state to VoiceOver (mirrors IngredientCheckRow).
@@ -101,56 +105,9 @@ extension FirstCookoutView {
         .accessibilityAddTraits(isChecked ? [.isSelected] : [])
     }
 
-    // MARK: Fire — Heat Coach first, then a rough starting point (DUT-239)
-
-    /// DUT-239: the fire step **leads with the Heat Coach**. Coals are read by
-    /// feel for the cook's own conditions (wind, weather, charcoal brand/size,
-    /// oven size) — a single prescribed number on the scariest step can sink a
-    /// beginner's first cook, the opposite of the guaranteed-win promise. So the
-    /// Heat Coach is the prominent CTA, not a button demoted below a hard count.
-    var heatCoachCallToAction: some View {
-        VStack(spacing: DODSpacing.xs) {
-            Text(
-                "Every fire is different — wind, weather, and your charcoal all change "
-                    + "the count. Read the coals by feel instead of trusting one number."
-            )
-            .dodFont(DODType.body)
-            .foregroundStyle(DODColor.labelSecondary)
-            .multilineTextAlignment(.center)
-            Button {
-                showingHeatCoach = true
-            } label: {
-                Label("Open the Heat Coach", systemImage: "thermometer.sun.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .dodProminentButton()
-            .tint(DODColor.burntOrange)
-        }
-        .padding(.top, DODSpacing.xs)
-    }
-
-    /// DUT-239: a *rough* starting point only — a range, framed as "dial it in
-    /// with the Heat Coach," never a hard "X coals" answer. De-emphasized below
-    /// the Heat Coach CTA so the beginner reaches for the coach, not the number.
-    var coalStartingPointNote: some View {
-        let coals = CharcoalRecipeConverter.recommend(
-            ovenTempF: cookout.ovenTempF,
-            ovenDiameterInches: cookout.ovenDiameterInches,
-            task: .bake
-        )
-        // A loose ±2 range so it never reads as a precise rule.
-        let low = max(coals.totalBriquettes - 2, 0)
-        let high = coals.totalBriquettes + 2
-        return Text(
-            "Rough starting point: about \(low)-\(high) coals for a "
-                + "\(cookout.ovenDiameterInches)-inch oven — then dial it in for your "
-                + "conditions with the Heat Coach."
-        )
-        .dodFont(DODType.caption)
-        .foregroundStyle(DODColor.labelSecondary)
-        .multilineTextAlignment(.center)
-        .padding(.top, DODSpacing.xxs)
-    }
+    // The *fire* step (embedded ``CoalAnswerCard`` + the Heat Coach CTA) lives in
+    // `FirstCookoutView+Fire.swift` (DUT — the inline coal card pushed this file
+    // over the `file_length` cap; extension members in a sibling file don't count).
 
     // MARK: Cook — rotation reminder + timer + recipe
 
@@ -199,6 +156,8 @@ extension FirstCookoutView {
                     Task { await notifier.cancelBakeDone(for: active.recipeID) }  // DUT-547: this rung only.
                 }
                 .foregroundStyle(DODColor.labelSecondary)
+                .frame(minHeight: 44)  // DUT-291: 44pt tap target
+                .contentShape(Rectangle())
             }
             .padding(.top, DODSpacing.xs)
         } else if timerEngine.timers.contains(where: {
@@ -219,6 +178,8 @@ extension FirstCookoutView {
                     timerEngine.clearFinished(for: cookout.recipeID)
                 }
                 .foregroundStyle(DODColor.labelSecondary)
+                .frame(minHeight: 44)  // DUT-291: 44pt tap target
+                .contentShape(Rectangle())
                 .accessibilityIdentifier("first-cookout-clear-timer")
             }
             .padding(.top, DODSpacing.xs)
@@ -232,7 +193,7 @@ extension FirstCookoutView {
                 AccessibilityNotification.Announcement("Timer's up! \(goCheckText)").post()
             }
         } else {
-            Button("Start the \(cookout.bakeMinutes)-minute bake timer") {
+            Button("Start the \(cookout.bakeMinutes)-Minute Bake Timer") {
                 let duration = Double(cookout.bakeMinutes) * 60
                 didStartBake = true  // DUT-626 — mark real cook progress for the onDisappear log gate.
                 timerEngine.start(label: bakeTimerLabel, duration: duration, recipeID: cookout.recipeID)
@@ -282,6 +243,8 @@ extension FirstCookoutView {
                 }
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
+                .frame(minHeight: 44)  // DUT-291: 44pt tap target
+                .contentShape(Rectangle())
             } else {
                 photoSourceButtons
             }

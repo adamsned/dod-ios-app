@@ -2,26 +2,114 @@ import DODDesignSystem
 import DODSupport
 import SwiftUI
 
-// The visual coal-split diagram for ``HeatCoachView`` (DUT-584 answer-first
-// redesign), split out of `HeatCoachView.swift` so each file stays under the
-// `file_length` cap.
-//
-// The diagram makes the coal count instantly readable: a row of dots for the
-// lid coals, the oven body showing the big total + "N on the lid · M
-// underneath", and a row of dots underneath. The dot counts reflect the real
-// ``CoalSplit`` (lid/bottom).
-//
-// Accessibility: the dots are DECORATIVE (`.accessibilityHidden`) — VoiceOver
-// must not read 24 individual dots. The whole diagram is ONE accessibility
-// element with a combined summary label (``coalDiagramAccessibilityLabel``),
-// e.g. "Starting coals: about 24 — 18 on the lid, 6 underneath."
+/// The **starting-coals answer card** — the "here's your coal count" beat of the
+/// Dutch Oven Heat Coach, extracted (DUT) into a standalone, data-driven view so
+/// it can be reused *outside* the full coach: the First Cookout fire step embeds
+/// it inline so a beginner sees the real coal count + lid/bottom split without
+/// leaving the flow.
+///
+/// It's the former `HeatCoachView.answerCard` + `coalSplitDiagram(_:)` lifted out
+/// of the view's `@State` internals. It takes everything it renders via `init`:
+///   - `split` — the ``CoalSplit`` to draw (the coach passes its
+///     condition-adjusted split; the fire step passes the plain starting split).
+///   - `conditionsAdjusted` — when true, the "Already adjusted for your
+///     conditions." note shows (the coach sets this when a hot/cold/windy day has
+///     already moved the count; the fire step leaves it false).
+///   - `cookTimeLine` — the optional elevation cook-time readout under a divider
+///     (the coach always passes one; the fire step passes `nil`, so the divider +
+///     line are omitted).
+///   - `recipeContextLine` — the optional "For this recipe at N°F." line.
+///
+/// Accessibility: the dots are DECORATIVE (`.accessibilityHidden`) — VoiceOver
+/// must not read 24 individual dots. The whole diagram is ONE accessibility
+/// element with a combined summary label (``coalDiagramAccessibilityLabel``),
+/// e.g. "Starting coals: about 24 — 18 on the lid, 6 underneath." The copy here
+/// is pinned by `HeatCoachViewTests`, so it must not drift.
+struct CoalAnswerCard: View {
 
-extension HeatCoachView {
+    /// The coal split to draw + summarize.
+    let split: CoalSplit
+    /// Show the "Already adjusted for your conditions." note (the coach's
+    /// condition-shifted count; false for the plain fire-step estimate).
+    let conditionsAdjusted: Bool
+    /// The optional elevation cook-time readout, shown under a divider. `nil`
+    /// omits both the divider and the line (the fire step has no elevation input).
+    let cookTimeLine: String?
+    /// The optional "For this recipe at N°F." context line.
+    let recipeContextLine: String?
+
+    init(
+        split: CoalSplit,
+        conditionsAdjusted: Bool = false,
+        cookTimeLine: String? = nil,
+        recipeContextLine: String? = nil
+    ) {
+        self.split = split
+        self.conditionsAdjusted = conditionsAdjusted
+        self.cookTimeLine = cookTimeLine
+        self.recipeContextLine = recipeContextLine
+    }
+
+    var body: some View {
+        VStack(spacing: DODSpacing.sm) {
+            Text("A Starting Point. Then Cook by Feel.")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .textCase(.uppercase)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // DUT-600 — the diagram reflects the CONDITION-adjusted count so a
+            // hot/cold/windy day moves the starting point, not just the notes.
+            coalSplitDiagram(split)
+
+            // DUT-653 — when conditions have already shifted the count, say so
+            // right on the diagram. Otherwise the cook double-counts the "What
+            // Changes" ranges (which describe THIS adjustment) on top of a total
+            // that already bakes them in. Hidden at mild + calm (delta 0...0),
+            // where the diagram equals the plain starting point.
+            if conditionsAdjusted {
+                Text("Already adjusted for your conditions.")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("heat-coach-adjusted-note")
+            }
+
+            // DUT-601 — elevation adjusts cook TIME (not coals, per the DOD
+            // method), so surface it live in the answer so the Elevation input
+            // also visibly moves the recommendation. `nil` (the fire step) omits it.
+            if let cookTimeLine {
+                Divider().overlay(DODColor.surfaceDivider)
+                Text(cookTimeLine)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("heat-coach-cook-time")
+            }
+
+            if let recipeContextLine {
+                Text(recipeContextLine)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("heat-coach-recipe-context")
+            }
+        }
+        .padding(DODSpacing.lg)
+        .frame(maxWidth: .infinity)
+        .cardSurface()
+        .accessibilityIdentifier("heat-coach-result")
+    }
+
+    // MARK: - Coal-split diagram
 
     /// The visual coal-split diagram — lid dots over the oven body over bottom
-    /// dots. Rendered inside the answer card. `split` is the current
-    /// ``CoalSplit`` (from ``HeatCoachModel/coalSplit``).
-    func coalSplitDiagram(_ split: CoalSplit) -> some View {
+    /// dots. `split` is the current ``CoalSplit`` the card was handed.
+    private func coalSplitDiagram(_ split: CoalSplit) -> some View {
         VStack(spacing: DODSpacing.sm) {
             coalDotRow(count: split.lid)
             ovenBody(split)
