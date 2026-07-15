@@ -4,9 +4,9 @@
 ///
 /// This is the reusable, feature-agnostic sibling of RecipeDetail's private
 /// `CookModeProgress` (modelled on it, but without the Cook-Mode-specific
-/// `isFinished` "All Done" page). It backs ``StepWalkthroughView`` and is shared
-/// so First Cookout (walking coaching/recipe steps) and, later, Cook Mode can
-/// present the same "Step X of Y" progress from one tested source of truth.
+/// `isFinished` "All Done" page). It backs First Cookout's Cook-Mode-style
+/// paged-flow footer progress bar and is shared so features can present the same
+/// "Step X of Y" progress from one tested source of truth.
 ///
 /// All accessors clamp defensively: an empty step list, or a `currentIndex`
 /// outside `0..<count`, still yields a sane fraction/caption rather than a

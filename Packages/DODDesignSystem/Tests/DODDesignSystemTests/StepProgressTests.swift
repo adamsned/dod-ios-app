@@ -3,7 +3,7 @@ import XCTest
 @testable import DODDesignSystem
 
 /// L1 unit coverage for ``StepProgress`` — the pure, SwiftUI-free progress model
-/// behind `StepWalkthroughView`. Covers first/last/empty/out-of-range so the
+/// behind First Cookout's paged-flow footer. Covers first/last/empty/out-of-range so the
 /// fraction, caption, and accessibility copy stay correct without booting a view.
 final class StepProgressTests: XCTestCase {
 
