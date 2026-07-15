@@ -51,12 +51,6 @@ public struct GuidedCookout: Sendable, Equatable {
     public let whyThisDish: String
     /// The coached steps, in order (one or more per stage).
     public let steps: [Step]
-    /// The curated, in-order step-by-step cook-along shown in the `.cook` stage's
-    /// Cook-Mode-style walkthrough (``StepWalkthroughView``). This is the recipe's
-    /// own instructions, curated + reordered for a coherent outdoor cook-along
-    /// (assembly first, then the outdoor cook). Empty means the `.cook` stage
-    /// falls back to its single coaching card.
-    public let cookingSteps: [String]
     /// The "you did it" message at the lid-lift.
     public let celebrationMessage: String
     /// The invitation onward — home reps → the campfire.
@@ -81,7 +75,6 @@ public struct GuidedCookout: Sendable, Equatable {
         dishTitle: String,
         whyThisDish: String,
         steps: [Step],
-        cookingSteps: [String] = [],
         celebrationMessage: String,
         nextStepPrompt: String,
         ovenTempF: Int = 350,
@@ -95,7 +88,6 @@ public struct GuidedCookout: Sendable, Equatable {
         self.dishTitle = dishTitle
         self.whyThisDish = whyThisDish
         self.steps = steps
-        self.cookingSteps = cookingSteps
         self.celebrationMessage = celebrationMessage
         self.nextStepPrompt = nextStepPrompt
         self.ovenTempF = ovenTempF
@@ -162,29 +154,6 @@ extension GuidedCookout {
                     "Bubbling, golden, smells incredible. You did that. Snap a photo before "
                     + "everyone digs in. You'll want to remember your first one."
             ),
-        ],
-        cookingSteps: [
-            "Brown the ground beef, onion, 2 tbsp Italian Seasoning Blend, garlic, salt, and pepper.",
-            "Remove the beef to a large mixing bowl and discard any renderings from the Dutch oven.",
-            "Add the spaghetti sauce to the beef and mix well; set aside.",
-            "In an additional large bowl, add the ricotta cheese, ¼ cup Parmesan cheese, 9 oz mozzarella cheese, and remaining Italian seasoning; mix well.",
-            "Layer the Dutch oven with four lasagna noodles so that they fit in the bottom, breaking as necessary to fit and fill holes.",
-            "Spread 1/3 of the meat mixture evenly over the noodles.",
-            "Spread 1/2 of the cheese mixture evenly over the meat mixture.",
-            "Place five noodles so that they fit on top of the mixture, breaking as necessary to fit and fill holes.",
-            "Spread another 1/3 of the meat mixture evenly over the noodles.",
-            "Spread the remaining cheese mixture evenly over the meat mixture.",
-            "Layer the remaining noodles over the cheese mixture, breaking as necessary to fit and fill holes.",
-            "Spread the remaining meat mixture evenly over the noodles.",
-            "Sprinkle the remaining mozzarella and Parmesan cheeses evenly over top.",
-            "Pour the hot water around the edges of the lasagna.",
-            "Nestle the Dutch oven on top of the coals.",
-            "Cover with the lid.",
-            "Place heated coals over the entire lid.",
-            "Cook for 60 minutes.",
-            "Check for doneness by using a lid lifter; if not done, cook up to an additional 15 minutes.",
-            "When done, remove from the coals and allow to rest for at least 10 minutes.",
-            "Garnish with fresh basil or parsley. Serve and enjoy.",
         ],
         celebrationMessage:
             "That's it. You just cooked a Dutch oven lasagna. The first one is the "

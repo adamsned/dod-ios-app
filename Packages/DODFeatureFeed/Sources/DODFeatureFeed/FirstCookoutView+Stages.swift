@@ -306,21 +306,6 @@ extension FirstCookoutView {
         .padding(.top, DODSpacing.xs)
     }
 
-    /// The centered page-progress dots for the paged flow footer (`controls`).
-    var progressDots: some View {
-        HStack(spacing: DODSpacing.xxs) {
-            ForEach(0...lastIndex, id: \.self) { dot in
-                Circle()
-                    .fill(dot == index ? DODColor.burntOrange : DODColor.labelSecondary.opacity(0.3))
-                    .frame(width: 7, height: 7)
-            }
-        }
-        // DUT — back the bare `Circle()`s with a single element so the label
-        // actually announces position (mirrors `AppIntroTour`'s custom dots).
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Step \(index + 1) of \(lastIndex + 1)")
-    }
-
     // MARK: - Pinned corner controls
 
     /// CL-267 — "back to the path" chevron (top-leading): returns to the roadmap
