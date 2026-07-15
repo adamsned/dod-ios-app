@@ -81,6 +81,9 @@ public struct FirstCookoutView: View {
     @State var bakeTimerFinishTick = 0
     /// Items the cook has ticked off the *gather* checklist.
     @State var checkedItems: Set<String> = []
+    /// The active step index of the `.cook` stage's Cook-Mode-style
+    /// ``StepWalkthroughView`` (shown when `cookout.cookingSteps` is non-empty).
+    @State var cookStepIndex = 0
     @State var cookPhotoItem: PhotosPickerItem?
     @State var cookPhoto: Image?
     /// Raw JPEG bytes of the captured photo — saved to the journal on "Done".
@@ -290,6 +293,15 @@ public struct FirstCookoutView: View {
                 coalAnswerCard
                 heatCoachCallToAction
             case .cook:
+                if !cookout.cookingSteps.isEmpty {
+                    StepWalkthroughView(
+                        steps: cookout.cookingSteps,
+                        currentIndex: $cookStepIndex,
+                        // The outer paged flow owns horizontal swipes; step nav is
+                        // button-only here to avoid a gesture conflict.
+                        allowsSwipe: false
+                    )
+                }
                 rotationReminder
                 cookTimerCard
                     // DUT — animate the countdown→"Timer's Up!" swap (keyed on the
