@@ -26,7 +26,7 @@ extension GuidedCookout {
             Step(
                 id: "gather-gear",
                 stage: .gather,
-                title: "Round up your gear and ingredients",
+                title: "Round Up Your Gear and Ingredients",
                 coaching:
                     "Same gear as last time. This one is barely more than a dump and "
                     + "braise, so getting it all out first makes it feel effortless."
@@ -34,7 +34,7 @@ extension GuidedCookout {
             Step(
                 id: "light-coals",
                 stage: .fire,
-                title: "Get your coals going",
+                title: "Get Your Coals Going",
                 coaching:
                     "You did this for the lasagna and you'll do it again here. A low, "
                     + "steady heat is all a braise wants. I'll give you the coal count for "
@@ -43,7 +43,7 @@ extension GuidedCookout {
             Step(
                 id: "layer-and-braise",
                 stage: .cook,
-                title: "Layer it, braise it, make the gravy",
+                title: "Layer It, Braise It, Make the Gravy",
                 coaching:
                     "Nestle the chicken in with the carrots and potatoes, pour the dressing, "
                     + "ginger ale, and soy over, set the lid, and walk away. At the end you'll "
@@ -53,7 +53,7 @@ extension GuidedCookout {
             Step(
                 id: "lift-the-lid",
                 stage: .celebrate,
-                title: "Lift the lid",
+                title: "Lift the Lid",
                 coaching:
                     "Fall-apart chicken in a rich gravy, with the potatoes and carrots right "
                     + "there. Plate it up, snap a photo, and dig in. You're two for two now."
@@ -107,7 +107,7 @@ extension GuidedCookout {
             Step(
                 id: "plan-and-pack",
                 stage: .gather,
-                title: "Pack the dish you've mastered",
+                title: "Pack the Dish You've Mastered",
                 coaching:
                     "Pick the cook you already know, the lasagna or the chicken. Pack your "
                     + "Dutch oven, coals, a chimney, gloves, and a flat rock or trivet. You "
@@ -116,7 +116,7 @@ extension GuidedCookout {
             Step(
                 id: "outdoor-fire",
                 stage: .fire,
-                title: "Build your fire, beat the wind",
+                title: "Build Your Fire, Beat the Wind",
                 coaching:
                     "Outdoors, wind and cold steal heat. Light your chimney and add three or "
                     + "four coals to your usual count, then pick a spot out of the wind. I'll "
@@ -125,7 +125,7 @@ extension GuidedCookout {
             Step(
                 id: "cook-and-be-present",
                 stage: .cook,
-                title: "Set it, then be with your people",
+                title: "Set It, Then Be With Your People",
                 coaching:
                     "Level ground, coals top and bottom, lid on. Here's the best part: you "
                     + "cook while you're with everyone, not stuck at a stove. Give it a "
@@ -134,7 +134,7 @@ extension GuidedCookout {
             Step(
                 id: "the-moment",
                 stage: .celebrate,
-                title: "Lift the lid in front of everyone",
+                title: "Lift the Lid in Front of Everyone",
                 coaching:
                     "This is the moment they remember. Serve it around the fire, snap the "
                     + "photo, and when someone asks how you did it, tell them. Then send them "

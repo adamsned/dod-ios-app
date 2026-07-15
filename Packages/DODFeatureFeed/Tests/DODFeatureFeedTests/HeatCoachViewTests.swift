@@ -14,14 +14,14 @@ import Testing
 
     @Test func diagramLabel_even12_summarizesTheSplit() {
         let split = DutchOvenHeatCoach.startingCoals(ovenDiameterInches: 12, style: .even)
-        let label = HeatCoachView.coalDiagramAccessibilityLabel(split)
+        let label = CoalAnswerCard.coalDiagramAccessibilityLabel(split)
         // One combined label (never 24 separate dots) with the total + split.
         #expect(label == "Starting coals: about 24 — 12 on the lid, 12 underneath.")
     }
 
     @Test func diagramLabel_baking12_isLidHeavy() {
         let split = DutchOvenHeatCoach.startingCoals(ovenDiameterInches: 12, style: .baking)
-        let label = HeatCoachView.coalDiagramAccessibilityLabel(split)
+        let label = CoalAnswerCard.coalDiagramAccessibilityLabel(split)
         #expect(label == "Starting coals: about 24 — 18 on the lid, 6 underneath.")
     }
 
