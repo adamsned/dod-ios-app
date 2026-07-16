@@ -41,7 +41,9 @@ struct RootView: View {
     // currently-selected tab (DUT-243).
     @State var selectedTab: AppTab = .feed
     // DUT-703 — hoisted (like `selectedTab`) so dedup survives the layout swap.
-    @State private var lastEmittedTab: AppTab?
+    // Non-private so `RootView+Layout.swift`'s `phoneTabs` / `iPadSplit` (both
+    // extracted for file_length) can bind it into `ScreenViewTracking`.
+    @State var lastEmittedTab: AppTab?
     /// T-762 / CL-159 (DUT-68) — drives the single first-launch welcome sheet
     /// (US-8). The former second sheet (the iCloud-Sync opt-in, AC-41.2) is
     /// removed; sync is opt-in only from Settings (AC-41.3) now, and the
