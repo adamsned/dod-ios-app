@@ -603,6 +603,41 @@ Tasks → Implement. Kept here as a short audit trail; remove entries once
 they're far enough in the rear-view mirror that the spec is the only
 useful reference.
 
+- **First-run overhaul (single-screen App Intro, iCloud sync default-on,
+  First Cookout callout)** — became **US-8 / AC-8.1 + AC-8.2 amendments**,
+  **US-41 / AC-41.2 + AC-41.3 + AC-41.11 amendments + new AC-41.14** /
+  [T-930..T-933](tasks.md) /
+  [CL-327..CL-330](clarifications.md). Graduated 2026-07-16 from Spencer's
+  first-run review. Four decisions, three implementation PRs:
+  **(a) CL-327** retires the DUT-335 paged `AppIntroTour` + the DUT-336
+  media layer; first launch returns to ONE screen (logo badge, Title-Case
+  headline, one intro sentence, feature bullets, the "Let's Get Cooking"
+  CTA) — no paging, no dots, no video, no screenshots. Screenshots rot on
+  every redesign and are redundant when the app is one tap away; video is
+  a production tax on a screen seen once. Effectively restores the
+  CL-38 / CL-159 bullets pattern with richer copy.
+  **(b) CL-328** flips iCloud Sync to **default ON** via a one-time
+  migration that materializes a value into `dod.cloudkit.syncOptInV1`
+  (`bool(forKey:)` can't tell "never asked" from "declined", which is the
+  whole problem). Users who saw the first-run alert and tapped "Not Now"
+  are identified by `dod.firstRunPromptsCompletedV1` and **stay OFF**. The
+  Settings toggle is unchanged and remains the off-ramp; the disclosure
+  moves to the welcome screen's iCloud bullet. CL-94 (no App Privacy
+  change) still holds; CL-95's policy paragraph needs the wording tweak
+  captured in CL-328.
+  **(c) CL-329** reduces first-run to the notification prompt only, adds
+  the comment-reply notification default on grant, and deletes the
+  "Turn On iCloud Sync?" alert + DUT-408's present-during-dismiss dance.
+  **(d) CL-330** turns the DUT-571 top-of-feed First Cookout hero into a
+  slim **overlay** callout above the tab bar with a tail pointing at the
+  Tools tab — which forces it out of `FeedView` and up to the app shell
+  (`RootView`, not `TabStack`).
+  Implementing PRs: T-930 (the spec PR) + T-931..T-933. Three spec/code
+  drifts were found and reconciled in T-930: CL-285's AC-8.1 amendment was
+  never written back inline; CL-159 says the first-launch iCloud *sheet*
+  was removed while an iCloud *alert* has been live since DUT-280; and
+  AC-41.3 / AC-41.11 / REG-26 name a `dod.cloudKitSyncEnabled` flag that
+  has never existed in code.
 - **Search is too strict — "nachos" doesn't find "Cast Iron Skillet Nachos"** —
   became **US-12 amendment / US-29 amendment / AC-3.2 amendment** /
   [T-642](tasks.md) / [CL-120](clarifications.md) / **REG-29**.
