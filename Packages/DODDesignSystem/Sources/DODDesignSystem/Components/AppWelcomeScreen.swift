@@ -37,6 +37,15 @@ public struct AppWelcomeScreen: View {
     /// One sentence setting up the bullets below.
     public let intro: String
     public let bullets: [Bullet]
+    /// An optional standing disclosure, pinned ABOVE the CTA and OUTSIDE the
+    /// scroll so it is always on screen.
+    ///
+    /// This is deliberately not a bullet. It carries the kind of statement the
+    /// user must actually see before tapping the CTA (today: that iCloud Sync is
+    /// on by default), and a bullet at the bottom of a scrolling list can be
+    /// tapped past without ever being read — which would make the disclosure
+    /// decorative rather than real.
+    public let disclosure: String?
     /// The persistent finish button label, e.g. "Let's Get Cooking".
     public let ctaTitle: String
     public let onFinish: @MainActor () -> Void
@@ -45,12 +54,14 @@ public struct AppWelcomeScreen: View {
         headline: String,
         intro: String,
         bullets: [Bullet],
+        disclosure: String? = nil,
         ctaTitle: String,
         onFinish: @MainActor @escaping () -> Void
     ) {
         self.headline = headline
         self.intro = intro
         self.bullets = bullets
+        self.disclosure = disclosure
         self.ctaTitle = ctaTitle
         self.onFinish = onFinish
     }
@@ -75,6 +86,7 @@ public struct AppWelcomeScreen: View {
                 .frame(maxWidth: 500)
                 .frame(maxWidth: .infinity)
             }
+            disclosureLine
             ctaButton
         }
         .padding(.bottom, DODSpacing.lg)
@@ -150,6 +162,23 @@ public struct AppWelcomeScreen: View {
     }
 
     // MARK: - CTA
+
+    /// The standing disclosure, directly above the CTA and outside the scroll so
+    /// it can't be tapped past unread. Quiet (caption / secondary) so it informs
+    /// without competing with the CTA.
+    @ViewBuilder
+    private var disclosureLine: some View {
+        if let disclosure {
+            Text(disclosure)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, DODSpacing.xl)
+                .frame(maxWidth: 500)
+                .accessibilityIdentifier("app-intro-disclosure")
+        }
+    }
 
     private var ctaButton: some View {
         Button(action: onFinish) {

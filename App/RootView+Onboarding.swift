@@ -15,6 +15,7 @@ extension RootView {
             headline: "Welcome to Dutch Oven Daddy",
             intro: "New to cast iron? You're in the right place. Here's what's inside.",
             bullets: Self.appWelcomeBullets,
+            disclosure: Self.appWelcomeDisclosure,
             ctaTitle: "Let's Get Cooking",
             onFinish: {
                 guard showOnboarding else { return }  // DUT-407: ignore a double-tap
@@ -34,14 +35,24 @@ extension RootView {
         )
     }
 
+    /// The standing iCloud disclosure on the welcome screen.
+    ///
+    /// Fresh installs default the sync opt-in ON (see
+    /// `DODApp.resolveCloudKitSyncDefaultIfNeeded`), which retires the old
+    /// first-run "Turn On iCloud Sync?" alert — so this line is the moment the
+    /// user is told. It is pinned above the CTA rather than living in the bullet
+    /// list on purpose: the bullets scroll, and a disclosure the user can tap
+    /// past without reading isn't a disclosure.
+    static let appWelcomeDisclosure =
+        "Your saved recipes sync to iCloud automatically. Turn it off any time in Settings."
+
     /// The bullets of the first-launch **App Welcome** screen (DUT-335).
     /// Declared static so the array isn't rebuilt every render and
     /// tests/previews reuse the exact content the app ships. Titles are Title
     /// Case; descriptions are sentence case.
     ///
-    /// iCloud Sync IS a bullet now: fresh installs default the sync opt-in ON
-    /// (see `DODApp.resolveCloudKitSyncDefaultIfNeeded`), so this bullet is the
-    /// disclosure that replaces the old first-run "Turn On iCloud Sync?" alert.
+    /// iCloud Sync is deliberately NOT a bullet — it's the screen's standing
+    /// `disclosure` line instead (see `appWelcomeDisclosure`).
     static var appWelcomeBullets: [AppWelcomeScreen.Bullet] {
         [
             .init(
@@ -75,13 +86,6 @@ extension RootView {
                 title: "Download for Offline",
                 description: "Save recipes to your device and cook anywhere, even with no signal at the campsite.",
                 symbol: "arrow.down.circle.fill"
-            ),
-            .init(
-                id: 5,
-                title: "iCloud Sync",
-                description:
-                    "Your saved recipes sync across your Apple devices automatically. Turn it off any time in Settings.",
-                symbol: "icloud.fill"
             ),
         ]
     }
