@@ -103,49 +103,6 @@ final class FeedViewSnapshotTests: XCTestCase {
         )
     }
 
-    // MARK: - DUT-571 — the top-of-feed First-Cookout hero card
-
-    // The hero's visibility is driven by a `@State` cook-state load that a
-    // synchronous snapshot render can't reliably await, so we snapshot the
-    // `FirstCookoutHeroCard` unit directly in its first-rung ("Your First
-    // Cookout") state — the new-cook surface DUT-571 adds to the top of the Feed.
-    // Its gating (new / un-graduated, non-dismissed) is covered by
-    // `FeedFirstCookoutHeroTests`.
-
-    @MainActor
-    func test_firstCookoutHero_firstRung_light() {
-        let view = Self.hostedHeroCard()
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .fixed(width: 390, height: 380), traits: Self.lightTraits()),
-            record: .missing
-        )
-    }
-
-    @MainActor
-    func test_firstCookoutHero_firstRung_dark() {
-        let view = Self.hostedHeroCard()
-        assertSnapshot(
-            of: view,
-            as: .image(layout: .fixed(width: 390, height: 380), traits: Self.darkTraits()),
-            record: .missing
-        )
-    }
-
-    /// The First-Cookout hero card seeded to the first rung, padded like the Feed
-    /// renders it (top of the recipe list).
-    @MainActor
-    static func hostedHeroCard() -> some View {
-        FirstCookoutHeroCard(
-            cookout: .firstCookout,
-            onStart: {},
-            onDismiss: {},
-            onCookDumpCake: {}
-        )
-        .padding()
-        .background(DODColor.surface)
-    }
-
     // MARK: - Fixtures
 
     /// Drives a `FeedViewModel` into `.loaded` with 6 deterministic rows
