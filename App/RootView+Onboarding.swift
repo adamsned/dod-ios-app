@@ -5,15 +5,16 @@ import SwiftUI
 
 extension RootView {
 
-    /// DUT-335 — the App Intro cover content (extracted here so `RootView`'s
+    /// DUT-335 — the App Welcome cover content (extracted here so `RootView`'s
     /// body stays under the SwiftLint `file_length` cap). The persistent
-    /// "Let's Get Cooking" CTA is the tour's single exit: it records onboarding
-    /// as done and kicks off first-run setup (notifications + the deferred
-    /// iCloud-Sync prompt).
+    /// "Let's Get Cooking" CTA is the screen's single exit: it records onboarding
+    /// as done and kicks off first-run setup (the notification permission prompt).
     @MainActor
     var onboardingCover: some View {
-        AppIntroTour(
-            pages: Self.appIntroPages,
+        AppWelcomeScreen(
+            headline: "Welcome to Dutch Oven Daddy",
+            intro: "New to cast iron? You're in the right place. Here's what's inside.",
+            bullets: Self.appWelcomeBullets,
             ctaTitle: "Let's Get Cooking",
             onFinish: {
                 guard showOnboarding else { return }  // DUT-407: ignore a double-tap
@@ -24,131 +25,99 @@ extension RootView {
                 // pre-DUT-280 legacy install by `migrateFirstRunFlagsIfNeeded`.
                 UserDefaults.standard.set(true, forKey: Self.firstRunPromptsArmedKey)
                 // First-run prompts (skipped under the onboarding UI test, which
-                // can't dismiss the system dialogs). Arm the pending flag BEFORE
-                // dismissing so it's set no matter how fast the dismiss animation
-                // (and its `onDismiss:`) races the async setup; the sync prompt
-                // itself is presented from `presentCloudSyncPromptIfPending`.
+                // can't dismiss the system dialogs).
                 if !DODEnvironment.suppressFirstRunPrompts {
-                    pendingCloudSyncPromptAfterOnboarding = true
-                    Task { await runFirstRunSetup(presentingFromCoverDismiss: true) }
+                    Task { await runFirstRunSetup() }
                 }
                 showOnboarding = false
             }
         )
     }
 
-    /// DUT-408 / DUT-529 — the onboarding cover's `onDismiss:` completion. Fires
-    /// after the dismiss animation finishes, so presenting the iCloud-Sync alert
-    /// here can't be swallowed as present-during-dismiss (replaces the old fixed
-    /// 450 ms sleep). No-op unless `onFinish` armed the pending flag.
-    @MainActor
-    func presentCloudSyncPromptIfPending() {
-        guard pendingCloudSyncPromptAfterOnboarding else { return }
-        pendingCloudSyncPromptAfterOnboarding = false
-        showCloudSyncPrompt = true
-    }
-
-    /// The slides of the first-launch **App Intro** tour (DUT-335). Declared
-    /// static so the array isn't rebuilt every render and tests/previews reuse
-    /// the exact content the app ships. Spotlights only the standout, app-unique
-    /// features — iCloud Sync is intentionally NOT a slide (it has its own
-    /// first-run opt-in prompt, `runFirstRunSetup`). Titles are Title Case;
-    /// descriptions are short but informative. `placeholderSymbol` stands in for
-    /// the real app screenshot until those are wired up later.
-    static var appIntroPages: [AppIntroTour.Page] {
+    /// The bullets of the first-launch **App Welcome** screen (DUT-335).
+    /// Declared static so the array isn't rebuilt every render and
+    /// tests/previews reuse the exact content the app ships. Titles are Title
+    /// Case; descriptions are sentence case.
+    ///
+    /// iCloud Sync IS a bullet now: fresh installs default the sync opt-in ON
+    /// (see `DODApp.resolveCloudKitSyncDefaultIfNeeded`), so this bullet is the
+    /// disclosure that replaces the old first-run "Turn On iCloud Sync?" alert.
+    static var appWelcomeBullets: [AppWelcomeScreen.Bullet] {
         [
             .init(
                 id: 0,
-                title: "Welcome to Dutch Oven Daddy",
-                description:
-                    "Browse cast iron recipes and articles, save your favorites, and cook them step by step with built-in coaching, even offline.",
-                placeholderSymbol: "flame.fill",
-                // DUT-336: the opening slide leads with the Dutch Oven Daddy
-                // badge (a bundled transparent PNG) as its clean welcome visual.
-                // Later slides use SF-symbol placeholders until real screenshots
-                // land. Media precedence is video → image → symbol.
-                image: .logo
+                title: "Browse Recipes & Articles",
+                description: "Fresh cast iron recipes to cook and articles to read, all in one tab.",
+                symbol: "square.grid.2x2.fill"
             ),
             .init(
                 id: 1,
-                title: "Browse Recipes & Articles",
-                description: "Explore fresh cast iron recipes to cook and articles to read, all in one tab.",
-                placeholderSymbol: "square.grid.2x2.fill",
-                // STILL slide (Browse). Add a device-framed, transparent-background
-                // PNG screenshot to DODDesignSystem `Media.xcassets` as
-                // `intro-still-browse`; it floats on the Flour/Cocoa background.
-                // Until the asset is added, the SF symbol above shows.
-                image: IntroImageSource(assetName: "intro-still-browse", isTransparent: true)
+                title: "Save Your Favorites",
+                description: "Tap the bookmark on any recipe to find it again later.",
+                symbol: "bookmark.fill"
             ),
             .init(
                 id: 2,
-                title: "Save Recipes for Later",
-                description: "Bookmark any recipe to build your own collection and find it again in a tap.",
-                placeholderSymbol: "bookmark.fill"
-                    // VIDEO slide. When the looping clip is ready, add:
-                    // video: IntroVideoSource(url: <bundled HEVC-alpha .mov>, isTransparent: true)
+                title: "Cook Mode",
+                description:
+                    "Cook one step at a time with large text and voice read-aloud. The screen stays awake so you never lose your place.",
+                symbol: "speaker.wave.2.fill"
             ),
             .init(
                 id: 3,
-                title: "Cook Mode",
+                title: "Cooking Tools",
                 description:
-                    "Cook one step at a time with large text and voice read-aloud, and the screen stays awake so you never lose your place.",
-                placeholderSymbol: "speaker.wave.2.fill",
-                // STILL slide (Cook Mode). Asset: `intro-still-cook-mode`
-                // (device-framed transparent PNG). SF symbol shows until added.
-                image: IntroImageSource(assetName: "intro-still-cook-mode", isTransparent: true)
+                    "Your First Cookout walks you to a guaranteed win, and the Heat Coach dials in your coals so every cook comes out right.",
+                symbol: "thermometer.medium"
             ),
             .init(
                 id: 4,
-                title: "Cooking Tools",
-                description:
-                    "New to cast iron? Your First Cookout walks you to a guaranteed win, and the Heat Coach dials in your coals so every cook comes out right.",
-                placeholderSymbol: "thermometer.medium",
-                // STILL slide (Cooking Tools). Asset: `intro-still-cooking-tools`
-                // (device-framed transparent PNG). SF symbol shows until added.
-                image: IntroImageSource(assetName: "intro-still-cooking-tools", isTransparent: true)
+                title: "Download for Offline",
+                description: "Save recipes to your device and cook anywhere, even with no signal at the campsite.",
+                symbol: "arrow.down.circle.fill"
             ),
             .init(
                 id: 5,
-                title: "Download for Offline",
-                description: "Save recipes to your device and cook anywhere, even with no signal at the campsite.",
-                placeholderSymbol: "arrow.down.circle.fill"
-                    // VIDEO slide. When the looping clip is ready, add:
-                    // video: IntroVideoSource(url: <bundled HEVC-alpha .mov>, isTransparent: true)
+                title: "iCloud Sync",
+                description:
+                    "Your saved recipes sync across your Apple devices automatically. Turn it off any time in Settings.",
+                symbol: "icloud.fill"
             ),
         ]
     }
 
-    /// First-run setup, run right after the welcome sheet's CTA on a brand-new
+    /// First-run setup, run right after the welcome screen's CTA on a brand-new
     /// install — and re-run next launch if a prior launch left it unfinished
-    /// (DUT-280): ask for notification permission (the system prompt), then ask
-    /// to turn on iCloud Sync. Both `Turn On iCloud Sync?` alert buttons set
-    /// `firstRunPromptsCompletedKey`, so this never re-runs once answered.
+    /// (DUT-280): ask for notification permission (the system prompt).
     ///
-    /// - Parameter presentingFromCoverDismiss: `true` when this runs off the
-    ///   onboarding CTA (`onFinish`), while the `fullScreenCover` is still
-    ///   dismissing. DUT-408: when notification auth is already decided,
-    ///   `requestAuthorization` returns instantly (no system dialog), so setting
-    ///   `showCloudSyncPrompt` here would present the alert mid-dismiss and iOS
-    ///   swallows it (present-during-dismiss). In that case the caller (`onFinish`)
-    ///   has already armed `pendingCloudSyncPromptAfterOnboarding`, and the cover's
-    ///   `onDismiss:` presents the alert once the dismiss animation has finished
-    ///   (see `RootView.swift`); this method leaves the prompt alone. When `false`
-    ///   (the `.task` recovery path — no cover on screen) it presents directly.
+    /// The iCloud-Sync half is gone: sync is resolved once at launch (fresh
+    /// installs default ON, everyone else is left exactly as they were — see
+    /// `DODApp.resolveCloudKitSyncDefaultIfNeeded`) and disclosed by the welcome
+    /// screen's iCloud bullet, so there is no longer an alert to ask. Settings
+    /// remains the place to change it.
+    ///
+    /// Sets `firstRunPromptsCompletedKey` once the notification prompt is
+    /// answered/dismissed, so it never re-runs — the DUT-280 contract, which the
+    /// removed alert's buttons used to carry.
     @MainActor
-    func runFirstRunSetup(presentingFromCoverDismiss: Bool = false) async {
-        // 1. Notifications — the system permission prompt. On grant, flip the app
-        //    toggle so alerts fire without a second trip to Settings.
+    func runFirstRunSetup() async {
+        // Notifications — the system permission prompt. On grant, flip the app
+        // toggles so alerts fire without a second trip to Settings. Only on
+        // grant: a denial must not leave the in-app switches reading "on".
         let granted = await dependencies.notificationService.requestAuthorization()
         if granted {
             UserDefaults.standard.set(true, forKey: SettingsViewModel.notificationsEnabledKey)
+            // Allowing notifications opts you into reply alerts too ("When
+            // Someone Replies to My Comment"); it's off by default otherwise.
+            UserDefaults.standard.set(
+                true,
+                forKey: SettingsViewModel.commentReplyNotificationsEnabledKey
+            )
         }
-        // 2. iCloud Sync — ask (never silently enable). When riding the onboarding
-        //    cover's dismissal the prompt is presented from `onDismiss:` (DUT-408),
-        //    so do nothing here; otherwise present it now.
-        if !presentingFromCoverDismiss {
-            showCloudSyncPrompt = true
-        }
+        // DUT-280 — the first-run prompt is answered; mark complete so it never
+        // re-runs. (Previously set by the iCloud alert's buttons, which were the
+        // tail of this flow.)
+        UserDefaults.standard.set(true, forKey: Self.firstRunPromptsCompletedKey)
     }
 
     /// DUT-400: migrate the pre-DUT-280 upgrade population — a user who onboarded

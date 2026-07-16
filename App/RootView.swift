@@ -49,20 +49,6 @@ struct RootView: View {
     /// Non-private so the `+Onboarding.swift` extension's `onboardingCover`
     /// (extracted for file_length) can read/flip it (DUT-529).
     @State var showOnboarding: Bool
-    /// First-run iCloud-Sync opt-in prompt, shown once right after the welcome
-    /// sheet on a brand-new install (paired with the notification permission
-    /// request). Re-introduces a launch-time *ask* for sync — DUT-68 removed the
-    /// old blocking opt-in sheet, but a new user was then never asked, so their
-    /// saved recipes never synced. "Turn On" sets the opt-in (effective next
-    /// launch); "Not Now" leaves it off (still changeable in Settings).
-    @State var showCloudSyncPrompt = false
-    /// DUT-408 / DUT-529 — set by `runFirstRunSetup(presentingFromCoverDismiss:)`
-    /// when the iCloud-Sync prompt must wait for the onboarding cover to finish
-    /// dismissing. The cover's `onDismiss:` reads and clears this to fire
-    /// `showCloudSyncPrompt`, so the alert presents *after* the dismiss animation
-    /// completes rather than being swallowed mid-dismiss (replaces the old fixed
-    /// 450 ms sleep).
-    @State var pendingCloudSyncPromptAfterOnboarding = false
     /// US-36 AC-36.2 — user-selected appearance preference (key
     /// `dod.settings.appearance`), applied to the root `Group` via
     /// `.preferredColorScheme(...)`; `.system` yields `nil` (OS drives it).
@@ -234,37 +220,17 @@ struct RootView: View {
             handle(intent: newValue)
             dispatcher.consume()
         }
-        // DUT-335 — the App Intro paged feature tour. Presented full-screen (no
+        // DUT-335 — the App Welcome screen. Presented full-screen (no
         // swipe-to-dismiss, so it can't be escaped without finishing — the
         // DUT-301 concern). The "Let's Get Cooking" CTA is the single exit.
-        // DUT-408 / DUT-529 — `onDismiss:` presents the iCloud-Sync prompt only
-        // after the cover's dismiss animation completes (this fires afterwards),
-        // so iOS can't swallow it as present-during-dismiss (replaces the old
-        // fixed 450 ms sleep in `runFirstRunSetup`).
-        .fullScreenCover(
-            isPresented: $showOnboarding,
-            onDismiss: presentCloudSyncPromptIfPending,
-            content: { onboardingCover }
-        )
+        // The `onDismiss:` that used to present the iCloud-Sync alert after the
+        // dismiss animation (DUT-408) is gone with the alert itself: sync is now
+        // resolved at launch and disclosed by the welcome screen's iCloud bullet.
+        .fullScreenCover(isPresented: $showOnboarding) { onboardingCover }
         // T-912 / DUT-551 (CL-306) — Settings sheet. The iPhone gear + iPad
         // sidebar row both flip `showSettingsSheet`. Content in
         // `RootView+Settings.swift` (file_length split, DUT-941).
         .sheet(isPresented: $showSettingsSheet) { settingsSheet }
-        .alert("Turn On iCloud Sync?", isPresented: $showCloudSyncPrompt) {
-            Button("Turn On Sync") {
-                // DUT-280 — both prompts answered; mark complete so they never re-run.
-                UserDefaults.standard.set(true, forKey: Self.firstRunPromptsCompletedKey)
-                Task { await dependencies.settingsDependencies().setCloudSyncOptIn(true) }
-            }
-            Button("Not Now", role: .cancel) {
-                UserDefaults.standard.set(true, forKey: Self.firstRunPromptsCompletedKey)
-            }
-        } message: {
-            Text(
-                "Keep your saved recipes and cook journal on all your devices. "
-                    + "Takes effect next time you open the app. Change it anytime in Settings."
-            )
-        }
         // DUT-549 — transient "couldn't open that recipe" toast for a failed
         // deep-link resolve (modifier + copy in `RootView+LinkRouting.swift`).
         .modifier(DeepLinkErrorSnackbar(message: $deepLinkErrorMessage))
