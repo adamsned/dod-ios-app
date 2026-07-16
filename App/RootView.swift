@@ -225,7 +225,8 @@ struct RootView: View {
         // DUT-301 concern). The "Let's Get Cooking" CTA is the single exit.
         // The `onDismiss:` that used to present the iCloud-Sync alert after the
         // dismiss animation (DUT-408) is gone with the alert itself: sync is now
-        // resolved at launch and disclosed by the welcome screen's iCloud bullet.
+        // resolved at launch and disclosed by the welcome screen's standing
+        // disclosure line (pinned above the CTA, not a scrollable bullet).
         .fullScreenCover(isPresented: $showOnboarding) { onboardingCover }
         // T-912 / DUT-551 (CL-306) — Settings sheet. The iPhone gear + iPad
         // sidebar row both flip `showSettingsSheet`. Content in

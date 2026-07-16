@@ -68,9 +68,9 @@ public struct AppWelcomeScreen: View {
 
     public var body: some View {
         VStack(spacing: DODSpacing.lg) {
-            // Six bullets + the badge overflow every iPhone at accessibility
-            // text sizes, so the content column scrolls while the CTA stays
-            // pinned and always reachable.
+            // The bullets + the badge overflow every iPhone at accessibility
+            // text sizes, so the content column scrolls while the disclosure
+            // and the CTA stay pinned and always reachable.
             ScrollView {
                 VStack(spacing: DODSpacing.xl) {
                     header

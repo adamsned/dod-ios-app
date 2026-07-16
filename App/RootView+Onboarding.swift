@@ -97,8 +97,8 @@ extension RootView {
     /// The iCloud-Sync half is gone: sync is resolved once at launch (fresh
     /// installs default ON, everyone else is left exactly as they were — see
     /// `DODApp.resolveCloudKitSyncDefaultIfNeeded`) and disclosed by the welcome
-    /// screen's iCloud bullet, so there is no longer an alert to ask. Settings
-    /// remains the place to change it.
+    /// screen's standing disclosure line, so there is no longer an alert to ask.
+    /// Settings remains the place to change it.
     ///
     /// Sets `firstRunPromptsCompletedKey` once the notification prompt is
     /// answered/dismissed, so it never re-runs — the DUT-280 contract, which the

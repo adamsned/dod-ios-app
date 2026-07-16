@@ -42,8 +42,8 @@ struct DODApp: App {
     /// materialize the key ONCE, here, before anything reads it.
     ///
     /// The gate is deliberately narrow — only a genuinely fresh install defaults
-    /// ON, disclosed by the welcome screen's iCloud bullet (which replaced the
-    /// old "Turn On iCloud Sync?" alert):
+    /// ON, disclosed by the welcome screen's standing disclosure line (which
+    /// replaced the old "Turn On iCloud Sync?" alert):
     ///
     /// - **Fresh install** (onboarding not completed) → ON.
     /// - **Existing user who explicitly declined** → the key is already set to
@@ -53,10 +53,24 @@ struct DODApp: App {
     ///   OFF rather than silently switched on. Flipping sync on for an established
     ///   user without their say-so is exactly the surprise we're avoiding.
     ///
+    /// The invariant: sync defaults on exactly for the users who see the welcome
+    /// screen that discloses it.
+    ///
     /// Idempotent: writes only when the key is unset, so it's a no-op on every
     /// launch after the first. Settings remains the way to change it.
     private static func resolveCloudKitSyncDefaultIfNeeded() {
-        let defaults = UserDefaults.standard
+        resolveCloudKitSyncDefault(in: .standard)
+    }
+
+    /// The rule itself, over an injectable `UserDefaults` so every branch is
+    /// testable against an isolated suite.
+    ///
+    /// This decides whether a user's saved recipes leave the device, and the
+    /// branch that matters most — an explicit decline surviving an upgrade — is
+    /// invisible until it's already wrong in someone's iCloud. So it does not get
+    /// to be untestable: `internal`, and reading the store it's handed rather than
+    /// `.standard`.
+    static func resolveCloudKitSyncDefault(in defaults: UserDefaults) {
         guard defaults.object(forKey: RecipeStore.cloudKitSyncOptInKey) == nil else { return }
         let isFreshInstall = !defaults.bool(forKey: RootView.onboardingCompletedKey)
         defaults.set(isFreshInstall, forKey: RecipeStore.cloudKitSyncOptInKey)
