@@ -130,6 +130,11 @@ struct RootView: View {
     /// The callout's persisted dismissal. Reuses the DUT-571 hero's key verbatim,
     /// so a cook who already dismissed the old inline hero stays dismissed.
     @AppStorage(FirstCookoutCalloutGate.dismissedKey) var firstCookoutCalloutDismissed = false
+    /// Whether the X was tapped in THIS session. Only read under
+    /// `-DODForceFirstCookoutCallout`, which ignores the persisted flag: it keeps the
+    /// X working (and observable) while the nudge is force-armed for review / UI
+    /// tests. Production reads the persisted flag directly. Non-private for the ext.
+    @State var firstCookoutCalloutDismissedThisSession = false
     /// Gates the callout's entrance transition (non-private for the extension).
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State private var dispatcher = DeepLinkDispatcher.shared

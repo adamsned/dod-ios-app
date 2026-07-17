@@ -41,6 +41,25 @@ extension RootView {
         return (CGFloat(index) + 0.5) / CGFloat(tabs.count)
     }
 
+    /// The dismissal as the gate should see it.
+    ///
+    /// `-DODForceFirstCookoutCallout` (see ``DODEnvironment/forceFirstCookoutCallout``)
+    /// ignores the PERSISTED dismissal so this once-per-install nudge can be reviewed
+    /// or UI-tested on a device that already dismissed it — including every long-lived
+    /// dev simulator, which dismissed the DUT-571 hero whose key this inherits, and so
+    /// would otherwise render nothing forever. The override is in-memory: it never
+    /// writes the persisted flag, so a tester's real state survives untouched and a
+    /// production launch (no flag) always honours a genuine dismissal.
+    ///
+    /// It re-arms the nudge at LAUNCH; it does not pin it on screen. An X tap in the
+    /// session still hides it (via ``firstCookoutCalloutDismissedThisSession``), so
+    /// the flag can't mask a broken dismiss button — which is exactly what an earlier
+    /// draft of it did, until `test_dismissHidesTheCallout` caught it.
+    var firstCookoutCalloutIsDismissed: Bool {
+        guard DODEnvironment.forceFirstCookoutCallout else { return firstCookoutCalloutDismissed }
+        return firstCookoutCalloutDismissedThisSession
+    }
+
     /// The overlay itself.
     ///
     /// **Feed-only, and above the tab bar, both structurally.** `phoneTabs`
@@ -61,7 +80,7 @@ extension RootView {
         if FirstCookoutCalloutGate.shouldShow(
             cookStateLoaded: firstCookoutCookStateLoaded,
             nextRung: firstCookoutNextRung,
-            dismissed: firstCookoutCalloutDismissed
+            dismissed: firstCookoutCalloutIsDismissed
         ) {
             TabBarCallout(
                 message: "New to cast iron? Your First Cookout starts here.",
@@ -76,7 +95,13 @@ extension RootView {
                     // The same path the retired hero's primary CTA took.
                     route(toHubTool: .firstCookout(scrollToDumpCakes: false))
                 },
-                onDismiss: { firstCookoutCalloutDismissed = true }
+                onDismiss: {
+                    // Persist (the production behaviour) AND record it for this
+                    // session, so the X also works under `-DODForceFirstCookoutCallout`,
+                    // which ignores the persisted flag.
+                    firstCookoutCalloutDismissed = true
+                    firstCookoutCalloutDismissedThisSession = true
+                }
             )
             // Gated on Reduce Motion — with it on, the callout just appears.
             .transition(reduceMotion ? .identity : .opacity.combined(with: .scale(scale: 0.96)))
