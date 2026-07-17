@@ -137,8 +137,10 @@ final class SmokeTests: XCTestCase {
     /// Saved shows the empty-state title from AC-5.8 on a fresh install; the
     /// Cooking Tools hub shows its header). v2 Search overhaul (1/3) — Search is
     /// no longer a 4th tab; the final assertion instead confirms the Feed
-    /// header's magnifying-glass button (`feed-open-search`) opens the pushed
-    /// Search screen (its "Search Recipes" field).
+    /// header's magnifying-glass button (`feed-open-search`) opens the Search
+    /// screen. v2 Search overhaul (2/3) — Search now presents as a BOTTOM-UP
+    /// modal (`.sheet`) rather than a push, so the tail of this test also
+    /// verifies the "Done" button (`search-done`) dismisses it back to the Feed.
     func test_tabBarOrderMatchesSpec() throws {
         try XCTSkipIf(isPad, "Bottom-tab order is an iPhone-only contract; iPad uses a sidebar (US-38 / DUT-89).")
         let tabBar = app.tabBars.firstMatch
@@ -176,11 +178,11 @@ final class SmokeTests: XCTestCase {
             "Third tab should land on the Cooking Tools hub (its header is visible)"
         )
 
-        // v2 Search overhaul (1/3) — Search is reached from the Feed header's
-        // magnifying-glass button, which PUSHES the Search screen within the Feed
-        // stack. Return to Recipes, tap `feed-open-search`, and confirm the
-        // pushed SearchView's "Search Recipes" field appears (SearchView uses a
-        // plain `TextField`, so it shows under `app.textFields`).
+        // v2 Search overhaul (2/3) — Search is reached from the Feed header's
+        // magnifying-glass button, which now presents the Search screen as a
+        // BOTTOM-UP modal (`.sheet`). Return to Recipes, tap `feed-open-search`,
+        // and confirm SearchView's "Search Recipes" field appears in the sheet
+        // (SearchView uses a plain `TextField`, so it shows under `app.textFields`).
         tabButtons[0].tap()
         let openSearch = app.buttons["feed-open-search"]
         XCTAssertTrue(
@@ -191,7 +193,26 @@ final class SmokeTests: XCTestCase {
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 6),
-            "Tapping feed-open-search should push the Search screen (Search Recipes field visible)"
+            "Tapping feed-open-search should present the Search modal (Search Recipes field visible)"
+        )
+
+        // v2 Search overhaul (2/3) — the modal dismisses via its top-right
+        // "Done" (`search-done`, the repo sheet convention). Tapping it should
+        // tear the sheet down so the search field is gone and we're back on the
+        // Feed (its magnifying-glass button is visible again).
+        let searchDone = app.buttons["search-done"]
+        XCTAssertTrue(
+            searchDone.waitForExistence(timeout: 6),
+            "The Search modal should host a top-right Done button (search-done)"
+        )
+        searchDone.tap()
+        XCTAssertTrue(
+            searchField.waitForNonExistence(timeout: 6),
+            "Tapping Done should dismiss the Search modal (Search Recipes field gone)"
+        )
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 6),
+            "Dismissing the Search modal should return to the Feed (search button visible)"
         )
     }
 

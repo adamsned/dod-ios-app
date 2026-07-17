@@ -73,8 +73,8 @@ struct RootView: View {
     // Saved exists so an article link tapped there opens in place instead of
     // yanking the user to Feed (DUT-243, push semantics). The retired Search
     // tab (v2 Search overhaul 1/3) no longer needs its own sink — Search is
-    // now pushed within the Feed tab's stack, so an article link tapped on the
-    // search page routes through the Feed sink.
+    // now a bottom-up modal presented over the Feed (overhaul 2/3) hosting its
+    // own NavigationStack, so it doesn't participate in the per-tab route sinks.
     // Non-private so the `+LinkRouting.swift` extension can write them.
     //
     // DUT-463 / DUT-464 / DUT-319 — these were single-slot `ExternalRoute?`

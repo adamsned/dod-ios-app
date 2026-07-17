@@ -95,6 +95,18 @@ struct TabStack: View {
     /// (file-length relief) can set it, mirroring how `TabStack+CardSave.swift`
     /// reaches the shared statics.
     @State var saveErrorMessage: String?
+    /// v2 Search overhaul (2/3) — drives the bottom-up Search modal (`.sheet`).
+    /// The Feed header's magnifying glass flips this true (was `path.append(.search)`
+    /// — a push); every other tab leaves it false, so the sheet only ever presents
+    /// over the Feed. Internal (no `private`) so the `+Destination.swift` extension's
+    /// `searchModal` can flip it back to `false` on the "Done" tap.
+    @State var showSearch = false
+    /// v2 Search overhaul (2/3) — the Search modal's OWN navigation path, separate
+    /// from the tab's `path`. Tapping a result / browse-category pushes onto THIS
+    /// stack (inside the sheet), so the recipe detail / category screen open within
+    /// the modal and never disturb the Feed's stack behind it. Reset to empty every
+    /// time the sheet re-presents (see the `.sheet` `onDismiss`).
+    @State var searchPath: [RecipeRoute] = []
 
     init(
         tab: AppTab,
@@ -158,6 +170,17 @@ struct TabStack: View {
                 message: $saveErrorMessage,
                 accessibilityID: "card-save-error-snackbar"
             )
+        )
+        // v2 Search overhaul (2/3) — the Search screen as a bottom-up modal.
+        // Only the Feed header's magnifying glass flips `showSearch`, so this
+        // sheet only ever presents over the Feed. Its content hosts its own
+        // `NavigationStack` (`searchModal`, in `+Destination.swift`) so a tapped
+        // result opens the recipe detail INSIDE the sheet. `onDismiss` clears the
+        // inner path so a re-open lands on the search root, not a stale detail.
+        .sheet(
+            isPresented: $showSearch,
+            onDismiss: { searchPath = [] },
+            content: { searchModal }
         )
         .task(id: externalRoute) {
             // External route sink. `.task(id:)` (not `.onChange`) so a queue
@@ -230,13 +253,13 @@ struct TabStack: View {
                 // Cake" (true) scrolls to Anytime Treats, primary "Start" (false) doesn't.
                 onStartFirstCookout: { startFirstCookout(false) },
                 onCookDumpCake: { startFirstCookout(true) },
-                // v2 Search overhaul (1/3) — the Feed header's magnifying-glass
-                // button PUSHES the Search screen within THIS tab's stack (Search
-                // is no longer a tab). The `.search` route resolves via the shared
-                // `navigationDestination(for: RecipeRoute.self)` → `SearchView`.
+                // v2 Search overhaul (2/3) — the Feed header's magnifying-glass
+                // button now presents the Search screen as a BOTTOM-UP modal
+                // (`.sheet`, flipped here) instead of pushing it onto this tab's
+                // stack. Slides up from the bottom; dismisses via its "Done".
                 // `DODFeatureFeed` can't import `DODFeatureSearch` (CL-122), so the
-                // header calls this injected closure and the App shell does the push.
-                onOpenSearch: { path.append(.search) }
+                // header calls this injected closure and the App shell presents it.
+                onOpenSearch: { showSearch = true }
             )
         case .saved:
             SavedView(
