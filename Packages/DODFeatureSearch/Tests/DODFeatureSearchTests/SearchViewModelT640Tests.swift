@@ -5,129 +5,61 @@ import Testing
 
 @testable import DODFeatureSearch
 
-/// CL-118 (T-640) — hot-fix to T-639 / CL-117's rotating Try pool.
-/// Pins the only-cache-full-slate cache-rule fix that closes the
-/// cold-start race: the view appears before
-/// `loadCategoriesIfNeeded()` resolves, so the first read of
-/// `displayedTrySlate` can see an empty `availableCategories` →
-/// `pickTrySlate(...)` returns the single synthesized [Latest Recipes]
-/// pill. Pre-fix that 1-pill slate was cached forever and the user
-/// was locked to one pill for the session. The fix: only cache the
-/// slate when it reaches the full visible count of
-/// `Self.trySlateVisibleCount`, so the next read after categories
-/// land recomputes and the user sees the real shuffle.
+/// v2 Search overhaul (3/3) — the "Try" slate invariants after the source
+/// swap from WP categories to the curated 100-term `SearchTryChips.pool`.
 ///
-/// Split into a separate file so `SearchViewModelTests.swift` stays
-/// under SwiftLint's `file_length` / `type_body_length` caps — mirrors
-/// the `SearchViewModelT637Tests.swift` Latest-Recipes-pill split.
+/// The pre-Wave-3 T-640 / CL-118 file guarded a cold-start cache race: the
+/// idle view appeared before `loadCategoriesIfNeeded()` resolved, so the
+/// first read of `displayedTrySlate` could see an empty `availableCategories`
+/// and cache a partial 1-pill slate forever. That race is **gone** — the pool
+/// is now a constant array that never depends on the async category fetch, so
+/// the very first read is always a full slate. These tests pin the new
+/// invariants (full-on-first-read + stable-within-session) and keep the
+/// "Uncategorized" exclusion coverage, now retargeted to `browseCategories`
+/// (which still derives from `availableCategories`).
+///
+/// Split into a separate file so `SearchViewModelTests.swift` stays under
+/// SwiftLint's `file_length` / `type_body_length` caps.
 @MainActor
-@Suite("SearchViewModel CL-118 / T-640 (cache race)") struct SearchViewModelT640Tests {
+@Suite("SearchViewModel Try slate + browse (v2 Search overhaul 3/3)") struct SearchViewModelT640Tests {
 
-    @Test func emptyPoolAtFirstAccessDoesNotCachePartialSlate() async {
-        // T-640 / CL-118: the cold-start cache race. The view appears
-        // before `loadCategoriesIfNeeded()` resolves → first read of
-        // `displayedTrySlate` sees an empty `availableCategories` →
-        // `pickTrySlate(...)` returns the single synthesized [Latest
-        // Recipes] pill (length 1, < `trySlateVisibleCount`). Pre-fix
-        // that partial slate was cached forever and the user was
-        // locked to one pill for the session. The fix: only cache
-        // full-count slates, so the next read after categories land
-        // recomputes and the user sees the real rotation.
-        let dependencies = FakeSearchDependencies()
-        dependencies.categories = []
+    @Test func slateIsFullOnFirstReadWithoutCategoryLoad() async {
+        // Wave 3: the slate no longer waits on `loadCategoriesIfNeeded()`.
+        // A fresh viewmodel with no categories loaded still returns a full
+        // slate (pinned Latest Recipes + 9 curated chips) on the first read.
         let viewModel = SearchViewModel(
-            dependencies: dependencies,
+            dependencies: FakeSearchDependencies(),
             recentSearches: Self.scratchRecents()
         )
-        // First read: pool is empty → partial slate (just pinned).
-        let firstRead = viewModel.displayedTrySlate
-        #expect(firstRead.count == 1)
-        #expect(firstRead.first?.id == 1590)
-
-        // Categories arrive (simulating the async fetch landing).
-        dependencies.categories = Self.makeRotationPool(size: 30)
-        await viewModel.loadCategoriesIfNeeded()
-
-        // Second read: pool is now full → MUST recompute, not return
-        // the cached 1-pill slate. This is the bug T-640 fixes.
-        let secondRead = viewModel.displayedTrySlate
-        #expect(secondRead.count == SearchViewModel.trySlateVisibleCount)
-        #expect(secondRead.first?.id == 1590)
+        let slate = viewModel.displayedTrySlate
+        #expect(slate.count == SearchViewModel.trySlateVisibleCount)
+        #expect(slate.first?.isLatestRecipes == true)
     }
 
     @Test func fullSlateCachesAndIsStableAcrossReads() async {
-        // T-640 / CL-118: confirm the stable-within-session contract
-        // still holds. Once a full-count slate caches, subsequent
-        // reads return the same slate (the shuffle does not re-fire).
-        // This is the existing T-639 contract — restated here to lock
-        // it alongside the new cache-rule behavior.
-        let dependencies = FakeSearchDependencies()
-        dependencies.categories = Self.makeRotationPool(size: 30)
+        // Once a full-count slate caches, subsequent reads return the same
+        // slate (the shuffle does not re-fire) — the stable-within-session
+        // contract, restated for the constant-pool source.
         let viewModel = SearchViewModel(
-            dependencies: dependencies,
+            dependencies: FakeSearchDependencies(),
             recentSearches: Self.scratchRecents()
         )
-        await viewModel.loadCategoriesIfNeeded()
-
         let first = viewModel.displayedTrySlate
         let second = viewModel.displayedTrySlate
         #expect(first.count == SearchViewModel.trySlateVisibleCount)
         #expect(first.map(\.id) == second.map(\.id))
     }
 
-    @Test func partialPoolSmallerThanVisibleCountDoesNotCache() async {
-        // T-640 / CL-118: the cache rule fires ONLY when the slate
-        // reaches the full visible count. A pool with just Latest
-        // Recipes (no rotatable entries) produces a 1-pill slate per
-        // `pickTrySlate(...)`'s "empty rotation tail → just pinned"
-        // branch — same length as the empty-pool path, so the cache
-        // rule must also skip caching here. If the pool is later
-        // widened (e.g. REST refetch), a fresh VM read produces the
-        // full slate, which caches as expected — the L1 assertion is
-        // that the partial-slate cache rule does NOT lock the 1-pill
-        // result.
+    // MARK: - T-641 / CL-119 — Uncategorized exclusion (browse list)
+
+    @Test func browseCategories_excludes_uncategorized() async {
+        // T-641 / CL-119: the browse "Categories" list must drop the
+        // "Uncategorized" WP category (and the synthetic Latest Recipes feed)
+        // before rendering. Fixture: an Uncategorized + a Latest Recipes entry
+        // plus 5 real categories — browse must return only the 5 real ones.
         let dependencies = FakeSearchDependencies()
         dependencies.categories = [
-            DODDomain.Category(id: 1590, name: "Latest Recipes", slug: "latest-recipes", count: 0)
-        ]
-        let viewModel = SearchViewModel(
-            dependencies: dependencies,
-            recentSearches: Self.scratchRecents()
-        )
-        await viewModel.loadCategoriesIfNeeded()
-
-        let firstRead = viewModel.displayedTrySlate
-        #expect(firstRead.count == 1)
-        #expect(firstRead.first?.id == 1590)
-
-        // Widen the pool — categories grow. `loadCategoriesIfNeeded()`
-        // short-circuits when `availableCategories` is non-empty, so
-        // seed a fresh viewmodel to simulate the post-widening read.
-        // This mirrors the production sequence: a single viewmodel
-        // sees the categories land monotonically, and the cache rule
-        // ensures the partial 1-pill slate did not lock the session.
-        dependencies.categories = Self.makeRotationPool(size: 30)
-        let widerViewModel = SearchViewModel(
-            dependencies: dependencies,
-            recentSearches: Self.scratchRecents()
-        )
-        await widerViewModel.loadCategoriesIfNeeded()
-        let widerRead = widerViewModel.displayedTrySlate
-        #expect(widerRead.count == SearchViewModel.trySlateVisibleCount)
-    }
-
-    // MARK: - T-641 / CL-119 — Uncategorized exclusion
-
-    @Test func topTrySlatePool_excludes_uncategorized() async {
-        // T-641 / CL-119: the rotating Try pool must drop the
-        // "Uncategorized" WP category before the shuffle so it never
-        // surfaces as a pill (tapping it fires a literal text search
-        // for the word, which is meaningless against the cookbook
-        // corpus). Fixture: an Uncategorized entry plus 5 real
-        // categories — the pool must return the 5 real ones and omit
-        // Uncategorized entirely.
-        let dependencies = FakeSearchDependencies()
-        dependencies.categories = [
+            DODDomain.Category(id: 1590, name: "Latest Recipes", slug: "latest-recipes", count: 100),
             DODDomain.Category(id: 9999, name: "Uncategorized", slug: "uncategorized", count: 1),
             DODDomain.Category(id: 101, name: "Beef", slug: "beef", count: 50),
             DODDomain.Category(id: 102, name: "Pork", slug: "pork", count: 40),
@@ -141,17 +73,16 @@ import Testing
         )
         await viewModel.loadCategoriesIfNeeded()
 
-        let pool = viewModel.topTrySlatePool
-        #expect(pool.count == 5)
-        #expect(!pool.contains(where: { $0.slug == "uncategorized" }))
+        let browse = viewModel.browseCategories
+        #expect(browse.count == 5)
+        #expect(!browse.contains(where: { $0.slug == "uncategorized" }))
+        #expect(!browse.contains(where: { $0.id == 1590 }))
     }
 
-    @Test func topTrySlatePool_exclusion_is_case_insensitive_on_slug() async {
-        // T-641 / CL-119: the exclusion-set lookup applies
-        // `$0.slug.lowercased()` to the category side, so an
-        // upper-case-bearing slug like "Uncategorized" is still
-        // filtered. Pin that contract — a WP REST anomaly returning
-        // a non-canonical-cased slug must not silently sneak through.
+    @Test func browseCategories_exclusion_is_case_insensitive_on_slug() async {
+        // T-641 / CL-119: the exclusion-set lookup applies `$0.slug.lowercased()`
+        // to the category side, so an upper-case-bearing slug like
+        // "Uncategorized" is still filtered. Pin that contract.
         let dependencies = FakeSearchDependencies()
         dependencies.categories = [
             DODDomain.Category(id: 9999, name: "Uncategorized", slug: "Uncategorized", count: 1),
@@ -163,66 +94,16 @@ import Testing
         )
         await viewModel.loadCategoriesIfNeeded()
 
-        let pool = viewModel.topTrySlatePool
-        #expect(pool.count == 1)
-        #expect(pool.first?.slug == "beef")
-    }
-
-    @Test func pickTrySlate_does_not_surface_excluded_categories() async {
-        // T-641 / CL-119: end-to-end sanity — the production path
-        // (topTrySlatePool → pickTrySlate → displayedTrySlate) must
-        // not surface Uncategorized in the rendered slate even when
-        // the raw `availableCategories` contains it. The filter at
-        // the pool boundary is upstream of the shuffle, so the
-        // helper never sees Uncategorized in the first place.
-        let dependencies = FakeSearchDependencies()
-        var pool: [DODDomain.Category] = [
-            DODDomain.Category(id: 1590, name: "Latest Recipes", slug: "latest-recipes", count: 100),
-            DODDomain.Category(id: 9999, name: "Uncategorized", slug: "uncategorized", count: 1),
-        ]
-        // Add enough real categories to fill the visible slate so the
-        // deterministic top-up branch doesn't backfill with repeats.
-        for index in 0..<(SearchViewModel.trySlateVisibleCount + 5) {
-            pool.append(
-                DODDomain.Category(
-                    id: 200 + index,
-                    name: "Cat\(index)",
-                    slug: "cat\(index)",
-                    count: 90 - index
-                )
-            )
-        }
-        dependencies.categories = pool
-        let viewModel = SearchViewModel(
-            dependencies: dependencies,
-            recentSearches: Self.scratchRecents()
-        )
-        await viewModel.loadCategoriesIfNeeded()
-
-        let slate = viewModel.displayedTrySlate
-        #expect(slate.count == SearchViewModel.trySlateVisibleCount)
-        #expect(!slate.contains(where: { $0.slug == "uncategorized" }))
+        let browse = viewModel.browseCategories
+        #expect(browse.count == 1)
+        #expect(browse.first?.slug == "beef")
     }
 
     // MARK: - Fixtures
 
-    /// Build a rotation pool with Latest Recipes pinned at id 1590
-    /// plus N-1 rotatable categories. Used by the T-640 / CL-118
-    /// cache-race regression tests.
-    static func makeRotationPool(size: Int) -> [DODDomain.Category] {
-        (1...size).map { id in
-            DODDomain.Category(
-                id: id == 1 ? 1590 : id + 100,
-                name: id == 1 ? "Latest Recipes" : "Cat\(id)",
-                slug: id == 1 ? "latest-recipes" : "cat\(id)",
-                count: 100 - id
-            )
-        }
-    }
-
-    /// Per-test isolated UserDefaults so the disk-backed history
-    /// doesn't leak between tests on the same machine. Mirrors the
-    /// existing `SearchViewModelTests.scratchRecents()` helper.
+    /// Per-test isolated UserDefaults so the disk-backed history doesn't leak
+    /// between tests on the same machine. Mirrors the existing
+    /// `SearchViewModelTests.scratchRecents()` helper.
     static func scratchRecents() -> RecentSearches {
         let suiteName = "dod.searchT640Tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard

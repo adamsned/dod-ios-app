@@ -134,12 +134,13 @@ public final class SearchViewModel {
         Array(availableCategories.sorted { $0.count > $1.count }.prefix(5))
     }
 
-    /// US-29 amendment / CL-117 / T-639: the rotating Try slate's storage
-    /// + helpers (`topTrySlatePool`, `displayedTrySlate`, `pickTrySlate`)
-    /// live in `SearchViewModel+T639.swift` to keep this file under
-    /// SwiftLint's `file_length` cap. The backing cache is here because
-    /// stored properties can't live in extensions.
-    var cachedTrySlate: [DODDomain.Category]?
+    /// US-29 amendment / CL-117 / T-639 → v2 Search overhaul (3/3): the "Try"
+    /// slate's storage + helpers (`displayedTrySlate`, `pickTrySlate`) live in
+    /// `SearchViewModel+T639.swift` to keep this file under SwiftLint's
+    /// `file_length` cap. The backing cache is here because stored properties
+    /// can't live in extensions. Wave 3 changed the element type from
+    /// `DODDomain.Category` to `SearchTryChip` (curated 100-term pool).
+    var cachedTrySlate: [SearchTryChip]?
 
     /// Newest-first recent queries. T-779 / DUT-85: `internal(set)` (was
     /// `private(set)`) so the `+Recents` extension can refresh it on commit.
