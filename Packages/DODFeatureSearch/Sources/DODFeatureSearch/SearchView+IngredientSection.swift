@@ -52,7 +52,11 @@ extension SearchView {
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
                 .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("dod.search.ingredientSection.header")
+                // v2 Search overhaul (2/3): this tier now carries the SERVER
+                // content matches (catalog-wide recipes that USE the term) plus
+                // the local ingredient supplement — hence the task-stable
+                // `search-results-using-header` id.
+                .accessibilityIdentifier("search-results-using-header")
             switch layout {
             case .gallery:
                 ingredientGallery
