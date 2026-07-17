@@ -308,34 +308,30 @@ import Testing
     // this file stays under SwiftLint's `file_length` cap.
 
     @Test func displayedTrySlateIsStableAcrossReAccessesWithinSingleViewModel() async {
-        // T-639 / CL-117 / AC-29.7: the rotating Try slate is computed
-        // **once** per `SearchViewModel` lifetime and cached on the
-        // viewmodel so re-accesses (`IdleSuggestionsView` re-creates on
-        // tab switches / navigation) return the same slate within a
-        // session. Cold launch (= fresh viewmodel) is the only reshuffle
-        // trigger; this test pins the in-session stability.
-        let dependencies = FakeSearchDependencies()
-        dependencies.categories = (1...10).map { id in
-            DODDomain.Category(
-                id: id == 1 ? 1590 : id + 100,
-                name: id == 1 ? "Latest Recipes" : "Cat\(id)",
-                slug: id == 1 ? "latest-recipes" : "cat\(id)",
-                count: 100 - id
-            )
-        }
+        // T-639 / CL-117 → v2 Search overhaul (3/3): the "Try" slate is
+        // computed **once** per `SearchViewModel` lifetime and cached on the
+        // viewmodel so re-accesses (`IdleSuggestionsView` re-creates on tab
+        // switches / navigation) return the same slate within a session. Cold
+        // launch (= fresh viewmodel) is the only reshuffle trigger; this test
+        // pins the in-session stability. Wave 3 sources the slate from the
+        // constant 100-term pool, so it is full on the very first read (no
+        // category load required).
         let viewModel = SearchViewModel(
-            dependencies: dependencies,
+            dependencies: FakeSearchDependencies(),
             recentSearches: Self.scratchRecents()
         )
-        await viewModel.loadCategoriesIfNeeded()
 
         let first = viewModel.displayedTrySlate
         let second = viewModel.displayedTrySlate
         let third = viewModel.displayedTrySlate
+        #expect(first.count == SearchViewModel.trySlateVisibleCount)
         #expect(first.map(\.id) == second.map(\.id))
         #expect(second.map(\.id) == third.map(\.id))
-        // The pinned Latest-Recipes pill is always first on every read.
-        #expect(first.first?.id == 1590)
+        // The pinned Latest-Recipes chip is always first on every read.
+        #expect(first.first?.isLatestRecipes == true)
+        // Every non-pinned chip is drawn from the curated pool.
+        let poolSet = Set(SearchTryChips.pool)
+        #expect(first.dropFirst().allSatisfy { poolSet.contains($0.query) })
     }
 
     static func makeItem(_ id: Int, title: String = "Match") -> RecipeListItem {

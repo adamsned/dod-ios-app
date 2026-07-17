@@ -17,9 +17,16 @@ import SwiftUI
 /// by the `.idle` arm of `SearchView`'s `content` switch.
 struct IdleSuggestionsView: View {
     let recents: [String]
-    let topCategories: [DODDomain.Category]
+    /// v2 Search overhaul (3/3) — the curated "Try Searching" chips. Sourced
+    /// from `SearchViewModel/displayedTrySlate` (a per-cold-launch shuffle
+    /// over the 100-term ``SearchTryChips/pool``, Latest Recipes pinned
+    /// first). Each carries a raw search `query` + a Title-Cased `display`.
+    let tryChips: [SearchTryChip]
     let onRecentTap: (String) -> Void
-    let onCategoryTap: (DODDomain.Category) -> Void
+    /// Tap a "Try" chip → run a text search for its raw `query` (the pinned
+    /// Latest Recipes chip runs its own recent-posts fetch). Host routes both
+    /// via `SearchView`.
+    let onTryChipTap: (SearchTryChip) -> Void
     let onClearRecents: () -> Void
     /// US-33 / AC-33.3 / CL-57: per-term context-menu removal.
     let onRemoveRecent: (String) -> Void
@@ -60,7 +67,7 @@ struct IdleSuggestionsView: View {
                 // idle page (moved here from the Feed header). Always visible so a
                 // cook can jump to a random recipe before typing anything.
                 surpriseMeButton
-                if recents.isEmpty && topCategories.isEmpty && categories.isEmpty {
+                if recents.isEmpty && tryChips.isEmpty && categories.isEmpty {
                     // No recents / categories yet (e.g. first launch offline): keep
                     // the legacy "type 2 characters" hint below Surprise Me.
                     EmptyState(
@@ -79,31 +86,26 @@ struct IdleSuggestionsView: View {
                         // via `RecentSearches.clear()`.
                         recentsSection
                     }
-                    if !topCategories.isEmpty {
+                    if !tryChips.isEmpty {
+                        // v2 Search overhaul (3/3) — curated "Try Searching"
+                        // chips. Each pill's raw `query` runs a normal text
+                        // search on tap (Latest Recipes runs its own fetch),
+                        // and the label is the Title-Cased `display`.
                         section(title: "Try Searching") {
                             FlowLayout(spacing: DODSpacing.xs) {
-                                ForEach(topCategories) { category in
-                                    pill(text: category.name, systemImage: "magnifyingglass") {
-                                        onCategoryTap(category)
+                                ForEach(tryChips) { chip in
+                                    pill(text: chip.display, systemImage: "magnifyingglass") {
+                                        onTryChipTap(chip)
                                     }
-                                    // T-638 / CL-107 — stable test handle for the
-                                    // L5 E2E `test_search_latest_recipes_pill_returns_recent_branch`
-                                    // (taps the matching pill → asserts the
-                                    // result count lands in the 3...8 range,
-                                    // discriminating against the failure mode
-                                    // of a literal text search returning either
-                                    // ~0 or many random matches — pins CL-106
-                                    // part 3 + REG-21). Case-insensitive name
-                                    // match mirrors the same check `SearchView`
-                                    // uses to route the tap to
-                                    // `surfaceLatestRecipes(...)`; the
-                                    // `topCategorySuggestions` rank can drift
-                                    // as recipe counts change so a per-pill
-                                    // identifier on the matching one is the
-                                    // robust hook.
+                                    // The pinned Latest Recipes chip keeps its
+                                    // T-638 / CL-107 handle for the L5 E2E
+                                    // `test_search_latest_recipes_pill_returns_recent_branch`;
+                                    // every curated pool chip gets the stable
+                                    // `search-try-chip` handle so the smoke /
+                                    // XCUITest can find and tap one.
                                     .accessibilityIdentifier(
-                                        SearchViewModel.isLatestRecipesCategory(category)
-                                            ? "dod.search.tryPill.latestRecipes" : ""
+                                        chip.isLatestRecipes
+                                            ? "dod.search.tryPill.latestRecipes" : "search-try-chip"
                                     )
                                 }
                             }

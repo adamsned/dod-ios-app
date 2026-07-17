@@ -262,41 +262,31 @@ public struct SearchView: View {
         case .idle:
             IdleSuggestionsView(
                 recents: viewModel.recentSearches,
-                // T-639 / CL-117: source the Try pills from the rotating
-                // `displayedTrySlate` (per-cold-launch shuffle, stable
-                // within session, Latest Recipes pinned first) instead
-                // of the pre-rotation `topCategorySuggestions` top-5.
-                topCategories: viewModel.displayedTrySlate,
+                // v2 Search overhaul (3/3): source the Try chips from
+                // `displayedTrySlate` — a per-cold-launch shuffle over the
+                // curated 100-term `SearchTryChips.pool` (stable within
+                // session, Latest Recipes pinned first).
+                tryChips: viewModel.displayedTrySlate,
                 onRecentTap: { viewModel.selectRecent($0) },
-                // US-29 / AC-29.1 / CL-49.1 + CL-49.5: tapping a "Try"
-                // category pill populates the search field and runs a
-                // normal text query through the existing debounce path.
-                // The pre-T-500 path also set `filters.categoryID`, which
-                // dropped every REST result whose recipe-detail page
-                // hadn't yet hydrated the local category-IDs cache — the
-                // smoking gun behind the "tag search returns no results"
-                // round-6 report. CL-49 documents the full root cause.
+                // v2 Search overhaul (3/3): tapping a "Try" chip runs a normal
+                // TEXT search for its RAW `query` (the Title-Cased label is
+                // display-only), through the same debounce path as typing.
                 //
                 // REG-19 / CL-66 / T-670: route through
-                // `selectCuratedSuggestion(_:)` (not raw `query = ...`)
-                // so the resulting REST search does NOT persist the
-                // tapped category name into the recent-searches store.
-                // The user tapped a curated pill; they did not type the
-                // term. Persisting it makes Clear All look broken because
-                // the same curated terms reappear under Recent.
-                onCategoryTap: { category in
-                    // US-29 / AC-29.1 amendment / CL-106 (T-637): "Latest
-                    // Recipes" is special-cased — a literal `selectCuratedSuggestion`
-                    // fulltext search for the phrase returns garbage; every other
-                    // category falls through to the curated-tap path.
-                    // DUT-693 — the id-1590 / name-match test is now the canonical
-                    // `nonisolated static` predicate on the view model
-                    // (`SearchViewModel+T639.swift`); this call site and
-                    // `IdleSuggestionsView` both delegate to it.
-                    if SearchViewModel.isLatestRecipesCategory(category) {
+                // `selectCuratedSuggestion(_:)` (not raw `query = ...`) so the
+                // resulting REST search does NOT persist the tapped term into
+                // the recent-searches store. The user tapped a curated chip;
+                // they did not type the term. Persisting it makes Clear All
+                // look broken because the same curated terms reappear under
+                // Recent.
+                onTryChipTap: { chip in
+                    // CL-106 (T-637): "Latest Recipes" stays special — a
+                    // literal fulltext search for the phrase returns garbage,
+                    // so the pinned chip runs the recent-posts fetch instead.
+                    if chip.isLatestRecipes {
                         Task { await viewModel.surfaceLatestRecipes() }
                     } else {
-                        viewModel.selectCuratedSuggestion(category.name)
+                        viewModel.selectCuratedSuggestion(chip.query)
                     }
                 },
                 onClearRecents: { viewModel.clearRecentSearches() },

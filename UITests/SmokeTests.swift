@@ -261,6 +261,66 @@ final class SmokeTests: XCTestCase {
         )
     }
 
+    /// v2 Search overhaul (3/3) — the idle "Try Searching" chips now draw from
+    /// a curated 100-term pool of specific SEARCH terms (not categories), and
+    /// tapping one runs a normal TEXT search for that term (like typing it),
+    /// not a category fetch. Open Search from the Feed header, wait for a
+    /// `search-try-chip` to render, tap it, and assert the tap ran a search:
+    /// the search field now holds a term AND a result surface (title card,
+    /// content card, or the "Recipes Using" header) appears. Hits the live
+    /// API, so the timeouts are generous.
+    func test_searchTryChipRunsTextSearch() throws {
+        XCTAssertTrue(waitForAppReady(), "App should reach an interactive first screen")
+
+        let openSearch = app.buttons["feed-open-search"]
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 8),
+            "The Feed header should host the magnifying-glass search button (feed-open-search)"
+        )
+        openSearch.tap()
+
+        let searchField = app.textFields["Search Recipes"]
+        XCTAssertTrue(
+            searchField.waitForExistence(timeout: 8),
+            "Tapping feed-open-search should present the Search modal (Search Recipes field visible)"
+        )
+
+        // The curated chips render immediately (the pool is a constant, not an
+        // async category fetch), so a `search-try-chip` should exist without
+        // waiting on the network.
+        let chip = app.buttons.matching(identifier: "search-try-chip").firstMatch
+        XCTAssertTrue(
+            chip.waitForExistence(timeout: 8),
+            "The idle Search page should render curated 'Try Searching' chips (search-try-chip)"
+        )
+        chip.tap()
+
+        // The tap runs a text search: the field is populated with the term...
+        let fieldValue = (searchField.value as? String) ?? ""
+        XCTAssertFalse(
+            fieldValue.isEmpty || fieldValue == "Search Recipes",
+            "Tapping a Try chip should populate the search field with its term; got '\(fieldValue)'"
+        )
+
+        // ...and a result surface appears (title card, content card, or the
+        // "Recipes Using" header — every pool term is pre-validated to return
+        // results, so at least one should land).
+        let anyResult = NSPredicate(
+            format: "identifier == %@ OR identifier == %@ OR identifier == %@",
+            "dod.search.card",
+            "dod.search.ingredientCard",
+            "search-results-using-header"
+        )
+        let result =
+            app.descendants(matching: .any)
+            .matching(anyResult)
+            .firstMatch
+        XCTAssertTrue(
+            result.waitForExistence(timeout: 20),
+            "Tapping a Try chip should run a text search that surfaces results"
+        )
+    }
+
     func test_feedShowsAtLeastOneRecipe() {
         // Feed tab is default; just wait for content.
         let firstStaticText = app.staticTexts.matching(NSPredicate(format: "label != %@", "Recipes"))
