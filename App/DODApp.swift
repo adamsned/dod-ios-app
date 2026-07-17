@@ -1,4 +1,6 @@
 import BackgroundTasks
+import DODDesignSystem
+import DODFeatureFeed
 import DODNetworking
 import DODSupport
 import Foundation
@@ -18,6 +20,12 @@ struct DODApp: App {
 
     init() {
         applyTestLaunchOverrides()
+        // v2 "Seasoned Cast Iron" — seed the OLED-surface global from the saved
+        // appearance BEFORE first render, so a user who last chose the OLED
+        // theme gets black surfaces on the very first frame (a dynamic UIColor
+        // provider only re-runs on a trait change, which cold launch doesn't
+        // supply). RootView + SettingsView keep it in sync on later changes.
+        DODColor.isOLEDDark = AppearancePreference.fromDefaults(.standard).isOLEDDark
     }
 
     var body: some Scene {
