@@ -24,6 +24,15 @@ struct RootView: View {
     /// launch instead of losing them forever (the prompts were coupled to the
     /// one-shot onboarding flag, which is committed before they run).
     static let firstRunPromptsCompletedKey = "dod.firstRunPromptsCompletedV1"
+    /// Set synchronously the moment the onboarding CTA fires (alongside
+    /// `onboardingCompletedKey`, before the first-run prompts even start),
+    /// distinguishing "onboarded under DUT-280-aware code, prompts merely
+    /// pending/interrupted" from "onboarded under genuinely older code that
+    /// predates this whole recovery mechanism". `migrateFirstRunFlagsIfNeeded`
+    /// (DUT-400) reads this to avoid mistaking a kill-mid-first-run-setup for
+    /// the pre-DUT-280 legacy-upgrade population it was written for — see the
+    /// bug this fixes in that method's doc comment.
+    static let firstRunPromptsArmedKey = "dod.firstRunPromptsArmedV1"
 
     // Non-private so the `+Onboarding.swift` extension's `runFirstRunSetup` can
     // reach it.
