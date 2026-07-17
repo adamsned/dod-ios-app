@@ -111,13 +111,15 @@ final class SmokeTests: XCTestCase {
         try XCTSkipIf(isPad, "Bottom tabs are iPhone-only; iPad uses a sidebar.")
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 12))
-        // Tab order is Recipes → Saved → Tools → Search (Categories folded into
-        // Search in T-800 / CL-194; the Grocery List + Settings tabs retired in
-        // T-912 / CL-306 — the Shopping List folded into the new Cooking Tools
-        // hub tab, whose bottom-tab label is "Tools", and Settings moved to a
-        // header gear). Iteration order here is purely "do they all open?"; the
-        // positional guard lives in `test_tabBarOrderMatchesSpec`. Spec: AC-16.1.
-        for tabName in ["Recipes", "Saved", "Tools", "Search"] {
+        // Tab order is Recipes → Saved → Tools (Categories folded into Search in
+        // T-800 / CL-194; the Grocery List + Settings tabs retired in T-912 /
+        // CL-306 — the Shopping List folded into the new Cooking Tools hub tab,
+        // whose bottom-tab label is "Tools", and Settings moved to a header gear;
+        // the Search tab retired in the v2 Search overhaul (1/3) — Search now
+        // pushes within the Feed stack via the header magnifying glass).
+        // Iteration order here is purely "do they all open?"; the positional
+        // guard lives in `test_tabBarOrderMatchesSpec`. Spec: AC-16.1.
+        for tabName in ["Recipes", "Saved", "Tools"] {
             let button = tabBar.buttons[tabName]
             XCTAssertTrue(button.exists, "Missing tab: \(tabName)")
             button.tap()
@@ -131,27 +133,31 @@ final class SmokeTests: XCTestCase {
     /// than silently changing the user-visible layout.
     ///
     /// Asserts both directly (the button at index 1 is "Saved", index 2 is
-    /// "Tools", index 3 is "Search") and behaviorally (tapping each lands on the
-    /// expected screen — Saved shows the empty-state title from AC-5.8 on a fresh
-    /// install; the Cooking Tools hub shows its header; Search shows its search
-    /// field placeholder).
+    /// "Tools") and behaviorally (tapping each lands on the expected screen —
+    /// Saved shows the empty-state title from AC-5.8 on a fresh install; the
+    /// Cooking Tools hub shows its header). v2 Search overhaul (1/3) — Search is
+    /// no longer a 4th tab; the final assertion instead confirms the Feed
+    /// header's magnifying-glass button (`feed-open-search`) opens the Search
+    /// screen. v2 Search overhaul (2/3) — Search now presents as a BOTTOM-UP
+    /// modal (`.sheet`) rather than a push, so the tail of this test also
+    /// verifies the "Done" button (`search-done`) dismisses it back to the Feed.
     func test_tabBarOrderMatchesSpec() throws {
         try XCTSkipIf(isPad, "Bottom-tab order is an iPhone-only contract; iPad uses a sidebar (US-38 / DUT-89).")
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
         let tabButtons = tabBar.buttons.allElementsBoundByIndex
-        XCTAssertEqual(tabButtons.count, 4, "Expected exactly 4 top-level tabs")
+        XCTAssertEqual(tabButtons.count, 3, "Expected exactly 3 top-level tabs")
 
         // Position-by-position (left → right). The labels here are what a real
         // user sees on the tab bar, so they double as a readable record of the
         // spec'd order. T-912 / DUT-551 (CL-306) retired the Grocery List +
         // Settings tabs (Shopping List folded into the Cooking Tools hub, whose
-        // bottom-tab label is "Tools"; Settings moved to a header gear).
+        // bottom-tab label is "Tools"; Settings moved to a header gear). The v2
+        // Search overhaul (1/3) retired the Search tab.
         XCTAssertEqual(tabButtons[0].label, "Recipes", "Tab 1 should be Recipes")
         XCTAssertEqual(tabButtons[1].label, "Saved", "Tab 2 should be Saved")
         XCTAssertEqual(tabButtons[2].label, "Tools", "Tab 3 should be Cooking Tools (label 'Tools')")
-        XCTAssertEqual(tabButtons[3].label, "Search", "Tab 4 should be Search")
 
         // Behavioral check: tapping the second tab actually lands on Saved,
         // not on a mislabeled screen. AC-5.8 empty-state title is the
@@ -172,15 +178,41 @@ final class SmokeTests: XCTestCase {
             "Third tab should land on the Cooking Tools hub (its header is visible)"
         )
 
-        // Behavioral check: fourth tab is Search. SearchView uses a
-        // plain `TextField` (not `.searchable`) with the placeholder
-        // "Search Recipes", so the search input shows up under
-        // `app.textFields`, not `app.searchFields`.
-        tabButtons[3].tap()
+        // v2 Search overhaul (2/3) — Search is reached from the Feed header's
+        // magnifying-glass button, which now presents the Search screen as a
+        // BOTTOM-UP modal (`.sheet`). Return to Recipes, tap `feed-open-search`,
+        // and confirm SearchView's "Search Recipes" field appears in the sheet
+        // (SearchView uses a plain `TextField`, so it shows under `app.textFields`).
+        tabButtons[0].tap()
+        let openSearch = app.buttons["feed-open-search"]
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 6),
+            "The Feed header should host the magnifying-glass search button (feed-open-search)"
+        )
+        openSearch.tap()
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 6),
-            "Fourth tab should land on the Search screen (Search Recipes field visible)"
+            "Tapping feed-open-search should present the Search modal (Search Recipes field visible)"
+        )
+
+        // v2 Search overhaul (2/3) — the modal dismisses via its top-right
+        // "Done" (`search-done`, the repo sheet convention). Tapping it should
+        // tear the sheet down so the search field is gone and we're back on the
+        // Feed (its magnifying-glass button is visible again).
+        let searchDone = app.buttons["search-done"]
+        XCTAssertTrue(
+            searchDone.waitForExistence(timeout: 6),
+            "The Search modal should host a top-right Done button (search-done)"
+        )
+        searchDone.tap()
+        XCTAssertTrue(
+            searchField.waitForNonExistence(timeout: 6),
+            "Tapping Done should dismiss the Search modal (Search Recipes field gone)"
+        )
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 6),
+            "Dismissing the Search modal should return to the Feed (search button visible)"
         )
     }
 

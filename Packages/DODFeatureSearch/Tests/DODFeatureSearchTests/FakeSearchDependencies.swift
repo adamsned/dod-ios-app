@@ -216,4 +216,25 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         if let appendGate { await appendGate() }
         return shoppingListResult
     }
+
+    // v2 Search overhaul (1/3) — the "Surprise Me" full-catalog random fetch.
+    // `randomRecipe` stubs the returned pick; `randomShouldThrow` simulates the
+    // offline / server-error branch so `surpriseMe` falls back to the in-memory
+    // `RandomRecipePicker` sample. `randomRecipeCallCount` lets a re-entrancy
+    // test assert an in-flight second tap was dropped.
+    var randomRecipe: RecipeListItem?
+    var randomShouldThrow = false
+    var randomRecipeCallCount = 0
+    /// Optional gate so a test can hold a random fetch IN FLIGHT while it
+    /// launches a second concurrent `surpriseMe`, proving the `isSurpriseMeLoading`
+    /// guard drops the duplicate. `nil` (default) = the fetch returns immediately.
+    var randomGate: (@Sendable () async -> Void)?
+    func fetchRandomRecipe() async throws -> RecipeListItem {
+        randomRecipeCallCount += 1
+        if let randomGate { await randomGate() }
+        guard !randomShouldThrow, let randomRecipe else {
+            throw NSError(domain: "FakeSearchDependencies", code: -1062)
+        }
+        return randomRecipe
+    }
 }

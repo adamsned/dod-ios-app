@@ -44,12 +44,11 @@ final class TabBarSnapshotTests: XCTestCase {
         assertTabBarSnapshot(selected: .saved, device: .iPhone13)
     }
     // T-912 / DUT-551 (CL-306) — the new Cooking Tools hub tab (replaces the
-    // retired Grocery List + Settings tabs).
+    // retired Grocery List + Settings tabs). v2 Search overhaul (1/3) retired the
+    // Search tab (Search now pushes within the Feed stack), so there's no
+    // search-selected state to pin — the 3-tab bar ends here.
     func test_tabBar_cookingToolsSelected_light_iPhone13() {
         assertTabBarSnapshot(selected: .cookingTools, device: .iPhone13)
-    }
-    func test_tabBar_searchSelected_light_iPhone13() {
-        assertTabBarSnapshot(selected: .search, device: .iPhone13)
     }
 
     // MARK: - iPad 12.9"
@@ -63,9 +62,6 @@ final class TabBarSnapshotTests: XCTestCase {
     // T-912 / DUT-551 (CL-306) — the new Cooking Tools hub tab.
     func test_tabBar_cookingToolsSelected_light_iPad129() {
         assertTabBarSnapshot(selected: .cookingTools, device: .iPad129)
-    }
-    func test_tabBar_searchSelected_light_iPad129() {
-        assertTabBarSnapshot(selected: .search, device: .iPad129)
     }
 
     /// Records on missing so the very first run lays down baselines
@@ -121,7 +117,7 @@ final class TabBarSnapshotTests: XCTestCase {
 private struct TabBarFixture: View {
 
     enum Tab: Hashable, CaseIterable {
-        case feed, saved, cookingTools, search
+        case feed, saved, cookingTools
 
         var title: String {
             switch self {
@@ -131,7 +127,6 @@ private struct TabBarFixture: View {
             // full "Cooking Tools" lives in the hub header), mirroring the
             // real `AppTab.tabLabel` split.
             case .cookingTools: "Tools"
-            case .search: "Search"
             }
         }
 
@@ -140,7 +135,6 @@ private struct TabBarFixture: View {
             case .feed: "house"
             case .saved: "bookmark"
             case .cookingTools: "frying.pan"
-            case .search: "magnifyingglass"
             }
         }
     }

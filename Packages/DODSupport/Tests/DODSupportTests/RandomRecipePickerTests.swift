@@ -1,13 +1,17 @@
 import Foundation
 import Testing
 
-@testable import DODFeatureFeed
+@testable import DODSupport
 
 /// L1 unit tests for `RandomRecipePicker.pick(...)` — the pure helper behind
-/// the Feed's "Surprise Me" button (DUT-939, Android parity). Mirrors
+/// the "Surprise Me" affordance (DUT-939, Android parity). Mirrors
 /// `PickTrySlateTests`' seeded-RNG determinism pattern (T-639) so the
 /// "avoid an immediate repeat" contract is exercised without ever touching
 /// `SystemRandomNumberGenerator`.
+///
+/// v2 Search overhaul (1/3) — moved here alongside `RandomRecipePicker` when it
+/// relocated from `DODFeatureFeed` to `DODSupport` (so both Feed and Search can
+/// use it without a feature→feature import).
 @Suite("RandomRecipePicker (DUT-939)") struct RandomRecipePickerTests {
 
     @Test func empty_ids_list_returns_nil() {

@@ -131,4 +131,81 @@ extension SearchView {
             }
         }
     }
+
+    /// US-38 / AC-38.3 — the title tier's 2-col grid. Body byte-identical to the
+    /// pre-T-650 `.results` rendering. Moved here from `SearchView.swift`
+    /// (file-length relief for the v2 Surprise Me wiring); `resultsScroll`
+    /// composes it. `internal` so the shared body can reach it.
+    var galleryResults: some View {
+        LazyVGrid(
+            columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+            spacing: DODSpacing.md
+        ) {
+            ForEach(viewModel.items) { item in
+                // CL-255 — cook-time chip omitted (browse declutter); Search's
+                // time filter covers cook time for those who want it.
+                RecipeCard(
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    heroImageURL: item.heroImage,
+                    // Highlight the COMMITTED query (`lastQuery`), not the live
+                    // `query` keystroke: the debounced fetch leaves stale cards
+                    // on screen, so the live term re-highlighted every card each
+                    // keystroke over the wrong substring ("chick" vs "chic").
+                    highlightQuery: viewModel.lastQuery
+                )
+                .recipeCardTap { onSelect(item) }
+                .recipeCardContextMenu(
+                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
+                    onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
+                        }
+                    },
+                    // DUT-534 Part 2 — Search opts into the shared helper's
+                    // "Add to Shopping List" item (Categories/Saved don't).
+                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
+                )
+                // T-737 / L5: stable handle mirroring `dod.feed.card`.
+                .accessibilityIdentifier("dod.search.card")
+            }
+        }
+    }
+
+    /// US-38 / AC-38.4 — the title tier's dense single-column variant. Composes
+    /// the same tap + context-menu modifiers as the gallery so US-34 / AC-34.1 /
+    /// AC-34.6 long-press-Save/Unsave works identically. Moved here alongside
+    /// `galleryResults` (file-length relief).
+    var listResults: some View {
+        // T-782 / DUT-88 — iPad tiles the rows into a multi-column grid; iPhone
+        // keeps the single-column LazyVStack.
+        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
+            ForEach(viewModel.items) { item in
+                // CL-255 — cook-time chip omitted (browse declutter); Search's
+                // time filter covers cook time for those who want it.
+                RecipeCard.ListRow(
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    heroImageURL: item.heroImage,
+                    // Committed query — see the gallery call site's rationale.
+                    highlightQuery: viewModel.lastQuery
+                )
+                .recipeCardTap { onSelect(item) }
+                .recipeCardContextMenu(
+                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
+                    onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
+                        }
+                    },
+                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
+                )
+                .accessibilityIdentifier("dod.search.card")
+            }
+        }
+    }
 }

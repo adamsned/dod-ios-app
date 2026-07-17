@@ -36,6 +36,15 @@ public struct SearchView: View {
     /// Optional + default nil so existing callers / previews / snapshots show no
     /// gear and stay unaffected. Production wires it through `TabStack`.
     public let onOpenSettings: (() -> Void)?
+    /// v2 Search overhaul (2/3) — Search is now presented as a bottom-up modal
+    /// (`.sheet`) from the Feed header's magnifying glass, not a pushed screen.
+    /// A sheet dismisses via a top-right "Done" (the repo nav convention —
+    /// system chevron for pushes, Done for sheets). When wired, the header's
+    /// trailing slot shows this Done button instead of the Settings gear (the
+    /// modal is a focused search context; Settings stays on the Feed root).
+    /// Optional + default nil so existing callers / previews / snapshots are
+    /// unaffected. Production wires it through `TabStack`.
+    public let onDone: (() -> Void)?
 
     public init(
         viewModel: SearchViewModel,
@@ -43,7 +52,8 @@ public struct SearchView: View {
         onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         onSelectCategory: @escaping (DODDomain.Category) -> Void = { _ in },
         openShoppingList: (() -> Void)? = nil,
-        onOpenSettings: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        onDone: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
@@ -51,6 +61,7 @@ public struct SearchView: View {
         self.onSelectCategory = onSelectCategory
         self.openShoppingList = openShoppingList
         self.onOpenSettings = onOpenSettings
+        self.onDone = onDone
     }
 
     public var body: some View {
@@ -60,9 +71,22 @@ public struct SearchView: View {
             // Recipes / Saved / Settings instead of a native white nav title.
             // DUT-551 (CL-306) — Settings gear in the trailing slot when wired.
             DODScreenHeader("Search") {
-                // DUT-572 — gear only in compact width (iPhone); iPad's sidebar
-                // already has a Settings row, so it's redundant in regular width.
-                if let onOpenSettings, horizontalSizeClass == .compact {
+                // v2 Search overhaul (2/3) — presented as a bottom-up `.sheet`,
+                // so the trailing slot hosts a "Done" dismissal (the repo
+                // sheet convention). It takes precedence over the Settings gear:
+                // the modal is a focused search context and the Feed root
+                // already owns the Settings gear.
+                if let onDone {
+                    Button("Done") { onDone() }
+                        .dodFont(DODType.bodyEmphasized)
+                        .tint(DODColor.burntOrange)
+                        // 44pt HIG tap target (matches DODHeaderGearButton).
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                        .accessibilityIdentifier("search-done")
+                } else if let onOpenSettings, horizontalSizeClass == .compact {
+                    // DUT-572 — gear only in compact width (iPhone); iPad's
+                    // sidebar already has a Settings row, redundant in regular.
                     DODHeaderGearButton { onOpenSettings() }
                 }
             }
@@ -266,7 +290,11 @@ public struct SearchView: View {
                 onRemoveRecent: { viewModel.removeRecentSearch($0) },
                 // T-799 / CL-193: browse-categories list + tap handler.
                 categories: viewModel.browseCategories,
-                onCategorySelect: onSelectCategory
+                onCategorySelect: onSelectCategory,
+                // v2 Search overhaul (1/3) — Surprise Me lives on the idle page now
+                // (moved off the Feed header); it opens a random recipe via `onSelect`.
+                isSurpriseMeLoading: viewModel.isSurpriseMeLoading,
+                onSurpriseMe: { Task { await viewModel.surpriseMe(onSelect: onSelect) } }
             )
         case .searching:
             ProgressView()
@@ -318,83 +346,8 @@ public struct SearchView: View {
             resultsScroll(layout: RecipeListLayout(rawValue: layoutRaw) ?? .gallery)
         }
     }
-
-    /// US-38 / AC-38.3 — existing 2-col grid. Body byte-identical to the
-    /// pre-T-650 `.results` rendering. DUT-11: `internal` so the
-    /// `+IngredientSection` extension's `resultsScroll` can compose it.
-    var galleryResults: some View {
-        LazyVGrid(
-            columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
-            spacing: DODSpacing.md
-        ) {
-            ForEach(viewModel.items) { item in
-                // CL-255 — cook-time chip omitted (browse declutter); Search's
-                // time filter covers cook time for those who want it.
-                RecipeCard(
-                    title: item.title,
-                    excerpt: item.excerpt,
-                    heroImageURL: item.heroImage,
-                    // Highlight the COMMITTED query (`lastQuery`), not the live
-                    // `query` keystroke: the debounced fetch leaves stale cards
-                    // on screen, so the live term re-highlighted every card each
-                    // keystroke over the wrong substring ("chick" vs "chic").
-                    highlightQuery: viewModel.lastQuery
-                )
-                .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(
-                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
-                    onToggle: {
-                        // DUT-629 — optimistic flip, re-inverted on write failure.
-                        viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item) { didSave in
-                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
-                        }
-                    },
-                    // DUT-534 Part 2 — Search opts into the shared helper's
-                    // "Add to Shopping List" item (Categories/Saved don't).
-                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
-                )
-                // T-737 / L5: stable handle mirroring `dod.feed.card`.
-                .accessibilityIdentifier("dod.search.card")
-            }
-        }
-    }
-
-    /// US-38 / AC-38.4 — dense single-column variant. Composes the same
-    /// tap + context-menu modifiers as the gallery so US-34 / AC-34.1
-    /// / AC-34.6 long-press-Save/Unsave works identically. DUT-11:
-    /// `internal` so the `+IngredientSection` extension can compose it.
-    var listResults: some View {
-        // T-782 / DUT-88 — iPad tiles the rows into a multi-column grid; iPhone
-        // keeps the single-column LazyVStack.
-        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
-            ForEach(viewModel.items) { item in
-                // CL-255 — cook-time chip omitted (browse declutter); Search's
-                // time filter covers cook time for those who want it.
-                RecipeCard.ListRow(
-                    title: item.title,
-                    excerpt: item.excerpt,
-                    heroImageURL: item.heroImage,
-                    // Committed query — see the gallery call site's rationale.
-                    highlightQuery: viewModel.lastQuery
-                )
-                .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(
-                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
-                    onToggle: {
-                        // DUT-629 — optimistic flip, re-inverted on write failure.
-                        viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item) { didSave in
-                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
-                        }
-                    },
-                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
-                )
-                .accessibilityIdentifier("dod.search.card")
-            }
-        }
-    }
 }
 
-// `FlowLayout`, `FilterChipRow`, `IdleSuggestionsView`, and the DUT-25
-// search-field affordance each live in their own file (400-line cap).
+// `FlowLayout`, `FilterChipRow`, `IdleSuggestionsView` (which hosts the v2
+// Surprise Me affordance), and the DUT-25 search-field affordance each live in
+// their own file (400-line cap).

@@ -26,30 +26,34 @@ final class DiscoveryAndEmptyStateJourneysE2ETests: XCTestCase {
 
     // MARK: - Journey 1: Surprise Me
 
-    /// DUT-939 — the "Surprise Me" dice button in the Feed header routes to a
-    /// recipe detail both times it is tapped (first tap, navigate back, second
-    /// tap).  With 3 canned recipes and ``FeedViewModel.lastSurpriseID`` excluding
-    /// the previous pick, the second tap is guaranteed to land on a different
-    /// recipe, but we intentionally do NOT assert *which* recipe — only that
-    /// SOME detail opens.  The button is disabled (not hidden) while the feed has
-    /// no items, so we wait for a feed card before asserting its existence.
+    /// DUT-939 / v2 Search overhaul (1/3) — "Surprise Me" moved OFF the Feed
+    /// header and ONTO the Search page's idle state (`search-surprise-me`). It
+    /// routes to a recipe detail both times it is tapped (first tap, navigate
+    /// back to the search page, second tap). With 3 canned recipes and
+    /// ``SearchViewModel.lastSurpriseID`` excluding the previous pick, the second
+    /// tap is guaranteed to land on a different recipe, but we intentionally do
+    /// NOT assert *which* recipe — only that SOME detail opens.
     func test_surpriseMe_routes_to_recipe_detail_twice() {
         app.launchForE2E()
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "tab bar should appear")
 
-        // Feed must be loaded before the Surprise Me button is enabled.
-        let feedCards = app.buttons.matching(identifier: "dod.feed.card")
+        // Let the feed finish its first render (the network stub is then warm)
+        // before opening Search.
         XCTAssertTrue(
-            feedCards.firstMatch.waitForExistence(timeout: 10),
-            "feed cards should be visible before tapping Surprise Me"
+            app.buttons.matching(identifier: "dod.feed.card").firstMatch.waitForExistence(timeout: 10),
+            "feed should load before opening Search"
         )
 
+        // Surprise Me now lives on the Search page's idle state; open Search via
+        // the Feed header's magnifying glass.
+        XCTAssertTrue(app.openSearchFromFeed(), "should open the pushed Search screen from the Feed header")
+
         // --- First tap ---
-        let surpriseMe = app.buttons["feed-surprise-me"]
+        let surpriseMe = app.buttons["search-surprise-me"]
         XCTAssertTrue(
             surpriseMe.waitForExistence(timeout: 5),
-            "feed-surprise-me button should be present in the Feed header"
+            "search-surprise-me button should be present on the Search idle page"
         )
         surpriseMe.tap()
         XCTAssertTrue(
@@ -57,20 +61,16 @@ final class DiscoveryAndEmptyStateJourneysE2ETests: XCTestCase {
             "first Surprise Me tap should open a recipe detail (Ingredients header hydrates from JSON-LD)"
         )
 
-        // Navigate back to the feed via the navigation bar back button.
+        // Navigate back to the Search page via the navigation bar back button.
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(
-            feedCards.firstMatch.waitForExistence(timeout: 10),
-            "feed cards should be visible again after navigating back from the first Surprise Me detail"
-        )
 
         // --- Second tap ---
         // Re-query the button — element references can become stale after a nav
-        // round-trip. The button is re-enabled immediately (items are still in memory).
-        let surpriseMeAgain = app.buttons["feed-surprise-me"]
+        // round-trip.
+        let surpriseMeAgain = app.buttons["search-surprise-me"]
         XCTAssertTrue(
-            surpriseMeAgain.waitForExistence(timeout: 5),
-            "feed-surprise-me button should still be present for the second tap"
+            surpriseMeAgain.waitForExistence(timeout: 10),
+            "search-surprise-me button should be present again after navigating back for the second tap"
         )
         surpriseMeAgain.tap()
         XCTAssertTrue(
@@ -120,7 +120,10 @@ final class DiscoveryAndEmptyStateJourneysE2ETests: XCTestCase {
             "feed should finish loading before switching to Search"
         )
 
-        tabBar.buttons["Search"].tap()
+        XCTAssertTrue(
+            app.openSearchFromFeed(),
+            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
+        )
 
         // The search field is the only TextField on the Search tab.
         let field = app.textFields.firstMatch

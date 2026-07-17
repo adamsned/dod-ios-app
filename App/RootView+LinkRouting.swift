@@ -179,15 +179,15 @@ extension RootView {
         route(control: pending)
     }
 
-    /// The external-route sink for one tab. Feed/Saved/Search each own a
-    /// FIFO queue so both layouts (phone tabs + iPad split detail) can hand
-    /// every `TabStack` its own; Settings renders no article surface, so it
-    /// keeps the inert constant.
+    /// The external-route sink for one tab. Feed/Saved each own a FIFO queue so
+    /// both layouts (phone tabs + iPad split detail) can hand every `TabStack`
+    /// its own; the Cooking Tools hub renders no article surface, so it keeps
+    /// the inert constant. Search is no longer a tab (v2 Search overhaul 1/3) —
+    /// it's pushed within the Feed stack, so its article links ride the Feed sink.
     func externalRouteBinding(for tab: AppTab) -> Binding<ExternalRouteQueue> {
         switch tab {
         case .feed: return $feedExternalRoute
         case .saved: return $savedExternalRoute
-        case .search: return $searchExternalRoute
         // T-912 / DUT-551 — the Cooking Tools hub renders no article surface, so
         // it keeps the inert constant (as the retired Grocery/Settings tabs did).
         case .cookingTools: return .constant(ExternalRouteQueue())
@@ -291,8 +291,7 @@ extension RootView {
         switch destination {
         case .feed: feedExternalRoute.enqueue(.push(route))
         case .saved: savedExternalRoute.enqueue(.push(route))
-        case .search: searchExternalRoute.enqueue(.push(route))
-        // unreachable: linkRoutingDestination only ever yields feed/saved/search
+        // unreachable: linkRoutingDestination only ever yields feed/saved
         // (it redirects the Cooking Tools hub — no article stack — to feed).
         case .cookingTools: break
         }

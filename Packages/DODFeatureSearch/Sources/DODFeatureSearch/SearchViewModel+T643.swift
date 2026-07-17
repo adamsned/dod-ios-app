@@ -319,4 +319,15 @@ extension SearchViewModel {
             cachedTitles: cachedTitles
         )
     }
+
+    /// Send the AC-3.6 SHA-256-hashed query to analytics on each completed
+    /// search. T-779 / DUT-85 moved recent-recording out of this path into
+    /// ``commitRecentSearch()`` (Return / keyboard dismissal only), so this no
+    /// longer persists to the recents store. The finalize hop above calls it.
+    /// Relocated here from `SearchViewModel.swift` (file-length relief for the
+    /// v2 Surprise Me stored state).
+    func sendSearchTelemetry(trimmed: String) async {
+        let hash = StringHasher.sha256Hex(trimmed)
+        await dependencies.sendSearchTelemetry(queryHash: hash)
+    }
 }

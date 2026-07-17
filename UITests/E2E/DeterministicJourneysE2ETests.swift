@@ -27,7 +27,10 @@ final class DeterministicJourneysE2ETests: XCTestCase {
             app.buttons.matching(identifier: "dod.feed.card").firstMatch.waitForExistence(timeout: 10),
             "feed should load before switching to Search"
         )
-        tabBar.buttons["Search"].tap()
+        XCTAssertTrue(
+            app.openSearchFromFeed(),
+            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
+        )
 
         let field = app.textFields.firstMatch  // the search field is the only text field here
         XCTAssertTrue(field.waitForExistence(timeout: 8), "search field should appear")

@@ -70,8 +70,11 @@ struct RootView: View {
     @State var deepLinkErrorMessage: String?
     // Per-tab external-route sinks. Feed carries deep links (App Intents /
     // Spotlight, spec.md US-10, replace semantics) AND in-app link taps;
-    // Saved + Search exist so an article link tapped there opens in place
-    // instead of yanking the user to Feed (DUT-243, push semantics).
+    // Saved exists so an article link tapped there opens in place instead of
+    // yanking the user to Feed (DUT-243, push semantics). The retired Search
+    // tab (v2 Search overhaul 1/3) no longer needs its own sink — Search is
+    // now a bottom-up modal presented over the Feed (overhaul 2/3) hosting its
+    // own NavigationStack, so it doesn't participate in the per-tab route sinks.
     // Non-private so the `+LinkRouting.swift` extension can write them.
     //
     // DUT-463 / DUT-464 / DUT-319 — these were single-slot `ExternalRoute?`
@@ -81,7 +84,6 @@ struct RootView: View {
     // route and `TabStack` drains it on appear + on change, dropping stale ones.
     @State var feedExternalRoute = ExternalRouteQueue()
     @State var savedExternalRoute = ExternalRouteQueue()
-    @State var searchExternalRoute = ExternalRouteQueue()
     /// DUT-250 — per-tab navigation stacks, hoisted out of `TabStack`'s local
     /// `@State` into `RootView` so they SURVIVE the iPad size-class flip. `body`
     /// swaps structurally different trees at the `.regular` boundary —

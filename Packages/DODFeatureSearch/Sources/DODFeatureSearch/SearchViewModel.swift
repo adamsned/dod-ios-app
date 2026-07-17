@@ -105,6 +105,13 @@ public final class SearchViewModel {
     /// DUT — bumped only on a genuine Save/Unsave (see `+SavedState`); drives
     /// `SearchView`'s `.selection` haptic. Mirrors Categories' `saveToggleCount`.
     public internal(set) var saveToggleCount: Int = 0
+    /// v2 Search overhaul (1/3) — Surprise Me state (behavior lives in
+    /// `SearchViewModel+SurpriseMe.swift`; stored here because extensions can't add
+    /// stored properties). `lastSurpriseID` avoids an immediate repeat via
+    /// `RandomRecipePicker`; `isSurpriseMeLoading` drives the idle button's spinner
+    /// + in-flight guard. `internal(set)` so the extension advances them.
+    public internal(set) var lastSurpriseID: Int?
+    public internal(set) var isSurpriseMeLoading = false
     /// DUT-534 Part 2 — Shopping List snackbar copy + optional trailing action
     /// title ("View"), driven by `SearchViewModel+ShoppingList`, rendered by
     /// `SearchView`. `nil` message hides the snackbar.
@@ -334,16 +341,8 @@ public final class SearchViewModel {
     }
 
     // CL-121 (T-643) + DUT-11: the `performSearch` helpers (fan-out / Path A / B
-    // / merge / finish / finalize) live in `SearchViewModel+T643.swift`.
-
-    /// Send the AC-3.6 SHA-256-hashed query to analytics on each completed
-    /// search. T-779 / DUT-85 moved recent-recording out of this path into
-    /// ``commitRecentSearch()`` (Return / keyboard dismissal only), so this no
-    /// longer persists to the recents store. `+T643`'s finalize hop calls it.
-    func sendSearchTelemetry(trimmed: String) async {
-        let hash = StringHasher.sha256Hex(trimmed)
-        await dependencies.sendSearchTelemetry(queryHash: hash)
-    }
+    // / merge / finish / finalize) — and `sendSearchTelemetry(trimmed:)`, which
+    // that finalize hop calls — live in `SearchViewModel+T643.swift`.
 
     /// Re-rank the cached merged set when filters change. Pure function over
     /// stored state — no I/O (apart from the optional cook-time hydration
