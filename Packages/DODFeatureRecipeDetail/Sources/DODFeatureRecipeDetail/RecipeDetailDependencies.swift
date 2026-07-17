@@ -340,9 +340,15 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         try JSONLDRecipeParser.parse(html: html, merging: merging, canonicalURL: canonicalURL)
     }
 
+    /// Fetches 5 (one more than the 4 the strip shows) so the caller's
+    /// self-exclusion filter (`loadRelated` drops the recipe currently being
+    /// viewed, which can appear in its own category's listing) still has a
+    /// full 4 to show after filtering. Deliberately does NOT truncate to 4
+    /// here — truncating before the caller filters could drop the one buffer
+    /// item that would have backfilled a self-match, silently under-filling
+    /// the strip to 3.
     public func relatedRecipes(forCategoryID categoryID: Int) async throws -> [RecipeListItem] {
-        let items = try await client.posts(categoryID: categoryID, page: 1, perPage: 5)
-        return Array(items.prefix(4))
+        try await client.posts(categoryID: categoryID, page: 1, perPage: 5)
     }
 
     public func mergeDetail(_ recipe: Recipe) async throws {
