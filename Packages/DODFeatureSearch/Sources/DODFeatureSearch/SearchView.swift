@@ -10,6 +10,12 @@ public struct SearchView: View {
     // when rendering the ingredient tier. Same cross-file-extension reason
     // the `SearchViewModel` storage was promoted from `private` (CL-106).
     @State var viewModel: SearchViewModel
+    /// v2 Search overhaul (2/3) — tracks search-field keyboard focus so the
+    /// type-ahead suggestions only show WHILE the user is actively typing (they
+    /// hide once the keyboard dismisses / a card is tapped). Fed by
+    /// `DODSearchField`'s `onFocusChange`. `internal` so the
+    /// `SearchView+Suggestions.swift` extension can gate the list on it.
+    @State var isFieldFocused = false
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     // DUT-700 PR-A — Reduce-Motion gate for the shopping-list snackbar ease.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -100,6 +106,8 @@ public struct SearchView: View {
                 // T-779 / DUT-85: record a Recent on keyboard dismissal (focus
                 // loss), not on every live debounced search.
                 onFocusChange: { focused in
+                    // v2 Search overhaul (2/3): drive the type-ahead visibility.
+                    isFieldFocused = focused
                     if !focused { viewModel.commitRecentSearch() }
                 }
             )
@@ -107,6 +115,12 @@ public struct SearchView: View {
             .onSubmit { viewModel.commitRecentSearch() }
             .padding(DODSpacing.md)
             .accessibilityIdentifier("dod.search.field.search")
+            // v2 Search overhaul (2/3) — type-ahead suggestions, shown directly
+            // under the field WHILE it's focused and the local title pool
+            // yielded matches. Lives in `SearchView+Suggestions.swift`.
+            if isFieldFocused, !viewModel.suggestions.isEmpty {
+                suggestionsList
+            }
             // US-12 / AC-12.2 amendment / CL-106 (T-637): hide the filter
             // chip row while idle — the `IdleSuggestionsView` "Try" /
             // "Recent" layout below already serves as the discovery

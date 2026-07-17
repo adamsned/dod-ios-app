@@ -216,6 +216,51 @@ final class SmokeTests: XCTestCase {
         )
     }
 
+    /// v2 Search overhaul (2/3) — typing an ingredient into the Search modal
+    /// must surface catalog-wide recipes that USE it. Before this overhaul the
+    /// server's content matches were discarded by the title-precision filter, so
+    /// an ingredient query returned only the handful of recipes with the term in
+    /// the title (often zero). This test opens Search from the Feed header, types
+    /// a common ingredient, and asserts a result card OR the "Recipes Using"
+    /// section header appears — i.e. content matches now survive. Hits the live
+    /// API, so the timeouts are generous.
+    func test_searchIngredientSurfacesResults() throws {
+        XCTAssertTrue(waitForAppReady(), "App should reach an interactive first screen")
+
+        let openSearch = app.buttons["feed-open-search"]
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 8),
+            "The Feed header should host the magnifying-glass search button (feed-open-search)"
+        )
+        openSearch.tap()
+
+        let searchField = app.textFields["Search Recipes"]
+        XCTAssertTrue(
+            searchField.waitForExistence(timeout: 8),
+            "Tapping feed-open-search should present the Search modal (Search Recipes field visible)"
+        )
+        searchField.tap()
+        searchField.typeText("chicken")
+
+        // A title card (`dod.search.card`), an ingredient/content card
+        // (`dod.search.ingredientCard`), or the "Recipes Using" header
+        // (`search-results-using-header`) — any one proves results surfaced.
+        let anyResult = NSPredicate(
+            format: "identifier == %@ OR identifier == %@ OR identifier == %@",
+            "dod.search.card",
+            "dod.search.ingredientCard",
+            "search-results-using-header"
+        )
+        let result =
+            app.descendants(matching: .any)
+            .matching(anyResult)
+            .firstMatch
+        XCTAssertTrue(
+            result.waitForExistence(timeout: 20),
+            "Searching an ingredient should surface recipe results (title or 'Recipes Using' tier)"
+        )
+    }
+
     func test_feedShowsAtLeastOneRecipe() {
         // Feed tab is default; just wait for content.
         let firstStaticText = app.staticTexts.matching(NSPredicate(format: "label != %@", "Recipes"))

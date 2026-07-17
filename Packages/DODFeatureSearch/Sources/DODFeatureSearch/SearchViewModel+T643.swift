@@ -168,23 +168,45 @@ extension SearchViewModel {
         let restFailed: Bool
     }
 
+    /// The two feeds of the "Recipes Using <term>" tier, bundled so
+    /// `finishTextSearch` stays under SwiftLint's parameter-count cap:
+    /// `contentMatches` are the SERVER body/ingredient hits (WP relevance
+    /// order), `localItems` the LOCAL ingredient-index supplement.
+    struct UsingTierSources {
+        let contentMatches: [RecipeListItem]
+        let localItems: [RecipeListItem]
+    }
+
     func finishTextSearch(
         merged: [RecipeListItem],
-        localItems: [RecipeListItem],
+        usingSources: UsingTierSources,
         trimmed: String,
         network: NetworkOutcome,
         generation: Int
     ) async {
         // H1: a newer search may have started while we awaited the fan-out.
         guard generation == searchGeneration else { return }
-        let titleIDs = Set(merged.map(\.id))
-        let ingredientOnly = localItems.filter { !titleIDs.contains($0.id) }
+        let contentMatches = usingSources.contentMatches
+        let localItems = usingSources.localItems
+        // v2 Search overhaul (2/3): the "Recipes Using <term>" tier is now the
+        // union of the SERVER content matches (WP relevance order — recipes
+        // whose ingredients/method contain the term, catalog-wide) and the
+        // LOCAL ingredient index (an offline supplement, capped ~100 LRU). The
+        // server tier leads because it's catalog-wide and relevance-ranked; the
+        // local index only adds rows the server pass didn't already return.
+        // Everything is deduped against the title tier AND against each other,
+        // so no recipe card is shown twice.
+        let usingTier = usingTierItems(
+            titleMerged: merged,
+            contentMatches: contentMatches,
+            localItems: localItems
+        )
 
         // True offline state only when BOTH tiers are empty. A local
         // ingredient hit needs no network, so it keeps the user on a results
         // screen even with REST down — the offline-resilience win DUT-11
         // unlocks on top of CL-120's title-precision contract.
-        if merged.isEmpty, ingredientOnly.isEmpty, !network.online {
+        if merged.isEmpty, usingTier.isEmpty, !network.online {
             state = .offline
             items = []
             ingredientItems = []
@@ -192,12 +214,12 @@ extension SearchViewModel {
         }
 
         // DUT-622: the online REST request FAILED (threw, not "returned zero")
-        // and no local ingredient tier covers it. Surface a retryable `.error`
+        // and no fallback tier covers it. Surface a retryable `.error`
         // instead of falling through to `.noResults` ("No recipes match
         // '<query>'"), which reads as "we searched and found nothing" and offers
         // no recovery. `restFailed` is only ever `true` while `online`, so this
         // never masks the offline branch above.
-        if merged.isEmpty, ingredientOnly.isEmpty, network.restFailed {
+        if merged.isEmpty, usingTier.isEmpty, network.restFailed {
             state = .error
             items = []
             ingredientItems = []
@@ -212,9 +234,31 @@ extension SearchViewModel {
         lastMergedRESTOrdering = merged
         lastMergedLocalOrdering = localItems
         lastSurface = .textQuery
-        ingredientItems = ingredientOnly
+        ingredientItems = usingTier
 
         await applyFiltersAndFinalize(merged: merged, trimmed: trimmed, generation: generation)
+    }
+
+    /// Build the "Recipes Using <term>" tier: server content matches (WP
+    /// relevance order) first, then the local ingredient-index supplement,
+    /// deduped against the title tier AND each other so no card repeats. Pure
+    /// value-type function; no I/O.
+    func usingTierItems(
+        titleMerged: [RecipeListItem],
+        contentMatches: [RecipeListItem],
+        localItems: [RecipeListItem]
+    ) -> [RecipeListItem] {
+        var seen = Set(titleMerged.map(\.id))
+        var tier: [RecipeListItem] = []
+        for item in contentMatches where !seen.contains(item.id) {
+            tier.append(item)
+            seen.insert(item.id)
+        }
+        for item in localItems where !seen.contains(item.id) {
+            tier.append(item)
+            seen.insert(item.id)
+        }
+        return tier
     }
 
     /// Final hop of `performSearch()`: hydrate the filter-support maps,
