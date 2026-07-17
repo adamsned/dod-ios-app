@@ -1,0 +1,2 @@
+timestamp	model	prompt_tokens	completion_tokens	total	label
+2026-07-17T20:36:41+00:00	qwen2.5-coder:14b	594	157	751	attached-vulgar-fraction-draft-discarded-rewritten-by-reviewer

@@ -16,6 +16,9 @@ import Foundation
 /// - "Cook 1.5 hours" → 5400s (decimal)
 /// - "Whisk for 45 seconds" / "45 sec" → 45s
 /// - "Steep for ½ hour" → 1800s (Unicode vulgar fraction)
+/// - "Braise for 2½ hours" → 9000s (digit + attached Unicode vulgar
+///   fraction, no space — the shape produced by decoding `&frac12;` right
+///   after a digit)
 ///
 /// Out of scope (returns `nil`):
 /// - Word numerals: "ten minutes", "half an hour"
@@ -150,16 +153,28 @@ public enum StepTimerParser {
         if let attached = readAttachedFraction(in: text, whole: whole, after: wholeRange) {
             return attached
         }
+        if let attachedVulgar = readAttachedVulgarFraction(in: text, whole: whole, after: wholeRange) {
+            return attachedVulgar
+        }
         if let mixed = readMixedNumberSuffix(in: text, whole: whole, after: wholeRange) {
             return mixed
         }
         return Quantity(value: whole, after: wholeRange)
     }
 
-    /// Read consecutive digits, returning the end index.
+    /// Read consecutive ASCII decimal digits, returning the end index.
+    ///
+    /// `Character.isNumber` is true for more than "0"-"9" — it also
+    /// matches Unicode "Number, Other" characters like the vulgar fraction
+    /// "½". An attached mixed number with no separating space (e.g. "2½",
+    /// the shape produced by decoding `&frac12;` right after a digit) would
+    /// otherwise have its fraction glyph folded into the same integer scan,
+    /// yielding the substring "2½" which fails `Double(...)` parsing and
+    /// silently becomes 0. Restricting the scan to ASCII digits keeps the
+    /// fraction glyph available for `readAttachedVulgarFraction` below.
     private static func scanInteger(in text: String, from index: String.Index) -> String.Index {
         var cursor = index
-        while cursor < text.endIndex, text[cursor].isNumber {
+        while cursor < text.endIndex, text[cursor].isASCII, text[cursor].isNumber {
             cursor = text.index(after: cursor)
         }
         return cursor
@@ -194,6 +209,21 @@ public enum StepTimerParser {
             denominator > 0
         else { return nil }
         return Quantity(value: whole / denominator, after: denomEnd)
+    }
+
+    /// "2½" (attached, no whitespace, Unicode vulgar fraction). Returns nil
+    /// when there's no character at `after` or it isn't a recognized vulgar
+    /// fraction. This is what lets a digit immediately followed by
+    /// "½"/"¼"/etc. (the shape produced by decoding `&frac12;` right after a
+    /// digit, with no space) resolve as a mixed number instead of losing the
+    /// whole-number part.
+    private static func readAttachedVulgarFraction(
+        in text: String,
+        whole: Double,
+        after: String.Index
+    ) -> Quantity? {
+        guard after < text.endIndex, let fracValue = vulgarFraction(text[after]) else { return nil }
+        return Quantity(value: whole + fracValue, after: text.index(after: after))
     }
 
     /// "1 1/2" or "1 ½" — whole number, whitespace, then a fraction.

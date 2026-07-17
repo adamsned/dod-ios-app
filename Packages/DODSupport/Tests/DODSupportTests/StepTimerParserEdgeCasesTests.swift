@@ -281,6 +281,47 @@ import Testing
         #expect(result == .seconds(1800))
     }
 
+    // MARK: - Attached Unicode vulgar fraction (no Linear ticket — found during bug-hunt)
+
+    @Test func attachedVulgarFractionRealRecipeInstruction() {
+        // Exact live WPRM instruction text (dutchovendaddy.com pork
+        // belly burnt ends), decoded from "&frac12;" — the digit and the
+        // fraction glyph sit with no space between them. Before the fix,
+        // `scanInteger` swallowed "½" into the same digit scan as "2"
+        // (Character.isNumber is true for vulgar fractions too), producing
+        // the unparsable substring "2½", silently defaulting the quantity to
+        // 0, and returning nil — no Cook Mode timer at all for this step.
+        let input =
+            "Braise for 2 to 2½ hours, until internal temperature reaches "
+            + "200-205°F and cubes are fork-tender. Check temperature at the 2-hour mark."
+        #expect(StepTimerParser.firstDuration(in: input) == .seconds(9000))
+    }
+
+    @Test func attachedVulgarFractionHours() {
+        // "2½ hours" (no space) must resolve to 2.5 hours, matching the
+        // already-supported spaced form "2 ½ hours".
+        #expect(StepTimerParser.firstDuration(in: "Bake for 2½ hours") == .seconds(9000))
+    }
+
+    @Test func attachedVulgarFractionOneAndAHalf() {
+        // "1½ hours" (no space) → 90 minutes, same value as the existing
+        // spaced-form test `unicodeMixedNumber` ("1 ½ hours").
+        #expect(StepTimerParser.firstDuration(in: "Bake for 1½ hours") == .seconds(90 * 60))
+    }
+
+    @Test func attachedVulgarQuarterMinutes() {
+        // "10¼ minutes" (no space) → 10.25 * 60 = 615 seconds.
+        #expect(StepTimerParser.firstDuration(in: "Wait 10¼ minutes") == .seconds(615))
+    }
+
+    @Test func plainIntegerStillStopsAtNonDigit() {
+        // Regression guard for the `scanInteger` fix itself: an ordinary
+        // integer quantity followed by a non-fraction, non-digit character
+        // must still stop cleanly at that character (unaffected by
+        // restricting the scan to ASCII digits).
+        #expect(StepTimerParser.firstDuration(in: "Bake for 20 minutes.") == .seconds(20 * 60))
+    }
+
     // MARK: - Rounding and precision
 
     @Test func fractionRoundingToInteger() {
