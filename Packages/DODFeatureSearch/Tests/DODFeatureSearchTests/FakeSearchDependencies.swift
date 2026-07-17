@@ -101,8 +101,19 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         return result
     }
 
+    /// Concurrency-hunt seam: a test can hold the DUT-314 lazy filter-support
+    /// hydration's `totalSeconds(forRecipeIDs:)` cache read IN FLIGHT while a
+    /// sibling cook-time hydration Task (`fetchTotalSeconds`, no gate) lands
+    /// and merges its own entries into `lastTotalSecondsByRecipe` first —
+    /// proving whether the DUT-314 completion's write clobbers that merge.
+    /// `nil` (default) = the call returns immediately.
+    var totalSecondsGate: (@Sendable () async -> Void)?
+
     func totalSeconds(forRecipeIDs ids: [Int]) async throws -> [Int: Int] {
         totalSecondsCalls.append(ids)
+        if let totalSecondsGate {
+            await totalSecondsGate()
+        }
         var result: [Int: Int] = [:]
         for id in ids {
             if let seconds = totalSecondsMap[id] {
