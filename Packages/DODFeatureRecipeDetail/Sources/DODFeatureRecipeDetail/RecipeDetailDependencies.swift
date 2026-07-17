@@ -351,9 +351,10 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         try JSONLDRecipeParser.parse(html: html, merging: merging, canonicalURL: canonicalURL)
     }
 
+    /// Fetches 5 (one more than the strip shows) and does NOT truncate here, so
+    /// the caller's self-exclusion filter still has a full 4 after filtering.
     public func relatedRecipes(forCategoryID categoryID: Int) async throws -> [RecipeListItem] {
-        let items = try await client.posts(categoryID: categoryID, page: 1, perPage: 5)
-        return Array(items.prefix(4))
+        try await client.posts(categoryID: categoryID, page: 1, perPage: 5)
     }
 
     public func mergeDetail(_ recipe: Recipe) async throws {

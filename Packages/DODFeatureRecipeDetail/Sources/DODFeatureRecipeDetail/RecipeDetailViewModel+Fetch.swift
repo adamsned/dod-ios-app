@@ -288,6 +288,10 @@ extension RecipeDetailViewModel {
             return
         }
         let fetched = try? await dependencies.relatedRecipes(forCategoryID: categoryID)
-        related = (fetched ?? []).filter { $0.id != listItem.id }
+        // Filter the current recipe out FIRST, then cap to 4 — so a self-match
+        // (this recipe appearing in its own category's listing) doesn't burn
+        // one of the 4 shown slots. `relatedRecipes` deliberately over-fetches
+        // by one for exactly this reason.
+        related = Array((fetched ?? []).filter { $0.id != listItem.id }.prefix(4))
     }
 }
