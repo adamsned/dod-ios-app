@@ -18,6 +18,11 @@ extension RootView {
             onFinish: {
                 guard showOnboarding else { return }  // DUT-407: ignore a double-tap
                 UserDefaults.standard.set(true, forKey: Self.onboardingCompletedKey)
+                // Recorded in the SAME synchronous beat as `onboardingCompletedKey`
+                // (see that key's doc comment / `shouldMigrateFirstRunFlags`) so a
+                // kill immediately after this tap is never confused for a
+                // pre-DUT-280 legacy install by `migrateFirstRunFlagsIfNeeded`.
+                UserDefaults.standard.set(true, forKey: Self.firstRunPromptsArmedKey)
                 // First-run prompts (skipped under the onboarding UI test, which
                 // can't dismiss the system dialogs). Arm the pending flag BEFORE
                 // dismissing so it's set no matter how fast the dismiss animation
@@ -150,12 +155,32 @@ extension RootView {
     /// before `firstRunPromptsCompletedKey` existed would otherwise get the recovery
     /// prompts fired unprompted on their first updated launch. Mark complete instead.
     /// A one-time, idempotent set; a fresh install (onboarding not done) is untouched.
+    ///
+    /// Bug fixed here: `onboardingCompletedKey == true && firstRunPromptsCompletedKey
+    /// == nil` is ALSO exactly the state of a brand-new, fully-current install that
+    /// completed the onboarding CTA and then had the app killed before either
+    /// first-run prompt resolved — the very case DUT-280's `firstRunPromptsCompletedKey`
+    /// recovery (see `needsFirstRunPrompts` in `RootView.body`'s `.task`) exists to
+    /// catch. Before this fix, this migration ran unconditionally on that state and
+    /// stamped `firstRunPromptsCompletedKey = true` regardless, permanently defeating
+    /// DUT-280's recovery: the notification-permission and iCloud-Sync prompts would
+    /// never be asked again on that install. `firstRunPromptsArmedKey` disambiguates —
+    /// it's set synchronously the instant onboarding completes under this
+    /// (post-DUT-280) code, so its presence means "this is an interrupted CURRENT
+    /// flow, not a legacy upgrade" and migration must be skipped.
     @MainActor
     func migrateFirstRunFlagsIfNeeded() {
-        let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: Self.onboardingCompletedKey),
-            defaults.object(forKey: Self.firstRunPromptsCompletedKey) == nil
-        else { return }
-        defaults.set(true, forKey: Self.firstRunPromptsCompletedKey)
+        guard Self.shouldMigrateFirstRunFlags(in: .standard) else { return }
+        UserDefaults.standard.set(true, forKey: Self.firstRunPromptsCompletedKey)
+    }
+
+    /// Pure decision logic for `migrateFirstRunFlagsIfNeeded` (DUT-400), extracted
+    /// so it's unit-testable without a SwiftUI host — mirrors the
+    /// `RootView.linkRoutingDestination(for:)` extraction pattern. `nonisolated`
+    /// so it can be called from a test without hopping to `@MainActor`.
+    nonisolated static func shouldMigrateFirstRunFlags(in defaults: UserDefaults) -> Bool {
+        defaults.bool(forKey: Self.onboardingCompletedKey)
+            && defaults.object(forKey: Self.firstRunPromptsCompletedKey) == nil
+            && defaults.object(forKey: Self.firstRunPromptsArmedKey) == nil
     }
 }
