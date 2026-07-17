@@ -16,7 +16,7 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     CODE_SIGN_STYLE: Automatic
     GENERATE_INFOPLIST_FILE: NO
-    MARKETING_VERSION: "1.0"
+    MARKETING_VERSION: "2.0"
     CURRENT_PROJECT_VERSION: "4"
 
 # Signing team is injected from a gitignored xcconfig so the Apple Team ID
@@ -121,6 +121,13 @@ targets:
         # this from `CURRENT_PROJECT_VERSION`; it hardcodes "1" as the
         # default unless explicitly set here.
         CFBundleVersion: "5"
+        # The marketing/display version the Settings footer shows
+        # (SettingsViewModel.versionFooter reads CFBundleShortVersionString).
+        # Tied to MARKETING_VERSION so there's ONE source of truth — XcodeGen
+        # otherwise defaults this key to a literal "1.0" in the generated
+        # Info.plist, decoupled from the build setting. Bump MARKETING_VERSION
+        # (settings.base) to move both.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         LSRequiresIPhoneOS: true
         # UILaunchScreen is required for iOS to render edge-to-edge on
         # modern devices (notch, Dynamic Island, home indicator). Without
@@ -260,6 +267,9 @@ targets:
         # extension contract — version skew between host + extension
         # rejected at upload).
         CFBundleVersion: "5"
+        # Match the host app's display version (Apple rejects skew between an
+        # app and its extensions). Tracks MARKETING_VERSION like the app.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -290,6 +300,9 @@ targets:
         # MUST match the host app's CFBundleVersion (Apple's bundle-
         # extension contract).
         CFBundleVersion: "5"
+        # Match the host app's display version (Apple rejects skew between an
+        # app and its extensions). Tracks MARKETING_VERSION like the app.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
