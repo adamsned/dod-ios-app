@@ -39,8 +39,9 @@ enum E2ETestSupport {
     /// blocks it before we get here.
     /// T-912 / DUT-551 (CL-306) — the Grocery List + Settings tabs retired (the
     /// Shopping List folded into the Cooking Tools hub, whose bottom-tab label is
-    /// "Tools"; Settings moved to a header gear). Four tabs now.
-    static let tabLabels: Set<String> = ["Recipes", "Saved", "Tools", "Search"]
+    /// "Tools"; Settings moved to a header gear). v2 Search overhaul (1/3) retired
+    /// the Search tab too (Search now pushes within the Feed stack). Three tabs now.
+    static let tabLabels: Set<String> = ["Recipes", "Saved", "Tools"]
 }
 
 extension XCUIApplication {
@@ -82,5 +83,25 @@ extension XCUIApplication {
 
         launchArguments.append(contentsOf: extraLaunchArguments)
         launch()
+    }
+
+    /// v2 Search overhaul (1/3) — open the Search screen the way a user now does:
+    /// Search is no longer a bottom tab. It's PUSHED within the Feed tab's stack
+    /// via the header's magnifying-glass button (`feed-open-search`). This helper
+    /// re-selects the Recipes tab (idempotent; re-tapping the selected tab pops
+    /// its stack to root) and taps that button, so any journey that used to do
+    /// `tabBar.buttons["Search"].tap()` can call `app.openSearchFromFeed()`
+    /// instead. Waits for the pushed SearchView's "Search Recipes" field so the
+    /// caller can act immediately.
+    @discardableResult
+    func openSearchFromFeed(timeout: TimeInterval = 10) -> Bool {
+        let tabBar = tabBars.firstMatch
+        if tabBar.buttons["Recipes"].exists {
+            tabBar.buttons["Recipes"].tap()
+        }
+        let openSearch = buttons["feed-open-search"]
+        guard openSearch.waitForExistence(timeout: timeout) else { return false }
+        openSearch.tap()
+        return textFields["Search Recipes"].waitForExistence(timeout: timeout)
     }
 }

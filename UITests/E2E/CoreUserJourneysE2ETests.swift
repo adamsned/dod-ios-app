@@ -95,7 +95,10 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         // DeterministicJourneysE2ETests) and is index-stable across tab-set
         // changes — DUT-536 inserted the Grocery List tab, shifting Search
         // from positional index 2 to 4, so positional taps are brittle.
-        tabBar.buttons["Search"].tap()
+        XCTAssertTrue(
+            app.openSearchFromFeed(),
+            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
+        )
 
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
@@ -398,7 +401,10 @@ final class CoreUserJourneysE2ETests: XCTestCase {
 
         // Switch to Search tab (name-based — index-stable across the DUT-536
         // 4→5 tab-set change that added the Grocery List tab).
-        tabBar.buttons["Search"].tap()
+        XCTAssertTrue(
+            app.openSearchFromFeed(),
+            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
+        )
 
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
@@ -425,7 +431,10 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
-        tabBar.buttons["Search"].tap()
+        XCTAssertTrue(
+            app.openSearchFromFeed(),
+            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
+        )
 
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
@@ -468,7 +477,10 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
-        tabBar.buttons["Search"].tap()
+        XCTAssertTrue(
+            app.openSearchFromFeed(),
+            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
+        )
 
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
@@ -591,7 +603,10 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
-        tabBar.buttons["Search"].tap()
+        XCTAssertTrue(
+            app.openSearchFromFeed(),
+            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
+        )
 
         // Wait for `loadCategoriesIfNeeded()` to populate
         // `topCategorySuggestions` so the Try pills render. The pill we

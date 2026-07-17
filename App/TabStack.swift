@@ -90,8 +90,11 @@ struct TabStack: View {
     /// fails to persist (`saveFromCard` returned `false`). Nil when hidden;
     /// surfaced via the reused ``DeepLinkErrorSnackbar`` overlay on `body`.
     /// Mirrors the DUT-549 deep-link failure snackbar so a silent catch no
-    /// longer leaves the user without feedback.
-    @State private var saveErrorMessage: String?
+    /// longer leaves the user without feedback. Internal (no `private`) so the
+    /// `destination(for:)` builder extracted to `TabStack+Destination.swift`
+    /// (file-length relief) can set it, mirroring how `TabStack+CardSave.swift`
+    /// reaches the shared statics.
+    @State var saveErrorMessage: String?
 
     init(
         tab: AppTab,
@@ -226,34 +229,14 @@ struct TabStack: View {
                 // DUT-571 — both hero CTAs open the guided path; DUT — "Or Cook a Dump
                 // Cake" (true) scrolls to Anytime Treats, primary "Start" (false) doesn't.
                 onStartFirstCookout: { startFirstCookout(false) },
-                onCookDumpCake: { startFirstCookout(true) }
-            )
-        case .search:
-            SearchView(
-                viewModel: SearchViewModel(dependencies: dependencies.searchDependencies()),
-                onSelect: { item in path.append(.recipe(item: item)) },
-                onSave: { item, report in
-                    Task {
-                        let didSave = await Self.saveFromCard(
-                            item: item,
-                            store: dependencies.store,
-                            publisher: dependencies.savedWidgetPublisher()
-                        )
-                        report(didSave)  // DUT-629 — revert optimistic flip on failure
-                        if !didSave { saveErrorMessage = Self.saveFailedMessage }  // DUT-693
-                    }
-                },
-                // T-799 / CL-193: browse-category tap → push the category's
-                // recipes. `.category` resolves via the shared
-                // `navigationDestination(for: RecipeRoute.self)` →
-                // `CategoryRecipesView`. Since T-800 (CL-194 / DUT-113)
-                // removed the Categories tab, this is now the only entry
-                // point into the category-browse → recipes flow.
-                onSelectCategory: { category in path.append(.category(category)) },
-                // DUT-534 Part 2 — the card snackbar's "View" opens the Shopping
-                // List, same closure Recipe Detail's Part 1 snackbar routes to.
-                openShoppingList: openShoppingList,
-                onOpenSettings: onOpenSettings  // DUT-551 (CL-306) — header gear
+                onCookDumpCake: { startFirstCookout(true) },
+                // v2 Search overhaul (1/3) — the Feed header's magnifying-glass
+                // button PUSHES the Search screen within THIS tab's stack (Search
+                // is no longer a tab). The `.search` route resolves via the shared
+                // `navigationDestination(for: RecipeRoute.self)` → `SearchView`.
+                // `DODFeatureFeed` can't import `DODFeatureSearch` (CL-122), so the
+                // header calls this injected closure and the App shell does the push.
+                onOpenSearch: { path.append(.search) }
             )
         case .saved:
             SavedView(
@@ -289,68 +272,10 @@ struct TabStack: View {
         }
     }
 
-    @ViewBuilder
-    private func destination(for route: RecipeRoute) -> some View {
-        switch route {
-        case .recipe(let item, let autoStartCookMode):
-            let canonical =
-                item.canonicalURL
-                ?? URL(string: "https://www.dutchovendaddy.com/") ?? URL(filePath: "/")
-            RecipeDetailView(
-                viewModel: RecipeDetailViewModel(
-                    listItem: item,
-                    canonicalURL: canonical,
-                    dependencies: dependencies.recipeDetailDependencies(),
-                    // DUT-546 — inject the shared store so a block on one open
-                    // recipe screen live-hides that author on another.
-                    commentModeration: commentModeration
-                ),
-                onSelectRelated: { related in path.append(.recipe(item: related)) },
-                autoStartCookMode: autoStartCookMode,
-                // DUT-534 — the Snackbar "View" action opens the Shopping List.
-                openShoppingList: openShoppingList,
-                // DUT-535 — present the ingredient-selection sheet on "Add to
-                // Shopping List" (pick which ingredients), replacing the DUT-534
-                // immediate add-all.
-                addToShoppingListSheet: dependencies.addToShoppingListSheetBuilder(),
-                // T-912 / DUT-551 — the per-recipe Heat Coach nudge routes to the
-                // hub tool; the Cook Mode heat-step shortcut presents Heat Coach
-                // as a sheet over the full-screen cover (a tab switch would be
-                // invisible beneath it).
-                openHeatCoach: openHeatCoach,
-                heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) }
-            )
-            .onAppear {
-                Telemetry.shared.send(.screenView(name: "recipe_detail"))
-            }
-        case .category(let category):
-            CategoryRecipesView(
-                viewModel: CategoryRecipesViewModel(
-                    category: category,
-                    dependencies: dependencies.categoriesDependencies()
-                ),
-                onSelect: { item in path.append(.recipe(item: item)) },
-                onSave: { item, report in
-                    Task {
-                        let didSave = await Self.saveFromCard(
-                            item: item,
-                            store: dependencies.store,
-                            publisher: dependencies.savedWidgetPublisher()
-                        )
-                        report(didSave)  // DUT-629 — revert optimistic flip on failure
-                        if !didSave { saveErrorMessage = Self.saveFailedMessage }  // DUT-693
-                    }
-                }
-            )
-            .onAppear {
-                Telemetry.shared.send(.screenView(name: "category_recipes"))
-            }
-        }
-    }
-
-    // `saveFromCard(...)` (the shared card-save path, DUT-629) and
-    // `listItem(from:)` live in `TabStack+CardSave.swift` (keeps this file under
-    // the SwiftLint `file_length` cap).
+    // The pushed-destination builder `destination(for:)` lives in
+    // `TabStack+Destination.swift`, and `saveFromCard(...)` / `listItem(from:)`
+    // in `TabStack+CardSave.swift`, so this file stays under the SwiftLint
+    // `file_length` cap.
 
     /// Service a widget deep link by pushing the recipe detail onto our
     /// path. Resolution preference, best → worst:

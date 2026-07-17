@@ -59,6 +59,14 @@ public struct FeedView: View {
     /// section — there's no distinct dump-cake route). Optional; wired through
     /// `TabStack` → `RootView.route(toHubTool: .firstCookout)`.
     public let onCookDumpCake: (() -> Void)?
+    /// v2 Search overhaul (1/3) — the header's magnifying-glass button opens the
+    /// Search screen, PUSHED within the Feed tab's own navigation stack (Search
+    /// is no longer a tab). `DODFeatureFeed` must not import `DODFeatureSearch`
+    /// (no feature→feature edge, CL-122), so the button calls this INJECTED
+    /// closure and the App shell fulfills it by appending the `.search` route to
+    /// the Feed path (mirrors `onStartFirstCookout` / `onOpenSettings`). Optional
+    /// so tests / previews can omit it — nil renders no search button.
+    public let onOpenSearch: (() -> Void)?
 
     /// DUT-571 — the cook's real next un-cooked rung, loaded in a `.task` (see
     /// `FeedView+FirstCookoutHero`). `nil` before it loads OR once the cook has
@@ -85,7 +93,8 @@ public struct FeedView: View {
         openShoppingList: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
         onStartFirstCookout: (() -> Void)? = nil,
-        onCookDumpCake: (() -> Void)? = nil
+        onCookDumpCake: (() -> Void)? = nil,
+        onOpenSearch: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
@@ -94,6 +103,7 @@ public struct FeedView: View {
         self.onOpenSettings = onOpenSettings
         self.onStartFirstCookout = onStartFirstCookout
         self.onCookDumpCake = onCookDumpCake
+        self.onOpenSearch = onOpenSearch
     }
 
     public var body: some View {
@@ -146,58 +156,48 @@ public struct FeedView: View {
         .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
-    /// T-912 / DUT-551 (CL-306) — the Settings gear in the Feed header trailing
-    /// slot. Settings left the tab bar; the gear opens it as a sheet via the
-    /// injected `onOpenSettings` closure (`RootView.showSettingsSheet`). Rendered
-    /// only when wired, so tests / previews that omit the closure show no gear.
-    /// Uses the shared, bigger ``DODHeaderGearButton`` so the gear matches the
-    /// Saved / Cooking Tools / Search headers exactly.
-    /// The Feed header's trailing slot. Groups the owner-only compose button
-    /// (Daddy Mode, Phase 1) with the long-standing Settings gear in one HStack
-    /// (`DODScreenHeader`'s trailing is a single `@ViewBuilder`). The compose
-    /// button self-gates on owner status, so non-owners see only the gear —
-    /// byte-identical to the pre-Daddy-Mode header.
+    /// The Feed header's trailing slot. Groups the v2 Search overhaul (1/3)
+    /// magnifying-glass ``searchButton`` (which replaced the old "Surprise Me"
+    /// dice — Surprise Me moved onto the search page) with the owner-only compose
+    /// button (Daddy Mode, Phase 1) and the long-standing Settings gear in one
+    /// HStack (`DODScreenHeader`'s trailing is a single `@ViewBuilder`). The
+    /// compose button self-gates on owner status; the Settings gear opens the
+    /// Settings sheet via the injected `onOpenSettings` closure
+    /// (`RootView.showSettingsSheet`) using the shared ``DODHeaderGearButton`` so
+    /// it matches the Saved / Cooking Tools / Search headers exactly.
     @ViewBuilder
     private var headerTrailing: some View {
         HStack(spacing: DODSpacing.xs) {
-            surpriseMeButton
+            searchButton
             composeButton
             settingsGear
         }
     }
 
-    /// DUT-939 — "Surprise Me" (Android parity: Android already ships a
-    /// random-recipe entry point, iOS didn't). Mirrors ``composeButton``'s
-    /// styling (44pt hit target, burnt-orange tint) so it reads as the same
-    /// family of header affordance as the gear/compose buttons. Disabled
-    /// (not hidden) while the feed has no items yet, so the header layout
-    /// never shifts as the initial load resolves.
-    ///
-    /// DUT-1062: `surpriseMe(onSelect:)` is now `async` — it fetches a truly
-    /// random recipe from the full WP catalog (falling back to the old
-    /// in-memory sample only if that fetch fails), so the tap now spawns a
-    /// `Task` and the button shows a spinner in place of the dice glyph
-    /// while `isSurpriseMeLoading`, plus disables re-tapping mid-fetch.
+    /// v2 Search overhaul (1/3) — the Search entry point. Replaces the old
+    /// "Surprise Me" dice (Surprise Me moved onto the search page's idle
+    /// state). Tapping calls the injected ``onOpenSearch`` closure, which the
+    /// App shell fulfills by PUSHING the Search screen within the Feed tab's
+    /// own navigation stack (Search is no longer a tab). Mirrors the other
+    /// header buttons' treatment: a 44pt hit target with the burnt-orange tint
+    /// on the icon only (never a full fill). Rendered only when wired, so tests
+    /// / previews that omit the closure show no search button and the header
+    /// layout stays byte-identical for them.
     @ViewBuilder
-    private var surpriseMeButton: some View {
-        Button {
-            Task { await viewModel.surpriseMe(onSelect: onSelect) }
-        } label: {
-            Group {
-                if viewModel.isSurpriseMeLoading {
-                    ProgressView()
-                } else {
-                    Image(systemName: "dice.fill")
-                        .font(.title2)
-                }
+    private var searchButton: some View {
+        if let onOpenSearch {
+            Button {
+                onOpenSearch()
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.title2)
+                    .accessibilityLabel("Search")
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
-            .accessibilityLabel("Surprise Me")
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
+            .tint(DODColor.burntOrange)
+            .accessibilityIdentifier("feed-open-search")
         }
-        .tint(DODColor.burntOrange)
-        .accessibilityIdentifier("feed-surprise-me")
-        .disabled(viewModel.items.isEmpty || viewModel.isSurpriseMeLoading)
     }
 
     /// Daddy Mode (Phase 1, cosmetic) — the owner-only compose entry point.

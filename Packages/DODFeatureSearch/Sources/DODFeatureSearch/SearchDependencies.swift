@@ -103,11 +103,24 @@ public protocol SearchDependencies: Sendable {
     /// `.couldntLoad` keeps existing fake conformers compiling and degrades
     /// gracefully when unwired.
     func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
+
+    /// v2 Search overhaul (1/3) — fetch ONE truly-random recipe from the full
+    /// WP catalog (server-side `orderby=rand`), backing the "Surprise Me"
+    /// affordance that moved from the Feed header onto the Search page's idle
+    /// state. Mirrors `FeedDependencies.fetchRandomRecipe()` (DUT-1062): both
+    /// route to `WPRestClient.randomPost()`. Default throws so existing fake
+    /// conformers that don't care about this path get a benign failure —
+    /// `SearchViewModel.surpriseMe` then falls back to the in-memory
+    /// `RandomRecipePicker` sample rather than leaving the button dead.
+    func fetchRandomRecipe() async throws -> RecipeListItem
 }
 
 extension SearchDependencies {
     public func savedRecipeIDs() async throws -> Set<Int> { [] }
     public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult { .couldntLoad }
+    public func fetchRandomRecipe() async throws -> RecipeListItem {
+        throw WPClientError.underlying(message: "fetchRandomRecipe not wired")
+    }
 }
 
 public struct LiveSearchDependencies: SearchDependencies {
@@ -153,6 +166,13 @@ public struct LiveSearchDependencies: SearchDependencies {
 
     public func search(query: String) async throws -> [RecipeListItem] {
         try await client.search(query: query)
+    }
+
+    /// v2 Search overhaul (1/3) — routes to `WPRestClient.randomPost()`
+    /// (server-side `orderby=rand`), the same endpoint `LiveFeedDependencies`
+    /// uses, giving the Search page's "Surprise Me" a true full-catalog sample.
+    public func fetchRandomRecipe() async throws -> RecipeListItem {
+        try await client.randomPost()
     }
 
     public func searchIngredients(matching query: String) async throws -> [Int] {

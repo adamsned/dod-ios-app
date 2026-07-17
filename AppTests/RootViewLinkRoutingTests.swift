@@ -12,7 +12,9 @@ final class RootViewLinkRoutingTests: XCTestCase {
     func testLinkStaysInTheTabItWasTappedFrom() {
         XCTAssertEqual(RootView.linkRoutingDestination(for: .feed), .feed)
         XCTAssertEqual(RootView.linkRoutingDestination(for: .saved), .saved)
-        XCTAssertEqual(RootView.linkRoutingDestination(for: .search), .search)
+        // v2 Search overhaul (1/3) — Search is no longer a tab, so there's no
+        // `.search` origin to assert here; a link tapped on the pushed search
+        // page rides the Feed stack (the tab it lives in).
     }
 
     func testCookingToolsLinkRedirectsToFeed() {

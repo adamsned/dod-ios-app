@@ -32,6 +32,15 @@ struct IdleSuggestionsView: View {
     /// Tap a category row → push that category's recipe list
     /// (`CategoryRecipesView`); `TabStack` wires it to `path.append(.category)`.
     let onCategorySelect: (DODDomain.Category) -> Void
+    /// v2 Search overhaul (1/3) — true while the "Surprise Me" random-recipe
+    /// fetch is in flight; the button shows a spinner in place of the dice and
+    /// disables re-tapping. Bound from ``SearchViewModel/isSurpriseMeLoading``.
+    let isSurpriseMeLoading: Bool
+    /// v2 Search overhaul (1/3) — tap the "Surprise Me" affordance. Surprise Me
+    /// moved OFF the Feed header and ONTO this idle page. `SearchView` wires this
+    /// to `viewModel.surpriseMe(onSelect:)`, which fetches a random recipe and
+    /// navigates to it via the screen's existing `onSelect`.
+    let onSurpriseMe: () -> Void
 
     /// DUT — "Clear All" wipes the persisted recent-searches store, an
     /// irreversible destructive action. Gate it behind a confirmation, mirroring
@@ -45,15 +54,22 @@ struct IdleSuggestionsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        if recents.isEmpty && topCategories.isEmpty && categories.isEmpty {
-            EmptyState(
-                systemImage: "magnifyingglass",
-                title: "Find a recipe",
-                message: "Type at least 2 characters to search."
-            )
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: DODSpacing.lg) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                // v2 Search overhaul (1/3) — Surprise Me pinned at the top of the
+                // idle page (moved here from the Feed header). Always visible so a
+                // cook can jump to a random recipe before typing anything.
+                surpriseMeButton
+                if recents.isEmpty && topCategories.isEmpty && categories.isEmpty {
+                    // No recents / categories yet (e.g. first launch offline): keep
+                    // the legacy "type 2 characters" hint below Surprise Me.
+                    EmptyState(
+                        systemImage: "magnifyingglass",
+                        title: "Find a Recipe",
+                        message: "Type at least 2 characters to search."
+                    )
+                    .frame(maxWidth: .infinity)
+                } else {
                     if !recents.isEmpty {
                         // US-29 / AC-29.2 / CL-49.2: the "Recent" section
                         // header is rendered with the title at the
@@ -100,13 +116,62 @@ struct IdleSuggestionsView: View {
                         categoriesSection
                     }
                 }
-                .padding(DODSpacing.md)
-                // DUT — bound the idle content to a comfortable reading column on
-                // iPad (regular width) instead of stretching edge-to-edge across
-                // the split-view pane; compact returns self → iPhone unchanged.
-                .readableContentColumn(horizontalSizeClass)
             }
+            .padding(DODSpacing.md)
+            // DUT — bound the idle content to a comfortable reading column on
+            // iPad (regular width) instead of stretching edge-to-edge across
+            // the split-view pane; compact returns self → iPhone unchanged.
+            .readableContentColumn(horizontalSizeClass)
         }
+    }
+
+    /// v2 Search overhaul (1/3) — the "Surprise Me" affordance. Surprise Me
+    /// moved OFF the Feed header and ONTO this idle page: it fetches a random
+    /// recipe and navigates straight to it via the screen's `onSelect`. Rendered
+    /// as a card/cell (`DODRadius.standard`, per the corner-radius token rule)
+    /// with the burnt-orange accent on the dice ICON only (never a full fill),
+    /// matching the header-affordance treatment. While a fetch is in flight the
+    /// dice swaps for a spinner and re-tapping is disabled.
+    private var surpriseMeButton: some View {
+        Button {
+            onSurpriseMe()
+        } label: {
+            HStack(spacing: DODSpacing.sm) {
+                Group {
+                    if isSurpriseMeLoading {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "dice.fill")
+                            .foregroundStyle(DODColor.burntOrange)
+                    }
+                }
+                .frame(width: 24)
+                Text("Surprise Me")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                Spacer(minLength: DODSpacing.xs)
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, DODSpacing.md)
+            .padding(.vertical, DODSpacing.sm)
+            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                    .fill(DODColor.surfaceElevated)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isSurpriseMeLoading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Surprise Me")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("search-surprise-me")
+        // DUT — pointer lift on iPad (see `categoryRow`); no-op on iPhone.
+        .pointerHoverHighlight()
     }
 
     private var recentsSection: some View {

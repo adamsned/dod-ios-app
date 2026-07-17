@@ -1,12 +1,17 @@
 import Foundation
 
-/// DUT-939 — pure random-recipe-selection logic backing the Feed's
-/// "Surprise Me" button (Android parity: Android already ships this, iOS
-/// didn't). Mirrors `SearchViewModel.pickTrySlate`'s `inout any
-/// RandomNumberGenerator` seam (T-639) so unit tests get a deterministic,
-/// seeded pick while production draws from the kernel-seeded
-/// `SystemRandomNumberGenerator` — same contract, same reason (a cold-launch
-/// shuffle that isn't reproducible in prod but IS reproducible under test).
+/// DUT-939 — pure random-recipe-selection logic behind the "Surprise Me"
+/// affordance (Android parity: Android already ships this, iOS didn't). Mirrors
+/// `SearchViewModel.pickTrySlate`'s `inout any RandomNumberGenerator` seam
+/// (T-639) so unit tests get a deterministic, seeded pick while production draws
+/// from the kernel-seeded `SystemRandomNumberGenerator` — same contract, same
+/// reason (a cold-launch shuffle that isn't reproducible in prod but IS
+/// reproducible under test).
+///
+/// v2 Search overhaul (1/3) — relocated from `DODFeatureFeed` to `DODSupport`
+/// (a shared lower package) so BOTH the Feed and the Search feature packages can
+/// reach it without a feature→feature import (CL-122). Surprise Me now lives on
+/// the search page; the Feed's own Surprise Me path still calls it too.
 public enum RandomRecipePicker {
 
     /// Picks a random recipe id from `ids`, avoiding an immediate repeat of
