@@ -150,12 +150,21 @@ struct RootView: View {
     var body: some View {
         Group {
             if horizontalSizeClass == .regular {
-                iPadSplit
+                // v2 "Seasoned Cast Iron" — `.id(appearance)` on the tab CONTENT
+                // (not the outer `Group`, so the Settings `.sheet` stays
+                // presented) forces re-resolution of the dynamic surface colors:
+                // Cocoa→Seasoned is a dark→dark switch, so the `DODColor` UIColor
+                // providers wouldn't otherwise re-run. See `syncOLEDDarkFlag()`.
+                iPadSplit.id(appearance)
             } else {
-                phoneTabs
+                phoneTabs.id(appearance)
             }
         }
         .preferredColorScheme(preferredColorScheme(for: appearance))
+        // v2 — keep `DODColor.isOLEDDark` in lock-step with the preference so the
+        // forced re-resolution above reads the correct flag (see extension).
+        .onAppear { syncOLEDDarkFlag() }
+        .onChange(of: appearance) { syncOLEDDarkFlag() }
         .animation(.easeInOut(duration: 0.2), value: appearance)
         .task {
             await dependencies.bootstrap()

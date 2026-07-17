@@ -26,17 +26,29 @@ public enum AppearancePreference: String, CaseIterable, Sendable, Hashable {
     case system
     case light
     case dark
+    /// A THIRD, true-OLED dark theme (v2). Deep black `#000000` background with
+    /// slightly-lighter-gray elevated surfaces; cream text + burnt-orange accent
+    /// carry over from ``dark`` ("Cocoa") unchanged. It does NOT replace Cocoa —
+    /// Cocoa stays the default dark. iOS only exposes light/dark traits, so a
+    /// second dark theme can't be a new asset appearance; instead this maps to
+    /// the `.dark` `colorScheme` and flips ``isOLEDDark``, which the app hands to
+    /// `DODColor.isOLEDDark` so the four surface tokens resolve to OLED hexes
+    /// under the dark trait. Raw value "seasonedCastIron" is the persisted wire
+    /// format — never rename without a migration shim.
+    case seasonedCastIron
 
     /// Human-readable label rendered in the picker row. T-763 / CL-160
     /// (DUT-69) — the two explicit-scheme labels carry brand personality:
     /// `.light` → "Flour", `.dark` → "Cocoa" (the `rawValue`s + the
     /// `colorScheme` mapping are unchanged, so a saved preference is
-    /// preserved). "Match System" stays plain.
+    /// preserved). "Match System" stays plain. v2 adds `.seasonedCastIron`
+    /// → "Seasoned Cast Iron" (the true-OLED dark theme).
     public var displayName: String {
         switch self {
         case .system: "Match System"
         case .light: "Flour"
         case .dark: "Cocoa"
+        case .seasonedCastIron: "Seasoned Cast Iron"
         }
     }
 
@@ -45,13 +57,24 @@ public enum AppearancePreference: String, CaseIterable, Sendable, Hashable {
     /// setting), `.light` / `.dark` → the forced scheme. Single source of
     /// truth reused by both `RootView` (main window) and `SettingsView`
     /// (the Settings sheet's own live theme — fixes DUT-62 bug 2).
+    /// `.seasonedCastIron` is a dark theme, so it forces `.dark` — the OLED
+    /// surface swap is layered on top via ``isOLEDDark`` (there is no distinct
+    /// iOS trait for a second dark appearance).
     public var colorScheme: ColorScheme? {
         switch self {
         case .system: nil
         case .light: .light
-        case .dark: .dark
+        case .dark, .seasonedCastIron: .dark
         }
     }
+
+    /// v2 — whether this preference is the true-OLED "Seasoned Cast Iron"
+    /// theme. The app reads this and sets `DODColor.isOLEDDark` (a plain
+    /// process-global in DODDesignSystem, which cannot import this module) so
+    /// the four background/surface tokens resolve to their OLED hexes under the
+    /// dark trait. Every other case (including "Cocoa") is `false`, leaving the
+    /// asset-catalog dark values untouched.
+    public var isOLEDDark: Bool { self == .seasonedCastIron }
 
     /// Default-aware read. An absent key OR an unknown raw value falls
     /// back to ``system`` so a malformed migration / forward-compat

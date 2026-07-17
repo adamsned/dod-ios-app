@@ -88,6 +88,14 @@ public struct SettingsView: View {
         VStack(spacing: 0) {
             content
         }
+        // v2 "Seasoned Cast Iron" — force the sheet's content subtree to
+        // re-resolve its dynamic surface colors when the theme changes.
+        // Cocoa→Seasoned is a dark→dark switch, so `.preferredColorScheme`
+        // below reports no trait change and the `DODColor` UIColor providers
+        // wouldn't otherwise re-run. Keyed here (inside the NavigationStack the
+        // sheet wraps in `RootView+Settings.swift`) so the nav chrome + Done
+        // button survive; the List may reset its scroll offset on a theme pick.
+        .id(viewModel.appearance)
         .background(DODColor.surface)
         // DUT-551 (CL-306) — Settings is now a pushed-feeling sheet: an inline
         // nav title + a leading back button (below) that dismisses it, replacing
