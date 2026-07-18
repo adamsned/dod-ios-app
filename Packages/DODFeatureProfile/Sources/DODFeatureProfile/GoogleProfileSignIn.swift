@@ -124,7 +124,12 @@ public struct GoogleProfileSignIn: Sendable {
             refreshToken: resolved.refreshToken,
             provider: .google
         )
-        try? sessionStore.save(googleSession)
+        // (this bug) — the Google mirror of DUT-928: a Keychain WRITE failure
+        // here means the user is NOT actually signed in. `try?` used to swallow
+        // this and fall through returning `signedIn: true`, the same "signs in
+        // but doesn't stick" bug DUT-928 already fixed on the Apple side. See
+        // `persistSession` below (mirrors `AppleProfileSignIn.persistSession`).
+        if let failure = persistSession(googleSession, resolved: resolved) { return failure }
 
         var profileSaved = false
         var profileWriteFailed = false
@@ -156,5 +161,30 @@ public struct GoogleProfileSignIn: Sendable {
             signedIn: true,
             profileWriteFailed: profileWriteFailed
         )
+    }
+
+    /// (this bug) — the Google mirror of `AppleProfileSignIn.persistSession`.
+    /// Returns `nil` on success, or the "not signed in" failure ``Outcome``
+    /// (carrying the raw `OSStatus`) when the Keychain WRITE throws — so the
+    /// caller returns it directly instead of the former silent `try?`-
+    /// swallowed success that left the user believing they were signed in via
+    /// Google while nothing persisted.
+    private func persistSession(
+        _ session: AppleAuthSession,
+        resolved: AppleAuthSession
+    ) -> AppleProfileSignIn.Outcome? {
+        do {
+            try sessionStore.save(session)
+            return nil
+        } catch {
+            return AppleProfileSignIn.Outcome(
+                displayName: resolved.displayName,
+                email: resolved.email,
+                profileSaved: false,
+                signedIn: false,
+                sessionSaveFailed: true,
+                sessionSaveStatus: AppleProfileSignIn.keychainStatus(from: error)
+            )
+        }
     }
 }
