@@ -290,7 +290,20 @@ extension CookJournalEntryView {
         photoCleared = true
     }
 
+    // DUT — `@MainActor` explicit (the struct itself isn't globally isolated):
+    // without it, two racing calls run truly concurrently instead of
+    // serializing through the main actor, and the `guard !isSaving` check
+    // below becomes a check-then-act data race instead of an atomic guard.
+    // Mirrors `ProfileEditView.handleSave()`'s explicit `@MainActor`.
+    @MainActor
     private func save() async {
+        // DUT — synchronous double-tap guard: set BEFORE the first await (the
+        // photo write / `onSave` calls below) so a fast second tap that races in
+        // before the toolbar Save button's `.disabled(isSaving)` visually
+        // updates is dropped rather than firing a duplicate photo write +
+        // `onSave` call. Mirrors `ProfileEditView.handleSave()` /
+        // `RecipeDetailViewModel.submitRatingAndComment()`.
+        guard !isSaving else { return }
         isSaving = true
         var photoID = entry.photoLocalID
         if let data = pendingImageData {
@@ -324,8 +337,13 @@ extension CookJournalEntryView {
 
     /// DUT-514 — delete this entry, then pop back to the journal (which reloads +
     /// recomputes its stats in its own `onDelete` handler).
+    ///
+    /// DUT — `@MainActor` explicit; see `save()`'s doc comment above for why.
+    @MainActor
     private func deleteEntry() async {
         guard let onDelete else { return }
+        // DUT — same synchronous double-tap guard as `save()` above.
+        guard !isSaving else { return }
         isSaving = true
         await onDelete()
         dismiss()
