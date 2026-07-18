@@ -20,6 +20,16 @@ extension CookModeView {
                 .foregroundStyle(DODColor.label)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                // Dynamic Type: `recipe.title` is an unbounded, WPRM-authored
+                // string (the same content DUT-527 found truncating to
+                // "Veget…" on the recipe card at large accessibility text
+                // sizes). This header keeps the single-line "now playing"
+                // layout, but — mirroring the `.minimumScaleFactor` mitigation
+                // `SidebarProfileRow` already applies to the same
+                // `DODType.heading` + `.lineLimit(1)` shape (DUT-695) — shrinks
+                // the title to fit rather than clipping it to a couple of
+                // words with no way to recover the rest.
+                .minimumScaleFactor(0.7)
                 .padding(.horizontal, 56)
                 .frame(maxWidth: .infinity)
                 .accessibilityAddTraits(.isHeader)
