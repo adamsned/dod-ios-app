@@ -15,10 +15,9 @@ public struct DODScreenHeader<Trailing: View>: View {
     private let trailing: Trailing
     /// US-43 Phase c (T-712) — when true, the ``DODBrandMark`` emblem (44pt) sits
     /// on the leading edge of the header row, before the section title, as the
-    /// magazine masthead. A single clean row: emblem + "Recipes & Articles" title
-    /// + trailing actions. Defaults `false` so every other tab's header (and its
-    /// L4 baseline) renders byte-identical; only the Feed opts in, gated by
-    /// ``DODFeed/layoutVariantStorageKey``.
+    /// masthead. A single clean row: emblem + "Recipes & Articles" title +
+    /// trailing actions. Defaults `false` so every other tab's header (and its
+    /// L4 baseline) renders byte-identical; only the Feed opts in.
     private let showsBrandMark: Bool
 
     public init(_ title: String, showsBrandMark: Bool = false, @ViewBuilder trailing: () -> Trailing) {

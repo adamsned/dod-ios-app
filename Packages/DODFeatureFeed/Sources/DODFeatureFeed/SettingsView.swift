@@ -256,8 +256,6 @@ public struct SettingsView: View {
                 .tint(DODColor.burntOrange)
                 .accessibilityIdentifier("settings-picker-appearance")
                 LayoutSettingPicker()
-                // US-43 Phase b/c/d (T-711..T-713) — Classic/Magazine register.
-                FeedLayoutVariantPicker()
 
                 VoiceRows(viewModel: viewModel)
 
