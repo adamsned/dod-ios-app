@@ -26,6 +26,11 @@ public final class SavedViewModel {
     /// is a partial projection that doesn't carry its categories.
     public private(set) var dessertIDs: Set<Int> = []
     public private(set) var loadState: LoadState = .idle
+    /// DUT — bumped only on a genuine user-initiated Unsave tap (never on
+    /// appear/refresh reconciliation) so the view can fire a
+    /// `.sensoryFeedback(.selection, trigger:)` haptic. Mirrors
+    /// `CategoryRecipesViewModel`/`FeedViewModel` (DUT-697).
+    public private(set) var saveToggleCount: Int = 0
 
     /// DUT-105 — the user's collections / cookbooks, shelf-ordered. Reloaded in
     /// ``refresh()`` (so a cross-device change surfaces) and after every CRUD
@@ -283,6 +288,11 @@ public final class SavedViewModel {
         pendingRemovals[id] = PendingRemoval(markedAt: .now, markedDate: .now)
         recipes.removeAll { $0.id == id }
         loadState = recipes.isEmpty ? .empty : .loaded
+        // DUT — the sole call site of this method is the genuine user-tap
+        // Unsave handler in `SavedView`, so every call here is a real toggle;
+        // bumping unconditionally is safe (mirrors `CategoryRecipesViewModel`'s
+        // `applyOptimisticSaveToggle`, DUT-697).
+        saveToggleCount += 1
     }
 
     /// DUT-513 — manually drop a recipe's optimistic-unsave suppression. The
