@@ -1,0 +1,2 @@
+timestamp	model	prompt_tokens	completion_tokens	total	label
+2026-07-18T18:08:12+00:00	qwen2.5-coder:14b	256	125	381	dut-1159-foil-tip

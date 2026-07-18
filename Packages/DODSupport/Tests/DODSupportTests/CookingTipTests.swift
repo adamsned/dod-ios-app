@@ -56,4 +56,14 @@ struct CookingTipTests {
         #expect(CookingTip.tip(atIndex: CookingTip.all.count) == nil)
         #expect(CookingTip.tip(atIndex: 0) == CookingTip.all.first)
     }
+
+    // DUT-1159 — new foil-liner crowd-cleanup tip is in the pool and resolves
+    // correctly by its index.
+    @Test func foilLinerTipIsPresentAndResolvesByIndex() {
+        let tip = "Foil liners ease big cleanups"
+        #expect(CookingTip.all.contains(tip))
+        let newIndex = CookingTip.all.count - 1
+        #expect(CookingTip.all[newIndex] == tip)
+        #expect(CookingTip.tip(atIndex: newIndex) == tip)
+    }
 }
