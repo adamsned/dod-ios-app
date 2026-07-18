@@ -235,13 +235,28 @@ extension ProfileEditView {
     @MainActor
     func handleGoogleSignIn(_ result: GoogleSignInResult) {
         guard case .success(let userIdentifier, let displayName, let email) = result else { return }
-        hasSession = true  // DUT-281 — a session will be persisted; keep Sign Out reachable
         Task {
             let outcome = await GoogleProfileSignIn(profileStore: store).apply(
                 userIdentifier: userIdentifier,
                 displayName: displayName,
                 email: email
             )
+            // (this bug) — mirror `handleAppleSignIn`'s DUT-928 guard: a genuine
+            // session-save FAILURE (the Keychain write threw) must NOT be silent.
+            // Before this fix `hasSession` was set `true` unconditionally right
+            // after the Google OAuth step succeeded, and `GoogleProfileSignIn`
+            // itself swallowed a session-save error with `try?` — so a signed-
+            // device Keychain failure left the user believing they were signed
+            // in via Google while nothing persisted. Surface it (with the raw
+            // OSStatus for on-device diagnosis) instead of that dead-end no-op.
+            guard outcome.signedIn else {
+                if outcome.sessionSaveFailed {
+                    let code = outcome.sessionSaveStatus.map { " (\($0))" } ?? ""
+                    saveError = "Couldn't Sign In With Google. Try Again.\(code)"
+                }
+                return
+            }
+            hasSession = true  // DUT-281 — a session was persisted; keep Sign Out reachable
             if let name = outcome.displayName { self.displayName = name }
             if let mail = outcome.email { self.email = mail }
             // DUT-891b — mirror the Apple handler: surface the error row ONLY on a
