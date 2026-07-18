@@ -107,6 +107,13 @@ extension ProfileEditView {
                 #if os(iOS)
             .autocapitalization(.words)
                 #endif
+                // (this bug) — mirrors GuestIdentitySheet's Name→Email→submit
+                // routing: Return on Name just advances focus to Email.
+                .focused($focusedField, equals: .displayName)
+                .submitLabel(.next)
+                .onSubmit {
+                    focusedField = .email
+                }
             if let displayNameFieldError {
                 Text(displayNameFieldError)
                     .dodFont(DODType.caption)
@@ -130,6 +137,20 @@ extension ProfileEditView {
             .autocapitalization(.none)
             .autocorrectionDisabled(true)
                 #endif
+                // (this bug) — Return on Email submits, gated on the exact same
+                // three conditions as `saveButton`'s
+                // `.disabled(!isFormValid || isSubmitting || !isDirty)`
+                // (De Morgan's-equivalent here), calling the SAME `handleSave()`
+                // the Save button calls — not a divergent save path — so Return
+                // on an invalid/unchanged form is a no-op exactly like tapping a
+                // disabled Save button would be.
+                .focused($focusedField, equals: .email)
+                .submitLabel(.done)
+                .onSubmit {
+                    if isFormValid && !isSubmitting && isDirty {
+                        Task { await handleSave() }
+                    }
+                }
             if let emailFieldError {
                 Text(emailFieldError)
                     .dodFont(DODType.caption)
