@@ -186,6 +186,17 @@ public protocol RecipeDetailDependencies: Sendable {
     /// `.couldntLoad` so fakes that don't model the list keep compiling — the
     /// default impl lives in the extension below.
     func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
+
+    // MARK: - Handwritten annotations (iPad + Apple Pencil, v2)
+    //
+    // Per-recipe PencilKit drawing persistence. Defaults + the live file-store
+    // routing live in `RecipeDetailDependencies+Annotations.swift`. The record
+    // is Foundation-only `Data` (see ``DODPersistence/RecipeAnnotationRecord``),
+    // so this seam stays platform-agnostic; the `PKDrawing` ⇄ `Data` conversion
+    // happens in the iOS-guarded view layer. Defaults are safe no-ops so every
+    // existing fake keeps compiling.
+    func loadRecipeAnnotation(recipeID: Int) async -> RecipeAnnotationRecord?
+    func saveRecipeAnnotation(_ record: RecipeAnnotationRecord, recipeID: Int) async
 }
 
 extension RecipeDetailDependencies {
