@@ -285,6 +285,16 @@ public final class RecipeDetailViewModel {
             await dependencies.publishSavedWidgetSnapshot()
         } catch {
             DODLog.persistence.error("toggle save failed: \(String(describing: error))")
+            // The store write never landed, so `isSaved` is deliberately left
+            // untouched above (no false flip) — but a silent no-op would leave
+            // the tap with zero feedback. Mirror `downloadForOffline()` /
+            // `removeDownload()` (`RecipeDetailViewModel+Download.swift`),
+            // which both surface a "Couldn't ... — try again." snackbar on
+            // catch instead of only logging.
+            snackbarMessage =
+                isSaved
+                ? "Couldn't remove from saved — try again."
+                : "Couldn't save recipe — try again."
         }
     }
 

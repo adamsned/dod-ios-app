@@ -40,10 +40,9 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     /// Per-recipe download-call counter so AC-35.4's "no second image
     /// fetch on re-tap" idempotency contract can be locked.
     var downloadCallCount: [Int: Int] = [:]
-    /// When non-nil, `downloadForOffline(recipe:)` throws this error
-    /// before flipping any state — lets tests cover the failure branch
-    /// without rigging up `ImageLoader` plumbing.
+    /// Throws before flipping state — covers the failure branch (no `ImageLoader` rig-up needed).
     var downloadShouldFail = false
+    var toggleSavedShouldFail = false
 
     // MARK: - Article-classification test surface (US-37 / CL-63 / T-640)
 
@@ -174,6 +173,7 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     func isSaved(id: Int) async throws -> Bool { savedIDs.contains(id) }
 
     func toggleSaved(id: Int) async throws -> Bool {
+        if toggleSavedShouldFail { throw URLError(.cannotWriteToFile) }
         if savedIDs.contains(id) {
             savedIDs.remove(id)
             return false
