@@ -21,6 +21,7 @@ public enum CookingTip {
         "Deglaze for a richer sauce",
         "Low and slow usually wins",
         "Parchment means easy cleanup",
+        "Foil liners ease big cleanups",
     ]
 
     /// Deterministic tip for a given day — rotates by absolute day number so the
