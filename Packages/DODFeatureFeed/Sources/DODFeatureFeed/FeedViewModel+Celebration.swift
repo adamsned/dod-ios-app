@@ -11,15 +11,22 @@ import Foundation
 extension FeedViewModel {
 
     /// DUT-104 — record a completed cook in the private journal (called when the
-    /// "Your First Cookout" flow reaches "Done"). Best-effort: a journal write
-    /// failing must never block dismissing the celebration. DUT-323: if the cook
-    /// graduates the path or bumps the cook up a rank, queue the celebration.
+    /// "Your First Cookout" flow reaches "Done"). A failed write must never
+    /// BLOCK dismissing the celebration flow, but (mirrors PR #744 / DUT-694)
+    /// it must not vanish silently either — see `cookLogFailureMessage` below.
+    /// DUT-323: if the cook graduates the path or bumps the cook up a rank,
+    /// queue the celebration.
     public func logCook(_ entry: CookLogEntry) async {
         let logsBefore = (try? await dependencies.cookLogs()) ?? []
         do {
             try await dependencies.logCook(entry)
         } catch {
-            // The journal is a nicety, not a blocker — swallow + move on.
+            // The write failing must never block the flow from finishing — but
+            // a bare swallow left the user with zero feedback that their "I
+            // made this" record didn't land. Mirrors PR #744
+            // (`RecipeDetailViewModel.toggleSaved()`) and DUT-694's
+            // `updateCook`/`deleteCook`: surface it instead of only logging.
+            cookLogFailureMessage = "Couldn't save your cook — try logging it again from the Cooking Journal."
             // DUT-208: the caller wrote the photo JPEG to disk before this call,
             // so a failed write would orphan it (no row ever references its
             // `photoLocalID`). Delete it here, mirroring the DUT-423 dedup-branch
@@ -77,5 +84,11 @@ extension FeedViewModel {
     /// Dismiss the celebration (DUT-323).
     public func dismissCelebration() {
         celebration = nil
+    }
+
+    /// Dismiss the cook-log failure snackbar (auto-dismiss timer, or a tap) —
+    /// mirrors `dismissShoppingListSnackbar()` in `FeedViewModel+ShoppingList`.
+    public func dismissCookLogFailureMessage() {
+        cookLogFailureMessage = nil
     }
 }
