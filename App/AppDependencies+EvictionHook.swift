@@ -1,15 +1,6 @@
 import DODPersistence
-import Foundation
 
 extension AppDependencies {
-
-    /// DUT-656 — one-shot latch so a second `AppDependencies()` (tests, previews,
-    /// or a spurious composition-root rebuild) can't clobber the already-installed
-    /// hook. `RecipeStore.onBridgedImagesEvicted` is a process-global; registering
-    /// it exactly once keeps the live reload closure stable for the process.
-    /// Guarded by a lock because `AppDependencies.init` is `@MainActor` but this
-    /// static is `nonisolated`.
-    private static let evictionHookLock = NSLock()
 
     /// DUT-475 — install the `RecipeStore.onBridgedImagesEvicted` delivery hook.
     /// Extracted from `init` as the testable seam: the hook the production evict
@@ -21,14 +12,13 @@ extension AppDependencies {
     ///
     /// DUT-656 — idempotent: only the FIRST call installs the hook; subsequent
     /// calls are no-ops so the global isn't clobbered by a re-built root.
+    ///
+    /// The check-then-set + every read now live behind ONE lock owned by
+    /// `RecipeStore` itself (``RecipeStore/installEvictionHookIfNeeded(_:)``),
+    /// so this is a true atomic compare-and-set rather than a lock here that
+    /// only covered the write while the store-actor's read went unguarded —
+    /// see that method's doc comment for the race this used to leave open.
     static func installBridgedEvictionHook(_ reload: @escaping @Sendable () -> Void) {
-        evictionHookLock.lock()
-        defer { evictionHookLock.unlock() }
-        // Idempotent by the hook's own presence: skip if one is already
-        // installed so a second `AppDependencies()` can't clobber the live
-        // closure. Naturally re-arms when the hook is cleared to nil (tests),
-        // so no separate process-wide latch is needed.
-        guard RecipeStore.onBridgedImagesEvicted == nil else { return }
-        RecipeStore.onBridgedImagesEvicted = reload
+        RecipeStore.installEvictionHookIfNeeded(reload)
     }
 }
