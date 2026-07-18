@@ -26,6 +26,7 @@ extension SearchViewModel {
             state = .idle
             didYouMean = nil  // DUT-568: parity with clear() — wipe the rescue banner.
             filterSupportHydrated = false  // DUT-505: re-arm lazy filter-support hydration.
+            resetResultsPaging()  // v2 search paging: re-arm the page cursor.
             return
         }
         debounceTask = Task { [weak self] in

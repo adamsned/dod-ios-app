@@ -14,6 +14,15 @@ import Foundation
 public protocol SearchDependencies: Sendable {
     // MARK: - REST + local search
     func search(query: String) async throws -> [RecipeListItem]
+    /// v2 search paging: fetch a LATER `?search=<query>` page for the same text
+    /// query, backing infinite-scroll. Routes to
+    /// `WPRestClient.search(query:page:perPage:)` (the `page:` param already
+    /// existed; only the view model never advanced it). Page 1 is the primary
+    /// `search(query:)` fetch; the view model only ever calls this with `page >=
+    /// 2`. A default extension implementation routes back to `search(query:)`
+    /// for page 1 and returns `[]` beyond it, so unwired conformers stop paging
+    /// gracefully instead of failing to compile.
+    func searchMore(query: String, page: Int) async throws -> [RecipeListItem]
     /// Recipe IDs whose locally-indexed ingredients contain `query`.
     /// Empty array is the normal "nothing matched" return — not an error.
     func searchIngredients(matching query: String) async throws -> [Int]
@@ -116,6 +125,13 @@ public protocol SearchDependencies: Sendable {
 }
 
 extension SearchDependencies {
+    /// v2 search paging: default routes page 1 to the primary `search(query:)`
+    /// and returns `[]` for later pages so conformers that predate the paging
+    /// seam keep compiling and simply never load a second page.
+    public func searchMore(query: String, page: Int) async throws -> [RecipeListItem] {
+        page <= 1 ? try await search(query: query) : []
+    }
+
     public func savedRecipeIDs() async throws -> Set<Int> { [] }
     public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult { .couldntLoad }
     public func fetchRandomRecipe() async throws -> RecipeListItem {
@@ -166,6 +182,14 @@ public struct LiveSearchDependencies: SearchDependencies {
 
     public func search(query: String) async throws -> [RecipeListItem] {
         try await client.search(query: query)
+    }
+
+    /// v2 search paging: fetch a later `?search=` page. The `page:` param has
+    /// been on `WPRestClient.search` since T-642; the view model just never
+    /// advanced it. `perPage` stays at the default `searchPageSize` (100) so
+    /// paged pages match page 1's recall window (CL-120).
+    public func searchMore(query: String, page: Int) async throws -> [RecipeListItem] {
+        try await client.search(query: query, page: page)
     }
 
     /// v2 Search overhaul (1/3) — routes to `WPRestClient.randomPost()`
