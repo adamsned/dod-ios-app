@@ -117,6 +117,11 @@ public struct FeedView: View {
         // DUT-534 Part 2 — the "Add to Shopping List" confirmation snackbar,
         // anchored to the bottom (mirrors Recipe Detail's Part 1 host).
         .overlay(alignment: .bottom) { shoppingListSnackbar }
+        // A failed cook-log write's snackbar (mirrors PR #744 / DUT-694 —
+        // see `FeedViewModel.cookLogFailureMessage`). Independent overlay from
+        // the shopping-list one above since the two are effectively mutually
+        // exclusive in practice (unrelated actions).
+        .overlay(alignment: .bottom) { cookLogFailureSnackbar }
         .background(DODColor.surface)
         // DUT-275 — nav bar hidden: the header button lives in the pinned header
         // row above (next to the title) instead of the nav bar, so no nav-bar
