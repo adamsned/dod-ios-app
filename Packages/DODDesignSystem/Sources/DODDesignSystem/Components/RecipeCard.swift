@@ -21,6 +21,16 @@ public struct RecipeCard: View {
     /// `title` are tinted in the brand accent; nil (every non-search host) keeps
     /// the plain `Text(title)` render byte-for-byte.
     public let highlightQuery: String?
+    /// US-43 Phase b (T-711) — the compositional register. `.classic` (the
+    /// default) keeps every existing host + L4 baseline byte-identical; only the
+    /// Feed passes the resolved (default `.magazine`) variant, so the magazine
+    /// treatment stays behind ``DODFeed/layoutVariantStorageKey``.
+    public let variant: DODFeed.LayoutVariant
+    /// US-43 Phase c (T-712) — the numbered "Popular" rank overlaid on the hero
+    /// (top-leading). `nil` (the default) renders no badge. The Feed's first cut
+    /// sets 1…N on its leading cards as a placeholder "Popular" treatment pending
+    /// a real popularity signal.
+    public let popularRank: Int?
 
     public init(
         title: String,
@@ -28,7 +38,9 @@ public struct RecipeCard: View {
         heroImageURL: URL?,
         totalTimeDisplay: String? = nil,
         highlightQuery: String? = nil,
-        isDownloaded: Bool = false
+        isDownloaded: Bool = false,
+        variant: DODFeed.LayoutVariant = .classic,
+        popularRank: Int? = nil
     ) {
         self.title = title
         self.excerpt = excerpt
@@ -36,6 +48,8 @@ public struct RecipeCard: View {
         self.totalTimeDisplay = totalTimeDisplay
         self.highlightQuery = highlightQuery
         self.isDownloaded = isDownloaded
+        self.variant = variant
+        self.popularRank = popularRank
     }
 
     public var body: some View {
@@ -58,44 +72,37 @@ public struct RecipeCard: View {
     /// Button wrapper).
     public var combinedAccessibilityLabel: String { accessibilityLabel }
 
+    /// Hero photo + its three corner overlays. US-43 Phase b/c (T-711/T-712) —
+    /// the aspect + clip are variant-driven (see ``heroImage`` in
+    /// `RecipeCard+Magazine.swift`): `.classic` keeps the 140pt fixed-height
+    /// hero byte-identical; `.magazine` adopts the site's 16:9 landscape crop.
+    /// The corner badges are applied as alignment overlays so a `.magazine`
+    /// numbered "Popular" medallion (top-leading) never collides with the time
+    /// chip (top-trailing) or the "Downloaded" badge (bottom-leading).
     private var heroSection: some View {
-        ZStack(alignment: .topTrailing) {
-            // DUT-195 — reliable cached loader instead of AsyncImage, which was
-            // dropping feed thumbnails to the broken-image placeholder on scroll.
-            ReliableImage(url: heroImageURL) { phase in
-                switch phase {
-                case .empty:
-                    LoadingSkeleton(cornerRadius: 0)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
-                    Image(systemName: "photo")
-                        .font(.system(size: 40))
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(DODColor.surface)
+        heroImage
+            .accessibilityHidden(true)
+            .overlay(alignment: .topLeading) {
+                if let popularRank {
+                    DODBadge.Numbered(number: popularRank)
+                        .padding(DODSpacing.xs)
                 }
             }
-            .frame(height: 140)
-            .clipped()
-            .accessibilityHidden(true)
-
-            if let totalTimeDisplay {
-                timeChip(totalTimeDisplay)
-                    .padding(DODSpacing.xs)
+            .overlay(alignment: .topTrailing) {
+                if let totalTimeDisplay {
+                    timeChip(totalTimeDisplay)
+                        .padding(DODSpacing.xs)
+                }
             }
-
-            // T-774 / DUT-80 — "Downloaded" badge, bottom-leading so it never
-            // collides with the top-trailing time chip at the Saved tab's
-            // narrow half-width.
-            if isDownloaded {
-                Self.downloadedBadge
-                    .padding(DODSpacing.xs)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .overlay(alignment: .bottomLeading) {
+                // T-774 / DUT-80 — "Downloaded" badge, bottom-leading so it never
+                // collides with the top-trailing time chip at the Saved tab's
+                // narrow half-width.
+                if isDownloaded {
+                    Self.downloadedBadge
+                        .padding(DODSpacing.xs)
+                }
             }
-        }
     }
 
     private var textSection: some View {
@@ -121,7 +128,7 @@ public struct RecipeCard: View {
     private var textBlockSizer: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Text(verbatim: " ")
-                .dodFont(DODType.heading)
+                .dodFont(titleFont)
                 .lineLimit(2, reservesSpace: true)
             Text(verbatim: " ")
                 .dodFont(DODType.caption)
@@ -137,7 +144,7 @@ public struct RecipeCard: View {
     private var textBlockContent: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Self.titleText(title, highlightQuery: highlightQuery)
-                .dodFont(DODType.heading)
+                .dodFont(titleFont)
                 .foregroundStyle(DODColor.label)
                 .lineLimit(2)
                 // Title claims its full natural height (up to 2 lines) FIRST;

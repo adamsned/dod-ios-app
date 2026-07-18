@@ -25,6 +25,14 @@ public struct FeedView: View {
     /// 2-column grid byte-for-byte for users who never tap the toggle.
     @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
         RecipeListLayout.gallery.rawValue
+    /// US-43 Phase b/c (T-711/T-712) — the classic-vs-magazine compositional
+    /// register, shared with `SearchView` via the same key. Default `.magazine`
+    /// (first cut ships the refreshed look ON); a user reverts to `.classic` from
+    /// Settings ▸ Customization and the pre-refresh feed returns byte-for-byte.
+    /// `internal` (no `private`) so the card builders in `FeedView+ShoppingList`
+    /// can read it (mirrors `layoutRaw`).
+    @AppStorage(DODFeed.layoutVariantStorageKey) var layoutVariantRaw: String =
+        DODFeed.LayoutVariant.magazine.rawValue
     public let onSelect: (RecipeListItem) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
@@ -121,7 +129,13 @@ public struct FeedView: View {
                 // (CL-306) — the trailing slot now hosts the Settings gear (the
                 // old Cooking Tools menu + its onboarding callout are retired; the
                 // tools moved to the first-class Cooking Tools hub tab).
-                DODScreenHeader("Recipes & Articles") { headerTrailing }
+                // US-43 Phase c (T-712) — the brand-mark masthead shows only in
+                // the magazine register, so reverting the flag restores the plain
+                // header byte-for-byte.
+                DODScreenHeader(
+                    "Recipes & Articles",
+                    showsBrandMark: feedLayoutVariant == .magazine
+                ) { headerTrailing }
                 content
             }
             // Offline shifts the whole stack below the OfflineBanner overlay.
@@ -322,6 +336,30 @@ public struct FeedView: View {
             }
         }
     }
+
+    /// US-43 Phase b/c — the resolved compositional register (defensive fallback
+    /// to `.magazine`, the first-cut default). `internal` so `FeedView+ShoppingList`
+    /// reads it.
+    var feedLayoutVariant: DODFeed.LayoutVariant {
+        DODFeed.LayoutVariant(rawValue: layoutVariantRaw) ?? .magazine
+    }
+
+    /// US-43 Phase c (T-712) — the numbered "Popular" rank for the card at
+    /// `index`, or `nil` for none.
+    ///
+    /// **Popularity source is a PLACEHOLDER (first cut).** There is no defined
+    /// popularity signal in the data model yet, so this treats the leading
+    /// ``popularBadgeCount`` feed cards as "Popular" (rank 1…N) purely as a visual
+    /// placeholder. Spencer to define the real signal (e.g. server-ranked
+    /// featured recipes) before this ships. Only applied in the magazine register
+    /// so reverting the flag removes the badges too.
+    func popularRank(at index: Int) -> Int? {
+        guard feedLayoutVariant == .magazine, index < Self.popularBadgeCount else { return nil }
+        return index + 1
+    }
+
+    /// The count of leading cards that receive a placeholder "Popular" badge.
+    static let popularBadgeCount = 3
 
     private var loadingSkeletons: some View {
         ScrollView {

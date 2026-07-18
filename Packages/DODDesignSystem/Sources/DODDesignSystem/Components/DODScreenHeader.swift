@@ -13,14 +13,24 @@ public struct DODScreenHeader<Trailing: View>: View {
 
     private let title: String
     private let trailing: Trailing
+    /// US-43 Phase c (T-712) — when true, the DOD brand mark (``DODBrandMark``,
+    /// ~32pt) sits on the leading edge of the header row, before the title, for
+    /// the magazine masthead. Defaults `false` so every other tab's header (and
+    /// its L4 baseline) renders byte-identical; only the Feed opts in, gated by
+    /// ``DODFeed/layoutVariantStorageKey``.
+    private let showsBrandMark: Bool
 
-    public init(_ title: String, @ViewBuilder trailing: () -> Trailing) {
+    public init(_ title: String, showsBrandMark: Bool = false, @ViewBuilder trailing: () -> Trailing) {
         self.title = title
+        self.showsBrandMark = showsBrandMark
         self.trailing = trailing()
     }
 
     public var body: some View {
         HStack(alignment: .center, spacing: DODSpacing.sm) {
+            if showsBrandMark {
+                DODBrandMark()
+            }
             Text(title)
                 .font(.largeTitle)
                 .fontWeight(.bold)
@@ -39,8 +49,8 @@ public struct DODScreenHeader<Trailing: View>: View {
 
 extension DODScreenHeader where Trailing == EmptyView {
     /// Title-only header (Search, Settings, Saved) — no trailing button.
-    public init(_ title: String) {
-        self.init(title) { EmptyView() }
+    public init(_ title: String, showsBrandMark: Bool = false) {
+        self.init(title, showsBrandMark: showsBrandMark) { EmptyView() }
     }
 }
 
