@@ -147,6 +147,24 @@ public enum TemperatureConverter {
         }
     }
 
+    /// Render a Fahrenheit magnitude (e.g. ``RecipeHeatProfile/Derived/ovenTempF``)
+    /// in `unit`, for callers that only have a derived Fahrenheit `Int` — not
+    /// free text — and need it in the user's display unit. Distinct from
+    /// ``converting(_:to:)``, which rewrites explicit-unit temperatures inside
+    /// prose; this is a plain numeric convert-for-display.
+    ///
+    /// `.fahrenheit` returns `fahrenheit` unchanged (no rounding drift).
+    /// `.celsius` reuses the same nearest-5°C rounding as ``converting(_:to:)``,
+    /// falling back to the original Fahrenheit value on the extremely unlikely
+    /// non-finite/overflow case (mirrors ``fahrenheitValues(in:)``'s same
+    /// failure-mode handling — never force-unwraps).
+    public static func displayValue(fahrenheit: Int, in unit: TemperatureUnit) -> Int {
+        switch unit {
+        case .fahrenheit: fahrenheit
+        case .celsius: convert(Double(fahrenheit), to: .celsius) ?? fahrenheit
+        }
+    }
+
     // MARK: - Match model
 
     /// The detected scale of one temperature token.

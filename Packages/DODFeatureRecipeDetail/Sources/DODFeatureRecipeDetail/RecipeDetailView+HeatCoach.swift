@@ -30,6 +30,18 @@ extension RecipeDetailView {
             // rule — same framing as the First Cookout coal note.
             let low = max(recommendation.totalBriquettes - 2, 0)
             let high = recommendation.totalBriquettes + 2
+            // The temperature displayed here must respect the same Settings
+            // preference the instructions above already convert to — the
+            // recipe's own explicit-unit temperature scale was already lost
+            // by the time `RecipeHeatProfile.derive(from:)` collapsed it into
+            // a single Fahrenheit `Int`, so `.recipeDefault` falls back to
+            // Fahrenheit like the pre-fix behavior; the bug this corrects is
+            // that an explicit Celsius preference was silently ignored,
+            // showing "350°F" here while the steps above correctly read
+            // "175°C" for the same recipe on the same screen.
+            let displayUnit = heatCoachDisplayUnit
+            let displayTemp = TemperatureConverter.displayValue(fahrenheit: derived.ovenTempF, in: displayUnit)
+            let unitSymbol = displayUnit == .celsius ? "°C" : "°F"
 
             VStack(alignment: .leading, spacing: DODSpacing.sm) {
                 HStack(spacing: DODSpacing.xs) {
@@ -43,7 +55,7 @@ extension RecipeDetailView {
                 Text(
                     "About \(low)-\(high) coals for a "
                         + "\(Self.heatCoachOvenDiameterInches)-inch oven at "
-                        + "\(derived.ovenTempF)°F. Dial it in for your conditions."
+                        + "\(displayTemp)\(unitSymbol). Dial it in for your conditions."
                 )
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
@@ -92,6 +104,18 @@ extension RecipeDetailView {
     private var heatCoachDerived: RecipeHeatProfile.Derived? {
         guard let recipe = viewModel.recipe, !recipe.instructions.isEmpty else { return nil }
         return RecipeHeatProfile.derive(from: recipe)
+    }
+
+    /// The unit the nudge displays its oven temperature in — reads the same
+    /// `temperatureUnitRaw` `@AppStorage` (declared on `RecipeDetailView`
+    /// itself) that the instructions section already converts to, so this
+    /// card can't drift from the rest of the screen. Falls back to
+    /// Fahrenheit for an absent/malformed value AND for `.recipeDefault` —
+    /// `RecipeHeatProfile.Derived.ovenTempF` is already collapsed to a single
+    /// Fahrenheit `Int` by the time it reaches here, so there's no original
+    /// per-recipe unit left to fall back to.
+    private var heatCoachDisplayUnit: TemperatureUnit {
+        TemperatureConverter.resolvedUnit(fromRawValue: temperatureUnitRaw) ?? .fahrenheit
     }
 
     /// The oven diameter the nudge assumes when it runs the charcoal
