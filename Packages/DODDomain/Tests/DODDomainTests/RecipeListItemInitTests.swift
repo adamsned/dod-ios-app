@@ -8,8 +8,8 @@ import Testing
     // MARK: Test 1 — Full RecipeListItem with all fields populated
     @Test func fullRecipeListItemPassesAllFieldsThrough() {
         let publishedDate = Date(timeIntervalSince1970: 1_234_567_890)
-        let heroURL = URL(string: "https://example.com/image.jpg")!
-        let canonicalURL = URL(string: "https://www.dutchovendaddy.com/recipe1")!
+        let heroURL = URL(string: "https://example.com/image.jpg") ?? URL(filePath: "/")
+        let canonicalURL = URL(string: "https://www.dutchovendaddy.com/recipe1") ?? URL(filePath: "/")
         let categoryIDs = [1, 2, 3]
 
         let listItem = RecipeListItem(
@@ -46,7 +46,7 @@ import Testing
     // MARK: Test 2 — canonicalURL nil → fallback to dutchovendaddy.com
     @Test func nilCanonicalURLUsesDidFallback() {
         let publishedDate = Date(timeIntervalSince1970: 1_234_567_890)
-        let heroURL = URL(string: "https://example.com/image.jpg")!
+        let heroURL = URL(string: "https://example.com/image.jpg") ?? URL(filePath: "/")
 
         let listItem = RecipeListItem(
             id: 43,
@@ -61,7 +61,7 @@ import Testing
         let recipe = Recipe(listItem: listItem)
 
         // Verify the fallback URL is used
-        let expectedFallback = URL(string: "https://www.dutchovendaddy.com/")!
+        let expectedFallback = URL(string: "https://www.dutchovendaddy.com/") ?? URL(filePath: "/")
         #expect(recipe.canonicalURL == expectedFallback)
 
         // Verify other fields are unaffected
@@ -77,7 +77,7 @@ import Testing
     // MARK: Test 3 — categoryIDs nil → defaults to empty array
     @Test func nilCategoryIDsDefaultsToEmpty() {
         let publishedDate = Date(timeIntervalSince1970: 9_876_543_210)
-        let canonicalURL = URL(string: "https://www.dutchovendaddy.com/recipe2")!
+        let canonicalURL = URL(string: "https://www.dutchovendaddy.com/recipe2") ?? URL(filePath: "/")
 
         let listItem = RecipeListItem(
             id: 44,
@@ -105,7 +105,7 @@ import Testing
     // MARK: Test 4 — categoryIDs explicit empty array [] → stays empty
     @Test func explicitEmptyCategoryIDsStaysEmpty() {
         let publishedDate = Date(timeIntervalSince1970: 5_555_555_555)
-        let canonicalURL = URL(string: "https://www.dutchovendaddy.com/recipe3")!
+        let canonicalURL = URL(string: "https://www.dutchovendaddy.com/recipe3") ?? URL(filePath: "/")
 
         let listItem = RecipeListItem(
             id: 45,
@@ -130,7 +130,7 @@ import Testing
     // MARK: Test 5 — heroImage nil → stays nil (no fallback for this field)
     @Test func nilHeroImageStaysNil() {
         let publishedDate = Date(timeIntervalSince1970: 7_777_777_777)
-        let canonicalURL = URL(string: "https://www.dutchovendaddy.com/recipe4")!
+        let canonicalURL = URL(string: "https://www.dutchovendaddy.com/recipe4") ?? URL(filePath: "/")
 
         let listItem = RecipeListItem(
             id: 46,
