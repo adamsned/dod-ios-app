@@ -33,6 +33,8 @@ struct InstructionsSectionView: View {
 
     @State private var isAnnotating = false
     @State private var canvasWidth: CGFloat = 0
+    /// v2 animation refresh — gates the annotate glyph's symbol `replace` swap.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     #if os(iOS) && canImport(PencilKit)
     @State private var drawing = PKDrawing()
@@ -105,10 +107,13 @@ struct InstructionsSectionView: View {
             Image(systemName: isAnnotating ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle")
                 .font(.title3)
                 .foregroundStyle(isAnnotating ? DODColor.burntOrange : DODColor.labelSecondary)
+                // v2 animation refresh — outline↔fill swap as annotate toggles.
+                .dodSymbolReplace(reduceMotion: reduceMotion)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        // v2 animation refresh — shared press spring + light haptic.
+        .buttonStyle(.dodPressable)
         .accessibilityLabel(isAnnotating ? "Done Annotating" : "Annotate Instructions")
         .accessibilityIdentifier("instructions-annotate-toggle")
     }

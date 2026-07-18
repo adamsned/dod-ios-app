@@ -56,23 +56,22 @@ public struct RecipeDetailView: View {
     /// is a display-time transform only — stored recipe data is untouched.
     @AppStorage(TemperatureConverter.preferenceKey)
     var temperatureUnitRaw: String = ""
-    /// DUT-517 — the "Use Metric Units" preference, read from the same
-    /// `UserDefaults` key the Settings toggle writes
-    /// (`IngredientMetricConverter.preferenceKey`) via `@AppStorage` so a
-    /// change in Settings re-renders the ingredient list in the same frame.
-    /// When `true`, each ALREADY-SCALED ingredient line is mapped through
-    /// ``DODSupport/IngredientMetricConverter/metric(_:)`` at display time;
-    /// non-convertible lines pass through unchanged. Display-time transform
-    /// only — stored recipe data is untouched (AC-31.8-style).
+    /// DUT-517 — the "Use Metric Units" preference, read via `@AppStorage` from
+    /// the same key the Settings toggle writes so a change re-renders the
+    /// ingredient list in the same frame. When `true`, each ALREADY-SCALED line
+    /// is mapped through ``DODSupport/IngredientMetricConverter/metric(_:)`` at
+    /// display time (non-convertible lines pass through); stored data untouched.
     @AppStorage(IngredientMetricConverter.preferenceKey)
     var useMetricUnits: Bool = false
     @Environment(\.dismiss) private var dismiss
-    /// T-804 — drives the iPad reading-column cap in `readyBody`. `.regular`
-    /// (iPad) bounds the content below the hero to a centered column;
-    /// `.compact` (iPhone) leaves the layout byte-identical. DUT-631 — now
-    /// `internal` (not `private`) so `RecipeDetailView+Sections.swift`'s
-    /// relocated `ingredientsInstructions(twoUp:)` can read it.
+    /// T-804 — drives the iPad reading-column cap in `readyBody` (`.regular`
+    /// bounds the content below the hero to a centered column; `.compact` leaves
+    /// it byte-identical). DUT-631 — `internal` so `+Sections.swift`'s relocated
+    /// `ingredientsInstructions(twoUp:)` can read it.
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    /// v2 animation refresh — gates the toolbar toggle glyphs' symbol `replace`
+    /// (bookmark / download); `internal` so the `+Toolbar` extension reads it.
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     public let onSelectRelated: (RecipeListItem) -> Void
     /// DUT-534 — the "View" action on the "Added to your Shopping List"
     /// Snackbar routes here. The App composition root passes a closure that

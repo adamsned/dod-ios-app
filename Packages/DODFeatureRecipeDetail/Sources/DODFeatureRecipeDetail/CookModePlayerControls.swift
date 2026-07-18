@@ -265,7 +265,9 @@ struct CookModePlayerControls: View {
                 .frame(width: flankDiameter, height: flankDiameter)
                 .background(Circle().fill(DODColor.accent))
         }
-        .buttonStyle(.plain)
+        // v2 animation refresh — shared press spring + light haptic, so the
+        // transport circles press with the same feel as every other button.
+        .buttonStyle(.dodPressable)
         .accessibilityLabel(label)
     }
 
@@ -281,6 +283,7 @@ struct CookModePlayerControls: View {
                 .frame(minWidth: secondaryTapTarget, minHeight: secondaryTapTarget)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        // v2 animation refresh — shared press spring + light haptic.
+        .buttonStyle(.dodPressable)
     }
 }
