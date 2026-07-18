@@ -26,11 +26,6 @@ public struct RecipeCard: View {
     /// Feed passes the resolved (default `.magazine`) variant, so the magazine
     /// treatment stays behind ``DODFeed/layoutVariantStorageKey``.
     public let variant: DODFeed.LayoutVariant
-    /// US-43 Phase c (T-712) — the numbered "Popular" rank overlaid on the hero
-    /// (top-leading). `nil` (the default) renders no badge. The Feed's first cut
-    /// sets 1…N on its leading cards as a placeholder "Popular" treatment pending
-    /// a real popularity signal.
-    public let popularRank: Int?
 
     public init(
         title: String,
@@ -39,8 +34,7 @@ public struct RecipeCard: View {
         totalTimeDisplay: String? = nil,
         highlightQuery: String? = nil,
         isDownloaded: Bool = false,
-        variant: DODFeed.LayoutVariant = .classic,
-        popularRank: Int? = nil
+        variant: DODFeed.LayoutVariant = .classic
     ) {
         self.title = title
         self.excerpt = excerpt
@@ -49,7 +43,6 @@ public struct RecipeCard: View {
         self.highlightQuery = highlightQuery
         self.isDownloaded = isDownloaded
         self.variant = variant
-        self.popularRank = popularRank
     }
 
     public var body: some View {
@@ -72,22 +65,14 @@ public struct RecipeCard: View {
     /// Button wrapper).
     public var combinedAccessibilityLabel: String { accessibilityLabel }
 
-    /// Hero photo + its three corner overlays. US-43 Phase b/c (T-711/T-712) —
-    /// the aspect + clip are variant-driven (see ``heroImage`` in
-    /// `RecipeCard+Magazine.swift`): `.classic` keeps the 140pt fixed-height
-    /// hero byte-identical; `.magazine` adopts the site's 16:9 landscape crop.
-    /// The corner badges are applied as alignment overlays so a `.magazine`
-    /// numbered "Popular" medallion (top-leading) never collides with the time
-    /// chip (top-trailing) or the "Downloaded" badge (bottom-leading).
+    /// Hero photo + its corner overlays. The 140pt fixed-height crop is the same
+    /// for every variant (the magazine register restyles the title + surface, not
+    /// the gallery hero aspect — the 16:9 landscape hero was dropped after the
+    /// first-cut review). The badges are alignment overlays so the time chip
+    /// (top-trailing) never collides with the "Downloaded" badge (bottom-leading).
     private var heroSection: some View {
         heroImage
             .accessibilityHidden(true)
-            .overlay(alignment: .topLeading) {
-                if let popularRank {
-                    DODBadge.Numbered(number: popularRank)
-                        .padding(DODSpacing.xs)
-                }
-            }
             .overlay(alignment: .topTrailing) {
                 if let totalTimeDisplay {
                     timeChip(totalTimeDisplay)

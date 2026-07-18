@@ -14,12 +14,8 @@ extension FeedView {
     /// contract is preserved unchanged.
     var galleryContent: some View {
         LazyVGrid(columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: DODSpacing.md) {
-            ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, item in
-                FeedRow(
-                    item: item,
-                    variant: feedLayoutVariant,
-                    popularRank: popularRank(at: index)
-                )
+            ForEach(viewModel.items) { item in
+                FeedRow(item: item, variant: feedLayoutVariant)
                     .recipeCardTap { onSelect(item) }
                     // T-765 / CL-162 (DUT-71) — state-aware Save/Unsave from the
                     // viewmodel-owned saved-id set; optimistic flip on toggle.
@@ -59,7 +55,7 @@ extension FeedView {
         // T-782 / DUT-88 — iPad tiles the dense rows into a multi-column grid;
         // iPhone (compact) keeps the exact single-column LazyVStack.
         adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
-            ForEach(Array(viewModel.items.enumerated()), id: \.element.id) { index, item in
+            ForEach(viewModel.items) { item in
                 // CL-254 (feed declutter) — no cook-time chip on the Recipes
                 // feed (noise); `totalTimeDisplay` omitted (defaults to nil).
                 // Time still shows on Search + the recipe detail page.
@@ -67,8 +63,7 @@ extension FeedView {
                     title: item.title,
                     excerpt: item.excerpt,
                     heroImageURL: item.heroImage,
-                    variant: feedLayoutVariant,
-                    popularRank: popularRank(at: index)
+                    variant: feedLayoutVariant
                 )
                 .recipeCardTap { onSelect(item) }
                 .recipeCardContextMenu(

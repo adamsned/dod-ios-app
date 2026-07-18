@@ -344,23 +344,6 @@ public struct FeedView: View {
         DODFeed.LayoutVariant(rawValue: layoutVariantRaw) ?? .magazine
     }
 
-    /// US-43 Phase c (T-712) — the numbered "Popular" rank for the card at
-    /// `index`, or `nil` for none.
-    ///
-    /// **Popularity source is a PLACEHOLDER (first cut).** There is no defined
-    /// popularity signal in the data model yet, so this treats the leading
-    /// ``popularBadgeCount`` feed cards as "Popular" (rank 1…N) purely as a visual
-    /// placeholder. Spencer to define the real signal (e.g. server-ranked
-    /// featured recipes) before this ships. Only applied in the magazine register
-    /// so reverting the flag removes the badges too.
-    func popularRank(at index: Int) -> Int? {
-        guard feedLayoutVariant == .magazine, index < Self.popularBadgeCount else { return nil }
-        return index + 1
-    }
-
-    /// The count of leading cards that receive a placeholder "Popular" badge.
-    static let popularBadgeCount = 3
-
     private var loadingSkeletons: some View {
         ScrollView {
             VStack(spacing: DODSpacing.md) {

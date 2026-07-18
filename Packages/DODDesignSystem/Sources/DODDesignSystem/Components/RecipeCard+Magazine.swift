@@ -1,21 +1,19 @@
 import SwiftUI
 
-// MARK: - Magazine variant (US-43 Phase b, T-711)
+// MARK: - Hero + magazine typography (US-43 Phase b, T-711)
 
-/// The variant-driven hero + typography for ``RecipeCard``. Split to its own
-/// file (extension on `RecipeCard`) so the main struct stays under the SwiftLint
-/// `type_body_length` cap, mirroring the `RecipeCard+ListRow` split.
+/// The hero builder + variant-driven title font for ``RecipeCard``. Split to its
+/// own file (extension on `RecipeCard`) so the main struct stays under the
+/// SwiftLint `type_body_length` cap, mirroring the `RecipeCard+ListRow` split.
 ///
-/// **Design choices (first cut).**
-/// - `.classic` keeps the pre-refresh 140pt fixed-height hero and `.headline`
-///   title byte-identical — reverting the ``DODFeed/LayoutVariant`` flag
-///   restores the classic card exactly (its L4 baselines stay valid).
-/// - `.magazine` moves the hero to the site's **16:9 landscape** crop (the gap
-///   AC-43 named — the app shipped a portrait-ish 140pt box) and bolds the title
-///   to the Phase-a display weight (`DODType.displayMedium`). The card keeps its
-///   `DODColor.surfaceElevated` background, which collapses to `Surface` on light
-///   mode (AC-43.2) so the card reads borderless-on-light. The cook-time chip and
-///   the excerpt are intentionally KEPT (Spencer's Move-6 call, CL-114).
+/// **Design choices (post first-cut review).** The 16:9 landscape hero explored
+/// in the first cut was dropped: Spencer prefers the single-column row card
+/// (`RecipeCard.ListRow`) for the magazine feed, so the gallery card keeps the
+/// classic 140pt top-image crop and the magazine register expresses itself
+/// through the bolder title + the borderless-on-light surface collapse (AC-43.2)
+/// only. Both variants share one hero shape, so every gallery card is a uniform
+/// size again (no per-card shrinking). The cook-time chip + excerpt remain card
+/// capabilities (Spencer's Move-6 call, CL-114).
 extension RecipeCard {
 
     /// The title typographic token per variant. `.magazine` steps up from
@@ -28,34 +26,10 @@ extension RecipeCard {
         }
     }
 
-    /// The hero photo box. `.classic` is the original 140pt fixed-height,
-    /// square-cornered crop (relies on the card's outer `clipShape` to round the
-    /// top). `.magazine` is a full-width 16:9 landscape box, rounded to
-    /// `DODRadius.standard` so the photo reads as an editorial plate floating on
-    /// the borderless-on-light surface.
-    @ViewBuilder
+    /// The 140pt fixed-height hero crop, shared by every variant so the gallery
+    /// grid stays uniform. `DUT-195` — `ReliableImage` (not `AsyncImage`, which
+    /// dropped thumbnails on scroll). The card's outer `clipShape` rounds the top.
     var heroImage: some View {
-        switch variant {
-        case .classic:
-            reliableHero
-                .frame(height: 140)
-                .clipped()
-        case .magazine:
-            Color.clear
-                .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                .overlay {
-                    reliableHero
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                }
-                .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
-        }
-    }
-
-    /// The shared cached-image loader body (DUT-195 — `ReliableImage`, not
-    /// `AsyncImage`, which dropped thumbnails on scroll). Framing + clipping are
-    /// applied by ``heroImage`` per variant.
-    private var reliableHero: some View {
         ReliableImage(url: heroImageURL) { phase in
             switch phase {
             case .empty:
@@ -72,19 +46,19 @@ extension RecipeCard {
                     .background(DODColor.surface)
             }
         }
+        .frame(height: 140)
+        .clipped()
     }
 }
 
-#Preview("Magazine, with Popular badge") {
+#Preview("Magazine gallery card") {
     RecipeCard(
         title: "Garlic Butter Skillet Corn",
         excerpt: "An easy 15-minute side dish that pairs with everything.",
         heroImageURL: URL(string: "https://www.dutchovendaddy.com/wp-content/uploads/sample.jpg"),
-        totalTimeDisplay: "15 min",
-        variant: .magazine,
-        popularRank: 1
+        variant: .magazine
     )
-    .frame(width: 340)
+    .frame(width: 180)
     .padding(DODSpacing.md)
     .background(DODColor.surface)
 }

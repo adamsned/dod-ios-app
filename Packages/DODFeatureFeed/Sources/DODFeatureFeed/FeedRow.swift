@@ -11,17 +11,13 @@ public struct FeedRow: View {
     /// `RecipeCard`. Defaults `.classic` so any existing caller / preview is
     /// byte-identical; `FeedView` passes the resolved (default `.magazine`) value.
     public let variant: DODFeed.LayoutVariant
-    /// US-43 Phase c (T-712) — the numbered "Popular" rank, or `nil` for none.
-    public let popularRank: Int?
 
     public init(
         item: RecipeListItem,
-        variant: DODFeed.LayoutVariant = .classic,
-        popularRank: Int? = nil
+        variant: DODFeed.LayoutVariant = .classic
     ) {
         self.item = item
         self.variant = variant
-        self.popularRank = popularRank
     }
 
     public var body: some View {
@@ -35,8 +31,7 @@ public struct FeedRow: View {
             title: item.title,
             excerpt: item.excerpt,
             heroImageURL: item.heroImage,
-            variant: variant,
-            popularRank: popularRank
+            variant: variant
         )
     }
 }

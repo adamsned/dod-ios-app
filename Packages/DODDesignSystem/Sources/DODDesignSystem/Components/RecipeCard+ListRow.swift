@@ -50,9 +50,6 @@ extension RecipeCard {
         /// Feed passes the resolved (default `.magazine`) variant, which steps up
         /// the thumbnail size + title weight for the editorial row.
         public let variant: DODFeed.LayoutVariant
-        /// US-43 Phase c (T-712) — the numbered "Popular" rank shown as a small
-        /// leading medallion. `nil` (default) renders none.
-        public let popularRank: Int?
 
         public init(
             title: String,
@@ -61,8 +58,7 @@ extension RecipeCard {
             totalTimeDisplay: String? = nil,
             highlightQuery: String? = nil,
             isDownloaded: Bool = false,
-            variant: DODFeed.LayoutVariant = .classic,
-            popularRank: Int? = nil
+            variant: DODFeed.LayoutVariant = .classic
         ) {
             self.title = title
             self.excerpt = excerpt
@@ -71,7 +67,6 @@ extension RecipeCard {
             self.highlightQuery = highlightQuery
             self.isDownloaded = isDownloaded
             self.variant = variant
-            self.popularRank = popularRank
         }
 
         /// US-43 Phase b — the thumbnail edge length. `.magazine` steps the
@@ -96,9 +91,6 @@ extension RecipeCard {
 
         public var body: some View {
             HStack(alignment: .center, spacing: DODSpacing.sm) {
-                if let popularRank {
-                    DODBadge.Numbered(number: popularRank)
-                }
                 thumbnail
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                     HStack(alignment: .firstTextBaseline, spacing: DODSpacing.xxs) {
