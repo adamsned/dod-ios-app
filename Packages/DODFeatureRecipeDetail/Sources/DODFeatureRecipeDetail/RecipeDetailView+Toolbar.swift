@@ -22,6 +22,9 @@ extension RecipeDetailView {
                 } label: {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
+                        // v2 animation refresh — clean fill↔outline symbol swap
+                        // on save/unsave (Reduce Motion → instant).
+                        .dodSymbolReplace(reduceMotion: reduceMotion)
                         // DUT-572 / CL-312 — glyph shadow so state colors survive
                         // over the full-bleed hero photo (mirrors the title shadow).
                         .shadow(color: .black.opacity(0.35), radius: 3)
@@ -62,6 +65,8 @@ extension RecipeDetailView {
                             : "square.and.arrow.down"
                     )
                     .foregroundStyle(viewModel.isDownloaded ? DODColor.burntOrange : DODColor.label)
+                    // v2 animation refresh — outline↔fill swap on download toggle.
+                    .dodSymbolReplace(reduceMotion: reduceMotion)
                     .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")

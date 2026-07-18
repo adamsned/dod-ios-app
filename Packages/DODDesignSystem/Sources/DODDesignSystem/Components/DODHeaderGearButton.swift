@@ -23,6 +23,11 @@ public struct DODHeaderGearButton: View {
         Button(action: action) {
             Image(systemName: "gearshape")
                 .font(.title2)
+                // v2 animation refresh — burnt-orange comes from an explicit
+                // `foregroundStyle` (not `.tint`) so it survives the switch to
+                // the plain-label ``DODPressableButtonStyle`` below; renders
+                // byte-identically to the prior tinted glyph.
+                .foregroundStyle(DODColor.burntOrange)
                 .accessibilityLabel("Settings")
                 // DUT-694 (PR-C): the `.title2` glyph alone is only a ~22pt tap
                 // target. Pad the label to the 44pt HIG minimum and make the
@@ -31,7 +36,9 @@ public struct DODHeaderGearButton: View {
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }
-        .tint(DODColor.burntOrange)
+        // v2 animation refresh — shared press spring + light haptic (Reduce
+        // Motion → still, haptic kept). Additive: no layout / color change.
+        .buttonStyle(.dodPressable)
         .accessibilityIdentifier(accessibilityID)
     }
 }

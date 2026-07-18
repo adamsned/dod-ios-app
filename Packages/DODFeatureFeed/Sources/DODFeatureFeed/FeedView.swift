@@ -82,6 +82,10 @@ public struct FeedView: View {
     @State private var isOwnerComposer = false
     /// Daddy Mode (Phase 1, cosmetic) — presents the honest compose placeholder.
     @State private var showingComposeSheet = false
+    /// v2 animation refresh — drives the search glyph's one-shot `.bounce`
+    /// symbol effect. Bumped on tap only when Reduce Motion is off, so a
+    /// Reduce-Motion user gets no bounce (the trigger never changes).
+    @State private var searchBounceTick = 0
     /// DUT-571 — persisted dismissal (a once-per-install "x" tap). `.standard`
     /// mirrors the Feed's existing `RecipeListLayout` layout-toggle store.
     @AppStorage(FeedView.firstCookoutHeroDismissedKey) var firstCookoutHeroDismissed = false
@@ -187,15 +191,24 @@ public struct FeedView: View {
     private var searchButton: some View {
         if let onOpenSearch {
             Button {
+                // v2 animation refresh — a single subtle bounce on the glyph as
+                // the actionable tap confirms. Gated on Reduce Motion by only
+                // bumping the trigger when motion is allowed (no bump → no bounce).
+                if !reduceMotion { searchBounceTick += 1 }
                 onOpenSearch()
             } label: {
                 Image(systemName: "magnifyingglass")
                     .font(.title2)
+                    // v2 animation refresh — explicit foreground (was `.tint`) so
+                    // the burnt-orange glyph survives the plain-label pressable
+                    // style; renders byte-identically.
+                    .foregroundStyle(DODColor.burntOrange)
+                    .symbolEffect(.bounce, value: searchBounceTick)
                     .accessibilityLabel("Search")
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .tint(DODColor.burntOrange)
+            .buttonStyle(.dodPressable)
             .accessibilityIdentifier("feed-open-search")
         }
     }
@@ -212,11 +225,14 @@ public struct FeedView: View {
             } label: {
                 Image(systemName: "square.and.pencil")
                     .font(.title2)
+                    // v2 animation refresh — explicit foreground (was `.tint`)
+                    // for the pressable style; renders byte-identically.
+                    .foregroundStyle(DODColor.burntOrange)
                     .accessibilityLabel("Compose Post")
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .tint(DODColor.burntOrange)
+            .buttonStyle(.dodPressable)
             .accessibilityIdentifier("feed-compose-button")
         }
     }
