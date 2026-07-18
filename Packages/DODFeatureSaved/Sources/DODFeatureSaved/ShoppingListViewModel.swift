@@ -1,4 +1,5 @@
 import DODDomain
+import DODIntelligence
 import DODSupport
 import Foundation
 import Observation
@@ -98,6 +99,21 @@ public final class ShoppingListViewModel {
     /// in that case the list is in-memory-only exactly as it was under CL-82.
     private let store: ShoppingListStore?
 
+    /// v2 on-device AI seam (App-injected ``LiveDODIntelligenceService`` in
+    /// production; a ``FakeIntelligenceService`` in tests / previews). `nil`
+    /// when no service is wired — then ``isSubstitutionAvailable`` is `false`
+    /// and the substitution affordance stays hidden. The VM depends only on the
+    /// DODIntelligence PROTOCOL — it never imports FoundationModels.
+    let intelligence: (any DODIntelligenceService)?
+
+    /// Current state of the ingredient-substitution surface (US-v2 AI). Drives
+    /// ``ShoppingListView``'s substitution sheet. Observed so the sheet reacts
+    /// to the loading → loaded / notFound transition. See
+    /// `ShoppingListViewModel+Substitution.swift` for the request flow.
+    /// `internal(set)` (not `private(set)`) so the same-module substitution
+    /// extension in the sibling file can drive the state machine.
+    public internal(set) var substitution: SubstitutionState = .idle
+
     /// Designated init (DUT-488). Sets the list to the given `items` AS-IS — it
     /// does NOT auto-load from `store`, and does NOT persist on construction.
     /// This keeps the explicit-data inits (`init(items:)` via tests/mocks,
@@ -111,8 +127,16 @@ public final class ShoppingListViewModel {
     ///   - items: The rows to seed the list with (explicit, authoritative).
     ///   - store: Where later mutations persist to. Defaults to the real
     ///     App-Group store; pass `nil` (mock/preview/tests) to stay in memory.
-    public init(items: [Item], store: ShoppingListStore? = ShoppingListStore()) {
+    ///   - intelligence: The on-device AI seam backing the substitution
+    ///     affordance. Defaults to `nil` (affordance hidden) so explicit-data
+    ///     inits stay AI-free unless a caller opts in.
+    public init(
+        items: [Item],
+        store: ShoppingListStore? = ShoppingListStore(),
+        intelligence: (any DODIntelligenceService)? = nil
+    ) {
         self.store = store
+        self.intelligence = intelligence
         self.items = items
         rebuildVisibleItems()
     }
@@ -123,8 +147,15 @@ public final class ShoppingListViewModel {
     /// from it so opening the list shows exactly what the cook last saw; with no
     /// saved list it starts empty-first (DUT-487 / T-906). Explicit-data inits
     /// deliberately do NOT take this path — see ``init(items:store:)``.
-    public init(store: ShoppingListStore? = ShoppingListStore()) {
+    ///
+    /// - Parameter intelligence: The on-device AI seam backing the substitution
+    ///   affordance (App-injected in production). `nil` hides the affordance.
+    public init(
+        store: ShoppingListStore? = ShoppingListStore(),
+        intelligence: (any DODIntelligenceService)? = nil
+    ) {
         self.store = store
+        self.intelligence = intelligence
         if let snapshot = store?.load() {
             self.items = snapshot.items
             self.checkedIDs = Set(snapshot.checkedIDs)
@@ -311,8 +342,12 @@ extension ShoppingListViewModel {
     /// NOT auto-loaded, so an explicit recipe build is never clobbered by a
     /// saved list. `store` defaults to the real App-Group store; pass `nil` to
     /// build in memory only.
-    public convenience init(recipes: [Recipe], store: ShoppingListStore? = ShoppingListStore()) {
-        self.init(items: Self.rows(from: recipes), store: store)
+    public convenience init(
+        recipes: [Recipe],
+        store: ShoppingListStore? = ShoppingListStore(),
+        intelligence: (any DODIntelligenceService)? = nil
+    ) {
+        self.init(items: Self.rows(from: recipes), store: store, intelligence: intelligence)
     }
 
     /// Explode `recipes` into per-recipe ``Item`` rows, each classified through

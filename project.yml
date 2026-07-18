@@ -57,6 +57,10 @@ packages:
     path: Packages/DODFeatureSaved
   DODFeatureProfile:
     path: Packages/DODFeatureProfile
+  # v2 on-device AI — leaf package holding the FoundationModels-backed
+  # intelligence service (the only place that imports FoundationModels).
+  DODIntelligence:
+    path: Packages/DODIntelligence
 
 targets:
   DODApp:
@@ -215,6 +219,8 @@ targets:
       - package: DODFeatureRecipeDetail
       - package: DODFeatureSaved
       - package: DODFeatureProfile
+      # v2 on-device AI — the Live intelligence service, App-injected.
+      - package: DODIntelligence
       # Widget extension (home-screen, US-9).
       - target: DODAppWidget
       # Live Activity extension (Cook Mode timer, US-11).
