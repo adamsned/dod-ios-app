@@ -38,11 +38,18 @@ struct GroceryTabRoot: View {
     /// throwaway VM each render — each running a `ShoppingListStore.load()`
     /// decode — of which only the first was ever kept by `ShoppingListView`'s
     /// `State(initialValue:)`. Same behavior, no per-render rebuild + reload.
-    @State private var listViewModel = ShoppingListViewModel()
+    ///
+    /// v2 on-device AI — built in `init` (not a default initializer) so the
+    /// App-injected ``DODIntelligenceService`` reaches it, gating the Shopping
+    /// List's "Substitute" affordance on real model availability.
+    @State private var listViewModel: ShoppingListViewModel
 
     init(dependencies: AppDependencies) {
         _savedViewModel = State(
             initialValue: SavedViewModel(dependencies: dependencies.savedDependencies())
+        )
+        _listViewModel = State(
+            initialValue: ShoppingListViewModel(intelligence: dependencies.intelligenceService())
         )
     }
 
