@@ -64,11 +64,17 @@ public struct GuestIdentitySheet: View {
 
     /// Inputs we differentiate on. Keeping this enum local avoids leaking
     /// UIKit's `UITextContentType` into the package's macOS build (the
-    /// DesignSystem module is multi-platform per Package.swift).
-    private enum FieldKind {
+    /// DesignSystem module is multi-platform per Package.swift). `Hashable`
+    /// so it can double as the `@FocusState` field identity below.
+    private enum FieldKind: Hashable {
         case name
         case email
     }
+
+    /// Return-key focus routing: Name → Email → submit. `.focused`/
+    /// `.onSubmit`/`.submitLabel` are cross-platform SwiftUI (not UIKit-only),
+    /// so this lives outside the `#if canImport(UIKit)` split in `input(_:)`.
+    @FocusState private var focusedField: FieldKind?
 
     private func field(
         title: String,
@@ -97,6 +103,23 @@ public struct GuestIdentitySheet: View {
     ) -> some View {
         let base = TextField(title, text: text)
             .dodFont(DODType.body)
+            .focused($focusedField, equals: kind)
+            .submitLabel(kind == .name ? .next : .done)
+            .onSubmit {
+                switch kind {
+                case .name:
+                    // Return on Name advances focus to Email.
+                    focusedField = .email
+                case .email:
+                    // Return on Email submits — but only if the form is
+                    // valid, mirroring `continueButton`'s `.disabled(!canContinue)`
+                    // gate so Return on an invalid form is a no-op, exactly
+                    // like tapping the disabled button would be.
+                    if canContinue {
+                        onContinue()
+                    }
+                }
+            }
 
         #if canImport(UIKit)
         switch kind {
