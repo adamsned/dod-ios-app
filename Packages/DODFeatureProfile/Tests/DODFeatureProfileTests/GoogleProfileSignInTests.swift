@@ -1,4 +1,5 @@
 import DODSupport
+import Security
 import Testing
 
 @testable import DODFeatureProfile
@@ -63,6 +64,37 @@ struct GoogleProfileSignInTests {
         _ = await signIn.apply(userIdentifier: "google-123", displayName: "Ned", email: "n@x.com")
         #expect((try? sessionStore.load())?.provider == .google)
     }
+
+    /// (this bug) — the Google mirror of `AppleProfileSignInTests
+    /// .sessionSaveFailure_reportsNotSignedIn` (DUT-928). Before this fix, `apply`
+    /// did `try? sessionStore.save(googleSession)` and still returned
+    /// `signedIn: true`, so a signed-device Keychain write failure left the user
+    /// believing they were logged in via Google while nothing persisted — the
+    /// same "signs in but doesn't stick" bug DUT-928 already closed for Apple.
+    /// The outcome must now report `signedIn == false` + `sessionSaveFailed ==
+    /// true` (carrying the raw OSStatus), with no profile written.
+    @Test func sessionSaveFailure_reportsNotSignedIn() async {
+        let sessionStore = ThrowingGoogleSessionStore(status: errSecMissingEntitlement)
+        let profileStore = NoopRecordingProfileStore()
+        let signIn = GoogleProfileSignIn(
+            profileStore: profileStore,
+            sessionStore: sessionStore,
+            revoker: SpyRevoker()
+        )
+
+        let outcome = await signIn.apply(
+            userIdentifier: "google-123",
+            displayName: "Ned Adams",
+            email: "ned@example.com"
+        )
+
+        #expect(outcome.signedIn == false)
+        #expect(outcome.sessionSaveFailed == true)
+        #expect(outcome.sessionSaveStatus == errSecMissingEntitlement)
+        // The early return happens before the profile write, so nothing is saved.
+        #expect(profileStore.saveCallCount == 0)
+        #expect(outcome.profileSaved == false)
+    }
 }
 
 private final class NoopProfileStore: ProfileStoring, @unchecked Sendable {
@@ -72,8 +104,30 @@ private final class NoopProfileStore: ProfileStoring, @unchecked Sendable {
     var hasProfile: Bool { get async { false } }
 }
 
+/// Like `NoopProfileStore`, but records whether `save` was ever called, so a
+/// test can prove a failed session save short-circuits BEFORE the profile
+/// write is attempted.
+private final class NoopRecordingProfileStore: ProfileStoring, @unchecked Sendable {
+    private(set) var saveCallCount = 0
+    func load() async -> UserProfile? { nil }
+    func save(_ profile: UserProfile) async throws { saveCallCount += 1 }
+    func clear() async throws {}
+    var hasProfile: Bool { get async { false } }
+}
+
 private final class SpyRevoker: SiwaRevoking, @unchecked Sendable {
     private(set) var revokedTokens: [String] = []
     func exchange(authorizationCode: String) async throws -> String { "rt" }
     func revoke(refreshToken: String) async throws { revokedTokens.append(refreshToken) }
+}
+
+/// A session store whose `save` always throws a Keychain error, to prove a
+/// device-side write failure surfaces as a NOT-signed-in outcome (this bug's
+/// Google-side mirror of DUT-928) rather than a silent `try?`-swallowed success.
+private final class ThrowingGoogleSessionStore: AppleAuthSessionStoring, @unchecked Sendable {
+    private let status: OSStatus
+    init(status: OSStatus) { self.status = status }
+    func load() throws -> AppleAuthSession? { nil }
+    func save(_ session: AppleAuthSession) throws { throw AppleAuthError.keychainFailed(status) }
+    func clear() throws {}
 }
