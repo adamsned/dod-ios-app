@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(UserNotifications)
+import UserNotifications
+#endif
 
 // US-42 / AC-42.1 + T-750 / CL-147 (DUT-56) — the notification toggle
 // setters, extracted from `SettingsViewModel.swift` so that file stays
@@ -32,6 +35,12 @@ extension SettingsViewModel {
             // New post + bake alerts are already gated on the toggle at schedule
             // time, so these are the only queued requests to flush.
             await SystemBakeTimerNotifier().cancelAllBakeDone()
+            // DUT-1181: a SECOND local-notification subsystem — the Cook Mode
+            // per-step timer alert (`SystemCookStepTimerNotifier`, DUT-604) —
+            // shipped after this DUT-379 flush and was never wired into it, so a
+            // step timer scheduled while notifications were ON kept firing after
+            // the user opted out. Flush it too.
+            await Self.cancelAllCookModeStepTimerNotifications()
             return false
         }
         let granted = await requestNotificationAuthorization()
@@ -61,5 +70,45 @@ extension SettingsViewModel {
             snackbarMessage = "Enable notifications in iOS Settings → DOD to get reply alerts."
         }
         return granted
+    }
+
+    // MARK: - DUT-1181 — Cook Mode step-timer opt-out flush
+
+    /// Base identifier `SystemCookStepTimerNotifier` (DODFeatureRecipeDetail)
+    /// schedules under — duplicated as a string literal (not a shared constant)
+    /// because `DODFeatureFeed` must not depend on `DODFeatureRecipeDetail`.
+    /// Mirrors this file's existing `notificationsEnabledKey` duplication
+    /// reasoning in `CookStepTimerNotifier.swift`. `internal` so the L1 suite
+    /// can pin it directly, matching `SystemBakeTimerNotifier.identifier`.
+    static let cookModeStepTimerDoneBaseIdentifier = "dod.cookMode.stepTimerDone"
+
+    /// Whether `id` is a Cook Mode step-timer request — the bare base id or any
+    /// `base.<recipeID>.<stepIndex>` per-timer id. Pure, so the L1 suite pins it
+    /// without touching `UserNotifications` — mirrors
+    /// `SystemBakeTimerNotifier.isBakeDoneIdentifier`.
+    static func isCookModeStepTimerDoneIdentifier(_ id: String) -> Bool {
+        id == Self.cookModeStepTimerDoneBaseIdentifier
+            || id.hasPrefix("\(Self.cookModeStepTimerDoneBaseIdentifier).")
+    }
+
+    /// DUT-1181 opt-out flush: drop every pending/delivered Cook Mode step-timer
+    /// request, across every recipe — we can't enumerate which are queued (this
+    /// package doesn't own that notifier), so the id-prefix filter above is the
+    /// only signal. Guarded on a real host bundle (mirrors
+    /// `SystemCookStepTimerNotifier.hasHostBundle`) so the macOS `swift test`
+    /// slice, which has no app bundle, never touches `UNUserNotificationCenter`.
+    static func cancelAllCookModeStepTimerNotifications() async {
+        #if canImport(UserNotifications)
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let center = UNUserNotificationCenter.current()
+        let pending = await center.pendingNotificationRequests()
+        center.removePendingNotificationRequests(
+            withIdentifiers: pending.map(\.identifier).filter(Self.isCookModeStepTimerDoneIdentifier)
+        )
+        let delivered = await center.deliveredNotifications()
+        center.removeDeliveredNotifications(
+            withIdentifiers: delivered.map(\.request.identifier).filter(Self.isCookModeStepTimerDoneIdentifier)
+        )
+        #endif
     }
 }
