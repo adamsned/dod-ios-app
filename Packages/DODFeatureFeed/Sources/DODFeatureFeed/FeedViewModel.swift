@@ -53,6 +53,19 @@ public final class FeedViewModel {
     public internal(set) var shoppingListSnackbarMessage: String?
     public internal(set) var shoppingListSnackbarActionTitle: String?
 
+    /// A failed cook-log write — mirrors PR #744's `RecipeDetailViewModel
+    /// .toggleSaved()` fix and DUT-694's `updateCook`/`deleteCook`. `logCook`'s
+    /// catch block used to only log the thrown error, so a `modelContext
+    /// .save()` failure after finishing the guided "First Cookout" flow
+    /// silently lost the "I made this" record — no journal entry, no streak
+    /// credit, no rank-up celebration, and no feedback at all. The write
+    /// completes AFTER the cookout sheet has already dismissed (see
+    /// `CookingToolsHubView`), so there's no sheet left to show an inline
+    /// alert; this surfaces as a Feed snackbar (driven by
+    /// `FeedViewModel+Celebration`, rendered by `FeedView+FirstCookoutHero`)
+    /// once the user lands back on the Feed. `nil` hides the snackbar.
+    public internal(set) var cookLogFailureMessage: String?
+
     // DUT-534 Part 2 — internal (was `private`) so `+ShoppingList` reaches it.
     let dependencies: FeedDependencies
     private var currentPage: Int = 0

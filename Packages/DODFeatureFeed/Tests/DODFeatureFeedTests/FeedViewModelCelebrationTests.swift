@@ -58,6 +58,44 @@ import Testing
         #expect(dependencies.deletedCookPhotoIDs.isEmpty)
     }
 
+    /// PR #744 / DUT-694 style fix — `logCook`'s catch block previously only
+    /// logged the thrown error, leaving a failed "I made this" write with zero
+    /// user feedback (no journal entry, no error). It must now surface a
+    /// snackbar, mirroring `RecipeDetailViewModel.toggleSaved()` and
+    /// `updateCook`/`deleteCook` in this same package.
+    @Test func failedLogCookSurfacesAFailureSnackbar() async {
+        let dependencies = FakeFeedDependencies()
+        dependencies.logCookShouldFail = true
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        await viewModel.logCook(makeCook(9102))
+
+        #expect(viewModel.cookLogFailureMessage != nil)
+    }
+
+    /// A successful log must not leave a stale failure snackbar showing.
+    @Test func successfulLogCookLeavesNoFailureSnackbar() async {
+        let dependencies = FakeFeedDependencies()
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        await viewModel.logCook(makeCook(9103))
+
+        #expect(viewModel.cookLogFailureMessage == nil)
+    }
+
+    /// Dismissing the failure snackbar (auto-dismiss timer, or a tap) clears it.
+    @Test func dismissingTheCookLogFailureMessageClearsIt() async {
+        let dependencies = FakeFeedDependencies()
+        dependencies.logCookShouldFail = true
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        await viewModel.logCook(makeCook(9104))
+        #expect(viewModel.cookLogFailureMessage != nil)
+
+        viewModel.dismissCookLogFailureMessage()
+
+        #expect(viewModel.cookLogFailureMessage == nil)
+    }
+
     @Test func loggingACookThatStaysInRankCelebratesNothing() async {
         let dependencies = FakeFeedDependencies()
         dependencies.cooks = [makeCook(9001)]  // 1 cook -> Fire Starter
