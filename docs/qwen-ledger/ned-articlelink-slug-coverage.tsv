@@ -1,0 +1,2 @@
+timestamp	model	prompt_tokens	completion_tokens	total	label
+2026-07-18T12:55:57+00:00	qwen2.5-coder:14b	1324	1216	2540	articlelink-slug-coverage-tests
