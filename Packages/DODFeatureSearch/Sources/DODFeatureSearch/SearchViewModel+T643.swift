@@ -235,6 +235,11 @@ extension SearchViewModel {
         lastMergedLocalOrdering = localItems
         lastSurface = .textQuery
         ingredientItems = usingTier
+        // v2 search paging: this is the fresh page-1 commit for the current
+        // query, so re-arm the page cursor + end latch. A new query bumped the
+        // generation upstream, cancelling any page still in flight for the prior
+        // query; this restarts paging from page 1 for the query just committed.
+        resetResultsPaging()
 
         await applyFiltersAndFinalize(merged: merged, trimmed: trimmed, generation: generation)
     }
