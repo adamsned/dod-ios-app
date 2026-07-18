@@ -13,11 +13,11 @@ public struct DODScreenHeader<Trailing: View>: View {
 
     private let title: String
     private let trailing: Trailing
-    /// US-43 Phase c (T-712) — when true, the header renders as a magazine
-    /// masthead: a brand lockup row (the ``DODBrandMark`` emblem + the "Dutch
-    /// Oven Daddy" wordmark in ``DODType/brand``, with the trailing actions) sits
-    /// ABOVE the section title. Defaults `false` so every other tab's header (and
-    /// its L4 baseline) renders byte-identical; only the Feed opts in, gated by
+    /// US-43 Phase c (T-712) — when true, the ``DODBrandMark`` emblem (44pt) sits
+    /// on the leading edge of the header row, before the section title, as the
+    /// magazine masthead. A single clean row: emblem + "Recipes & Articles" title
+    /// + trailing actions. Defaults `false` so every other tab's header (and its
+    /// L4 baseline) renders byte-identical; only the Feed opts in, gated by
     /// ``DODFeed/layoutVariantStorageKey``.
     private let showsBrandMark: Bool
 
@@ -28,46 +28,25 @@ public struct DODScreenHeader<Trailing: View>: View {
     }
 
     public var body: some View {
-        Group {
+        HStack(alignment: .center, spacing: DODSpacing.sm) {
             if showsBrandMark {
-                masthead
-            } else {
-                titleRow
+                // 44pt so the mark reads as an intentional element beside the
+                // large title (the too-small 32pt first cut looked cramped), with
+                // a little extra trailing air before the title.
+                DODBrandMark(size: 44)
+                    .padding(.trailing, DODSpacing.xxs)
             }
+            titleText
+            trailing
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.top, DODSpacing.sm)
         .padding(.bottom, DODSpacing.xs)
     }
 
-    /// The default header: the large section title + trailing actions on one row.
-    private var titleRow: some View {
-        HStack(alignment: .center, spacing: DODSpacing.sm) {
-            titleText
-            trailing
-        }
-    }
-
-    /// US-43 Phase c — the magazine masthead. A brand lockup (emblem + wordmark +
-    /// trailing actions) reads as an intentional identity band; the section title
-    /// sits beneath it, so the mark no longer looks squeezed into the title's row.
-    private var masthead: some View {
-        VStack(alignment: .leading, spacing: DODSpacing.xs) {
-            HStack(alignment: .center, spacing: DODSpacing.sm) {
-                DODBrandMark(size: 40)
-                Text("Dutch Oven Daddy")
-                    .dodFont(DODType.brand)
-                    .foregroundStyle(DODColor.label)
-                Spacer(minLength: DODSpacing.sm)
-                trailing
-            }
-            titleText
-        }
-    }
-
-    /// The large section title, shared by both header modes. DUT-263 — true
-    /// black/white (`labelStrong`), not the warmer brand grey/cream `label`, so
-    /// every tab's large title reads identically.
+    /// The large section title. DUT-263 — true black/white (`labelStrong`), not
+    /// the warmer brand grey/cream `label`, so every tab's large title reads
+    /// identically.
     private var titleText: some View {
         Text(title)
             .font(.largeTitle)
