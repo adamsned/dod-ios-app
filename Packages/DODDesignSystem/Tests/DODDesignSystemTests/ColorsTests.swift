@@ -49,7 +49,7 @@ import UIKit
 /// resolve to the asset-catalog value. `.serialized` + the `deinit` reset keep
 /// the mutated process-global from leaking into the parallel snapshot/color
 /// suites (a leaked `true` would render every dark snapshot black).
-@Suite("DODColor OLED surfaces (v2)", .serialized) struct DODColorOLEDTests {
+@Suite("DODColor OLED surfaces (v2)", .serialized) final class DODColorOLEDTests {
 
     private let dark = UITraitCollection(userInterfaceStyle: .dark)
     private let light = UITraitCollection(userInterfaceStyle: .light)

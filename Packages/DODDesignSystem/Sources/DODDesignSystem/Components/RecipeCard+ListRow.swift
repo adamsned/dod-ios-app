@@ -45,6 +45,11 @@ extension RecipeCard {
         /// call site (Feed/Search) and their L4 baselines render byte-identical;
         /// only the Saved tab's list rows pass the real downloaded state.
         public let isDownloaded: Bool
+        /// US-43 Phase b (T-711) — the compositional register. `.classic` (the
+        /// default) keeps every existing host + L4 baseline byte-identical; the
+        /// Feed passes the resolved (default `.magazine`) variant, which steps up
+        /// the thumbnail size + title weight for the editorial row.
+        public let variant: DODFeed.LayoutVariant
 
         public init(
             title: String,
@@ -52,7 +57,8 @@ extension RecipeCard {
             heroImageURL: URL?,
             totalTimeDisplay: String? = nil,
             highlightQuery: String? = nil,
-            isDownloaded: Bool = false
+            isDownloaded: Bool = false,
+            variant: DODFeed.LayoutVariant = .classic
         ) {
             self.title = title
             self.excerpt = excerpt
@@ -60,6 +66,27 @@ extension RecipeCard {
             self.totalTimeDisplay = totalTimeDisplay
             self.highlightQuery = highlightQuery
             self.isDownloaded = isDownloaded
+            self.variant = variant
+        }
+
+        /// US-43 Phase b — the thumbnail edge length. `.magazine` steps the
+        /// square thumbnail up from 60 to 72pt for a more editorial row; the
+        /// `DODRadius.inner` clip is shared.
+        private var thumbnailSize: CGFloat {
+            switch variant {
+            case .classic: 60
+            case .magazine: 72
+            }
+        }
+
+        /// US-43 Phase b — the title token. `.magazine` bolds to the Phase-a
+        /// `DODType.displayMedium` (title2 `.bold`) to match the gallery card's
+        /// editorial register; `.classic` keeps `.headline`.
+        private var titleFont: Font {
+            switch variant {
+            case .classic: DODType.heading
+            case .magazine: DODType.displayMedium
+            }
         }
 
         public var body: some View {
@@ -68,7 +95,7 @@ extension RecipeCard {
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                     HStack(alignment: .firstTextBaseline, spacing: DODSpacing.xxs) {
                         RecipeCard.titleText(title, highlightQuery: highlightQuery)
-                            .dodFont(DODType.heading)
+                            .dodFont(titleFont)
                             .foregroundStyle(DODColor.label)
                             // DUT-527 — allow 2 title lines on compact (iPhone) too,
                             // matching the gallery card, so larger Dynamic Type sizes
@@ -125,7 +152,7 @@ extension RecipeCard {
                         .background(DODColor.surface)
                 }
             }
-            .frame(width: 60, height: 60)
+            .frame(width: thumbnailSize, height: thumbnailSize)
             .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
             .accessibilityHidden(true)
         }

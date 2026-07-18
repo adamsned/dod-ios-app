@@ -169,7 +169,7 @@ public struct CookModeView: View {
             CookModeStepIndicator(viewModel: viewModel)
                 .padding(.bottom, DODSpacing.xs)
         }
-        .background(DODColor.surface.ignoresSafeArea())
+        .background(DODColor.surfaceWarm.ignoresSafeArea())  // US-43 Phase d — warm low-light backdrop (CL-110)
         .gesture(swipeGesture)
         .sheet(isPresented: $ingredientsDrawerVisible) {
             ingredientsDrawer

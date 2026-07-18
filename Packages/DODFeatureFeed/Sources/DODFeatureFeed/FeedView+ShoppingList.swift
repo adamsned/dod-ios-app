@@ -15,7 +15,7 @@ extension FeedView {
     var galleryContent: some View {
         LazyVGrid(columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: DODSpacing.md) {
             ForEach(viewModel.items) { item in
-                FeedRow(item: item)
+                FeedRow(item: item, variant: feedLayoutVariant)
                     .recipeCardTap { onSelect(item) }
                     // T-765 / CL-162 (DUT-71) — state-aware Save/Unsave from the
                     // viewmodel-owned saved-id set; optimistic flip on toggle.
@@ -62,7 +62,8 @@ extension FeedView {
                 RecipeCard.ListRow(
                     title: item.title,
                     excerpt: item.excerpt,
-                    heroImageURL: item.heroImage
+                    heroImageURL: item.heroImage,
+                    variant: feedLayoutVariant
                 )
                 .recipeCardTap { onSelect(item) }
                 .recipeCardContextMenu(
