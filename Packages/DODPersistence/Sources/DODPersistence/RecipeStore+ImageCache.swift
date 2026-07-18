@@ -145,7 +145,52 @@ extension RecipeStore {
     /// gradient placeholder until the 4-hour refresh). Static because the
     /// persistence package can't import WidgetKit; `AppDependencies.bootstrap`
     /// wires it once at launch.
-    nonisolated(unsafe) public static var onBridgedImagesEvicted: (@Sendable () -> Void)?
+    ///
+    /// Lock-guarded on EVERY access path. This used to be a bare
+    /// `nonisolated(unsafe)` static: the App target's
+    /// `installBridgedEvictionHook` took its own `NSLock` around the
+    /// check-then-set install, but the read here — `evictImagesIfNeeded()`
+    /// firing the hook from the `RecipeStore` actor's executor — took no lock
+    /// at all, and neither did a direct test assignment
+    /// (`RecipeStore.onBridgedImagesEvicted = nil`). That's a genuine,
+    /// documented race: `AppTests/EvictionHookInstallTests.swift`'s own DUT-475
+    /// comment says outright that "the store-actor read of the still-nil
+    /// `nonisolated(unsafe)` hook races the write" — DUT-475 only narrowed the
+    /// timing window (installing earlier in the app lifecycle) rather than
+    /// synchronizing the two sides. Moving the lock here, next to the storage,
+    /// and routing every read/write through it (get/set + the atomic
+    /// ``installEvictionHookIfNeeded(_:)`` install seam) closes that window
+    /// for real instead of just making it unlikely.
+    private static let onBridgedImagesEvictedLock = NSLock()
+    nonisolated(unsafe) private static var _onBridgedImagesEvicted: (@Sendable () -> Void)?
+
+    public static var onBridgedImagesEvicted: (@Sendable () -> Void)? {
+        get {
+            onBridgedImagesEvictedLock.lock()
+            defer { onBridgedImagesEvictedLock.unlock() }
+            return _onBridgedImagesEvicted
+        }
+        set {
+            onBridgedImagesEvictedLock.lock()
+            defer { onBridgedImagesEvictedLock.unlock() }
+            _onBridgedImagesEvicted = newValue
+        }
+    }
+
+    /// Atomically install `hook` as the eviction-reload delivery hook, but only
+    /// if none is installed yet — a second `AppDependencies()` (tests, previews,
+    /// a spurious composition-root rebuild) can't clobber the already-live
+    /// closure. The check-then-set happens under the SAME lock that guards
+    /// every read, so this is a true atomic compare-and-set rather than two
+    /// separately-locked operations racing a concurrent installer.
+    @discardableResult
+    public static func installEvictionHookIfNeeded(_ hook: @escaping @Sendable () -> Void) -> Bool {
+        onBridgedImagesEvictedLock.lock()
+        defer { onBridgedImagesEvictedLock.unlock() }
+        guard _onBridgedImagesEvicted == nil else { return false }
+        _onBridgedImagesEvicted = hook
+        return true
+    }
 
     /// Purge every unpinned `CachedImage` row + its App Group file
     /// bridge mirror. Returns the total bytes freed so the Settings
