@@ -66,6 +66,11 @@ public struct SavedView: View {
                 viewModel.startObserving()
                 await viewModel.refresh()
             }
+            // DUT — a `.selection` tap only on a genuine card long-press Unsave
+            // (keyed to `saveToggleCount`, not the `recipes` array, so appear/
+            // refresh reconciliation never mis-fires the haptic). Mirrors
+            // Feed/Categories/Search (DUT-697).
+            .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
     @ViewBuilder
