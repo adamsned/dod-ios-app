@@ -82,6 +82,15 @@ struct CookTimer: View {
                     .monospacedDigit()
                     .foregroundStyle(didComplete ? DODColor.accent : DODColor.label)
                     .accessibilityLabel(accessibilityTimeLabel(remaining))
+                    // The label above changes every second (this view redraws via the
+                    // `TimelineView(.periodic(from: .now, by: 1))` in `body`). Without
+                    // this trait, VoiceOver treats every tick as a fresh value change
+                    // and tries to re-speak the remaining time once per second — a
+                    // chatty, unusable announcement stream for a cook tracking Cook
+                    // Mode hands-free. `.updatesFrequently` tells VoiceOver this
+                    // element updates on its own cadence, so it throttles automatic
+                    // re-announcements instead of firing on every single tick.
+                    .accessibilityAddTraits(.updatesFrequently)
                 Spacer(minLength: 0)
                 controls(isRunning: isRunning, didComplete: didComplete)
             }
