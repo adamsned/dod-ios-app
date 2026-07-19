@@ -147,40 +147,68 @@ extension RecipeStore {
         try buildWithMigrationRecovery(
             defaults: defaults,
             build: { try productionContainer(defaults: defaults) },
-            recover: { _ in
-                // A CloudKit-mirrored open can't itself be the migration failure
-                // (its own fallback handles that), so recovery always opens the
-                // plain local layout after moving the corrupt store aside.
-                //
-                // DUT-586: scope the reset. The `default.store` cache is the store
-                // that actually fails migration/corruption, so it always resets.
-                // `SyncedSaved.store` (the user's whole Saved tab) is a SEPARATE
-                // store; for an opted-OUT user it is local-only with no remote
-                // copy, so sweeping it aside would DESTROY the sole copy of their
-                // Saved list with nothing to re-hydrate it. Only sweep it when the
-                // CloudKit mirror is active (opt-in ON) so a re-import can restore
-                // it; otherwise leave the intact synced store in place and reopen
-                // it as-is.
-                //
-                // DUT-733: opt-in ON is NOT proof the mirror is live. An opted-in
-                // user whose CloudKit is unavailable (no iCloud account, or the
-                // Production schema not yet deployed) runs on a LOCAL-ONLY fallback
-                // `SyncedSaved` store with no remote copy — sweeping it on the flag
-                // alone would destroy their only Saved list. Require a CONFIRMED
-                // import (`backfillDidComplete`) too: that flag only flips once a
-                // real CloudKit import reconciles, proving a remote copy exists to
-                // re-hydrate. Absent that, protect the possibly-local-only store
-                // exactly like the opted-out branch.
-                let mirrorConfirmed =
-                    cloudKitSyncOptIn(in: defaults) && backfillDidComplete(in: defaults)
-                resetOnDiskStores(includingSyncedStore: mirrorConfirmed)
-                return try ModelContainer(
-                    for: Schema(SchemaV6.models),
-                    migrationPlan: MigrationPlan.self,
-                    configurations: localCacheConfiguration(inMemory: false),
-                    syncedSavedConfiguration(inMemory: false, cloudKit: false)
+            recover: { _ in try recoverByResettingStores(defaults: defaults) }
+        )
+    }
+
+    /// DUT-78 — the same migration-recovery wrapper, additionally threading
+    /// the pre-open account-status guard and the self-heal escape hatch
+    /// through to the `build` closure (see
+    /// `RecipeStore+CloudKitSelfHeal.swift`). Layering order matters: the
+    /// DUT-78 guards decide CloudKit-vs-local for THIS launch; this wrapper
+    /// still catches a genuine synchronous migration/corruption failure on
+    /// whichever layout that decision picks.
+    public static func productionContainerRecoveringFromMigrationFailure(
+        defaults: UserDefaults,
+        accountStatus: CloudKitAvailability.AccountStatus?,
+        launchHealth: LaunchHealthTracker?
+    ) throws -> ContainerBuildResult {
+        try buildWithMigrationRecovery(
+            defaults: defaults,
+            build: {
+                try productionContainer(
+                    defaults: defaults,
+                    accountStatus: accountStatus,
+                    launchHealth: launchHealth
                 )
-            }
+            },
+            recover: { _ in try recoverByResettingStores(defaults: defaults) }
+        )
+    }
+
+    /// Shared recovery step for both entry points above: a CloudKit-mirrored
+    /// open can't itself be the migration failure (its own fallback handles
+    /// that), so recovery always opens the plain local layout after moving
+    /// the corrupt store aside.
+    ///
+    /// DUT-586: scope the reset. The `default.store` cache is the store
+    /// that actually fails migration/corruption, so it always resets.
+    /// `SyncedSaved.store` (the user's whole Saved tab) is a SEPARATE
+    /// store; for an opted-OUT user it is local-only with no remote
+    /// copy, so sweeping it aside would DESTROY the sole copy of their
+    /// Saved list with nothing to re-hydrate it. Only sweep it when the
+    /// CloudKit mirror is active (opt-in ON) so a re-import can restore
+    /// it; otherwise leave the intact synced store in place and reopen
+    /// it as-is.
+    ///
+    /// DUT-733: opt-in ON is NOT proof the mirror is live. An opted-in
+    /// user whose CloudKit is unavailable (no iCloud account, or the
+    /// Production schema not yet deployed) runs on a LOCAL-ONLY fallback
+    /// `SyncedSaved` store with no remote copy — sweeping it on the flag
+    /// alone would destroy their only Saved list. Require a CONFIRMED
+    /// import (`backfillDidComplete`) too: that flag only flips once a
+    /// real CloudKit import reconciles, proving a remote copy exists to
+    /// re-hydrate. Absent that, protect the possibly-local-only store
+    /// exactly like the opted-out branch.
+    private static func recoverByResettingStores(defaults: UserDefaults) throws -> ModelContainer {
+        let mirrorConfirmed =
+            cloudKitSyncOptIn(in: defaults) && backfillDidComplete(in: defaults)
+        resetOnDiskStores(includingSyncedStore: mirrorConfirmed)
+        return try ModelContainer(
+            for: Schema(SchemaV6.models),
+            migrationPlan: MigrationPlan.self,
+            configurations: localCacheConfiguration(inMemory: false),
+            syncedSavedConfiguration(inMemory: false, cloudKit: false)
         )
     }
 

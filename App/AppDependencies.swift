@@ -62,6 +62,14 @@ final class AppDependencies {
     /// gate the DUT-240 seed on it.
     let usedCloudKitFallback: Bool
 
+    /// DUT-78 — `true` when the crash-loop self-heal escape hatch tripped
+    /// this launch (see `AppDependencies+CloudKitLaunch.swift`).
+    let didSelfHeal: Bool
+
+    /// DUT-78 — the self-heal escape hatch's launch-health counter, armed in
+    /// `init()` and cleared in `bootstrap()` (see `LaunchHealthTracker`).
+    private let launchHealth = LaunchHealthTracker()
+
     /// DUT-494 — synced saved-id baseline captured SYNCHRONOUSLY in `init` (pre
     /// run loop / import) so the async CloudKit import can't poison the seed.
     let processStartSyncedIDs: Set<Int>
@@ -86,6 +94,10 @@ final class AppDependencies {
 
     init() {
         var fellBackToLocal = false
+        var selfHealed = false
+        // DUT-78: stamp "launch started, not yet healthy" BEFORE building any
+        // container, so a trap in async CloudKit mirroring is counted.
+        launchHealth.recordLaunchStarted()
         do {
             // L3 isolation hook (`-DODUseInMemoryStore`) + T-610 hermetic E2E
             // use a clean in-memory store so nothing persists across CI runs.
@@ -98,11 +110,15 @@ final class AppDependencies {
                 // corruption on a POPULATED opt-out store used to rethrow into
                 // the `fatalError` below (a launch crash-loop); now the corrupt
                 // store is moved aside and a fresh one opened (working-but-empty).
-                let result = try RecipeStore.productionContainerRecoveringFromMigrationFailure(
-                    defaults: .standard
+                // DUT-78: also threads the account-status guard + self-heal
+                // hatch (`AppDependencies+CloudKitLaunch.swift`).
+                let result = try Self.buildProductionContainer(
+                    defaults: .standard,
+                    launchHealth: launchHealth
                 )
                 self.modelContainer = result.container
                 fellBackToLocal = result.usedCloudKitFallback
+                selfHealed = result.didSelfHeal
                 // DUT-552: surface the destructive recovery (was `_ =`) as a log.
                 if result.recoveredFromMigrationFailure {
                     DODLog.persistence.error("SwiftData store unopenable; moved aside + opened FRESH.")
@@ -115,6 +131,7 @@ final class AppDependencies {
             fatalError("SwiftData migration failed and recovery could not open a fresh store: \(error)")
         }
         self.usedCloudKitFallback = fellBackToLocal
+        self.didSelfHeal = selfHealed
         // DUT-494: anchor the synced-saved baseline synchronously, pre run loop.
         self.processStartSyncedIDs = (try? RecipeStore.syncedSavedIDSet(in: modelContainer)) ?? []
         self.store = RecipeStore(modelContainer: modelContainer)
@@ -151,6 +168,11 @@ final class AppDependencies {
         // (appOpen telemetry, network monitor start, CloudKit probe) fire once.
         guard !hasBootstrapped else { return }
         hasBootstrapped = true
+        // DUT-78: past the async-mirroring-trap window — reset the
+        // unhealthy-launch counter so a later unrelated crash doesn't
+        // accumulate toward the self-heal threshold.
+        launchHealth.markLaunchHealthy()
+        logSelfHealIfNeeded()
         await networkMonitor.start()
         // DUT-377: ReliableImage offline disk fallback (saved/downloaded heroes).
         ReliableImageConfig.setOfflineDataProvider { [store] url in try? await store.image(url: url) }
@@ -203,6 +225,7 @@ final class AppDependencies {
                 // as a real error instead of letting the Settings row read a
                 // falsely-healthy "Idle".
                 cloudKitDiagnostics.markContainerOpenFailed()
+                logTaintedStoreIfNeeded()
             }
             await checkCloudKitAvailability()
         }
@@ -362,19 +385,8 @@ final class AppDependencies {
         )
     }
 
-    /// Fetch a single post (by WP id) from the live REST API and project it
-    /// to a ``RecipeListItem``. Backs the notification deep-link fetch-on-
-    /// cache-miss path (T-632 / REG-20 / CL-101): a notification targets a
-    /// brand-new post that is never cached, so `RootView.resolveRecipeRoute`
-    /// calls this when `store.recipeWithoutTouching(id:)` misses, then routes
-    /// to recipe-detail (which runs the JSON-LD parse / article
-    /// classification to resolve recipe-vs-article per AC-4.11 / AC-37.2).
-    func fetchListItem(forPostID id: Int) async throws -> RecipeListItem {
-        try await restClient.post(id: id)
-    }
-
-    // `resolveRecipe(forArticleLink:)` + `recipeSlug(fromDODURL:)` (the in-app
-    // article recipe-link resolve, DOD-ART-2 / DUT-920) live in
-    // `AppDependencies+ArticleLink.swift` (keeps this file under the SwiftLint
-    // `file_length` cap).
+    // `fetchListItem(forPostID:)` + `resolveRecipe(forArticleLink:)` +
+    // `recipeSlug(fromDODURL:)` (deep-link recipe-list-item resolution,
+    // DOD-ART-2 / DUT-920 / T-632) live in `AppDependencies+ArticleLink.swift`
+    // (keeps this file under the SwiftLint `file_length` cap).
 }
