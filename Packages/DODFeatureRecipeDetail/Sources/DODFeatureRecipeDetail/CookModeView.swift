@@ -245,14 +245,7 @@ public struct CookModeView: View {
         // the `didBegin` / `priorIdleTimerDisabled` symmetry, so they never
         // double-restore against the `.onDisappear` `endCookMode` above.
         .onChange(of: scenePhase) { _, newPhase in
-            switch newPhase {
-            case .background:
-                viewModel.suspendIdleTimerForBackground()
-            case .active:
-                viewModel.resumeIdleTimerIfActive()
-            default:
-                break
-            }
+            Self.handleScenePhaseChange(newPhase, viewModel: viewModel)
         }
     }
 
