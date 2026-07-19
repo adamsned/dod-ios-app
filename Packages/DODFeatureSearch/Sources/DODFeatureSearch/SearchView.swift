@@ -230,35 +230,17 @@ public struct SearchView: View {
                 // of the pre-rotation `topCategorySuggestions` top-5.
                 topCategories: viewModel.displayedTrySlate,
                 onRecentTap: { viewModel.selectRecent($0) },
-                // US-29 / AC-29.1 / CL-49.1 + CL-49.5: tapping a "Try"
-                // category pill populates the search field and runs a
-                // normal text query through the existing debounce path.
-                // The pre-T-500 path also set `filters.categoryID`, which
-                // dropped every REST result whose recipe-detail page
-                // hadn't yet hydrated the local category-IDs cache — the
-                // smoking gun behind the "tag search returns no results"
-                // round-6 report. CL-49 documents the full root cause.
-                //
-                // REG-19 / CL-66 / T-670: route through
-                // `selectCuratedSuggestion(_:)` (not raw `query = ...`)
-                // so the resulting REST search does NOT persist the
-                // tapped category name into the recent-searches store.
-                // The user tapped a curated pill; they did not type the
-                // term. Persisting it makes Clear All look broken because
-                // the same curated terms reappear under Recent.
+                // DUT-1233: tapping a "Try" category pill BROWSES that
+                // category (like the "Categories" rows below already do),
+                // except "Latest Recipes" which keeps its own bespoke feed
+                // fetch. See `categoryTapAction(for:)` in
+                // `SearchView+CategoryTap.swift` for the full reasoning.
                 onCategoryTap: { category in
-                    // US-29 / AC-29.1 amendment / CL-106 (T-637): "Latest
-                    // Recipes" is special-cased — a literal `selectCuratedSuggestion`
-                    // fulltext search for the phrase returns garbage; every other
-                    // category falls through to the curated-tap path.
-                    // DUT-693 — the id-1590 / name-match test is now the canonical
-                    // `nonisolated static` predicate on the view model
-                    // (`SearchViewModel+T639.swift`); this call site and
-                    // `IdleSuggestionsView` both delegate to it.
-                    if SearchViewModel.isLatestRecipesCategory(category) {
+                    switch Self.categoryTapAction(for: category) {
+                    case .surfaceLatestRecipes:
                         Task { await viewModel.surfaceLatestRecipes() }
-                    } else {
-                        viewModel.selectCuratedSuggestion(category.name)
+                    case .browseCategory:
+                        onSelectCategory(category)
                     }
                 },
                 onClearRecents: { viewModel.clearRecentSearches() },
