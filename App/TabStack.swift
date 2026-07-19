@@ -91,7 +91,11 @@ struct TabStack: View {
     /// surfaced via the reused ``DeepLinkErrorSnackbar`` overlay on `body`.
     /// Mirrors the DUT-549 deep-link failure snackbar so a silent catch no
     /// longer leaves the user without feedback.
-    @State private var saveErrorMessage: String?
+    ///
+    /// `internal` (not `private`) so `TabStack+Destination.swift` (split out
+    /// for the file-length cap, DUT-1240) can surface the category-card save
+    /// failure too.
+    @State var saveErrorMessage: String?
 
     init(
         tab: AppTab,
@@ -289,68 +293,10 @@ struct TabStack: View {
         }
     }
 
-    @ViewBuilder
-    private func destination(for route: RecipeRoute) -> some View {
-        switch route {
-        case .recipe(let item, let autoStartCookMode):
-            let canonical =
-                item.canonicalURL
-                ?? URL(string: "https://www.dutchovendaddy.com/") ?? URL(filePath: "/")
-            RecipeDetailView(
-                viewModel: RecipeDetailViewModel(
-                    listItem: item,
-                    canonicalURL: canonical,
-                    dependencies: dependencies.recipeDetailDependencies(),
-                    // DUT-546 — inject the shared store so a block on one open
-                    // recipe screen live-hides that author on another.
-                    commentModeration: commentModeration
-                ),
-                onSelectRelated: { related in path.append(.recipe(item: related)) },
-                autoStartCookMode: autoStartCookMode,
-                // DUT-534 — the Snackbar "View" action opens the Shopping List.
-                openShoppingList: openShoppingList,
-                // DUT-535 — present the ingredient-selection sheet on "Add to
-                // Shopping List" (pick which ingredients), replacing the DUT-534
-                // immediate add-all.
-                addToShoppingListSheet: dependencies.addToShoppingListSheetBuilder(),
-                // T-912 / DUT-551 — the per-recipe Heat Coach nudge routes to the
-                // hub tool; the Cook Mode heat-step shortcut presents Heat Coach
-                // as a sheet over the full-screen cover (a tab switch would be
-                // invisible beneath it).
-                openHeatCoach: openHeatCoach,
-                heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) }
-            )
-            .onAppear {
-                Telemetry.shared.send(.screenView(name: "recipe_detail"))
-            }
-        case .category(let category):
-            CategoryRecipesView(
-                viewModel: CategoryRecipesViewModel(
-                    category: category,
-                    dependencies: dependencies.categoriesDependencies()
-                ),
-                onSelect: { item in path.append(.recipe(item: item)) },
-                onSave: { item, report in
-                    Task {
-                        let didSave = await Self.saveFromCard(
-                            item: item,
-                            store: dependencies.store,
-                            publisher: dependencies.savedWidgetPublisher()
-                        )
-                        report(didSave)  // DUT-629 — revert optimistic flip on failure
-                        if !didSave { saveErrorMessage = Self.saveFailedMessage }  // DUT-693
-                    }
-                }
-            )
-            .onAppear {
-                Telemetry.shared.send(.screenView(name: "category_recipes"))
-            }
-        }
-    }
-
-    // `saveFromCard(...)` (the shared card-save path, DUT-629) and
-    // `listItem(from:)` live in `TabStack+CardSave.swift` (keeps this file under
-    // the SwiftLint `file_length` cap).
+    // `destination(for:)` (the `.recipe` / `.category` push destinations) lives
+    // in `TabStack+Destination.swift`, and `saveFromCard(...)` / `listItem(from:)`
+    // (the shared card-save path, DUT-629) live in `TabStack+CardSave.swift` —
+    // both keep this file under the SwiftLint `file_length` cap.
 
     /// Service a widget deep link by pushing the recipe detail onto our
     /// path. Resolution preference, best → worst:
