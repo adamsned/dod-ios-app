@@ -194,7 +194,7 @@ extension ProfileEditView {
         }
     }
 
-    /// (this bug) — whether a completed provider sign-in should dismiss the
+    /// Whether a completed provider sign-in should dismiss the
     /// profile editor, given the ``AppleProfileSignIn/Outcome`` already past
     /// its `signedIn`/`profileWriteFailed` guards. DUT-935 decided a signed-in
     /// user should NEVER be trapped on the sheet, even when the credential
@@ -312,7 +312,7 @@ extension ProfileEditView {
             // DUT — mirror the Apple handler: a `.success` tap confirms the
             // successful Google sign-in.
             authSuccessTick &+= 1
-            // (this bug) — DUT-935 mirror: a successful sign-in ALWAYS
+            // Bug fix — DUT-935 mirror: a successful sign-in ALWAYS
             // dismisses, exactly like the Apple handler, even when the Google
             // credential carried no profile to auto-fill (e.g. a restored
             // session, or a workspace account with no public profile name).

@@ -3,7 +3,7 @@ import Testing
 
 @testable import DODFeatureProfile
 
-/// (this bug) regression L1 for ``ProfileEditView/shouldDismissAfterSignIn(outcome:)`` —
+/// Regression L1 for ``ProfileEditView/shouldDismissAfterSignIn(outcome:)`` —
 /// the shared policy behind DUT-935's "never trap a signed-in user on the
 /// profile editor sheet" rule. Before this fix `handleGoogleSignIn` still
 /// gated dismissal on `outcome.profileSaved`, which DUT-935 had already
@@ -14,7 +14,7 @@ import Testing
 ///
 /// These pin the policy directly on the pure helper both handlers now share,
 /// so it can never again drift apart between the Apple and Google paths.
-@Suite("ProfileEditView sign-in dismiss policy ((this bug))")
+@Suite("ProfileEditView sign-in dismiss policy")
 struct ProfileEditViewSignInDismissTests {
 
     /// The KEY regression case: signed in, but the credential carried no
