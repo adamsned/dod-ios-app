@@ -198,13 +198,13 @@ struct TabStack: View {
         case .feed:
             FeedView(
                 viewModel: FeedViewModel(dependencies: dependencies.feedDependencies()),
-                // DUT — a pick made after the hub's Cook Mode "Find a Recipe"
-                // (which armed the flag) opens already in Cook Mode; a plain Feed
-                // browse leaves it false. One-shot: disarm as we consume it.
+                // DUT-1229 fix — a pick made after the hub's Cook Mode "Find a
+                // Recipe" (which armed the flag) opens already in Cook Mode; a
+                // plain Feed browse leaves it false. Stays armed across repeated
+                // picks (see `cookModeFindRecipeArmed`'s doc comment) — disarm
+                // happens in `RootView` when the user leaves the Feed tab, not here.
                 onSelect: { item in
-                    let armed = cookModeFindRecipeArmed
-                    if armed { cookModeFindRecipeArmed = false }
-                    path.append(Self.recipeRoute(for: item, cookModeArmed: armed))
+                    path.append(Self.recipeRoute(for: item, cookModeArmed: cookModeFindRecipeArmed))
                 },
                 onSave: { item, report in
                     Task {

@@ -47,7 +47,7 @@ extension TabStack {
     }
 
     /// DUT — build the ``RecipeRoute`` a Feed card tap pushes. `cookModeArmed` is
-    /// the one-shot "we came here to cook" flag the Cooking Tools hub's Cook Mode
+    /// the "we came here to cook" flag the Cooking Tools hub's Cook Mode
     /// "Find a Recipe" sets before routing to the Feed: when armed, the route
     /// carries `autoStartCookMode: true` so the recipe opens ALREADY in Cook Mode
     /// (the same effect as the StartCookMode deep link, honored downstream by

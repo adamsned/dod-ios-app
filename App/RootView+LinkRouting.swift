@@ -155,6 +155,24 @@ extension RootView {
         selectedTab = .feed
     }
 
+    /// DUT-1229 fix — whether switching to `newTab` should disarm the Cook Mode
+    /// "Find a Recipe" flag. `cookModeFindRecipeArmed` now stays armed across
+    /// repeated recipe picks (so backing out of Cook Mode and picking a
+    /// DIFFERENT recipe still auto-starts), but must still reset once the user
+    /// leaves the "I came here to cook" session — i.e. leaves the Feed tab.
+    /// Pure so this boundary is unit-testable without a live `RootView` host.
+    static func shouldDisarmCookModeFind(forTab newTab: AppTab) -> Bool {
+        newTab != .feed
+    }
+
+    /// `.onChange(of: selectedTab)` hook (wired in `RootView.body`) that applies
+    /// ``shouldDisarmCookModeFind(forTab:)``.
+    func disarmCookModeFindIfNeeded(forTab newTab: AppTab) {
+        if Self.shouldDisarmCookModeFind(forTab: newTab) {
+            cookModeFindRecipeArmed = false
+        }
+    }
+
     /// T-912 / DUT-551 (CL-306) — route to Heat Coach (the hub's row #3 sheet).
     /// The per-recipe Heat Coach nudge (Recipe Detail) taps this. Kept as a named
     /// function for its callers; delegates to the unified `route(toHubTool:)`.

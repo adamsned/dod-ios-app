@@ -10,12 +10,20 @@ import XCTest
 /// the picked recipe routed with `autoStartCookMode: false`, dropping the
 /// intent — the user landed on plain recipe detail and had to tap Cook Mode.
 ///
-/// The mechanism is a one-shot "we came here to cook" arm: `RootView` sets it
-/// before selecting `.feed`, and the Feed card tap builds its route through
-/// ``TabStack/recipeRoute(for:cookModeArmed:)``, consuming the arm. This suite
-/// pins that pure route-construction invariant without a SwiftUI host; the
-/// downstream auto-start (`RecipeDetailView`'s `pendingAutoCookMode`) is the
-/// same path the deep link already exercises.
+/// The mechanism is a "we came here to cook" arm: `RootView` sets it before
+/// selecting `.feed`, and the Feed card tap builds its route through
+/// ``TabStack/recipeRoute(for:cookModeArmed:)``. This suite pins that pure
+/// route-construction invariant without a SwiftUI host; the downstream
+/// auto-start (`RecipeDetailView`'s `pendingAutoCookMode`) is the same path
+/// the deep link already exercises.
+///
+/// DUT-1229 — the arm used to disarm itself the instant the FIRST pick
+/// consumed it (in `TabStack`'s `onSelect` closure), so backing out of Cook
+/// Mode and picking a DIFFERENT recipe silently stopped auto-starting: "works
+/// once, not the second time," exactly as reported. The arm now stays armed
+/// across repeated picks and only disarms via
+/// ``RootView/shouldDisarmCookModeFind(forTab:)`` when the user leaves the
+/// Feed tab — pinned below alongside the pre-existing route-construction tests.
 final class CookModeFindRecipeRouteTests: XCTestCase {
 
     private func makeItem(id: Int = 42) -> RecipeListItem {
@@ -57,5 +65,23 @@ final class CookModeFindRecipeRouteTests: XCTestCase {
             autoStart,
             "a plain Feed/Saved/Search/category tap must NOT auto-start Cook Mode"
         )
+    }
+
+    /// DUT-1229 regression: staying on the Feed tab must NOT disarm — this is
+    /// exactly what lets a SECOND, different recipe pick (after backing out of
+    /// Cook Mode) still auto-start, without the user re-tapping "Find a Recipe."
+    func test_stayingOnFeed_doesNotDisarm() {
+        XCTAssertFalse(RootView.shouldDisarmCookModeFind(forTab: .feed))
+    }
+
+    /// DUT-1229 regression: leaving Feed for ANY other tab disarms — the
+    /// natural end of the "I came here to cook" session.
+    func test_leavingFeedForAnyOtherTab_disarms() {
+        for tab in AppTab.allCases where tab != .feed {
+            XCTAssertTrue(
+                RootView.shouldDisarmCookModeFind(forTab: tab),
+                "leaving Feed for \(tab) must disarm the Cook Mode Find-a-Recipe flag"
+            )
+        }
     }
 }
