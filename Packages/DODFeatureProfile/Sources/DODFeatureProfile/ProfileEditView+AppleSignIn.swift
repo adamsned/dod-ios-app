@@ -194,6 +194,25 @@ extension ProfileEditView {
         }
     }
 
+    /// (this bug) — whether a completed provider sign-in should dismiss the
+    /// profile editor, given the ``AppleProfileSignIn/Outcome`` already past
+    /// its `signedIn`/`profileWriteFailed` guards. DUT-935 decided a signed-in
+    /// user should NEVER be trapped on the sheet, even when the credential
+    /// carried no profile to auto-fill (Apple withholds name/email after the
+    /// first authorization) — being signed in is enough to use the app, and
+    /// the display name/email can be added later. `static` + pure so both
+    /// `handleAppleSignIn` and `handleGoogleSignIn` share ONE policy instead of
+    /// each re-deriving it — which is exactly how they drifted apart before
+    /// this fix: `handleGoogleSignIn` still gated on `outcome.profileSaved`
+    /// after DUT-935 removed that same gate from the Apple handler, so a
+    /// successful Google sign-in whose credential carried no profile data
+    /// (e.g. a restored session, or a workspace account with no public
+    /// profile name) left the user stuck on the sheet looking like sign-in
+    /// had failed, when they were actually already signed in.
+    static func shouldDismissAfterSignIn(outcome: AppleProfileSignIn.Outcome) -> Bool {
+        outcome.signedIn && !outcome.profileWriteFailed
+    }
+
     #if canImport(UIKit)
     /// Reflect a completed Sign in with Apple: fill the fields from the
     /// credential, and — when a valid profile was written in one tap — refresh
@@ -242,6 +261,9 @@ extension ProfileEditView {
         // longer trap them on the sheet with empty "required" fields demanding
         // manual entry, which read as "sign-in didn't work." Being signed in is
         // enough to use the app; the display name is optional and set later.
+        // Delegates to `shouldDismissAfterSignIn` so this policy stays shared
+        // with `handleGoogleSignIn` instead of drifting apart again.
+        guard Self.shouldDismissAfterSignIn(outcome: outcome) else { return }
         Task {
             await onProfileChanged()
             dismiss()
@@ -290,8 +312,17 @@ extension ProfileEditView {
             // DUT — mirror the Apple handler: a `.success` tap confirms the
             // successful Google sign-in.
             authSuccessTick &+= 1
-            // Nothing to auto-fill → keep the editor open for manual entry.
-            guard outcome.profileSaved else { return }
+            // (this bug) — DUT-935 mirror: a successful sign-in ALWAYS
+            // dismisses, exactly like the Apple handler, even when the Google
+            // credential carried no profile to auto-fill (e.g. a restored
+            // session, or a workspace account with no public profile name).
+            // This used to read `guard outcome.profileSaved else { return }`,
+            // which kept the editor open in that case — the exact "trap the
+            // user on the sheet after a successful sign-in" bug DUT-935
+            // eliminated on the Apple path but never fixed here, so a
+            // genuinely signed-in Google user could be left staring at a
+            // sheet that looked like sign-in had failed.
+            guard Self.shouldDismissAfterSignIn(outcome: outcome) else { return }
             await onProfileChanged()
             dismiss()
         }
