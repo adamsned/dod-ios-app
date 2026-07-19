@@ -15,13 +15,13 @@ struct MetricConverterNamelessLineTests {
     @Test func bareQuantityUnitConvertsWithoutAName() {
         #expect(IngredientMetricConverter.metric("2 cups") == "480 ml")
         #expect(IngredientMetricConverter.metric("1 pound") == "450 g")
-        #expect(IngredientMetricConverter.metric("8 ounces") == "220 g")
+        #expect(IngredientMetricConverter.metric("8 ounces") == "230 g")
         #expect(IngredientMetricConverter.metric("3 tablespoons") == "45 ml")
     }
 
     @Test func namedLinesStillConvertWithTheName() {
         #expect(IngredientMetricConverter.metric("2 cups water") == "480 ml water")
-        #expect(IngredientMetricConverter.metric("8 ounces cheese") == "220 g cheese")
+        #expect(IngredientMetricConverter.metric("8 ounces cheese") == "230 g cheese")
     }
 
     @Test func nonConvertibleOrUnparseableLinesAreUnchanged() {
