@@ -1,0 +1,2 @@
+timestamp	model	prompt_tokens	completion_tokens	total	label
+2026-07-19T00:51:38+00:00	qwen2.5-coder:14b	846	889	1735	freshscout6-hunt-fix-draft
