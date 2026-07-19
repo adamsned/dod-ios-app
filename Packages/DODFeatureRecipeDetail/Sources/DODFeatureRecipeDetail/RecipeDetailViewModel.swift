@@ -293,8 +293,8 @@ public final class RecipeDetailViewModel {
             // catch instead of only logging.
             snackbarMessage =
                 isSaved
-                ? "Couldn't remove from saved — try again."
-                : "Couldn't save recipe — try again."
+                ? "Couldn't remove from saved. Try again."
+                : "Couldn't save recipe. Try again."
         }
     }
 

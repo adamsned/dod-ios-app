@@ -20,7 +20,7 @@ public enum AddToShoppingListResult: Sendable, Equatable {
 
     /// The recipe carried no ingredients and none could be fetched (offline /
     /// unfetchable / parse failure), so nothing was added. The affordance shows
-    /// "Couldn't load ingredients — open the recipe to add." Distinct from
+    /// "Couldn't load ingredients. Open the recipe to add." Distinct from
     /// `.added(count: 0)`, which would only arise from a genuinely empty
     /// hydrated recipe (still nothing to add, folded into this case by the
     /// appender so the UI copy is consistent).

@@ -142,7 +142,7 @@ extension CookModeJournalLogSheet {
             .accessibilityLabel(displayImage == nil ? "Add a photo" : "Change photo")
             .accessibilityIdentifier("cook-mode-journal-photo")
             if photoLoadFailed {
-                Text("Couldn't load that photo — try again.")
+                Text("Couldn't load that photo. Try again.")
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.accent)
             }

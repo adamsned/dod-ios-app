@@ -27,7 +27,7 @@ struct TestNotificationButton: View {
                 Task {
                     await sendTestNotification()
                     confirmationMessage =
-                        "Test notification scheduled — it'll arrive in a moment if notifications are enabled."
+                        "Test notification scheduled. It'll arrive in a moment if notifications are enabled."
                 }
             } label: {
                 Text("Send Test New-Post Notification")

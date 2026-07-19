@@ -261,7 +261,7 @@ struct RootView: View {
         } message: {
             Text(
                 "Keep your saved recipes and cook journal on all your devices. "
-                    + "Takes effect next time you open the app — change it anytime in Settings."
+                    + "Takes effect next time you open the app. Change it anytime in Settings."
             )
         }
         // DUT-549 — transient "couldn't open that recipe" toast for a failed

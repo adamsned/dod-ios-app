@@ -341,7 +341,7 @@ public final class SettingsViewModel {
             // Best-effort — the store actor's SwiftData writes are wrapped in
             // `try modelContext.save()`, which surfaces here on a persistence
             // failure. Surface a humane error rather than silently failing.
-            snackbarMessage = "Couldn't clear cache — try again."
+            snackbarMessage = "Couldn't clear cache. Try again."
         }
     }
 

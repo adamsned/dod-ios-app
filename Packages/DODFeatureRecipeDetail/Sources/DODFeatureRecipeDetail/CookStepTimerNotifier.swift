@@ -50,7 +50,7 @@ public struct SystemCookStepTimerNotifier: CookStepTimerNotifying {
     /// Base of the per-(recipe, step) notification identifier.
     static let identifier = "dod.cookMode.stepTimerDone"
     static let title = "Your timer's up!"
-    static let body = "Head back to your recipe — this step's timer just finished."
+    static let body = "Head back to your recipe. This step's timer just finished."
 
     /// The app-wide notifications opt-out key. Duplicated as a string literal
     /// (not referenced from `DODFeatureFeed.SettingsViewModel`) because
