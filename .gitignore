@@ -18,15 +18,29 @@ xcuserdata/
 timeline.xctimeline
 playground.xcworkspace
 
-# XcodeGen — the project file is generated; we don't commit it
-DODApp.xcodeproj/
+# XcodeGen — the project file is generated; we don't commit it, EXCEPT for
+# one file: `Package.resolved` (see the Swift Package Manager section below
+# for why). `xcodegen generate` never touches that file if it's already
+# present (verified: survives a full regenerate byte-identical), so a
+# committed copy at this exact path persists across every CI run.
+DODApp.xcodeproj/*
+!DODApp.xcodeproj/project.xcworkspace/
+DODApp.xcodeproj/project.xcworkspace/*
+!DODApp.xcodeproj/project.xcworkspace/xcshareddata/
+DODApp.xcodeproj/project.xcworkspace/xcshareddata/*
+!DODApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+DODApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/*
+!DODApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # Swift Package Manager
 .swiftpm/
 .build/
 Packages/*/.build/
 Packages/*/.swiftpm/
+# Bare `Package.resolved` still applies everywhere else (e.g. individual
+# package checkouts) — only the one committed path above is exempted.
 Package.resolved
+!DODApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # Secrets (constitution §9)
 *.xcconfig
