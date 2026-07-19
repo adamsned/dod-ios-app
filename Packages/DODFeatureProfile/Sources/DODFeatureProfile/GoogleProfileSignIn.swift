@@ -95,6 +95,16 @@ public struct GoogleProfileSignIn: Sendable {
         displayName: String?,
         email: String?
     ) async -> AppleProfileSignIn.Outcome {
+        // DUT-506 parity gap (Google side): a blank / whitespace-only identifier
+        // is NOT a valid sign-in. `GIDSignInProvider`'s own gate is a bare
+        // `!identifier.isEmpty`, which a whitespace-only string still passes, so
+        // this method must guard too — otherwise the orphaned-token revoke below
+        // could fire against a real, different signed-in user (DUT-279) for a
+        // sign-in that goes on to fail anyway. Mirrors `AppleProfileSignIn.apply`'s
+        // guard; bail BEFORE resolve/revoke/save so none of that runs.
+        guard !userIdentifier.isBlankAppleIdentifier else {
+            return Self.blankIdentifierOutcome
+        }
         let existing = try? sessionStore.load()
         let resolved = AppleCredentialResolver.resolve(
             userIdentifier: userIdentifier,
@@ -162,6 +172,16 @@ public struct GoogleProfileSignIn: Sendable {
             profileWriteFailed: profileWriteFailed
         )
     }
+
+    /// DUT-506 parity gap (Google side) — the no-op "not signed in" outcome for
+    /// a blank / whitespace-only identifier. Factored out purely to keep
+    /// `apply`'s body under the SwiftLint `function_body_length` cap.
+    private static let blankIdentifierOutcome = AppleProfileSignIn.Outcome(
+        displayName: nil,
+        email: nil,
+        profileSaved: false,
+        signedIn: false
+    )
 
     /// (this bug) — the Google mirror of `AppleProfileSignIn.persistSession`.
     /// Returns `nil` on success, or the "not signed in" failure ``Outcome``
