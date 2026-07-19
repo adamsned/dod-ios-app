@@ -1,6 +1,7 @@
 import DODCookActivity
 import DODDomain
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import DODFeatureRecipeDetail
@@ -199,6 +200,43 @@ struct CookModeTimerTests {
         vm.revalidateLiveActivityAvailability()
         vm.tickTimers(now: t0.addingTimeInterval(4))
         #expect(spy.startCallCount == 2)  // retried after the latch cleared
+        #expect(vm.liveActivityStepKey == 0)
+    }
+
+    /// DUT-558 — `revalidateLiveActivityAvailability()` clearing the latch was
+    /// unit-tested (above) by calling it directly, but nothing ever proved the
+    /// PRODUCTION wiring actually calls it: `CookModeView` only called it from a
+    /// `.onChange(of: scenePhase)` closure with no test coverage, and in fact
+    /// never called it at all (the doc comment promised "scene-activate" but no
+    /// call site existed). This drives the same scene-activate path the app
+    /// takes — `CookModeView.handleScenePhaseChange(.active, viewModel:)` — so a
+    /// regression that drops the revalidate call again is caught here rather
+    /// than only in the direct-call unit test above.
+    @Test func sceneActivateRevalidatesLiveActivityAvailabilityAndRetriesTheStart() {
+        let spy = FakeLiveActivityController()
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1, liveActivity: spy)
+
+        // Permanently unavailable: start fails AND the auth check reports disabled.
+        spy.startShouldFail = true
+        spy.areActivitiesEnabled = false
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 120, now: t0)
+        #expect(spy.startCallCount == 1)  // attempted exactly once
+        #expect(vm.liveActivityStepKey == nil)  // never claimed a dead card
+
+        // More ticks while still unavailable — must not retry (DUT-558).
+        vm.tickTimers(now: t0.addingTimeInterval(1))
+        vm.tickTimers(now: t0.addingTimeInterval(2))
+        #expect(spy.startCallCount == 1)
+
+        // The user re-enables Live Activities in Settings and returns to the
+        // app — the scene transitions to `.active`. Drive the actual production
+        // entry point instead of calling the view model method directly.
+        spy.startShouldFail = false
+        spy.areActivitiesEnabled = true
+        CookModeView.handleScenePhaseChange(.active, viewModel: vm)
+
+        vm.tickTimers(now: t0.addingTimeInterval(3))
+        #expect(spy.startCallCount == 2)  // retried after scene-activate revalidation
         #expect(vm.liveActivityStepKey == 0)
     }
 
