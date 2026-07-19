@@ -12,11 +12,24 @@ import Foundation
 /// just the quantity + unit and re-emits `"<qty> <metric-unit> <name>"`.
 ///
 /// ## What it converts (canonical unit → metric)
-/// - Volume → millilitres: cup→240, tablespoon→15, teaspoon→5, pint→475,
-///   quart→950. A result ≥ 1000 ml is expressed in litres (one decimal, a
+/// - Volume → millilitres: cup→240, tablespoon→15, teaspoon→5, pint→480,
+///   quart→960. A result ≥ 1000 ml is expressed in litres (one decimal, a
 ///   trailing `.0` trimmed): `"1.9 L"`, `"2 L"`.
-/// - Mass → grams: pound→450, ounce→28. A result ≥ 1000 g is expressed in
+/// - Mass → grams: pound→450, ounce→28.125. A result ≥ 1000 g is expressed in
 ///   kilograms (one decimal, trailing `.0` trimmed): `"1.4 kg"`, `"2 kg"`.
+///
+/// **Bug fix: every unit within a dimension must be an exact multiple of its
+/// smallest sibling, not an independently-rounded real-world value.** `pint`
+/// and `quart` used to be their own real-world-ml values rounded to a "nice"
+/// number (475, 950) instead of being derived from `cup` (240) — so `"1
+/// quart"` rendered `"950 ml"` while the equal-volume `"4 cups"` rendered
+/// `"960 ml"`, a visible mismatch for the same real quantity. Likewise
+/// `ounce` was independently rounded to 28 instead of `pound / 16`, so
+/// `"8 ounces"` rendered `"220 g"` while the equal-weight `"0.5 pound"`
+/// rendered `"230 g"`. `pint` (`2 × cup`) and `quart` (`4 × cup`) are now
+/// derived from `cup`; `ounce` (`pound / 16`) is now derived from `pound` —
+/// so the same real quantity always converts to the same metric string
+/// regardless of which unit spelling the source recipe used.
 ///
 /// ## What it deliberately leaves alone (returned unchanged)
 /// - Already-metric units: gram, kilogram, millilitre, litre.
@@ -224,9 +237,15 @@ public enum IngredientMetricConverter {
         "cup": Conversion(factor: 240, dimension: .volume),
         "tablespoon": Conversion(factor: 15, dimension: .volume),
         "teaspoon": Conversion(factor: 5, dimension: .volume),
-        "pint": Conversion(factor: 475, dimension: .volume),
-        "quart": Conversion(factor: 950, dimension: .volume),
+        // Bug fix: derived from `cup` (2× / 4×), not an independently-rounded
+        // real-world value — keeps "1 quart" and "4 cups" converting to the
+        // same millilitre figure.
+        "pint": Conversion(factor: 480, dimension: .volume),
+        "quart": Conversion(factor: 960, dimension: .volume),
         "pound": Conversion(factor: 450, dimension: .mass),
-        "ounce": Conversion(factor: 28, dimension: .mass),
+        // Bug fix: derived from `pound` (÷ 16), not an independently-rounded
+        // real-world value — keeps "8 ounces" and "0.5 pound" converting to
+        // the same gram figure.
+        "ounce": Conversion(factor: 28.125, dimension: .mass),
     ]
 }
