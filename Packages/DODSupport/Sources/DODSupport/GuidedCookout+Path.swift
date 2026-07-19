@@ -197,6 +197,20 @@ extension GuidedCookout {
         recipeID == Self.campfire.recipeID
     }
 
+    /// DUT-1235 — whether the campfire capstone should be presented as
+    /// LOCKED: true until the cook has logged at least one home rung before
+    /// it (today, the lasagna or the Italian chicken) — completing EITHER is
+    /// enough to unlock, not both. The path's own premise is "one guaranteed
+    /// win at a time" building toward the campfire peak; letting a brand-new
+    /// cook jump straight to the hardest, outdoor rung undercuts that guided
+    /// progression. Checks every rung BEFORE the campfire in ``path`` (not
+    /// hardcoded recipe ids), so a future home rung slotted in ahead of the
+    /// campfire is covered for free.
+    public static func isCampfireLocked(cookedRecipeIDs: Set<Int>) -> Bool {
+        let homeRungs = path.dropLast()
+        return !homeRungs.contains { cookedRecipeIDs.contains($0.recipeID) }
+    }
+
     /// DUT-207: the intro-screen eyebrow. `FirstCookoutView` is reused for every
     /// rung, so it must NOT always read "Your First Cookout".
     public var introEyebrow: String {
