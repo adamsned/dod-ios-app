@@ -324,43 +324,6 @@ public enum JSONLDRecipeParser {
         default: return nil
         }
     }
-
-    static func mapVideo(_ raw: Any?) -> RecipeVideo? {
-        let dict: [String: Any]?
-        if let object = raw as? [String: Any] {
-            dict = object
-        } else if let array = raw as? [Any] {
-            // DUT-214: `raw as? [[String: Any]]` succeeds only when EVERY element
-            // is a dictionary, so a `video` array mixing a `VideoObject` dict with
-            // any non-dict element (a stray `"#video"` graph reference, a
-            // heterogeneous `@graph` ref) failed the whole-array cast and silently
-            // dropped the video. Cast to `[Any]` and recover the first dictionary
-            // element, skipping non-dictionaries.
-            dict = array.compactMap { $0 as? [String: Any] }.first
-        } else {
-            dict = nil
-        }
-        guard let dict else { return nil }
-
-        // contentUrl is preferred; fall back to embedUrl. Resolve each
-        // candidate to a `URL` before falling back — a scraped `contentUrl`
-        // that is present but blank/malformed (e.g. `"contentUrl": ""`) must
-        // not win the `??` and swallow a perfectly good `embedUrl`, dropping
-        // the whole video for a field that only LOOKS populated.
-        let url =
-            (dict["contentUrl"] as? String).flatMap { URL(string: $0) }
-            ?? (dict["embedUrl"] as? String).flatMap { URL(string: $0) }
-        guard let url else { return nil }
-
-        let thumbnail =
-            (dict["thumbnailUrl"] as? String).flatMap { URL(string: $0) }
-            ?? ((dict["thumbnailUrl"] as? [Any])?.compactMap { $0 as? String }.first)
-            .flatMap { URL(string: $0) }
-
-        let duration = parseISO8601Duration(dict["duration"] as? String)
-
-        return RecipeVideo(url: url, thumbnailURL: thumbnail, duration: duration)
-    }
 }
 
 extension RecipeIngredient {
