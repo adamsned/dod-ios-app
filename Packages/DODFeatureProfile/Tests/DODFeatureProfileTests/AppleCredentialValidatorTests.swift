@@ -191,6 +191,51 @@ struct AppleCredentialValidatorTests {
         #expect(await fixture.validator.validateOnLaunchOrForeground())
         #expect((try? fixture.sessionStore.load()) == nil)
     }
+
+    /// DUT-701 — the live `credentialRevokedNotification` path must apply the
+    /// SAME provider guard as ``validateOnLaunchOrForeground()``. Apple's
+    /// notification is posted app-wide, independent of which provider issued
+    /// the app's currently-stored session, so a Google-issued session must
+    /// never be torn down by it (this was the gap left open when DUT-701 only
+    /// patched the poll path).
+    @Test func handleCredentialRevokedSkipsGoogleProviderSession() async {
+        let sessionStore = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "google-123", provider: .google)
+        )
+        let profileStore = InMemoryProfileStore(
+            initial: UserProfile(id: UUID(), displayName: "Ned", email: "ned@dod.com")
+        )
+        let guest = SpyGuest()
+        let validator = AppleCredentialValidator(
+            sessionStore: sessionStore,
+            profileStore: profileStore,
+            revoker: nil,
+            guestIdentity: guest,
+            credentialStatus: { _ in .authorized }
+        )
+
+        await validator.handleCredentialRevoked()
+
+        #expect((try? sessionStore.load())?.userIdentifier == "google-123")  // kept
+        #expect(await profileStore.load() != nil)  // profile NOT deleted
+        #expect(guest.clearCalls == 0)  // guest identity NOT torn down
+    }
+
+    /// DUT-701 — the provider guard on the notification path must not weaken
+    /// DUT-635: an explicitly Apple-issued session is still cleared by the live
+    /// revocation notification.
+    @Test func handleCredentialRevokedStillClearsAppleProviderSession() async {
+        let fixture = makeFixture(
+            session: AppleAuthSession(userIdentifier: "u1", refreshToken: "rt", provider: .apple),
+            status: .authorized  // status is irrelevant on the notification path
+        )
+
+        await fixture.validator.handleCredentialRevoked()
+
+        #expect((try? fixture.sessionStore.load()) == nil)
+        #expect(await fixture.profileStore.load() == nil)
+        #expect(fixture.guest.clearCalls == 1)
+    }
 }
 
 /// Records `clear()` calls so a test can assert the guest-identity row was torn
