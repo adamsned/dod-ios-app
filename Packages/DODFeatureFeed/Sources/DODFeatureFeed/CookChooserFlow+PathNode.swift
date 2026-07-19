@@ -17,6 +17,12 @@ struct CookPathNode: View {
     let number: Int
     let state: NodeState
     let isLast: Bool
+    /// DUT-1235 — true only for the campfire capstone while neither home rung
+    /// before it has been cooked yet. Orthogonal to `state` (a locked rung is
+    /// always `.current` or `.upcoming`, never `.done` — a done campfire was,
+    /// by definition, already cooked). Dims the card, swaps the node symbol
+    /// for a lock, and disables the tap.
+    var isLocked: Bool = false
     let onTap: () -> Void
 
     var body: some View {
@@ -70,7 +76,11 @@ struct CookPathNode: View {
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(DODColor.labelOnAccent)
         case .current, .upcoming:
-            if rung.isCampfire {
+            if isLocked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(symbolColor)
+            } else if rung.isCampfire {
                 Image(systemName: "flame.fill")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(symbolColor)
@@ -114,30 +124,46 @@ struct CookPathNode: View {
                         .strokeBorder(DODColor.burntOrange, lineWidth: 2)
                 }
             }
+            // DUT-1235 — a locked campfire reads as unavailable, not just
+            // upcoming: dimmed, matching the disabled Button below.
+            .opacity(isLocked ? 0.5 : 1)
         }
         .buttonStyle(.plain)
+        // DUT-1235 — a locked rung can't be tapped into yet; cook one home
+        // rung first. `.disabled` also correctly excludes it from VoiceOver's
+        // tap targets and announces it as unavailable.
+        .disabled(isLocked)
         .padding(.bottom, isLast ? 0 : DODSpacing.md)
         .accessibilityIdentifier("cook-chooser-rung-\(rung.recipeID)")
     }
 
     @ViewBuilder private var statePill: some View {
-        switch state {
-        case .current:
-            Text(currentPillText)
-                .dodFont(DODType.caption)
-                .foregroundStyle(DODColor.labelOnAccent)
-                .padding(.horizontal, DODSpacing.xs)
-                .padding(.vertical, DODSpacing.xxs)
-                .background(DODColor.burntOrange, in: Capsule())
-        case .done:
+        if isLocked {
             HStack(spacing: DODSpacing.xxs) {
-                Image(systemName: "checkmark")
-                Text("Cooked")
+                Image(systemName: "lock.fill")
+                Text("Locked")
             }
             .dodFont(DODType.caption)
             .foregroundStyle(DODColor.labelSecondary)
-        case .upcoming:
-            EmptyView()
+        } else {
+            switch state {
+            case .current:
+                Text(currentPillText)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelOnAccent)
+                    .padding(.horizontal, DODSpacing.xs)
+                    .padding(.vertical, DODSpacing.xxs)
+                    .background(DODColor.burntOrange, in: Capsule())
+            case .done:
+                HStack(spacing: DODSpacing.xxs) {
+                    Image(systemName: "checkmark")
+                    Text("Cooked")
+                }
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+            case .upcoming:
+                EmptyView()
+            }
         }
     }
 
