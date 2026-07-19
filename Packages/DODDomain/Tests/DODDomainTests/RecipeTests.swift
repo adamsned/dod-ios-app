@@ -96,10 +96,57 @@ import Testing
         #expect(recipe.hasDetail)
     }
 
+    @Test func hasDetailTrueWhenArticleHasNonEmptyBody() {
+        let recipe = Self.makeRecipe(
+            id: 1,
+            kind: .article,
+            articleBodyHTML: "<p>Some article content</p>"
+        )
+        #expect(recipe.hasDetail)
+    }
+
+    @Test func hasDetailFalseWhenArticleHasNilBody() {
+        let recipe = Self.makeRecipe(
+            id: 1,
+            kind: .article,
+            articleBodyHTML: nil
+        )
+        #expect(!recipe.hasDetail)
+    }
+
+    @Test func hasDetailFalseWhenArticleHasEmptyStringBody() {
+        let recipe = Self.makeRecipe(
+            id: 1,
+            kind: .article,
+            articleBodyHTML: ""
+        )
+        #expect(!recipe.hasDetail)
+    }
+
+    @Test func hasDetailTrueWhenArticleHasIngredientsEdgeCase() {
+        let recipe = Self.makeRecipe(
+            id: 1,
+            ingredients: [RecipeIngredient(text: "1 cup flour")],
+            kind: .article
+        )
+        #expect(recipe.hasDetail)
+    }
+
+    @Test func hasDetailFalseWhenRecipeKindIgnoresArticleBodyHTML() {
+        let recipe = Self.makeRecipe(
+            id: 1,
+            kind: .recipe,
+            articleBodyHTML: "<p>This should be ignored</p>"
+        )
+        #expect(!recipe.hasDetail)
+    }
+
     private static func makeRecipe(
         id: Int,
         ingredients: [RecipeIngredient] = [],
-        instructions: [RecipeInstruction] = []
+        instructions: [RecipeInstruction] = [],
+        kind: PostKind = .recipe,
+        articleBodyHTML: String? = nil
     ) -> Recipe {
         Recipe(
             id: id,
@@ -109,7 +156,9 @@ import Testing
             canonicalURL: baseURL,
             publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
             ingredients: ingredients,
-            instructions: instructions
+            instructions: instructions,
+            kind: kind,
+            articleBodyHTML: articleBodyHTML
         )
     }
 }
