@@ -153,11 +153,29 @@ extension CookModeViewModel {
     /// DUT-583 — format any speed multiplier as a compact label ("1x", "1.5x",
     /// "0.5x"), shared by the speed button and its long-press menu so a picked
     /// speed and the button text always match.
-    public nonisolated static func speedLabel(for multiplier: Double) -> String {
+    ///
+    /// Bug fix: this used `String(format: "%.2f", multiplier)`, which always
+    /// pins the C-locale period — the exact bug DUT-320 (`FractionRenderer`)
+    /// and DUT-737 (`IngredientMetricConverter`) already fixed on the other
+    /// two decimal-display surfaces in the app. A comma-decimal-locale cook
+    /// (French, German, …) opening the Cook Mode speed picker saw "1.5x" /
+    /// "0.75x" instead of the locale-correct "1,5x" / "0,75x" — inconsistent
+    /// with every other fractional number the app renders. Routed through the
+    /// same locale-aware `NumberFormatter` pattern those two fixes use, with
+    /// an injectable `locale` (default `.current`, mirroring
+    /// `CookLogStats.currentWeeklyStreak`'s injectable `calendar`) so this is
+    /// directly testable without depending on the test runner's ambient locale.
+    public nonisolated static func speedLabel(for multiplier: Double, locale: Locale = .current) -> String {
         if multiplier == multiplier.rounded() { return "\(Int(multiplier))x" }
-        var text = String(format: "%.2f", multiplier)
-        while text.hasSuffix("0") { text.removeLast() }
-        if text.hasSuffix(".") { text.removeLast() }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        // `maximumFractionDigits = 2` plus the `= 0` minimum above does the
+        // trailing-zero trim `String(format:)` needed a manual char-by-char
+        // loop for ("1.50" → "1.5").
+        formatter.maximumFractionDigits = 2
+        formatter.locale = locale
+        let text = formatter.string(from: NSNumber(value: multiplier)) ?? String(multiplier)
         return "\(text)x"
     }
 
