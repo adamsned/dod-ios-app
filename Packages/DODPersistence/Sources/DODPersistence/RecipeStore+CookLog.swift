@@ -142,6 +142,29 @@ extension RecipeStore {
         try modelContext.save()
     }
 
+    /// Delete EVERY journal entry (and their photo files). The cook journal is
+    /// local-only, device-private data (`SchemaV6` — never CloudKit-synced,
+    /// unlike `SyncedSavedRecipe`), so nothing else clears it. Account teardown
+    /// (Sign Out / Delete Profile, `RootView.accountTeardownExtras`) calls this
+    /// so User A's private cook history — reflection notes, personal ratings,
+    /// and photos — never leaks forward to whoever signs into the same shared
+    /// device next, mirroring the existing recent-searches / comment-moderation
+    /// teardown clears.
+    public func deleteAllCookLogs() throws {
+        let descriptor = FetchDescriptor<CachedCookLogEntry>()
+        let rows = try modelContext.fetch(descriptor)
+        guard !rows.isEmpty else { return }
+        let photoStore = CookPhotoStore()
+        for row in rows {
+            // Mirrors the `deleteCookLog` per-row cleanup — never orphan a photo.
+            if let photoLocalID = row.photoLocalID {
+                photoStore.delete(id: photoLocalID)
+            }
+            modelContext.delete(row)
+        }
+        try modelContext.save()
+    }
+
     private static func toDomain(_ row: CachedCookLogEntry) -> CookLogEntry {
         CookLogEntry(
             id: row.id,
