@@ -64,4 +64,54 @@ struct CookJournalAndCookPhotoA11yTests {
         #expect(CookJournalView.photoThumbnailAccessibilityLabel == "Photo of this cook")
         #expect(!CookJournalView.photoThumbnailAccessibilityLabel.isEmpty)
     }
+
+    // MARK: - DUT-320 wave 4 — averageRatingText locale-aware decimal rendering
+
+    /// DUT-320 (and related fixes DUT-737, PR #768): the fourth detected instance
+    /// of String(format:) always using C-locale period. averageRatingTextFormatted
+    /// must respect device locale (comma in de_DE, period in en_US).
+    @Test func averageRatingFormattedEnglishLocaleUsesPeriodsForDecimal() {
+        let text = CookJournalView.averageRatingTextFormatted(
+            4.3,
+            locale: Locale(identifier: "en_US")
+        )
+        #expect(text == "4.3")
+    }
+
+    /// German locale (de_DE) uses a comma decimal separator.
+    @Test func averageRatingFormattedGermanLocaleUsesCommaForDecimal() {
+        let text = CookJournalView.averageRatingTextFormatted(
+            4.3,
+            locale: Locale(identifier: "de_DE")
+        )
+        #expect(text == "4,3")
+    }
+
+    /// Whole-number ratings always show exactly one decimal place (e.g., "4.0" not "4").
+    /// This behavior matches the prior String(format: "%.1f", ...) implementation.
+    @Test func averageRatingFormattedWholeNumberShowsSingleDecimalPlace() {
+        let text = CookJournalView.averageRatingTextFormatted(
+            4.0,
+            locale: Locale(identifier: "en_US")
+        )
+        #expect(text == "4.0")
+    }
+
+    /// DUT-882 — when nothing has been rated yet (nil), show an em dash, not "0.0".
+    @Test func averageRatingFormattedNilReturnsEmDash() {
+        let text = CookJournalView.averageRatingTextFormatted(
+            nil,
+            locale: Locale(identifier: "en_US")
+        )
+        #expect(text == "—")
+    }
+
+    /// French locale (fr_FR) also uses comma.
+    @Test func averageRatingFormattedFrenchLocaleUsesCommaForDecimal() {
+        let text = CookJournalView.averageRatingTextFormatted(
+            4.7,
+            locale: Locale(identifier: "fr_FR")
+        )
+        #expect(text == "4,7")
+    }
 }
