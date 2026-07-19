@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 
 /// Appends a single recipe's ingredients to the persisted Shopping List, from
@@ -76,18 +77,31 @@ public struct LiveShoppingListAppender: ShoppingListAppender {
     /// ``ShoppingListViewModel``'s `store: nil` in-memory fallback.
     private let store: ShoppingListStore?
 
+    /// The `UserDefaults` the shared "Use Metric Units" preference
+    /// (``IngredientMetricConverter/preferenceKey``) is read from. Defaults to
+    /// `.standard` — the same store `SettingsViewModel` writes through and
+    /// Recipe Detail's `@AppStorage` reads — so an append picks up whatever
+    /// the preference is set to AT APPEND TIME, not whatever it was when the
+    /// appender was constructed. Constructor-injected so tests use an
+    /// isolated suite instead of touching `.standard`.
+    private let defaults: UserDefaults
+
     /// - Parameters:
     ///   - hydrate: fills a recipe's ingredients when empty (the DUT-487
     ///     fetch+parse+cache path). Defaults to identity so a caller that only
     ///     ever passes already-loaded recipes (Recipe Detail) can omit it.
     ///   - store: the App-Group Shopping List store. Defaults to the real one;
     ///     pass a test-scoped store (or `nil`) in tests.
+    ///   - defaults: where the "Use Metric Units" preference is read from.
+    ///     Defaults to `.standard`; pass a test-scoped suite in tests.
     public init(
         hydrate: @escaping @Sendable (Recipe) async -> Recipe = { $0 },
-        store: ShoppingListStore? = ShoppingListStore()
+        store: ShoppingListStore? = ShoppingListStore(),
+        defaults: UserDefaults = .standard
     ) {
         self.hydrate = hydrate
         self.store = store
+        self.defaults = defaults
     }
 
     public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
@@ -98,7 +112,10 @@ public struct LiveShoppingListAppender: ShoppingListAppender {
         // Still empty after hydration (offline / unfetchable / parse failure)
         // → nothing to add. Folded into `.couldntLoad` so the surface shows the
         // "open the recipe to add" copy rather than a misleading "Added 0".
-        let rows = ShoppingListViewModel.rows(from: [resolved])
+        let rows = Self.applyMetricPreference(
+            ShoppingListViewModel.rows(from: [resolved]),
+            defaults: defaults
+        )
         guard !rows.isEmpty else { return .couldntLoad }
 
         // No store (no App Group) → can't persist; report couldn't-load so the
@@ -115,10 +132,55 @@ public struct LiveShoppingListAppender: ShoppingListAppender {
     /// the chosen rows — no hydrate, no re-classify. An empty selection (all
     /// deselected, which the sheet's disabled-at-zero confirm normally prevents)
     /// or a missing store reports `.couldntLoad` rather than a false "added 0".
+    ///
+    /// Deliberately does NOT run ``applyMetricPreference(_:defaults:)`` — this
+    /// path only ever backs the Recipe Detail ingredient-selection sheet, whose
+    /// candidate rows are already built from a pre-scaled/pre-converted recipe
+    /// (`RecipeDetailView+Toolbar.presentAddToShoppingList`), so re-converting
+    /// here would be redundant (harmless, since the converter is idempotent on
+    /// already-metric text, but unnecessary).
     public func addToShoppingList(rows: [ShoppingListViewModel.Item]) async -> AddToShoppingListResult {
         guard !rows.isEmpty else { return .couldntLoad }
         guard let store else { return .couldntLoad }
         let appendedCount = store.append(rows: rows)
         return .added(count: appendedCount)
+    }
+
+    /// Rewrite each row's `ingredientText` to metric when the shared
+    /// "Use Metric Units" preference is on; a transparent pass-through
+    /// otherwise (or when a row's text isn't confidently convertible —
+    /// ``IngredientMetricConverter/metric(_:)`` already returns those
+    /// unchanged).
+    ///
+    /// **Why this exists here.** Recipe Detail's whole-recipe append already
+    /// pre-converts ingredient text client-side
+    /// (`RecipeDetailViewModel.scaledRecipe`) before it ever reaches this
+    /// appender, so for that path this second pass is a documented no-op:
+    /// `IngredientMetricConverter.metric` intentionally leaves already-metric
+    /// units (ml / L / g / kg) unchanged. Feed and Search cards, by contrast,
+    /// hand this appender a never-converted `Recipe` built fresh from a
+    /// lightweight `RecipeListItem` (see `FeedViewModel.addToShoppingList` /
+    /// `SearchViewModel.addToShoppingList`) — those two surfaces never read
+    /// the preference at all before this fix, so a metric-mode cook who
+    /// long-pressed a Feed or Search card and chose "Add to Shopping List"
+    /// got imperial rows appended onto a list that might already carry metric
+    /// rows added from Recipe Detail, a same-toggle inconsistency depending
+    /// entirely on which surface was tapped. Applying the rewrite HERE, at
+    /// the single shared append choke point, fixes both surfaces at once
+    /// without threading a `useMetric` parameter through each feature
+    /// package's own `*Dependencies` protocol.
+    private static func applyMetricPreference(
+        _ rows: [ShoppingListViewModel.Item],
+        defaults: UserDefaults
+    ) -> [ShoppingListViewModel.Item] {
+        guard defaults.bool(forKey: IngredientMetricConverter.preferenceKey) else { return rows }
+        return rows.map { row in
+            ShoppingListViewModel.Item(
+                id: row.id,
+                ingredientText: IngredientMetricConverter.metric(row.ingredientText),
+                recipeTitle: row.recipeTitle,
+                aisle: row.aisle
+            )
+        }
     }
 }
