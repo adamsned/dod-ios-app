@@ -33,7 +33,7 @@ extension RecipeDetailViewModel {
             await dependencies.publishSavedWidgetSnapshot()
         } catch {
             DODLog.persistence.error("download failed: \(String(describing: error))")
-            snackbarMessage = "Couldn't download — try again."
+            snackbarMessage = "Couldn't download. Try again."
         }
     }
 
@@ -49,7 +49,7 @@ extension RecipeDetailViewModel {
             snackbarMessage = "Download removed"
         } catch {
             DODLog.persistence.error("remove download failed: \(String(describing: error))")
-            snackbarMessage = "Couldn't remove download — try again."
+            snackbarMessage = "Couldn't remove download. Try again."
         }
     }
 

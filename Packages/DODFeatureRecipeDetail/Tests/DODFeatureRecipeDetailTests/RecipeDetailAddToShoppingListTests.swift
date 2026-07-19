@@ -47,7 +47,7 @@ struct RecipeDetailAddToShoppingListTests {
 
         await vm.addToShoppingList()
 
-        #expect(vm.snackbarMessage == "Couldn't load ingredients — open the recipe to add.")
+        #expect(vm.snackbarMessage == "Couldn't load ingredients. Open the recipe to add.")
         #expect(vm.snackbarActionTitle == nil)
     }
 
@@ -63,7 +63,7 @@ struct RecipeDetailAddToShoppingListTests {
 
         await vm.addToShoppingList()
 
-        #expect(vm.snackbarMessage == "Couldn't load ingredients — open the recipe to add.")
+        #expect(vm.snackbarMessage == "Couldn't load ingredients. Open the recipe to add.")
         #expect(deps.addToShoppingListRecipes.isEmpty)
     }
 

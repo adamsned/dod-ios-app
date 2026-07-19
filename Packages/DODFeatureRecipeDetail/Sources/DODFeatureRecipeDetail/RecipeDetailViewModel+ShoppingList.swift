@@ -93,7 +93,7 @@ extension RecipeDetailViewModel {
             snackbarMessage = Self.addedMessage(count: count)
             snackbarActionTitle = "View"
         case .couldntLoad:
-            snackbarMessage = "Couldn't load ingredients — open the recipe to add."
+            snackbarMessage = "Couldn't load ingredients. Open the recipe to add."
             snackbarActionTitle = nil
         }
     }

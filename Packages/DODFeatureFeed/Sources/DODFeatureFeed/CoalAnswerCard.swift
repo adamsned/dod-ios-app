@@ -189,10 +189,10 @@ struct CoalAnswerCard: View {
     }
 
     /// The single combined VoiceOver label for the whole diagram, e.g.
-    /// "Starting coals: about 24 — 18 on the lid, 6 underneath." Static + pure
+    /// "Starting coals: about 24, 18 on the lid and 6 underneath." Static + pure
     /// so a unit test can pin it without a snapshot host.
     static func coalDiagramAccessibilityLabel(_ split: CoalSplit) -> String {
-        "Starting coals: about \(split.total) — \(split.lid) on the lid, \(split.bottom) underneath."
+        "Starting coals: about \(split.total), \(split.lid) on the lid and \(split.bottom) underneath."
     }
 }
 
