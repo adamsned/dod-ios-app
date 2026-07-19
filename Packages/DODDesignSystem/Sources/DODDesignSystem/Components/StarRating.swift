@@ -74,7 +74,24 @@ public struct StarRatingDisplay: View {
     }
 
     private var accessibilityLabel: String {
-        let rounded = String(format: "%.1f", average)
+        Self.accessibilityLabelText(average: average, count: count, locale: .current)
+    }
+
+    /// Locale-aware accessibility label for a star rating display.
+    /// - Parameters:
+    ///   - average: The average rating (e.g., 4.3).
+    ///   - count: The number of ratings.
+    ///   - locale: The locale for decimal formatting (e.g., "de_DE" uses comma).
+    ///   Defaults to `.current` for production use.
+    /// - Returns: A string like "4.3 out of 5 stars, 12 ratings" or
+    ///   "4,3 out of 5 stars, 12 ratings" in German locale.
+    static func accessibilityLabelText(average: Double, count: Int, locale: Locale = .current) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 1
+        formatter.locale = locale
+        let rounded = formatter.string(from: NSNumber(value: average)) ?? String(average)
         let suffix = count == 1 ? "rating" : "ratings"
         return "\(rounded) out of 5 stars, \(count) \(suffix)"
     }
