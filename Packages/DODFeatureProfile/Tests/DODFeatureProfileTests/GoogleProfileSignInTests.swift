@@ -51,6 +51,33 @@ struct GoogleProfileSignInTests {
         #expect((try? sessionStore.load())?.refreshToken == "rt-1")  // carried forward
     }
 
+    /// DUT-506 mirror for Google: a blank / whitespace-only `userIdentifier` must
+    /// be rejected BEFORE any revoke runs, exactly like `AppleProfileSignIn`'s
+    /// `emptyUserIdentifier_doesNotRevokeExistingToken`. Without this guard, a
+    /// degenerate Google identifier (reachable because `GIDSignInProvider`'s own
+    /// gate is a bare `!identifier.isEmpty`, which a whitespace-only string still
+    /// passes) would revoke the current, DIFFERENT signed-in user's real Apple
+    /// refresh token — even though this Google sign-in itself goes on to fail
+    /// (the blank-keyed session is rejected at `persistSession`).
+    @Test func blankUserIdentifier_doesNotRevokeExistingToken() async {
+        let sessionStore = InMemoryAppleAuthSessionStore(
+            initial: AppleAuthSession(userIdentifier: "apple-user", refreshToken: "rt-apple")
+        )
+        let revoker = SpyRevoker()
+        let signIn = GoogleProfileSignIn(
+            profileStore: NoopProfileStore(),
+            sessionStore: sessionStore,
+            revoker: revoker
+        )
+
+        let outcome = await signIn.apply(userIdentifier: "   ", displayName: nil, email: nil)
+
+        // No revoke fired, and the other user's session is left intact.
+        #expect(revoker.revokedTokens.isEmpty)
+        #expect((try? sessionStore.load())?.userIdentifier == "apple-user")
+        #expect(outcome.signedIn == false)
+    }
+
     /// DUT-701 — a Google sign-in must persist the session tagged `.google` so the
     /// Apple credential-revocation validator skips it (the other half of the fix:
     /// see `AppleCredentialValidatorTests.googleProviderSessionIsNeverPolledOrCleared`).
