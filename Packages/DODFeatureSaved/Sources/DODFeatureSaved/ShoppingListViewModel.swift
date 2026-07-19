@@ -98,6 +98,14 @@ public final class ShoppingListViewModel {
     /// in that case the list is in-memory-only exactly as it was under CL-82.
     private let store: ShoppingListStore?
 
+    /// The `UserDefaults` the shared "Use Metric Units" preference
+    /// (``IngredientMetricConverter/preferenceKey``) is read from by
+    /// ``add(recipes:)``. Defaults to `.standard` — the same store
+    /// `SettingsViewModel` writes through — so a bulk-built list picks up
+    /// whatever the preference is set to AT APPEND TIME. Constructor-injected
+    /// so tests use an isolated suite instead of touching `.standard`.
+    private let defaults: UserDefaults
+
     /// Designated init (DUT-488). Sets the list to the given `items` AS-IS — it
     /// does NOT auto-load from `store`, and does NOT persist on construction.
     /// This keeps the explicit-data inits (`init(items:)` via tests/mocks,
@@ -111,8 +119,16 @@ public final class ShoppingListViewModel {
     ///   - items: The rows to seed the list with (explicit, authoritative).
     ///   - store: Where later mutations persist to. Defaults to the real
     ///     App-Group store; pass `nil` (mock/preview/tests) to stay in memory.
-    public init(items: [Item], store: ShoppingListStore? = ShoppingListStore()) {
+    ///   - defaults: where the "Use Metric Units" preference is read from by
+    ///     a later ``add(recipes:)`` call. Defaults to `.standard`; pass a
+    ///     test-scoped suite in tests.
+    public init(
+        items: [Item],
+        store: ShoppingListStore? = ShoppingListStore(),
+        defaults: UserDefaults = .standard
+    ) {
         self.store = store
+        self.defaults = defaults
         self.items = items
         rebuildVisibleItems()
     }
@@ -123,8 +139,9 @@ public final class ShoppingListViewModel {
     /// from it so opening the list shows exactly what the cook last saw; with no
     /// saved list it starts empty-first (DUT-487 / T-906). Explicit-data inits
     /// deliberately do NOT take this path — see ``init(items:store:)``.
-    public init(store: ShoppingListStore? = ShoppingListStore()) {
+    public init(store: ShoppingListStore? = ShoppingListStore(), defaults: UserDefaults = .standard) {
         self.store = store
+        self.defaults = defaults
         if let snapshot = store?.load() {
             self.items = snapshot.items
             self.checkedIDs = Set(snapshot.checkedIDs)
@@ -273,9 +290,22 @@ public final class ShoppingListViewModel {
     /// whole-recipe re-add no longer re-stacks rows, distinct recipes sharing an
     /// ingredient still keep separate rows, AND a recipe that legitimately
     /// repeats a line keeps BOTH (see ``dedupedAppend(existing:adding:)``).
-    /// Persists.
+    ///
+    /// Metric preference — this is the Saved-tab "Make Shopping List" bulk
+    /// picker (``ShoppingListBuilderSheet`` → ``ShoppingListView``'s
+    /// `build(from:)`), a sibling of the single-recipe "Add to Shopping List"
+    /// append that ``LiveShoppingListAppender`` backs from Recipe Detail / a
+    /// Feed / Search card. That appender rewrites appended rows to metric when
+    /// the shared "Use Metric Units" preference is on; this path built rows
+    /// straight from ``rows(from:)`` with no such rewrite, so a metric-mode
+    /// cook who built their list here got imperial rows possibly mixed onto a
+    /// list that already carried metric rows added from Recipe Detail — the
+    /// same toggle behaving differently depending on which surface the append
+    /// came from. Applying ``applyMetricPreference(_:defaults:)`` here closes
+    /// that gap. Persists.
     public func add(recipes: [Recipe]) {
-        items = Self.dedupedAppend(existing: items, adding: Self.rows(from: recipes))
+        let newRows = Self.applyMetricPreference(Self.rows(from: recipes), defaults: defaults)
+        items = Self.dedupedAppend(existing: items, adding: newRows)
         rebuildVisibleItems()
         persist()
     }
@@ -311,8 +341,16 @@ extension ShoppingListViewModel {
     /// NOT auto-loaded, so an explicit recipe build is never clobbered by a
     /// saved list. `store` defaults to the real App-Group store; pass `nil` to
     /// build in memory only.
-    public convenience init(recipes: [Recipe], store: ShoppingListStore? = ShoppingListStore()) {
-        self.init(items: Self.rows(from: recipes), store: store)
+    public convenience init(
+        recipes: [Recipe],
+        store: ShoppingListStore? = ShoppingListStore(),
+        defaults: UserDefaults = .standard
+    ) {
+        self.init(
+            items: Self.applyMetricPreference(Self.rows(from: recipes), defaults: defaults),
+            store: store,
+            defaults: defaults
+        )
     }
 
     /// Explode `recipes` into per-recipe ``Item`` rows, each classified through
@@ -343,7 +381,9 @@ extension ShoppingListViewModel {
     }
 
     // DUT-648: the append de-dup (`dedupedAppend` / `occurrenceKeys` / `RowKey`)
-    // lives in `ShoppingListViewModel+Dedup.swift`, and the CL-82 mock fixture
-    // lives in `ShoppingListViewModel+Mock.swift`, to keep this file under
+    // lives in `ShoppingListViewModel+Dedup.swift`; the metric-preference
+    // rewrite (`applyMetricPreference`) lives in
+    // `ShoppingListViewModel+MetricPreference.swift`; the CL-82 mock fixture
+    // lives in `ShoppingListViewModel+Mock.swift` — all to keep this file under
     // SwiftLint's `file_length` cap.
 }
