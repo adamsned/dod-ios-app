@@ -36,6 +36,22 @@ echo "ci_post_clone: generated DODApp.xcodeproj via XcodeGen at $CI_PRIMARY_REPO
 # resolved file was never present to update). Resolve explicitly here, in the
 # post-clone hook, so Archive finds an already-current resolved file instead
 # of needing to (and being disallowed from) resolving it itself.
-xcodebuild -resolvePackageDependencies -project DODApp.xcodeproj -scheme DODApp
+#
+# This step itself has been observed to fail intermittently on Xcode Cloud's
+# runners (exit 74 — BSD EX_IOERR) while fetching package sources from GitHub,
+# even though the identical command succeeds reliably outside that sandboxed
+# network environment. Retry a few times before giving up, since a transient
+# fetch hiccup here otherwise fails the entire Archive with no recourse but a
+# manual rebuild.
+resolve_attempt=1
+until xcodebuild -resolvePackageDependencies -project DODApp.xcodeproj -scheme DODApp; do
+  if [ "$resolve_attempt" -ge 3 ]; then
+    echo "ci_post_clone: giving up resolving SwiftPM package dependencies after $resolve_attempt attempts" >&2
+    exit 1
+  fi
+  echo "ci_post_clone: package resolution failed (attempt $resolve_attempt) — retrying in 15s"
+  resolve_attempt=$((resolve_attempt + 1))
+  sleep 15
+done
 
 echo "ci_post_clone: resolved SwiftPM package dependencies for DODApp.xcodeproj"
