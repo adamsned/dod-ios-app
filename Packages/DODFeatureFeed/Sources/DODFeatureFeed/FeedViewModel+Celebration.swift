@@ -26,7 +26,7 @@ extension FeedViewModel {
             // made this" record didn't land. Mirrors PR #744
             // (`RecipeDetailViewModel.toggleSaved()`) and DUT-694's
             // `updateCook`/`deleteCook`: surface it instead of only logging.
-            cookLogFailureMessage = "Couldn't save your cook — try logging it again from the Cooking Journal."
+            cookLogFailureMessage = "Couldn't save your cook. Try logging it again from the Cooking Journal."
             // DUT-208: the caller wrote the photo JPEG to disk before this call,
             // so a failed write would orphan it (no row ever references its
             // `photoLocalID`). Delete it here, mirroring the DUT-423 dedup-branch
