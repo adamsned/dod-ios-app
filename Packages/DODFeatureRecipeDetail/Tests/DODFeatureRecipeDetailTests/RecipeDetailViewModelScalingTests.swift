@@ -126,6 +126,58 @@ import Testing
         #expect(viewModel.userServings == 7)  // still no clobber
     }
 
+    /// Regression: the AC-31.3 default-sync must land `userServings` exactly on
+    /// `sourceServings` — even for a large-batch recipe whose yield exceeds the
+    /// stepper's own `1...24` UI range (`userServingsRange`, AC-31.2). Before the
+    /// fix, `resetServingsToSourceIfFirstLoad()` ran the synced value through
+    /// `clampToRange`, so a 30-serving recipe silently landed at
+    /// `userServings == 24` on first load and `servingsScaleFactor == 24/30 ==
+    /// 0.8` — every ingredient quantity rendered 20% under what the recipe
+    /// actually calls for, with zero user interaction. `userServingsRange` is a
+    /// UI affordance for the stepper's own +/- taps (`setUserServings`), not a
+    /// bound on the default sync.
+    @Test func firstLoadDoesNotClampSourceServingsAboveStepperRange() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 420,
+            withDetail: true,
+            servings: 30
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 420)
+        await viewModel.onAppear()
+        viewModel.resetServingsToSourceIfFirstLoad()
+        #expect(viewModel.sourceServings == 30)
+        #expect(viewModel.userServings == 30)  // must NOT clamp to 24
+        #expect(viewModel.servingsScaleFactor == 1.0)
+    }
+
+    /// Same regression as ``firstLoadDoesNotClampSourceServingsAboveStepperRange``,
+    /// but through the DUT-315 resync path (a different, larger-yield recipe
+    /// swapped in after the one-shot already fired at the default) rather than
+    /// the first-load one-shot itself. `resyncServingsIfSourceYieldChanged()` had
+    /// the identical `clampToRange` bug.
+    @Test func resyncDoesNotClampSourceServingsAboveStepperRange() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 421,
+            withDetail: true,
+            servings: 40
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 421)
+
+        // First `.ready` before the detail loads — sourceServings is the default.
+        #expect(viewModel.sourceServings == RecipeDetailViewModel.defaultServings)
+        viewModel.resetServingsToSourceIfFirstLoad()  // spends the one-shot at the default
+
+        // Full detail lands the real (large) yield; the resync must sync the
+        // stepper to it exactly, not clamp it to the 1...24 UI range.
+        await viewModel.onAppear()
+        #expect(viewModel.sourceServings == 40)
+        viewModel.resyncServingsIfSourceYieldChanged()
+        #expect(viewModel.userServings == 40)  // must NOT clamp to 24
+        #expect(viewModel.servingsScaleFactor == 1.0)
+    }
+
     @Test func setUserServingsClampsToRange() async throws {
         let dependencies = FakeRecipeDetailDependencies()
         dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
