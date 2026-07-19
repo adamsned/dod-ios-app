@@ -42,13 +42,13 @@ struct IngredientMetricConverterTests {
     }
 
     @Test func pintToMilliliters() {
-        // 1 × 475 = 475 ml → nearest 10 (>= 100) → 480.
+        // pint is derived from cup (2 × 240): 1 × 480 = 480 ml → nearest 10 → 480.
         #expect(IngredientMetricConverter.metric("1 pint cream") == "480 ml cream")
     }
 
     @Test func quartToMilliliters() {
-        // 1 × 950 = 950 ml → nearest 25 → 950.
-        #expect(IngredientMetricConverter.metric("1 quart stock") == "950 ml stock")
+        // quart is derived from cup (4 × 240): 1 × 960 = 960 ml → nearest 10 → 960.
+        #expect(IngredientMetricConverter.metric("1 quart stock") == "960 ml stock")
     }
 
     // MARK: - Mass → grams
@@ -59,13 +59,38 @@ struct IngredientMetricConverterTests {
     }
 
     @Test func ounceToGrams() {
-        // 4 × 28 = 112 g → nearest 10 (>= 100) → 112/10 = 11.2 → 11 → 110.
+        // ounce is derived from pound (450 / 16 = 28.125):
+        // 4 × 28.125 = 112.5 g → nearest 10 (>= 100) → 112.5/10 = 11.25 → 11 → 110.
         #expect(IngredientMetricConverter.metric("4 ounces cheese") == "110 g cheese")
     }
 
     @Test func singleOunceRoundsToNearestFive() {
-        // 1 × 28 = 28 g → nearest 5 (< 100) → 30.
+        // 1 × 28.125 = 28.125 g → nearest 5 (< 100) → 30.
         #expect(IngredientMetricConverter.metric("1 ounce chocolate") == "30 g chocolate")
+    }
+
+    // MARK: - Cross-unit consistency (bug fix)
+
+    @Test func fourCupsMatchesOneQuart() {
+        // 4 cups and 1 quart are the identical real-world US volume. Before the
+        // fix, quart (950) wasn't derived from cup (240 × 4 = 960), so these
+        // rendered different millilitre figures ("950 ml" vs "960 ml") for the
+        // same amount depending purely on which unit the source recipe used.
+        #expect(
+            IngredientMetricConverter.metric("4 cups milk")
+                == IngredientMetricConverter.metric("1 quart milk")
+        )
+    }
+
+    @Test func eightOuncesMatchesHalfPound() {
+        // 8 ounces and 0.5 pound are the identical real-world weight. Before the
+        // fix, ounce (28) wasn't derived from pound (450 / 16 = 28.125), so these
+        // rendered different gram figures ("220 g" vs "230 g") for the same
+        // amount depending purely on which unit the source recipe used.
+        #expect(
+            IngredientMetricConverter.metric("8 ounces cheese")
+                == IngredientMetricConverter.metric("0.5 pound cheese")
+        )
     }
 
     // MARK: - Mixed / fraction quantities
@@ -143,18 +168,18 @@ struct IngredientMetricConverterTests {
     // MARK: - Rollover to litres / kilograms
 
     @Test func millilitersRollUpToLiters() {
-        // "2 quarts" → 2 × 950 = 1900 ml → 1.9 L.
+        // "2 quarts" → 2 × 960 = 1920 ml → 1.92 → 1.9 L.
         #expect(IngredientMetricConverter.metric("2 quarts water") == "1.9 L water")
     }
 
     @Test func litersTrimTrailingZero() {
         // "4 cups" → 4 × 240 = 960 ml (< 1000, stays ml). Use pints for a clean L:
-        // "5 pints" → 5 × 475 = 2375 ml → 2.375 → 2.4 L (one decimal).
+        // "5 pints" → 5 × 480 = 2400 ml → 2.4 L.
         #expect(IngredientMetricConverter.metric("5 pints broth") == "2.4 L broth")
     }
 
     @Test func largeVolumeStaysOneDecimalLiters() {
-        // "4 quarts" → 4 × 950 = 3800 ml → 3.8 L (one decimal, no trailing zero).
+        // "4 quarts" → 4 × 960 = 3840 ml → 3.84 → 3.8 L (one decimal, no trailing zero).
         #expect(IngredientMetricConverter.metric("4 quarts water") == "3.8 L water")
     }
 
@@ -221,7 +246,7 @@ struct IngredientMetricConverterTests {
     }
 
     @Test func scaleThenConvertRollsToLiters() {
-        // "1 quart" scaled ×3 → "3 quarts" → 3 × 950 = 2850 ml → 2.85 → 2.9 L.
+        // "1 quart" scaled ×3 → "3 quarts" → 3 × 960 = 2880 ml → 2.88 → 2.9 L.
         let scaled = FractionRenderer.scale("1 quart stock", by: 3)
         #expect(IngredientMetricConverter.metric(scaled) == "2.9 L stock")
     }

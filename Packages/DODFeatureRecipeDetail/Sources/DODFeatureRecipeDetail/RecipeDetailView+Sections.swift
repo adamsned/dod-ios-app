@@ -85,7 +85,7 @@ extension RecipeDetailView {
     /// chosen servings (US-31 / AC-31.4), then — when "Use Metric Units" is on
     /// (DUT-517) — convert the ALREADY-SCALED line to metric. Order matters: the
     /// converter reads the post-scale quantity, so `"1 cup" ×2 → "2 cups" →
-    /// "475 ml"`. Non-convertible lines fall through unchanged.
+    /// "480 ml"`. Non-convertible lines fall through unchanged.
     func displayIngredientText(_ text: String, scaledBy factor: Double) -> String {
         let scaled = FractionRenderer.scale(text, by: factor)
         return useMetricUnits ? IngredientMetricConverter.metric(scaled) : scaled
