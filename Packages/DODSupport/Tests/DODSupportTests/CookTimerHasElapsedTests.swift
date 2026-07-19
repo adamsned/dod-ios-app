@@ -3,8 +3,10 @@ import Testing
 
 @testable import DODSupport
 
-final class CookTimerHasElapsedTests {
-    @Test func running_timer_now_less_than_endDate_expect_hasElapsed_false() {
+/// L1 coverage for ``CookTimer/hasElapsed(at:)`` — previously untested (zero
+/// references anywhere in the repo). Pure value type, no mocks needed.
+@Suite("CookTimer.hasElapsed(at:)") struct CookTimerHasElapsedTests {
+    @Test func runningBeforeEndDateHasNotElapsed() {
         let baseDate = Date(timeIntervalSince1970: 1000)
         let timer = CookTimer(
             id: UUID(),
@@ -18,7 +20,7 @@ final class CookTimerHasElapsedTests {
         #expect(timer.hasElapsed(at: now) == false)
     }
 
-    @Test func running_timer_now_equal_to_endDate_expect_hasElapsed_true() {
+    @Test func runningAtExactEndDateHasElapsed() {
         let baseDate = Date(timeIntervalSince1970: 1000)
         let timer = CookTimer(
             id: UUID(),
@@ -32,7 +34,7 @@ final class CookTimerHasElapsedTests {
         #expect(timer.hasElapsed(at: now) == true)
     }
 
-    @Test func running_timer_now_greater_than_endDate_expect_hasElapsed_true() {
+    @Test func runningPastEndDateHasElapsed() {
         let baseDate = Date(timeIntervalSince1970: 1000)
         let timer = CookTimer(
             id: UUID(),
@@ -46,21 +48,24 @@ final class CookTimerHasElapsedTests {
         #expect(timer.hasElapsed(at: now) == true)
     }
 
-    @Test func paused_timer_expect_hasElapsed_false() {
+    @Test func pausedNeverHasElapsed() {
         let timer = CookTimer(id: UUID(), label: "Bake", duration: 600, state: .paused(remaining: 30), recipeID: nil)
 
         #expect(timer.hasElapsed(at: Date(timeIntervalSince1970: 2000)) == false)
     }
 
-    @Test func finished_timer_expect_hasElapsed_true() {
+    @Test func finishedAlwaysHasElapsed() {
         let timer = CookTimer(id: UUID(), label: "Bake", duration: 600, state: .finished, recipeID: nil)
 
         #expect(timer.hasElapsed(at: Date(timeIntervalSince1970: 3000)) == true)
     }
 
-    @Test func paused_timer_with_now_far_in_future_expect_hasElapsed_false() {
+    /// Pause freezes elapsed-ness even at a `now` far past what would have
+    /// been the deadline had the timer kept running — not a coincidence of a
+    /// nearby `now`.
+    @Test func pausedFreezesElapsedEvenFarInTheFuture() {
         let timer = CookTimer(id: UUID(), label: "Bake", duration: 600, state: .paused(remaining: 15), recipeID: nil)
 
-        #expect(timer.hasElapsed(at: Date(timeIntervalSince1970: 1_000_000)) == false, "paused freezes elapsed")
+        #expect(timer.hasElapsed(at: Date(timeIntervalSince1970: 1_000_000)) == false)
     }
 }
