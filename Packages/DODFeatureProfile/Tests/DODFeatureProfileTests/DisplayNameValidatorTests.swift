@@ -88,11 +88,25 @@ import Testing
     }
 
     @Test func actualSlurStillBlockedAlongsideAllowlistedWord() {
-        // The allowlist only exempts an EXACT normalized full-name match, so a
-        // genuinely inappropriate name doesn't get a free pass just because it
-        // also contains "Nigeria" as a substring or prefix.
+        // The allowlist exempts "Nigeria" only as its OWN word, so a genuinely
+        // inappropriate name sharing the string doesn't get a free pass — it
+        // still blocks on its other, non-exempt word.
         #expect(DisplayNameValidator.validate("Nigeria Fuck") == .inappropriate)
         #expect(DisplayNameValidator.validate("nigger") == .inappropriate)
+    }
+
+    @Test func demonymInAMultiWordNameIsNotFalselyBlocked() {
+        // Regression: the allowlist above only exempted an EXACT whole-string
+        // match ("Nigeria" alone), not the word appearing alongside any other
+        // word. Since the substring haystack squashes all whitespace out of the
+        // name before scanning, "Nigerian Chef" / "Team Nigeria" / "Chef from
+        // Nigeria" / "Nigeria Eats" collapsed to blobs like "nigerianchef" /
+        // "teamnigeria" that still contained "niger" (what "nigger" collapses
+        // to) as a substring — wrongly blocking ordinary names that reference
+        // the country or its demonym alongside any other word.
+        for name in ["Nigerian Chef", "Team Nigeria", "Chef from Nigeria", "Nigeria Eats", "Niger Delta"] {
+            #expect(DisplayNameValidator.validate(name) == .ok, "\(name) should be ok")
+        }
     }
 
     @Test func slurEvasionsStillBlockedDespiteAllowlist() {
@@ -103,5 +117,15 @@ import Testing
         for name in ["niiggerr", "n-i-g-g-e-r", "N1GGER", "nigga"] {
             #expect(DisplayNameValidator.validate(name) == .inappropriate, "\(name) should be blocked")
         }
+    }
+
+    @Test func slurEvasionAcrossSeparateWordsStillBlocked() {
+        // The per-word haystack in `substringCheckHaystack` concatenates every
+        // non-allowlisted word's normalized form in order, so a slur spaced out
+        // across separate words (not just within one word) still recombines
+        // and trips the match — the allowlist exemption doesn't create a
+        // loophole for word-level spacing evasion.
+        #expect(DisplayNameValidator.validate("F U C K") == .inappropriate)
+        #expect(DisplayNameValidator.validate("Big Ass Joe") == .inappropriate)
     }
 }
