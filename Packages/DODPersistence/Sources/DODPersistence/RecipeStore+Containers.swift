@@ -113,35 +113,10 @@ extension RecipeStore {
         try productionContainer(defaults: .standard).container
     }
 
-    /// Outcome of building the production container, distinguishing the
-    /// CloudKit-backed open from the DOD-CRASH-1 safety fallback (DUT-6).
-    /// The host (`AppDependencies`) reads ``usedCloudKitFallback`` to log
-    /// the degraded state; the diagnostics surface keys off it so a user
-    /// whose `.private` open failed sees a sensible status instead of a
-    /// crash.
-    public struct ContainerBuildResult {
-        public let container: ModelContainer
-        /// `true` when the opt-in flag was ON but the CloudKit-backed
-        /// `.private` open threw, so we fell back to a plain local
-        /// container. `false` on the normal opt-in or opt-out paths.
-        public let usedCloudKitFallback: Bool
-        /// DUT-525 — `true` when the primary container open threw (a failed
-        /// V-chain migration or on-disk corruption) and we recovered by moving
-        /// the corrupt store aside and opening a FRESH one, so the user lands in
-        /// a working-but-empty app instead of a launch crash-loop. `false` on
-        /// the normal path.
-        public let recoveredFromMigrationFailure: Bool
-
-        public init(
-            container: ModelContainer,
-            usedCloudKitFallback: Bool,
-            recoveredFromMigrationFailure: Bool = false
-        ) {
-            self.container = container
-            self.usedCloudKitFallback = usedCloudKitFallback
-            self.recoveredFromMigrationFailure = recoveredFromMigrationFailure
-        }
-    }
+    // `ContainerBuildResult` (the outcome of building the production
+    // container — DUT-6 fallback flag, DUT-525 migration-recovery flag, and
+    // the DUT-78 self-heal flag) lives in `RecipeStore+CloudKitSelfHeal.swift`
+    // (keeps this file under the SwiftLint `file_length` cap).
 
     /// Build the production container for the *current persisted opt-in
     /// flag*, with a DOD-CRASH-1 safety net (DUT-6).
@@ -271,15 +246,24 @@ extension RecipeStore {
     ///
     /// DUT-525 — non-private so `RecipeStore+MigrationRecovery.swift` can build
     /// the fresh recovery container's synced store.
+    ///
+    /// DUT-78 — `inMemory` forces `.none` regardless of `cloudKit`. An
+    /// in-memory `ModelConfiguration` carrying `.private(...)` still spins up
+    /// an `NSCloudKitMirroringDelegate` → PushKit registration on a background
+    /// queue, which aborts in a test host with no CloudKit entitlement (the
+    /// self-heal L1 suite drives the opt-in / account-status / self-heal
+    /// *decision* branches in-memory and must never open a real CloudKit
+    /// container to do so). Production (`inMemory == false`) is unchanged.
     static func syncedSavedConfiguration(
         inMemory: Bool,
         cloudKit: Bool
     ) -> ModelConfiguration {
-        ModelConfiguration(
+        let useCloudKit = cloudKit && !inMemory
+        return ModelConfiguration(
             "SyncedSaved",
             schema: Schema(SchemaV6.syncedModels),
             isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: cloudKit ? .private(cloudKitContainerIdentifier) : .none
+            cloudKitDatabase: useCloudKit ? .private(cloudKitContainerIdentifier) : .none
         )
     }
 
