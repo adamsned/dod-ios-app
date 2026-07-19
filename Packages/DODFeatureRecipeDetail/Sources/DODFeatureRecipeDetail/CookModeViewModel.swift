@@ -202,7 +202,17 @@ public final class CookModeViewModel {
         liveActivityUnavailable = false  // DUT-558: a re-entry starts clean
         // AC-7.6 / AC-40.1 — stop any in-flight utterance and release the
         // ducked audio session so the user's music returns to full volume
-        // the moment they leave Cook Mode.
+        // the moment they leave Cook Mode. Bug fix: drop the DUT-390 session
+        // hold BEFORE stop() (mirroring `setVoiceMode(false)`'s ordering) —
+        // without this, exiting while Voice Mode was on left `holdsSessionOpen`
+        // latched true on the (session-scoped) VoiceReader. `stop()` still
+        // released the session immediately here, but a later ONE-SHOT replay
+        // in the next Cook Mode session (`replayCurrentStep()`, which works
+        // regardless of the toggle) would re-activate it and then never
+        // release it on completion — its `onQueueDidEmpty` drain guards on
+        // `holdsSessionOpen`, which was still (wrongly) true — leaving other
+        // apps' audio ducked for the rest of that new session.
+        voiceReader.setSessionHold(false)
         voiceReader.stop()
         isVoiceModeEnabled = false
         // DUT-583 — a re-entry starts clean: idle transport + natural pace.
