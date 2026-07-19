@@ -114,9 +114,9 @@ struct RootView: View {
     /// DUT-461 (revised) — the hub's Cooking Tip token. The widget tap mints it;
     /// the hub consumes it via `.task(id:)` to pop to its root so the tip shows.
     @State var hubTipToken: UUID?
-    /// DUT — one-shot "we came here to cook" arm. The hub's Cook Mode "Find a
-    /// Recipe" sets it before selecting `.feed`; the next Feed card tap consumes
-    /// it, routing with `autoStartCookMode: true`, then disarms. Bound only to Feed.
+    /// The "we came here to cook" arm (Feed-only). DUT-1229 fix: used to disarm
+    /// on the FIRST pick, so picking a different recipe next stopped
+    /// auto-starting; now stays armed until leaving Feed (`disarmCookModeFindIfNeeded`).
     @State var cookModeFindRecipeArmed = false
     @State private var dispatcher = DeepLinkDispatcher.shared
     // Non-private (like `systemOpenURL` below) so the `+Settings.swift`
@@ -166,6 +166,7 @@ struct RootView: View {
         }
         .preferredColorScheme(preferredColorScheme(for: appearance))
         .animation(.easeInOut(duration: 0.2), value: appearance)
+        .onChange(of: selectedTab) { _, newTab in disarmCookModeFindIfNeeded(forTab: newTab) }
         .task {
             await dependencies.bootstrap()
             // DUT-635 (wire) — validate the Apple credential + start the revocation
