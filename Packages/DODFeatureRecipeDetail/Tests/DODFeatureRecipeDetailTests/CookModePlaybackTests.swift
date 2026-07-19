@@ -186,6 +186,27 @@ struct CookModePlaybackTests {
         #expect(CookModeViewModel.speedLabel(for: 2.0) == "2x")
     }
 
+    /// Bug fix: a fractional speed label must follow the given locale's decimal
+    /// separator, not a hard-coded period. `speedLabel` used to build its text
+    /// with `String(format: "%.2f", multiplier)`, which always pins the
+    /// C-locale period regardless of the device's locale — the same class of
+    /// bug DUT-320 (`FractionRenderer`) and DUT-737 (`IngredientMetricConverter`)
+    /// already fixed on the app's other two decimal-display surfaces, just
+    /// missed here. Drives the real production entry point
+    /// (`CookModeViewModel.speedLabel`, exactly what `voiceSpeedLabel` and the
+    /// speed picker menu call) with an explicit comma-decimal locale — this is
+    /// deterministic and has nothing to do with the test runner's own locale.
+    @Test func speedLabelsUseCommaDecimalLocale() {
+        let german = Locale(identifier: "de_DE")
+        #expect(CookModeViewModel.speedLabel(for: 0.5, locale: german) == "0,5x")
+        #expect(CookModeViewModel.speedLabel(for: 0.75, locale: german) == "0,75x")
+        #expect(CookModeViewModel.speedLabel(for: 1.25, locale: german) == "1,25x")
+        #expect(CookModeViewModel.speedLabel(for: 1.5, locale: german) == "1,5x")
+        // Whole numbers take the integer short-circuit before locale ever
+        // matters, so they're unaffected either way.
+        #expect(CookModeViewModel.speedLabel(for: 2.0, locale: german) == "2x")
+    }
+
     /// Changing speed while actively reading re-speaks the step at the new pace.
     @Test func changingSpeedWhileSpeakingRespeaks() {
         let mock = MockSpeechSynthesizer()
