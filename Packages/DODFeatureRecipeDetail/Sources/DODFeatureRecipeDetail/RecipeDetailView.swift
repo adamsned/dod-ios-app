@@ -44,7 +44,9 @@ public struct RecipeDetailView: View {
     /// link (US-10). We watch the load state and flip the cover open as
     /// soon as the recipe has instructions to render. Resets to false
     /// after firing so a manual exit + re-entry behaves normally.
-    @State private var pendingAutoCookMode: Bool
+    /// `internal` (not `private`) so `RecipeDetailView+LoadStateChange.swift`
+    /// (split out for the file-length cap, DUT-1240) can consume it.
+    @State var pendingAutoCookMode: Bool
     /// DUT-47 (temperature half) — the user's recipe-step temperature unit
     /// preference, read from the same `UserDefaults` key Settings writes
     /// (`TemperatureConverter.preferenceKey`) via `@AppStorage` so a change
@@ -66,7 +68,9 @@ public struct RecipeDetailView: View {
     /// only — stored recipe data is untouched (AC-31.8-style).
     @AppStorage(IngredientMetricConverter.preferenceKey)
     var useMetricUnits: Bool = false
-    @Environment(\.dismiss) private var dismiss
+    // `internal` (not `private`) so `RecipeDetailView+LoadStateChange.swift`
+    // (split out for the file-length cap, DUT-1240) can dismiss on `.unavailable`.
+    @Environment(\.dismiss) var dismiss
     /// T-804 — drives the iPad reading-column cap in `readyBody`. `.regular`
     /// (iPad) bounds the content below the hero to a centered column;
     /// `.compact` (iPhone) leaves the layout byte-identical. DUT-631 — now
@@ -103,6 +107,12 @@ public struct RecipeDetailView: View {
     /// (previews / unwired hosts) hides the Cook Mode shortcut.
     public let heatCoachSheet: (() -> AnyView)?
 
+    /// DUT-1240 — fired when `autoStartCookMode` actually PRESENTS Cook Mode
+    /// (data loaded + auto-start consumed), not merely at construction. Lets
+    /// the host disarm a "came here to cook" arm once genuinely fulfilled,
+    /// rather than on the tap (too early) or the tab switch (too late).
+    public let onAutoCookModeStarted: (() -> Void)?
+
     /// DUT-535 — the recipe whose ingredient-selection sheet is presented.
     /// Non-nil drives the `.sheet(item:)`; set when the toolbar `cart.badge.plus`
     /// is tapped, cleared on dismiss. `internal` (not `private`) so the
@@ -116,7 +126,8 @@ public struct RecipeDetailView: View {
         openShoppingList: (() -> Void)? = nil,
         addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)? = nil,
         openHeatCoach: ((HeatCoachSeed?) -> Void)? = nil,
-        heatCoachSheet: (() -> AnyView)? = nil
+        heatCoachSheet: (() -> AnyView)? = nil,
+        onAutoCookModeStarted: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         _pendingAutoCookMode = State(initialValue: autoStartCookMode)
@@ -125,6 +136,7 @@ public struct RecipeDetailView: View {
         self.addToShoppingListSheet = addToShoppingListSheet
         self.openHeatCoach = openHeatCoach
         self.heatCoachSheet = heatCoachSheet
+        self.onAutoCookModeStarted = onAutoCookModeStarted
     }
 
     public var body: some View {
@@ -369,32 +381,7 @@ public struct RecipeDetailView: View {
     // `format(duration:)` helpers live in `RecipeDetailView+InfoCard.swift`
     // (extension on `RecipeDetailView`) so this file stays under the SwiftLint
     // file-length cap.
-}
-
-// MARK: - Helpers
-
-extension RecipeDetailView {
-
-    fileprivate func handleLoadStateChange(_ newValue: RecipeDetailViewModel.LoadState) {
-        if newValue == .unavailable {
-            // Pop after a brief moment so the snackbar is visible.
-            Task {
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                dismiss()
-            }
-        }
-        // US-31 / AC-31.3: once the recipe is loaded, sync the stepper
-        // default to the source `recipeYield` if we haven't already.
-        if newValue == .ready {
-            viewModel.resetServingsToSourceIfFirstLoad()
-        }
-        // US-10 / AC-10.1: if the deep link asked us to jump straight to
-        // Cook Mode, do it the instant the recipe has instructions
-        // populated. Same gating as the manual CTA (AC-7.1).
-        guard newValue == .ready, pendingAutoCookMode else { return }
-        guard let recipe = viewModel.recipe, !recipe.instructions.isEmpty else { return }
-        pendingAutoCookMode = false
-        Task { await viewModel.didTapCookMode() }
-        isCookModePresented = true
-    }
+    //
+    // `handleLoadStateChange(_:)` lives in
+    // `RecipeDetailView+LoadStateChange.swift` for the same reason.
 }
