@@ -114,6 +114,14 @@ public final class ShoppingListViewModel {
     /// extension in the sibling file can drive the state machine.
     public internal(set) var substitution: SubstitutionState = .idle
 
+    /// The `UserDefaults` the shared "Use Metric Units" preference
+    /// (``IngredientMetricConverter/preferenceKey``) is read from by
+    /// ``add(recipes:)``. Defaults to `.standard` — the same store
+    /// `SettingsViewModel` writes through — so a bulk-built list picks up
+    /// whatever the preference is set to AT APPEND TIME. Constructor-injected
+    /// so tests use an isolated suite instead of touching `.standard`.
+    private let defaults: UserDefaults
+
     /// Designated init (DUT-488). Sets the list to the given `items` AS-IS — it
     /// does NOT auto-load from `store`, and does NOT persist on construction.
     /// This keeps the explicit-data inits (`init(items:)` via tests/mocks,
@@ -130,13 +138,18 @@ public final class ShoppingListViewModel {
     ///   - intelligence: The on-device AI seam backing the substitution
     ///     affordance. Defaults to `nil` (affordance hidden) so explicit-data
     ///     inits stay AI-free unless a caller opts in.
+    ///   - defaults: where the "Use Metric Units" preference is read from by
+    ///     a later ``add(recipes:)`` call. Defaults to `.standard`; pass a
+    ///     test-scoped suite in tests.
     public init(
         items: [Item],
         store: ShoppingListStore? = ShoppingListStore(),
-        intelligence: (any DODIntelligenceService)? = nil
+        intelligence: (any DODIntelligenceService)? = nil,
+        defaults: UserDefaults = .standard
     ) {
         self.store = store
         self.intelligence = intelligence
+        self.defaults = defaults
         self.items = items
         rebuildVisibleItems()
     }
@@ -152,10 +165,12 @@ public final class ShoppingListViewModel {
     ///   affordance (App-injected in production). `nil` hides the affordance.
     public init(
         store: ShoppingListStore? = ShoppingListStore(),
-        intelligence: (any DODIntelligenceService)? = nil
+        intelligence: (any DODIntelligenceService)? = nil,
+        defaults: UserDefaults = .standard
     ) {
         self.store = store
         self.intelligence = intelligence
+        self.defaults = defaults
         if let snapshot = store?.load() {
             self.items = snapshot.items
             self.checkedIDs = Set(snapshot.checkedIDs)
@@ -301,9 +316,22 @@ public final class ShoppingListViewModel {
     /// whole-recipe re-add no longer re-stacks rows, distinct recipes sharing an
     /// ingredient still keep separate rows, AND a recipe that legitimately
     /// repeats a line keeps BOTH (see ``dedupedAppend(existing:adding:)``).
-    /// Persists.
+    ///
+    /// Metric preference — this is the Saved-tab "Make Shopping List" bulk
+    /// picker (``ShoppingListBuilderSheet`` → ``ShoppingListView``'s
+    /// `build(from:)`), a sibling of the single-recipe "Add to Shopping List"
+    /// append that ``LiveShoppingListAppender`` backs from Recipe Detail / a
+    /// Feed / Search card. That appender rewrites appended rows to metric when
+    /// the shared "Use Metric Units" preference is on; this path built rows
+    /// straight from ``rows(from:)`` with no such rewrite, so a metric-mode
+    /// cook who built their list here got imperial rows possibly mixed onto a
+    /// list that already carried metric rows added from Recipe Detail — the
+    /// same toggle behaving differently depending on which surface the append
+    /// came from. Applying ``applyMetricPreference(_:defaults:)`` here closes
+    /// that gap. Persists.
     public func add(recipes: [Recipe]) {
-        items = Self.dedupedAppend(existing: items, adding: Self.rows(from: recipes))
+        let newRows = Self.applyMetricPreference(Self.rows(from: recipes), defaults: defaults)
+        items = Self.dedupedAppend(existing: items, adding: newRows)
         rebuildVisibleItems()
         persist()
     }
@@ -325,57 +353,4 @@ public final class ShoppingListViewModel {
     func persist() {
         store?.save(items: items, checked: checkedIDs, alreadyHave: alreadyHaveIDs)
     }
-}
-
-// MARK: - Construction from recipes
-
-extension ShoppingListViewModel {
-
-    /// Build a view-model from recipes, exploding each recipe's ingredients
-    /// into per-recipe rows classified by ``IngredientAisleClassifier``
-    /// (CL-77 — no cross-recipe merge). This is the shape T-680c's production
-    /// initializer reuses once the entry surfaces feed real recipes in. Takes
-    /// the exploded rows AS-IS through ``init(items:store:)`` (DUT-488) — it is
-    /// NOT auto-loaded, so an explicit recipe build is never clobbered by a
-    /// saved list. `store` defaults to the real App-Group store; pass `nil` to
-    /// build in memory only.
-    public convenience init(
-        recipes: [Recipe],
-        store: ShoppingListStore? = ShoppingListStore(),
-        intelligence: (any DODIntelligenceService)? = nil
-    ) {
-        self.init(items: Self.rows(from: recipes), store: store, intelligence: intelligence)
-    }
-
-    /// Explode `recipes` into per-recipe ``Item`` rows, each classified through
-    /// ``IngredientAisleClassifier`` (CL-77 — no cross-recipe merge). Shared by
-    /// ``init(recipes:)`` and ``add(recipes:)`` (DUT-487 / T-906) so the initial
-    /// build and later appends produce identical rows. DUT-534 — module-internal
-    /// (was `private`) so ``LiveShoppingListAppender`` builds the exact same rows
-    /// when appending from Recipe Detail / a card, rather than duplicating the
-    /// explode-and-classify logic.
-    static func rows(from recipes: [Recipe]) -> [Item] {
-        recipes.flatMap { recipe in
-            recipe.ingredients.compactMap { ingredient -> Item? in
-                // Defense-in-depth (DUT-587): drop any ingredient whose text
-                // trims to empty so a blank/whitespace line — even one that
-                // slips past the parser — never becomes a garbage row.
-                guard
-                    !ingredient.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                else {
-                    return nil
-                }
-                return Item(
-                    ingredientText: ingredient.text,
-                    recipeTitle: recipe.title,
-                    aisle: IngredientAisleClassifier.classify(ingredient.text)
-                )
-            }
-        }
-    }
-
-    // DUT-648: the append de-dup (`dedupedAppend` / `occurrenceKeys` / `RowKey`)
-    // lives in `ShoppingListViewModel+Dedup.swift`, and the CL-82 mock fixture
-    // lives in `ShoppingListViewModel+Mock.swift`, to keep this file under
-    // SwiftLint's `file_length` cap.
 }
