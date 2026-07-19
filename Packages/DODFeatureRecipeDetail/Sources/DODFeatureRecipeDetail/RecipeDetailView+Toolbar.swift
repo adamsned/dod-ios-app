@@ -86,7 +86,18 @@ extension RecipeDetailView {
                     )
 
                     if let recipe = viewModel.recipe {
-                        ShareLink(item: RecipeShareTextFormatter.format(recipe: recipe)) {
+                        // Fix: share the SCALED (+ metric-converted when "Use
+                        // Metric Units" is on) ingredient lines, matching what's
+                        // on screen and what "Add to Shopping List" already
+                        // shares (DUT-639) — not the raw source-servings /
+                        // imperial text the recipe was fetched with.
+                        ShareLink(
+                            item: Self.shareAsTextPayload(
+                                recipe: recipe,
+                                servingsScaleFactor: viewModel.servingsScaleFactor,
+                                useMetricUnits: useMetricUnits
+                            )
+                        ) {
                             Label("Share as Text", systemImage: "doc.plaintext")
                         }
                         .simultaneousGesture(
@@ -104,6 +115,29 @@ extension RecipeDetailView {
                 .accessibilityLabel("Share recipe")
             }
         }
+    }
+
+    // MARK: - Share as Text
+
+    /// Build the "Share as Text" payload: the recipe rewritten through the
+    /// same SCALED (+ metric-converted when `useMetricUnits` is on) ingredient
+    /// pipeline the ingredients list, Cook Mode, and "Add to Shopping List"
+    /// already share (DUT-639), so what gets shared matches what's on screen
+    /// rather than the recipe's raw source-servings / imperial text.
+    ///
+    /// `static` and free of view state so it's directly unit-testable without
+    /// standing up a live `RecipeDetailView` hierarchy.
+    static func shareAsTextPayload(
+        recipe: Recipe,
+        servingsScaleFactor: Double,
+        useMetricUnits: Bool
+    ) -> String {
+        let scaled = RecipeDetailViewModel.scaledRecipe(
+            recipe,
+            by: servingsScaleFactor,
+            useMetric: useMetricUnits
+        )
+        return RecipeShareTextFormatter.format(recipe: scaled)
     }
 
     // MARK: - Add to Shopping List (DUT-535)
