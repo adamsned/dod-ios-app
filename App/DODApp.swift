@@ -1,5 +1,6 @@
 import BackgroundTasks
 import DODNetworking
+import DODPersistence
 import DODSupport
 import Foundation
 import SwiftUI
@@ -8,7 +9,14 @@ import UserNotifications
 @main
 struct DODApp: App {
 
-    @State private var dependencies = AppDependencies()
+    /// Assigned explicitly in `init()` rather than via a default value, because
+    /// ORDER MATTERS: `AppDependencies.init` builds the SwiftData
+    /// `ModelContainer`, and whether that container is CloudKit-backed is read
+    /// from `RecipeStore.cloudKitSyncOptInKey` at construction time. A default
+    /// property value would be evaluated BEFORE the `init()` body runs, so the
+    /// container would be built against an unresolved flag. The launch
+    /// overrides + the sync default must both be settled first.
+    @State private var dependencies: AppDependencies
     /// Installs the `UNUserNotificationCenterDelegate` at launch (US-42 /
     /// AC-42.3 + AC-42.5). A SwiftUI `App` has no `application(_:didFinish…)`
     /// hook, so the delegate adaptor bridges UIKit's launch callback where
@@ -17,7 +25,55 @@ struct DODApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
-        applyTestLaunchOverrides()
+        // 1. Launch overrides first — they can clear/set the onboarding flag the
+        //    sync default is derived from.
+        Self.applyTestLaunchOverrides()
+        // 2. Resolve the iCloud-Sync default while nothing has read it yet.
+        Self.resolveCloudKitSyncDefaultIfNeeded()
+        // 3. Only now build the composition root (and with it the container).
+        _dependencies = State(initialValue: AppDependencies())
+    }
+
+    /// One-time resolution of the iCloud-Sync opt-in default (fresh installs ON).
+    ///
+    /// `RecipeStore.cloudKitSyncOptIn(in:)` is a plain `defaults.bool(...)`, so an
+    /// unset key reads `false`. Rather than change that read (the container logic
+    /// and the DUT-630 simulator guard both depend on its exact semantics), we
+    /// materialize the key ONCE, here, before anything reads it.
+    ///
+    /// The gate is deliberately narrow — only a genuinely fresh install defaults
+    /// ON, disclosed by the welcome screen's standing disclosure line (which
+    /// replaced the old "Turn On iCloud Sync?" alert):
+    ///
+    /// - **Fresh install** (onboarding not completed) → ON.
+    /// - **Existing user who explicitly declined** → the key is already set to
+    ///   `false`; the `object(forKey:) == nil` guard means we never touch it, so
+    ///   their decline is honored.
+    /// - **Existing user who was never asked** (key unset, onboarding done) → left
+    ///   OFF rather than silently switched on. Flipping sync on for an established
+    ///   user without their say-so is exactly the surprise we're avoiding.
+    ///
+    /// The invariant: sync defaults on exactly for the users who see the welcome
+    /// screen that discloses it.
+    ///
+    /// Idempotent: writes only when the key is unset, so it's a no-op on every
+    /// launch after the first. Settings remains the way to change it.
+    private static func resolveCloudKitSyncDefaultIfNeeded() {
+        resolveCloudKitSyncDefault(in: .standard)
+    }
+
+    /// The rule itself, over an injectable `UserDefaults` so every branch is
+    /// testable against an isolated suite.
+    ///
+    /// This decides whether a user's saved recipes leave the device, and the
+    /// branch that matters most — an explicit decline surviving an upgrade — is
+    /// invisible until it's already wrong in someone's iCloud. So it does not get
+    /// to be untestable: `internal`, and reading the store it's handed rather than
+    /// `.standard`.
+    static func resolveCloudKitSyncDefault(in defaults: UserDefaults) {
+        guard defaults.object(forKey: RecipeStore.cloudKitSyncOptInKey) == nil else { return }
+        let isFreshInstall = !defaults.bool(forKey: RootView.onboardingCompletedKey)
+        defaults.set(isFreshInstall, forKey: RecipeStore.cloudKitSyncOptInKey)
     }
 
     var body: some Scene {
@@ -48,7 +104,7 @@ struct DODApp: App {
     ///
     /// The override flag wins if both are set (you said you wanted a fresh
     /// onboarding more recently).
-    private func applyTestLaunchOverrides() {
+    private static func applyTestLaunchOverrides() {
         let args = CommandLine.arguments
         let env = ProcessInfo.processInfo.environment
         if env["DOD_SUPPRESS_ONBOARDING"] == "1" {
