@@ -1,3 +1,4 @@
+import DODAnalytics
 import DODDomain
 import DODNetworking
 import DODPersistence
@@ -7,7 +8,21 @@ import Testing
 
 @testable import DODFeatureRecipeDetail
 
-@Suite("LiveRecipeDetailDependencies.downloadForOffline image caching (DUT-418)")
+// DUT-1323: three tests below mutate the process-wide `Telemetry.shared`
+// singleton (`.replaceTransport`) — the only telemetry seam this live
+// dependency layer exposes (see `LiveRecipeDetailDependencies.sendTelemetry`).
+// Unlike `CookModeVoiceModeTests` (which does the same but is `@MainActor`,
+// so its tests are naturally serialized onto one executor), this suite has
+// no such constraint: swift-testing runs its `@Test` methods concurrently
+// by default, and they raced on the shared singleton — one test's recorder
+// observed OTHER tests' `.recipeSaved` events. `.serialized` fixes the
+// intra-suite race. It does NOT fix a cross-suite race against
+// `CookModeVoiceModeTests` (a different, non-serialized suite touching the
+// same singleton) — that risk still exists and is unaddressed here.
+@Suite(
+    "LiveRecipeDetailDependencies.downloadForOffline image caching (DUT-418)",
+    .serialized
+)
 struct LiveDependenciesDownloadImageCacheTests {
 
     // MARK: - Setup Helpers
@@ -279,6 +294,82 @@ struct LiveDependenciesDownloadImageCacheTests {
             secondFetchCount == firstFetchCount,
             "Re-download should not trigger additional image fetches"
         )
+    }
+
+    // MARK: - Save Telemetry (DUT-1323)
+    //
+    // `downloadForOffline` also saves the recipe (T-761 / CL-158) — these
+    // pin down that the save-side telemetry only fires on a REAL
+    // unsaved -> saved transition, mirroring `RecipeDetailViewModel.toggleSaved()`.
+    // Follows `CookModeVoiceModeTests.togglingVoiceModeFiresAnalyticsOnFlipOnly()`'s
+    // `Telemetry.shared.replaceTransport(...)` pattern — the only seam this
+    // live-dependency layer exposes for telemetry (no injectable transport
+    // parameter exists on `LiveRecipeDetailDependencies`).
+
+    /// Downloading a recipe that was never explicitly saved must fire exactly
+    /// one `.recipeSaved` — the silent-save gap this ticket closes.
+    @Test func freshDownloadOfUnsavedRecipeSendsRecipeSavedOnce() async throws {
+        let recorder = RecordingTelemetryTransport()
+        Telemetry.shared.replaceTransport(recorder)
+        defer { Telemetry.shared.replaceTransport(RecordingTelemetryTransport()) }
+
+        let fakeClient = FakeHTTPClient()
+        let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
+        let recipe = makeRecipe(id: 200)
+        try await insertRecipeIntoStore(store, recipe: recipe)
+        #expect(try await !store.isSaved(id: recipe.id), "Precondition: recipe starts unsaved")
+
+        _ = try await deps.downloadForOffline(recipe: recipe)
+
+        #expect(recordedSavedRecipeIDs(recorder) == [recipe.id])
+    }
+
+    /// Downloading a recipe that is ALREADY saved must send ZERO
+    /// `.recipeSaved` events. This is the case a naive "always send" fix
+    /// would get wrong by double-counting an already-bookmarked recipe.
+    @Test func downloadOfAlreadySavedRecipeSendsNoRecipeSaved() async throws {
+        let recorder = RecordingTelemetryTransport()
+        Telemetry.shared.replaceTransport(recorder)
+        defer { Telemetry.shared.replaceTransport(RecordingTelemetryTransport()) }
+
+        let fakeClient = FakeHTTPClient()
+        let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
+        let recipe = makeRecipe(id: 201)
+        try await insertRecipeIntoStore(store, recipe: recipe)
+        _ = try await store.markSaved(id: recipe.id)  // pre-saved, outside the download flow
+
+        _ = try await deps.downloadForOffline(recipe: recipe)
+
+        #expect(recordedSavedRecipeIDs(recorder).isEmpty)
+    }
+
+    /// A second download tap on an already-downloaded (and now already-saved)
+    /// recipe must send no additional `.recipeSaved` — mirrors the
+    /// `.alreadyDownloaded` idempotency on the download side.
+    @Test func secondDownloadOfSameRecipeSendsNoAdditionalRecipeSaved() async throws {
+        let recorder = RecordingTelemetryTransport()
+        Telemetry.shared.replaceTransport(recorder)
+        defer { Telemetry.shared.replaceTransport(RecordingTelemetryTransport()) }
+
+        let fakeClient = FakeHTTPClient()
+        let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
+        let recipe = makeRecipe(id: 202)
+        try await insertRecipeIntoStore(store, recipe: recipe)
+
+        let firstOutcome = try await deps.downloadForOffline(recipe: recipe)
+        #expect(firstOutcome == .firstTime)
+        let secondOutcome = try await deps.downloadForOffline(recipe: recipe)
+        #expect(secondOutcome == .alreadyDownloaded)
+
+        #expect(recordedSavedRecipeIDs(recorder) == [recipe.id])
+    }
+
+    /// Extract the recipe IDs of every `.recipeSaved` event the recorder saw.
+    private func recordedSavedRecipeIDs(_ recorder: RecordingTelemetryTransport) -> [Int] {
+        recorder.events.compactMap { event in
+            if case .recipeSaved(let recipeID) = event { return recipeID }
+            return nil
+        }
     }
 }
 

@@ -61,7 +61,17 @@ extension LiveRecipeDetailDependencies {
         let transitioned = try await store.markDownloaded(id: recipe.id)
         // Download also saves (T-761) — idempotent, so a re-download of an
         // already-saved recipe is a no-op on the save side.
-        _ = try await store.markSaved(id: recipe.id)
+        //
+        // DUT-1323 — downloading a not-yet-saved recipe silently saved it
+        // with zero analytics; `markSaved` returns whether this call
+        // actually transitioned it, so only send `.recipeSaved` when it
+        // did (mirrors `RecipeDetailViewModel.toggleSaved()`). A recipe
+        // that was ALREADY saved before the download tap must not emit a
+        // second recipeSaved event.
+        let didSave = try await store.markSaved(id: recipe.id)
+        if didSave {
+            await sendTelemetry(.recipeSaved(recipeID: recipe.id))
+        }
         guard transitioned else {
             // Already explicitly downloaded — no image re-fetch (AC-35.4).
             return .alreadyDownloaded
