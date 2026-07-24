@@ -89,7 +89,7 @@ extension GuidedCookout {
         Step(
             id: "gather-gear",
             stage: .gather,
-            title: "Round up your gear and ingredients",
+            title: "Round Up Your Gear and Ingredients",
             coaching:
                 "Three simple things: your fruit, a box of cake mix, and a stick of butter. "
                 + "That's the whole secret. Get it all out and you're halfway there."
@@ -97,7 +97,7 @@ extension GuidedCookout {
         Step(
             id: "light-coals",
             stage: .fire,
-            title: "Get your coals going",
+            title: "Get Your Coals Going",
             coaching:
                 "Coals on the bottom and the lid for a steady bake. I'll tell you exactly how "
                 + "many and where, same as always. You've done this."
@@ -105,7 +105,7 @@ extension GuidedCookout {
         Step(
             id: "dump-and-lid",
             stage: .cook,
-            title: "Dump it, dot it, lid it",
+            title: "Dump It, Dot It, Lid It",
             coaching:
                 "Dump the fruit in, spread the dry cake mix evenly over the top, and slice the "
                 + "butter across it. Do not stir. Lid on, and walk away. The Dutch oven does "
@@ -114,7 +114,7 @@ extension GuidedCookout {
         Step(
             id: "scoop-it-warm",
             stage: .celebrate,
-            title: "Lift the lid",
+            title: "Lift the Lid",
             coaching:
                 "Bubbling, golden, smells like a county fair. Scoop it warm, add ice cream if "
                 + "you've got it, and watch everyone's faces. Snap a photo first."
