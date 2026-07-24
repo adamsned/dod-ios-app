@@ -57,8 +57,6 @@ struct TabStack: View {
     /// like `openShoppingList`; defaults to a no-op. DUT-584 — carries an optional
     /// ``HeatCoachSeed`` so the per-recipe nudge can open the coach pre-answered.
     let openHeatCoach: (HeatCoachSeed?) -> Void
-    /// DUT-571 — hero CTAs open the guided path; Bool = scrollToDumpCakes (dump-cake CTA).
-    let startFirstCookout: (Bool) -> Void
     /// DUT-560 — the UNIFIED hub-tool reroute request, owned by `RootView` and
     /// bound only into the Cooking Tools tab (every tool entry point mints it via
     /// `route(toHubTool:)`). The hub consumes it via `.task(id:)` and opens the
@@ -107,7 +105,6 @@ struct TabStack: View {
         onOpenSettings: @escaping () -> Void = {},
         onFindRecipe: @escaping () -> Void = {},
         openHeatCoach: @escaping (HeatCoachSeed?) -> Void = { _ in },
-        startFirstCookout: @escaping (Bool) -> Void = { _ in },
         hubPendingTool: Binding<HubToolRoute?> = .constant(nil),
         hubTipToken: Binding<UUID?> = .constant(nil),
         cookModeFindRecipeArmed: Binding<Bool> = .constant(false),
@@ -122,7 +119,6 @@ struct TabStack: View {
         self.onOpenSettings = onOpenSettings
         self.onFindRecipe = onFindRecipe
         self.openHeatCoach = openHeatCoach
-        self.startFirstCookout = startFirstCookout
         self._hubPendingTool = hubPendingTool
         self._hubTipToken = hubTipToken
         self._cookModeFindRecipeArmed = cookModeFindRecipeArmed
@@ -226,11 +222,7 @@ struct TabStack: View {
                 openShoppingList: openShoppingList,
                 // T-912 / DUT-551 (CL-306) — the Feed header trailing slot now
                 // hosts the Settings gear (the old Cooking Tools menu is retired).
-                onOpenSettings: onOpenSettings,
-                // DUT-571 — both hero CTAs open the guided path; DUT — "Or Cook a Dump
-                // Cake" (true) scrolls to Anytime Treats, primary "Start" (false) doesn't.
-                onStartFirstCookout: { startFirstCookout(false) },
-                onCookDumpCake: { startFirstCookout(true) }
+                onOpenSettings: onOpenSettings
             )
         case .search:
             SearchView(

@@ -110,6 +110,15 @@ struct DODApp: App {
         if env["DOD_SUPPRESS_ONBOARDING"] == "1" {
             UserDefaults.standard.set(true, forKey: RootView.onboardingCompletedKey)
         }
+        // Re-arm the once-per-install First Cookout callout for review / UI tests.
+        // In-memory only: it never writes (or clears) the persisted dismissal, so a
+        // tester's real state survives the launch unchanged.
+        let forcesCallout =
+            args.contains("-DODForceFirstCookoutCallout")
+            || env["DOD_FORCE_FIRST_COOKOUT_CALLOUT"] == "1"
+        if forcesCallout {
+            DODEnvironment.forceFirstCookoutCallout = true
+        }
         if args.contains("-DODForceFreshOnboarding") {
             UserDefaults.standard.removeObject(forKey: RootView.onboardingCompletedKey)
             // The onboarding UI test dismisses the welcome sheet; suppress the
@@ -162,6 +171,21 @@ enum DODEnvironment {
     /// welcome sheet but must not trip the system permission dialogs. Production
     /// launches (no flag) leave this false, so real new installs get the prompts.
     nonisolated(unsafe) static var suppressFirstRunPrompts: Bool = false
+
+    /// True when the host was launched with `-DODForceFirstCookoutCallout`: treat
+    /// the First Cookout callout as NOT dismissed, whatever the persisted flag says.
+    ///
+    /// Why this exists: the callout is a once-per-install nudge, so any device that
+    /// ever dismissed it — including every long-lived dev simulator, which dismissed
+    /// the DUT-571 hero this callout inherits the key from — can never render it
+    /// again. That made the callout effectively unreviewable and unverifiable on a
+    /// real device without hand-editing `UserDefaults`, which mutates the tester's
+    /// data. This flag makes it presentable on demand WITHOUT a write: it overrides
+    /// the read in memory and persists nothing.
+    ///
+    /// Read only by ``RootView/firstCookoutCalloutIsDismissed``. Production launches
+    /// (no flag) leave this false, so a real dismissal is always honoured.
+    nonisolated(unsafe) static var forceFirstCookoutCallout: Bool = false
 }
 
 /// UIKit application delegate bridged into the SwiftUI lifecycle via
