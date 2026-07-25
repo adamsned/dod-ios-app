@@ -182,6 +182,21 @@ public final class RecipeDetailViewModel {
     /// ``cookModeTelemetrySentThisSession`` dedupe.
     private var offlineReadTelemetrySentThisSession: Bool = false
 
+    /// DUT-1326 — reentrancy guard for `retryLoad()`. A rapid double-tap on the
+    /// visible "Retry" button (shown only in `.retryableError`, so this can
+    /// only ever race against ITSELF, never the initial onAppear load) would
+    /// otherwise start two concurrent `fetchAndParse()` pipelines racing on
+    /// `loadState`/`recipe`/`blurbBlocks` and double-firing `loadRelated`.
+    /// Mirrors `CategoryRecipesViewModel.isLoadInFlight` (DUT-706) — set before
+    /// the first await, cleared via `defer`, so it protects the whole call
+    /// regardless of where inside `fetchAndParse()` the second tap would land.
+    /// No explicit access modifier (module-internal default) — matches
+    /// ``ratingRefreshGeneration``'s convention for state mutated from a
+    /// sibling `+Extension.swift` file within this module (`private` is
+    /// file-scoped in Swift, so it would not be visible from
+    /// `RecipeDetailViewModel+Fetch.swift`).
+    var isRetryingLoad = false
+
     /// Internal so the fetch + classification extension (in
     /// `RecipeDetailViewModel+Fetch.swift`, T-640) and the US-35
     /// `+Download` extension (T-620) can read it. The dependency
