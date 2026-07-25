@@ -119,10 +119,8 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var cachedCommentWrites: [(comments: [RecipeComment], postID: Int)] = []
     var savedGuestIdentities: [(name: String, email: String)] = []
 
-    // Spy counters introduced for the rendering regression suite — they
-    // let those tests assert that `loadRatingsAndComments()` actually
-    // routed through the dependency surface, even when the cached recipe
-    // path made the fetch skip.
+    // Spy counters (rendering regression suite): prove `loadRatingsAndComments()`
+    // routed through the dependency surface, even on a cached-recipe fetch skip.
     var fetchRatingSummaryCallCount = 0
     var cachedCommentsCallCount = 0
     var fetchCommentsCallCount = 0
@@ -131,11 +129,13 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     /// returning. Lets a test prove that a hung ratings fetch never
     /// stalls the recipe-detail load state itself.
     var fetchRatingSummaryGate: (@Sendable () async -> Void)?
+    var fetchHTMLGate: (@Sendable () async -> Void)?  // DUT-1326 — mirrors the gate above.
 
     func cachedRecipe(id: Int) async throws -> Recipe? { cachedRecipes[id] }
 
     func fetchHTML(for url: URL) async throws -> String {
         fetchCount += 1
+        if let gate = fetchHTMLGate { await gate() }
         if fetchShouldFail { throw URLError(.notConnectedToInternet) }
         return htmlToReturn
     }
