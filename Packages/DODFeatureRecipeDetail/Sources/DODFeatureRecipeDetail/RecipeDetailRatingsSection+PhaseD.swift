@@ -61,7 +61,10 @@ extension RecipeDetailRatingsSection {
         )
         // DUT-501 (Guideline 1.2) — report/block another user's comment. Report
         // hides it locally at once and opens a prefilled moderation email;
-        // Block hides every comment from that author, app-wide.
+        // Block hides every comment from that author, app-wide. Block confirms
+        // first for a named author (see `pendingBlockComment` on the section) —
+        // an anonymous row's "Hide Comment" fallback stays single-comment-scoped
+        // and immediate, same blast radius as Report.
         .contextMenu {
             if viewModel.canModerate(comment) {
                 Button {
@@ -70,11 +73,22 @@ extension RecipeDetailRatingsSection {
                     Label("Report Comment", systemImage: "flag")
                 }
                 Button(role: .destructive) {
-                    viewModel.blockAuthor(of: comment)
+                    requestBlock(of: comment)
                 } label: {
                     Label(blockLabel(for: comment), systemImage: "hand.raised")
                 }
             }
+        }
+    }
+
+    /// Route a Block tap through the confirmation gate for a named author (the
+    /// permanent, app-wide action); an anonymous row's "Hide Comment" fallback
+    /// is single-comment-scoped, so it fires immediately like Report does.
+    func requestBlock(of comment: RecipeComment) {
+        if CommentModerationStore.isAnonymous(author: comment.authorName) {
+            viewModel.blockAuthor(of: comment)
+        } else {
+            pendingBlockComment = comment
         }
     }
 
@@ -146,6 +160,51 @@ extension RecipeDetailRatingsSection {
     fileprivate func displayAuthor(for comment: RecipeComment) -> String {
         let trimmed = comment.authorName.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Anonymous" : trimmed
+    }
+}
+
+extension View {
+    /// Wires the "Block This Person?" confirmation to a section's body.
+    /// Extracted out of `RecipeDetailRatingsSection`'s body (which is near
+    /// SwiftLint's `file_length` cap) into its own `ViewModifier` below.
+    func blockConfirmation(
+        viewModel: RecipeDetailViewModel,
+        pendingComment: Binding<RecipeComment?>
+    ) -> some View {
+        modifier(BlockConfirmationAlert(viewModel: viewModel, pendingComment: pendingComment))
+    }
+}
+
+/// See `RecipeDetailRatingsSection.pendingBlockComment` for why a NAMED
+/// author's Block confirms first: it's app-wide + permanent-feeling (no
+/// in-app Unblock), the same class of action Sign Out / Delete Profile /
+/// Clear Shopping List / Clear Recent Searches all gate behind a confirm.
+private struct BlockConfirmationAlert: ViewModifier {
+
+    let viewModel: RecipeDetailViewModel
+    @Binding var pendingComment: RecipeComment?
+
+    func body(content: Content) -> some View {
+        content.alert(
+            "Block This Person?",
+            isPresented: Binding(
+                get: { pendingComment != nil },
+                set: { if !$0 { pendingComment = nil } }
+            ),
+            presenting: pendingComment
+        ) { comment in
+            Button("Block", role: .destructive) {
+                viewModel.blockAuthor(of: comment)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { comment in
+            let trimmed = comment.authorName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = trimmed.isEmpty ? "Anonymous" : trimmed
+            Text(
+                "This hides every comment from \(name) here, now and going forward. "
+                    + "There's no in-app way to undo this."
+            )
+        }
     }
 }
 
