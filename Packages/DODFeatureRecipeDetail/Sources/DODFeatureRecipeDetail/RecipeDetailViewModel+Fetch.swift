@@ -64,6 +64,12 @@ extension RecipeDetailViewModel {
     /// `.unavailable`, and a still-flaky connection back to `.retryableError`.
     /// Wired to the Retry button the view shows in the `.retryableError` state.
     public func retryLoad() async {
+        // DUT-1326 — guard against a rapid double-tap on the Retry button
+        // starting two concurrent `fetchAndParse()` pipelines. See
+        // ``RecipeDetailViewModel/isRetryingLoad`` for the full rationale.
+        guard !isRetryingLoad else { return }
+        isRetryingLoad = true
+        defer { isRetryingLoad = false }
         loadState = .loadingDetail
         snackbarMessage = nil
         await fetchAndParse()
