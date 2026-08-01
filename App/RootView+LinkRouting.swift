@@ -1,3 +1,4 @@
+import CoreSpotlight
 import DODAnalytics
 import DODDesignSystem
 import DODFeatureFeed
@@ -11,6 +12,27 @@ import SwiftUI
 // `RootView` for exactly this cross-file access.
 
 extension RootView {
+
+    /// DUT-1325 — route a Universal Link (a tapped dutchovendaddy.com web URL,
+    /// delivered as a browsing-web activity) via the shared `openRecipeLink`,
+    /// which resolves the `/<slug>/` permalink to its post and routes it in-app,
+    /// falling back to the system browser for any non-recipe / off-site URL.
+    /// Extracted here (not inline in `RootView.body`) to keep that file under the
+    /// SwiftLint `file_length` cap.
+    func handleUniversalLink(_ activity: NSUserActivity) {
+        guard let url = activity.webpageURL else { return }
+        Task { @MainActor in _ = await openRecipeLink(url) }
+    }
+
+    /// Route a Spotlight result tap to its recipe (US-10 / DUT-12). Extracted
+    /// alongside `handleUniversalLink` for the same file-length reason.
+    func handleSpotlightActivity(_ activity: NSUserActivity) {
+        guard
+            let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+            let id = identifier.split(separator: ".").last.flatMap({ Int($0) })
+        else { return }
+        handle(intent: .openRecipe(id: id))
+    }
 
     /// Widget URL handler (spec.md US-9 AC-9.2, US-17 AC-17.4). Recipe + feed
     /// routes switch to Feed and hand the link to the TabStack via
