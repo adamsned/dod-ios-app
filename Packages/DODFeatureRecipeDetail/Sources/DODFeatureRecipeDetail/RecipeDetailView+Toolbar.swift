@@ -21,10 +21,12 @@ extension RecipeDetailView {
                     Task { await viewModel.toggleSaved() }
                 } label: {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
-                        .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
-                        // DUT-572 / CL-312 — glyph shadow so state colors survive
-                        // over the full-bleed hero photo (mirrors the title shadow).
-                        .shadow(color: .black.opacity(0.35), radius: 3)
+                        // DUT-1322 — circular scrim (replaces the old bare
+                        // `.foregroundStyle` + `.shadow`) so the glyph reads over
+                        // BOTH the full-bleed hero photo AND the plain
+                        // `DODColor.surface` once scrolled past it. See
+                        // `ToolbarGlyphChip.swift` for the contrast math.
+                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.save(isSaved: viewModel.isSaved))
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
 
@@ -40,8 +42,8 @@ extension RecipeDetailView {
                     presentAddToShoppingList()
                 } label: {
                     Image(systemName: "cart.badge.plus")
-                        .foregroundStyle(DODColor.label)
-                        .shadow(color: .black.opacity(0.35), radius: 3)
+                        // DUT-1322 — see the Save button above.
+                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
                 }
                 .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Add to Shopping List")
@@ -61,8 +63,10 @@ extension RecipeDetailView {
                             ? "square.and.arrow.down.fill"
                             : "square.and.arrow.down"
                     )
-                    .foregroundStyle(viewModel.isDownloaded ? DODColor.burntOrange : DODColor.label)
-                    .shadow(color: .black.opacity(0.35), radius: 3)
+                    // DUT-1322 — see the Save button above.
+                    .toolbarGlyphChip(
+                        foreground: ToolbarGlyphForeground.download(isDownloaded: viewModel.isDownloaded)
+                    )
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
 
@@ -109,8 +113,8 @@ extension RecipeDetailView {
                     }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
-                        .foregroundStyle(DODColor.label)
-                        .shadow(color: .black.opacity(0.35), radius: 3)
+                        // DUT-1322 — see the Save button above.
+                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
                 }
                 .accessibilityLabel("Share recipe")
             }
