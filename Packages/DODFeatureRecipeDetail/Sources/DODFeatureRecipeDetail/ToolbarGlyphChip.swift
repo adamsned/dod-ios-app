@@ -21,34 +21,71 @@ import SwiftUI
 // against ANY backdrop (hero photo, light-mode white `Surface`, dark-mode
 // near-black `Surface`) rather than trying to keep the glyph color and the
 // page background from ever colliding.
-
-/// A circular translucent scrim behind a single recipe-detail toolbar glyph,
-/// applied via `View.toolbarGlyphChip(foreground:)` below.
-///
-/// The scrim is a FIXED-opacity black circle — deliberately NOT a
-/// `Material` and NOT a color that adapts to the real (device) color scheme.
-/// `RecipeDetailView` already forces `.toolbarColorScheme(.dark, for:
-/// .navigationBar)`, so every glyph's own foreground is ALREADY pinned to
-/// its dark-appearance token regardless of the device's actual appearance
-/// (see the file-level doc above). Given that, the scrim only needs to
-/// guarantee contrast against whatever page content happens to sit behind
-/// it — it doesn't need to adapt to anything itself.
-///
-/// Contrast math (WCAG relative luminance, worst realistic backdrop = a
-/// bright hero highlight or the light-mode white `Surface`, both ≈ full
-/// white):
-/// - `DODColor.label`'s dark-appearance cream (`#E6DECF`, relative luminance
-///   ≈0.75) against the scrim (`#000000` at `scrimOpacity` composited over
-///   white ⇒ ≈`#363636`, relative luminance ≈0.033) ⇒ contrast ≈9.5:1.
-/// - `DODColor.accent` / `DODColor.burntOrange` (both `#C56A24` — the two
-///   tokens currently share this hex — relative luminance ≈0.23) against the
-///   same scrim ⇒ contrast ≈3.9:1.
-///
-/// Both numbers only IMPROVE over a darker backdrop (a dim hero region, or
-/// the dark-mode near-black `Surface`), so one fixed scrim covers light
-/// mode, dark mode, over-the-hero, and scrolled-past-the-hero without any
-/// environment branching. 3:1 is the WCAG 1.4.11 non-text-contrast floor for
-/// UI/graphical objects; both cases clear it with margin.
+//
+// DUT-1323 — DUT-1322 shipped that scrim as a FIXED `Color.black.opacity
+// (0.85)` circle. Ned's on-device read: legible, but "very aggressive with
+// the dark fill" — four heavy dark dots sitting on the hero photo, and off
+// the app's own house style for photo-legibility (`WidgetCard+Scrim.swift`
+// uses a soft gradient, not a hard fill) and for toolbar glyphs
+// (`DODHeaderGearButton` is a bare tinted glyph, no chip at all). This pass
+// swaps the fixed fill for `.ultraThinMaterial` — the Apple-native
+// translucent-blur treatment for controls over imagery (Photos, Maps) — plus
+// a documented, minimal supplementary tint (see ``tintOpacity``).
+//
+// The DUT-1322 author deliberately rejected `Material` on the theory that,
+// under the forced-dark toolbar, it might resolve its LIGHT variant and
+// destroy the contrast it exists to provide. That theory was verified
+// EMPIRICALLY here, not assumed: built + ran on an iPhone 16 / iOS 26.5
+// simulator, navigated to a real recipe detail, and captured
+// `xcrun simctl io <udid> screenshot` over the hero photo AND scrolled to
+// plain `DODColor.surface`, in both light and dark device appearance
+// (`xcrun simctl ui <udid> appearance light|dark`), then measured actual
+// on-screen pixel colors (not theoretical ones) at the glyph and at the chip
+// fill and ran the same WCAG relative-luminance / contrast-ratio math
+// `ToolbarGlyphChipTests.swift` already used for the DUT-1322 scrim.
+//
+// Two real findings came out of that, not the guess either engineer started
+// with:
+//
+// 1. `.ultraThinMaterial` DOES track the device's real light/dark appearance
+//    (not the `.toolbarColorScheme(.dark, ...)` forced on the toolbar) — the
+//    DUT-1322 author's instinct was directionally right. Measured chip-fill
+//    luminance was visibly lighter in light-mode screenshots than dark-mode
+//    ones at the same tint opacity. But it does NOT go fully light/see
+//    through the way pure "no scrim at all" would — it still contributes
+//    real, substantial darkening even in light mode.
+// 2. `.ultraThinMaterial` ALONE (no supplementary tint) measured BELOW the
+//    WCAG 1.4.11 3:1 non-text floor for the cream `DODColor.label` glyph in
+//    light mode: 2.76:1 over the hero photo, 2.11:1 over light-mode
+//    `Surface` (`#FFFFFF`). Dark mode cleared it easily (5.89:1 / 9.25:1),
+//    consistent with finding 1. So a supplementary tint is required — Ned's
+//    fallback instruction, not a fixed guess.
+//
+// The supplementary tint is `DODColor.darkEarth` (fixed hex — `#1B140E` in
+// BOTH appearances, see `DODDesignSystem/Colors.swift` — so it can't itself
+// flip light under any environment) at ``tintOpacity``, layered UNDER the
+// material so the material's own blur + backdrop-dependent sheen still shows
+// through on top of it (this is what keeps the chip reading as translucent
+// glass rather than a flat matte dot — compare the visible color/light
+// variation inside the chips in the screenshots this PR attaches to the flat
+// single-tone circles DUT-1322 shipped).
+//
+// `tintOpacity` had to go through THREE empirically-measured iterations, not
+// one: 0.35 was the first guess (softest option) and it held the 3:1 floor
+// for `DODColor.label` in every combination (4.89:1 hero / 3.97:1 surface,
+// light mode; 8.20:1 / 10.77:1 dark mode) — but a state this suite hadn't
+// screenshotted yet, the SAVED bookmark rendering `DODColor.accent`
+// (`#C56A24`, a mid-luminance color, unlike the very-light cream label),
+// measured only 1.71:1 in light mode over the hero — a real, missed failure
+// a "just check the unsaved state" pass would have shipped. `DODColor.accent`
+// / `DODColor.burntOrange` are close enough in luminance to a lightly-tinted
+// chip that darkening the chip FURTHER (not lighter) is what closes that gap
+// — a middling 0.55 only reached 2.40:1, 0.70 only 3.12:1 (too thin a
+// margin), and 0.75 is the value that cleared 3:1 for the accent/burntOrange
+// case with real margin in every measured combination: light-mode hero
+// 3.40:1, light-mode surface 3.14:1, dark-mode hero 4.02:1, dark-mode
+// surface 4.38:1 (the cream-label case clears comfortably throughout, from
+// 9.04:1 up to 12.61:1).
 struct ToolbarGlyphChip: ViewModifier {
 
     /// Circle diameter. Comfortably larger than the ~20–22pt rendered SF
@@ -65,11 +102,16 @@ struct ToolbarGlyphChip: ViewModifier {
     /// read from a plain (non-actor-isolated) `@Test` function.
     nonisolated static let diameter: CGFloat = 34
 
-    /// Fixed (non-adaptive) scrim opacity. See the contrast math in the type
-    /// doc above for why this specific value clears WCAG 1.4.11 for every
-    /// foreground token the four glyphs can render. `nonisolated` — see
-    /// ``diameter``.
-    nonisolated static let scrimOpacity: Double = 0.85
+    /// Fixed (non-adaptive) supplementary tint opacity for ``DODColor/darkEarth``,
+    /// layered UNDER `.ultraThinMaterial` so the material's own blur/sheen
+    /// still shows on top of it. See the type doc above for the three rounds
+    /// of empirical (screenshot + measured-pixel) verification behind this
+    /// exact value — 0.35 held the WCAG 1.4.11 3:1 floor for the neutral
+    /// cream glyph but NOT for the accent/burnt-orange saved/downloaded
+    /// glyph (1.71:1 in the worst measured case); 0.75 is the first value
+    /// that cleared 3:1 for BOTH in every measured light/dark ×
+    /// hero-photo/`Surface` combination. `nonisolated` — see ``diameter``.
+    nonisolated static let tintOpacity: Double = 0.75
 
     let foreground: Color
 
@@ -77,15 +119,20 @@ struct ToolbarGlyphChip: ViewModifier {
         content
             .foregroundStyle(foreground)
             .frame(width: Self.diameter, height: Self.diameter)
-            .background(Circle().fill(Color.black.opacity(Self.scrimOpacity)))
+            .background(
+                Circle()
+                    .fill(DODColor.darkEarth.opacity(Self.tintOpacity))
+                    .background(.ultraThinMaterial, in: Circle())
+            )
     }
 }
 
 extension View {
-    /// Applies the DUT-1322 toolbar glyph contrast scrim: the glyph's
-    /// resolved `foreground` tint over a fixed circular scrim. See
-    /// ``ToolbarGlyphChip`` for why the scrim is a fixed opacity rather than
-    /// an adaptive `Material`.
+    /// Applies the DUT-1322/DUT-1323 toolbar glyph contrast chip: the
+    /// glyph's resolved `foreground` tint over a translucent
+    /// `.ultraThinMaterial` circle with a fixed supplementary tint
+    /// underneath. See ``ToolbarGlyphChip`` for the empirical verification
+    /// behind this combination.
     func toolbarGlyphChip(foreground: Color) -> some View {
         modifier(ToolbarGlyphChip(foreground: foreground))
     }
