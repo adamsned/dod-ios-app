@@ -109,14 +109,31 @@ struct ToolbarGlyphChip: ViewModifier {
     let foreground: Color
 
     func body(content: Content) -> some View {
-        content
-            .foregroundStyle(foreground)
-            .frame(width: Self.diameter, height: Self.diameter)
-            .background(
-                Circle()
-                    .fill(DODColor.darkEarth.opacity(Self.tintOpacity))
-                    .background(.ultraThinMaterial, in: Circle())
-            )
+        // DUT-1327 — iOS 26 groups the `.primaryAction` toolbar items in its own
+        // system Liquid-Glass pill, so the per-glyph chip becomes a redundant
+        // second background — four gray dots inside the pill, which reads badly
+        // (Spencer, on-device). Drop the circle there and let the system pill be
+        // the backdrop; a subtle shadow still separates the glyph from the hero
+        // photo (matches v2's toolbar treatment).
+        //
+        // The DUT-1322 chip is kept ONLY on iOS 17–25, which have no system glass
+        // grouping (iPadOS 17's fully transparent nav bar is exactly where the
+        // bare glyph went invisible over the cream `Surface`). iOS 17 is still the
+        // package's min deployment target, so that path must stay.
+        if #available(iOS 26, *) {
+            content
+                .foregroundStyle(foreground)
+                .shadow(color: .black.opacity(0.35), radius: 3)
+        } else {
+            content
+                .foregroundStyle(foreground)
+                .frame(width: Self.diameter, height: Self.diameter)
+                .background(
+                    Circle()
+                        .fill(DODColor.darkEarth.opacity(Self.tintOpacity))
+                        .background(.ultraThinMaterial, in: Circle())
+                )
+        }
     }
 }
 
