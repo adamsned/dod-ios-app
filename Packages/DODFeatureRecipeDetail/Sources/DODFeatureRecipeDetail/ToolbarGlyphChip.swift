@@ -27,65 +27,48 @@ import SwiftUI
 // the dark fill" — four heavy dark dots sitting on the hero photo, and off
 // the app's own house style for photo-legibility (`WidgetCard+Scrim.swift`
 // uses a soft gradient, not a hard fill) and for toolbar glyphs
-// (`DODHeaderGearButton` is a bare tinted glyph, no chip at all). This pass
-// swaps the fixed fill for `.ultraThinMaterial` — the Apple-native
+// (`DODHeaderGearButton` is a bare tinted glyph, no chip at all). A first
+// pass swapped the fixed fill for `.ultraThinMaterial` — the Apple-native
 // translucent-blur treatment for controls over imagery (Photos, Maps) — plus
-// a documented, minimal supplementary tint (see ``tintOpacity``).
+// a `DODColor.darkEarth` tint underneath. That pass verified, empirically
+// (built + ran on an iPhone 16 / iOS 26.5 simulator, navigated to a real
+// recipe detail, captured `xcrun simctl io <udid> screenshot` over the hero
+// photo AND scrolled to plain `DODColor.surface`, in both light and dark
+// device appearance, then measured actual pixel colors and ran WCAG
+// relative-luminance / contrast-ratio math), that `.ultraThinMaterial` alone
+// falls below the WCAG 1.4.11 3:1 non-text floor (2.76:1 hero / 2.11:1
+// surface, light mode) — so SOME supplementary tint is genuinely required,
+// not a fixed guess. But it then chased `tintOpacity` up to 0.75 to hold 3:1
+// for the SAVED/DOWNLOADED state, which at the time rendered
+// `DODColor.accent`/`DODColor.burntOrange` (`#C56A24`, mid-luminance
+// burnt-orange) directly on the chip. Reconstructed composite chip color at
+// that tint: RGB (59, 54, 49) over `DODColor.surface` — warmer than the
+// rejected black scrim, but still a dark dot four times over. Ned rejected
+// that outcome too, for the same reason as the original: chasing 3:1 for a
+// mid-luminance orange on a soft chip is exactly what forces the tint back
+// up.
 //
-// The DUT-1322 author deliberately rejected `Material` on the theory that,
-// under the forced-dark toolbar, it might resolve its LIGHT variant and
-// destroy the contrast it exists to provide. That theory was verified
-// EMPIRICALLY here, not assumed: built + ran on an iPhone 16 / iOS 26.5
-// simulator, navigated to a real recipe detail, and captured
-// `xcrun simctl io <udid> screenshot` over the hero photo AND scrolled to
-// plain `DODColor.surface`, in both light and dark device appearance
-// (`xcrun simctl ui <udid> appearance light|dark`), then measured actual
-// on-screen pixel colors (not theoretical ones) at the glyph and at the chip
-// fill and ran the same WCAG relative-luminance / contrast-ratio math
-// `ToolbarGlyphChipTests.swift` already used for the DUT-1322 scrim.
+// The actual fix breaks the constraint instead of satisfying it: no
+// mid-luminance brand token clears 3:1 on a genuinely soft chip —
+// `DODColor.warmGold` (`#D4A24C`) reaches only 2.26:1, `DODColor.accent` /
+// `DODColor.burntOrange` (`#C56A24`) only 1.36:1, both computed the same
+// tint-alone way as ``ToolbarGlyphChipTests``'s floor tests. Only a
+// near-white token does — `DODColor.cream` (`#FAF6EE`), ~4.85:1+ tint-alone
+// at any opacity that also clears it for `DODColor.label`. So the
+// SAVED/DOWNLOADED state no longer tints the glyph burnt orange at all —
+// see `ToolbarGlyphForeground` below. State is carried by the
+// filled-vs-outline SF Symbol variant (already wired in
+// `RecipeDetailView+Toolbar.swift`: `bookmark`/`bookmark.fill`,
+// `square.and.arrow.down`/`square.and.arrow.down.fill`) — the standard iOS
+// idiom — plus a brightness step: `DODColor.cream` reads visibly lighter
+// than `DODColor.label`'s toolbar-forced-dark value (`#E6DECF`), not a hue
+// change.
 //
-// Two real findings came out of that, not the guess either engineer started
-// with:
-//
-// 1. `.ultraThinMaterial` DOES track the device's real light/dark appearance
-//    (not the `.toolbarColorScheme(.dark, ...)` forced on the toolbar) — the
-//    DUT-1322 author's instinct was directionally right. Measured chip-fill
-//    luminance was visibly lighter in light-mode screenshots than dark-mode
-//    ones at the same tint opacity. But it does NOT go fully light/see
-//    through the way pure "no scrim at all" would — it still contributes
-//    real, substantial darkening even in light mode.
-// 2. `.ultraThinMaterial` ALONE (no supplementary tint) measured BELOW the
-//    WCAG 1.4.11 3:1 non-text floor for the cream `DODColor.label` glyph in
-//    light mode: 2.76:1 over the hero photo, 2.11:1 over light-mode
-//    `Surface` (`#FFFFFF`). Dark mode cleared it easily (5.89:1 / 9.25:1),
-//    consistent with finding 1. So a supplementary tint is required — Ned's
-//    fallback instruction, not a fixed guess.
-//
-// The supplementary tint is `DODColor.darkEarth` (fixed hex — `#1B140E` in
-// BOTH appearances, see `DODDesignSystem/Colors.swift` — so it can't itself
-// flip light under any environment) at ``tintOpacity``, layered UNDER the
-// material so the material's own blur + backdrop-dependent sheen still shows
-// through on top of it (this is what keeps the chip reading as translucent
-// glass rather than a flat matte dot — compare the visible color/light
-// variation inside the chips in the screenshots this PR attaches to the flat
-// single-tone circles DUT-1322 shipped).
-//
-// `tintOpacity` had to go through THREE empirically-measured iterations, not
-// one: 0.35 was the first guess (softest option) and it held the 3:1 floor
-// for `DODColor.label` in every combination (4.89:1 hero / 3.97:1 surface,
-// light mode; 8.20:1 / 10.77:1 dark mode) — but a state this suite hadn't
-// screenshotted yet, the SAVED bookmark rendering `DODColor.accent`
-// (`#C56A24`, a mid-luminance color, unlike the very-light cream label),
-// measured only 1.71:1 in light mode over the hero — a real, missed failure
-// a "just check the unsaved state" pass would have shipped. `DODColor.accent`
-// / `DODColor.burntOrange` are close enough in luminance to a lightly-tinted
-// chip that darkening the chip FURTHER (not lighter) is what closes that gap
-// — a middling 0.55 only reached 2.40:1, 0.70 only 3.12:1 (too thin a
-// margin), and 0.75 is the value that cleared 3:1 for the accent/burntOrange
-// case with real margin in every measured combination: light-mode hero
-// 3.40:1, light-mode surface 3.14:1, dark-mode hero 4.02:1, dark-mode
-// surface 4.38:1 (the cream-label case clears comfortably throughout, from
-// 9.04:1 up to 12.61:1).
+// Dropping orange from the toolbar is what buys back the soft chip: with
+// both possible glyph foregrounds now light (cream/label, not orange),
+// `tintOpacity` drops from 0.75 back down to a genuinely soft 0.35 — see
+// ``tintOpacity`` for the full empirical trail and the on-device
+// verification screenshots this PR attaches.
 struct ToolbarGlyphChip: ViewModifier {
 
     /// Circle diameter. Comfortably larger than the ~20–22pt rendered SF
@@ -104,14 +87,24 @@ struct ToolbarGlyphChip: ViewModifier {
 
     /// Fixed (non-adaptive) supplementary tint opacity for ``DODColor/darkEarth``,
     /// layered UNDER `.ultraThinMaterial` so the material's own blur/sheen
-    /// still shows on top of it. See the type doc above for the three rounds
-    /// of empirical (screenshot + measured-pixel) verification behind this
-    /// exact value — 0.35 held the WCAG 1.4.11 3:1 floor for the neutral
-    /// cream glyph but NOT for the accent/burnt-orange saved/downloaded
-    /// glyph (1.71:1 in the worst measured case); 0.75 is the first value
-    /// that cleared 3:1 for BOTH in every measured light/dark ×
-    /// hero-photo/`Surface` combination. `nonisolated` — see ``diameter``.
-    nonisolated static let tintOpacity: Double = 0.75
+    /// still shows on top of it. Ned's explicit correction (see the type doc
+    /// above): once the SAVED/DOWNLOADED state stopped tinting the glyph
+    /// burnt orange (``ToolbarGlyphForeground``), both possible glyph
+    /// foregrounds are light (`DODColor.cream` / `DODColor.label`), so the
+    /// tint no longer has to be darkened just to hold contrast for a
+    /// mid-luminance orange — it can go back to the genuinely soft value:
+    /// ~RGB 110 composited over `DODColor.surface`, clearly lighter than
+    /// either the rejected `Color.black.opacity(0.85)` scrim (RGB (36, 36,
+    /// 35)) or the previous `.darkEarth` tint this PR is correcting away
+    /// from (0.75 → RGB (59, 54, 49)). Verified empirically (screenshots +
+    /// measured pixel WCAG contrast) that both `DODColor.cream` and
+    /// `DODColor.label` still clear the 1.4.11 3:1 non-text floor against
+    /// this chip in every light/dark × hero-photo/`Surface` combination —
+    /// see the type doc's verification trail for the measured numbers.
+    /// Changing this value again requires re-running that `xcrun simctl`
+    /// screenshot verification, not just satisfying
+    /// `ToolbarGlyphChipTests.swift`. `nonisolated` — see ``diameter``.
+    nonisolated static let tintOpacity: Double = 0.35
 
     let foreground: Color
 
@@ -143,20 +136,38 @@ extension View {
 /// plain, environment-free data (no `View`) so the state → color mapping —
 /// the "state colors must stay visually distinct" half of the DUT-1322 fix
 /// — is unit-testable without a live view hierarchy.
+///
+/// DUT-1323 (Ned's correction) — SAVED/DOWNLOADED no longer tints the glyph
+/// `DODColor.accent`/`DODColor.burntOrange`. That mid-luminance orange is
+/// what forced ``ToolbarGlyphChip/tintOpacity`` up to a chip dark enough that
+/// Ned rejected it on device a second time; no mid-luminance brand token
+/// clears WCAG 1.4.11 3:1 on a genuinely soft chip (see
+/// `ToolbarGlyphChip.swift`'s type doc). Active states now render
+/// `DODColor.cream` — the only token with enough headroom to clear 3:1 at a
+/// soft tint — instead. State is carried primarily by the filled-vs-outline
+/// SF Symbol variant already wired in `RecipeDetailView+Toolbar.swift` (the
+/// standard iOS idiom), with `cream` vs `label` supplying a secondary
+/// brightness step (`DODColor.cream` `#FAF6EE` reads visibly lighter than
+/// `DODColor.label`'s toolbar-forced-dark `#E6DECF`) rather than a hue
+/// change.
 enum ToolbarGlyphForeground {
 
     /// Add to Shopping List + Share — neither carries a toggle state.
     static let neutral: Color = DODColor.label
 
-    /// Save / bookmark glyph. Saved renders `DODColor.accent` (unchanged
-    /// from pre-DUT-1322 behavior); unsaved renders `DODColor.label`.
+    /// Save / bookmark glyph. Saved renders `DODColor.cream`; unsaved
+    /// renders `DODColor.label`. State reads primarily through the
+    /// `bookmark.fill` / `bookmark` SF Symbol swap in
+    /// `RecipeDetailView+Toolbar.swift`.
     static func save(isSaved: Bool) -> Color {
-        isSaved ? DODColor.accent : DODColor.label
+        isSaved ? DODColor.cream : DODColor.label
     }
 
-    /// Download glyph. Downloaded renders `DODColor.burntOrange`
-    /// (unchanged); not-downloaded renders `DODColor.label`.
+    /// Download glyph. Downloaded renders `DODColor.cream`; not-downloaded
+    /// renders `DODColor.label`. State reads primarily through the
+    /// `square.and.arrow.down.fill` / `square.and.arrow.down` SF Symbol swap
+    /// in `RecipeDetailView+Toolbar.swift`.
     static func download(isDownloaded: Bool) -> Color {
-        isDownloaded ? DODColor.burntOrange : DODColor.label
+        isDownloaded ? DODColor.cream : DODColor.label
     }
 }

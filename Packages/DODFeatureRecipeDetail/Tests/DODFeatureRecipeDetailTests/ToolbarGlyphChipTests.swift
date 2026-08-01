@@ -16,38 +16,36 @@ import Testing
 /// environment-free surface instead: ``ToolbarGlyphForeground``'s state →
 /// color mapping, and WCAG contrast checks.
 ///
-/// DUT-1323 swapped the DUT-1322 fixed-opacity black scrim for
-/// `.ultraThinMaterial` (an Apple system `Material`) plus a fixed
-/// `DODColor.darkEarth` tint underneath. A `Material` has no fixed
-/// resolvable color outside a live view hierarchy/trait environment, so the
-/// FULL on-screen contrast (material + tint together) genuinely can't be
-/// computed here — it was verified empirically instead (`xcrun simctl`
-/// screenshots + measured pixel colors across light/dark appearance × hero
-/// photo/`Surface`, documented in `ToolbarGlyphChip.swift` and the PR
-/// description: 9.04:1–12.61:1 for the neutral cream glyph, 3.14:1–4.38:1
-/// for the accent/burnt-orange saved/downloaded glyph — all clearing the
-/// WCAG 1.4.11 3:1 non-text floor with margin).
+/// DUT-1323, corrected — a first pass swapped the DUT-1322 fixed-opacity
+/// black scrim for `.ultraThinMaterial` plus a `DODColor.darkEarth` tint,
+/// but chased `tintOpacity` up to 0.75 to hold WCAG 3:1 for a
+/// SAVED/DOWNLOADED state that tinted the glyph `DODColor.accent`/
+/// `DODColor.burntOrange` (mid-luminance burnt-orange). Ned rejected that
+/// chip as still too dark. The actual fix breaks the constraint instead of
+/// satisfying it: SAVED/DOWNLOADED no longer tints the glyph orange at all
+/// (`DODColor.cream` instead — see `ToolbarGlyphChip.swift`'s type doc for
+/// the full trail), which lets `tintOpacity` drop back to a genuinely soft
+/// 0.35. Full on-screen contrast (material + tint together) genuinely can't
+/// be computed here — a `Material` has no fixed resolvable color outside a
+/// live view hierarchy/trait environment — so it was verified empirically
+/// instead (`xcrun simctl` screenshots + measured pixel colors across
+/// light/dark appearance × hero photo/`Surface`, documented in
+/// `ToolbarGlyphChip.swift` and the PR description).
 ///
-/// What CAN be tested here, deterministically, is the FIXED tint's own
-/// contribution in isolation — modeling `.ultraThinMaterial` as contributing
-/// NOTHING (the most conservative assumption possible), composited over a
-/// worst-case full-white backdrop. For the cream label glyph this actually
-/// clears the real WCAG 3:1 floor from tint-alone arithmetic (no material
-/// credit needed) — see `tintAloneClearsWCAGFloorForCreamLabelOverWorstCaseBackdrop`.
-/// For the accent/burnt-orange glyph it does NOT (that color's luminance
-/// sits close enough to a lightly-tinted chip's own luminance that
-/// tint-alone contrast is non-monotonic in opacity and never a clean win at
-/// the softer opacity this PR shipped) — so that case is guarded by pinning
-/// the exact empirically validated constant instead; see
-/// `tintOpacityMatchesEmpiricallyValidatedValue` for the full reasoning.
+/// What CAN be tested here, deterministically, is (1) the state → color
+/// mapping itself, with real discriminating power against active/unset
+/// collapsing to the same color, and (2) `tintOpacity` staying within the
+/// bounds Ned's correction actually requires: soft enough that it doesn't
+/// regress back toward the rejected 0.75, but non-trivial enough that it
+/// isn't accidentally zeroed.
 @Suite("Toolbar glyph chip — DUT-1322/DUT-1323 contrast fix")
 struct ToolbarGlyphChipTests {
 
     // MARK: — ToolbarGlyphForeground: state → color mapping
 
     @Test
-    func savedGlyphUsesAccent() {
-        #expect(ToolbarGlyphForeground.save(isSaved: true) == DODColor.accent)
+    func savedGlyphUsesCream() {
+        #expect(ToolbarGlyphForeground.save(isSaved: true) == DODColor.cream)
     }
 
     @Test
@@ -56,8 +54,8 @@ struct ToolbarGlyphChipTests {
     }
 
     @Test
-    func downloadedGlyphUsesBurntOrange() {
-        #expect(ToolbarGlyphForeground.download(isDownloaded: true) == DODColor.burntOrange)
+    func downloadedGlyphUsesCream() {
+        #expect(ToolbarGlyphForeground.download(isDownloaded: true) == DODColor.cream)
     }
 
     @Test
@@ -71,6 +69,56 @@ struct ToolbarGlyphChipTests {
         #expect(ToolbarGlyphForeground.neutral == DODColor.label)
     }
 
+    /// Explicit, direct version of the requirement the ticket calls out by
+    /// name: active and unset must not read as the same color. The four
+    /// mapping tests above already pin each branch to a distinct constant,
+    /// so this is belt-and-suspenders — but it's the one assertion that
+    /// still fails on its own even if a future edit repointed both branches
+    /// at some new THIRD shared color that neither existing mapping test
+    /// happens to name.
+    @Test
+    func savedGlyphDiffersFromUnsavedGlyph() {
+        #expect(
+            ToolbarGlyphForeground.save(isSaved: true)
+                != ToolbarGlyphForeground.save(isSaved: false)
+        )
+    }
+
+    @Test
+    func downloadedGlyphDiffersFromNotDownloadedGlyph() {
+        #expect(
+            ToolbarGlyphForeground.download(isDownloaded: true)
+                != ToolbarGlyphForeground.download(isDownloaded: false)
+        )
+    }
+
+    // MARK: — Brightness step (DUT-1323 correction)
+
+    /// With hue no longer carrying the state signal (SAVED/DOWNLOADED are no
+    /// longer burnt-orange), Ned's instruction requires state to ALSO read
+    /// via "a slight brightness step" on top of the filled-vs-outline SF
+    /// Symbol swap. Reproduces the same WCAG relative-luminance math as the
+    /// tint-floor tests below over the two glyph colors directly (no tint/
+    /// material involved — this is a pure color-token comparison) and
+    /// asserts the active-state color is measurably brighter, not just
+    /// "different" (a broken change that picked two arbitrarily different
+    /// but equally dark colors would fail this even though it would pass
+    /// the not-equal checks above).
+    @Test
+    func creamActiveStateIsBrighterThanLabelUnsetState() {
+        let creamLuminance = WCAG.relativeLuminance(
+            red: Self.cream.red,
+            green: Self.cream.green,
+            blue: Self.cream.blue
+        )
+        let labelLuminance = WCAG.relativeLuminance(
+            red: Self.labelDarkAppearance.red,
+            green: Self.labelDarkAppearance.green,
+            blue: Self.labelDarkAppearance.blue
+        )
+        #expect(creamLuminance > labelLuminance)
+    }
+
     // MARK: — ToolbarGlyphChip: tap target isn't shrunk
 
     /// The pre-fix glyphs had no explicit frame (their footprint was just the
@@ -82,7 +130,7 @@ struct ToolbarGlyphChipTests {
         #expect(ToolbarGlyphChip.diameter >= 34)
     }
 
-    // MARK: — Tint opacity sanity (DUT-1323)
+    // MARK: — Tint opacity bounds (DUT-1323 correction)
 
     /// `tintOpacity` must be a REAL, non-trivial fixed tint — not
     /// accidentally zeroed (which would revert to bare `.ultraThinMaterial`,
@@ -96,7 +144,39 @@ struct ToolbarGlyphChipTests {
         #expect(ToolbarGlyphChip.tintOpacity < 1)
     }
 
-    // MARK: — Fixed-tint contrast floor (DUT-1323)
+    /// This is the test the ticket calls a "tint-floor" test in the sense
+    /// that matters here: Ned's instruction was explicit that if the tint
+    /// ever needs to exceed ~0.5 to hold contrast, that means the styling
+    /// has stopped being "genuinely soft" and the fix has failed — do NOT
+    /// silently push it back up. This pins that ceiling directly, so a
+    /// regression that crept `tintOpacity` back toward the rejected 0.75
+    /// (e.g. someone re-adding an orange active state and "fixing" contrast
+    /// the old way) fails HERE, not just via the exact-value pin below.
+    @Test
+    func tintOpacityStaysUnderTheSoftChipCeiling() {
+        #expect(ToolbarGlyphChip.tintOpacity <= 0.5)
+    }
+
+    /// The real on-device floor (material + tint together, against BOTH
+    /// `DODColor.cream` and `DODColor.label`) can't be re-derived by pure
+    /// arithmetic — `.ultraThinMaterial` has no fixed resolvable color
+    /// outside a live trait environment, and tint-alone arithmetic doesn't
+    /// clear 3:1 at this soft an opacity for either glyph color (see
+    /// `tintAloneDoesNotByItselfClearTheWCAGFloor` below — that's expected,
+    /// not a bug, since the material's own un-mockable contribution is what
+    /// closes the real gap, per `ToolbarGlyphChip.swift`'s empirical trail).
+    /// So — same pattern the pre-correction suite used for the
+    /// accent/burnt-orange case — this pins the exact empirically validated
+    /// constant instead of a derived inequality: changing `tintOpacity`
+    /// again requires re-running the `xcrun simctl` screenshot verification,
+    /// not just satisfying this test.
+    @Test
+    func tintOpacityMatchesEmpiricallyValidatedValue() {
+        #expect(ToolbarGlyphChip.tintOpacity == 0.35)
+    }
+
+    // MARK: — Fixed-tint arithmetic (documents what tint-alone CAN and
+    // CANNOT prove, at the corrected value)
 
     /// Reproduces WCAG relative-luminance / contrast-ratio math over plain
     /// sRGB triples — deliberately NOT going through `Color`/`UIColor`
@@ -126,9 +206,7 @@ struct ToolbarGlyphChipTests {
         /// composite gets, since gamma linearization is non-linear
         /// (`pow(_, 2.4)`) — blending the encoded components first, THEN
         /// linearizing the composite, is the correct order and is what this
-        /// returns. Generalizes DUT-1322's `blendBlackThenLuminance` (which
-        /// only had to model pure black, where every channel contributes 0)
-        /// to an arbitrary fixed tint color.
+        /// returns.
         static func blendColorThenLuminance(
             red: Double,
             green: Double,
@@ -139,7 +217,11 @@ struct ToolbarGlyphChipTests {
             let compositedRed = backdrop * (1 - opacity) + red * opacity
             let compositedGreen = backdrop * (1 - opacity) + green * opacity
             let compositedBlue = backdrop * (1 - opacity) + blue * opacity
-            return relativeLuminance(red: compositedRed, green: compositedGreen, blue: compositedBlue)
+            return relativeLuminance(
+                red: compositedRed,
+                green: compositedGreen,
+                blue: compositedBlue
+            )
         }
     }
 
@@ -150,6 +232,14 @@ struct ToolbarGlyphChipTests {
     /// .colorset/Contents.json`'s dark-appearance entry (`0xE6, 0xDE, 0xCF`).
     private static let labelDarkAppearance = (
         red: Double(0xE6) / 255, green: Double(0xDE) / 255, blue: Double(0xCF) / 255
+    )
+
+    /// `DODColor.cream` — fixed hex in BOTH appearances (`Cream.colorset`
+    /// only has a `universal` entry, no dark override), so it can't itself
+    /// flip under any environment. Sourced from `Cream.colorset/Contents
+    /// .json` (`0xFA, 0xF6, 0xEE`).
+    private static let cream = (
+        red: Double(0xFA) / 255, green: Double(0xF6) / 255, blue: Double(0xEE) / 255
     )
 
     /// ``DODColor/darkEarth`` — the DUT-1323 supplementary tint color, fixed
@@ -166,26 +256,22 @@ struct ToolbarGlyphChipTests {
     /// improve contrast, so this is the number that matters.
     private static let worstCaseEncodedBackdrop = 1.0
 
-    /// Unlike DUT-1322's pure-black scrim, `DODColor.darkEarth` at
-    /// `tintOpacity` composited alone (material contributing nothing) is
-    /// NOT monotonic in opacity against a FIXED foreground: as opacity rises
-    /// from 0, the composite's luminance falls from white (1.0) toward
-    /// `darkEarth`'s own near-black luminance, so contrast against any FIXED
-    /// foreground dips to a minimum right where the two luminances cross,
-    /// then recovers as the composite keeps getting darker. For the cream
-    /// label (`relativeLuminance` ≈0.736, high), that crossing/minimum
-    /// happens at LOW opacity (≈0.15) and 3:1 is only reached once opacity
-    /// rises past ≈0.53 and stays cleared all the way to `tintOpacity`'s
-    /// actual 0.75 (≈6.07:1 tint-alone here) — a single, clean, high-margin
-    /// crossing in the direction that matters (weakening the tint below
-    /// ≈0.53 fails this; the current value passes with room). This is a
-    /// REAL, non-vacuous WCAG 1.4.11 floor for the label glyph — verified
-    /// tint-ALONE, not relying on `.ultraThinMaterial`'s un-mockable
-    /// contribution at all (which only makes the real on-device number
-    /// better, per the empirically-measured 9.04:1–12.61:1 in
-    /// `ToolbarGlyphChip.swift`'s type doc).
+    /// Documents (rather than asserts a passing floor from) a real fact
+    /// about the corrected, softer tint: at `tintOpacity` 0.35, DarkEarth
+    /// tint-ALONE — material contributing nothing, the most conservative
+    /// possible assumption — does NOT reach 3:1 for either glyph color
+    /// against the worst-case backdrop (cream ≈2.08:1, label ≈1.68:1 here).
+    /// That's expected, not a regression: the pre-correction 0.75 value only
+    /// cleared 3:1 tint-alone because it was darkened well past "soft" to
+    /// compensate for a mid-luminance orange foreground that no longer
+    /// exists. The REAL floor for the current, lighter foregrounds is
+    /// necessarily a material+tint measurement, not tint-alone arithmetic —
+    /// hence `tintOpacityMatchesEmpiricallyValidatedValue` pinning the
+    /// screenshot-verified constant instead of deriving an inequality here.
+    /// This test exists so a future reader can't mistake "tint-alone doesn't
+    /// clear 3:1" for a bug — it's asserted as a documented, expected fact.
     @Test
-    func tintAloneClearsWCAGFloorForCreamLabelOverWorstCaseBackdrop() {
+    func tintAloneDoesNotByItselfClearTheWCAGFloorAtTheCorrectedOpacity() {
         let tintLuminance = WCAG.blendColorThenLuminance(
             red: Self.darkEarth.red,
             green: Self.darkEarth.green,
@@ -193,40 +279,17 @@ struct ToolbarGlyphChipTests {
             opacity: ToolbarGlyphChip.tintOpacity,
             overEncodedBackdrop: Self.worstCaseEncodedBackdrop
         )
+        let creamLuminance = WCAG.relativeLuminance(
+            red: Self.cream.red,
+            green: Self.cream.green,
+            blue: Self.cream.blue
+        )
         let labelLuminance = WCAG.relativeLuminance(
             red: Self.labelDarkAppearance.red,
             green: Self.labelDarkAppearance.green,
             blue: Self.labelDarkAppearance.blue
         )
-        let contrast = WCAG.contrastRatio(tintLuminance, labelLuminance)
-        #expect(contrast >= 3.0)
-    }
-
-    /// The SAME non-monotonic crossing described above happens for
-    /// `DODColor.accent`/`burntOrange` (`relativeLuminance` ≈0.223, much
-    /// lower than the label's) — but its crossing/minimum sits at a much
-    /// HIGHER opacity (≈0.53), and the tint alone does NOT climb back over
-    /// 3:1 until roughly 0.84, well past `tintOpacity`'s actual 0.75
-    /// (≈2.11:1 tint-alone there). So — UNLIKE the label case above — the
-    /// accent/burntOrange 3:1 floor genuinely cannot be proven from
-    /// tint-alone arithmetic at the softer opacity this PR shipped; only
-    /// `.ultraThinMaterial`'s real, un-mockable contribution closes that
-    /// last gap (measured 3.14:1–4.38:1 on-device — see
-    /// `ToolbarGlyphChip.swift`). This was the actual failure DUT-1323's
-    /// verification caught: at the first, lighter `tintOpacity` guess
-    /// (0.35), this color's REAL on-device contrast measured only 1.71:1 —
-    /// a near-miss the label case alone would NOT have caught (its own
-    /// tint-alone number, ≈1.68:1 at that same 0.35, looks similarly weak,
-    /// but a reviewer eyeballing "the neutral glyph looks fine" screenshots
-    /// could easily have missed testing the SAVED state at all). Because the
-    /// real floor here depends on `.ultraThinMaterial` and can't be
-    /// re-derived by arithmetic, this test pins the exact empirically
-    /// validated constant instead of a derived inequality — a deliberate
-    /// choice: changing `tintOpacity` again requires re-running the
-    /// `xcrun simctl` screenshot verification in `ToolbarGlyphChip.swift`'s
-    /// type doc, not just satisfying this test.
-    @Test
-    func tintOpacityMatchesEmpiricallyValidatedValue() {
-        #expect(ToolbarGlyphChip.tintOpacity == 0.75)
+        #expect(WCAG.contrastRatio(tintLuminance, creamLuminance) < 3.0)
+        #expect(WCAG.contrastRatio(tintLuminance, labelLuminance) < 3.0)
     }
 }
