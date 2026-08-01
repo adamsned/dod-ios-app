@@ -2,6 +2,10 @@ import DODDesignSystem
 import DODDomain
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 // The recipe-detail top-bar actions + the bottom Snackbar, split out of
 // `RecipeDetailView.swift` to keep that file under the SwiftLint 400-line
 // `file_length` + 250-line `type_body_length` caps (DUT-534 added the
@@ -70,79 +74,99 @@ extension RecipeDetailView {
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
 
-                // DUT-889 — iOS parity twin of Android's DUT-886 "Share as
-                // Text". A bare `ShareLink` can only carry one payload, so
-                // the URL-only share (unchanged behavior) and the new
-                // formatted plain-text share now live behind a `Menu` on
-                // the same toolbar glyph rather than adding a 6th icon.
-                // Each option gets its own `simultaneousGesture` so the
-                // haptic + `didShare()` telemetry still fires regardless of
-                // which format the user picked.
-                Menu {
-                    ShareLink(item: viewModel.canonicalURL) {
-                        Label("Share Link", systemImage: "link")
-                    }
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            shareTapCount += 1  // fires the `.sensoryFeedback` tick on the body
-                            Task { await viewModel.didShare() }
-                        }
-                    )
-
-                    if let recipe = viewModel.recipe {
-                        // Fix: share the SCALED (+ metric-converted when "Use
-                        // Metric Units" is on) ingredient lines, matching what's
-                        // on screen and what "Add to Shopping List" already
-                        // shares (DUT-639) — not the raw source-servings /
-                        // imperial text the recipe was fetched with.
-                        ShareLink(
-                            item: Self.shareAsTextPayload(
-                                recipe: recipe,
-                                servingsScaleFactor: viewModel.servingsScaleFactor,
-                                useMetricUnits: useMetricUnits
-                            )
-                        ) {
-                            Label("Share as Text", systemImage: "doc.plaintext")
-                        }
-                        .simultaneousGesture(
-                            TapGesture().onEnded {
-                                shareTapCount += 1
-                                Task { await viewModel.didShare() }
-                            }
-                        )
-                    }
+                // DUT-1324 — the Share glyph opens the full iOS share sheet with a
+                // custom print-ready recipe PDF (see `RecipePDFRenderer`): Print,
+                // AirDrop, Messages, Mail, contacts, and any share extension. This
+                // replaces the old two-option `Menu` (Share Link / Share as Text).
+                // The PDF is built at tap time (it needs the hero image + the
+                // on-screen scaled/converted recipe), so a `Button` prepares it and
+                // drives a `.sheet` on the body rather than an upfront `ShareLink`.
+                #if os(iOS)
+                Button {
+                    Task { await prepareRecipePDFShare() }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         // DUT-1322 — see the Save button above.
                         .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
                 }
+                .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Share recipe")
+                #else
+                // macOS `swift test` slice: no UIKit share sheet — keep a plain
+                // URL ShareLink so the toolbar still compiles cross-platform.
+                ShareLink(item: viewModel.canonicalURL) {
+                    Image(systemName: "square.and.arrow.up")
+                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
+                }
+                .accessibilityLabel("Share recipe")
+                #endif
             }
         }
     }
 
-    // MARK: - Share as Text
+    // MARK: - Share as PDF (DUT-1324)
 
-    /// Build the "Share as Text" payload: the recipe rewritten through the
-    /// same SCALED (+ metric-converted when `useMetricUnits` is on) ingredient
-    /// pipeline the ingredients list, Cook Mode, and "Add to Shopping List"
-    /// already share (DUT-639), so what gets shared matches what's on screen
-    /// rather than the recipe's raw source-servings / imperial text.
-    ///
-    /// `static` and free of view state so it's directly unit-testable without
-    /// standing up a live `RecipeDetailView` hierarchy.
-    static func shareAsTextPayload(
+    #if os(iOS)
+    /// Build the print-ready recipe PDF and present the iOS share sheet over it.
+    /// Runs at tap time because it needs the hero image (fetched) and the
+    /// on-screen SCALED (+ metric-converted) recipe, matching what's displayed —
+    /// the same pipeline "Add to Shopping List" / "Share as Text" used (DUT-639).
+    func prepareRecipePDFShare() async {
+        guard let recipe = viewModel.recipe else { return }
+        shareTapCount += 1  // fires the `.sensoryFeedback` tick on the body
+        await viewModel.didShare()
+
+        let heroImage = await Self.loadShareImage(recipe.heroImageLargeURL ?? recipe.heroImage)
+        let data = Self.recipePDFData(
+            recipe: recipe,
+            servingsScaleFactor: viewModel.servingsScaleFactor,
+            useMetricUnits: useMetricUnits,
+            heroImage: heroImage,
+            logo: DODBrandAsset.logoBadge
+        )
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(Self.pdfFilename(for: recipe))
+        do {
+            try data.write(to: fileURL, options: .atomic)
+            sharePDF = SharePDFItem(url: fileURL)
+        } catch {
+            // Best-effort: temp dir is writable in practice; if not, no sheet.
+        }
+    }
+
+    /// Pure PDF bytes for a recipe at the current servings/units. `static` +
+    /// view-state-free so it's unit-testable without a live view.
+    static func recipePDFData(
         recipe: Recipe,
         servingsScaleFactor: Double,
-        useMetricUnits: Bool
-    ) -> String {
+        useMetricUnits: Bool,
+        heroImage: UIImage?,
+        logo: UIImage?
+    ) -> Data {
         let scaled = RecipeDetailViewModel.scaledRecipe(
             recipe,
             by: servingsScaleFactor,
             useMetric: useMetricUnits
         )
-        return RecipeShareTextFormatter.format(recipe: scaled)
+        return RecipePDFRenderer().pdfData(recipe: scaled, heroImage: heroImage, logo: logo)
     }
+
+    /// Fetch the hero image for the PDF. Hits the shared `URLCache` that
+    /// `ReliableImage` already populated for the on-screen hero, so it's usually
+    /// instant; returns `nil` (header degrades) on any failure.
+    static func loadShareImage(_ url: URL?) async -> UIImage? {
+        guard let url else { return nil }
+        guard let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }
+        return UIImage(data: data)
+    }
+
+    /// A tidy, share-friendly file name (the recipe slug), so the share sheet
+    /// and the recipient see e.g. "dutch-oven-pot-roast.pdf".
+    static func pdfFilename(for recipe: Recipe) -> String {
+        let base = recipe.slug.isEmpty ? "recipe" : recipe.slug
+        return "\(base).pdf"
+    }
+    #endif
 
     // MARK: - Add to Shopping List (DUT-535)
 

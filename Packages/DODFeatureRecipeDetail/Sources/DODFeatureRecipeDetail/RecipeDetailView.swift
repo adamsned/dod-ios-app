@@ -119,6 +119,12 @@ public struct RecipeDetailView: View {
     /// `RecipeDetailView+Toolbar.swift` extension can present it.
     @State var recipeForShoppingListSheet: SheetRecipe?
 
+    /// DUT-1324 — the generated recipe PDF whose iOS share sheet is presented.
+    /// Non-nil drives the `.sheet(item:)`; set by the toolbar Share button after
+    /// the PDF is built. `internal` so the `RecipeDetailView+Toolbar.swift`
+    /// extension can set it.
+    @State var sharePDF: SharePDFItem?
+
     public init(
         viewModel: RecipeDetailViewModel,
         onSelectRelated: @escaping (RecipeListItem) -> Void,
@@ -183,6 +189,13 @@ public struct RecipeDetailView: View {
                 viewModel.showAddToShoppingListSnackbar(for: result)
             }
         }
+        #if os(iOS)
+        // DUT-1324 — the full iOS share sheet over the generated recipe PDF,
+        // presented once the toolbar Share button has built the file.
+        .sheet(item: $sharePDF) { item in
+            ShareSheet(items: [item.url])
+        }
+        #endif
         .task {
             await viewModel.onAppear()
             isOfflineSnapshot = await viewModel.isOffline
