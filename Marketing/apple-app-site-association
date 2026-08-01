@@ -1,0 +1,21 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.dutchovendaddy.DODApp",
+        "paths": [
+          "NOT /wp-admin/*",
+          "NOT /wp-login.php",
+          "NOT /wp-json/*",
+          "NOT /category/*",
+          "NOT /tag/*",
+          "NOT /author/*",
+          "NOT /feed/*",
+          "NOT /.well-known/*",
+          "/*"
+        ]
+      }
+    ]
+  }
+}
