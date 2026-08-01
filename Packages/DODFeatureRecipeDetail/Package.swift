@@ -48,6 +48,11 @@ let package = Package(
                 "DODFeatureRecipeDetail",
                 "DODAnalytics",
                 "DODCookActivity",
+                // DUT-1322 — the toolbar glyph contrast tests assert directly
+                // against the real `DODColor.accent` / `.label` / `.burntOrange`
+                // tokens (rather than re-declaring their hex values), so the
+                // test target needs the module those live in.
+                "DODDesignSystem",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             ],
             resources: [.process("__Snapshots__")]
