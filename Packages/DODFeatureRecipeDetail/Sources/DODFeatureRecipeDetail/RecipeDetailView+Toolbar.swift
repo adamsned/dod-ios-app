@@ -71,44 +71,45 @@ extension RecipeDetailView {
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
 
-                // DUT-889 — iOS parity twin of Android's DUT-886 "Share as
-                // Text". A bare `ShareLink` can only carry one payload, so
-                // the URL-only share (unchanged behavior) and the new
-                // formatted plain-text share now live behind a `Menu` on
-                // the same toolbar glyph rather than adding a 6th icon.
-                // Each option gets its own `simultaneousGesture` so the
-                // haptic + `didShare()` telemetry still fires regardless of
-                // which format the user picked.
-                Menu {
-                    ShareLink(item: viewModel.canonicalURL) {
-                        Label("Share Link", systemImage: "link")
-                    }
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            shareTapCount += 1  // fires the `.sensoryFeedback` tick on the body
-                            Task { await viewModel.didShare() }
-                        }
-                    )
-
-                    if let recipe = viewModel.recipe {
-                        ShareLink(item: RecipeShareTextFormatter.format(recipe: recipe)) {
-                            Label("Share as Text", systemImage: "doc.plaintext")
-                        }
-                        .simultaneousGesture(
-                            TapGesture().onEnded {
-                                shareTapCount += 1
-                                Task { await viewModel.didShare() }
-                            }
-                        )
-                    }
-                } label: {
+                // Tapping Share opens Apple's full share sheet directly (was a
+                // `Menu` offering "Share Link" / "Share as Text"). One tap now
+                // presents the system sheet carrying the formatted recipe —
+                // title, ingredients, numbered steps, and the canonical URL — so
+                // the user can Print the instructions, or send the whole recipe
+                // to any contact or service (Messages, Mail, Notes, third-party
+                // apps), with the link included. Before the recipe finishes
+                // loading (rare, transient) it falls back to the URL alone. The
+                // `simultaneousGesture` keeps the share haptic (via the body's
+                // `.sensoryFeedback` on `shareTapCount`) + `didShare()` telemetry
+                // firing on tap. v1/v2 parity: the identical change lands on main.
+                ShareLink(item: recipeShareText) {
                     Image(systemName: "square.and.arrow.up")
                         .foregroundStyle(DODColor.label)
                         .shadow(color: .black.opacity(0.35), radius: 3)
                 }
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        shareTapCount += 1
+                        Task { await viewModel.didShare() }
+                    }
+                )
                 .accessibilityLabel("Share recipe")
             }
         }
+    }
+
+    // MARK: - Share payload
+
+    /// The single item handed to the Share sheet. Once the recipe is loaded this
+    /// is the full formatted recipe (title, ingredients, numbered steps, and the
+    /// canonical URL) so Print carries the instructions and any messaging /
+    /// service target gets the whole recipe plus the link. Before load (rare,
+    /// transient) it falls back to the canonical URL string so Share still works.
+    var recipeShareText: String {
+        if let recipe = viewModel.recipe {
+            return RecipeShareTextFormatter.format(recipe: recipe)
+        }
+        return viewModel.canonicalURL.absoluteString
     }
 
     // MARK: - Add to Shopping List (DUT-535)
