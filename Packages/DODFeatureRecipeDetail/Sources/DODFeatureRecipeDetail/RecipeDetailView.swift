@@ -193,7 +193,7 @@ public struct RecipeDetailView: View {
         // DUT-1324 — the full iOS share sheet over the generated recipe PDF,
         // presented once the toolbar Share button has built the file.
         .sheet(item: $sharePDF) { item in
-            ShareSheet(items: [item.url])
+            ShareSheet(items: [item.pdfURL, LinkActivityItemSource(item.linkURL)])
         }
         #endif
         .task {

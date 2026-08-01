@@ -128,7 +128,7 @@ extension RecipeDetailView {
             .appendingPathComponent(Self.pdfFilename(for: recipe))
         do {
             try data.write(to: fileURL, options: .atomic)
-            sharePDF = SharePDFItem(url: fileURL)
+            sharePDF = SharePDFItem(pdfURL: fileURL, linkURL: recipe.canonicalURL)
         } catch {
             // Best-effort: temp dir is writable in practice; if not, no sheet.
         }
