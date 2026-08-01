@@ -224,6 +224,18 @@ struct RootView: View {
             else { return }
             handle(intent: .openRecipe(id: id))
         }
+        // DUT-1325 — Universal Links. A tapped dutchovendaddy.com link (from
+        // Messages, Mail, social, a newsletter) arrives here as a browsing-web
+        // activity carrying the https URL. Reuse `openRecipeLink`, which resolves
+        // a `/<slug>/` permalink to its post and routes it in-app, and falls back
+        // to the system browser for any non-recipe / off-site URL. Inert until
+        // the Associated Domains entitlement is provisioned AND the site serves
+        // the apple-app-site-association file (see the entitlements file + the
+        // Marketing/universal-links runbook).
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            guard let url = activity.webpageURL else { return }
+            Task { @MainActor in _ = await openRecipeLink(url) }
+        }
         .onChange(of: scenePhase) {
             reindexSpotlightOnForeground($1)
             // DUT-480 — a Control Center tap set `openAppWhenRun`, so it

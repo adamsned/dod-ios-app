@@ -58,5 +58,32 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!--
+	  Associated Domains — Universal Links (DUT-1325). Lets a tapped
+	  dutchovendaddy.com link open in the app (on the matching recipe/article)
+	  instead of Safari. `applinks:` covers both the apex and www host because
+	  DOD serves the site on both; iOS fetches each host's
+	  apple-app-site-association (AASA) file to verify the association.
+
+	  HARD PREREQUISITES (same shape as aps-environment / applesignin above),
+	  BOTH required before this actually routes a link:
+	    1. The App ID com.dutchovendaddy.DODApp must have the "Associated
+	       Domains" capability enabled in the Apple Developer portal and the
+	       provisioning profile regenerated — automatic signing cannot provision
+	       `applinks` for an App ID that lacks the capability.
+	    2. The site must serve the AASA file over HTTPS (no redirect) at
+	       https://dutchovendaddy.com/.well-known/apple-app-site-association AND
+	       the www host, listing "<TEAM_ID>.com.dutchovendaddy.DODApp". See
+	       Marketing/universal-links.md for the file + WordPress runbook.
+
+	  Simulator (Debug) builds are unsigned and strip entitlements, so Universal
+	  Links can't be exercised on the sim — this needs a signed device build with
+	  both prerequisites live.
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:dutchovendaddy.com</string>
+		<string>applinks:www.dutchovendaddy.com</string>
+	</array>
 </dict>
 </plist>
