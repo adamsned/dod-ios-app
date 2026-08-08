@@ -1,6 +1,10 @@
 import DODDomain
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+#endif
+
 /// Horizontal page-flip between recipes, the way you'd thumb through a magazine:
 /// open a recipe from the feed and swipe left/right to land on the next/previous
 /// one in the feed's order. No label, no setting — it's just how the detail
@@ -58,13 +62,41 @@ public struct RecipeDetailPager<Page: View>: View {
             // signposted, and dots would sit over the recipe content.
             .tabViewStyle(.page(indexDisplayMode: .never))
             // Let the pages bleed under the status bar so the immersive blur
-            // header survives the pager: a `.page` TabView otherwise insets each
-            // page by the top safe area (its pages then read a 0 top inset and
-            // can't reach the top). Ignoring `.top` here restores that room; the
-            // pages get the real inset via `topInset` above. Only `.top` — the
-            // bottom keeps its safe-area padding, matching the single-recipe view.
+            // header survives the pager. Only `.top` — the bottom keeps its
+            // safe-area padding, matching the single-recipe view.
             .ignoresSafeArea(.container, edges: .top)
+            // Clear the NavigationStack bar's background. SwiftUI's
+            // `.toolbarBackground(.hidden)` can't reach the bar from inside a
+            // `.page` TabView (the toolbar ITEMS come from the pages), so the bar
+            // stayed opaque — a solid band behind the status bar, and it reserved
+            // its height so the hero couldn't reach the top. This finds the real
+            // `UINavigationBar` and makes it transparent, matching the
+            // single-recipe view; the hero + blur then show through to the top.
+            .background(TransparentNavBar())
             #endif
         }
     }
 }
+
+#if os(iOS)
+/// Forces the enclosing `NavigationStack`'s `UINavigationBar` transparent.
+/// Needed because `.toolbarBackground(.hidden)` doesn't propagate to the bar
+/// from inside a `.page` `TabView` (see the call site). Applied via a
+/// zero-footprint representable that reaches its `navigationController`.
+private struct TransparentNavBar: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Proxy { Proxy() }
+    func updateUIViewController(_ controller: Proxy, context: Context) {}
+
+    final class Proxy: UIViewController {
+        override func didMove(toParent parent: UIViewController?) {
+            super.didMove(toParent: parent)
+            guard let bar = navigationController?.navigationBar else { return }
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithTransparentBackground()
+            bar.standardAppearance = appearance
+            bar.scrollEdgeAppearance = appearance
+            bar.compactAppearance = appearance
+        }
+    }
+}
+#endif
