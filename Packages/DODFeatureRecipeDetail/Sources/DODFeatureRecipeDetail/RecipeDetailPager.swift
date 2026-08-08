@@ -24,14 +24,14 @@ public struct RecipeDetailPager<Page: View>: View {
 
     private let items: [RecipeListItem]
     private let startIndex: Int
-    private let page: (_ item: RecipeListItem, _ isStart: Bool) -> Page
+    private let page: (_ item: RecipeListItem, _ isStart: Bool, _ topInset: CGFloat) -> Page
 
     @State private var selection: Int
 
     public init(
         items: [RecipeListItem],
         startIndex: Int,
-        @ViewBuilder page: @escaping (_ item: RecipeListItem, _ isStart: Bool) -> Page
+        @ViewBuilder page: @escaping (_ item: RecipeListItem, _ isStart: Bool, _ topInset: CGFloat) -> Page
     ) {
         self.items = items
         // Clamp defensively: a stale start id resolves to the first page rather
@@ -42,16 +42,29 @@ public struct RecipeDetailPager<Page: View>: View {
     }
 
     public var body: some View {
-        TabView(selection: $selection) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                page(item, index == startIndex)
-                    .tag(index)
+        // Read the real top safe-area inset HERE, outside the TabView — the pages
+        // can't read their own (see below) — and hand it to each page so the
+        // full-bleed hero's blur band sizes correctly.
+        GeometryReader { geo in
+            let topInset = geo.safeAreaInsets.top
+            TabView(selection: $selection) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    page(item, index == startIndex, topInset)
+                        .tag(index)
+                }
             }
+            #if os(iOS)
+            // `.never` — no page dots. The swipe is meant to be felt, not
+            // signposted, and dots would sit over the recipe content.
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            // Let the pages bleed under the status bar so the immersive blur
+            // header survives the pager: a `.page` TabView otherwise insets each
+            // page by the top safe area (its pages then read a 0 top inset and
+            // can't reach the top). Ignoring `.top` here restores that room; the
+            // pages get the real inset via `topInset` above. Only `.top` — the
+            // bottom keeps its safe-area padding, matching the single-recipe view.
+            .ignoresSafeArea(.container, edges: .top)
+            #endif
         }
-        #if os(iOS)
-        // `.never` — no page dots. The swipe is meant to be felt, not signposted,
-        // and dots would sit over the recipe content.
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        #endif
     }
 }

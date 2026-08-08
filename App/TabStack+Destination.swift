@@ -79,10 +79,11 @@ extension TabStack {
         push: @escaping (RecipeRoute) -> Void
     ) -> some View {
         let startIndex = items.firstIndex { $0.id == startID } ?? 0
-        RecipeDetailPager(items: items, startIndex: startIndex) { pageItem, isStart in
+        RecipeDetailPager(items: items, startIndex: startIndex) { pageItem, isStart, topInset in
             recipeDetailView(
                 item: pageItem,
                 autoStartCookMode: isStart && autoStartCookMode,
+                topInsetOverride: topInset,
                 push: push
             )
         }
@@ -95,6 +96,9 @@ extension TabStack {
     private func recipeDetailView(
         item: RecipeListItem,
         autoStartCookMode: Bool,
+        // Supplied by the swipe pager (the real top inset it read outside its
+        // TabView); `nil` for a single-recipe push, which reads its own.
+        topInsetOverride: CGFloat? = nil,
         push: @escaping (RecipeRoute) -> Void
     ) -> some View {
         let canonical =
@@ -122,7 +126,8 @@ extension TabStack {
             // as a sheet over the full-screen cover (a tab switch would be
             // invisible beneath it).
             openHeatCoach: openHeatCoach,
-            heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) }
+            heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) },
+            topInsetOverride: topInsetOverride
         )
         .onAppear {
             Telemetry.shared.send(.screenView(name: "recipe_detail"))

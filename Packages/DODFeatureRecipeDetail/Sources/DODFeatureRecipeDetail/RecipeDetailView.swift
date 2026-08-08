@@ -102,6 +102,14 @@ public struct RecipeDetailView: View {
     /// (previews / unwired hosts) hides the Cook Mode shortcut.
     public let heatCoachSheet: (() -> AnyView)?
 
+    /// The top safe-area inset used to size the full-bleed hero's blur band.
+    /// `nil` (the single-recipe push) reads the real inset from `readyBody`'s
+    /// GeometryReader, as before. ``RecipeDetailPager`` supplies it explicitly
+    /// because a `.page` `TabView` zeroes its pages' own safe-area insets — so
+    /// the pager reads the inset once, outside the TabView, and passes it down;
+    /// the immersive header then survives the swipe wrapper unchanged.
+    public let topInsetOverride: CGFloat?
+
     /// DUT-535 — the recipe whose ingredient-selection sheet is presented.
     /// Non-nil drives the `.sheet(item:)`; set when the toolbar `cart.badge.plus`
     /// is tapped, cleared on dismiss. `internal` (not `private`) so the
@@ -118,7 +126,8 @@ public struct RecipeDetailView: View {
         openShoppingList: (() -> Void)? = nil,
         addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)? = nil,
         openHeatCoach: ((HeatCoachSeed?) -> Void)? = nil,
-        heatCoachSheet: (() -> AnyView)? = nil
+        heatCoachSheet: (() -> AnyView)? = nil,
+        topInsetOverride: CGFloat? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         _pendingAutoCookMode = State(initialValue: autoStartCookMode)
@@ -127,6 +136,7 @@ public struct RecipeDetailView: View {
         self.addToShoppingListSheet = addToShoppingListSheet
         self.openHeatCoach = openHeatCoach
         self.heatCoachSheet = heatCoachSheet
+        self.topInsetOverride = topInsetOverride
     }
 
     public var body: some View {
@@ -233,7 +243,10 @@ public struct RecipeDetailView: View {
         // passes it into `RecipeDetailHero`.
         GeometryReader { geo in
             let twoUp = geo.size.width >= 1000
-            let topInset = geo.safeAreaInsets.top
+            // `topInsetOverride` wins when the pager supplied it (a `.page`
+            // TabView zeroes this GeometryReader's own top inset); otherwise the
+            // single-recipe push reads the real inset here, unchanged.
+            let topInset = topInsetOverride ?? geo.safeAreaInsets.top
             ScrollViewReader { proxy in
                 ScrollView {
                     // DUT-573 / CL-313 + DUT-631 — iterated editorial order:
