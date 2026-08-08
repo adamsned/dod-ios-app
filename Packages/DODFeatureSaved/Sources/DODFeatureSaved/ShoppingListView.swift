@@ -87,6 +87,13 @@ public struct ShoppingListView: View {
                     build(from: selected)
                 }
             }
+            // v2 on-device AI — the ingredient-substitution result sheet, bound
+            // to the view model's substitution state (loading → loaded / notFound).
+            .sheet(isPresented: substitutionSheetBinding) {
+                SubstitutionSheet(state: viewModel.substitution) {
+                    viewModel.dismissSubstitution()
+                }
+            }
             // DUT-488 — confirm before wiping a persisted list. Destructive
             // role tints the button red; the list clears + persists empty on
             // confirm (survives close/reopen).
@@ -152,6 +159,15 @@ public struct ShoppingListView: View {
             .sensoryFeedback(trigger: viewModel.visibleItems.count) { old, new in
                 new < old ? .impact : nil
             }
+    }
+
+    /// v2 on-device AI — presents the substitution sheet whenever the view
+    /// model's substitution state is not `.idle`; the dismiss path resets it.
+    private var substitutionSheetBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.substitution != .idle },
+            set: { if !$0 { viewModel.dismissSubstitution() } }
+        )
     }
 
     /// DUT-487 — subtle progress overlay shown while ``build(from:)`` hydrates
@@ -313,6 +329,12 @@ public struct ShoppingListView: View {
                                 withAnimation(reduceMotion ? nil : .default) {
                                     viewModel.markAlreadyHave(item)
                                 }
+                            },
+                            // v2 on-device AI — offer "Substitute" only when a
+                            // usable model is present (no dead affordance).
+                            showSubstitute: viewModel.isSubstitutionAvailable,
+                            onSubstitute: {
+                                Task { await viewModel.requestSubstitution(for: item) }
                             }
                         )
                     }
