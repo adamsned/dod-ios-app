@@ -13,28 +13,14 @@ public struct DODScreenHeader<Trailing: View>: View {
 
     private let title: String
     private let trailing: Trailing
-    /// US-43 Phase c (T-712) — when true, the ``DODBrandMark`` emblem (44pt) sits
-    /// on the leading edge of the header row, before the section title, as the
-    /// masthead. A single clean row: emblem + "Recipes & Articles" title +
-    /// trailing actions. Defaults `false` so every other tab's header (and its
-    /// L4 baseline) renders byte-identical; only the Feed opts in.
-    private let showsBrandMark: Bool
 
-    public init(_ title: String, showsBrandMark: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+    public init(_ title: String, @ViewBuilder trailing: () -> Trailing) {
         self.title = title
-        self.showsBrandMark = showsBrandMark
         self.trailing = trailing()
     }
 
     public var body: some View {
         HStack(alignment: .center, spacing: DODSpacing.sm) {
-            if showsBrandMark {
-                // 44pt so the mark reads as an intentional element beside the
-                // large title (the too-small 32pt first cut looked cramped), with
-                // a little extra trailing air before the title.
-                DODBrandMark(size: 44)
-                    .padding(.trailing, DODSpacing.xxs)
-            }
             titleText
             trailing
         }
@@ -58,8 +44,8 @@ public struct DODScreenHeader<Trailing: View>: View {
 
 extension DODScreenHeader where Trailing == EmptyView {
     /// Title-only header (Search, Settings, Saved) — no trailing button.
-    public init(_ title: String, showsBrandMark: Bool = false) {
-        self.init(title, showsBrandMark: showsBrandMark) { EmptyView() }
+    public init(_ title: String) {
+        self.init(title) { EmptyView() }
     }
 }
 
@@ -90,12 +76,8 @@ extension View {
 
 #Preview("Header") {
     VStack(spacing: 0) {
-        // Magazine masthead (US-43 Phase c): emblem + wordmark above the title.
-        DODScreenHeader("Recipes & Articles", showsBrandMark: true) {
-            Image(systemName: "magnifyingglass").foregroundStyle(DODColor.burntOrange)
-        }
         DODScreenHeader("Recipes & Articles") {
-            Image(systemName: "frying.pan.fill").foregroundStyle(DODColor.burntOrange)
+            Image(systemName: "magnifyingglass").foregroundStyle(DODColor.burntOrange)
         }
         DODScreenHeader("Search")
     }

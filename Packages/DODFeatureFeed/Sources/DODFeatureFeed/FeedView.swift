@@ -121,9 +121,7 @@ public struct FeedView: View {
                 // (CL-306) — the trailing slot now hosts the Settings gear (the
                 // old Cooking Tools menu + its onboarding callout are retired; the
                 // tools moved to the first-class Cooking Tools hub tab).
-                // US-43 Phase c (T-712) — the brand-mark masthead is the header
-                // now that the Classic/Magazine register has been retired.
-                DODScreenHeader("Recipes & Articles", showsBrandMark: true) {
+                DODScreenHeader("Recipes & Articles") {
                     headerTrailing
                 }
                 content
