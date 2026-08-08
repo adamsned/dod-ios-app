@@ -227,10 +227,10 @@ struct TabStack: View {
                 // DUT — a pick made after the hub's Cook Mode "Find a Recipe"
                 // (which armed the flag) opens already in Cook Mode; a plain Feed
                 // browse leaves it false. One-shot: disarm as we consume it.
-                onSelect: { item in
+                onSelect: { item, items in
                     let armed = cookModeFindRecipeArmed
                     if armed { cookModeFindRecipeArmed = false }
-                    path.append(Self.recipeRoute(for: item, cookModeArmed: armed))
+                    path.append(Self.feedRecipeRoute(for: item, in: items, cookModeArmed: armed))
                 },
                 onSave: { item, report in
                     Task {
