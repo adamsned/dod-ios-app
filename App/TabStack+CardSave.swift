@@ -58,6 +58,23 @@ extension TabStack {
         .recipe(item: item, autoStartCookMode: cookModeArmed)
     }
 
+    /// The route for a tap in the FEED: a `.recipeSeries` carrying the feed's
+    /// ordered `items` so the detail screen can swipe left/right through them
+    /// (magazine-style). Degrades to a plain `.recipe` when there's nothing to
+    /// page through — a single-item context (Surprise Me hands `[item]`) or an
+    /// item somehow absent from the list. Pure, so the "list → series, single →
+    /// recipe" rule is unit-testable without a SwiftUI host.
+    static func feedRecipeRoute(
+        for item: RecipeListItem,
+        in items: [RecipeListItem],
+        cookModeArmed: Bool
+    ) -> RecipeRoute {
+        guard items.count > 1, items.contains(where: { $0.id == item.id }) else {
+            return .recipe(item: item, autoStartCookMode: cookModeArmed)
+        }
+        return .recipeSeries(items: items, startID: item.id, autoStartCookMode: cookModeArmed)
+    }
+
     static func listItem(from recipe: Recipe) -> RecipeListItem {
         RecipeListItem(
             id: recipe.id,

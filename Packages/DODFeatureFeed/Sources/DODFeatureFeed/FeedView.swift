@@ -25,7 +25,11 @@ public struct FeedView: View {
     /// 2-column grid byte-for-byte for users who never tap the toggle.
     @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
         RecipeListLayout.gallery.rawValue
-    public let onSelect: (RecipeListItem) -> Void
+    /// Tap-to-open. The second argument is the ORDERED list the tap came from
+    /// (the feed's current items), so the host can open the recipe inside a
+    /// left/right swipe pager over that list. Surprise Me passes just `[item]`
+    /// (a one-recipe context — nothing to page through).
+    public let onSelect: (RecipeListItem, [RecipeListItem]) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
     /// here means the context menu still appears but the Save button is a
@@ -92,7 +96,7 @@ public struct FeedView: View {
 
     public init(
         viewModel: FeedViewModel,
-        onSelect: @escaping (RecipeListItem) -> Void,
+        onSelect: @escaping (RecipeListItem, [RecipeListItem]) -> Void,
         onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         openShoppingList: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
