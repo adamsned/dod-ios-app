@@ -146,6 +146,8 @@ _(Graduated 2026-05-29 as **US-40 amendment / CL-109 / T-720 + T-721**. **T-720 
 
 #### Cast iron photo scanner → walks user through cleaning steps
 
+_(**On-device AI path graduated 2026-07-17 as US-54 / CL-327..CL-331 / T-930..T-934 / DUT-1126.** This entry's architecture-decision tree named on-device **Apple FoundationModels** the "best privacy (no image leaves device)" path; that path is now the constitution-blessed approach for the app's AI affordances — recipe/article summary, shopping-list ingredient substitution, and a text Cooking Tools helper — via a docs-only constitution amendment (§13 owner-approval gate) templated on the CloudKit precedent. The **cloud-LLM** variant stays explicitly out of scope as a separate future §9 amendment, exactly as the "Constitution conflict on the v2 cloud-LLM path" open question below asked. **Still open in backlog:** the camera/Vision cast-iron **scanner** itself (the photo-→-condition classification + the Vision rect-detection hybrid v1 + the CoreML classifier XL path) — US-54 shipped the on-device **text** LLM capability, not the camera scanner.)_
+
 **New feature request from dad**, observed from the real-device install. The pitch: open the camera, point at a piece of cast iron (rusty, seasoned, sticky, whatever), and the app diagnoses its condition + walks through cleaning + re-seasoning steps. Plays to DOD's brand — "Cast Iron Living" is on the icon — and turns the app from a recipe reader into a cast-iron care companion. Could be the single biggest "why this app exists" moment for a user who just inherited their grandfather's skillet.
 
 **The architecture decision tree:**
