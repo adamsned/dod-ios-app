@@ -21,11 +21,6 @@ public struct RecipeCard: View {
     /// `title` are tinted in the brand accent; nil (every non-search host) keeps
     /// the plain `Text(title)` render byte-for-byte.
     public let highlightQuery: String?
-    /// US-43 Phase b (T-711) — the compositional register. `.classic` (the
-    /// default) keeps every existing host + L4 baseline byte-identical; only the
-    /// Feed passes the resolved (default `.magazine`) variant, so the magazine
-    /// treatment stays behind ``DODFeed/layoutVariantStorageKey``.
-    public let variant: DODFeed.LayoutVariant
 
     public init(
         title: String,
@@ -33,8 +28,7 @@ public struct RecipeCard: View {
         heroImageURL: URL?,
         totalTimeDisplay: String? = nil,
         highlightQuery: String? = nil,
-        isDownloaded: Bool = false,
-        variant: DODFeed.LayoutVariant = .classic
+        isDownloaded: Bool = false
     ) {
         self.title = title
         self.excerpt = excerpt
@@ -42,7 +36,6 @@ public struct RecipeCard: View {
         self.totalTimeDisplay = totalTimeDisplay
         self.highlightQuery = highlightQuery
         self.isDownloaded = isDownloaded
-        self.variant = variant
     }
 
     public var body: some View {
@@ -65,11 +58,10 @@ public struct RecipeCard: View {
     /// Button wrapper).
     public var combinedAccessibilityLabel: String { accessibilityLabel }
 
-    /// Hero photo + its corner overlays. The 140pt fixed-height crop is the same
-    /// for every variant (the magazine register restyles the title + surface, not
-    /// the gallery hero aspect — the 16:9 landscape hero was dropped after the
-    /// first-cut review). The badges are alignment overlays so the time chip
-    /// (top-trailing) never collides with the "Downloaded" badge (bottom-leading).
+    /// Hero photo + its corner overlays. The 140pt fixed-height crop keeps every
+    /// gallery card a uniform size. The badges are alignment overlays so the time
+    /// chip (top-trailing) never collides with the "Downloaded" badge
+    /// (bottom-leading).
     private var heroSection: some View {
         heroImage
             .accessibilityHidden(true)

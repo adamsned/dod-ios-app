@@ -79,8 +79,11 @@ import UIKit
 
     @Test func oledFlagLeavesLightTraitOnAssetValue() {
         DODColor.isOLEDDark = true
-        // Light surface is the asset's `#FFFFFF` — the OLED swap is dark-only.
-        #expect(rgb(DODColor.surface, light) == [0xFF, 0xFF, 0xFF])
+        // Light surface is the asset's warm cream `#F2F1EC` — the OLED swap is
+        // dark-only. (This asserted `#FFFFFF` when it shipped, which never held:
+        // the DOD light background has always been the cream, not white. The
+        // suite could not compile, so the wrong expectation went unnoticed.)
+        #expect(rgb(DODColor.surface, light) == [0xF2, 0xF1, 0xEC])
     }
 
     @Test func flagOffKeepsAssetDarkValue() {

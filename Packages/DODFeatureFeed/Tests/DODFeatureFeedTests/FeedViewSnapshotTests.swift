@@ -221,7 +221,7 @@ private struct FeedStatefulHost: View {
 
     var body: some View {
         NavigationStack {
-            FeedView(viewModel: viewModel, onSelect: { _ in })
+            FeedView(viewModel: viewModel, onSelect: { _, _ in })
         }
     }
 }

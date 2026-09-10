@@ -8,6 +8,13 @@ enum RecipeRoute: Hashable {
     /// without an extra user tap. Defaulted to `false` for the normal
     /// list-tap path.
     case recipe(item: RecipeListItem, autoStartCookMode: Bool = false)
+    /// A recipe opened from an ORDERED list (the feed), carrying that list so the
+    /// detail screen can page left/right through it. `startID` is the tapped
+    /// recipe's id — the page to open on. Identity is keyed on `startID` (like
+    /// `.recipe`'s id-keyed equality below), NOT the whole `items` array, so the
+    /// same tap re-arriving de-dupes on the NavigationStack; the array rides
+    /// along as payload the destination reads but equality ignores.
+    case recipeSeries(items: [RecipeListItem], startID: Int, autoStartCookMode: Bool = false)
     case category(DODDomain.Category)
 
     // DUT-617 — identity is keyed on the recipe **id** (+ `autoStartCookMode`)
@@ -22,6 +29,10 @@ enum RecipeRoute: Hashable {
         switch (lhs, rhs) {
         case (.recipe(let lItem, let lAuto), .recipe(let rItem, let rAuto)):
             return lItem.id == rItem.id && lAuto == rAuto
+        case (.recipeSeries(_, let lStart, let lAuto), .recipeSeries(_, let rStart, let rAuto)):
+            // Identity is the opened page + cook-mode flag; the `items` payload
+            // is deliberately not compared (see the case doc).
+            return lStart == rStart && lAuto == rAuto
         case (.category(let lCategory), .category(let rCategory)):
             // DUT-658 — key category identity on `id` only, mirroring the
             // `.recipe` narrowing above. The whole `Category` includes a volatile
@@ -39,6 +50,10 @@ enum RecipeRoute: Hashable {
         case .recipe(let item, let autoStartCookMode):
             hasher.combine(0)
             hasher.combine(item.id)
+            hasher.combine(autoStartCookMode)
+        case .recipeSeries(_, let startID, let autoStartCookMode):
+            hasher.combine(2)
+            hasher.combine(startID)
             hasher.combine(autoStartCookMode)
         case .category(let category):
             hasher.combine(1)

@@ -7,17 +7,9 @@ import SwiftUI
 public struct FeedRow: View {
 
     public let item: RecipeListItem
-    /// US-43 Phase b (T-711) — the compositional register forwarded to
-    /// `RecipeCard`. Defaults `.classic` so any existing caller / preview is
-    /// byte-identical; `FeedView` passes the resolved (default `.magazine`) value.
-    public let variant: DODFeed.LayoutVariant
 
-    public init(
-        item: RecipeListItem,
-        variant: DODFeed.LayoutVariant = .classic
-    ) {
+    public init(item: RecipeListItem) {
         self.item = item
-        self.variant = variant
     }
 
     public var body: some View {
@@ -30,8 +22,7 @@ public struct FeedRow: View {
         RecipeCard(
             title: item.title,
             excerpt: item.excerpt,
-            heroImageURL: item.heroImage,
-            variant: variant
+            heroImageURL: item.heroImage
         )
     }
 }

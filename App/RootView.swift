@@ -211,15 +211,10 @@ struct RootView: View {
                 handle(intent: intent)
             }
         }
-        .onContinueUserActivity(CSSearchableItemActionType) { activity in
-            guard
-                let identifier = activity.userInfo?[
-                    CSSearchableItemActivityIdentifier
-                ] as? String,
-                let id = identifier.split(separator: ".").last.flatMap({ Int($0) })
-            else { return }
-            handle(intent: .openRecipe(id: id))
-        }
+        .onContinueUserActivity(CSSearchableItemActionType) { handleSpotlightActivity($0) }
+        // DUT-1325 — Universal Links: a tapped dutchovendaddy.com link routes
+        // in-app (see `handleUniversalLink` in RootView+LinkRouting).
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { handleUniversalLink($0) }
         .onChange(of: scenePhase) {
             reindexSpotlightOnForeground($1)
             // DUT-480 — a Control Center tap set `openAppWhenRun`, so it
