@@ -27,11 +27,10 @@ extension RecipeDetailView {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
                         // v2 animation refresh — clean fill↔outline symbol swap
-                        // on save/unsave (Reduce Motion → instant)...
+                        // on save/unsave (Reduce Motion → instant). No bounce here:
+                        // on the most-tapped glyph it read as jarring, so Save keeps
+                        // just the quiet crossfade.
                         .dodSymbolReplace(reduceMotion: reduceMotion)
-                        // ...plus a celebratory upward bounce as it fills, so a
-                        // save *feels* like the recipe is being tucked away.
-                        .dodSymbolBounce(on: viewModel.isSaved, direction: .up, reduceMotion: reduceMotion)
                         // DUT-572 / CL-312 — glyph shadow so state colors survive
                         // over the full-bleed hero photo (mirrors the title shadow).
                         .shadow(color: .black.opacity(0.35), radius: 3)
