@@ -69,7 +69,7 @@ public struct RecipeCard: View {
                 case .success(let image):
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .scaledToFill()
                 case .failure:
                     Image(systemName: "photo")
                         .font(.system(size: 40))

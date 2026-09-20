@@ -117,7 +117,7 @@ extension RecipeCard {
                 case .success(let image):
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .scaledToFill()
                 case .failure:
                     Image(systemName: "photo")
                         .foregroundStyle(DODColor.labelSecondary)
