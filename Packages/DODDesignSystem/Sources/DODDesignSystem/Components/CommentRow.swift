@@ -137,7 +137,7 @@ public struct CommentRow: View {
                 case .success(let image):
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .scaledToFill()
                 case .empty, .failure:
                     fallbackAvatar
                 @unknown default:
@@ -153,7 +153,7 @@ public struct CommentRow: View {
     private var fallbackAvatar: some View {
         Image(systemName: "person.crop.circle.fill")
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .foregroundStyle(DODColor.labelSecondary)
             .frame(width: 40, height: 40)
     }

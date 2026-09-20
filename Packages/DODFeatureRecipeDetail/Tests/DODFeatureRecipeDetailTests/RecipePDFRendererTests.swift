@@ -53,7 +53,9 @@ struct RecipePDFRendererTests {
 
     @Test func producesValidPDFBytes() {
         let data = RecipePDFRenderer().pdfData(
-            recipe: recipe(ingredients: 5, steps: 4), heroImage: nil, logo: nil
+            recipe: recipe(ingredients: 5, steps: 4),
+            heroImage: nil,
+            logo: nil
         )
         #expect(!data.isEmpty)
         // Every PDF starts with the "%PDF" magic header.
@@ -63,7 +65,9 @@ struct RecipePDFRendererTests {
 
     @Test func shortRecipeIsSinglePage() {
         let data = RecipePDFRenderer().pdfData(
-            recipe: recipe(ingredients: 4, steps: 3), heroImage: nil, logo: nil
+            recipe: recipe(ingredients: 4, steps: 3),
+            heroImage: nil,
+            logo: nil
         )
         #expect(pageCount(data) == 1)
     }
@@ -71,7 +75,9 @@ struct RecipePDFRendererTests {
     @Test func longRecipePaginates() {
         // Far more content than one US Letter page holds — must not clip.
         let data = RecipePDFRenderer().pdfData(
-            recipe: recipe(ingredients: 40, steps: 40), heroImage: nil, logo: nil
+            recipe: recipe(ingredients: 40, steps: 40),
+            heroImage: nil,
+            logo: nil
         )
         #expect(pageCount(data) >= 2)
     }
@@ -84,7 +90,9 @@ struct RecipePDFRendererTests {
             ctx.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
         }
         let data = RecipePDFRenderer().pdfData(
-            recipe: recipe(ingredients: 5, steps: 4), heroImage: dot, logo: dot
+            recipe: recipe(ingredients: 5, steps: 4),
+            heroImage: dot,
+            logo: dot
         )
         #expect(pageCount(data) >= 1)
     }
