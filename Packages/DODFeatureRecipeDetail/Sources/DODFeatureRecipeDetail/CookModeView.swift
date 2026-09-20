@@ -278,7 +278,7 @@ public struct CookModeView: View {
             ReliableImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
+                    image.resizable().scaledToFill()
                 case .failure:
                     // DUT-524 — neutral static placeholder instead of the
                     // infinite skeleton shimmer when the hero can't load.
