@@ -8,12 +8,14 @@ import Testing
 @Suite("Cook Mode voice speed control")
 struct CookModeVoiceSpeedTests {
     // MARK: - Speed up tests
-    @Test func speedUpFromDefaultAdvancesTo1_25x() {
+    // Speed list reworked to a podcast/audiobook range (0.75 · 1.0 · 1.1 · 1.25
+    // · 1.5): the first step up from 1× is now 1.1×, and the top is 1.5×.
+    @Test func speedUpFromDefaultAdvancesTo1_1x() {
         let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 1)
         #expect(viewModel.voiceSpeedMultiplier == 1.0)
 
         viewModel.speedUp()
-        #expect(viewModel.voiceSpeedMultiplier == 1.25)
+        #expect(viewModel.voiceSpeedMultiplier == 1.1)
     }
 
     @Test func speedUpMultipleTimesStaysAtMax() {
@@ -23,7 +25,7 @@ struct CookModeVoiceSpeedTests {
         for _ in 0..<8 {
             viewModel.speedUp()
         }
-        #expect(viewModel.voiceSpeedMultiplier == 2.0)
+        #expect(viewModel.voiceSpeedMultiplier == 1.5)
     }
 
     // MARK: - Slow down tests
@@ -42,7 +44,7 @@ struct CookModeVoiceSpeedTests {
         for _ in 0..<8 {
             viewModel.slowDown()
         }
-        #expect(viewModel.voiceSpeedMultiplier == 0.5)
+        #expect(viewModel.voiceSpeedMultiplier == 0.75)
     }
 
     // MARK: - Round-trip speed control
