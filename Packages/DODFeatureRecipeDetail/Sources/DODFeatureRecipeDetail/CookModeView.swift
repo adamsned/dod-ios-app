@@ -133,43 +133,59 @@ public struct CookModeView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            cookModeHeader
-            ScrollView {
-                VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                    heroBlock
-                    stepBody
+        // GeometryReader reads the real top safe-area inset here (the immersive
+        // `CookModeHero` ignores safe area so can't read its own) and passes it
+        // in, mirroring `RecipeDetailView`.
+        GeometryReader { geo in
+            let topInset = geo.safeAreaInsets.top
+            ZStack(alignment: .top) {
+                VStack(spacing: 0) {
+                    // Immersive full-bleed hero (blur strip + overlaid title)
+                    // replaces the old title bar + inset card, reclaiming the
+                    // header height for the step text. `.ignoresSafeArea(top)` lets
+                    // the hero sit under the floating controls; only the TOP is
+                    // ignored so the player + counter still clear the home
+                    // indicator.
+                    if viewModel.isFinished {
+                        // Done: hero pinned, celebratory card centered in the
+                        // space above the controls (Spacers, no scroll needed).
+                        VStack(spacing: 0) {
+                            heroView(topInset: topInset)
+                            Spacer(minLength: 0)
+                            stepBody
+                            Spacer(minLength: 0)
+                        }
+                        .ignoresSafeArea(.container, edges: .top)
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                                heroView(topInset: topInset)
+                                stepBody
+                            }
+                            .padding(.bottom, DODSpacing.md)
+                        }
+                        .ignoresSafeArea(.container, edges: .top)
+                        // DUT-596/599 — a tap in the collapsed step area brings the
+                        // controls back; a no-op while expanded so it never fights
+                        // reading.
+                        .contentShape(Rectangle())
+                        .onTapGesture { if !controlsExpanded { wakeControls() } }
+                    }
+                    // DUT-596 — the auto-minimizing player panel + the progress
+                    // footer (bar + counter, which becomes the star on Done).
+                    playerPanel
+                    CookModeStepIndicator(viewModel: viewModel)
+                        .padding(.bottom, DODSpacing.xs)
                 }
-                .padding(.top, DODSpacing.sm)
-                .padding(.bottom, DODSpacing.md)
+                // Floating back + ingredients controls over the hero's blur strip.
+                cookModeTopBar()
             }
-            // DUT-596/599 — tapping the step area while the controls are
-            // collapsed brings them back (one easy tap). While expanded a tap is
-            // a no-op so it never fights reading. `contentShape` so the tap lands
-            // on the whole scroll region; a tap-only gesture that leaves
-            // scrolling alone.
-            .contentShape(Rectangle())
-            .onTapGesture { if !controlsExpanded { wakeControls() } }
-            // DUT-599 — scrolling DOWN the step hides the controls (more room to
-            // read); scrolling back UP pops them right back. `onScrollGeometryChange`
-            // is iOS 18+/macOS 15+, so the modifier guards both `#if os(iOS)` and
-            // `if #available(iOS 18)` (the package deploys below both) and no-ops
-            // gracefully on older OSes — the idle timer + grabber still work.
-            .modifier(
-                StepScrollHideModifier { oldOffset, newOffset in
-                    handleStepScroll(from: oldOffset, to: newOffset)
-                }
-            )
-            // DUT-596 (was DUT-582 / CL-315) — the auto-minimizing player panel:
-            // the transport collapses (after an idle delay, a scroll-down, or a
-            // tap on the grabber) so more step text shows; the grabber toggles it
-            // back and mini prev/next arrows keep navigation available while
-            // collapsed.
-            playerPanel
-            CookModeStepIndicator(viewModel: viewModel)
-                .padding(.bottom, DODSpacing.xs)
+            // The whole Cook Mode surface uses `surface` — the SAME token the
+            // player panel + the rest of the app use — so it reads as one uniform
+            // color per appearance (Flour #F2F1EC, Cocoa #1B140E, Seasoned Cast
+            // Iron OLED #000000), not the old mismatched `surfaceWarm` panel.
+            .background(DODColor.surface.ignoresSafeArea())
         }
-        .background(DODColor.surface.ignoresSafeArea())
         .gesture(swipeGesture)
         .sheet(isPresented: $ingredientsDrawerVisible) {
             ingredientsDrawer
@@ -256,49 +272,22 @@ public struct CookModeView: View {
         reduceMotion ? nil : .easeInOut(duration: 0.2)
     }
 
-    // MARK: - Header (AC-7.2 step counter, AC-7.6 Done exit, DUT-325 layout)
+    // MARK: - Header + hero
     //
-    // `cookModeHeader` (the slim Done + voice-controls top row plus the recipe
-    // name with the step counter directly beneath it) and the voice-controls
-    // cluster live in `CookModeView+Header.swift` so this file stays under the
-    // SwiftLint `file_length` cap.
+    // The floating back + ingredients controls (`cookModeTopBar`) live in
+    // `CookModeView+Header.swift`, and the immersive full-bleed hero is
+    // `CookModeHero.swift` — both keep this file under the SwiftLint `file_length`
+    // cap. (The old inset "album art" `heroBlock` + separate title bar were
+    // replaced by the immersive hero, per the Cook Mode redesign.)
 
-    // MARK: - Hero (AC-7.2)
-
-    /// DUT-582 (CL-315) — the "album art": the recipe hero, taller (~340pt) and
-    /// rounded (`DODRadius.standard`), shown on every step. No bottom gradient
-    /// now that the step text lives below the image rather than over it.
-    private let heroHeight: CGFloat = 340
-
-    @ViewBuilder
-    private var heroBlock: some View {
-        if let url = viewModel.recipe.heroImageLargeURL ?? viewModel.recipe.heroImage {
-            // T-839 — reliable cached loader (ReliableImage), not AsyncImage,
-            // so the Cook Mode hero doesn't stick on the skeleton.
-            ReliableImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
-                case .failure:
-                    // DUT-524 — neutral static placeholder instead of the
-                    // infinite skeleton shimmer when the hero can't load.
-                    DODColor.surfaceElevated
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .overlay(
-                            Image(systemName: "fork.knife")
-                                .font(.system(size: 40))
-                                .foregroundStyle(DODColor.labelSecondary)
-                        )
-                case .empty:
-                    LoadingSkeleton(cornerRadius: DODRadius.standard)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: heroHeight)
-            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
-            .padding(.horizontal, DODSpacing.md)
-            .accessibilityHidden(true)
-        }
+    /// The immersive hero, shared by the scrolling step layout and the centered
+    /// Done layout.
+    private func heroView(topInset: CGFloat) -> some View {
+        CookModeHero(
+            url: viewModel.recipe.heroImageLargeURL ?? viewModel.recipe.heroImage,
+            title: viewModel.recipe.title,
+            topInset: topInset
+        )
     }
 
     // MARK: - Ingredients drawer (AC-7.2, AC-7.5)

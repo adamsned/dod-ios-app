@@ -1,72 +1,75 @@
 import DODDesignSystem
 import SwiftUI
 
-/// Cook Mode header (DUT-325, redesigned DUT-582 / CL-315) — extracted from
-/// `CookModeView.swift` so that file stays under the SwiftLint `file_length` cap.
+/// Cook Mode's floating top controls (redesigned) — the back control and the
+/// ingredients button, overlaid on the immersive ``CookModeHero``'s blur strip
+/// rather than sitting in a separate title bar.
 ///
-/// DUT-582 layout: a **minimal** top bar — a back control (`chevron.backward`)
-/// on the leading edge, the recipe title small and centered, nothing else. The
-/// voice/replay/speed controls moved into the player transport bar
-/// (`CookModePlayerControls`) and the step counter moved to the bottom paged
-/// indicator (`CookModeStepIndicator`), so this row is now just "get me out"
-/// plus a quiet title — like the top of a now-playing screen.
+/// The title itself now lives ON the hero photo (see ``CookModeHero``), so this
+/// row is just the two glyph buttons. They float in a `ZStack` above the step
+/// ScrollView (see `CookModeView.body`) so they stay pinned even as the hero
+/// scrolls away on a long step; each sits on a small circular scrim so it reads
+/// over both a bright photo and the black step area below.
 extension CookModeView {
 
-    /// The minimal Cook Mode top bar: close (leading) + a small centered title.
-    var cookModeHeader: some View {
-        ZStack {
-            Text(viewModel.recipe.title)
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                // Dynamic Type: `recipe.title` is an unbounded, WPRM-authored
-                // string (the same content DUT-527 found truncating to
-                // "Veget…" on the recipe card at large accessibility text
-                // sizes). This header keeps the single-line "now playing"
-                // layout, but — mirroring the `.minimumScaleFactor` mitigation
-                // `SidebarProfileRow` already applies to the same
-                // `DODType.heading` + `.lineLimit(1)` shape (DUT-695) — shrinks
-                // the title to fit rather than clipping it to a couple of
-                // words with no way to recover the rest.
-                .minimumScaleFactor(0.7)
-                .padding(.horizontal, 56)
-                .frame(maxWidth: .infinity)
-                .accessibilityAddTraits(.isHeader)
+    /// The floating back (leading) + ingredients (trailing) controls. They sit in
+    /// the `ZStack` (which respects the top safe area), so a small top padding
+    /// places them just under the status bar, on the hero's blur strip — no manual
+    /// safe-area inset needed (adding one double-insets them into the photo).
+    func cookModeTopBar() -> some View {
+        HStack {
+            floatingButton(
+                systemName: "chevron.backward",
+                label: "Exit Cook Mode",
+                action: { close() }
+            )
+            .accessibilityIdentifier("cook-mode-close")
 
-            HStack {
-                closeButton
-                Spacer()
-            }
+            Spacer()
+
+            // DUT-599 successor — ingredients moved off the transport's carrot
+            // button up here so the transport's play/pause can sit dead-center.
+            floatingButton(
+                systemName: "carrot.fill",
+                label: "Show ingredients",
+                action: { openIngredients() }
+            )
+            .accessibilityIdentifier("cook-mode-ingredients")
+            .accessibilityValue(
+                "\(viewModel.checkedIngredientIDs.count) of \(viewModel.recipe.ingredients.count) checked"
+            )
         }
         .padding(.horizontal, DODSpacing.md)
-        .padding(.top, DODSpacing.sm)
-        .padding(.bottom, DODSpacing.sm)
-        .frame(maxWidth: .infinity)
-        .background(DODColor.surface)
+        .padding(.top, DODSpacing.xs)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
-    /// Close (exit Cook Mode). DUT-583 — a back chevron ("go back" to the recipe
-    /// page), which reads more naturally than a downward dismiss now that Cook
-    /// Mode is a destination you navigated into.
-    private var closeButton: some View {
-        Button {
-            close()
-        } label: {
-            Image(systemName: "chevron.backward")
-                .font(.system(size: 18, weight: .semibold))
+    /// A circular glyph button for the floating hero controls, backed by Liquid
+    /// Glass so it reads over any photo. A taller transparent frame gives the
+    /// 44pt HIG tap target without enlarging the 34pt glass circle.
+    private func floatingButton(
+        systemName: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(DODColor.burntOrange)
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(width: 34, height: 34)
+                .modifier(FloatingControlGlass())
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Exit Cook Mode")
+        .accessibilityLabel(label)
     }
 
     // MARK: - Step counter (AC-7.2)
     //
-    // The "Step X of Y" copy now lives on `CookModeStepIndicator` at the bottom
-    // (DUT-582). These strings are kept for any remaining callers / tests.
+    // The "Step X of Y" copy lives on `CookModeStepIndicator` at the bottom
+    // (next to the progress bar). These strings are kept for any remaining
+    // callers / tests.
 
     var stepCounterLabel: String {
         if viewModel.isFinished { return "Done" }
@@ -76,5 +79,22 @@ extension CookModeView {
     var stepCounterAccessibilityLabel: String {
         if viewModel.isFinished { return "Cooking complete" }
         return "Step \(viewModel.currentStepIndex + 1) of \(viewModel.stepCount)"
+    }
+}
+
+/// Liquid Glass background for the floating hero controls (iOS 26+). Falls back
+/// to a translucent black scrim circle on older OSes (the package deploys below
+/// iOS 26), keeping the glyphs legible over any photo either way.
+struct FloatingControlGlass: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular, in: Circle())
+        } else {
+            content.background(Circle().fill(.black.opacity(0.35)))
+        }
+        #else
+        content.background(Circle().fill(.black.opacity(0.35)))
+        #endif
     }
 }
