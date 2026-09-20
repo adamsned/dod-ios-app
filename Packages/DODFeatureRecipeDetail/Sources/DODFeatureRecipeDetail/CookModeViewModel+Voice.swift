@@ -161,8 +161,10 @@ extension CookModeViewModel {
         return "\(text)x"
     }
 
-    /// DUT-583 — advance the voice speed one notch, wrapping from the top (2×)
-    /// back to the bottom (0.5×). Drives the single tap on the speed button.
+    /// Advance the voice speed one notch, wrapping from the top (1.5×) back to
+    /// the bottom (0.75×). The list is now a tight podcast/audiobook range, so
+    /// the wrap is a soft step rather than the old jarring 2×→0.5× jump. Drives
+    /// the single tap on the speed button.
     public func cycleVoiceSpeed() {
         let speeds = VoiceReader.speedMultipliers
         let index = speeds.firstIndex(of: voiceSpeedMultiplier) ?? speeds.firstIndex(of: 1.0) ?? 0

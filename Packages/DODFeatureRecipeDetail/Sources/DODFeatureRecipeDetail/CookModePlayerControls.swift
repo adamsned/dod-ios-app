@@ -5,23 +5,24 @@ import SwiftUI
 import UIKit
 #endif
 
-/// DUT-582 (CL-315) — Cook Mode's music/podcast-style transport bar.
+/// Cook Mode's transport — a single horizontal row, redesigned so the whole
+/// control cluster is short (one row, not two) and the play/pause button sits
+/// dead-center.
 ///
-/// A single row of circular brand-colored controls, laid out like a media
-/// player: **Previous** and **Next** flank a large center **Voice play/pause**
-/// button, with a secondary row underneath carrying **Replay** and a **speed**
-/// control (the pacing menu, surfaced as a visible affordance).
+/// Five equal-width slots, left to right: **Replay · Previous · Play/Pause ·
+/// Next · Speed**. Equal slots put the center Play button exactly under the ^
+/// grabber. Ingredients moved OUT of the transport up to the hero (see
+/// `CookModeView.cookModeTopBar`), which is what frees the center slot for Play.
+/// Only the center control is a filled circle (podcast-transport style); the
+/// side controls are plain burnt-orange glyphs.
 ///
-/// This is a pure presentation layer over ``CookModeViewModel`` — it wires the
-/// existing bindings (`goBack`/`goNext`, `togglePlayback`, `replayCurrentStep`,
-/// `cycleVoiceSpeed`/`setVoiceSpeed`) and holds no state of its own. All controls
-/// render on brand tokens (`burntOrange`/`accent`/`cream`); nothing renders grey.
+/// Pure presentation over ``CookModeViewModel`` — it wires the existing bindings
+/// (`goBack`/`goNext`, `togglePlayback`, `replayCurrentStep`, `cycleVoiceSpeed`/
+/// `setVoiceSpeed`) and holds no state.
 ///
-/// Center semantics (DUT-583): a true **play / pause / resume** control driven by
-/// `playbackState`. Idle → play glyph; tapping starts reading. Speaking → pause
-/// glyph; tapping pauses in place (no restart). Paused → play glyph; tapping
-/// resumes from where it left off. In the finished state it becomes a "Finish"
-/// affordance that closes Cook Mode.
+/// Center semantics (DUT-583): a true play / pause / resume control driven by
+/// `playbackState`; in the finished state it becomes a "Finish" checkmark that
+/// closes Cook Mode.
 struct CookModePlayerControls: View {
 
     let viewModel: CookModeViewModel
@@ -34,18 +35,11 @@ struct CookModePlayerControls: View {
     /// the host can wake the auto-minimizing control panel and re-arm the idle
     /// timer. Defaults to a no-op for previews / hosts that don't wire it.
     var onInteract: () -> Void = {}
-    /// DUT-599 — open the ingredients drawer. The ingredients access moved off
-    /// the old bottom pull tab into the `carrot.fill` button in the secondary
-    /// row. No-op default for previews.
-    var onIngredients: () -> Void = {}
 
-    /// DUT — iPad scales the transport up for the larger canvas. On iPad the
-    /// glyphs, circles, speed pill, and spacing enlarge ~1.3–1.4×; on iPhone
-    /// every size below returns the exact shipped value, so ALL iPhones render
-    /// byte-identically. Gated on the DEVICE IDIOM (not the width class) so an
-    /// iPhone Pro Max in landscape — which reports a `.regular` width class —
-    /// keeps the iPhone sizes; only genuine iPads scale up. The idiom is fixed
-    /// for the process, so reading it once here is fine.
+    /// DUT — iPad scales the transport up for the larger canvas. On iPhone every
+    /// size below returns the exact iPhone value, so all iPhones render
+    /// identically. Gated on the DEVICE IDIOM (not the width class) so an iPhone
+    /// Pro Max in landscape (`.regular` width) keeps the iPhone sizes.
     private var isPad: Bool {
         #if canImport(UIKit)
         UIDevice.current.userInterfaceIdiom == .pad
@@ -59,56 +53,64 @@ struct CookModePlayerControls: View {
     }
 
     var body: some View {
-        VStack(spacing: DODSpacing.sm) {
-            transportRow
-            secondaryRow
+        HStack(spacing: 0) {
+            slot { replayButton }
+            slot { previousButton }
+            slot { centerButton }
+            slot { nextButton }
+            slot { speedButton }
         }
-        .padding(.horizontal, DODSpacing.md)
-        .padding(.vertical, DODSpacing.sm)
+        .padding(.horizontal, DODSpacing.sm)
+        .padding(.bottom, DODSpacing.xs)
         .frame(maxWidth: .infinity)
         .background(DODColor.surface)
     }
 
-    // MARK: - Transport row (Prev / Voice play-pause / Next)
+    /// One equal-width column. Equal slots keep the center Play button aligned to
+    /// the row's center regardless of the side controls' widths.
+    private func slot<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content().frame(maxWidth: .infinity)
+    }
 
-    private var transportRow: some View {
-        HStack(spacing: transportSpacing) {
-            Spacer(minLength: 0)
-            previousButton
-            centerButton
-            nextButton
-            Spacer(minLength: 0)
+    // MARK: - Side controls (plain glyphs)
+
+    private var replayButton: some View {
+        glyphButton(symbol: "arrow.trianglehead.counterclockwise", label: "Replay step") {
+            onInteract()
+            viewModel.replayCurrentStep()
         }
+        .accessibilityIdentifier("cook-mode-replay-step")
+        .accessibilityHint("read this step aloud once")
     }
 
     @ViewBuilder
     private var previousButton: some View {
         if showsPrevious {
-            flankButton(symbol: "arrow.backward", label: "Previous Step") {
+            glyphButton(symbol: "arrow.backward", label: "Previous Step") {
                 onInteract()
                 withAnimation(stepChangeAnimation) { viewModel.goBack() }
             }
             .accessibilityIdentifier("cook-mode-previous")
         } else {
             // Reserve the slot so the center button stays centered on step 1.
-            Color.clear.frame(width: flankDiameter, height: flankDiameter)
+            Color.clear.frame(width: glyphTapTarget, height: glyphTapTarget)
         }
     }
 
     private var nextButton: some View {
-        flankButton(symbol: "arrow.forward", label: "Next Step") {
+        glyphButton(symbol: "arrow.forward", label: "Next Step") {
             onInteract()
             withAnimation(stepChangeAnimation) { viewModel.goNext() }
         }
         .accessibilityIdentifier("cook-mode-next")
         // Advancing past the last step is handled by the view model (isFinished);
-        // hide Next only once fully finished so the row collapses to Finish.
+        // hide Next once fully finished so the row reads as complete.
         .opacity(viewModel.isFinished ? 0 : 1)
         .disabled(viewModel.isFinished)
     }
 
-    /// The large center control: Voice play/pause (podcast-style), or Finish in
-    /// the done state.
+    // MARK: - Center (Play / Pause / Finish)
+
     private var centerButton: some View {
         Button(action: centerAction) {
             Image(systemName: centerSymbol)
@@ -152,49 +154,11 @@ struct CookModePlayerControls: View {
         return viewModel.isPlaying ? "pause reading this step" : "read this step aloud"
     }
 
-    // MARK: - Secondary row (Ingredients + Replay + speed)
+    // MARK: - Speed
 
-    private var secondaryRow: some View {
-        HStack(spacing: secondarySpacing) {
-            Spacer(minLength: 0)
-            ingredientsButton
-            replayButton
-            speedButton
-            Spacer(minLength: 0)
-        }
-        .opacity(viewModel.isFinished ? 0 : 1)
-        .disabled(viewModel.isFinished)
-        .accessibilityHidden(viewModel.isFinished)
-    }
-
-    /// DUT-599 — ingredients access, a `carrot.fill` to the LEFT of Replay
-    /// (replacing the old bottom pull tab). Opens the ingredients drawer.
-    private var ingredientsButton: some View {
-        secondaryButton(symbol: "carrot.fill", title: "Ingredients") {
-            onInteract()
-            onIngredients()
-        }
-        .accessibilityIdentifier("cook-mode-ingredients")
-        .accessibilityLabel("Show ingredients")
-        .accessibilityValue(
-            "\(viewModel.checkedIngredientIDs.count) of \(viewModel.recipe.ingredients.count) checked"
-        )
-    }
-
-    private var replayButton: some View {
-        secondaryButton(symbol: "arrow.trianglehead.counterclockwise", title: "Replay") {
-            onInteract()
-            viewModel.replayCurrentStep()
-        }
-        .accessibilityIdentifier("cook-mode-replay-step")
-        .accessibilityLabel("Replay step")
-        .accessibilityHint("read this step aloud once")
-    }
-
-    /// DUT-583 — the pacing control as a single "1x" pill that shows the actual
-    /// speed. A tap cycles up through the speeds and wraps from the top (2×)
-    /// back to the bottom (0.5×); a long press opens a menu to pick an exact
-    /// speed. Re-speaks when a step is actively reading (handled by the model).
+    /// DUT-583 — the pacing control as a single pill showing the actual speed. A
+    /// tap cycles up through the podcast/audiobook speeds (soft wrap at the top);
+    /// a long press opens a menu to pick an exact speed.
     private var speedButton: some View {
         Button {
             onInteract()
@@ -204,7 +168,7 @@ struct CookModePlayerControls: View {
                 .dodFont(speedFont)
                 .monospacedDigit()
                 .foregroundStyle(DODColor.accent)
-                .frame(minWidth: speedPillMinWidth, minHeight: speedPillMinHeight)
+                .frame(minWidth: speedPillMinWidth, minHeight: glyphTapTarget)
                 .contentShape(Capsule())
                 .overlay(
                     Capsule().strokeBorder(DODColor.accent.opacity(0.6), lineWidth: speedPillStroke)
@@ -235,55 +199,34 @@ struct CookModePlayerControls: View {
 
     // MARK: - Control sizing (iPad-scaled)
     //
-    // DUT — compact (iPhone) returns the exact shipped literals; regular (iPad)
-    // scales the transport glyphs + circles ~1.35–1.4×, and bumps the speed pill
-    // and row spacing proportionally. Tap targets stay >=44pt on both.
-    private var centerDiameter: CGFloat { isPad ? 100 : 72 }
-    private var flankDiameter: CGFloat { isPad ? 74 : 54 }
-    private var centerIconSize: CGFloat { isPad ? 42 : 30 }
-    private var flankIconSize: CGFloat { isPad ? 30 : 22 }
-    private var secondaryIconSize: CGFloat { isPad ? 27 : 20 }
-    private var secondaryTapTarget: CGFloat { isPad ? 56 : 44 }
-    private var speedPillMinWidth: CGFloat { isPad ? 76 : 56 }
-    private var speedPillMinHeight: CGFloat { isPad ? 56 : 44 }
+    // iPhone returns the exact literals; iPad scales the center circle + glyphs
+    // up for the larger canvas. Tap targets stay >=44pt on both.
+    private var centerDiameter: CGFloat { isPad ? 92 : 64 }
+    private var centerIconSize: CGFloat { isPad ? 40 : 27 }
+    private var glyphIconSize: CGFloat { isPad ? 30 : 24 }
+    private var glyphTapTarget: CGFloat { isPad ? 56 : 44 }
+    private var speedPillMinWidth: CGFloat { isPad ? 72 : 52 }
     private var speedPillStroke: CGFloat { isPad ? 2 : 1.5 }
     private var speedFont: Font { isPad ? DODType.displayMedium : DODType.bodyEmphasized }
-    private var transportSpacing: CGFloat { isPad ? DODSpacing.xl : DODSpacing.lg }
-    private var secondarySpacing: CGFloat { isPad ? 40 : DODSpacing.xl }
 
-    // MARK: - Reusable button shapes
+    // MARK: - Reusable side-glyph button
 
-    private func flankButton(
+    /// A plain (unfilled) burnt-orange glyph button with a >=44pt tap target,
+    /// used for Replay / Previous / Next so only the center Play reads as filled.
+    private func glyphButton(
         symbol: String,
         label: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: flankIconSize, weight: .semibold))
-                .foregroundStyle(DODColor.cream)
-                .frame(width: flankDiameter, height: flankDiameter)
-                .background(Circle().fill(DODColor.accent))
-        }
-        // v2 animation refresh — shared press spring + light haptic, so the
-        // transport circles press with the same feel as every other button.
-        .buttonStyle(.dodPressable)
-        .accessibilityLabel(label)
-    }
-
-    private func secondaryButton(
-        symbol: String,
-        title: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: secondaryIconSize, weight: .semibold))
-                .foregroundStyle(DODColor.accent)
-                .frame(minWidth: secondaryTapTarget, minHeight: secondaryTapTarget)
+                .font(.system(size: glyphIconSize, weight: .semibold))
+                .foregroundStyle(DODColor.burntOrange)
+                .frame(width: glyphTapTarget, height: glyphTapTarget)
                 .contentShape(Rectangle())
         }
         // v2 animation refresh — shared press spring + light haptic.
         .buttonStyle(.dodPressable)
+        .accessibilityLabel(label)
     }
 }

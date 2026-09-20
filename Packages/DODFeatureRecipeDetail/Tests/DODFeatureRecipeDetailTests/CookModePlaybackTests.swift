@@ -155,11 +155,12 @@ struct CookModePlaybackTests {
         #expect(viewModel.voiceSpeedLabel == "1x")
     }
 
-    /// A tap cycles up through the speeds and wraps from the top (2×) back to the
-    /// bottom (0.5×), then climbs back to 1×.
+    /// A tap cycles up through the speeds and wraps from the top (1.5×) back to
+    /// the bottom (0.75×), then climbs back to 1×. The tight podcast/audiobook
+    /// range makes the wrap a soft step, not the old 2×→0.5× jump.
     @Test func cycleVoiceSpeedAdvancesThenWraps() {
         let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 1)
-        let expected: [Double] = [1.25, 1.5, 1.75, 2.0, 0.5, 0.75, 1.0]
+        let expected: [Double] = [1.1, 1.25, 1.5, 0.75, 1.0]
         var got: [Double] = []
         for _ in expected {
             viewModel.cycleVoiceSpeed()
@@ -171,19 +172,18 @@ struct CookModePlaybackTests {
     /// The menu picks an exact speed; the label follows.
     @Test func setVoiceSpeedPicksExactValue() {
         let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 1)
-        viewModel.setVoiceSpeed(1.75)
-        #expect(viewModel.voiceSpeedMultiplier == 1.75)
-        #expect(viewModel.voiceSpeedLabel == "1.75x")
+        viewModel.setVoiceSpeed(1.1)
+        #expect(viewModel.voiceSpeedMultiplier == 1.1)
+        #expect(viewModel.voiceSpeedLabel == "1.1x")
     }
 
     /// Speed labels drop trailing zeros: whole numbers read "Nx".
     @Test func speedLabelsFormatCompactly() {
-        #expect(CookModeViewModel.speedLabel(for: 0.5) == "0.5x")
         #expect(CookModeViewModel.speedLabel(for: 0.75) == "0.75x")
         #expect(CookModeViewModel.speedLabel(for: 1.0) == "1x")
+        #expect(CookModeViewModel.speedLabel(for: 1.1) == "1.1x")
         #expect(CookModeViewModel.speedLabel(for: 1.25) == "1.25x")
         #expect(CookModeViewModel.speedLabel(for: 1.5) == "1.5x")
-        #expect(CookModeViewModel.speedLabel(for: 2.0) == "2x")
     }
 
     /// Changing speed while actively reading re-speaks the step at the new pace.
@@ -220,11 +220,12 @@ struct CookModePlaybackTests {
         #expect(viewModel.voiceSpeedLabel == "1.5x")
     }
 
-    /// The multiplier→engine-rate mapping lines the extremes up exactly with the
-    /// reader's clamped bounds (no clamping needed for the listed speeds).
+    /// The multiplier→engine-rate mapping anchors 1× at the app's calmed natural
+    /// pace and lines the list extremes up exactly with the reader's clamped
+    /// bounds (no clamping needed for the listed speeds).
     @Test func rateMappingMatchesReaderBounds() {
-        #expect(VoiceReader.rate(for: 1.0) == VoiceReader.defaultRate)
-        #expect(VoiceReader.rate(for: 2.0) == VoiceReader.maximumRate)
-        #expect(VoiceReader.rate(for: 0.5) == VoiceReader.minimumRate)
+        #expect(VoiceReader.rate(for: 1.0) == VoiceReader.naturalRate)
+        #expect(VoiceReader.rate(for: 1.5) == VoiceReader.maximumRate)
+        #expect(VoiceReader.rate(for: 0.75) == VoiceReader.minimumRate)
     }
 }
