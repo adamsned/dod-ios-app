@@ -5,20 +5,22 @@ import SwiftUI
 import UIKit
 #endif
 
-/// DUT-596 (was DUT-582 / CL-315) — Cook Mode's slim brand progress bar, shown
-/// at the bottom of the player (below the ingredients pull tab).
+/// Cook Mode's slim brand progress footer (redesigned) — a single continuous
+/// progress bar with the "Step X of Y" counter INLINE at its trailing end.
 ///
-/// A single continuous progress bar (the old per-step "page dots" are gone: they
-/// didn't scale to long recipes and read as clutter next to the transport). A
-/// `surfaceDivider` track carries a `burntOrange` fill whose width is the
-/// completion fraction, with a star glyph pinned to the trailing end — an outline
-/// `star` while cooking, becoming a filled burnt-orange `star.fill` only on the
-/// "All Done" page. Below it sits the "Step X of Y" caption ("Done" when
-/// finished). Purely presentational — reads `currentStepIndex`, `stepCount`, and
-/// `isFinished` off the view model.
+/// A `surfaceDivider` track carries a `burntOrange` fill whose width is the
+/// completion fraction. The trailing slot shows the step counter while cooking
+/// and TRANSFORMS into a filled gold star on the "All Done" page — so the star
+/// (the completion reward) lives here via a transform rather than taking a
+/// permanent slot. Purely presentational — reads `currentStepIndex`,
+/// `stepCount`, and `isFinished` off the view model.
 struct CookModeStepIndicator: View {
 
     let viewModel: CookModeViewModel
+
+    /// Constitution §7 — drop the counter→star transform animation under Reduce
+    /// Motion (the swap still happens, just without the scale/pop).
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// DUT — iPad enlarges the progress bar, star, width, and caption for the
     /// larger canvas; ALL iPhones keep the shipped sizes byte-for-byte. Gated on
@@ -32,13 +34,11 @@ struct CookModeStepIndicator: View {
         #endif
     }
 
-    /// Diameter of the trailing star glyph, and the horizontal room reserved for
-    /// it so the fill never runs under the star.
+    /// Size of the trailing gold star (Done state).
     private var starSize: CGFloat { isPad ? 24 : 18 }
 
-    /// Height of the progress track, and the max width the whole indicator claims.
+    /// Height of the progress track.
     private var barHeight: CGFloat { isPad ? 8 : 6 }
-    private var indicatorMaxWidth: CGFloat { isPad ? 420 : 280 }
     private var counterFont: Font { isPad ? DODType.detail : DODType.caption }
 
     private var progress: CookModeProgress {
@@ -50,43 +50,54 @@ struct CookModeStepIndicator: View {
     }
 
     var body: some View {
-        VStack(spacing: DODSpacing.xs) {
+        HStack(spacing: DODSpacing.sm) {
             progressBar
-            Text(progress.counterLabel)
-                .dodFont(counterFont)
-                .foregroundStyle(DODColor.labelSecondary)
-                .monospacedDigit()
+            trailingStatus
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.xs)
         .frame(maxWidth: .infinity)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: progress.isFinished)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(progress.accessibilityLabel)
     }
 
-    // MARK: - Progress bar with trailing star
-
+    /// The full-width progress track + burnt-orange fill.
     private var progressBar: some View {
         let fraction = progress.fraction
-        return HStack(spacing: DODSpacing.xs) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(DODColor.surfaceDivider)
-                    Capsule()
-                        .fill(DODColor.burntOrange)
-                        .frame(width: max(barHeight, geo.size.width * fraction))
-                }
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(DODColor.surfaceDivider)
+                Capsule()
+                    .fill(DODColor.burntOrange)
+                    .frame(width: max(barHeight, geo.size.width * fraction))
             }
-            .frame(height: barHeight)
-
-            Image(systemName: progress.isFinished ? "star.fill" : "star")
-                .font(.system(size: starSize * 0.8, weight: .semibold))
-                .foregroundStyle(progress.isFinished ? DODColor.burntOrange : DODColor.surfaceDivider)
-                .frame(width: starSize, height: starSize)
-                .accessibilityHidden(true)
         }
-        .frame(maxWidth: indicatorMaxWidth)
+        .frame(height: barHeight)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// The trailing slot: the "Step X of Y" counter while cooking, which
+    /// transforms into a filled burnt-orange star on the Done page (the star
+    /// lives here via a transform rather than taking a permanent slot). Orange
+    /// (not gold) so it matches the progress-bar fill + the rest of the transport.
+    @ViewBuilder
+    private var trailingStatus: some View {
+        if progress.isFinished {
+            Image(systemName: "star.fill")
+                .font(.system(size: starSize, weight: .semibold))
+                .foregroundStyle(DODColor.burntOrange)
+                .transition(.scale.combined(with: .opacity))
+                .accessibilityHidden(true)
+        } else {
+            Text(progress.counterLabel)
+                .dodFont(counterFont)
+                .foregroundStyle(DODColor.labelSecondary)
+                .monospacedDigit()
+                .fixedSize()
+                .transition(.opacity)
+        }
     }
 }
 
