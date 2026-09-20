@@ -121,7 +121,7 @@ struct RecipeDetailHero: View {
         ReliableImage(url: url) { phase in
             switch phase {
             case .success(let image):
-                image.resizable().aspectRatio(contentMode: .fill)
+                image.resizable().scaledToFill()
             case .failure:
                 // DUT-524 — a missing / permanently-failing hero renders a
                 // neutral static placeholder (matching the feed-card empty tile)
