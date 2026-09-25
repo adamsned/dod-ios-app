@@ -89,10 +89,6 @@ public struct FeedView: View {
     @AppStorage(DevDebug.forceShowOwnerUIKey) private var devForceShowOwnerUI = false
     /// Daddy Mode (Phase 1, cosmetic) — presents the honest compose placeholder.
     @State private var showingComposeSheet = false
-    /// v2 animation refresh — drives the search glyph's one-shot `.bounce`
-    /// symbol effect. Bumped on tap only when Reduce Motion is off, so a
-    /// Reduce-Motion user gets no bounce (the trigger never changes).
-    @State private var searchBounceTick = 0
     /// DUT-571 — persisted dismissal (a once-per-install "x" tap). `.standard`
     /// mirrors the Feed's existing `RecipeListLayout` layout-toggle store.
     @AppStorage(FeedView.firstCookoutHeroDismissedKey) var firstCookoutHeroDismissed = false
@@ -131,6 +127,12 @@ public struct FeedView: View {
                 DODScreenHeader("Recipes & Articles") {
                     headerTrailing
                 }
+                // v2 feed-search redesign — the search entry is a full-width
+                // search bar under the title (Messages-style) instead of a
+                // corner glyph. Tapping it opens the Search screen (its rich
+                // idle: categories, Try chips, Surprise Me), via the same
+                // injected `onOpenSearch` seam the old button used.
+                searchBar
                 content
             }
             // Offline shifts the whole stack below the OfflineBanner overlay.
@@ -169,56 +171,58 @@ public struct FeedView: View {
         .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
-    /// The Feed header's trailing slot. Groups the v2 Search overhaul (1/3)
-    /// magnifying-glass ``searchButton`` (which replaced the old "Surprise Me"
-    /// dice — Surprise Me moved onto the search page) with the owner-only compose
-    /// button (Daddy Mode, Phase 1) and the long-standing Settings gear in one
-    /// HStack (`DODScreenHeader`'s trailing is a single `@ViewBuilder`). The
-    /// compose button self-gates on owner status; the Settings gear opens the
-    /// Settings sheet via the injected `onOpenSettings` closure
-    /// (`RootView.showSettingsSheet`) using the shared ``DODHeaderGearButton`` so
-    /// it matches the Saved / Cooking Tools / Search headers exactly.
+    /// The Feed header's trailing slot: the owner-only compose button (Daddy
+    /// Mode, Phase 1) + the Settings gear, in one HStack (`DODScreenHeader`'s
+    /// trailing is a single `@ViewBuilder`). Search moved OFF the corner into a
+    /// full-width `searchBar` under the title (v2 feed-search redesign). The
+    /// compose button self-gates on owner status; the gear opens Settings via the
+    /// injected `onOpenSettings` closure using the shared ``DODHeaderGearButton``.
     @ViewBuilder
     private var headerTrailing: some View {
         HStack(spacing: DODSpacing.xs) {
-            searchButton
             composeButton
             settingsGear
         }
     }
 
-    /// v2 Search overhaul (1/3) — the Search entry point. Replaces the old
-    /// "Surprise Me" dice (Surprise Me moved onto the search page's idle
-    /// state). Tapping calls the injected ``onOpenSearch`` closure, which the
-    /// App shell fulfills by PUSHING the Search screen within the Feed tab's
-    /// own navigation stack (Search is no longer a tab). Mirrors the other
-    /// header buttons' treatment: a 44pt hit target with the burnt-orange tint
-    /// on the icon only (never a full fill). Rendered only when wired, so tests
-    /// / previews that omit the closure show no search button and the header
-    /// layout stays byte-identical for them.
+    /// v2 feed-search redesign — the Search entry point: a full-width search
+    /// BAR under the "Recipes & Articles" title (replacing the old corner
+    /// magnifying-glass), styled to match the brand ``DODSearchField`` (a
+    /// `surfaceElevated` capsule with a leading glyph + soft shadow). It's a
+    /// read-only affordance: tapping calls the injected ``onOpenSearch`` — the
+    /// same seam the old button used, which the App shell fulfills by opening
+    /// the Search screen (its rich idle: categories, Try chips, Surprise Me).
+    /// Keeps the `feed-open-search` id so the existing UI/E2E journeys still
+    /// find it. Rendered only when wired, so tests / previews that omit the
+    /// closure show no bar and the layout stays byte-identical for them.
     @ViewBuilder
-    private var searchButton: some View {
+    private var searchBar: some View {
         if let onOpenSearch {
             Button {
-                // v2 animation refresh — a single subtle bounce on the glyph as
-                // the actionable tap confirms. Gated on Reduce Motion by only
-                // bumping the trigger when motion is allowed (no bump → no bounce).
-                if !reduceMotion { searchBounceTick += 1 }
                 onOpenSearch()
             } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.title2)
-                    // v2 animation refresh — explicit foreground (was `.tint`) so
-                    // the burnt-orange glyph survives the plain-label pressable
-                    // style; renders byte-identically.
-                    .foregroundStyle(DODColor.burntOrange)
-                    .symbolEffect(.bounce, value: searchBounceTick)
-                    .accessibilityLabel("Search")
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                HStack(spacing: DODSpacing.xs) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .accessibilityHidden(true)
+                    Text("Search Recipes")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.labelSecondary)
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, DODSpacing.sm)
+                .padding(.horizontal, DODSpacing.md)
+                .background(Capsule(style: .continuous).fill(DODColor.surfaceElevated))
+                .shadow(color: DODColor.charcoal.opacity(0.12), radius: 4, x: 0, y: 1)
+                .contentShape(Capsule())
             }
-            .buttonStyle(.dodPressable)
+            .buttonStyle(.plain)
+            .padding(.horizontal, DODSpacing.md)
+            .padding(.top, DODSpacing.xs)
+            .padding(.bottom, DODSpacing.sm)
             .accessibilityIdentifier("feed-open-search")
+            .accessibilityLabel("Search recipes")
+            .accessibilityAddTraits(.isSearchField)
         }
     }
 

@@ -33,8 +33,7 @@ extension SearchViewModel {
     /// (tab switches, navigation pushes/pops).
     ///
     /// The slate has a fixed visible count of `Self.trySlateVisibleCount`
-    /// (= 10) with "Latest Recipes" always first; see `pickTrySlate(...)`
-    /// for the pin-first + shuffle logic.
+    /// (= 10), all shuffled from the curated pool; see `pickTrySlate(...)`.
     public var displayedTrySlate: [SearchTryChip] {
         if let cached = cachedTrySlate, cached.count >= Self.trySlateVisibleCount {
             return cached
@@ -63,19 +62,24 @@ extension SearchViewModel {
     static let excludedTryPoolSlugs: Set<String> = ["uncategorized"]
 
     /// Visible pill count for the "Try" slate — fixed across every cold
-    /// launch so the layout never shifts. v2 Search overhaul (3/3) bumps this
-    /// from 6 to 10 (1 pinned Latest Recipes + 9 shuffled from the 100-term
-    /// pool) so the widened pool is felt on the idle page. `nonisolated` so
+    /// launch so the layout never shifts. v2 Search overhaul (3/3) bumped this
+    /// from 6 to 10 shuffled from the 100-term pool so the widened pool is felt
+    /// on the idle page (the pinned Latest Recipes pill was later dropped, so
+    /// all 10 are pool terms now). `nonisolated` so
     /// the pure `pickTrySlate(...)` helper's L1 tests can reference it off the
     /// main actor (it is an immutable constant, so safe to share).
     public nonisolated static let trySlateVisibleCount: Int = 10
 
-    /// Pure helper that produces the "Try" slate: pinned-Latest-Recipes-first
-    /// + shuffle the remainder over the curated pool + deterministic top-up
-    /// (repeat the shuffled tail) only if the pool is smaller than the
-    /// requested count. With the 100-term pool the top-up never fires; it is
-    /// retained for degenerate / test pools. Degrades to a single pinned pill
-    /// when the pool is empty or `visibleCount` is 1.
+    /// Pure helper that produces the "Try" slate: a shuffle over the curated
+    /// pool + deterministic top-up (repeat the shuffled tail) only if the pool
+    /// is smaller than the requested count. With the 100-term pool the top-up
+    /// never fires; it is retained for degenerate / test pools. Returns an
+    /// empty slate when the pool is empty or `visibleCount` is 0.
+    ///
+    /// v2 feed-search redesign (2026-09-25): the special pinned "Latest
+    /// Recipes" pill was removed — the feed already shows the latest recipes,
+    /// and "Latest" is moving to a browse sort control (deferred), so every
+    /// slot now fills from the normal, non-persistent pool.
     ///
     /// The `using rng:` seam lets unit tests pin "same seed + same pool =
     /// same slate" determinism — production passes a
@@ -86,16 +90,14 @@ extension SearchViewModel {
         visibleCount: Int,
         using rng: inout any RandomNumberGenerator
     ) -> [SearchTryChip] {
-        let pinned = SearchTryChips.latestRecipes
-        guard visibleCount > 1 else { return [pinned] }
-        guard !pool.isEmpty else { return [pinned] }
+        guard visibleCount > 0, !pool.isEmpty else { return [] }
         var shuffled = pool
         shuffled.shuffle(using: &rng)
-        var slate: [SearchTryChip] = [pinned]
+        var slate: [SearchTryChip] = []
         var index = 0
-        // Deterministic top-up: if the pool has fewer than the non-pinned
-        // slot count, repeat the shuffled-pool tail to fill — the same term
-        // runs the same search, so a duplicate pill is functionally correct.
+        // Deterministic top-up: if the pool has fewer than the slot count,
+        // repeat the shuffled-pool tail to fill — the same term runs the same
+        // search, so a duplicate pill is functionally correct.
         while slate.count < visibleCount {
             slate.append(SearchTryChips.chip(for: shuffled[index % shuffled.count]))
             index += 1

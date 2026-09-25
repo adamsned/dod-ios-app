@@ -265,7 +265,8 @@ public struct SearchView: View {
                 // v2 Search overhaul (3/3): source the Try chips from
                 // `displayedTrySlate` — a per-cold-launch shuffle over the
                 // curated 100-term `SearchTryChips.pool` (stable within
-                // session, Latest Recipes pinned first).
+                // session; the pinned Latest Recipes pill was dropped in the
+                // v2 feed-search redesign, so all slots are pool terms).
                 tryChips: viewModel.displayedTrySlate,
                 onRecentTap: { viewModel.selectRecent($0) },
                 // v2 Search overhaul (3/3): tapping a "Try" chip runs a normal
@@ -280,14 +281,11 @@ public struct SearchView: View {
                 // look broken because the same curated terms reappear under
                 // Recent.
                 onTryChipTap: { chip in
-                    // CL-106 (T-637): "Latest Recipes" stays special — a
-                    // literal fulltext search for the phrase returns garbage,
-                    // so the pinned chip runs the recent-posts fetch instead.
-                    if chip.isLatestRecipes {
-                        Task { await viewModel.surfaceLatestRecipes() }
-                    } else {
-                        viewModel.selectCuratedSuggestion(chip.query)
-                    }
+                    // Every "Try" chip now runs a normal curated text search
+                    // (the special pinned "Latest Recipes" pill was removed in
+                    // the v2 feed-search redesign — the feed already surfaces
+                    // the latest recipes).
+                    viewModel.selectCuratedSuggestion(chip.query)
                 },
                 onClearRecents: { viewModel.clearRecentSearches() },
                 // US-33 / AC-33.3 / CL-57: per-term context-menu Clear.
