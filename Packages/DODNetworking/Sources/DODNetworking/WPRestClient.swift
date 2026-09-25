@@ -54,6 +54,23 @@ public struct WPRestClient: Sendable {
         queryItems: [URLQueryItem] = [],
         decode: T.Type = T.self
     ) async throws -> (value: T, totalPages: Int) {
+        let (data, response) = try await perform(path: path, queryItems: queryItems)
+        let totalPages = Self.parseTotalPages(response)
+        do {
+            return (try decoder.decode(T.self, from: data), totalPages)
+        } catch {
+            throw WPClientError.decoding(message: String(describing: error))
+        }
+    }
+
+    /// Perform a validated GET and hand back the raw body + response, so
+    /// header-only reads (``totalCount(path:queryItems:)`` for `X-WP-Total`)
+    /// share the exact request setup — notably the REG-18 / CL-50 cache bypass —
+    /// with the decoding ``getPaged(path:queryItems:decode:)`` path.
+    func perform(
+        path: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> (data: Data, response: HTTPURLResponse) {
         let url = try buildURL(path: path, queryItems: queryItems)
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "GET"
@@ -80,12 +97,16 @@ public struct WPRestClient: Sendable {
         guard (200..<300).contains(response.statusCode) else {
             throw WPClientError.httpStatus(response.statusCode)
         }
-        let totalPages = Self.parseTotalPages(response)
-        do {
-            return (try decoder.decode(T.self, from: data), totalPages)
-        } catch {
-            throw WPClientError.decoding(message: String(describing: error))
-        }
+        return (data, response)
+    }
+
+    /// Read WP's `X-WP-Total` collection-count header for a query (a
+    /// `per_page=1` probe is enough; the body is ignored). `nil` when the
+    /// header is absent or unparseable. Backs "Surprise Me"'s uniform pick
+    /// over the whole recipe set (DUT-1062 fix — see ``randomPost()``).
+    func totalCount(path: String, queryItems: [URLQueryItem] = []) async throws -> Int? {
+        let (_, response) = try await perform(path: path, queryItems: queryItems)
+        return Self.parseTotalCount(response)
     }
 
     /// Parse WP's `X-WP-TotalPages` header, defaulting to 1 when absent,
@@ -98,6 +119,19 @@ public struct WPRestClient: Sendable {
             return 1
         }
         return pages
+    }
+
+    /// Parse WP's `X-WP-Total` collection-count header (total items across all
+    /// pages of a query). `nil` when absent, unparseable, or negative — the
+    /// caller decides how to degrade (Surprise Me falls back to its in-memory
+    /// sample rather than leaving the button dead).
+    static func parseTotalCount(_ response: HTTPURLResponse) -> Int? {
+        guard let raw = response.value(forHTTPHeaderField: "X-WP-Total"),
+            let count = Int(raw), count >= 0
+        else {
+            return nil
+        }
+        return count
     }
 
     /// DUT-386: `.urlQueryAllowed` minus "+" and ";". `URLComponents.queryItems`
