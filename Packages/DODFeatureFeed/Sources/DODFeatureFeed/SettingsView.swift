@@ -43,12 +43,9 @@ public struct SettingsView: View {
     /// `internal` (not `private`) so `snackbarOverlay` in `SettingsView+Feedback.swift`
     /// reads it across the file_length split (DUT-694).
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    /// Closure the Clear Cache row delegates to. Returns the total
-    /// bytes freed so the snackbar can format the "Freed X.X MB" copy.
-    /// Optional so previews + snapshot tests don't need to plumb a
-    /// `RecipeStore` — the button surfaces the zero-bytes copy when
-    /// nil. Production callers (composition root, FeedView's gear icon)
-    /// always pass a non-nil closure.
+    /// Clear Cache row's delegate; returns bytes freed for the "Freed X.X MB"
+    /// snackbar. Optional so previews / snapshot tests skip plumbing a
+    /// `RecipeStore` (nil surfaces the zero-bytes copy); production always wires it.
     public let onClearImageCache: (() async throws -> Int)?
     /// DUT-572 — hides the top Profile section when true. Injected from RootView's
     /// real device size class because this sheet always reports `.compact` on iPad
@@ -59,11 +56,13 @@ public struct SettingsView: View {
     /// Notification" button. `nil` by default so existing callers/previews
     /// compile unchanged (button hidden).
     private let sendTestNotification: (() async -> Void)?
-    /// DUT-694 (PR-D) — in-flight guard for the Clear Cache row. Set while a clear
-    /// runs so a double-tap can't kick off two overlapping clears (which showed
-    /// contradictory snackbars). Also `.disabled`-s the button. `internal` so the
-    /// action in `SettingsView+Feedback.swift` can flip it across the file split.
+    /// DUT-694 (PR-D) — in-flight guard for the Clear Cache row (blocks a
+    /// double-tap double-clear). `internal` for `SettingsView+Feedback.swift`.
     @State var isClearingCache = false
+    // ⚠️ DEV DEBUG — strip before public; see SettingsView+DevDebug.swift.
+    @AppStorage(DevDebug.unlockedKey) var devDebugUnlocked = false
+    @AppStorage(DevDebug.forceShowOwnerUIKey) var devForceShowOwnerUI = false
+    @State var devDebugIsOwner = false
 
     public init(
         viewModel: SettingsViewModel? = nil,
@@ -335,6 +334,8 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
+            devDebugSection  // ⚠️ DEV DEBUG — strip before public release
+
             Section {
                 EmptyView()
             } footer: {
@@ -343,6 +344,7 @@ public struct SettingsView: View {
                     .foregroundStyle(DODColor.labelSecondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .accessibilityIdentifier("settings-version-footer")
+                    .devDebugFooterUnlock(unlocked: $devDebugUnlocked, forceShowOwnerUI: $devForceShowOwnerUI)
             }
             .listRowBackground(DODColor.surfaceElevated)
         }
@@ -354,6 +356,7 @@ public struct SettingsView: View {
         // `snackbarMessage`) so error + notification-deny snackbars don't buzz, and
         // the system switches keep self-haptic-ing without a duplicate here.
         .sensoryFeedback(.success, trigger: viewModel.cacheClearSuccessCount)
+        .task { devDebugIsOwner = OwnerGate.isCurrentUserOwner() }  // ⚠️ DEV DEBUG
 
         #if os(iOS)
         baseList.listStyle(.insetGrouped)
