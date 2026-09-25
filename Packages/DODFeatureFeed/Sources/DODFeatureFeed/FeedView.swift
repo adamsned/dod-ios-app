@@ -84,6 +84,9 @@ public struct FeedView: View {
     /// recompute). Gates the owner-only compose button; OFF for everyone until
     /// Dad's real `sub` is configured in `OwnerGate`.
     @State private var isOwnerComposer = false
+    /// ⚠️ DEV DEBUG (strip before public release — see DevDebug.swift) — the
+    /// Settings "Dev Debug" toggle force-shows this owner UI for design review.
+    @AppStorage(DevDebug.forceShowOwnerUIKey) private var devForceShowOwnerUI = false
     /// Daddy Mode (Phase 1, cosmetic) — presents the honest compose placeholder.
     @State private var showingComposeSheet = false
     /// v2 animation refresh — drives the search glyph's one-shot `.bounce`
@@ -225,7 +228,9 @@ public struct FeedView: View {
     /// authorizes nothing. Hidden entirely for non-owners.
     @ViewBuilder
     private var composeButton: some View {
-        if isOwnerComposer {
+        // ⚠️ DEV DEBUG (strip before public release) — `devForceShowOwnerUI`
+        // reveals this owner button for design review; it stays a placeholder.
+        if isOwnerComposer || devForceShowOwnerUI {
             Button {
                 showingComposeSheet = true
             } label: {
