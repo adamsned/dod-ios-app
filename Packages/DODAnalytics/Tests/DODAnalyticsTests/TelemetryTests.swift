@@ -5,6 +5,7 @@ import Testing
 
 /// Telemetry.shared is process-global; tests must run one at a time
 /// or they race over the transport swap.
+@TelemetryTestActor
 @Suite("Telemetry facade", .serialized) struct TelemetryTests {
 
     @Test func startConfiguresTransportOnce() {
