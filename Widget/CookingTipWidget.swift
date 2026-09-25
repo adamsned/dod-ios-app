@@ -23,6 +23,7 @@ struct CookingTipWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: Self.kind, provider: CookingTipProvider()) { entry in
             CookingTipEntryView(entry: entry)
+                .dodWidgetSeasonedCastIron()  // v2 Seasoned Cast Iron → widgets
         }
         .configurationDisplayName("Cooking Tip")
         .description("A short Dutch oven cooking tip each day.")
