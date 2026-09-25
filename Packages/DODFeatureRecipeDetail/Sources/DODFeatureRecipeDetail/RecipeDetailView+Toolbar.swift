@@ -27,7 +27,9 @@ extension RecipeDetailView {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
                         // v2 animation refresh — clean fill↔outline symbol swap
-                        // on save/unsave (Reduce Motion → instant).
+                        // on save/unsave (Reduce Motion → instant). No bounce here:
+                        // on the most-tapped glyph it read as jarring, so Save keeps
+                        // just the quiet crossfade.
                         .dodSymbolReplace(reduceMotion: reduceMotion)
                         // DUT-572 / CL-312 — glyph shadow so state colors survive
                         // over the full-bleed hero photo (mirrors the title shadow).
@@ -44,10 +46,15 @@ extension RecipeDetailView {
                 // hosts) it falls back to DUT-534's immediate add-all. Sits
                 // between Save (AC-4.7) and Download (AC-35.1).
                 Button {
+                    addToListTapCount += 1
                     presentAddToShoppingList()
                 } label: {
                     Image(systemName: "cart.badge.plus")
                         .foregroundStyle(DODColor.label)
+                        // v2 animation refresh — the cart bounces as it "receives"
+                        // the tap (the glyph has no state to swap, so a tap counter
+                        // drives it).
+                        .dodSymbolBounce(on: addToListTapCount, direction: .up, reduceMotion: reduceMotion)
                         .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .disabled(viewModel.recipe == nil)
@@ -69,8 +76,11 @@ extension RecipeDetailView {
                             : "square.and.arrow.down"
                     )
                     .foregroundStyle(viewModel.isDownloaded ? DODColor.burntOrange : DODColor.label)
-                    // v2 animation refresh — outline↔fill swap on download toggle.
+                    // v2 animation refresh — outline↔fill swap on download toggle...
                     .dodSymbolReplace(reduceMotion: reduceMotion)
+                    // ...with a DOWNWARD bounce — the arrow "pulls" the recipe
+                    // down onto the device.
+                    .dodSymbolBounce(on: viewModel.isDownloaded, direction: .down, reduceMotion: reduceMotion)
                     .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
@@ -88,6 +98,10 @@ extension RecipeDetailView {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .foregroundStyle(DODColor.label)
+                        // v2 animation refresh — an upward bounce as the sheet is
+                        // summoned, echoing the glyph's own up-arrow. Driven by the
+                        // existing `shareTapCount` (also the share haptic trigger).
+                        .dodSymbolBounce(on: shareTapCount, direction: .up, reduceMotion: reduceMotion)
                         .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .disabled(viewModel.recipe == nil)

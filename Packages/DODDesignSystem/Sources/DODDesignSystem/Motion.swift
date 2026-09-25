@@ -81,4 +81,54 @@ extension View {
     public func dodSymbolReplace(reduceMotion: Bool) -> some View {
         contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
     }
+
+    /// v2 animation refresh — a one-shot SF Symbol **bounce**, played each time
+    /// `value` changes, as a small celebratory confirmation of a deliberate
+    /// action (Save, Add to List, Download, Share…). Composes with
+    /// ``dodSymbolReplace``: a glyph can fill AND bounce on the same tap.
+    ///
+    /// `direction` points the bounce the way the action moves — ``/up`` for
+    /// send-y actions (Save, Share), ``/down`` for receive-y ones (Download) —
+    /// so the motion *means* something rather than being decoration. Reduce
+    /// Motion → no bounce (the underlying state still changes instantly).
+    public func dodSymbolBounce(
+        on value: some Equatable,
+        direction: DODSymbolBounceDirection = .up,
+        reduceMotion: Bool
+    ) -> some View {
+        modifier(DODSymbolBounceModifier(value: value, direction: direction, reduceMotion: reduceMotion))
+    }
+}
+
+/// The direction an SF Symbol bounce travels — chosen to echo the action's own
+/// motion. See ``SwiftUICore/View/dodSymbolBounce(on:direction:reduceMotion:)``.
+public enum DODSymbolBounceDirection {
+    /// Bounce up — for send-y / outbound actions (Save, Share).
+    case up
+    /// Bounce down — for receive-y / inbound actions (Download).
+    case down
+}
+
+/// Backs ``SwiftUICore/View/dodSymbolBounce(on:direction:reduceMotion:)``. Gates
+/// the discrete bounce on Reduce Motion at the point of use, mirroring
+/// ``DODPressableButtonStyle`` and ``SwiftUICore/View/dodSymbolReplace(reduceMotion:)``.
+private struct DODSymbolBounceModifier<Value: Equatable>: ViewModifier {
+
+    let value: Value
+    let direction: DODSymbolBounceDirection
+    let reduceMotion: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            switch direction {
+            case .up:
+                content.symbolEffect(.bounce.up, value: value)
+            case .down:
+                content.symbolEffect(.bounce.down, value: value)
+            }
+        }
+    }
 }

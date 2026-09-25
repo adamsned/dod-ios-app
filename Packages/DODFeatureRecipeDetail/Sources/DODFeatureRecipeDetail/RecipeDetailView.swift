@@ -37,6 +37,10 @@ public struct RecipeDetailView: View {
     /// `.sensoryFeedback` trigger, bumped in the ShareLink tap gesture (see
     /// `RecipeDetailView+Toolbar.swift`). `internal` so the extension bumps it.
     @State var shareTapCount: Int = 0
+    /// v2 animation refresh — bumped on each "Add to Shopping List" tap to fire
+    /// the cart glyph's one-shot bounce (the glyph itself doesn't change state).
+    /// `internal` so the toolbar extension bumps it.
+    @State var addToListTapCount: Int = 0
     // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
     // extension's relocated Cook Mode CTA tap can present the cover (DUT-631).
     @State var isCookModePresented: Bool = false
