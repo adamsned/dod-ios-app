@@ -11,9 +11,10 @@ import Foundation
 
 extension SearchViewModel {
 
-    /// Fetch ONE truly-random recipe from the WHOLE WP catalog
-    /// (`dependencies.fetchRandomRecipe()`, server-side `orderby=rand`) and hand
-    /// it to the Search screen's EXISTING recipe-open path, `onSelect` — the same
+    /// Fetch ONE uniformly-random recipe from the WHOLE WP catalog
+    /// (`dependencies.fetchRandomRecipe()`, a random `offset` over the WP Recipe
+    /// Maker recipe set) and hand it to the Search screen's EXISTING recipe-open
+    /// path, `onSelect` — the same
     /// closure a result-card tap already calls (``SearchView``'s injected
     /// closure, which the App shell wires to `path.append(.recipe(...))`). The
     /// view model doesn't own navigation itself, so the caller (the idle button's
