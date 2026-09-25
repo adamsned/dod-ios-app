@@ -63,6 +63,7 @@ public struct SettingsView: View {
     @AppStorage(DevDebug.unlockedKey) var devDebugUnlocked = false
     @AppStorage(DevDebug.forceShowOwnerUIKey) var devForceShowOwnerUI = false
     @State var devDebugIsOwner = false
+    @AppStorage(Self.appearanceAppliesToWidgetsKey) var appearanceAppliesToWidgets = false
 
     public init(
         viewModel: SettingsViewModel? = nil,
@@ -236,9 +237,8 @@ public struct SettingsView: View {
 
             // MARK: T-752 / CL-149 — Customization group
 
-            // DUT-58 — Appearance picker + the Cook Mode Voice rows
-            // (`VoiceRows`, `SettingsView+Voice.swift`) grouped under one
-            // "Customization" header.
+            // DUT-58 — Appearance picker + Cook Mode Voice rows (`VoiceRows`),
+            // grouped under one "Customization" header.
             Section {
                 Picker(selection: appearanceBinding) {
                     ForEach(AppearancePreference.allCases, id: \.self) { value in
@@ -254,6 +254,7 @@ public struct SettingsView: View {
                 // default system blue).
                 .tint(DODColor.burntOrange)
                 .accessibilityIdentifier("settings-picker-appearance")
+                appliesToWidgetsToggle  // v2 Seasoned Cast Iron → widgets
                 LayoutSettingPicker()
 
                 VoiceRows(viewModel: viewModel)

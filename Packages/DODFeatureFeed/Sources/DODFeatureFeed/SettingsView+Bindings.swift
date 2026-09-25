@@ -59,6 +59,9 @@ extension SettingsView {
             set: {
                 DODColor.isOLEDDark = $0.isOLEDDark
                 viewModel.appearance = $0
+                // v2 Seasoned Cast Iron → widgets: revert/apply the widget flag
+                // when the appearance itself changes (e.g. Seasoned → Cocoa).
+                syncWidgetSeasonedCastIron(for: $0)
             }
         )
     }
