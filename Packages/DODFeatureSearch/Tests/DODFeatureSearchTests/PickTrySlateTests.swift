@@ -10,15 +10,13 @@ import Testing
 ///
 /// Wave 3 swapped the source from WP categories to the curated 100-term
 /// string pool (``SearchTryChips/pool``) and the element type from
-/// `DODDomain.Category` to ``SearchTryChip``. The helper stays `static` +
-/// pure (modulo the `inout RandomNumberGenerator` seam): every case runs a
-/// single call against a fixture pool and asserts the returned slate matches
-/// the contract — pinned-Latest-Recipes-first + shuffle the remainder +
-/// deterministic top-up if the pool is too small + empty-pool fallback to the
-/// single pinned pill.
+/// `DODDomain.Category` to ``SearchTryChip``. The v2 feed-search redesign
+/// (2026-09-25) then dropped the special pinned "Latest Recipes" pill, so the
+/// slate is now a pure shuffle over the pool + deterministic top-up when the
+/// pool is smaller than the requested count + an empty slate for an empty pool.
 @Suite("pickTrySlate (v2 Search overhaul 3/3)") struct PickTrySlateTests {
 
-    @Test func pool_of_30_visible_10_returns_10_with_latest_recipes_first() {
+    @Test func pool_of_30_visible_10_returns_10_pool_terms() {
         let pool = Self.makePool(size: 30)
         var rng: any RandomNumberGenerator = SeededRandomNumberGenerator(seed: 1)
         let slate = SearchViewModel.pickTrySlate(
@@ -27,18 +25,15 @@ import Testing
             using: &rng
         )
         #expect(slate.count == 10)
-        #expect(slate.first?.isLatestRecipes == true)
-        #expect(slate.first?.display == "Latest Recipes")
-        // No Latest-Recipes pill in the rotation tail — the pin is the single
-        // occurrence; every tail chip carries a real raw query.
-        let tail = Array(slate.dropFirst())
-        #expect(!tail.contains(where: { $0.isLatestRecipes }))
-        #expect(tail.allSatisfy { !$0.query.isEmpty })
+        // No pinned Latest Recipes pill any more — every chip is a real pool
+        // term with a non-empty raw query.
+        #expect(!slate.contains(where: { $0.isLatestRecipes }))
+        #expect(slate.allSatisfy { !$0.query.isEmpty })
     }
 
-    @Test func real_pool_slate_draws_tail_from_the_curated_pool() {
-        // End-to-end against the production 100-term pool: every tail chip's
-        // raw query must be a member of `SearchTryChips.pool`.
+    @Test func real_pool_slate_draws_from_the_curated_pool() {
+        // End-to-end against the production 100-term pool: every chip's raw
+        // query must be a member of `SearchTryChips.pool`.
         var rng: any RandomNumberGenerator = SeededRandomNumberGenerator(seed: 7)
         let slate = SearchViewModel.pickTrySlate(
             from: SearchTryChips.pool,
@@ -46,19 +41,17 @@ import Testing
             using: &rng
         )
         #expect(slate.count == SearchViewModel.trySlateVisibleCount)
-        #expect(slate.first?.isLatestRecipes == true)
+        #expect(!slate.contains(where: { $0.isLatestRecipes }))
         let poolSet = Set(SearchTryChips.pool)
-        let tail = Array(slate.dropFirst())
-        #expect(tail.allSatisfy { poolSet.contains($0.query) })
-        // With 99 free slots and 9 tail chips, no repeats.
-        #expect(Set(tail.map(\.query)).count == tail.count)
+        #expect(slate.allSatisfy { poolSet.contains($0.query) })
+        // With 100 terms and 10 slots, no repeats.
+        #expect(Set(slate.map(\.query)).count == slate.count)
     }
 
     @Test func pool_smaller_than_visible_count_tops_up_deterministically() {
-        // Pool has 2 rotatable terms. Visible count 6 → slate is
-        // [pinned, A, B, A, B, A] (repetition of the shuffled tail).
-        // Contract: slate.count == 6 (no short row), pinned still first,
-        // tail uses only the two pool terms.
+        // Pool has 2 terms. Visible count 6 → the shuffled tail repeats to fill
+        // (e.g. [A, B, A, B, A, B]). Contract: slate.count == 6 (no short row),
+        // uses only the two pool terms, no pinned pill.
         let pool = ["alpha", "beta"]
         var rng: any RandomNumberGenerator = SeededRandomNumberGenerator(seed: 3)
         let slate = SearchViewModel.pickTrySlate(
@@ -67,12 +60,11 @@ import Testing
             using: &rng
         )
         #expect(slate.count == 6)
-        #expect(slate.first?.isLatestRecipes == true)
-        let tailQueries = Set(slate.dropFirst().map(\.query))
-        #expect(tailQueries == Set(["alpha", "beta"]))
+        #expect(!slate.contains(where: { $0.isLatestRecipes }))
+        #expect(Set(slate.map(\.query)) == Set(["alpha", "beta"]))
     }
 
-    @Test func empty_pool_returns_just_latest_recipes() {
+    @Test func empty_pool_returns_empty_slate() {
         let pool: [String] = []
         var rng: any RandomNumberGenerator = SeededRandomNumberGenerator(seed: 4)
         let slate = SearchViewModel.pickTrySlate(
@@ -80,9 +72,7 @@ import Testing
             visibleCount: 10,
             using: &rng
         )
-        #expect(slate.count == 1)
-        #expect(slate.first?.isLatestRecipes == true)
-        #expect(slate.first?.display == "Latest Recipes")
+        #expect(slate.isEmpty)
     }
 
     @Test func same_seed_and_same_pool_returns_same_slate() {
@@ -106,7 +96,7 @@ import Testing
         #expect(slateA.map(\.id) != slateB.map(\.id))
     }
 
-    @Test func visible_count_1_returns_just_latest_recipes() {
+    @Test func visible_count_1_returns_one_pool_chip() {
         let pool = Self.makePool(size: 10)
         var rng: any RandomNumberGenerator = SeededRandomNumberGenerator(seed: 6)
         let slate = SearchViewModel.pickTrySlate(
@@ -115,14 +105,13 @@ import Testing
             using: &rng
         )
         #expect(slate.count == 1)
-        #expect(slate.first?.isLatestRecipes == true)
+        #expect(slate.first?.isLatestRecipes == false)
+        #expect(slate.first.map { !$0.query.isEmpty } == true)
     }
 
     // MARK: - Fixtures
 
-    /// Build a pool of `size` raw terms ("term1", "term2", ...). Latest
-    /// Recipes is synthesized by the helper (not one of the pool terms), so
-    /// fixtures no longer inject it.
+    /// Build a pool of `size` raw terms ("term1", "term2", ...).
     static func makePool(size: Int) -> [String] {
         (1...size).map { "term\($0)" }
     }

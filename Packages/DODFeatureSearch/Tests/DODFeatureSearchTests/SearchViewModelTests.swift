@@ -327,11 +327,11 @@ import Testing
         #expect(first.count == SearchViewModel.trySlateVisibleCount)
         #expect(first.map(\.id) == second.map(\.id))
         #expect(second.map(\.id) == third.map(\.id))
-        // The pinned Latest-Recipes chip is always first on every read.
-        #expect(first.first?.isLatestRecipes == true)
-        // Every non-pinned chip is drawn from the curated pool.
+        // v2 feed-search redesign: no pinned Latest-Recipes chip — every chip
+        // is drawn from the curated pool.
+        #expect(!first.contains(where: { $0.isLatestRecipes }))
         let poolSet = Set(SearchTryChips.pool)
-        #expect(first.dropFirst().allSatisfy { poolSet.contains($0.query) })
+        #expect(first.allSatisfy { poolSet.contains($0.query) })
     }
 
     static func makeItem(_ id: Int, title: String = "Match") -> RecipeListItem {
