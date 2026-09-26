@@ -67,16 +67,52 @@ import UIKit
 
     // MARK: - Asset bundle sanity
 
-    @Test func aboutNedImageAsset_existsInBundle() {
-        // `UIImage(named:in:with:)` returns non-nil iff the asset
-        // catalog at the supplied bundle carries an imageset with the
-        // requested name. The asset lives in `App/Assets.xcassets/
-        // AboutNed.imageset/` which compiles into `Bundle.main` at app
-        // build time. The DODFeatureFeed test bundle is hosted by the
-        // app's test runner, so `Bundle.main` resolves to the app's
-        // compiled bundle and the asset is reachable.
-        let image = UIImage(named: "AboutNed", in: .main, with: nil)
-        #expect(image != nil)
+    @Test func aboutImageAssets_existInBundle() {
+        // `UIImage(named:in:with:)` returns non-nil iff the asset catalog at
+        // the supplied bundle carries an imageset with the requested name.
+        // The DUT-1330 About photos live in `App/Assets.xcassets/*.imageset/`
+        // which compiles into `Bundle.main`; the DODFeatureFeed test bundle is
+        // hosted by the app's test runner, so `Bundle.main` resolves to the
+        // app's compiled bundle and the assets are reachable. Catches a
+        // removed / renamed photo before the view silently falls back to a
+        // transparent box at runtime.
+        let names = [
+            "AboutHero", "AboutPeachDumpCake", "AboutManicotti",
+            "About7CanSoup", "AboutCherryChocolate", "AboutAlaska",
+        ]
+        for name in names {
+            #expect(UIImage(named: name, in: .main, with: nil) != nil, "missing asset: \(name)")
+        }
+    }
+
+    // MARK: - DUT-1330 — translated section content pins
+
+    @Test func funFacts_countAndDadJoke() {
+        // Count + the closing scarecrow joke guard the site translation
+        // against a silently dropped or reordered fact.
+        #expect(AboutNedContent.funFacts.count == 10)
+        #expect(AboutNedContent.funFacts.last?.contains("scarecrow") == true)
+    }
+
+    @Test func publicationsAndPodcasts_shape() {
+        #expect(AboutNedContent.publicationParagraphs.count == 3)
+        #expect(AboutNedContent.podcasts.count == 4)
+        // Every podcast row is a real, tappable link.
+        #expect(AboutNedContent.podcasts.allSatisfy { $0.url != nil })
+    }
+
+    @Test func televisionAndEvents_shapeAndLinks() {
+        #expect(AboutNedContent.televisionAppearances.count == 4)
+        #expect(AboutNedContent.events.count == 1)
+        // TV segments deep-link to their recipe; the Alaska event has no link.
+        #expect(AboutNedContent.televisionAppearances.allSatisfy { $0.url != nil })
+        #expect(AboutNedContent.events.first?.url == nil)
+        #expect(AboutNedContent.televisionAppearances.first?.title == "Camp Oven Peach Dump Cake")
+    }
+
+    @Test func faqs_shapeAndFirstQuestion() {
+        #expect(AboutNedContent.faqs.count == 4)
+        #expect(AboutNedContent.faqs.first?.question == "Who is Dutch Oven Daddy?")
     }
 
     // MARK: - View construction sanity
