@@ -1,52 +1,37 @@
 import DODDesignSystem
 import SwiftUI
 
-/// Destination for the About Dutch Oven Daddy row.
+/// The About Dutch Oven Daddy destination (Settings ▸ About Dutch Oven Daddy).
 ///
-/// T-738 / CL-134 (2026-05-31, DUT-14) graduated this from the original
-/// T-550 "Coming soon — fetched from /about-me/" placeholder to the
-/// embedded DUT-14 copy + Ned's photo bundled as a local asset. T-552
-/// (the planned WP REST `/about-me/` fetch path) is superseded — the
-/// copy is now embedded verbatim, not fetched dynamically. See CL-133
-/// for the supersession reasoning + the original magazine-sidebar trade.
+/// DUT-1330 (2026-09-26) rebuilt this as a full translation of the website
+/// About page (`dutchovendaddy.com/about-me/`) in the app's design language,
+/// for v1 + v2. A full-bleed hero photo (Ned holding the No. 8 lid) leads,
+/// then: the About story, Fun Facts, Publications (+ podcasts), Television
+/// Appearances (photo cards), Events, and FAQ. Skips the site's "Navigating
+/// My Site", "My Top Recipes", "Keep in Touch", and Subscribe / sidebar
+/// blocks per spec. External references (podcasts, articles, TV-segment
+/// recipes) open in the browser.
 ///
-/// Layout: vertically-stacked centered hero inside a `ScrollView` —
-/// `VStack(alignment: .center)` with a 160pt image centered horizontally
-/// on top, clipped to a `Circle()` (T-749 / CL-146 — matching the app's
-/// avatar register per AC-44.15; was a `RoundedRectangle` pre-T-749), and
-/// the verbatim copy below it at full width (leading-aligned) as a
-/// leading-aligned `VStack` of paragraph `Text`s. T-741 / CL-135 (DUT-18)
-/// revised this from the original T-738 magazine sidebar
-/// (`HStack(alignment: .top)`, 120pt leading image + paragraph wrapping
-/// right) because the right-side wrap did not read well on the live build
-/// — DUT-14 explicitly named the centered-above arrangement as the
-/// fallback. The image bumps 120pt → 160pt now that it no longer shares
-/// the row with the paragraph.
+/// History: graduated from the T-550 "Coming soon" placeholder → T-738 /
+/// CL-134 (DUT-14) embedded intro + circular avatar → T-749 / CL-146 (DUT-55)
+/// added the three story paragraphs → this DUT-1330 full-page build. The
+/// intro (``aboutNedCopy``) and story (``aboutNedStoryParagraphs``) copy stays
+/// verbatim and L1-pinned; the section content lives in ``AboutNedContent``.
 ///
-/// **T-749 / CL-146 (DUT-55) — `ScrollView` + multi-paragraph story.**
-/// The intro paragraph gained three story paragraphs below it; the
-/// content is now wrapped in a `ScrollView` so the longer copy + the
-/// 160pt photo don't clip on shorter devices (the pre-T-749 plain
-/// top-aligned `VStack` + `Spacer` would clip the tail on an iPhone SE).
-///
-/// Lives in its own file (not inline in `SettingsView.swift`) so the
-/// host file stays under the 400-line `file_length` cap. The view is
-/// only consumed from one call site (`SettingsView`'s About
-/// `NavigationLink`), so module-internal visibility is sufficient.
+/// Section builders live in `AboutNedView+Sections.swift` so this file stays
+/// under the 400-line `file_length` cap.
 struct AboutNedView: View {
 
-    /// The verbatim DUT-14 About Ned intro copy. Pinned by an L1 test
-    /// (`aboutNedView_copy_matchesDUT14Verbatim`) so any future paraphrase
-    /// trips CI — surfacing the change to the spec author before it
-    /// silently lands on the user's device.
+    @Environment(\.openURL) var openURL
+
+    /// The verbatim DUT-14 intro, kept as a warm lead above the site's story
+    /// paragraphs. Pinned by `aboutNedView_copy_matchesDUT14Verbatim`.
     static let aboutNedCopy: String =
         "Hi I'm Ned, the Dutch Oven Daddy! I'm a full-time computer nerd and part-time cook. My passion is cast iron cooking with tips, tricks, and delicious recipes. I love using my recipes to bring together family and friends. I believe everything is made better in cast iron!"
 
-    /// T-749 / CL-146 (DUT-55) — the three story paragraphs that render
-    /// below the intro, in order, with a paragraph break between each.
-    /// Verbatim per Spencer's DUT-55 copy; pinned by an L1 test
-    /// (`aboutNedView_storyParagraphs_matchVerbatim`) on the same
-    /// no-silent-paraphrase contract as ``aboutNedCopy``.
+    /// The three verbatim story paragraphs (DUT-55), matching the website's
+    /// "About Ned Adams & Dutch Oven Daddy" section. Pinned by
+    /// `aboutNedView_storyParagraphs_matchVerbatim`.
     static let aboutNedStoryParagraphs: [String] = [
         "Dutch Oven Daddy is the happy result of a gifted cast iron skillet and meal prep for a family member recovering from surgery. The desire to keep track of the recipes created brought Dutch Oven Daddy into existence. As these things go, the randomness of the Internet allowed D.O.D. to flourish as did with my love and appreciation for cast iron.",
         "Since that first skillet, my activity in the cast iron community has grown. I love to educate others on not only how to cook with it, but how to care for it along with the benefits of using cast iron.",
@@ -55,24 +40,20 @@ struct AboutNedView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .center, spacing: DODSpacing.md) {
-                Image("AboutNed")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 160, height: 160)
-                    .clipShape(Circle())
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: DODSpacing.md) {
-                    paragraphText(Self.aboutNedCopy)
-                    ForEach(Self.aboutNedStoryParagraphs, id: \.self) { paragraph in
-                        paragraphText(paragraph)
-                    }
+            VStack(alignment: .leading, spacing: 0) {
+                heroImage
+                VStack(alignment: .leading, spacing: DODSpacing.xl) {
+                    aboutSection
+                    funFactsSection
+                    publicationsSection
+                    televisionSection
+                    eventsSection
+                    faqSection
                 }
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.top, DODSpacing.lg)
+                .padding(.bottom, DODSpacing.xl)
             }
-            .padding(DODSpacing.md)
-            .frame(maxWidth: .infinity, alignment: .top)
         }
         .background(DODColor.surface)
         .navigationTitle("About")
@@ -82,16 +63,76 @@ struct AboutNedView: View {
         .accessibilityIdentifier("settings-about")
     }
 
-    /// A single body paragraph in the brand body register, full-width +
-    /// leading-aligned, allowed to grow vertically to fit its wrapped
-    /// content. Extracted so the intro + each story paragraph share one
-    /// modifier chain (T-749 / CL-146).
+    // MARK: - Hero + About story
+
+    /// Full-bleed hero: Ned holding up the vintage Wagner Ware No. 8 lid.
+    private var heroImage: some View {
+        Image("AboutHero")
+            .resizable()
+            .scaledToFill()
+            .frame(height: 260)
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .accessibilityLabel("Ned Adams, the Dutch Oven Daddy, holding a cast iron Dutch oven lid")
+    }
+
+    private var aboutSection: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.md) {
+            sectionHeader("About Dutch Oven Daddy")
+            Text(Self.aboutNedCopy)
+                .dodFont(DODType.bodyEmphasized)
+                .foregroundStyle(DODColor.label)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(Self.aboutNedStoryParagraphs, id: \.self) { paragraph($0) }
+        }
+    }
+
+    // MARK: - Shared building blocks (used here + in +Sections)
+
+    /// A section heading in the brand heading register.
     @ViewBuilder
-    private func paragraphText(_ text: String) -> some View {
+    func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .dodFont(DODType.heading)
+            .foregroundStyle(DODColor.labelStrong)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A plain body paragraph, full-width + leading-aligned.
+    @ViewBuilder
+    func paragraph(_ text: String) -> some View {
         Text(text)
             .dodFont(DODType.body)
             .foregroundStyle(DODColor.label)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// A body paragraph that renders inline markdown links (`[text](url)`),
+    /// tinted burnt-orange and opening in the browser on tap. Falls back to
+    /// plain text if the markdown can't be parsed.
+    @ViewBuilder
+    func richParagraph(_ markdown: String) -> some View {
+        richText(markdown)
+            .dodFont(DODType.body)
+            .foregroundStyle(DODColor.label)
+            .tint(DODColor.burntOrange)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Runtime-string markdown → `Text`. Uses `AttributedString(markdown:)`
+    /// (reliable for non-literal strings, unlike `LocalizedStringKey`) so the
+    /// inline links survive; whitespace is preserved and only inline syntax
+    /// is interpreted (no block/list transforms).
+    func richText(_ markdown: String) -> Text {
+        if let attributed = try? AttributedString(
+            markdown: markdown,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        ) {
+            return Text(attributed)
+        }
+        return Text(markdown)
     }
 }
