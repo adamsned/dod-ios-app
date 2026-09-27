@@ -13,6 +13,13 @@ public struct SavedView: View {
     /// never toggle. Mirrors `FeedView`'s declaration.
     @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
         RecipeListLayout.gallery.rawValue
+    /// DUT-105 — the recipe whose "Add to Collection" sheet is presented (nil =
+    /// none). `item:`-driven so it carries the tapped recipe.
+    @State private var recipeForCollection: Recipe?
+    /// DUT-105 — the "New Collection" name sheet (from the shelf's New chip).
+    @State private var showingNewCollection = false
+    /// DUT-105 — the collection being renamed (nil = none), from a chip's menu.
+    @State private var renamingCollection: RecipeCollection?
     public let onSelect: (Recipe) -> Void
     /// US-34 / AC-34.1 / AC-34.6 — long-press → state-aware Save/Unsave
     /// context menu wiring. See `FeedView.onSave`; this surface passes a
@@ -58,6 +65,15 @@ public struct SavedView: View {
             .background(DODColor.surface.ignoresSafeArea())
             // DUT-275 — nav bar hidden; the pinned header lives above.
             .dodHidesNavBar()
+            // DUT-105 — the collections create / rename / add-to-collection sheets.
+            .modifier(
+                CollectionSheets(
+                    viewModel: viewModel,
+                    recipeForCollection: $recipeForCollection,
+                    showingNewCollection: $showingNewCollection,
+                    renamingCollection: $renamingCollection
+                )
+            )
             .task {
                 // DUT-6: subscribe to CloudKit remote-import signals (no-op
                 // if already subscribed) so a recipe saved on another device
@@ -86,8 +102,29 @@ public struct SavedView: View {
                     DODHeaderGearButton { onOpenSettings() }
                 }
             }
+            // DUT-105 — the collections shelf sits above the list once there are
+            // saved recipes to organise. "All Saved" clears the filter (the flat
+            // list); a chip filters to that cookbook; "New Collection" creates one.
+            if viewModel.loadState == .loaded {
+                collectionsShelf
+            }
             loadStateBody
         }
+    }
+
+    /// DUT-105 — the collections shelf, wired to the view model's shelf state.
+    private var collectionsShelf: some View {
+        CollectionsShelf(
+            collections: viewModel.collections,
+            selectedID: viewModel.selectedCollectionID,
+            onSelectAll: { viewModel.selectCollection(nil) },
+            onSelect: { viewModel.selectCollection($0.id) },
+            onNew: { showingNewCollection = true },
+            onRename: { renamingCollection = $0 },
+            onDelete: { collection in
+                Task { await viewModel.deleteCollection(id: collection.id) }
+            }
+        )
     }
 
     @ViewBuilder
@@ -119,6 +156,16 @@ public struct SavedView: View {
                     Task { await viewModel.refresh() }
                 }
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .loaded where viewModel.displayedRecipes.isEmpty:
+            // DUT-105 — a collection filter with no still-saved members. (The flat
+            // "All Saved" list can't reach here: an empty saved set is `.empty`.)
+            EmptyState(
+                systemImage: "folder",
+                title: "No Recipes in This Collection",
+                message: "Add saved recipes to this collection from the recipe menu."
+            )
+            .accessibilityIdentifier("saved.emptyCollection")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded:
             // DUT-530 — branch on the unified list/grid preference (shared with
@@ -154,7 +201,7 @@ public struct SavedView: View {
             columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
             spacing: DODSpacing.md
         ) {
-            ForEach(viewModel.recipes) { recipe in
+            ForEach(viewModel.displayedRecipes) { recipe in
                 RecipeCard(
                     title: recipe.title,
                     excerpt: recipe.excerpt,
@@ -224,7 +271,10 @@ public struct SavedView: View {
                         // recipe fully openable offline, so nothing is
                         // stranded and no confirmation is needed.
                         Task { await viewModel.requestRemoveDownload(id: recipe.id) }
-                    }
+                    },
+                    // DUT-105 — long-press → "Add to Collection…" opens the
+                    // collection picker sheet for this recipe.
+                    onAddToCollection: { recipeForCollection = recipe }
                 )
             }
         }
@@ -240,7 +290,7 @@ public struct SavedView: View {
     /// so the compact download glyph (DUT-530) matches the gallery card's badge.
     private var listContent: some View {
         adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
-            ForEach(viewModel.recipes) { recipe in
+            ForEach(viewModel.displayedRecipes) { recipe in
                 RecipeCard.ListRow(
                     title: recipe.title,
                     excerpt: recipe.excerpt,
@@ -272,7 +322,9 @@ public struct SavedView: View {
                     },
                     onRemoveDownload: {
                         Task { await viewModel.requestRemoveDownload(id: recipe.id) }
-                    }
+                    },
+                    // DUT-105 — same "Add to Collection…" entry as the gallery.
+                    onAddToCollection: { recipeForCollection = recipe }
                 )
             }
         }

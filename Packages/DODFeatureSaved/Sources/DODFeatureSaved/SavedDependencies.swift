@@ -80,6 +80,30 @@ public protocol SavedDependencies: Sendable {
     /// same behavior as before this fix. Default is identity so fake conformers
     /// (previews/tests) keep compiling; the live wiring fetches + parses + caches.
     func recipeWithIngredients(_ recipe: Recipe) async -> Recipe
+
+    // MARK: - Recipe collections (DUT-105)
+    //
+    // The Saved tab's collections shelf + "Add to Collection" sheet route
+    // through these. All carry default implementations (see the extension
+    // below) so fake conformers that don't model collections keep compiling;
+    // the live wiring routes to `RecipeStore`'s collection CRUD.
+
+    /// Every collection, shelf-ordered. Default `[]`.
+    func collections() async throws -> [RecipeCollection]
+    /// Create a collection with `name`, returning the created value.
+    func createCollection(name: String) async throws -> RecipeCollection
+    /// Rename a collection.
+    func renameCollection(id: UUID, name: String) async throws
+    /// Delete a collection (the recipes stay saved).
+    func deleteCollection(id: UUID) async throws
+    /// The collection ids a recipe currently belongs to (seeds the sheet's checkmarks).
+    func collectionIDs(forRecipe recipeID: Int) async throws -> Set<UUID>
+    /// Set exactly which collections a recipe belongs to.
+    func setCollections(forRecipe recipeID: Int, to ids: Set<UUID>) async throws
+    /// The saved recipes in a collection, in add order.
+    func recipes(inCollection id: UUID) async throws -> [Recipe]
+    /// Reorder the shelf (nice-to-have).
+    func reorderCollections(orderedIDs: [UUID]) async throws
 }
 
 extension SavedDependencies {
