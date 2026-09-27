@@ -18,6 +18,13 @@ public final class SavedViewModel {
     /// hydrated alongside `recipes` in ``refresh()``. ``SavedView`` checks
     /// membership to render the "Downloaded" badge on saved + downloaded cards.
     public private(set) var downloadedIDs: Set<Int> = []
+    /// DUT-1339 — ids of saved recipes that read as a dessert, hydrated
+    /// alongside `recipes` in ``refresh()``. The "Desserts" filter chip narrows
+    /// to these. Computed from each recipe's own category signals in the store
+    /// (``RecipeStore/dessertRecipeIDs()``), so it lives on the view model the
+    /// same way ``downloadedIDs`` does — the recipe object the Saved tab renders
+    /// is a partial projection that doesn't carry its categories.
+    public private(set) var dessertIDs: Set<Int> = []
     public private(set) var loadState: LoadState = .idle
 
     /// DUT-105 — the user's collections / cookbooks, shelf-ordered. Reloaded in
@@ -170,13 +177,16 @@ public final class SavedViewModel {
             }
             fetched.removeAll { pendingRemovals.keys.contains($0.id) }
             recipes = fetched
-            // Best-effort: a download-state read failure just means no badges,
-            // never a failed Saved-tab load (T-774 / DUT-80).
-            let downloaded = (try? await dependencies.downloadedRecipeIDs()) ?? []
-            // DUT: re-check after the second `await` too — a newer refresh may
-            // have committed while this one was fetching the download-id set.
+            // Hydrate the two id-set projections the filter chips need
+            // (downloaded badges + Desserts filter) on the same cycle. Both are
+            // best-effort — a read failure just drops that chip's narrowing,
+            // never a failed Saved-tab load (T-774 / DUT-80, DUT-1339).
+            let auxiliary = await auxiliaryFilterSets()
+            // DUT: re-check after those `await`s too — a newer refresh may have
+            // committed while this one was fetching the projections.
             guard generation == refreshGeneration else { return }
-            downloadedIDs = downloaded
+            downloadedIDs = auxiliary.downloaded
+            dessertIDs = auxiliary.desserts
             // DUT-105: reload collections on the same cycle so their counts and
             // the shelf reflect a cross-device change. Best-effort — a failure
             // just leaves the last-known shelf, never a failed Saved-tab load.
@@ -197,6 +207,17 @@ public final class SavedViewModel {
             // the error state when there's nothing already on screen.
             if recipes.isEmpty { loadState = .error }
         }
+    }
+
+    /// The two id-set projections the filter chips narrow on, read together so
+    /// ``refresh()`` stays a single flat sequence (and under the complexity
+    /// cap). Both are best-effort: a read failure yields an empty set (that
+    /// chip simply matches nothing) rather than failing the whole refresh —
+    /// downloaded badges (T-774 / DUT-80) and the Desserts filter (DUT-1339).
+    private func auxiliaryFilterSets() async -> (downloaded: Set<Int>, desserts: Set<Int>) {
+        let downloaded = (try? await dependencies.downloadedRecipeIDs()) ?? []
+        let desserts = (try? await dependencies.dessertRecipeIDs()) ?? []
+        return (downloaded, desserts)
     }
 
     /// DUT-487 — hydrate a recipe's ingredients before it feeds the Shopping

@@ -23,6 +23,12 @@ public protocol SavedDependencies: Sendable {
     /// `[]` (no badges) so existing fake conformers keep compiling; the live
     /// wiring routes to ``RecipeStore/downloadedRecipeIDs()``.
     func downloadedRecipeIDs() async throws -> Set<Int>
+    /// DUT-1339 — the id set of saved recipes that read as a dessert, so the
+    /// Saved tab's "Desserts" filter chip can narrow to them. Computed locally
+    /// from each cached recipe's own category signals (see
+    /// ``RecipeStore/dessertRecipeIDs()``); default `[]` so fake conformers keep
+    /// compiling and simply offer no desserts. The live wiring routes to the store.
+    func dessertRecipeIDs() async throws -> Set<Int>
     /// T-775 / DUT-81 — clear a recipe's explicit-download pin (un-download)
     /// so its "Downloaded" badge clears. Default no-op; the live wiring routes
     /// to ``RecipeStore/removeDownload(id:)``. The recipe stays saved.
@@ -128,6 +134,11 @@ extension SavedDependencies {
     /// state inherit the empty set. T-774 / DUT-80.
     public func downloadedRecipeIDs() async throws -> Set<Int> { [] }
 
+    /// Default: no desserts, so the "Desserts" chip narrows to nothing for a
+    /// fake that doesn't model category data. The live wiring overrides this.
+    /// DUT-1339.
+    public func dessertRecipeIDs() async throws -> Set<Int> { [] }
+
     /// Default no-op so fakes that don't model download state keep compiling
     /// (T-775 / DUT-81). Live routes to ``RecipeStore/removeDownload(id:)``.
     public func removeDownload(id: Int) async throws {}
@@ -204,6 +215,10 @@ public struct LiveSavedDependencies: SavedDependencies {
 
     public func downloadedRecipeIDs() async throws -> Set<Int> {
         try await store.downloadedRecipeIDs()
+    }
+
+    public func dessertRecipeIDs() async throws -> Set<Int> {
+        try await store.dessertRecipeIDs()
     }
 
     public func removeDownload(id: Int) async throws {

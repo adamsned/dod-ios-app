@@ -18,6 +18,8 @@ extension SavedViewModel {
         case recipes
         /// `Recipe.isArticle == true`.
         case articles
+        /// Desserts (id in ``SavedViewModel/dessertIDs``, DUT-1339 / DUT-325).
+        case desserts
         /// Downloaded for offline use (id in ``SavedViewModel/downloadedIDs``).
         case downloaded
 
@@ -27,17 +29,20 @@ extension SavedViewModel {
             case .all: return "All"
             case .recipes: return "Recipes"
             case .articles: return "Articles"
+            case .desserts: return "Desserts"
             case .downloaded: return "Downloaded"
             }
         }
 
-        /// Whether a recipe passes this filter. `downloadedIDs` is threaded in
-        /// because the download set lives on the view model, not the recipe.
-        func matches(_ recipe: Recipe, downloadedIDs: Set<Int>) -> Bool {
+        /// Whether a recipe passes this filter. `downloadedIDs` / `dessertIDs`
+        /// are threaded in because those sets live on the view model, not on the
+        /// partial recipe the Saved tab renders (which carries no categories).
+        func matches(_ recipe: Recipe, downloadedIDs: Set<Int>, dessertIDs: Set<Int>) -> Bool {
             switch self {
             case .all: return true
             case .recipes: return !recipe.isArticle
             case .articles: return recipe.isArticle
+            case .desserts: return dessertIDs.contains(recipe.id)
             case .downloaded: return downloadedIDs.contains(recipe.id)
             }
         }
@@ -49,7 +54,7 @@ extension SavedViewModel {
     /// memory, so this stays a pure client-side filter (no fetch).
     public var displayedRecipes: [Recipe] {
         var result = collectionScopedRecipes.filter {
-            typeFilter.matches($0, downloadedIDs: downloadedIDs)
+            typeFilter.matches($0, downloadedIDs: downloadedIDs, dessertIDs: dessertIDs)
         }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !query.isEmpty {

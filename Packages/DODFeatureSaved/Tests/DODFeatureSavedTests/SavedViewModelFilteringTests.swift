@@ -24,11 +24,13 @@ import Testing
 
     private func loadedViewModel(
         recipes: [Recipe],
-        downloaded: Set<Int> = []
+        downloaded: Set<Int> = [],
+        desserts: Set<Int> = []
     ) async -> (SavedViewModel, FakeSavedDependencies) {
         let dependencies = FakeSavedDependencies()
         dependencies.recipes = recipes
         dependencies.downloadedIDs = downloaded
+        dependencies.dessertIDs = desserts
         let viewModel = SavedViewModel(dependencies: dependencies)
         await viewModel.refresh()
         return (viewModel, dependencies)
@@ -99,6 +101,25 @@ import Testing
 
         viewModel.typeFilter = .downloaded
         #expect(viewModel.displayedRecipes.map(\.id) == [2, 3])
+    }
+
+    // MARK: - Desserts (DUT-1339 / DUT-325)
+
+    @Test func dessertFilterKeepsOnlyDessertIDs() async {
+        let (viewModel, _) = await loadedViewModel(
+            recipes: [
+                makeRecipe(id: 1, title: "Chili"),
+                makeRecipe(id: 2, title: "Skillet Brownie"),
+                makeRecipe(id: 3, title: "Peach Cobbler"),
+            ],
+            desserts: [2, 3]
+        )
+        // Sanity: the view model hydrated its dessert set from the dependency.
+        #expect(viewModel.dessertIDs == [2, 3])
+
+        viewModel.typeFilter = .desserts
+        #expect(viewModel.displayedRecipes.map(\.id) == [2, 3])
+        #expect(viewModel.isFilteringActive)
     }
 
     // MARK: - Composition
