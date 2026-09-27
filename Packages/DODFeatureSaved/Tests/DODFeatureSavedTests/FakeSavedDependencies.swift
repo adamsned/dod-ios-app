@@ -114,4 +114,75 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     func fireRemoteChange() {
         remoteChangeContinuation.yield(())
     }
+
+    // MARK: - Collections (DUT-105) — in-memory model for view-model tests.
+
+    /// The fake's collection store. Tests seed it or let the view model's CRUD
+    /// mutate it, then assert on it.
+    var storedCollections: [RecipeCollection] = []
+
+    func collections() async throws -> [RecipeCollection] {
+        if shouldFail { throw URLError(.unknown) }
+        return storedCollections
+    }
+
+    func createCollection(name: String) async throws -> RecipeCollection {
+        let created = RecipeCollection(
+            id: UUID(),
+            name: name,
+            sortOrder: storedCollections.count,
+            createdAt: .now,
+            recipeIDs: []
+        )
+        storedCollections.append(created)
+        return created
+    }
+
+    func renameCollection(id: UUID, name: String) async throws {
+        storedCollections = storedCollections.map { collection in
+            collection.id == id ? collection.withMembership(name: name) : collection
+        }
+    }
+
+    func deleteCollection(id: UUID) async throws {
+        storedCollections.removeAll { $0.id == id }
+    }
+
+    func collectionIDs(forRecipe recipeID: Int) async throws -> Set<UUID> {
+        Set(storedCollections.filter { $0.recipeIDs.contains(recipeID) }.map(\.id))
+    }
+
+    func setCollections(forRecipe recipeID: Int, to ids: Set<UUID>) async throws {
+        storedCollections = storedCollections.map { collection in
+            var members = collection.recipeIDs.filter { $0 != recipeID }
+            if ids.contains(collection.id) { members.append(recipeID) }
+            return collection.withMembership(recipeIDs: members)
+        }
+    }
+
+    func recipes(inCollection id: UUID) async throws -> [Recipe] {
+        guard let collection = storedCollections.first(where: { $0.id == id }) else { return [] }
+        let byID = Dictionary(recipes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return collection.recipeIDs.compactMap { byID[$0] }
+    }
+
+    func reorderCollections(orderedIDs: [UUID]) async throws {
+        storedCollections.sort { lhs, rhs in
+            (orderedIDs.firstIndex(of: lhs.id) ?? .max) < (orderedIDs.firstIndex(of: rhs.id) ?? .max)
+        }
+    }
+}
+
+/// Test helper — rebuild a `RecipeCollection` (an immutable value type) with a
+/// changed name or membership.
+extension RecipeCollection {
+    fileprivate func withMembership(name: String? = nil, recipeIDs: [Int]? = nil) -> RecipeCollection {
+        RecipeCollection(
+            id: id,
+            name: name ?? self.name,
+            sortOrder: sortOrder,
+            createdAt: createdAt,
+            recipeIDs: recipeIDs ?? self.recipeIDs
+        )
+    }
 }

@@ -20,7 +20,20 @@ public final class SavedViewModel {
     public private(set) var downloadedIDs: Set<Int> = []
     public private(set) var loadState: LoadState = .idle
 
-    private let dependencies: SavedDependencies
+    /// DUT-105 — the user's collections / cookbooks, shelf-ordered. Reloaded in
+    /// ``refresh()`` (so a cross-device change surfaces) and after every CRUD
+    /// edit. Empty when the user has created none, which hides the shelf.
+    /// `internal(set)` so `SavedViewModel+Collections.swift` (a separate file)
+    /// can commit reloads.
+    public internal(set) var collections: [RecipeCollection] = []
+    /// DUT-105 — the collection the shelf is filtered to, or `nil` for the flat
+    /// "All Saved" list (the default). ``displayedRecipes`` reads this.
+    /// `internal(set)` for the same cross-file reason as ``collections``.
+    public internal(set) var selectedCollectionID: UUID?
+
+    /// DUT-105 — `internal` (not `private`) so the collections logic in
+    /// `SavedViewModel+Collections.swift` can reach it from its own file.
+    let dependencies: SavedDependencies
 
     /// Subscription handle for CloudKit remote-import signals (DUT-6).
     /// `@ObservationIgnored` because no view observes it (a private lifecycle
@@ -152,6 +165,12 @@ public final class SavedViewModel {
             // have committed while this one was fetching the download-id set.
             guard generation == refreshGeneration else { return }
             downloadedIDs = downloaded
+            // DUT-105: reload collections on the same cycle so their counts and
+            // the shelf reflect a cross-device change. Best-effort — a failure
+            // just leaves the last-known shelf, never a failed Saved-tab load.
+            let loadedCollections = (try? await dependencies.collections()) ?? collections
+            guard generation == refreshGeneration else { return }
+            applyCollections(loadedCollections)
             loadState = recipes.isEmpty ? .empty : .loaded
             // DUT-365: republish the home-screen widget so a cross-device
             // save/unsave (which reaches us via the remote-change refresh) updates
