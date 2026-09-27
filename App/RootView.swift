@@ -46,6 +46,10 @@ struct RootView: View {
     /// Non-private so `RootView+Appearance.swift` decodes it.
     @AppStorage(SettingsViewModel.appearancePreferenceKey)
     var appearanceRaw: String = AppearancePreference.system.rawValue
+    // ⚠️ DEV DEBUG (strip before public release) — gates `DevPopupHarness`, the
+    // app-level test harness for the Dev Debug ▸ Testing buttons. Locked builds
+    // wire no observers or overlays. See `RootView+DevHarness.swift`.
+    @AppStorage(DevDebug.unlockedKey) var devDebugUnlocked = false
     /// Widget deep link (spec.md US-9 AC-9.2). Feed tab consumes via .task(id:).
     /// Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)` can set it.
     @State var pendingDeepLink: WidgetDeepLink?
@@ -224,6 +228,10 @@ struct RootView: View {
         // resolved at launch and disclosed by the welcome screen's standing
         // disclosure line (pinned above the CTA, not a scrollable bullet).
         .fullScreenCover(isPresented: $showOnboarding) { onboardingCover }
+        // ⚠️ DEV DEBUG (strip before public release) — fires the Dev Debug
+        // "Testing" popups (Snackbar / OfflineBanner / App Welcome) over the app.
+        // Inert unless Dev Debug is unlocked. See `RootView+DevHarness.swift`.
+        .modifier(DevPopupHarness(enabled: devDebugUnlocked, showOnboarding: $showOnboarding))
         // T-912 / DUT-551 (CL-306) — Settings sheet. The iPhone gear + iPad
         // sidebar row both flip `showSettingsSheet`. Content in
         // `RootView+Settings.swift` (file_length split, DUT-941).
