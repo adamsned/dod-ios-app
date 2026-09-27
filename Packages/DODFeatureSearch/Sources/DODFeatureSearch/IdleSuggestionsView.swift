@@ -195,7 +195,7 @@ struct IdleSuggestionsView: View {
             // DUT — destructive confirmation for the recents wipe. Same roles
             // as `ShoppingListView`'s dialog: a destructive confirm + Cancel.
             .confirmationDialog(
-                "Clear recent searches?",
+                "Clear Recent Searches?",
                 isPresented: $isConfirmingClearRecents,
                 titleVisibility: .visible
             ) {
