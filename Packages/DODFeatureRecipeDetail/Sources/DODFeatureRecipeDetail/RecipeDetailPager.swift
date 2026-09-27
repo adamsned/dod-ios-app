@@ -1,3 +1,4 @@
+import DODDesignSystem
 import DODDomain
 import SwiftUI
 
@@ -74,6 +75,13 @@ public struct RecipeDetailPager<Page: View>: View {
             // single-recipe view; the hero + blur then show through to the top.
             .background(TransparentNavBar())
             #endif
+            // DUT-1335 — paint the bottom safe area BEHIND the pager so recipe
+            // (and article) pages don't show a black strip below the floating tab
+            // bar. The `.page` TabView insets each page from the bottom safe area
+            // (only `.top` is ignored above), so a page's own `.ignoresSafeArea()`
+            // surface background can't reach that strip — the pager's black shows
+            // through. Filling it here matches RecipeDetailView + CookModeView.
+            .background(DODColor.surface.ignoresSafeArea())
         }
     }
 }
