@@ -26,6 +26,7 @@ extension WPDTO.Post {
             (try? container.decode(WPDTO.RenderedString.self, forKey: .excerpt)) ?? WPDTO.RenderedString(rendered: "")
         date = try container.decodeIfPresent(String.self, forKey: .date)
         dateGMT = try container.decodeIfPresent(String.self, forKey: .dateGMT)
+        modifiedGMT = try container.decodeIfPresent(String.self, forKey: .modifiedGMT)
         featuredMedia = try container.decodeIfPresent(Int.self, forKey: .featuredMedia)
         categories = try container.decodeIfPresent([Int].self, forKey: .categories)
         // DUT-640: decode `_embedded` leniently. A malformed embedded block

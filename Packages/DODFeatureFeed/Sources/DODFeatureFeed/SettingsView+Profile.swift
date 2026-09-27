@@ -123,6 +123,8 @@ struct ProfileSettingsSection: View {
     /// New-Post Notification" button. `nil` (button hidden) unless the App
     /// target's composition root injects it.
     var sendTestNotification: (() async -> Void)?
+    /// DUT-1333 — threaded to the "Send Test New-Article Notification" button.
+    var sendTestArticleNotification: (() async -> Void)?
 
     /// Daddy Mode (Phase 1, cosmetic) — resolved once on appear so the body
     /// doesn't hit the Keychain on every recompute. Gated OFF for everyone until
@@ -143,7 +145,10 @@ struct ProfileSettingsSection: View {
                 // force-show it for design review — reveal only, no owner action.)
                 if isOwner || devForceShowOwnerUI {
                     NavigationLink {
-                        OwnerToolsPlaceholderView(sendTestNotification: sendTestNotification)
+                        OwnerToolsPlaceholderView(
+                            sendTestNotification: sendTestNotification,
+                            sendTestArticleNotification: sendTestArticleNotification
+                        )
                     } label: {
                         Label("Daddy's Tools", systemImage: "key.shield.fill")
                             .dodFont(DODType.body)

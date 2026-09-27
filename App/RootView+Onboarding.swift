@@ -137,6 +137,12 @@ extension RootView {
         let granted = await dependencies.notificationService.requestAuthorization()
         if granted {
             UserDefaults.standard.set(true, forKey: SettingsViewModel.notificationsEnabledKey)
+            // DUT-1333 — allowing notifications opts you into new-article alerts
+            // too ("When a New Article Drops"); it's off by default otherwise.
+            UserDefaults.standard.set(
+                true,
+                forKey: SettingsViewModel.articleNotificationsEnabledKey
+            )
         }
         // 2. iCloud Sync — ask (never silently enable). When riding the onboarding
         //    cover's dismissal the prompt is presented from `onDismiss:` (DUT-408),

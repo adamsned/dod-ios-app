@@ -16,6 +16,11 @@ import SwiftUI
 /// trigger on demand.
 struct TestNotificationButton: View {
 
+    /// Button label — DUT-1333 parameterized it so the same component renders
+    /// both the recipe and article test-fire buttons.
+    let title: String
+    /// Stable id for the button; the confirmation gets `"\(id)-confirmation"`.
+    let accessibilityID: String
     let sendTestNotification: () async -> Void
     /// Brief inline confirmation shown after the closure runs. `nil` (no
     /// message) until the first tap.
@@ -30,13 +35,13 @@ struct TestNotificationButton: View {
                         "Test notification scheduled — it'll arrive in a moment if notifications are enabled."
                 }
             } label: {
-                Text("Send Test New-Post Notification")
+                Text(title)
                     .dodFont(DODType.body)
                     .frame(maxWidth: .infinity)
             }
             .dodProminentButton()
             .tint(DODColor.burntOrange)
-            .accessibilityIdentifier("daddys-tools-send-test-notification")
+            .accessibilityIdentifier(accessibilityID)
 
             if let confirmationMessage {
                 Text(confirmationMessage)
@@ -44,7 +49,7 @@ struct TestNotificationButton: View {
                     .foregroundStyle(DODColor.labelSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("daddys-tools-send-test-notification-confirmation")
+                    .accessibilityIdentifier("\(accessibilityID)-confirmation")
             }
         }
         .padding(.top, DODSpacing.md)

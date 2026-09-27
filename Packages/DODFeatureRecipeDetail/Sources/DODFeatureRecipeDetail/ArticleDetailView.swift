@@ -104,7 +104,7 @@ struct ArticleDetailView: View {
     /// also uses (medium → long per Ned). The visible text equals the VoiceOver
     /// label by construction, so no separate `.accessibilityLabel` is needed.
     private var publishedDateCaption: some View {
-        PublishedDateCaption(date: recipe.publishedAt)
+        PublishedDateCaption(date: recipe.updatedAt ?? recipe.publishedAt)
     }
 
     /// The rendered article body: native blocks when the HTML parsed, else a
