@@ -22,14 +22,9 @@ extension CookingToolsHubView {
                     .foregroundStyle(DODColor.labelSecondary)
                     .padding(.top, DODSpacing.xs)
 
-                toolCard(
-                    icon: "flame.fill",
-                    title: "Your First Cookout",
-                    description: "New to Dutch oven cooking? Get coached through a whole cook, "
-                        + "start to finish.",
-                    accessibilityID: "hub-first-cookout"
-                ) { activeToolSheet = .firstCookout(scrollToDumpCakes: false) }
-
+                // DUT-1337 — Shopping List leads: buying your ingredients is the
+                // first step in "the order you'll use it" (matches the caption +
+                // the HubTool enum's stated shop-first meal-making order).
                 toolCard(
                     icon: "cart.fill",
                     title: "Shopping List",
@@ -39,6 +34,14 @@ extension CookingToolsHubView {
                 ) {
                     if path.last != .shoppingList { path.append(.shoppingList) }
                 }
+
+                toolCard(
+                    icon: "flame.fill",
+                    title: "Your First Cookout",
+                    description: "New to Dutch oven cooking? Get coached through a whole cook, "
+                        + "start to finish.",
+                    accessibilityID: "hub-first-cookout"
+                ) { activeToolSheet = .firstCookout(scrollToDumpCakes: false) }
 
                 toolCard(
                     icon: "thermometer.medium",
