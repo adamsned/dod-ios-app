@@ -17,10 +17,13 @@ import SwiftUI
 /// hosts — see `OwnerToolsPlaceholderView+TestNotification.swift`).
 struct OwnerToolsPlaceholderView: View {
 
-    /// Fires a real test notification when non-nil. Injected from the App
-    /// target's composition root (see `RootView+Settings.swift`); nil by
+    /// Fires a real test *recipe* notification when non-nil. Injected from the
+    /// App target's composition root (see `RootView+Settings.swift`); nil by
     /// default so previews and callers that don't wire it still compile.
     var sendTestNotification: (() async -> Void)?
+    /// DUT-1333 — companion closure for the "Send Test New-Article
+    /// Notification" button. Injected from the composition root; nil hides it.
+    var sendTestArticleNotification: (() async -> Void)?
 
     var body: some View {
         ScrollView {
@@ -50,7 +53,18 @@ struct OwnerToolsPlaceholderView: View {
                 .padding(.horizontal, DODSpacing.md)
 
                 if let sendTestNotification {
-                    TestNotificationButton(sendTestNotification: sendTestNotification)
+                    TestNotificationButton(
+                        title: "Send Test New-Recipe Notification",
+                        accessibilityID: "daddys-tools-send-test-notification",
+                        sendTestNotification: sendTestNotification
+                    )
+                }
+                if let sendTestArticleNotification {
+                    TestNotificationButton(
+                        title: "Send Test New-Article Notification",
+                        accessibilityID: "daddys-tools-send-test-article-notification",
+                        sendTestNotification: sendTestArticleNotification
+                    )
                 }
             }
             .frame(maxWidth: .infinity)
@@ -73,6 +87,6 @@ struct OwnerToolsPlaceholderView: View {
 
 #Preview("With test-notification button") {
     NavigationStack {
-        OwnerToolsPlaceholderView(sendTestNotification: {})
+        OwnerToolsPlaceholderView(sendTestNotification: {}, sendTestArticleNotification: {})
     }
 }

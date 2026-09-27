@@ -1,9 +1,11 @@
 import DODDesignSystem
 import SwiftUI
 
-/// Shared "Published <absolute date>" caption for the article + recipe detail
-/// headers. Renders a long-style, locale-aware date — "Published June 1, 2026"
-/// — in the secondary-caption style both surfaces use.
+/// Shared "Last Updated: <absolute date>" caption for the article + recipe
+/// detail headers (DUT-1334 — was "Published …"). Renders a long-style,
+/// locale-aware date, e.g. "Last Updated: June 1, 2026", in the secondary-
+/// caption style both surfaces use. Callers pass the post's `updatedAt`
+/// (WordPress `modified`), falling back to `publishedAt` when absent.
 ///
 /// T-789 / CL-185 (DUT-96): introduced when the published date was added to
 /// recipe detail (Ned's open question on DUT-95) and the format moved from
@@ -28,7 +30,7 @@ struct PublishedDateCaption: View {
     }()
 
     var body: some View {
-        Text("Published \(Self.formatter.string(from: date))")
+        Text("Last Updated: \(Self.formatter.string(from: date))")
             .dodFont(DODType.caption)
             .foregroundStyle(DODColor.labelSecondary)
     }
