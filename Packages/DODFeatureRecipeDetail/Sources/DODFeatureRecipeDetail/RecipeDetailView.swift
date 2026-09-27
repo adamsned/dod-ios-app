@@ -361,7 +361,7 @@ public struct RecipeDetailView: View {
     /// Mode at the top of the viewport (Instructions immediately below it).
     private func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            PublishedDateCaption(date: viewModel.listItem.publishedAt)
+            PublishedDateCaption(date: viewModel.listItem.updatedAt ?? viewModel.listItem.publishedAt)
             Spacer(minLength: DODSpacing.sm)
             if !(viewModel.recipe?.instructions.isEmpty ?? true) {
                 Button {
