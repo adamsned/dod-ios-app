@@ -91,7 +91,7 @@ public struct ShoppingListView: View {
             // role tints the button red; the list clears + persists empty on
             // confirm (survives close/reopen).
             .confirmationDialog(
-                "Clear this shopping list?",
+                "Clear This Shopping List?",
                 isPresented: $isConfirmingClear,
                 titleVisibility: .visible
             ) {
