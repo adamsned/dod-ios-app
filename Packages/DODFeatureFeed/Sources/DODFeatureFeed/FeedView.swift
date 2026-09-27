@@ -142,7 +142,9 @@ public struct FeedView: View {
         // DUT-534 Part 2 — the "Add to Shopping List" confirmation snackbar,
         // anchored to the bottom (mirrors Recipe Detail's Part 1 host).
         .overlay(alignment: .bottom) { shoppingListSnackbar }
-        .background(DODColor.surface)
+        // DUT-1335 — fill the bottom safe area so no black bar shows under the
+        // floating tab bar (matches the detail screens + CookModeView).
+        .background(DODColor.surface.ignoresSafeArea())
         // DUT-275 — nav bar hidden: the header button lives in the pinned header
         // row above (next to the title) instead of the nav bar, so no nav-bar
         // height is reserved and the title sits at the same top Y as every other
