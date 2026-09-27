@@ -81,6 +81,16 @@ public protocol SettingsDependencies: Sendable {
     /// Unlike an edit this DOES change the cook count, so the journal reloads its
     /// stats after. Default no-op so previews / doubles stay source-compatible.
     func deleteCookLog(id: UUID) async throws
+
+    // MARK: - Export My Data (DUT-162)
+
+    /// Gather the user's on-device data (saved recipes, cooking journal,
+    /// shopping list, profile) into a single portable JSON file and return its
+    /// local file URL, ready to hand to the system share sheet. Runs fully
+    /// offline and succeeds for guest users with no account. Returns `nil` when
+    /// export isn't wired (previews / the L1 recording double), so the row
+    /// degrades to a no-op rather than a crash.
+    func exportMyData() async throws -> URL?
 }
 
 extension SettingsDependencies {
@@ -92,4 +102,5 @@ extension SettingsDependencies {
     public func shoppingListItemCount() async throws -> Int { 0 }
     public func updateCookLog(_ entry: CookLogEntry) async throws {}
     public func deleteCookLog(id: UUID) async throws {}
+    public func exportMyData() async throws -> URL? { nil }
 }
