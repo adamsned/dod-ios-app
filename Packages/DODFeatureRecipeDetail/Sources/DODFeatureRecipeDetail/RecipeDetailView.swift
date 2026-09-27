@@ -144,7 +144,11 @@ public struct RecipeDetailView: View {
             content
             snackbar
         }
-        .background(DODColor.surface)
+        // DUT-1335 — fill the bottom safe area (home-indicator strip below the
+        // floating tab bar) with the brand surface. The ScrollView only ignores
+        // the TOP safe area for the immersive hero, so without this the bottom
+        // inset was left unpainted and read as a black bar. Matches CookModeView.
+        .background(DODColor.surface.ignoresSafeArea())
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         // DUT-572 / CL-312 — full-bleed hero: hide the nav-bar background so the
