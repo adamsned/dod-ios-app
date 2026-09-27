@@ -135,9 +135,6 @@ public struct FeedView: View {
                 searchBar
                 content
             }
-            // Offline shifts the whole stack below the OfflineBanner overlay.
-            .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
-            OfflineBanner(isOffline: viewModel.isOffline)
         }
         // DUT-534 Part 2 — the "Add to Shopping List" confirmation snackbar,
         // anchored to the bottom (mirrors Recipe Detail's Part 1 host).
@@ -267,18 +264,40 @@ public struct FeedView: View {
 
     @ViewBuilder
     private var content: some View {
+        if viewModel.isOffline {
+            // DUT-1333 — offline blocks the WHOLE Recipes page (not a thin
+            // banner over stale cache). A clear "couldn't load" message + Retry,
+            // plus a pointer to the Saved tab for downloaded recipes, so the
+            // offline state reads unambiguously — especially for less technical
+            // cooks who need to know Saved is where offline recipes live.
+            offlineBlock
+        } else {
+            loadStateContent
+        }
+    }
+
+    /// Full-page offline block. Supersedes the old `OfflineBanner` strip.
+    private var offlineBlock: some View {
+        EmptyState(
+            systemImage: "wifi.slash",
+            title: "You're Offline",
+            message:
+                "The Recipes page couldn't load without an internet connection. If you've downloaded recipes for offline use, open the Saved tab to cook from them.",
+            action: .init(title: "Retry") {
+                Task { await viewModel.refresh() }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var loadStateContent: some View {
         switch viewModel.loadState {
         case .loadingInitial:
             loadingSkeletons
         case .firstLaunchOffline:
-            EmptyState(
-                systemImage: "wifi.slash",
-                title: "You need internet",
-                message: "Connect to load recipes the first time.",
-                action: .init(title: "Retry") {
-                    Task { await viewModel.refresh() }
-                }
-            )
+            // Unreachable while `isOffline` is the precedence gate above, but
+            // kept as a defensive fallback for the first-launch-no-cache path.
+            offlineBlock
         case .firstLaunchFailed:
             // DUT-621 — an ONLINE first-launch failure: a real failure message
             // + a Retry wired to `refresh()`, NOT the dead-end "No recipes."
