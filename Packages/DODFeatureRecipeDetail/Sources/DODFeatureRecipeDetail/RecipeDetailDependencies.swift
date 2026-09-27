@@ -178,23 +178,19 @@ public protocol RecipeDetailDependencies: Sendable {
     // MARK: - Add to Shopping List (US-39 / DUT-534)
 
     /// DUT-534 — append this recipe's ingredients to the Shopping List. Recipe
-    /// Detail carries a fully-loaded `recipe` (ingredients populated), so no
-    /// hydration happens here; the live wiring routes to
-    /// `DODFeatureSaved.LiveShoppingListAppender` (App-Group store), which this
-    /// package can't import directly — hence the seam. Returns the appended-row
-    /// count / `.couldntLoad` so the view model picks the Snackbar copy. Default
-    /// `.couldntLoad` so fakes that don't model the list keep compiling — the
-    /// default impl lives in the extension below.
+    /// Detail's `recipe` is already loaded (ingredients populated), so the live
+    /// wiring just routes to `DODFeatureSaved.LiveShoppingListAppender` (App-Group
+    /// store), which this package can't import directly — hence the seam. Returns
+    /// the appended-row count / `.couldntLoad` for the Snackbar copy; the default
+    /// `.couldntLoad` in the extension below keeps fakes compiling.
     func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
 
     // MARK: - Handwritten annotations (iPad + Apple Pencil, v2)
     //
     // Per-recipe PencilKit drawing persistence. Defaults + the live file-store
-    // routing live in `RecipeDetailDependencies+Annotations.swift`. The record
-    // is Foundation-only `Data` (see ``DODPersistence/RecipeAnnotationRecord``),
-    // so this seam stays platform-agnostic; the `PKDrawing` ⇄ `Data` conversion
-    // happens in the iOS-guarded view layer. Defaults are safe no-ops so every
-    // existing fake keeps compiling.
+    // routing live in `RecipeDetailDependencies+Annotations.swift`; the record is
+    // Foundation-only `Data`, so this seam stays platform-agnostic. Defaults are
+    // safe no-ops so every existing fake keeps compiling.
     func loadRecipeAnnotation(recipeID: Int) async -> RecipeAnnotationRecord?
     func saveRecipeAnnotation(_ record: RecipeAnnotationRecord, recipeID: Int) async
 }
