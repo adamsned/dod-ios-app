@@ -31,6 +31,18 @@ public final class SavedViewModel {
     /// `internal(set)` for the same cross-file reason as ``collections``.
     public internal(set) var selectedCollectionID: UUID?
 
+    /// DUT-1339 — the live search query, filtered client-side over the loaded
+    /// saved set by recipe title (case-insensitive substring). Bound to the
+    /// header's ``DODSearchField``; ``displayedRecipes`` narrows on it. The
+    /// whole saved set is already in memory, so this is a pure local filter (no
+    /// fetch). Composes WITH the collection shelf selection and ``typeFilter``.
+    public var searchText: String = ""
+
+    /// DUT-1339 — the active type/state filter chip. ``displayedRecipes`` reads
+    /// this and narrows the saved set (recipes vs articles vs downloaded).
+    /// Composes WITH the collection shelf selection and ``searchText``.
+    public var typeFilter: SavedTypeFilter = .all
+
     /// DUT-105 — `internal` (not `private`) so the collections logic in
     /// `SavedViewModel+Collections.swift` can reach it from its own file.
     let dependencies: SavedDependencies

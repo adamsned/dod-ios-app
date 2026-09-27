@@ -10,10 +10,12 @@ import Foundation
 // since `@Observable` can only track stored properties declared there.)
 extension SavedViewModel {
 
-    /// The recipes to show in the grid/list: the whole saved set for "All Saved"
-    /// (`selectedCollectionID == nil`), or just a collection's members when one
-    /// is selected, preserving the saved-set (newest-first) order.
-    public var displayedRecipes: [Recipe] {
+    /// The saved recipes narrowed to the shelf selection ONLY: the whole saved
+    /// set for "All Saved" (`selectedCollectionID == nil`), or just a
+    /// collection's members when one is selected, preserving the saved-set
+    /// (newest-first) order. DUT-1339 — the public ``displayedRecipes`` layers
+    /// the type filter + search on top of this (see `SavedViewModel+Filtering`).
+    var collectionScopedRecipes: [Recipe] {
         guard
             let selectedCollectionID,
             let collection = collections.first(where: { $0.id == selectedCollectionID })
