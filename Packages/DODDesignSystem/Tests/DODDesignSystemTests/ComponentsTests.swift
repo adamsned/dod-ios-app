@@ -296,33 +296,23 @@ import Testing
         #expect(addCount == 1)
     }
 
-    @Test func appIntroTourConstructs() {
-        let tour = AppIntroTour(
-            pages: [
-                .init(id: 0, title: "One", description: "First.", placeholderSymbol: "flame.fill"),
-                .init(id: 1, title: "Two", description: "Last.", placeholderSymbol: "star.fill"),
+    /// The paged tour collapsed to a single scrolling welcome screen, so the old
+    /// `isFirst` / `isLast` end-slide nav predicates are gone along with the
+    /// TabView, page dots, and Next/Back buttons they governed.
+    @Test func appWelcomeScreenConstructs() {
+        let welcome = AppWelcomeScreen(
+            headline: "Welcome",
+            intro: "Here's what's inside.",
+            bullets: [
+                .init(id: 0, title: "One", description: "First.", symbol: "flame.fill"),
+                .init(id: 1, title: "Two", description: "Second.", symbol: "star.fill"),
             ],
             ctaTitle: "Go",
             onFinish: {}
         )
-        #expect(tour.pages.count == 2)
-        #expect(tour.ctaTitle == "Go")
-    }
-
-    /// DUT-564 — the transparent end-slide nav buttons must leave the accessibility
-    /// tree so VoiceOver doesn't read an invisible "Previous"/"Next, dimmed, button".
-    /// `navButton` hides via `.accessibilityHidden(disabled)`, where `disabled` is
-    /// exactly `isFirst` / `isLast`. Assert that predicate directly.
-    @Test func appIntroEndSlideNavButtonsAreHiddenFromAccessibility() {
-        // "Previous" is disabled (hence a11y-hidden) only on the first slide.
-        #expect(AppIntroTour.isFirst(index: 0))
-        #expect(!AppIntroTour.isFirst(index: 1))
-        #expect(!AppIntroTour.isFirst(index: 2))
-
-        // "Next" is disabled (hence a11y-hidden) only on the last slide.
-        #expect(AppIntroTour.isLast(index: 2, pageCount: 3))
-        #expect(!AppIntroTour.isLast(index: 1, pageCount: 3))
-        #expect(!AppIntroTour.isLast(index: 0, pageCount: 3))
+        #expect(welcome.bullets.count == 2)
+        #expect(welcome.ctaTitle == "Go")
+        #expect(welcome.headline == "Welcome")
     }
 }
 
