@@ -27,7 +27,10 @@ extension RootView {
                 // `ProfileSettingsSection` to `OwnerToolsPlaceholderView`, which
                 // only renders the button when it's non-nil (it always is here;
                 // the button itself is hidden for non-owners upstream).
-                sendTestNotification: { await sendOwnerTestNotification() }
+                sendTestNotification: { await sendOwnerTestNotification() },
+                // DUT-1333 — second owner button fires the latest post as an
+                // *article* notification so the distinct look is verifiable.
+                sendTestArticleNotification: { await sendOwnerTestArticleNotification() }
             )
         }
     }
@@ -49,6 +52,19 @@ extension RootView {
         await dependencies.notificationService.scheduleNewPostNotification(
             title: latest.title,
             postKind: .recipe,
+            recipeID: latest.id
+        )
+    }
+
+    /// DUT-1333 — companion to ``sendOwnerTestNotification()`` that fires the
+    /// latest post as an *article* notification (`New Article 📖`), so the
+    /// distinct article styling + `dod://article/<id>` deep link can be
+    /// verified. Gated on the "When a New Article Drops" toggle.
+    func sendOwnerTestArticleNotification() async {
+        guard let latest = try? await dependencies.restClient.posts().first else { return }
+        await dependencies.notificationService.scheduleNewPostNotification(
+            title: latest.title,
+            postKind: .article,
             recipeID: latest.id
         )
     }

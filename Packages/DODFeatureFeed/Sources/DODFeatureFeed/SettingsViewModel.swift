@@ -38,12 +38,13 @@ public final class SettingsViewModel {
     /// authorization when the user flips it ON.
     public nonisolated static let notificationsEnabledKey = "dod.settings.notificationsEnabled"
 
-    /// T-750 / CL-147 (DUT-56) — "When Someone Replies to My Comment"
-    /// toggle key. Defaults OFF. Secures notification permission on enable
-    /// like ``notificationsEnabledKey``; reply-alert delivery awaits a
-    /// server-side push trigger (the DUT-15 backend gap). `V1` suffix.
-    public nonisolated static let commentReplyNotificationsEnabledKey =
-        "dod.settings.commentReplyNotificationsEnabledV1"
+    /// DUT-1333 — "When a New Article Drops" toggle key (replaces the
+    /// never-deliverable comment-reply toggle). Defaults OFF. Secures
+    /// notification permission on enable like ``notificationsEnabledKey``;
+    /// article-alert delivery follows the same DUT-1332 APNs trigger that
+    /// recipe alerts need.
+    public nonisolated static let articleNotificationsEnabledKey =
+        "dod.settings.articleNotificationsEnabled"
 
     /// AC-36.2 — Appearance preference key. Value is the raw value of
     /// ``AppearancePreference`` (`"system"` / `"light"` / `"dark"`).
@@ -153,15 +154,14 @@ public final class SettingsViewModel {
         didSet { defaults.set(notificationsEnabled, forKey: Self.notificationsEnabledKey) }
     }
 
-    /// T-750 / CL-147 (DUT-56). The "When Someone Replies to My Comment"
-    /// preference. **DUT-430 — observable stored property** (same fix as
-    /// ``notificationsEnabled``). Seeded in `init`, `didSet`-persisted;
-    /// defaults false (absent key → off). Written through the async
-    /// ``setCommentReplyNotificationsEnabled(_:)`` so an enable requests
+    /// DUT-1333. The "When a New Article Drops" preference (replaces the
+    /// comment-reply toggle). **DUT-430 — observable stored property**.
+    /// Seeded in `init`, `didSet`-persisted; defaults false. Written through
+    /// the async ``setArticleNotificationsEnabled(_:)`` so an enable requests
     /// system authorization, mirroring ``notificationsEnabled``.
-    public var commentReplyNotificationsEnabled: Bool {
+    public var articleNotificationsEnabled: Bool {
         didSet {
-            defaults.set(commentReplyNotificationsEnabled, forKey: Self.commentReplyNotificationsEnabledKey)
+            defaults.set(articleNotificationsEnabled, forKey: Self.articleNotificationsEnabledKey)
         }
     }
 
@@ -285,7 +285,7 @@ public final class SettingsViewModel {
         // DUT-430 — seed the observable notification flags from defaults
         // (didSet doesn't fire for these initial-in-init assignments).
         self.notificationsEnabled = defaults.bool(forKey: Self.notificationsEnabledKey)
-        self.commentReplyNotificationsEnabled = defaults.bool(forKey: Self.commentReplyNotificationsEnabledKey)
+        self.articleNotificationsEnabled = defaults.bool(forKey: Self.articleNotificationsEnabledKey)
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies

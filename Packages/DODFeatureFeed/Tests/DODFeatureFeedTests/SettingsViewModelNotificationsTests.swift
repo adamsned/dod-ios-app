@@ -6,7 +6,7 @@ import Testing
 /// L1 coverage for the Settings notification toggle setters
 /// (`SettingsViewModel+Notifications.swift`). The recipe-drop toggle's
 /// persistence is covered in `SettingsViewModelTests`; this suite focuses
-/// on the T-750 / CL-147 (DUT-56) "When Someone Replies to My Comment"
+/// on the T-750 / CL-147 (DUT-56) "When a New Article Drops"
 /// toggle — its default-off persistence + the authorization-gated enable
 /// path (grant persists ON; deny reverts to OFF + surfaces a snackbar;
 /// OFF never calls authorization).
@@ -28,21 +28,21 @@ struct SettingsViewModelNotificationsTests {
         return defaults
     }
 
-    @Test func commentReplyNotificationsDefaultsOffAndRoundTrips() async throws {
+    @Test func articleNotificationsDefaultsOffAndRoundTrips() async throws {
         let defaults = Self.isolatedDefaults()
         let viewModel = SettingsViewModel(defaults: defaults)
 
         // Default OFF (absent key).
-        #expect(viewModel.commentReplyNotificationsEnabled == false)
-        viewModel.commentReplyNotificationsEnabled = true
-        #expect(defaults.bool(forKey: SettingsViewModel.commentReplyNotificationsEnabledKey) == true)
+        #expect(viewModel.articleNotificationsEnabled == false)
+        viewModel.articleNotificationsEnabled = true
+        #expect(defaults.bool(forKey: SettingsViewModel.articleNotificationsEnabledKey) == true)
 
         // Persists across instances.
         let next = SettingsViewModel(defaults: defaults)
-        #expect(next.commentReplyNotificationsEnabled == true)
+        #expect(next.articleNotificationsEnabled == true)
     }
 
-    @Test func setCommentReplyNotificationsEnabledOnGrantPersistsTrue() async throws {
+    @Test func setArticleNotificationsEnabledOnGrantPersistsTrue() async throws {
         let defaults = Self.isolatedDefaults()
         // Inject an auth closure that GRANTS.
         let viewModel = SettingsViewModel(
@@ -50,13 +50,13 @@ struct SettingsViewModelNotificationsTests {
             requestNotificationAuthorization: { true }
         )
 
-        let granted = await viewModel.setCommentReplyNotificationsEnabled(true)
+        let granted = await viewModel.setArticleNotificationsEnabled(true)
         #expect(granted == true)
-        #expect(viewModel.commentReplyNotificationsEnabled == true)
+        #expect(viewModel.articleNotificationsEnabled == true)
         #expect(viewModel.snackbarMessage == nil)
     }
 
-    @Test func setCommentReplyNotificationsEnabledOnDenyStaysOffWithSnackbar() async throws {
+    @Test func setArticleNotificationsEnabledOnDenyStaysOffWithSnackbar() async throws {
         let defaults = Self.isolatedDefaults()
         // Inject an auth closure that DENIES (the default, made explicit).
         let viewModel = SettingsViewModel(
@@ -64,11 +64,11 @@ struct SettingsViewModelNotificationsTests {
             requestNotificationAuthorization: { false }
         )
 
-        let granted = await viewModel.setCommentReplyNotificationsEnabled(true)
+        let granted = await viewModel.setArticleNotificationsEnabled(true)
         #expect(granted == false)
         // Persisted intent stays OFF so the UI never claims it's on while
         // the OS suppresses delivery (mirrors AC-42.1).
-        #expect(viewModel.commentReplyNotificationsEnabled == false)
+        #expect(viewModel.articleNotificationsEnabled == false)
         #expect(viewModel.snackbarMessage != nil)
     }
 
@@ -113,10 +113,10 @@ struct SettingsViewModelNotificationsTests {
         #expect(next.notificationsEnabled == true)
     }
 
-    @Test func setCommentReplyNotificationsEnabledOffPersistsFalseWithoutAuth() async throws {
+    @Test func setArticleNotificationsEnabledOffPersistsFalseWithoutAuth() async throws {
         let defaults = Self.isolatedDefaults()
         // Seed it ON, then turn OFF — the OFF path must not call auth.
-        defaults.set(true, forKey: SettingsViewModel.commentReplyNotificationsEnabledKey)
+        defaults.set(true, forKey: SettingsViewModel.articleNotificationsEnabledKey)
         let viewModel = SettingsViewModel(
             defaults: defaults,
             requestNotificationAuthorization: {
@@ -125,8 +125,8 @@ struct SettingsViewModelNotificationsTests {
             }
         )
 
-        let result = await viewModel.setCommentReplyNotificationsEnabled(false)
+        let result = await viewModel.setArticleNotificationsEnabled(false)
         #expect(result == false)
-        #expect(viewModel.commentReplyNotificationsEnabled == false)
+        #expect(viewModel.articleNotificationsEnabled == false)
     }
 }

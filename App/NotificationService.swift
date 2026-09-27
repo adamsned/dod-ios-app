@@ -75,7 +75,14 @@ final class NotificationService {
     ///   - recipeID: the WP post id baked into the `dod://<kind>/<id>`
     ///     deep link stamped into `userInfo` for the tap handler.
     func scheduleNewPostNotification(title: String, postKind: PostKind, recipeID: Int) async {
-        let toggleEnabled = defaults.bool(forKey: SettingsViewModel.notificationsEnabledKey)
+        // DUT-1333 — gate PER KIND: recipe notifications honor the "When New
+        // Recipes Drop" toggle, article notifications the "When a New Article
+        // Drops" toggle.
+        let toggleKey =
+            postKind == .recipe
+            ? SettingsViewModel.notificationsEnabledKey
+            : SettingsViewModel.articleNotificationsEnabledKey
+        let toggleEnabled = defaults.bool(forKey: toggleKey)
         let authorized = await isAuthorized()
         guard
             NotificationContentBuilder.shouldSchedule(

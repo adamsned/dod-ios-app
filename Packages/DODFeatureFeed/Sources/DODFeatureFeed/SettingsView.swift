@@ -14,7 +14,7 @@ import SwiftUI
 /// **Section layout (T-752 / CL-149 — top → bottom).** Profile (US-44,
 /// no header); **Measurements & Units** (Use Metric Units toggle + Recipe
 /// Step Temperatures picker); **Notification Settings** (When New Recipes
-/// Drop + When Someone Replies to My Comment toggles); **Customization**
+/// Drop + When a New Article Drops toggles); **Customization**
 /// (Appearance picker + Cook Mode Voice rows via ``VoiceRows`` + the DUT-596
 /// controls auto-minimize picker); **Data & Privacy** (iCloud Sync
 /// via ``CloudSyncRows`` + Clear Cached Recipe Images + Share Anonymous Usage
@@ -47,15 +47,14 @@ public struct SettingsView: View {
     /// snackbar. Optional so previews / snapshot tests skip plumbing a
     /// `RecipeStore` (nil surfaces the zero-bytes copy); production always wires it.
     public let onClearImageCache: (() async throws -> Int)?
-    /// DUT-572 — hides the top Profile section when true. Injected from RootView's
-    /// real device size class because this sheet always reports `.compact` on iPad
-    /// (see ``ProfileSettingsSection``); hides on iPad, shows on iPhone.
+    /// DUT-572 — hides the top Profile section on iPad (this sheet always reports
+    /// `.compact`, so RootView injects the real size class). See ``ProfileSettingsSection``.
     private let hidesProfile: Bool
-    /// DUT-941 — threaded down through `ProfileSettingsSection` to
-    /// `OwnerToolsPlaceholderView`'s owner-only "Send Test New-Post
-    /// Notification" button. `nil` by default so existing callers/previews
-    /// compile unchanged (button hidden).
+    /// DUT-941 — threaded through `ProfileSettingsSection` to the owner-only
+    /// recipe test-fire button. `nil` by default (button hidden for non-owners).
     private let sendTestNotification: (() async -> Void)?
+    /// DUT-1333 — companion closure for the article test-fire button.
+    private let sendTestArticleNotification: (() async -> Void)?
     /// DUT-694 (PR-D) — in-flight guard for the Clear Cache row (blocks a
     /// double-tap double-clear). `internal` for `SettingsView+Feedback.swift`.
     @State var isClearingCache = false
@@ -70,7 +69,8 @@ public struct SettingsView: View {
         onClearImageCache: (() async throws -> Int)? = nil,
         settingsDependencies: (any SettingsDependencies)? = nil,
         hidesProfile: Bool = false,
-        sendTestNotification: (() async -> Void)? = nil
+        sendTestNotification: (() async -> Void)? = nil,
+        sendTestArticleNotification: (() async -> Void)? = nil
     ) {
         // Construct a default view-model when none is injected,
         // honoring the optional `settingsDependencies` so the iCloud
@@ -82,6 +82,7 @@ public struct SettingsView: View {
         self.onClearImageCache = onClearImageCache
         self.hidesProfile = hidesProfile
         self.sendTestNotification = sendTestNotification
+        self.sendTestArticleNotification = sendTestArticleNotification
     }
 
     public var body: some View {
@@ -156,7 +157,8 @@ public struct SettingsView: View {
             ProfileSettingsSection(
                 viewModel: viewModel,
                 hidesProfile: hidesProfile,
-                sendTestNotification: sendTestNotification
+                sendTestNotification: sendTestNotification,
+                sendTestArticleNotification: sendTestArticleNotification
             )
 
             // MARK: T-750 / CL-147 — Measurements & Units group
@@ -207,11 +209,9 @@ public struct SettingsView: View {
 
             // MARK: T-750 / CL-147 — Notification Settings group
 
-            // DUT-56 — the renamed recipe-drop toggle (US-36 AC-36.1) +
-            // the new "When Someone Replies to My Comment" toggle grouped
-            // under one header. The reply toggle persists + secures
-            // notification permission now; delivery follows the server-side
-            // push trigger (the DUT-15 backend gap).
+            // DUT-1333 — recipe-drop toggle (US-36 AC-36.1) + the new article-drop
+            // toggle (replaced the never-deliverable comment-reply one); delivery
+            // follows the DUT-1332 APNs trigger.
             Section {
                 Toggle(isOn: notificationsEnabledBinding) {
                     Text("When New Recipes Drop")
@@ -220,12 +220,12 @@ public struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-toggle-notifications")
 
-                Toggle(isOn: commentReplyNotificationsBinding) {
-                    Text("When Someone Replies to My Comment")
+                Toggle(isOn: articleNotificationsBinding) {
+                    Text("When a New Article Drops")
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                 }
-                .accessibilityIdentifier("settings-toggle-comment-reply-notifications")
+                .accessibilityIdentifier("settings-toggle-article-notifications")
             } header: {
                 sectionHeader("Notification Settings")
             } footer: {

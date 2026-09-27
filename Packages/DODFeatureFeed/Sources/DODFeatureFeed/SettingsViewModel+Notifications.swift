@@ -44,21 +44,21 @@ extension SettingsViewModel {
         return granted
     }
 
-    /// T-750 / CL-147 (DUT-56) — drives the "When Someone Replies to My
-    /// Comment" toggle. Mirrors ``setNotificationsEnabled(_:)``: ON
-    /// requests authorization (persist on grant, revert + snackbar on
-    /// deny); OFF persists `false`. Reply-alert delivery awaits a future
-    /// server-side push trigger (the DUT-15 backend gap).
+    /// DUT-1333 — drives the "When a New Article Drops" toggle (replaces the
+    /// comment-reply toggle). Mirrors ``setNotificationsEnabled(_:)``: ON
+    /// requests authorization (persist on grant, revert + snackbar on deny);
+    /// OFF persists `false`. Article-alert delivery follows the DUT-1332 APNs
+    /// trigger recipe alerts need.
     @discardableResult
-    public func setCommentReplyNotificationsEnabled(_ enabled: Bool) async -> Bool {
+    public func setArticleNotificationsEnabled(_ enabled: Bool) async -> Bool {
         guard enabled else {
-            commentReplyNotificationsEnabled = false
+            articleNotificationsEnabled = false
             return false
         }
         let granted = await requestNotificationAuthorization()
-        commentReplyNotificationsEnabled = granted
+        articleNotificationsEnabled = granted
         if !granted {
-            snackbarMessage = "Enable notifications in iOS Settings → DOD to get reply alerts."
+            snackbarMessage = "Enable notifications in iOS Settings → DOD to get new-article alerts."
         }
         return granted
     }
