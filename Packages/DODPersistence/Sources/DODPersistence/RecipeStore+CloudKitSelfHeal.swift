@@ -137,7 +137,13 @@ extension RecipeStore {
         // never force a fallback or flip flags that don't apply to it.
         if cloudKitSyncOptIn(in: defaults), launchHealth?.shouldSelfHeal == true {
             let container = try ModelContainer(
-                for: Schema(SchemaV6.models),
+                // SchemaV7 (not V6): the container's schema must include every
+                // model the configurations reference. Collections (DUT-105) added
+                // `SyncedRecipeCollection` to the synced configuration, so a V6
+                // container schema omits it and the open throws
+                // `configurationSchemaNotFoundInContainerSchema`. Mirrors every
+                // other container builder (Containers / MigrationRecovery).
+                for: Schema(SchemaV7.models),
                 migrationPlan: inMemory ? nil : MigrationPlan.self,
                 configurations: localCacheConfiguration(inMemory: inMemory),
                 syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)
