@@ -147,7 +147,7 @@ public struct SavedView: View {
     private var searchField: some View {
         DODSearchField(
             text: $viewModel.searchText,
-            placeholder: "Search saved recipes"
+            placeholder: "Search Saved"
         )
         .padding(.horizontal, DODSpacing.md)
         .padding(.bottom, DODSpacing.xs)
