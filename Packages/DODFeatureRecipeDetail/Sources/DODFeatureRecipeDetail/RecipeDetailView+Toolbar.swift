@@ -19,10 +19,21 @@ extension RecipeDetailView {
     var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             HStack(spacing: DODSpacing.md) {
+                // DUT-1340 — the bookmark is now a `Menu` with a `primaryAction`.
+                // A plain TAP fires `primaryAction` (save/unsave, unchanged);
+                // press-and-hold opens the menu with "Add to Collection", which
+                // loads the collections + membership and presents the picker
+                // sheet. `Menu`+`primaryAction` is used deliberately instead of
+                // `.onLongPressGesture` (unreliable on toolbar items).
                 // Save haptic is wired via `.sensoryFeedback(.success, trigger:
                 // viewModel.isSaved)` on the body — no manual generator here.
-                Button {
-                    Task { await viewModel.toggleSaved() }
+                Menu {
+                    Button {
+                        presentCollectionPicker()
+                    } label: {
+                        Label("Add to Collection", systemImage: "folder.badge.plus")
+                    }
+                    .accessibilityIdentifier("dod.detail.addToCollection.menuItem")
                 } label: {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
@@ -32,6 +43,8 @@ extension RecipeDetailView {
                         // DUT-572 / CL-312 — glyph shadow so state colors survive
                         // over the full-bleed hero photo (mirrors the title shadow).
                         .shadow(color: .black.opacity(0.35), radius: 3)
+                } primaryAction: {
+                    Task { await viewModel.toggleSaved() }
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
 
@@ -195,6 +208,20 @@ extension RecipeDetailView {
         }
     }
 
+    // MARK: - Add to Collection (DUT-1340)
+
+    /// Handle the bookmark menu's "Add to Collection" item. Loads the
+    /// collections + the recipe's current membership into the view model, THEN
+    /// flips the presentation flag so the picker sheet opens pre-populated.
+    /// Guarded on `recipe != nil` (the picker acts on the loaded recipe).
+    private func presentCollectionPicker() {
+        guard viewModel.recipe != nil else { return }
+        Task {
+            await viewModel.loadCollectionsForPicker()
+            showCollectionPicker = true
+        }
+    }
+
     // MARK: - Snackbar
 
     @ViewBuilder
@@ -239,5 +266,27 @@ extension View {
         #else
         self
         #endif
+    }
+
+    /// DUT-1340 — presents the self-contained "Add to Collection" picker
+    /// (`RecipeCollectionPickerSheet`) over the recipe. Factored out of
+    /// `RecipeDetailView.body` to keep that file under the SwiftLint length cap.
+    /// The view model supplies the collections + seed selection (loaded by the
+    /// menu action) and receives the create + commit callbacks.
+    func recipeCollectionPickerSheet(
+        isPresented: Binding<Bool>,
+        viewModel: RecipeDetailViewModel
+    ) -> some View {
+        sheet(isPresented: isPresented) {
+            RecipeCollectionPickerSheet(
+                recipeTitle: viewModel.recipe?.title ?? viewModel.listItem.title,
+                collections: viewModel.pickerCollections,
+                initialSelection: viewModel.pickerInitialSelection,
+                onCreate: { name in await viewModel.createCollectionFromPicker(name: name) },
+                onCommit: { ids in
+                    Task { await viewModel.commitCollections(ids) }
+                }
+            )
+        }
     }
 }
