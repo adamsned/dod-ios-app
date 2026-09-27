@@ -68,6 +68,36 @@ import Testing
         #expect(HTMLSanitizer.plainText(from: "&Ccedil;a va") == "Ça va")
     }
 
+    // MARK: - `&ordm;` (masculine ordinal indicator) — degree-sign substitute
+    // confirmed on live dutchovendaddy.com pages (oven temperatures).
+
+    @Test func decodesOrdinalIndicatorEntityInOvenTemperature() {
+        let result = HTMLSanitizer.plainText(
+            from: "Preheat the oven to 400&ordm;F, line a large baking dish with parchment."
+        )
+        #expect(result == "Preheat the oven to 400\u{00BA}F, line a large baking dish with parchment.")
+    }
+
+    @Test func decodesOrdinalIndicatorEntityInSecondLiveExample() {
+        let result = HTMLSanitizer.plainText(
+            from: "heat the oven to 350&ordm;F and grease a 12-cup cast-iron muffin pan."
+        )
+        #expect(result == "heat the oven to 350\u{00BA}F and grease a 12-cup cast-iron muffin pan.")
+    }
+
+    @Test func decodesOrdinalIndicatorAdjacentToAmpersandEntity() {
+        let result = HTMLSanitizer.plainText(from: "350&ordm;F &amp; 400&ordm;F")
+        #expect(result == "350\u{00BA}F & 400\u{00BA}F")
+    }
+
+    @Test func ordinalIndicatorIsDistinctFromDegreeSign() {
+        // `&ordm;` (U+00BA, "º") must NOT be conflated with `&deg;` (U+00B0, "°") —
+        // they are visually similar but distinct code points.
+        let result = HTMLSanitizer.plainText(from: "350&ordm;F vs 350&deg;F")
+        #expect(result == "350\u{00BA}F vs 350\u{00B0}F")
+        #expect(result != "350\u{00B0}F vs 350\u{00B0}F")
+    }
+
     @Test func decodesGuillemetAndPrimeEntities() {
         // Observed on the same live pages: breadcrumb guillemets + inch prime marks.
         #expect(HTMLSanitizer.plainText(from: "Home &raquo; Recipes &laquo; Back") == "Home » Recipes « Back")

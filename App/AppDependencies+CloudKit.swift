@@ -32,6 +32,15 @@ extension AppDependencies {
         do {
             let status = try await container.accountStatus()
             DODLog.app.info("CloudKit account status: \(String(describing: status))")
+            // DUT-78: cache the mapped status for the NEXT launch's
+            // SYNCHRONOUS container build to read (this probe is async and
+            // that build isn't, so caching now is the only way this result
+            // can reach that decision — see `CloudKitAvailability` /
+            // `RecipeStore+CloudKitSelfHeal.swift`'s pre-open guard).
+            CloudKitAvailability.cacheAccountStatus(
+                CloudKitAvailability.accountStatus(from: status),
+                in: .standard
+            )
             // DUT-671 — a non-`.available` account means sync can never run this
             // launch, so surface it in the Settings status row instead of leaving
             // it a falsely-idle "Off". `.available` leaves `latestStatus` to the
@@ -41,6 +50,10 @@ extension AppDependencies {
             }
         } catch {
             DODLog.app.notice("CloudKit availability check failed: \(error.localizedDescription)")
+            // DUT-78: a probe failure is exactly "couldn't determine" for the
+            // next launch's pre-open guard — safer to fall back to local than
+            // to gamble on the async mirroring trap.
+            CloudKitAvailability.cacheAccountStatus(.couldNotDetermine, in: .standard)
         }
     }
 

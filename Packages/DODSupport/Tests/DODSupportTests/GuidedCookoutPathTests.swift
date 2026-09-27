@@ -86,6 +86,27 @@ struct GuidedCookoutPathTests {
         #expect(campfire.ingredients.isEmpty == false)
     }
 
+    /// DUT-1235 — the campfire capstone is locked until at least one home
+    /// rung before it has been cooked; completing EITHER is enough, not both.
+    @Test func campfireIsLockedUntilEitherHomeRungIsCooked() {
+        #expect(GuidedCookout.isCampfireLocked(cookedRecipeIDs: []) == true)
+        #expect(
+            GuidedCookout.isCampfireLocked(cookedRecipeIDs: [GuidedCookout.firstCookout.recipeID])
+                == false
+        )
+        #expect(
+            GuidedCookout.isCampfireLocked(cookedRecipeIDs: [GuidedCookout.italianChicken.recipeID])
+                == false
+        )
+        let bothHomeRungs: Set<Int> = [
+            GuidedCookout.firstCookout.recipeID, GuidedCookout.italianChicken.recipeID,
+        ]
+        #expect(GuidedCookout.isCampfireLocked(cookedRecipeIDs: bothHomeRungs) == false)
+        // An unrelated id (e.g. some other recipe cooked outside the path)
+        // must NOT accidentally unlock it.
+        #expect(GuidedCookout.isCampfireLocked(cookedRecipeIDs: [999_999]) == true)
+    }
+
     /// DUT-193 — guard against the gather checklist drifting back to fabricated
     /// ingredients: pin a signature ingredient from each real published recipe
     /// and assert the old made-up values are gone.
