@@ -96,10 +96,41 @@ import Testing
         #expect(recipe.hasDetail)
     }
 
+    // MARK: - isDessert (DUT-325)
+
+    @Test func isDessertFalseForOrdinarySavory() {
+        let recipe = Self.makeRecipe(id: 1)
+        #expect(!recipe.isDessert)
+    }
+
+    @Test func isDessertTrueFromWordPressCategory() {
+        let recipe = Self.makeRecipe(id: 1, categoryIDs: [12, Recipe.dessertCategoryID])
+        #expect(recipe.isDessert)
+    }
+
+    @Test func isDessertTrueFromJSONLDCourse() {
+        // Tagged only by the JSON-LD course, not the WP category — the old
+        // category-only check missed these.
+        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["Dessert"])
+        #expect(recipe.isDessert)
+    }
+
+    @Test func isDessertCourseMatchIsCaseInsensitive() {
+        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["dessert"])
+        #expect(recipe.isDessert)
+    }
+
+    @Test func isDessertFalseForOtherCourses() {
+        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["Main Course", "Side Dish"])
+        #expect(!recipe.isDessert)
+    }
+
     private static func makeRecipe(
         id: Int,
         ingredients: [RecipeIngredient] = [],
-        instructions: [RecipeInstruction] = []
+        instructions: [RecipeInstruction] = [],
+        categoryIDs: [Int] = [],
+        recipeCategory: [String] = []
     ) -> Recipe {
         Recipe(
             id: id,
@@ -107,9 +138,11 @@ import Testing
             title: "Garlic Butter Skillet Corn",
             excerpt: "An easy side dish.",
             canonicalURL: baseURL,
+            categoryIDs: categoryIDs,
             publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
             ingredients: ingredients,
-            instructions: instructions
+            instructions: instructions,
+            recipeCategory: recipeCategory
         )
     }
 }

@@ -121,10 +121,13 @@ extension CookModeViewModel {
         return TemperatureConverter.converting(text, to: unit)
     }
 
-    /// DUT-325 — true when this recipe is filed under the "Dessert Recipes" WP
-    /// category (id 336), used to tailor the spoken completion line.
+    /// DUT-325 — true when this recipe reads as a dessert, used to tailor the
+    /// spoken completion line. Delegates to ``Recipe/isDessert``, which now
+    /// combines the "Dessert Recipes" WP category with the JSON-LD
+    /// `recipeCategory` course so desserts tagged by only one signal still
+    /// hear "enjoy your dessert" (the old check looked at the category alone).
     private var isDessert: Bool {
-        recipe.categoryIDs.contains(336)
+        recipe.isDessert
     }
 
     /// DUT-325 — speak the current step (or the Done line) exactly once,

@@ -37,7 +37,7 @@ public struct SettingsView: View {
     @State var viewModel: SettingsViewModel
     /// DUT-551 (CL-306) — Settings is a sheet; the in-content `DODScreenHeader`
     /// was replaced by a nav-bar back button that dismisses the sheet.
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
     /// DUT-529 — when Reduce Motion is on, the cache-clear snackbar crossfades in
     /// (opacity only) instead of sliding up from the bottom edge (constitution §7).
     /// `internal` (not `private`) so `snackbarOverlay` in `SettingsView+Feedback.swift`
@@ -58,6 +58,10 @@ public struct SettingsView: View {
     /// DUT-694 (PR-D) — in-flight guard for the Clear Cache row (blocks a
     /// double-tap double-clear). `internal` for `SettingsView+Feedback.swift`.
     @State var isClearingCache = false
+    // DUT-162 — Export My Data: in-flight guard + the generated-file box that
+    // drives the share `.sheet(item:)` (see `SettingsView+Export.swift`).
+    @State var isExporting = false
+    @State var exportItem: ExportShareItem?
     // ⚠️ DEV DEBUG — strip before public; see SettingsView+DevDebug.swift.
     @AppStorage(DevDebug.unlockedKey) var devDebugUnlocked = false
     @AppStorage(DevDebug.forceShowOwnerUIKey) var devForceShowOwnerUI = false
@@ -301,6 +305,11 @@ public struct SettingsView: View {
                 .disabled(isClearingCache)
                 .accessibilityIdentifier("settings-button-clear-cache")
 
+                // DUT-162 — "Export My Data": bundles saved recipes, journal,
+                // shopping list, and profile into one JSON file and hands it to
+                // the system share sheet (see `SettingsView+Export.swift`).
+                exportDataRow
+
                 // DUT-679 / DUT-502 — App Store Guideline 5.1.1(i) in-app Privacy
                 // Policy + Terms of Use links (see `SettingsView+PolicyLinks.swift`).
                 dataPrivacyPolicyLinks
@@ -317,37 +326,9 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
-            // MARK: US-32 About + version
-
-            Section {
-                NavigationLink {
-                    AboutNedView()
-                } label: {
-                    Text("About Dutch Oven Daddy")
-                        .dodFont(DODType.body)
-                        .foregroundStyle(DODColor.label)
-                }
-                .accessibilityIdentifier("settings-link-about")
-
-                // DUT-502 — a published Contact / Support affordance in-app
-                // (Guideline 1.2). See `SettingsView+PolicyLinks.swift`.
-                contactSupportLink
-            }
-            .listRowBackground(DODColor.surfaceElevated)
-
-            devDebugSection  // ⚠️ DEV DEBUG — strip before public release
-
-            Section {
-                EmptyView()
-            } footer: {
-                Text(SettingsViewModel.versionFooter())
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .accessibilityIdentifier("settings-version-footer")
-                    .devDebugFooterUnlock(unlocked: $devDebugUnlocked, forceShowOwnerUI: $devForceShowOwnerUI)
-            }
-            .listRowBackground(DODColor.surfaceElevated)
+            // About + Dev Debug + version footer (split into `SettingsView+About.swift`
+            // to keep this file under the SwiftLint 400-line `file_length` cap).
+            aboutAndVersionSections
         }
         .scrollContentBackground(.hidden)
         .background(DODColor.surface)
@@ -357,6 +338,8 @@ public struct SettingsView: View {
         // `snackbarMessage`) so error + notification-deny snackbars don't buzz, and
         // the system switches keep self-haptic-ing without a duplicate here.
         .sensoryFeedback(.success, trigger: viewModel.cacheClearSuccessCount)
+        // DUT-162 — present the export file in the system share sheet (iOS-only).
+        .exportDataShareSheet($exportItem)
         .task { devDebugIsOwner = OwnerGate.isCurrentUserOwner() }  // ⚠️ DEV DEBUG
 
         #if os(iOS)

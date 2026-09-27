@@ -119,6 +119,10 @@ public struct RecipeDetailView: View {
     /// DUT-1324 — non-nil drives the PDF share sheet; set by the toolbar.
     @State var sharePDF: SharePDFItem?
 
+    /// DUT-1340 — drives the "Add to Collection" picker from the bookmark's
+    /// press-and-hold menu. `internal` so the `+Toolbar` extension flips it.
+    @State var showCollectionPicker = false
+
     public init(
         viewModel: RecipeDetailViewModel,
         onSelectRelated: @escaping (RecipeListItem) -> Void,
@@ -188,6 +192,8 @@ public struct RecipeDetailView: View {
             }
         }
         .recipePDFShareSheet($sharePDF)  // DUT-1324 (iOS-only; see +Toolbar)
+        // DUT-1340 — long-press bookmark's "Add to Collection" picker (see +Toolbar).
+        .recipeCollectionPickerSheet(isPresented: $showCollectionPicker, viewModel: viewModel)
         .task {
             await viewModel.onAppear()
             isOfflineSnapshot = await viewModel.isOffline

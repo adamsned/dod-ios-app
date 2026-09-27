@@ -23,6 +23,12 @@ public protocol SavedDependencies: Sendable {
     /// `[]` (no badges) so existing fake conformers keep compiling; the live
     /// wiring routes to ``RecipeStore/downloadedRecipeIDs()``.
     func downloadedRecipeIDs() async throws -> Set<Int>
+    /// DUT-1339 — the id set of saved recipes that read as a dessert, so the
+    /// Saved tab's "Desserts" filter chip can narrow to them. Computed locally
+    /// from each cached recipe's own category signals (see
+    /// ``RecipeStore/dessertRecipeIDs()``); default `[]` so fake conformers keep
+    /// compiling and simply offer no desserts. The live wiring routes to the store.
+    func dessertRecipeIDs() async throws -> Set<Int>
     /// T-775 / DUT-81 — clear a recipe's explicit-download pin (un-download)
     /// so its "Downloaded" badge clears. Default no-op; the live wiring routes
     /// to ``RecipeStore/removeDownload(id:)``. The recipe stays saved.
@@ -80,6 +86,30 @@ public protocol SavedDependencies: Sendable {
     /// same behavior as before this fix. Default is identity so fake conformers
     /// (previews/tests) keep compiling; the live wiring fetches + parses + caches.
     func recipeWithIngredients(_ recipe: Recipe) async -> Recipe
+
+    // MARK: - Recipe collections (DUT-105)
+    //
+    // The Saved tab's collections shelf + "Add to Collection" sheet route
+    // through these. All carry default implementations (see the extension
+    // below) so fake conformers that don't model collections keep compiling;
+    // the live wiring routes to `RecipeStore`'s collection CRUD.
+
+    /// Every collection, shelf-ordered. Default `[]`.
+    func collections() async throws -> [RecipeCollection]
+    /// Create a collection with `name`, returning the created value.
+    func createCollection(name: String) async throws -> RecipeCollection
+    /// Rename a collection.
+    func renameCollection(id: UUID, name: String) async throws
+    /// Delete a collection (the recipes stay saved).
+    func deleteCollection(id: UUID) async throws
+    /// The collection ids a recipe currently belongs to (seeds the sheet's checkmarks).
+    func collectionIDs(forRecipe recipeID: Int) async throws -> Set<UUID>
+    /// Set exactly which collections a recipe belongs to.
+    func setCollections(forRecipe recipeID: Int, to ids: Set<UUID>) async throws
+    /// The saved recipes in a collection, in add order.
+    func recipes(inCollection id: UUID) async throws -> [Recipe]
+    /// Reorder the shelf (nice-to-have).
+    func reorderCollections(orderedIDs: [UUID]) async throws
 }
 
 extension SavedDependencies {
@@ -103,6 +133,11 @@ extension SavedDependencies {
     /// wiring overrides this; fake conformers that don't care about download
     /// state inherit the empty set. T-774 / DUT-80.
     public func downloadedRecipeIDs() async throws -> Set<Int> { [] }
+
+    /// Default: no desserts, so the "Desserts" chip narrows to nothing for a
+    /// fake that doesn't model category data. The live wiring overrides this.
+    /// DUT-1339.
+    public func dessertRecipeIDs() async throws -> Set<Int> { [] }
 
     /// Default no-op so fakes that don't model download state keep compiling
     /// (T-775 / DUT-81). Live routes to ``RecipeStore/removeDownload(id:)``.
@@ -180,6 +215,10 @@ public struct LiveSavedDependencies: SavedDependencies {
 
     public func downloadedRecipeIDs() async throws -> Set<Int> {
         try await store.downloadedRecipeIDs()
+    }
+
+    public func dessertRecipeIDs() async throws -> Set<Int> {
+        try await store.dessertRecipeIDs()
     }
 
     public func removeDownload(id: Int) async throws {

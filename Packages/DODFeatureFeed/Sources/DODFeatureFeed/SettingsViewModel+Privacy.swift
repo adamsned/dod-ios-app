@@ -37,4 +37,11 @@ extension SettingsViewModel {
     /// privacy/terms disclosures.
     public nonisolated static let contactSupportURLString =
         "https://dutchovendaddy.com/contact/"
+
+    /// DUT-160 — the public blog the Privacy Dashboard's Public bucket links to.
+    /// Comments and ratings are hosted on the WordPress site, so "manage on the
+    /// blog" points here (there is no in-app comment-management surface). Same
+    /// `String`-not-`URL` convention as the policy links above.
+    public nonisolated static let blogHomeURLString =
+        "https://dutchovendaddy.com/"
 }
