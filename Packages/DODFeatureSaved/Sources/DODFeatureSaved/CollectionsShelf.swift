@@ -14,6 +14,9 @@ import SwiftUI
 struct CollectionsShelf: View {
 
     let collections: [RecipeCollection]
+    /// DUT-1339 — the total number of saved items, shown on the leading "All
+    /// Saved" chip so it carries a count like every collection chip does.
+    let totalCount: Int
     let selectedID: UUID?
     let onSelectAll: () -> Void
     let onSelect: (RecipeCollection) -> Void
@@ -24,7 +27,9 @@ struct CollectionsShelf: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DODSpacing.xs) {
-                chip(title: "All Saved", isSelected: selectedID == nil, action: onSelectAll)
+                // DUT-1339 — the total saved count trails "All Saved", matching
+                // the per-collection chips' "name  count" format.
+                chip(title: "All Saved  \(totalCount)", isSelected: selectedID == nil, action: onSelectAll)
                     .accessibilityIdentifier("dod.saved.collectionChip.all")
                 ForEach(collections) { collection in
                     collectionChip(collection)

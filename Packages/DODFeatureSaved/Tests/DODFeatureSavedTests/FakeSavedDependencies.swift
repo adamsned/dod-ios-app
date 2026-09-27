@@ -23,6 +23,9 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     /// T-774 / DUT-80 — the set ``downloadedRecipeIDs()`` returns, so a test can
     /// assert the view model hydrates `downloadedIDs` for the Saved-tab badge.
     var downloadedIDs: Set<Int> = []
+    /// DUT-1339 — the set ``dessertRecipeIDs()`` returns, so a test can assert
+    /// the view model hydrates `dessertIDs` for the "Desserts" filter chip.
+    var dessertIDs: Set<Int> = []
     /// T-775 / DUT-81 — recipe ids the view model asked to un-download, so a
     /// test can assert the store write routed through the dependency.
     var removedDownloadIDs: [Int] = []
@@ -92,6 +95,10 @@ final class FakeSavedDependencies: SavedDependencies, @unchecked Sendable {
     func downloadedRecipeIDs() async throws -> Set<Int> {
         if shouldFailDownloadedIDs { throw URLError(.unknown) }
         return downloadedIDs
+    }
+
+    func dessertRecipeIDs() async throws -> Set<Int> {
+        dessertIDs
     }
 
     func publishSavedWidget() async {

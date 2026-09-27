@@ -105,8 +105,17 @@ public struct SavedView: View {
             // DUT-105 — the collections shelf sits above the list once there are
             // saved recipes to organise. "All Saved" clears the filter (the flat
             // list); a chip filters to that cookbook; "New Collection" creates one.
+            // DUT-1339 — the search field + type/state filter chips sit below the
+            // shelf; all three (collection, filter, search) compose and narrow
+            // together. Only shown once loaded (an empty saved set has nothing to
+            // search or filter).
             if viewModel.loadState == .loaded {
                 collectionsShelf
+                searchField
+                SavedFilterChips(
+                    selected: viewModel.typeFilter,
+                    onSelect: { viewModel.typeFilter = $0 }
+                )
             }
             loadStateBody
         }
@@ -116,6 +125,9 @@ public struct SavedView: View {
     private var collectionsShelf: some View {
         CollectionsShelf(
             collections: viewModel.collections,
+            // DUT-1339 — the whole saved set (unfiltered) backs the "All Saved"
+            // count; the shelf/filter/search selections don't change the total.
+            totalCount: viewModel.recipes.count,
             selectedID: viewModel.selectedCollectionID,
             onSelectAll: { viewModel.selectCollection(nil) },
             onSelect: { viewModel.selectCollection($0.id) },
@@ -125,6 +137,21 @@ public struct SavedView: View {
                 Task { await viewModel.deleteCollection(id: collection.id) }
             }
         )
+    }
+
+    /// DUT-1339 — the client-side title search bar, using the shared brand
+    /// ``DODSearchField`` (same component the Search tab uses) so the look is
+    /// consistent. `onClear` defaults to emptying the bound text; the filter is
+    /// a pure computed over the already-loaded set, so no VM-side cleanup is
+    /// needed on clear.
+    private var searchField: some View {
+        DODSearchField(
+            text: $viewModel.searchText,
+            placeholder: "Search saved recipes"
+        )
+        .padding(.horizontal, DODSpacing.md)
+        .padding(.bottom, DODSpacing.xs)
+        .accessibilityIdentifier("dod.saved.searchField")
     }
 
     @ViewBuilder
@@ -156,6 +183,18 @@ public struct SavedView: View {
                     Task { await viewModel.refresh() }
                 }
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .loaded where viewModel.displayedRecipes.isEmpty && viewModel.isFilteringActive:
+            // DUT-1339 — search and/or a type filter narrowed the set to nothing.
+            // Distinct from the empty-collection state so the message points the
+            // user at their query, not at adding recipes to a collection. The
+            // search field + filter chips stay visible above so it can be relaxed.
+            EmptyState(
+                systemImage: "magnifyingglass",
+                title: "No Matching Saved Recipes",
+                message: "No saved recipes match. Try a different search or filter."
+            )
+            .accessibilityIdentifier("saved.emptyFilterResults")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded where viewModel.displayedRecipes.isEmpty:
             // DUT-105 — a collection filter with no still-saved members. (The flat
