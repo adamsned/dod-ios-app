@@ -64,7 +64,7 @@ extension AppDependencies {
         case .available:
             return nil
         case .noAccount:
-            return "No iCloud account — sign in to iCloud in Settings to sync."
+            return "No iCloud account. Sign in to iCloud in Settings to sync."
         case .restricted:
             return "iCloud is restricted on this device; sync is unavailable."
         case .couldNotDetermine, .temporarilyUnavailable:

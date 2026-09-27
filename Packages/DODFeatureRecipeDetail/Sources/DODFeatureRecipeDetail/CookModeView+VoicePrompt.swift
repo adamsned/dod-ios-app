@@ -39,7 +39,7 @@ private struct CookModeVoiceUpgradePrompt: ViewModifier {
             // (onChange alone only sees a transition after the modifier mounts).
             .onChange(of: viewModel.isVoiceModeEnabled) { _, _ in offerUpgradeIfNeeded() }
             .onAppear { offerUpgradeIfNeeded() }
-            .alert("Want a more natural voice?", isPresented: $isPresented) {
+            .alert("Want a More Natural Voice?", isPresented: $isPresented) {
                 Button("Open Settings") { openVoiceSettings() }
                 Button("Not Now", role: .cancel) {}
             } message: {

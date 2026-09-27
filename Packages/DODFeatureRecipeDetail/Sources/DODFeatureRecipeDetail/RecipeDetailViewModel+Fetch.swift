@@ -38,7 +38,7 @@ extension RecipeDetailViewModel {
                 // as RETRYABLE: keep the user on a retry surface instead of
                 // downgrading to `.unavailable` + auto-pop on a flaky connection.
                 loadState = .retryableError
-                snackbarMessage = "Couldn't load recipe — check your connection."
+                snackbarMessage = "Couldn't load recipe. Check your connection."
             }
             return
         }
