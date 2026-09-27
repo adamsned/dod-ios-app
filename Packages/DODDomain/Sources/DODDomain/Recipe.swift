@@ -200,4 +200,31 @@ extension Recipe {
     public var isArticle: Bool {
         kind == .article
     }
+
+    /// The "Dessert Recipes" WordPress category id on dutchovendaddy.com.
+    /// Kept as a named constant so the two dessert signals stay in one place.
+    public static let dessertCategoryID = 336
+
+    /// DUT-325 — true when this recipe reads as a dessert. Powers Cook Mode's
+    /// spoken completion line ("enjoy your dessert") and the Saved "Desserts"
+    /// filter. Delegates to the pure ``isDessert(categoryIDs:recipeCategory:)``
+    /// so call-sites that only have the two raw signals (e.g. the persistence
+    /// layer's `CachedRecipe`) evaluate dessert-ness identically.
+    public var isDessert: Bool {
+        Self.isDessert(categoryIDs: categoryIDs, recipeCategory: recipeCategory)
+    }
+
+    /// The dessert decision as a pure function of the two signals, so the
+    /// Domain model and the persistence layer share ONE definition. Combines
+    /// them so a dessert tagged by only one still counts: the "Dessert Recipes"
+    /// WordPress category (``dessertCategoryID``) OR a JSON-LD `recipeCategory`
+    /// course whose name contains "dessert" (case-insensitive). The earlier
+    /// detection looked at the category id alone, so desserts carrying only the
+    /// JSON-LD course were missed.
+    public static func isDessert(categoryIDs: [Int], recipeCategory: [String]) -> Bool {
+        if categoryIDs.contains(dessertCategoryID) {
+            return true
+        }
+        return recipeCategory.contains { $0.localizedCaseInsensitiveContains("dessert") }
+    }
 }
