@@ -54,7 +54,8 @@ public struct SavedView: View {
         // it sits at the same Y as every other tab in every state. (No native
         // `.navigationTitle` — dodges the iOS 26 large-title bug.)
         content
-            .background(DODColor.surface)
+            // DUT-1335 — fill the bottom safe area (no black bar under the tab bar).
+            .background(DODColor.surface.ignoresSafeArea())
             // DUT-275 — nav bar hidden; the pinned header lives above.
             .dodHidesNavBar()
             .task {

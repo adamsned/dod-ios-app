@@ -1,3 +1,4 @@
+import DODDesignSystem
 import DODDomain
 import SwiftUI
 
@@ -61,10 +62,14 @@ public struct RecipeDetailPager<Page: View>: View {
             // `.never` — no page dots. The swipe is meant to be felt, not
             // signposted, and dots would sit over the recipe content.
             .tabViewStyle(.page(indexDisplayMode: .never))
-            // Let the pages bleed under the status bar so the immersive blur
-            // header survives the pager. Only `.top` — the bottom keeps its
-            // safe-area padding, matching the single-recipe view.
-            .ignoresSafeArea(.container, edges: .top)
+            // Let the pages bleed under the status bar (immersive blur header)
+            // AND under the home indicator. DUT-1335: `.top` alone left the pages
+            // inset from the bottom safe area, so the strip below the floating tab
+            // bar went unpainted and showed as a black bar; `.page` insets each
+            // page, so a page's own background couldn't reach it. `.vertical` lets
+            // the page content run to the physical bottom edge (like the feed
+            // list), so the recipe surface fills there and there is no bar.
+            .ignoresSafeArea(.container, edges: .vertical)
             // Clear the NavigationStack bar's background. SwiftUI's
             // `.toolbarBackground(.hidden)` can't reach the bar from inside a
             // `.page` TabView (the toolbar ITEMS come from the pages), so the bar
@@ -74,6 +79,11 @@ public struct RecipeDetailPager<Page: View>: View {
             // single-recipe view; the hero + blur then show through to the top.
             .background(TransparentNavBar())
             #endif
+            // DUT-1335 — backstop surface behind the pager for the brief page
+            // transition (in case a neighbour page hasn't laid out yet), so no
+            // window-black flashes at the bottom edge. The primary fix is the
+            // `.vertical` ignore above, which lets each page fill to the edge.
+            .background(DODColor.surface.ignoresSafeArea())
         }
     }
 }
