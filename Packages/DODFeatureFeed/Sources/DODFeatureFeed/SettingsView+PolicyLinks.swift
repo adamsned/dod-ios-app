@@ -15,9 +15,12 @@ import SwiftUI
 // than crashing.
 extension SettingsView {
 
-    /// Privacy Policy + Terms of Use rows for the "Data & Privacy" section.
+    /// Privacy Dashboard entry (DUT-160) + Privacy Policy + Terms of Use rows
+    /// for the "Data & Privacy" section. The dashboard row leads so it sits
+    /// beside the policy links it complements.
     @ViewBuilder
     var dataPrivacyPolicyLinks: some View {
+        privacyDashboardLink
         policyLink(
             title: "Privacy Policy",
             urlString: SettingsViewModel.privacyPolicyURLString,

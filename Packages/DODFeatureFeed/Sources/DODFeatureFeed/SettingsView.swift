@@ -37,7 +37,7 @@ public struct SettingsView: View {
     @State var viewModel: SettingsViewModel
     /// DUT-551 (CL-306) — Settings is a sheet; the in-content `DODScreenHeader`
     /// was replaced by a nav-bar back button that dismisses the sheet.
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
     /// DUT-529 — when Reduce Motion is on, the cache-clear snackbar crossfades in
     /// (opacity only) instead of sliding up from the bottom edge (constitution §7).
     /// `internal` (not `private`) so `snackbarOverlay` in `SettingsView+Feedback.swift`
