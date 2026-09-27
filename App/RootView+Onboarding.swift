@@ -111,11 +111,11 @@ extension RootView {
         let granted = await dependencies.notificationService.requestAuthorization()
         if granted {
             UserDefaults.standard.set(true, forKey: SettingsViewModel.notificationsEnabledKey)
-            // Allowing notifications opts you into reply alerts too ("When
-            // Someone Replies to My Comment"); it's off by default otherwise.
+            // DUT-1333 — allowing notifications opts you into new-article alerts
+            // too ("When a New Article Drops"); it's off by default otherwise.
             UserDefaults.standard.set(
                 true,
-                forKey: SettingsViewModel.commentReplyNotificationsEnabledKey
+                forKey: SettingsViewModel.articleNotificationsEnabledKey
             )
         }
         // DUT-280 — the first-run prompt is answered; mark complete so it never
