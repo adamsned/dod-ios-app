@@ -68,6 +68,12 @@ public protocol SettingsDependencies: Sendable {
     func savedRecipeCount() async throws -> Int
     /// Number of recipes this device has submitted a star rating for.
     func userRatingCount() async throws -> Int
+    /// DUT-160 — number of items currently on the on-device Shopping List. The
+    /// list is a JSON blob in the shared App Group `UserDefaults` suite (not the
+    /// SwiftData store), so the Privacy Dashboard reads its count through this
+    /// seam rather than depending on `DODFeatureSaved`. Defaults to 0 so
+    /// previews / doubles stay source-compatible.
+    func shoppingListItemCount() async throws -> Int
     /// In-place edit of one cook-log entry from the journal (note / rating /
     /// photo); never changes the cook count.
     func updateCookLog(_ entry: CookLogEntry) async throws
@@ -83,6 +89,7 @@ extension SettingsDependencies {
     public func cookLogs() async throws -> [CookLogEntry] { [] }
     public func savedRecipeCount() async throws -> Int { 0 }
     public func userRatingCount() async throws -> Int { 0 }
+    public func shoppingListItemCount() async throws -> Int { 0 }
     public func updateCookLog(_ entry: CookLogEntry) async throws {}
     public func deleteCookLog(id: UUID) async throws {}
 }

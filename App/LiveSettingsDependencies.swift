@@ -33,6 +33,9 @@ struct LiveSettingsDependencies: SettingsDependencies {
     let cookLogsLoad: CookLogsLoad
     let savedCountLoad: CountLoad
     let ratingCountLoad: CountLoad
+    // DUT-160 — Shopping List item count for the Privacy Dashboard's On Device
+    // bucket (the list is App-Group `UserDefaults`, not the SwiftData store).
+    let shoppingCountLoad: CountLoad
     let cookLogWrite: CookLogWrite
     let cookLogDelete: CookLogDelete
 
@@ -42,6 +45,7 @@ struct LiveSettingsDependencies: SettingsDependencies {
         cookLogsLoad: @escaping CookLogsLoad = { [] },
         savedCountLoad: @escaping CountLoad = { 0 },
         ratingCountLoad: @escaping CountLoad = { 0 },
+        shoppingCountLoad: @escaping CountLoad = { 0 },
         cookLogWrite: @escaping CookLogWrite = { _ in },
         cookLogDelete: @escaping CookLogDelete = { _ in }
     ) {
@@ -50,6 +54,7 @@ struct LiveSettingsDependencies: SettingsDependencies {
         self.cookLogsLoad = cookLogsLoad
         self.savedCountLoad = savedCountLoad
         self.ratingCountLoad = ratingCountLoad
+        self.shoppingCountLoad = shoppingCountLoad
         self.cookLogWrite = cookLogWrite
         self.cookLogDelete = cookLogDelete
     }
@@ -71,6 +76,7 @@ struct LiveSettingsDependencies: SettingsDependencies {
     func cookLogs() async throws -> [CookLogEntry] { try await cookLogsLoad() }
     func savedRecipeCount() async throws -> Int { try await savedCountLoad() }
     func userRatingCount() async throws -> Int { try await ratingCountLoad() }
+    func shoppingListItemCount() async throws -> Int { try await shoppingCountLoad() }
     func updateCookLog(_ entry: CookLogEntry) async throws { try await cookLogWrite(entry) }
     func deleteCookLog(id: UUID) async throws { try await cookLogDelete(id) }
 }
