@@ -282,12 +282,17 @@ extension View {
     /// shared helper (which serves Feed, Search, Categories, and Saved) only
     /// grows the item on the two surfaces that pass it (Feed + Search); the other
     /// two pass `nil`, so the item doesn't render and they're unaffected.
+    /// **DUT-105 — opt-in "Add to Collection".** When `onAddToCollection` is
+    /// supplied, an item (a folder-plus glyph) opens the collection picker for
+    /// the card's recipe. Opt-in like `onAddToShoppingList`, so only the Saved
+    /// tab (which passes it) grows the item; the other surfaces pass `nil`.
     public func recipeCardContextMenu(
         isSaved: Bool,
         isDownloaded: Bool = false,
         onToggle: @escaping () -> Void,
         onRemoveDownload: (() -> Void)? = nil,
-        onAddToShoppingList: (() -> Void)? = nil
+        onAddToShoppingList: (() -> Void)? = nil,
+        onAddToCollection: (() -> Void)? = nil
     ) -> some View {
         self.contextMenu {
             Button(action: onToggle) {
@@ -295,6 +300,12 @@ extension View {
                     isSaved ? "Unsave" : "Save",
                     systemImage: isSaved ? "bookmark" : "bookmark.fill"
                 )
+            }
+            if let onAddToCollection {
+                Button(action: onAddToCollection) {
+                    Label("Add to Collection…", systemImage: "folder.badge.plus")
+                }
+                .accessibilityIdentifier("dod.card.addToCollection")
             }
             if isDownloaded, let onRemoveDownload {
                 Button(action: onRemoveDownload) {
