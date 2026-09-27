@@ -27,6 +27,8 @@ struct LiveSettingsDependencies: SettingsDependencies {
     typealias CookLogWrite = @Sendable (CookLogEntry) async throws -> Void
     // DUT-514 — delete one journal entry by id (cascades its photo in the store).
     typealias CookLogDelete = @Sendable (UUID) async throws -> Void
+    // DUT-162 — build the "Export My Data" file and return its URL to share.
+    typealias ExportLoad = @Sendable () async throws -> URL?
 
     let flagWrite: FlagWrite
     let statusProvider: StatusProvider
@@ -35,6 +37,7 @@ struct LiveSettingsDependencies: SettingsDependencies {
     let ratingCountLoad: CountLoad
     let cookLogWrite: CookLogWrite
     let cookLogDelete: CookLogDelete
+    let exportLoad: ExportLoad
 
     init(
         flagWrite: @escaping FlagWrite,
@@ -43,7 +46,8 @@ struct LiveSettingsDependencies: SettingsDependencies {
         savedCountLoad: @escaping CountLoad = { 0 },
         ratingCountLoad: @escaping CountLoad = { 0 },
         cookLogWrite: @escaping CookLogWrite = { _ in },
-        cookLogDelete: @escaping CookLogDelete = { _ in }
+        cookLogDelete: @escaping CookLogDelete = { _ in },
+        exportLoad: @escaping ExportLoad = { nil }
     ) {
         self.flagWrite = flagWrite
         self.statusProvider = statusProvider
@@ -52,6 +56,7 @@ struct LiveSettingsDependencies: SettingsDependencies {
         self.ratingCountLoad = ratingCountLoad
         self.cookLogWrite = cookLogWrite
         self.cookLogDelete = cookLogDelete
+        self.exportLoad = exportLoad
     }
 
     func setCloudSyncOptIn(_ enabled: Bool) async {
@@ -73,4 +78,8 @@ struct LiveSettingsDependencies: SettingsDependencies {
     func userRatingCount() async throws -> Int { try await ratingCountLoad() }
     func updateCookLog(_ entry: CookLogEntry) async throws { try await cookLogWrite(entry) }
     func deleteCookLog(id: UUID) async throws { try await cookLogDelete(id) }
+
+    // MARK: - Export My Data (DUT-162)
+
+    func exportMyData() async throws -> URL? { try await exportLoad() }
 }
