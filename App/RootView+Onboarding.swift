@@ -12,8 +12,10 @@ extension RootView {
     /// iCloud-Sync prompt).
     @MainActor
     var onboardingCover: some View {
-        AppIntroTour(
-            pages: Self.appIntroPages,
+        AppIntroWelcome(
+            headline: "Welcome to Dutch Oven Daddy",
+            intro: "Your guide from your first cookout to cast iron hero.",
+            bullets: Self.appIntroBullets,
             ctaTitle: "Let's Get Cooking",
             onFinish: {
                 guard showOnboarding else { return }  // DUT-407: ignore a double-tap
@@ -43,73 +45,50 @@ extension RootView {
         showCloudSyncPrompt = true
     }
 
-    /// The slides of the first-launch **App Intro** tour (DUT-335). Declared
+    /// The feature bullets of the single-screen first-launch **App Intro**
+    /// (DUT-1089, CL-327 — replaces the DUT-335 paged `appIntroPages`). Declared
     /// static so the array isn't rebuilt every render and tests/previews reuse
-    /// the exact content the app ships. Spotlights only the standout, app-unique
-    /// features — iCloud Sync is intentionally NOT a slide (it has its own
-    /// first-run opt-in prompt, `runFirstRunSetup`). Titles are Title Case;
-    /// descriptions are short but informative. `placeholderSymbol` stands in for
-    /// the real app screenshot until those are wired up later.
-    static var appIntroPages: [AppIntroTour.Page] {
+    /// the exact content the app ships. Titles are Title Case; details are
+    /// sentence case. The iCloud bullet carries the sync disclosure the welcome
+    /// screen is now responsible for (CL-328 / DUT-1090).
+    static var appIntroBullets: [AppIntroWelcome.Bullet] {
         [
             .init(
                 id: 0,
-                title: "Welcome to Dutch Oven Daddy",
-                description:
-                    "Browse cast iron recipes and articles, save your favorites, and cook them step by step with built-in coaching, even offline.",
-                placeholderSymbol: "flame.fill",
-                // DUT-336: the opening slide leads with the Dutch Oven Daddy
-                // badge (a bundled transparent PNG) as its clean welcome visual.
-                // Later slides use SF-symbol placeholders until real screenshots
-                // land. Media precedence is video → image → symbol.
-                image: .logo
+                icon: "square.grid.2x2.fill",
+                title: "Browse Recipes & Articles",
+                detail: "Fresh cast iron recipes to cook and articles to read, all in one place."
             ),
             .init(
                 id: 1,
-                title: "Browse Recipes & Articles",
-                description: "Explore fresh cast iron recipes to cook and articles to read, all in one tab.",
-                placeholderSymbol: "square.grid.2x2.fill",
-                // STILL slide (Browse). Add a device-framed, transparent-background
-                // PNG screenshot to DODDesignSystem `Media.xcassets` as
-                // `intro-still-browse`; it floats on the Flour/Cocoa background.
-                // Until the asset is added, the SF symbol above shows.
-                image: IntroImageSource(assetName: "intro-still-browse", isTransparent: true)
+                icon: "bookmark.fill",
+                title: "Save Your Favorites",
+                detail: "Bookmark any recipe to build your own collection and find it again in a tap."
             ),
             .init(
                 id: 2,
-                title: "Save Recipes for Later",
-                description: "Bookmark any recipe to build your own collection and find it again in a tap.",
-                placeholderSymbol: "bookmark.fill"
-                    // VIDEO slide. When the looping clip is ready, add:
-                    // video: IntroVideoSource(url: <bundled HEVC-alpha .mov>, isTransparent: true)
+                icon: "speaker.wave.2.fill",
+                title: "Cook Mode",
+                detail: "Cook one step at a time with large text, voice read-aloud, and a screen that stays awake."
             ),
             .init(
                 id: 3,
-                title: "Cook Mode",
-                description:
-                    "Cook one step at a time with large text and voice read-aloud, and the screen stays awake so you never lose your place.",
-                placeholderSymbol: "speaker.wave.2.fill",
-                // STILL slide (Cook Mode). Asset: `intro-still-cook-mode`
-                // (device-framed transparent PNG). SF symbol shows until added.
-                image: IntroImageSource(assetName: "intro-still-cook-mode", isTransparent: true)
+                icon: "flame.fill",
+                title: "Cooking Tools",
+                detail: "Your First Cookout, the Heat Coach, and the shopping list, in the order you'll use them."
             ),
             .init(
                 id: 4,
-                title: "Cooking Tools",
-                description:
-                    "New to cast iron? Your First Cookout walks you to a guaranteed win, and the Heat Coach dials in your coals so every cook comes out right.",
-                placeholderSymbol: "thermometer.medium",
-                // STILL slide (Cooking Tools). Asset: `intro-still-cooking-tools`
-                // (device-framed transparent PNG). SF symbol shows until added.
-                image: IntroImageSource(assetName: "intro-still-cooking-tools", isTransparent: true)
+                icon: "arrow.down.circle.fill",
+                title: "Cook Offline",
+                detail: "Download recipes to your device and cook anywhere, even with no signal at the campsite."
             ),
             .init(
                 id: 5,
-                title: "Download for Offline",
-                description: "Save recipes to your device and cook anywhere, even with no signal at the campsite.",
-                placeholderSymbol: "arrow.down.circle.fill"
-                    // VIDEO slide. When the looping clip is ready, add:
-                    // video: IntroVideoSource(url: <bundled HEVC-alpha .mov>, isTransparent: true)
+                icon: "icloud.fill",
+                title: "Synced Across Devices",
+                detail: "Your saved recipes and cook journal stay with you on all your Apple "
+                    + "devices. Turn it off any time in Settings."
             ),
         ]
     }
