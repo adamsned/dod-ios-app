@@ -272,7 +272,7 @@ public struct ProfileEditView: View {
         // value-scoped so only `isEditing` animates; auth-event success tap (sign-in/out/delete).
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isEditing)
         .sensoryFeedback(.success, trigger: authSuccessTick)
-        .alert("Delete your profile?", isPresented: $showDeleteConfirmation) {
+        .alert("Delete Your Profile?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task { await handleDelete() }
             }

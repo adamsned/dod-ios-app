@@ -35,7 +35,7 @@ extension ProfileEditView {
             // DUT-429 — Sign Out is a destructive local teardown (clears the
             // guest-identity prefill too), so confirm it like Delete rather
             // than acting on a single unguarded tap.
-            .alert("Sign out of your profile?", isPresented: $showSignOutConfirmation) {
+            .alert("Sign Out of Your Profile?", isPresented: $showSignOutConfirmation) {
                 Button("Sign Out", role: .destructive) {
                     Task { await handleSignOut() }
                 }
