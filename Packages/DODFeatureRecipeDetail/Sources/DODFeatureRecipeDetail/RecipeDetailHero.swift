@@ -77,11 +77,13 @@ struct RecipeDetailHero: View {
                 Text(title)
                     .dodFont(DODType.displayLarge)
                     .foregroundStyle(.white)
-                    // Long recipe titles ("Cast Iron Cherry Cobbler with Candied
-                    // Pecans") must show in full, not truncate on the hero — allow
-                    // up to two lines and shrink slightly before wrapping a third.
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
+                    // DUT-1336 — the full recipe/article title must always show so
+                    // the reader can tell exactly what they're viewing; never
+                    // truncate to "…". The bottom-leading ZStack grows extra lines
+                    // upward over the darkened hero band, so a long name doesn't
+                    // push layout. (Was `lineLimit(2)` + 0.8 scale, which clipped
+                    // long names like "Best Dutch Oven For Every Budget…".)
+                    .lineLimit(nil)
                     .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 2)
                     .padding(.horizontal, DODSpacing.md)
                     .padding(.bottom, DODSpacing.md)
