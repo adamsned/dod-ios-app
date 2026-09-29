@@ -224,6 +224,20 @@ By tag (recommended for a real release, leaves an audit trail):
 Any tag matching `release-*` triggers the workflow. The build number is still
 the UTC timestamp computed at run time, independent of the tag text.
 
+Building from a development branch (for example `v2`):
+Anyone with write access can ship a TestFlight build of the branch they are
+developing on. Nothing restricts the release workflow to main.
+    gh workflow run release.yml --ref v2
+or Actions -> Release (TestFlight) -> Run workflow -> pick `v2` in the branch
+dropdown. Tagging works too: tag a commit on the branch and push it:
+    git tag release-v2-2026.09.28.1 origin/v2
+    git push origin release-v2-2026.09.28.1
+The version testers see comes from `MARKETING_VERSION` in that branch's
+`project.yml` (v2 is 2.0, main is 1.0), so each line shows up as its own
+version in TestFlight and the two never collide. Build numbers are UTC
+timestamps, so they stay unique across branches. The release workflow does
+not run tests or lint, so check CI on the branch before shipping to testers.
+
 Note: the pipeline does NOT auto-deploy on every push to main, by design. If you
 ever want that, replace the `push: tags:` trigger block in
 `.github/workflows/release.yml` with:
