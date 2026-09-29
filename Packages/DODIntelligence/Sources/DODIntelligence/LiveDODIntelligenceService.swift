@@ -36,12 +36,49 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #endif
     }
 
-    public func suggestSubstitution(for ingredient: String) async -> IngredientSubstitution? {
+    public func suggestSubstitution(
+        for ingredient: String,
+        reason: SubstitutionReason?
+    ) async -> IngredientSubstitution? {
         let trimmed = ingredient.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         #if os(iOS)
         if #available(iOS 26, *) {
-            return await Self.generateSubstitution(for: trimmed)
+            return await Self.generateSubstitution(for: trimmed, reason: reason)
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
+    public func summarize(_ text: String) async -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateText(
+                instructions: Self.summaryInstructions,
+                // Cap the body so a very long article stays inside the model's
+                // context window; the lede carries the gist.
+                prompt: "Summarize this for a home cook:\n\n\(String(trimmed.prefix(4000)))"
+            )
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
+    public func answer(_ question: String) async -> String? {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateText(
+                instructions: Self.helperInstructions,
+                prompt: trimmed
+            )
         }
         return nil
         #else
@@ -56,20 +93,63 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
     /// error — including a safety-guardrail rejection — is swallowed to `nil`
     /// so a failed suggestion never surfaces as a thrown error in the UI.
     @available(iOS 26, *)
-    private static func generateSubstitution(for ingredient: String) async -> IngredientSubstitution? {
+    private static func generateSubstitution(
+        for ingredient: String,
+        reason: SubstitutionReason?
+    ) async -> IngredientSubstitution? {
         guard case .available = SystemLanguageModel.default.availability else { return nil }
         let session = LanguageModelSession(instructions: instructions)
+        // Fold the reason into the ask so the swap fits the need (a dairy-free
+        // substitute reads very differently from a lower-carb one). No reason →
+        // a general pantry swap.
+        let prompt: String
+        if let reason {
+            prompt = "Suggest a substitute for '\(ingredient)' because \(reason.promptClause)."
+        } else {
+            prompt = "Suggest a common substitute for: \(ingredient)"
+        }
         do {
-            let reply = try await session.respond(
-                to: "Suggest a common substitute for: \(ingredient)",
-                generating: GenerableSubstitution.self
-            )
+            let reply = try await session.respond(to: prompt, generating: GenerableSubstitution.self)
             let content = reply.content
             return IngredientSubstitution(substitute: content.substitute, note: content.note)
         } catch {
             return nil
         }
     }
+
+    /// Shared one-shot free-text turn for ``summarize(_:)`` and ``answer(_:)``.
+    /// Re-checks availability, runs one plain-text turn under the given
+    /// instructions, and swallows any error (including a guardrail rejection) to
+    /// `nil` so a failure never surfaces as a thrown error in the UI.
+    @available(iOS 26, *)
+    private static func generateText(instructions: String, prompt: String) async -> String? {
+        guard case .available = SystemLanguageModel.default.availability else { return nil }
+        let session = LanguageModelSession(instructions: instructions)
+        do {
+            let reply = try await session.respond(to: prompt)
+            let text = reply.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? nil : text
+        } catch {
+            return nil
+        }
+    }
+
+    /// Instructions for the recipe/article summary surface (T-932).
+    @available(iOS 26, *)
+    private static let summaryInstructions = """
+        You are a concise cooking assistant. Summarize the given recipe or \
+        article for a home cook in two or three short sentences: what it is and \
+        what to expect. Do not invent details that are not in the text.
+        """
+
+    /// Instructions for the Cooking Tools question helper (T-934).
+    @available(iOS 26, *)
+    private static let helperInstructions = """
+        You are a friendly cast-iron and Dutch-oven cooking expert. Answer the \
+        cook's question with practical, safe, step-by-step guidance in a short \
+        paragraph. Stick to cast iron, Dutch ovens, and cooking technique; if a \
+        question is outside that, say so briefly.
+        """
 
     /// System instructions scoping the model to concise, practical cooking
     /// substitutions. Kept terse — the structured `@Generable` output shape

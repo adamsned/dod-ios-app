@@ -71,4 +71,35 @@ struct DODIntelligenceServiceTests {
         let result = await LiveDODIntelligenceService().suggestSubstitution(for: "   ")
         #expect(result == nil)
     }
+
+    // MARK: - Reason-aware substitution + summary + answer (T-932 / T-933 / T-934)
+
+    /// The reason-carrying overload still returns the canned suggestion when the
+    /// fake is available (the reason only shapes the live prompt).
+    @Test func fakeSubstitutionAcceptsAReason() async {
+        let service = FakeIntelligenceService()
+        let result = await service.suggestSubstitution(for: "1 cup buttermilk", reason: .dairyFree)
+        #expect(result == .cannedButtermilk)
+    }
+
+    /// `summarize` / `answer` return their canned strings when available and
+    /// `nil` when the device is unsupported (affordance hidden).
+    @Test func fakeSummaryAndAnswerGateOnAvailability() async {
+        let available = FakeIntelligenceService(summary: "S", answer: "A")
+        #expect(await available.summarize("some recipe body") == "S")
+        #expect(await available.answer("how do I season a skillet?") == "A")
+
+        let unavailable = FakeIntelligenceService(isAvailable: false)
+        #expect(await unavailable.summarize("body") == nil)
+        #expect(await unavailable.answer("q") == nil)
+    }
+
+    /// Every reason maps to a non-empty Title Case label + a prompt clause.
+    @Test func substitutionReasonsHaveLabelsAndClauses() {
+        for reason in SubstitutionReason.allCases {
+            #expect(!reason.title.isEmpty)
+            #expect(!reason.promptClause.isEmpty)
+        }
+        #expect(SubstitutionReason.lowerCarb.title == "Lower Carb")
+    }
 }

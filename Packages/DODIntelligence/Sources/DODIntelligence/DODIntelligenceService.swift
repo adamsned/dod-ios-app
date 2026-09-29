@@ -31,10 +31,37 @@ public protocol DODIntelligenceService: Sendable {
     /// on this so unsupported devices see no dead controls.
     var isAvailable: Bool { get }
 
-    /// Suggest a common substitute for the given raw ingredient line.
+    /// Suggest a substitute for the given raw ingredient line, tailored to why
+    /// the cook wants to swap it (``SubstitutionReason``). `reason: nil` asks for
+    /// a general pantry swap.
     ///
     /// Returns `nil` — never throws — when the service is unavailable, the
     /// input is empty, the model errors, or a safety guardrail rejects the
     /// request, so the UI degrades gracefully in every failure mode.
-    func suggestSubstitution(for ingredient: String) async -> IngredientSubstitution?
+    func suggestSubstitution(
+        for ingredient: String,
+        reason: SubstitutionReason?
+    ) async -> IngredientSubstitution?
+
+    /// Summarize already-cached recipe or article body text into a few short
+    /// sentences (US-54 / T-932). `text` is the on-device body; nothing is sent
+    /// off-device. Returns `nil` — never throws — when unavailable, the input is
+    /// empty, the model errors, or a guardrail rejects it, so the "Summarize"
+    /// affordance degrades gracefully.
+    func summarize(_ text: String) async -> String?
+
+    /// Answer an on-device cast-iron / Dutch-oven / cooking-technique question
+    /// for the Cooking Tools helper (US-54 / T-934). Returns `nil` — never
+    /// throws — on unavailability / empty input / model error / guardrail
+    /// rejection, so the helper degrades gracefully.
+    func answer(_ question: String) async -> String?
+}
+
+extension DODIntelligenceService {
+
+    /// Convenience for a reason-free (general pantry) substitution, so existing
+    /// call sites and previews that don't model a reason stay terse.
+    public func suggestSubstitution(for ingredient: String) async -> IngredientSubstitution? {
+        await suggestSubstitution(for: ingredient, reason: nil)
+    }
 }
