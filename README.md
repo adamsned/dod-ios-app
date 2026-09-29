@@ -4,6 +4,13 @@ Native iPhone + iPad reader for [dutchovendaddy.com](https://www.dutchovendaddy.
 
 Built spec-first. See [`specs/`](specs/) for the constitution, spec, plan, and task list — code traces back to them.
 
+> **The North Star.** Dutch Oven Daddy takes a nervous beginner and walks them,
+> one guaranteed win at a time, into the cast-iron hero who feeds their family.
+> Run every feature through **the filter:** _does this make the user more of a
+> hero to the people they're feeding?_ If not, it's probably noise. The keystone
+> is the coached **"Your First Cookout"** path (`DODSupport/GuidedCookout`) — a
+> ladder of guaranteed wins (lasagna → Italian chicken → a dump-cake branch).
+
 ## Status
 
 Phase 6 — Iterate. v1.0 feature-complete; post-launch bugs DOD-NAV-1 (detail
@@ -85,11 +92,46 @@ Each module owns its sources and tests. Layering is compiler-enforced — see [`
 3. PR description cites the T-ID **and** the AC IDs from `spec.md` it implements (constitution §11).
 4. CI green + human approval required to merge.
 
-## Formatting
+## The Dev Loop
+
+One command mirrors the CI required gates locally, so you never push a red build:
 
 ```bash
-bin/format.sh             # runs swift-format across the tree
+./bin/verify.sh            # format-fix, swift-format lint, SwiftLint, app build
+./bin/verify.sh --quick    # just format + both lints (skip the build) — fast
+./bin/verify.sh --test DODFeatureFeed   # also run that package's tests
 ```
+
+For the tight inner loop while editing one package (seconds, not minutes):
+
+```bash
+xcrun swift test --package-path Packages/DODFeatureFeed
+```
+
+**Gotcha that bites everyone:** swift-format's *formatter* and its *linter* can
+disagree (e.g. multi-line call arguments), so formatting alone is not enough —
+CI runs the linter. `bin/verify.sh` runs both; trust it over a bare `format.sh`.
+
+## CI Gates and Shipping
+
+The **CI required** check is the aggregate that must be green to merge:
+**Format check** (`swift-format lint --strict`), **Lint** (`bin/lint.sh`), and
+**L1 Unit** (package tests). The `L3`/`L4` device-matrix legs are **not**
+required (they flake on simulator provisioning) — don't block on them.
+
+Once `CI required` is green: `gh pr merge <#> --merge`. **Every merge to `main`
+is followed by a TestFlight build** (`gh workflow run release.yml --ref main`) —
+Ned verifies on device.
+
+## House Rules and Gotchas
+
+- **Titles use Title Case** — screen/nav titles, card titles, section headers.
+- **Copy avoids em dashes** (Ned's preference) — commas or periods instead. Comments are exempt.
+- **`file_length`** warns at 400 lines, which fails under `--strict`. Split into
+  `Foo+Feature.swift` extension files before you hit the cap.
+- **`#if` blocks** sit flush-left (`indentConditionalCompilationBlocks: false`).
+- **No-Xcode machines** (e.g. the shared Mac mini) can run `swift-format` but
+  **not** whole-project SwiftLint or `xcodebuild` — those validate only in CI.
 
 ## Known limitations (v1.0)
 
