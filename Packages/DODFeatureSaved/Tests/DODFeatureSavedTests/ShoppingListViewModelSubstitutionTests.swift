@@ -6,8 +6,9 @@ import Testing
 @testable import DODFeatureSaved
 
 /// L1 coverage for the v2 on-device-AI substitution seam on
-/// ``ShoppingListViewModel`` — the availability-driven visibility flag and the
-/// loading → loaded / notFound state machine (constitution §6 L1 mandate).
+/// ``ShoppingListViewModel`` — the availability flag and the pickingReason →
+/// loading → loaded / notFound state machine, plus Apply replacing the row
+/// (constitution §6 L1 mandate).
 ///
 /// The live model is unavailable in the simulator / CI and non-deterministic,
 /// so these drive a ``FakeIntelligenceService`` — the seam, never the model.
@@ -19,73 +20,97 @@ struct ShoppingListViewModelSubstitutionTests {
         ShoppingListViewModel.Item(ingredientText: text, recipeTitle: "R", aisle: .produce)
     }
 
+    private static func model(
+        items: [ShoppingListViewModel.Item] = [],
+        isAvailable: Bool = true,
+        substitution: IngredientSubstitution? = .cannedButtermilk
+    ) -> ShoppingListViewModel {
+        ShoppingListViewModel(
+            items: items,
+            store: nil,
+            intelligence: FakeIntelligenceService(isAvailable: isAvailable, substitution: substitution)
+        )
+    }
+
+    // MARK: - Availability gate
+
     @Test func affordanceHiddenWhenNoServiceInjected() {
-        let viewModel = ShoppingListViewModel(items: [], store: nil)
-        #expect(!viewModel.isSubstitutionAvailable)
+        #expect(!ShoppingListViewModel(items: [], store: nil).isSubstitutionAvailable)
     }
 
     @Test func affordanceHiddenWhenServiceUnavailable() {
-        let viewModel = ShoppingListViewModel(
-            items: [],
-            store: nil,
-            intelligence: FakeIntelligenceService(isAvailable: false)
-        )
-        #expect(!viewModel.isSubstitutionAvailable)
+        #expect(!Self.model(isAvailable: false).isSubstitutionAvailable)
     }
 
     @Test func affordanceShownWhenServiceAvailable() {
-        let viewModel = ShoppingListViewModel(
-            items: [],
-            store: nil,
-            intelligence: FakeIntelligenceService(isAvailable: true)
-        )
-        #expect(viewModel.isSubstitutionAvailable)
+        #expect(Self.model(isAvailable: true).isSubstitutionAvailable)
     }
 
-    @Test func requestExposesCannedSubstitution() async {
-        let viewModel = ShoppingListViewModel(
-            items: [],
-            store: nil,
-            intelligence: FakeIntelligenceService(isAvailable: true, substitution: .cannedButtermilk)
-        )
-        await viewModel.requestSubstitution(for: Self.item("1 cup buttermilk"))
-        #expect(
-            viewModel.substitution
-                == .loaded(
-                    ingredient: "1 cup buttermilk",
-                    substitution: .cannedButtermilk
-                )
-        )
+    // MARK: - Flow
+
+    @Test func beginOpensTheReasonPicker() {
+        let target = Self.item("1 cup buttermilk")
+        let viewModel = Self.model(items: [target])
+        viewModel.beginSubstitution(for: target)
+        #expect(viewModel.substitution == .pickingReason(itemID: target.id, ingredient: "1 cup buttermilk"))
     }
 
-    @Test func requestWithNoResultLandsInNotFound() async {
-        let viewModel = ShoppingListViewModel(
-            items: [],
-            store: nil,
-            intelligence: FakeIntelligenceService(isAvailable: true, substitution: nil)
-        )
-        await viewModel.requestSubstitution(for: Self.item("unobtanium"))
-        #expect(viewModel.substitution == .notFound(ingredient: "unobtanium"))
-    }
-
-    @Test func requestIsNoOpWhenUnavailable() async {
-        let viewModel = ShoppingListViewModel(
-            items: [],
-            store: nil,
-            intelligence: FakeIntelligenceService(isAvailable: false)
-        )
-        await viewModel.requestSubstitution(for: Self.item("1 cup buttermilk"))
+    @Test func beginIsNoOpWhenUnavailable() {
+        let target = Self.item("1 cup buttermilk")
+        let viewModel = Self.model(items: [target], isAvailable: false)
+        viewModel.beginSubstitution(for: target)
         // Never leaves idle — no empty sheet on an unsupported device.
         #expect(viewModel.substitution == .idle)
     }
 
-    @Test func dismissReturnsToIdle() async {
-        let viewModel = ShoppingListViewModel(
-            items: [],
-            store: nil,
-            intelligence: FakeIntelligenceService(isAvailable: true)
+    @Test func generateExposesCannedSubstitution() async {
+        let target = Self.item("1 cup buttermilk")
+        let viewModel = Self.model(items: [target], substitution: .cannedButtermilk)
+        viewModel.beginSubstitution(for: target)
+        await viewModel.generateSubstitution(reason: .dairyFree)
+        #expect(
+            viewModel.substitution
+                == .loaded(itemID: target.id, ingredient: "1 cup buttermilk", substitution: .cannedButtermilk)
         )
-        await viewModel.requestSubstitution(for: Self.item("1 cup buttermilk"))
+    }
+
+    @Test func generateWithNoResultLandsInNotFound() async {
+        let target = Self.item("unobtanium")
+        let viewModel = Self.model(items: [target], substitution: nil)
+        viewModel.beginSubstitution(for: target)
+        await viewModel.generateSubstitution(reason: nil)
+        #expect(viewModel.substitution == .notFound(itemID: target.id, ingredient: "unobtanium"))
+    }
+
+    // MARK: - Apply
+
+    @Test func applyReplacesTheRowInPlace() async {
+        let target = Self.item("1 cup buttermilk")
+        let viewModel = Self.model(items: [target], substitution: .cannedButtermilk)
+        viewModel.beginSubstitution(for: target)
+        await viewModel.generateSubstitution(reason: nil)
+        viewModel.applySubstitution()
+
+        // Same row id, new ingredient text, sheet dismissed.
+        #expect(viewModel.items.count == 1)
+        #expect(viewModel.items.first?.id == target.id)
+        #expect(viewModel.items.first?.ingredientText == IngredientSubstitution.cannedButtermilk.substitute)
+        #expect(viewModel.items.first?.recipeTitle == "R")
+        #expect(viewModel.substitution == .idle)
+    }
+
+    @Test func applyIsNoOpUnlessLoaded() {
+        let viewModel = Self.model(items: [Self.item("1 cup buttermilk")])
+        viewModel.applySubstitution()  // state is .idle
+        #expect(viewModel.substitution == .idle)
+        #expect(viewModel.items.first?.ingredientText == "1 cup buttermilk")
+    }
+
+    @Test func dismissReturnsToIdle() async {
+        let target = Self.item("1 cup buttermilk")
+        let viewModel = Self.model(items: [target])
+        viewModel.beginSubstitution(for: target)
+        await viewModel.generateSubstitution(reason: nil)
         #expect(viewModel.substitution != .idle)
         viewModel.dismissSubstitution()
         #expect(viewModel.substitution == .idle)
