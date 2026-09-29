@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODFeatureFeed
+import DODIntelligence
 import SwiftUI
 
 // DUT-551 (CL-306) — the six tool cards, extracted from `CookingToolsHubView`
@@ -65,6 +66,24 @@ extension CookingToolsHubView {
                     description: "Log every cook with a photo and notes, and build your streak.",
                     accessibilityID: "hub-journal"
                 ) { activeToolSheet = .cookingJournal }
+
+                // T-934 (US-54 / AC-54.4) — the on-device AI Q&A helper. Wired
+                // with `dependencies.intelligenceService()` (the same seam
+                // `GroceryTabRoot` threads into the Shopping List's substitution
+                // VM), and gated on availability INSIDE `CookingHelperEntry`: on
+                // a device with no on-device model the entry renders nothing, so
+                // the whole card is absent rather than a dead row. Reuses the
+                // hub's `toolCard` styling so it matches every other tool.
+                CookingHelperEntry(intelligence: dependencies.intelligenceService()) { action in
+                    toolCard(
+                        icon: "sparkles",
+                        title: "Ask Dutch Oven Daddy",
+                        description: "Get on-device answers to your cast iron, Dutch oven, "
+                            + "and technique questions.",
+                        accessibilityID: "hub-cooking-helper",
+                        action: action
+                    )
+                }
 
                 toolCard(
                     icon: "bag.fill",

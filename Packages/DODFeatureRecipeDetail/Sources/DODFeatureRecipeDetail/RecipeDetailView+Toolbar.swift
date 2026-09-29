@@ -19,6 +19,26 @@ extension RecipeDetailView {
     var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             HStack(spacing: DODSpacing.md) {
+                // US-54 / T-932 (AC-54.2) — on-device "Summarize". Shown ONLY
+                // when the model is usable right now AND there is cached body
+                // text to summarize, so unsupported devices (iOS 17-25, no
+                // Apple Intelligence, the simulator) see NO dead control — the
+                // button is absent, not disabled. Tapping runs the on-device
+                // model over the already-cached body and presents the summary
+                // sheet. Covers both the recipe (US-4) and article (US-37)
+                // branches because the toolbar is shared across them.
+                if viewModel.isSummaryAvailable, !viewModel.summaryBodyText.isEmpty {
+                    Button {
+                        Task { await viewModel.requestSummary() }
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(DODColor.label)
+                            .shadow(color: .black.opacity(0.35), radius: 3)
+                    }
+                    .accessibilityLabel("Summarize")
+                    .accessibilityIdentifier("dod.detail.summary.button")
+                }
+
                 // DUT-1340 — the bookmark is now a `Menu` with a `primaryAction`.
                 // A plain TAP fires `primaryAction` (save/unsave, unchanged);
                 // press-and-hold opens the menu with "Add to Collection", which
@@ -116,7 +136,29 @@ extension RecipeDetailView {
                 .accessibilityLabel("Share recipe")
                 #endif
             }
+            // US-54 / T-932 — the summary sheet, driven off the view model's
+            // `summary` state (no extra @State on the body, which is already at
+            // the SwiftLint length cap). Attached to the toolbar content rather
+            // than `RecipeDetailView.body` for the same reason.
+            .sheet(isPresented: summaryPresented) {
+                SummarySheet(state: viewModel.summary) {
+                    viewModel.dismissSummary()
+                }
+            }
         }
+    }
+
+    /// US-54 / T-932 — presents the summary sheet whenever ``summary`` leaves
+    /// `.idle`; dismissing it resets the state to `.idle`.
+    private var summaryPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.summary != .idle },
+            set: { presented in
+                if !presented {
+                    viewModel.dismissSummary()
+                }
+            }
+        )
     }
 
     // MARK: - Share as PDF (DUT-1324)

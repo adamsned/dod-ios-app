@@ -85,7 +85,7 @@ public final class ShoppingListViewModel {
     }
 
     /// Every row in the list, in insertion order (per-recipe, un-merged).
-    public private(set) var items: [Item]
+    public internal(set) var items: [Item]
 
     /// Rows the user has checked off while shopping (AC-39.5). Ephemeral.
     public private(set) var checkedIDs: Set<UUID> = []
@@ -241,7 +241,7 @@ public final class ShoppingListViewModel {
     /// `markAlreadyHave`, `clearAll`) so the one filter runs on change instead of
     /// per-access. `toggleChecked` is deliberately NOT a caller — it touches only
     /// `checkedIDs`, which doesn't affect which rows are visible.
-    private func rebuildVisibleItems() {
+    func rebuildVisibleItems() {
         visibleItems = items.filter { !alreadyHaveIDs.contains($0.id) }
     }
 
@@ -279,14 +279,11 @@ public final class ShoppingListViewModel {
         persist()
     }
 
-    /// Mark a row "I already have this" — it drops out of the still-need list
-    /// (CL-82). The row is REMOVED from `items` outright (DUT-589) rather than
-    /// merely masked by `alreadyHaveIDs`, so the persisted App-Group blob shrinks
-    /// with it instead of growing without bound; its id is also purged from both
-    /// ephemeral sets so no parallel bookkeeping lingers. The trailing-swipe UX
-    /// (ShoppingListView) is unchanged — the row still disappears from the list,
-    /// and every other row's checked state survives (only this row's state is
-    /// dropped). Persists (DUT-488).
+    /// Mark a row "I already have this" (the trailing trash button) — it drops
+    /// out of the still-need list (CL-82). The row is REMOVED from `items`
+    /// outright (DUT-589) rather than masked by `alreadyHaveIDs`, so the persisted
+    /// App-Group blob shrinks with it; its id is purged from both ephemeral sets.
+    /// Persists (DUT-488).
     public func markAlreadyHave(_ item: Item) {
         items.removeAll { $0.id == item.id }
         alreadyHaveIDs.remove(item.id)
@@ -325,7 +322,7 @@ public final class ShoppingListViewModel {
     /// Save the current list state to ``store`` (DUT-488). No-op when `store` is
     /// nil (mock / preview / no App Group), and never throws — see
     /// ``ShoppingListStore``.
-    private func persist() {
+    func persist() {
         store?.save(items: items, checked: checkedIDs, alreadyHave: alreadyHaveIDs)
     }
 }

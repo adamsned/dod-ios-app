@@ -1,6 +1,7 @@
 import DODAnalytics
 import DODDomain
 import DODFeatureProfile
+import DODIntelligence
 import DODNetworking
 import DODSupport
 import Foundation
@@ -199,16 +200,33 @@ public final class RecipeDetailViewModel {
     /// surface is otherwise private to the view-model module.
     let dependencies: RecipeDetailDependencies
 
+    /// US-54 / T-932 — the on-device AI seam backing the "Summarize" affordance
+    /// (App-injected in production; a ``FakeIntelligenceService`` in tests).
+    /// `nil` when unwired — then ``isSummaryAvailable`` is `false` and the
+    /// affordance stays hidden. Mirrors the Shopping List substitution seam
+    /// (#735): depends only on the DODIntelligence PROTOCOL, never on
+    /// FoundationModels. State machine lives in `+Summary`.
+    let intelligence: (any DODIntelligenceService)?
+
+    /// US-54 / T-932 — the recipe/article summary surface state, driving the
+    /// summary sheet. `internal(set)` so the same-module `+Summary` extension
+    /// drives the state machine.
+    public internal(set) var summary: SummaryState = .idle
+
     public init(
         listItem: RecipeListItem,
         canonicalURL: URL,
         dependencies: RecipeDetailDependencies,
-        commentModeration: CommentModerationStore = CommentModerationStore()  // DUT-546 gap 3
+        commentModeration: CommentModerationStore = CommentModerationStore(),  // DUT-546 gap 3
+        // US-54 / T-932 — defaults to `nil` so existing call sites, tests, and
+        // previews compile unchanged; the App injects the real service.
+        intelligence: (any DODIntelligenceService)? = nil
     ) {
         self.listItem = listItem
         self.canonicalURL = canonicalURL
         self.dependencies = dependencies
         self.commentModeration = commentModeration
+        self.intelligence = intelligence
     }
 
     public func onAppear() async {

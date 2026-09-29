@@ -87,13 +87,9 @@ public struct ShoppingListView: View {
                     build(from: selected)
                 }
             }
-            // v2 on-device AI — the ingredient-substitution result sheet, bound
-            // to the view model's substitution state (loading → loaded / notFound).
-            .sheet(isPresented: substitutionSheetBinding) {
-                SubstitutionSheet(state: viewModel.substitution) {
-                    viewModel.dismissSubstitution()
-                }
-            }
+            // v2 on-device AI — substitution sheet (in `+SubstitutionSheet.swift`
+            // to keep this body's type-check + file length in check).
+            .shoppingSubstitutionSheet(isPresented: substitutionSheetBinding, viewModel: viewModel)
             // DUT-488 — confirm before wiping a persisted list. Destructive
             // role tints the button red; the list clears + persists empty on
             // confirm (survives close/reopen).
@@ -161,8 +157,7 @@ public struct ShoppingListView: View {
             }
     }
 
-    /// v2 on-device AI — presents the substitution sheet whenever the view
-    /// model's substitution state is not `.idle`; the dismiss path resets it.
+    /// v2 on-device AI — sheet presented whenever substitution state != `.idle`.
     private var substitutionSheetBinding: Binding<Bool> {
         Binding(
             get: { viewModel.substitution != .idle },
@@ -331,11 +326,10 @@ public struct ShoppingListView: View {
                                 }
                             },
                             // v2 on-device AI — offer "Substitute" only when a
-                            // usable model is present (no dead affordance).
+                            // usable model is present (no dead affordance). Opens
+                            // the reason picker; generation runs from the sheet.
                             showSubstitute: viewModel.isSubstitutionAvailable,
-                            onSubstitute: {
-                                Task { await viewModel.requestSubstitution(for: item) }
-                            }
+                            onSubstitute: { viewModel.beginSubstitution(for: item) }
                         )
                     }
                 } header: {

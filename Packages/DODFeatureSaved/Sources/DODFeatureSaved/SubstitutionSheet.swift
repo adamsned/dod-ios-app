@@ -2,24 +2,30 @@ import DODDesignSystem
 import DODIntelligence
 import SwiftUI
 
-/// v2 on-device AI (1/n) — the ingredient-substitution result sheet.
+/// v2 on-device AI — the ingredient-substitution sheet.
 ///
-/// Renders ``ShoppingListViewModel/SubstitutionState``: a brief loading state
-/// while the on-device model runs, the suggestion in a
-/// ``DODColor/surfaceElevated`` card on success, and a graceful "no substitute
-/// found" on `nil` (unavailable / model error / guardrail rejection — the
-/// service never throws). Read-only for v1: it shows the suggestion, it does
-/// NOT add anything to the list.
+/// Flow: the user picks a **reason** (or "No Specific Reason") so the swap fits
+/// the need, taps **Suggest a Substitute** to run the on-device model, then
+/// **Apply** to replace the shopping-list row with the suggestion. Renders
+/// ``ShoppingListViewModel/SubstitutionState``: `.pickingReason` shows the reason
+/// chips, `.loading` a spinner, `.loaded` the suggestion in a
+/// ``DODColor/surfaceElevated`` card with an Apply toolbar action, `.notFound`
+/// a graceful empty result.
 ///
-/// Copy conventions (CL-305 / feedback): Title Case heading, sentence-case
-/// body, no em dashes. Sheet dismissal is a top-right Done button (CL — sheets
-/// dismiss with Done, pushes with the system chevron).
+/// Copy conventions (CL-305): Title Case controls/headings, sentence-case body,
+/// no em dashes. Dismiss is a top-left Cancel; the top-right confirmation action
+/// is Apply and appears only once a suggestion is loaded.
 struct SubstitutionSheet: View {
 
     let state: ShoppingListViewModel.SubstitutionState
-    /// Called by the Done button; the host resets the state to `.idle`, which
-    /// dismisses the sheet through its `isPresented` binding.
-    let onDone: () -> Void
+    /// Run the model for the current ingredient with the picked reason.
+    let onSuggest: (SubstitutionReason?) -> Void
+    /// Replace the row with the loaded suggestion.
+    let onApply: () -> Void
+    /// Dismiss without applying.
+    let onCancel: () -> Void
+
+    @State private var selectedReason: SubstitutionReason?
 
     var body: some View {
         NavigationStack {
@@ -31,10 +37,16 @@ struct SubstitutionSheet: View {
             .navigationBarTitleDisplayMode(.inline)
                 #endif
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { onDone() }
-                            .tint(DODColor.accent)
-                            .accessibilityIdentifier("shopping-substitution-done")
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { onCancel() }
+                            .accessibilityIdentifier("shopping-substitution-cancel")
+                    }
+                    if case .loaded = state {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Apply") { onApply() }
+                                .tint(DODColor.accent)
+                                .accessibilityIdentifier("shopping-substitution-apply")
+                        }
                     }
                 }
         }
@@ -54,9 +66,11 @@ struct SubstitutionSheet: View {
             switch state {
             case .idle:
                 EmptyView()
+            case .pickingReason:
+                reasonPicker
             case .loading:
                 loadingBody
-            case .loaded(_, let substitution):
+            case .loaded(_, _, let substitution):
                 resultCard(for: substitution)
             case .notFound:
                 notFoundBody
@@ -65,6 +79,56 @@ struct SubstitutionSheet: View {
             Spacer(minLength: 0)
         }
         .padding(DODSpacing.lg)
+    }
+
+    /// Reason chips + the Suggest button (the first step, before any model run).
+    private var reasonPicker: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.md) {
+            Text("Why swap it?")
+                .dodFont(DODType.bodyEmphasized)
+                .foregroundStyle(DODColor.label)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: DODSpacing.xs) {
+                    reasonChip(title: "No Specific Reason", reason: nil)
+                    ForEach(SubstitutionReason.allCases) { reason in
+                        reasonChip(title: reason.title, reason: reason)
+                    }
+                }
+                .padding(.vertical, DODSpacing.xxs)
+            }
+            .accessibilityIdentifier("shopping-substitution-reasons")
+
+            Button {
+                onSuggest(selectedReason)
+            } label: {
+                Text("Suggest a Substitute")
+                    .dodFont(DODType.bodyEmphasized)
+                    .foregroundStyle(DODColor.labelOnAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, DODSpacing.sm)
+                    .background(Capsule().fill(DODColor.accent))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("shopping-substitution-suggest")
+        }
+    }
+
+    /// One selectable reason chip; `nil` is the "No Specific Reason" default.
+    private func reasonChip(title: String, reason: SubstitutionReason?) -> some View {
+        let isSelected = selectedReason == reason
+        return Button {
+            selectedReason = reason
+        } label: {
+            Text(title)
+                .dodFont(DODType.caption)
+                .lineLimit(1)
+                .padding(.horizontal, DODSpacing.sm)
+                .padding(.vertical, DODSpacing.xs)
+                .foregroundStyle(isSelected ? DODColor.labelOnAccent : DODColor.label)
+                .background(Capsule().fill(isSelected ? DODColor.accent : DODColor.surfaceElevated))
+        }
+        .buttonStyle(.plain)
     }
 
     /// Brief loading state while the on-device model runs.
@@ -81,7 +145,8 @@ struct SubstitutionSheet: View {
         .accessibilityLabel("Finding a substitute")
     }
 
-    /// The suggestion, in a burnt-orange-accented elevated card.
+    /// The suggestion, in a burnt-orange-accented elevated card. Apply lives in
+    /// the toolbar.
     private func resultCard(for substitution: IngredientSubstitution) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Label {
@@ -124,23 +189,24 @@ struct SubstitutionSheet: View {
     }
 }
 
-#Preview("Substitution — loaded") {
+#Preview("Substitution — pick reason") {
     Color.clear.sheet(isPresented: .constant(true)) {
         SubstitutionSheet(
-            state: .loaded(ingredient: "1 cup buttermilk", substitution: .cannedButtermilk),
-            onDone: {}
+            state: .pickingReason(itemID: UUID(), ingredient: "1 cup buttermilk"),
+            onSuggest: { _ in },
+            onApply: {},
+            onCancel: {}
         )
     }
 }
 
-#Preview("Substitution — loading") {
+#Preview("Substitution — loaded") {
     Color.clear.sheet(isPresented: .constant(true)) {
-        SubstitutionSheet(state: .loading(ingredient: "1 cup buttermilk"), onDone: {})
-    }
-}
-
-#Preview("Substitution — not found") {
-    Color.clear.sheet(isPresented: .constant(true)) {
-        SubstitutionSheet(state: .notFound(ingredient: "unobtanium"), onDone: {})
+        SubstitutionSheet(
+            state: .loaded(itemID: UUID(), ingredient: "1 cup buttermilk", substitution: .cannedButtermilk),
+            onSuggest: { _ in },
+            onApply: {},
+            onCancel: {}
+        )
     }
 }
