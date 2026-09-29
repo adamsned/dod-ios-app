@@ -16,14 +16,14 @@ extension ProfileEditView {
     /// in; revocation is reserved for account *deletion*).
     @MainActor
     func handleSignOut() async {
-        await teardown(revoke: false, failureMessage: "Couldn't Sign Out. Try Again.")
+        await teardown(revoke: false, failureMessage: "Couldn't sign out. Try again.")
     }
 
     /// Delete Profile — clear both coupled rows AND revoke the Apple refresh
     /// token (App Store 5.1.1(v)).
     @MainActor
     func handleDelete() async {
-        await teardown(revoke: true, failureMessage: "Couldn't Delete Profile. Try Again.")
+        await teardown(revoke: true, failureMessage: "Couldn't delete profile. Try again.")
     }
 
     @MainActor

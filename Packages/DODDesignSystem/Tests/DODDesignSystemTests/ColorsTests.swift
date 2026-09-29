@@ -49,7 +49,7 @@ import UIKit
 /// resolve to the asset-catalog value. `.serialized` + the `deinit` reset keep
 /// the mutated process-global from leaking into the parallel snapshot/color
 /// suites (a leaked `true` would render every dark snapshot black).
-@Suite("DODColor OLED surfaces (v2)", .serialized) struct DODColorOLEDTests {
+@Suite("DODColor OLED surfaces (v2)", .serialized) final class DODColorOLEDTests {
 
     private let dark = UITraitCollection(userInterfaceStyle: .dark)
     private let light = UITraitCollection(userInterfaceStyle: .light)
@@ -79,8 +79,11 @@ import UIKit
 
     @Test func oledFlagLeavesLightTraitOnAssetValue() {
         DODColor.isOLEDDark = true
-        // Light surface is the asset's `#FFFFFF` — the OLED swap is dark-only.
-        #expect(rgb(DODColor.surface, light) == [0xFF, 0xFF, 0xFF])
+        // Light surface is the asset's warm cream `#F2F1EC` — the OLED swap is
+        // dark-only. (This asserted `#FFFFFF` when it shipped, which never held:
+        // the DOD light background has always been the cream, not white. The
+        // suite could not compile, so the wrong expectation went unnoticed.)
+        #expect(rgb(DODColor.surface, light) == [0xF2, 0xF1, 0xEC])
     }
 
     @Test func flagOffKeepsAssetDarkValue() {

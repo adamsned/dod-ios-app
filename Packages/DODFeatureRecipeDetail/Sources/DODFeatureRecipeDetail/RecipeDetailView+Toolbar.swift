@@ -2,6 +2,10 @@ import DODDesignSystem
 import DODDomain
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 // The recipe-detail top-bar actions + the bottom Snackbar, split out of
 // `RecipeDetailView.swift` to keep that file under the SwiftLint 400-line
 // `file_length` + 250-line `type_body_length` caps (DUT-534 added the
@@ -15,16 +19,32 @@ extension RecipeDetailView {
     var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             HStack(spacing: DODSpacing.md) {
+                // DUT-1340 — the bookmark is now a `Menu` with a `primaryAction`.
+                // A plain TAP fires `primaryAction` (save/unsave, unchanged);
+                // press-and-hold opens the menu with "Add to Collection", which
+                // loads the collections + membership and presents the picker
+                // sheet. `Menu`+`primaryAction` is used deliberately instead of
+                // `.onLongPressGesture` (unreliable on toolbar items).
                 // Save haptic is wired via `.sensoryFeedback(.success, trigger:
                 // viewModel.isSaved)` on the body — no manual generator here.
-                Button {
-                    Task { await viewModel.toggleSaved() }
+                Menu {
+                    Button {
+                        presentCollectionPicker()
+                    } label: {
+                        Label("Add to Collection", systemImage: "folder.badge.plus")
+                    }
+                    .accessibilityIdentifier("dod.detail.addToCollection.menuItem")
                 } label: {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
+                        // v2 animation refresh — clean fill↔outline symbol swap
+                        // on save/unsave (Reduce Motion → instant).
+                        .dodSymbolReplace(reduceMotion: reduceMotion)
                         // DUT-572 / CL-312 — glyph shadow so state colors survive
                         // over the full-bleed hero photo (mirrors the title shadow).
                         .shadow(color: .black.opacity(0.35), radius: 3)
+                } primaryAction: {
+                    Task { await viewModel.toggleSaved() }
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
 
@@ -62,51 +82,109 @@ extension RecipeDetailView {
                             : "square.and.arrow.down"
                     )
                     .foregroundStyle(viewModel.isDownloaded ? DODColor.burntOrange : DODColor.label)
+                    // v2 animation refresh — outline↔fill swap on download toggle.
+                    .dodSymbolReplace(reduceMotion: reduceMotion)
                     .shadow(color: .black.opacity(0.35), radius: 3)
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
 
-                // DUT-889 — iOS parity twin of Android's DUT-886 "Share as
-                // Text". A bare `ShareLink` can only carry one payload, so
-                // the URL-only share (unchanged behavior) and the new
-                // formatted plain-text share now live behind a `Menu` on
-                // the same toolbar glyph rather than adding a 6th icon.
-                // Each option gets its own `simultaneousGesture` so the
-                // haptic + `didShare()` telemetry still fires regardless of
-                // which format the user picked.
-                Menu {
-                    ShareLink(item: viewModel.canonicalURL) {
-                        Label("Share Link", systemImage: "link")
-                    }
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            shareTapCount += 1  // fires the `.sensoryFeedback` tick on the body
-                            Task { await viewModel.didShare() }
-                        }
-                    )
-
-                    if let recipe = viewModel.recipe {
-                        ShareLink(item: RecipeShareTextFormatter.format(recipe: recipe)) {
-                            Label("Share as Text", systemImage: "doc.plaintext")
-                        }
-                        .simultaneousGesture(
-                            TapGesture().onEnded {
-                                shareTapCount += 1
-                                Task { await viewModel.didShare() }
-                            }
-                        )
-                    }
+                // DUT-1324 — the Share glyph opens the full iOS share sheet with a
+                // custom print-ready recipe PDF (see `RecipePDFRenderer`): Print,
+                // AirDrop, Messages, Mail, contacts, and any share extension. This
+                // replaces the old two-option `Menu` (Share Link / Share as Text).
+                // The PDF is built at tap time (it needs the hero image + the
+                // on-screen scaled/converted recipe), so a `Button` prepares it and
+                // drives a `.sheet` on the body rather than an upfront `ShareLink`.
+                #if os(iOS)
+                Button {
+                    Task { await prepareRecipePDFShare() }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .foregroundStyle(DODColor.label)
                         .shadow(color: .black.opacity(0.35), radius: 3)
                 }
+                .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Share recipe")
+                #else
+                // macOS `swift test` slice: no UIKit share sheet — keep a plain
+                // URL ShareLink so the toolbar still compiles cross-platform.
+                ShareLink(item: viewModel.canonicalURL) {
+                    Image(systemName: "square.and.arrow.up")
+                        .foregroundStyle(DODColor.label)
+                        .shadow(color: .black.opacity(0.35), radius: 3)
+                }
+                .accessibilityLabel("Share recipe")
+                #endif
             }
         }
     }
 
+    // MARK: - Share as PDF (DUT-1324)
+
+    #if os(iOS)
+    /// Build the print-ready recipe PDF and present the iOS share sheet over it.
+    /// Runs at tap time because it needs the hero image (fetched) and the
+    /// on-screen SCALED (+ metric-converted) recipe, matching what's displayed —
+    /// the same pipeline "Add to Shopping List" / "Share as Text" used (DUT-639).
+    func prepareRecipePDFShare() async {
+        guard let recipe = viewModel.recipe else { return }
+        shareTapCount += 1  // fires the `.sensoryFeedback` tick on the body
+        await viewModel.didShare()
+
+        let heroImage = await Self.loadShareImage(recipe.heroImageLargeURL ?? recipe.heroImage)
+        let data = Self.recipePDFData(
+            recipe: recipe,
+            servingsScaleFactor: viewModel.servingsScaleFactor,
+            useMetricUnits: useMetricUnits,
+            heroImage: heroImage,
+            logo: DODBrandAsset.logoBadge
+        )
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(Self.pdfFilename(for: recipe))
+        do {
+            try data.write(to: fileURL, options: .atomic)
+            sharePDF = SharePDFItem(pdfURL: fileURL, linkURL: recipe.canonicalURL)
+        } catch {
+            // Best-effort: temp dir is writable in practice; if not, no sheet.
+        }
+    }
+
+    /// Pure PDF bytes for a recipe at the current servings/units. `static` +
+    /// view-state-free so it's unit-testable without a live view.
+    static func recipePDFData(
+        recipe: Recipe,
+        servingsScaleFactor: Double,
+        useMetricUnits: Bool,
+        heroImage: UIImage?,
+        logo: UIImage?
+    ) -> Data {
+        let scaled = RecipeDetailViewModel.scaledRecipe(
+            recipe,
+            by: servingsScaleFactor,
+            useMetric: useMetricUnits
+        )
+        return RecipePDFRenderer().pdfData(recipe: scaled, heroImage: heroImage, logo: logo)
+    }
+
+    /// Fetch the hero image for the PDF. Hits the shared `URLCache` that
+    /// `ReliableImage` already populated for the on-screen hero, so it's usually
+    /// instant; returns `nil` (header degrades) on any failure.
+    static func loadShareImage(_ url: URL?) async -> UIImage? {
+        guard let url else { return nil }
+        guard let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }
+        return UIImage(data: data)
+    }
+
+    /// A tidy, share-friendly file name (the recipe slug), so the share sheet
+    /// and the recipient see e.g. "dutch-oven-pot-roast.pdf".
+    static func pdfFilename(for recipe: Recipe) -> String {
+        let base = recipe.slug.isEmpty ? "recipe" : recipe.slug
+        return "\(base).pdf"
+    }
+    #endif
+
     // MARK: - Add to Shopping List (DUT-535)
+    // (see the `View.recipePDFShareSheet` helper at the end of this file)
 
     /// Handle the `cart.badge.plus` tap. DUT-535 — present the ingredient-
     /// selection sheet for the loaded recipe when the sheet seam is wired
@@ -127,6 +205,20 @@ extension RecipeDetailView {
             recipeForShoppingListSheet = SheetRecipe(recipe: scaled)
         } else {
             Task { await viewModel.addToShoppingList(useMetric: useMetricUnits) }
+        }
+    }
+
+    // MARK: - Add to Collection (DUT-1340)
+
+    /// Handle the bookmark menu's "Add to Collection" item. Loads the
+    /// collections + the recipe's current membership into the view model, THEN
+    /// flips the presentation flag so the picker sheet opens pre-populated.
+    /// Guarded on `recipe != nil` (the picker acts on the loaded recipe).
+    private func presentCollectionPicker() {
+        guard viewModel.recipe != nil else { return }
+        Task {
+            await viewModel.loadCollectionsForPicker()
+            showCollectionPicker = true
         }
     }
 
@@ -158,6 +250,43 @@ extension RecipeDetailView {
         return Snackbar.Action(title: title) {
             viewModel.dismissSnackbar()
             openShoppingList()
+        }
+    }
+}
+
+extension View {
+    /// DUT-1324 — presents the full iOS share sheet over the generated recipe
+    /// PDF (`SharePDFItem`). iOS-only; a no-op on the macOS `swift test` slice.
+    /// Lives here (not inline in `RecipeDetailView.body`) to keep that file under
+    /// the SwiftLint 400-line cap.
+    @ViewBuilder
+    func recipePDFShareSheet(_ item: Binding<SharePDFItem?>) -> some View {
+        #if os(iOS)
+        sheet(item: item) { ShareSheet(items: [$0.pdfURL, LinkActivityItemSource($0.linkURL)]) }
+        #else
+        self
+        #endif
+    }
+
+    /// DUT-1340 — presents the self-contained "Add to Collection" picker
+    /// (`RecipeCollectionPickerSheet`) over the recipe. Factored out of
+    /// `RecipeDetailView.body` to keep that file under the SwiftLint length cap.
+    /// The view model supplies the collections + seed selection (loaded by the
+    /// menu action) and receives the create + commit callbacks.
+    func recipeCollectionPickerSheet(
+        isPresented: Binding<Bool>,
+        viewModel: RecipeDetailViewModel
+    ) -> some View {
+        sheet(isPresented: isPresented) {
+            RecipeCollectionPickerSheet(
+                recipeTitle: viewModel.recipe?.title ?? viewModel.listItem.title,
+                collections: viewModel.pickerCollections,
+                initialSelection: viewModel.pickerInitialSelection,
+                onCreate: { name in await viewModel.createCollectionFromPicker(name: name) },
+                onCommit: { ids in
+                    Task { await viewModel.commitCollections(ids) }
+                }
+            )
         }
     }
 }

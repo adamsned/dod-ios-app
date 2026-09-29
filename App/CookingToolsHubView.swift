@@ -181,7 +181,7 @@ struct CookingToolsHubView: View {
                 tipBanner
                 toolList
             }
-            .background(DODColor.surface)
+            .background(DODColor.surface.ignoresSafeArea())  // DUT-1335 fill bottom safe area
             .dodHidesNavBar()
             .navigationDestination(for: HubDestination.self) { destination in
                 switch destination {
@@ -363,7 +363,7 @@ struct CookingToolsHubView: View {
             }
             .padding(DODSpacing.lg)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            .background(DODColor.surface)
+            .background(DODColor.surface.ignoresSafeArea())  // DUT-1335 fill bottom safe area
             .navigationTitle("")
             .dodInlineNavTitle()
             .toolbar {

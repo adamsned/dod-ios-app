@@ -47,7 +47,7 @@ public struct SystemBakeTimerNotifier: BakeTimerNotifying {
     /// rather than stacking duplicates or clobbering a sibling rung's alert.
     static let identifier = "dod.firstCookout.bakeDone"
     static let title = "Your bake is done!"
-    static let body = "Time to check your Dutch oven — carefully lift the lid and see how it turned out."
+    static let body = "Time to check your Dutch oven. Carefully lift the lid and see how it turned out."
 
     /// DUT-443 — schedule the alert this far AFTER the engine deadline. The
     /// foreground finish is detected on the NEXT 1 Hz tick (~0.5s average) and

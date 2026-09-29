@@ -205,6 +205,13 @@ public struct CookChooserFlow: View {
         return .upcoming
     }
 
+    /// Pure, testable rung → locked mapping (DUT-1235): only the campfire
+    /// capstone can ever be locked, and only while neither home rung before it
+    /// has been cooked yet. Every other rung is never locked.
+    nonisolated static func isRungLocked(_ rung: GuidedCookout, cookedRecipeIDs: Set<Int> = []) -> Bool {
+        rung.isCampfire && GuidedCookout.isCampfireLocked(cookedRecipeIDs: cookedRecipeIDs)
+    }
+
     @ViewBuilder private var pathSection: some View {
         VStack(spacing: 0) {
             ForEach(Array(pathRungs.enumerated()), id: \.element.recipeID) { index, rung in
@@ -212,7 +219,8 @@ public struct CookChooserFlow: View {
                     rung: rung,
                     number: index + 1,
                     state: nodeState(index),
-                    isLast: index == pathRungs.count - 1
+                    isLast: index == pathRungs.count - 1,
+                    isLocked: Self.isRungLocked(rung, cookedRecipeIDs: cookedRecipeIDs)
                 ) {
                     selected = rung
                 }

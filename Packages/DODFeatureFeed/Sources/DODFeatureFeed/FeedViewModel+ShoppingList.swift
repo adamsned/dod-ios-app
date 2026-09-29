@@ -40,7 +40,7 @@ extension FeedViewModel {
             shoppingListSnackbarMessage = Self.shoppingListAddedMessage(count: count)
             shoppingListSnackbarActionTitle = "View"
         case .couldntLoad:
-            shoppingListSnackbarMessage = "Couldn't load ingredients — open the recipe to add."
+            shoppingListSnackbarMessage = "Couldn't load ingredients. Open the recipe to add."
             shoppingListSnackbarActionTitle = nil
         }
     }

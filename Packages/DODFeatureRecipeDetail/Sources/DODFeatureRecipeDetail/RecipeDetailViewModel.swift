@@ -73,6 +73,17 @@ public final class RecipeDetailViewModel {
     /// `RecipeDetailViewModel+Blurb.swift`) is the visibility gate.
     public internal(set) var blurbBlocks: [ArticleBlock] = []
 
+    // MARK: - Add to Collection picker (DUT-1340)
+
+    /// Every collection the long-press "Add to Collection" picker renders.
+    /// Loaded by ``loadCollectionsForPicker()`` right before the sheet presents.
+    /// The commit + create action methods live in
+    /// `RecipeDetailViewModel+Collections.swift` (`file_length` discipline).
+    public internal(set) var pickerCollections: [RecipeCollection] = []
+    /// The collection ids the recipe already belongs to — the picker's seed
+    /// selection (its checkmarks). Loaded alongside ``pickerCollections``.
+    public internal(set) var pickerInitialSelection: Set<UUID> = []
+
     // MARK: - Servings scaler (US-31)
 
     /// Current user-selected serving count. Defaults to the recipe's source

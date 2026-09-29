@@ -123,11 +123,16 @@ struct ProfileSettingsSection: View {
     /// New-Post Notification" button. `nil` (button hidden) unless the App
     /// target's composition root injects it.
     var sendTestNotification: (() async -> Void)?
+    /// DUT-1333 — threaded to the "Send Test New-Article Notification" button.
+    var sendTestArticleNotification: (() async -> Void)?
 
     /// Daddy Mode (Phase 1, cosmetic) — resolved once on appear so the body
     /// doesn't hit the Keychain on every recompute. Gated OFF for everyone until
     /// Dad's real `sub` is configured in `OwnerGate`.
     @State private var isOwner = false
+    /// ⚠️ DEV DEBUG (strip before public release — see DevDebug.swift) — the
+    /// Settings "Dev Debug" toggle force-shows this owner UI for design review.
+    @AppStorage(DevDebug.forceShowOwnerUIKey) private var devForceShowOwnerUI = false
 
     var body: some View {
         if !hidesProfile {
@@ -135,11 +140,15 @@ struct ProfileSettingsSection: View {
                 ProfileSettingsRow(viewModel: viewModel)
 
                 // Daddy Mode (Phase 1, cosmetic) — owner-only "Daddy's Tools"
-                // entry point to the honest placeholder screen. Hidden entirely
-                // for non-owners; display-only, authorizes nothing.
-                if isOwner {
+                // entry point to the honest placeholder screen. Hidden for
+                // non-owners; display-only, authorizes nothing. (Dev Debug can
+                // force-show it for design review — reveal only, no owner action.)
+                if isOwner || devForceShowOwnerUI {
                     NavigationLink {
-                        OwnerToolsPlaceholderView(sendTestNotification: sendTestNotification)
+                        OwnerToolsPlaceholderView(
+                            sendTestNotification: sendTestNotification,
+                            sendTestArticleNotification: sendTestArticleNotification
+                        )
                     } label: {
                         Label("Daddy's Tools", systemImage: "key.shield.fill")
                             .dodFont(DODType.body)

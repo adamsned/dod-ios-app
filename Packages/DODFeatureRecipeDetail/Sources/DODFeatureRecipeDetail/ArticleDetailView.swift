@@ -91,7 +91,10 @@ struct ArticleDetailView: View {
             // The parent GeometryReader still reports the real `topInset`.
             .ignoresSafeArea(.container, edges: .top)
         }
-        .background(DODColor.surface)
+        // DUT-1335 — fill the bottom safe area too (see RecipeDetailView): the
+        // ScrollView ignores only the TOP safe area for the hero, so the bottom
+        // home-indicator strip was unpainted and read as a black bar.
+        .background(DODColor.surface.ignoresSafeArea())
     }
 
     /// "Published <absolute date>" caption above the body — the shared
@@ -101,7 +104,7 @@ struct ArticleDetailView: View {
     /// also uses (medium → long per Ned). The visible text equals the VoiceOver
     /// label by construction, so no separate `.accessibilityLabel` is needed.
     private var publishedDateCaption: some View {
-        PublishedDateCaption(date: recipe.publishedAt)
+        PublishedDateCaption(date: recipe.updatedAt ?? recipe.publishedAt)
     }
 
     /// The rendered article body: native blocks when the HTML parsed, else a

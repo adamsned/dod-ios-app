@@ -204,6 +204,34 @@ public final class SearchViewModel {
     /// `+T637`'s `surfaceLatestRecipes` can claim a generation too.
     var searchGeneration = 0
 
+    // MARK: - Infinite-scroll paging (v2 search paging)
+    /// Highest `?search=` page already folded into the visible result set for
+    /// the CURRENT text query. Reset to 1 whenever `finishTextSearch` commits a
+    /// fresh page-1 set (a new query resets paging); `loadMoreResults` advances
+    /// it. Paging applies only to the plain text-search path — the
+    /// Latest-Recipes (`+T637`) and category-fetch (Path B) surfaces don't page.
+    var searchResultsPage = 1
+    /// Latches `true` once a fetched page comes back empty or short (fewer than
+    /// `searchResultsPageSize` rows = WP's last page), so the near-bottom trigger
+    /// stops firing. Reset on every fresh page-1 commit.
+    var searchResultsReachedEnd = false
+    /// Single-flight guard for concurrent page fetches (mirrors `FeedViewModel`'s
+    /// `isLoading`): the near-bottom trigger can fire several times per scroll,
+    /// so `loadMoreResults` bails while a page is already in flight. Drives the
+    /// bottom spinner row in `SearchView`. `public internal(set)` so the view can
+    /// observe it while only the `+Paging` extension advances it.
+    public internal(set) var isLoadingMoreResults = false
+    /// The `?search=` per-page size the pipeline pages at. Matches
+    /// `WPRestClient.searchPageSize` (100) so a page returning fewer than this
+    /// reliably signals WP's last page (the "short page stops" rule). Kept at 100
+    /// (not dropped smaller) so paged pages share page 1's title-precision recall
+    /// window (CL-120) and each append pulls a full batch in one round trip.
+    static let searchResultsPageSize = 100
+    /// Near-bottom trigger window: the trailing N combined rows (title tier +
+    /// "Recipes Using" tier) whose appearance arms the next page fetch, mirroring
+    /// `FeedViewModel.loadMoreIfNeeded`'s `items.suffix(3)`.
+    static let loadMoreTailWindow = 3
+
     /// DUT-541: in-flight guard for card "Add to Shopping List". A rapid double
     /// long-press fires two independent `Task { await addToShoppingList(item) }`
     /// with no gate, and `ShoppingListStore.append` is additive (CL-77), so the
@@ -246,6 +274,7 @@ public final class SearchViewModel {
         lastSurface = .textQuery
         didYouMean = nil  // CL-127 (T-649): wipe the rescue banner too.
         filterSupportHydrated = false  // DUT-505: re-arm lazy filter-support hydration.
+        resetResultsPaging()  // v2 search paging: re-arm the page cursor for the next query.
     }
 
     /// Surface a stored query (e.g. user tapped a recent chip). Sets the

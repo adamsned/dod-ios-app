@@ -25,7 +25,11 @@ public struct FeedView: View {
     /// 2-column grid byte-for-byte for users who never tap the toggle.
     @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
         RecipeListLayout.gallery.rawValue
-    public let onSelect: (RecipeListItem) -> Void
+    /// Tap-to-open. The second argument is the ORDERED list the tap came from
+    /// (the feed's current items), so the host can open the recipe inside a
+    /// left/right swipe pager over that list. Surprise Me passes just `[item]`
+    /// (a one-recipe context — nothing to page through).
+    public let onSelect: (RecipeListItem, [RecipeListItem]) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
     /// here means the context menu still appears but the Save button is a
@@ -80,6 +84,9 @@ public struct FeedView: View {
     /// recompute). Gates the owner-only compose button; OFF for everyone until
     /// Dad's real `sub` is configured in `OwnerGate`.
     @State private var isOwnerComposer = false
+    /// ⚠️ DEV DEBUG (strip before public release — see DevDebug.swift) — the
+    /// Settings "Dev Debug" toggle force-shows this owner UI for design review.
+    @AppStorage(DevDebug.forceShowOwnerUIKey) private var devForceShowOwnerUI = false
     /// Daddy Mode (Phase 1, cosmetic) — presents the honest compose placeholder.
     @State private var showingComposeSheet = false
     /// DUT-571 — persisted dismissal (a once-per-install "x" tap). `.standard`
@@ -88,7 +95,7 @@ public struct FeedView: View {
 
     public init(
         viewModel: FeedViewModel,
-        onSelect: @escaping (RecipeListItem) -> Void,
+        onSelect: @escaping (RecipeListItem, [RecipeListItem]) -> Void,
         onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         openShoppingList: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
@@ -117,17 +124,24 @@ public struct FeedView: View {
                 // (CL-306) — the trailing slot now hosts the Settings gear (the
                 // old Cooking Tools menu + its onboarding callout are retired; the
                 // tools moved to the first-class Cooking Tools hub tab).
-                DODScreenHeader("Recipes & Articles") { headerTrailing }
+                DODScreenHeader("Recipes & Articles") {
+                    headerTrailing
+                }
+                // v2 feed-search redesign — the search entry is a full-width
+                // search bar under the title (Messages-style) instead of a
+                // corner glyph. Tapping it opens the Search screen (its rich
+                // idle: categories, Try chips, Surprise Me), via the same
+                // injected `onOpenSearch` seam the old button used.
+                searchBar
                 content
             }
-            // Offline shifts the whole stack below the OfflineBanner overlay.
-            .padding(.top, viewModel.isOffline ? DODSpacing.xl : 0)
-            OfflineBanner(isOffline: viewModel.isOffline)
         }
         // DUT-534 Part 2 — the "Add to Shopping List" confirmation snackbar,
         // anchored to the bottom (mirrors Recipe Detail's Part 1 host).
         .overlay(alignment: .bottom) { shoppingListSnackbar }
-        .background(DODColor.surface)
+        // DUT-1335 — fill the bottom safe area so no black bar shows under the
+        // floating tab bar (matches the detail screens + CookModeView).
+        .background(DODColor.surface.ignoresSafeArea())
         // DUT-275 — nav bar hidden: the header button lives in the pinned header
         // row above (next to the title) instead of the nav bar, so no nav-bar
         // height is reserved and the title sits at the same top Y as every other
@@ -156,47 +170,58 @@ public struct FeedView: View {
         .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
-    /// The Feed header's trailing slot. Groups the v2 Search overhaul (1/3)
-    /// magnifying-glass ``searchButton`` (which replaced the old "Surprise Me"
-    /// dice — Surprise Me moved onto the search page) with the owner-only compose
-    /// button (Daddy Mode, Phase 1) and the long-standing Settings gear in one
-    /// HStack (`DODScreenHeader`'s trailing is a single `@ViewBuilder`). The
-    /// compose button self-gates on owner status; the Settings gear opens the
-    /// Settings sheet via the injected `onOpenSettings` closure
-    /// (`RootView.showSettingsSheet`) using the shared ``DODHeaderGearButton`` so
-    /// it matches the Saved / Cooking Tools / Search headers exactly.
+    /// The Feed header's trailing slot: the owner-only compose button (Daddy
+    /// Mode, Phase 1) + the Settings gear, in one HStack (`DODScreenHeader`'s
+    /// trailing is a single `@ViewBuilder`). Search moved OFF the corner into a
+    /// full-width `searchBar` under the title (v2 feed-search redesign). The
+    /// compose button self-gates on owner status; the gear opens Settings via the
+    /// injected `onOpenSettings` closure using the shared ``DODHeaderGearButton``.
     @ViewBuilder
     private var headerTrailing: some View {
         HStack(spacing: DODSpacing.xs) {
-            searchButton
             composeButton
             settingsGear
         }
     }
 
-    /// v2 Search overhaul (1/3) — the Search entry point. Replaces the old
-    /// "Surprise Me" dice (Surprise Me moved onto the search page's idle
-    /// state). Tapping calls the injected ``onOpenSearch`` closure, which the
-    /// App shell fulfills by PUSHING the Search screen within the Feed tab's
-    /// own navigation stack (Search is no longer a tab). Mirrors the other
-    /// header buttons' treatment: a 44pt hit target with the burnt-orange tint
-    /// on the icon only (never a full fill). Rendered only when wired, so tests
-    /// / previews that omit the closure show no search button and the header
-    /// layout stays byte-identical for them.
+    /// v2 feed-search redesign — the Search entry point: a full-width search
+    /// BAR under the "Recipes & Articles" title (replacing the old corner
+    /// magnifying-glass), styled to match the brand ``DODSearchField`` (a
+    /// `surfaceElevated` capsule with a leading glyph + soft shadow). It's a
+    /// read-only affordance: tapping calls the injected ``onOpenSearch`` — the
+    /// same seam the old button used, which the App shell fulfills by opening
+    /// the Search screen (its rich idle: categories, Try chips, Surprise Me).
+    /// Keeps the `feed-open-search` id so the existing UI/E2E journeys still
+    /// find it. Rendered only when wired, so tests / previews that omit the
+    /// closure show no bar and the layout stays byte-identical for them.
     @ViewBuilder
-    private var searchButton: some View {
+    private var searchBar: some View {
         if let onOpenSearch {
             Button {
                 onOpenSearch()
             } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.title2)
-                    .accessibilityLabel("Search")
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                HStack(spacing: DODSpacing.xs) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .accessibilityHidden(true)
+                    Text("Search Recipes")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.labelSecondary)
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, DODSpacing.sm)
+                .padding(.horizontal, DODSpacing.md)
+                .background(Capsule(style: .continuous).fill(DODColor.surfaceElevated))
+                .shadow(color: DODColor.charcoal.opacity(0.12), radius: 4, x: 0, y: 1)
+                .contentShape(Capsule())
             }
-            .tint(DODColor.burntOrange)
+            .buttonStyle(.plain)
+            .padding(.horizontal, DODSpacing.md)
+            .padding(.top, DODSpacing.xs)
+            .padding(.bottom, DODSpacing.sm)
             .accessibilityIdentifier("feed-open-search")
+            .accessibilityLabel("Search recipes")
+            .accessibilityAddTraits(.isSearchField)
         }
     }
 
@@ -206,17 +231,22 @@ public struct FeedView: View {
     /// authorizes nothing. Hidden entirely for non-owners.
     @ViewBuilder
     private var composeButton: some View {
-        if isOwnerComposer {
+        // ⚠️ DEV DEBUG (strip before public release) — `devForceShowOwnerUI`
+        // reveals this owner button for design review; it stays a placeholder.
+        if isOwnerComposer || devForceShowOwnerUI {
             Button {
                 showingComposeSheet = true
             } label: {
                 Image(systemName: "square.and.pencil")
                     .font(.title2)
+                    // v2 animation refresh — explicit foreground (was `.tint`)
+                    // for the pressable style; renders byte-identically.
+                    .foregroundStyle(DODColor.burntOrange)
                     .accessibilityLabel("Compose Post")
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .tint(DODColor.burntOrange)
+            .buttonStyle(.dodPressable)
             .accessibilityIdentifier("feed-compose-button")
         }
     }
@@ -236,18 +266,40 @@ public struct FeedView: View {
 
     @ViewBuilder
     private var content: some View {
+        if viewModel.isOffline {
+            // DUT-1333 — offline blocks the WHOLE Recipes page (not a thin
+            // banner over stale cache). A clear "couldn't load" message + Retry,
+            // plus a pointer to the Saved tab for downloaded recipes, so the
+            // offline state reads unambiguously — especially for less technical
+            // cooks who need to know Saved is where offline recipes live.
+            offlineBlock
+        } else {
+            loadStateContent
+        }
+    }
+
+    /// Full-page offline block. Supersedes the old `OfflineBanner` strip.
+    private var offlineBlock: some View {
+        EmptyState(
+            systemImage: "wifi.slash",
+            title: "You're Offline",
+            message:
+                "The Recipes page couldn't load without an internet connection. If you've downloaded recipes for offline use, open the Saved tab to cook from them.",
+            action: .init(title: "Retry") {
+                Task { await viewModel.refresh() }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var loadStateContent: some View {
         switch viewModel.loadState {
         case .loadingInitial:
             loadingSkeletons
         case .firstLaunchOffline:
-            EmptyState(
-                systemImage: "wifi.slash",
-                title: "You need internet",
-                message: "Connect to load recipes the first time.",
-                action: .init(title: "Retry") {
-                    Task { await viewModel.refresh() }
-                }
-            )
+            // Unreachable while `isOffline` is the precedence gate above, but
+            // kept as a defensive fallback for the first-launch-no-cache path.
+            offlineBlock
         case .firstLaunchFailed:
             // DUT-621 — an ONLINE first-launch failure: a real failure message
             // + a Retry wired to `refresh()`, NOT the dead-end "No recipes."

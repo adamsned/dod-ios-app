@@ -34,14 +34,14 @@ extension SettingsView {
         )
     }
 
-    var commentReplyNotificationsBinding: Binding<Bool> {
+    var articleNotificationsBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.commentReplyNotificationsEnabled },
+            get: { viewModel.articleNotificationsEnabled },
             // Mirrors `notificationsEnabledBinding` — turning ON requests
-            // system authorization (T-750 / CL-147); a denied prompt leaves
-            // the persisted flag OFF so the toggle springs back.
+            // system authorization (DUT-1333); a denied prompt leaves the
+            // persisted flag OFF so the toggle springs back.
             set: { newValue in
-                Task { await viewModel.setCommentReplyNotificationsEnabled(newValue) }
+                Task { await viewModel.setArticleNotificationsEnabled(newValue) }
             }
         )
     }
@@ -59,6 +59,9 @@ extension SettingsView {
             set: {
                 DODColor.isOLEDDark = $0.isOLEDDark
                 viewModel.appearance = $0
+                // v2 Seasoned Cast Iron → widgets: revert/apply the widget flag
+                // when the appearance itself changes (e.g. Seasoned → Cocoa).
+                syncWidgetSeasonedCastIron(for: $0)
             }
         )
     }

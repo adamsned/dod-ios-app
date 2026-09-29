@@ -26,14 +26,16 @@ import Testing
     @Test func slateIsFullOnFirstReadWithoutCategoryLoad() async {
         // Wave 3: the slate no longer waits on `loadCategoriesIfNeeded()`.
         // A fresh viewmodel with no categories loaded still returns a full
-        // slate (pinned Latest Recipes + 9 curated chips) on the first read.
+        // slate (10 curated chips) on the first read.
         let viewModel = SearchViewModel(
             dependencies: FakeSearchDependencies(),
             recentSearches: Self.scratchRecents()
         )
         let slate = viewModel.displayedTrySlate
         #expect(slate.count == SearchViewModel.trySlateVisibleCount)
-        #expect(slate.first?.isLatestRecipes == true)
+        // v2 feed-search redesign: no pinned Latest Recipes pill — every chip
+        // is a curated pool term.
+        #expect(!slate.contains(where: { $0.isLatestRecipes }))
     }
 
     @Test func fullSlateCachesAndIsStableAcrossReads() async {

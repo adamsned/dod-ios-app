@@ -11,6 +11,11 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
     public let excerpt: String
     public let heroImage: URL?
     public let publishedAt: Date
+    /// WordPress `modified` (last-updated) UTC instant, when the source
+    /// supplied it (DUT-1334). `nil` for items from sources that don't carry
+    /// it (older Codable payloads, the offline cache) — the UI falls back to
+    /// ``publishedAt``.
+    public let updatedAt: Date?
     /// "30 min" if known from REST; nil pre-detail-fetch.
     public let totalTimeDisplay: String?
     /// Optional so older Codable payloads (pre-this-field) decode cleanly.
@@ -36,6 +41,7 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
         excerpt: String,
         heroImage: URL? = nil,
         publishedAt: Date,
+        updatedAt: Date? = nil,
         totalTimeDisplay: String? = nil,
         canonicalURL: URL? = nil,
         categoryIDs: [Int]? = nil
@@ -45,6 +51,7 @@ public struct RecipeListItem: Sendable, Hashable, Identifiable, Codable {
         self.excerpt = excerpt
         self.heroImage = heroImage
         self.publishedAt = publishedAt
+        self.updatedAt = updatedAt
         self.totalTimeDisplay = totalTimeDisplay
         self.canonicalURL = canonicalURL
         self.categoryIDs = categoryIDs

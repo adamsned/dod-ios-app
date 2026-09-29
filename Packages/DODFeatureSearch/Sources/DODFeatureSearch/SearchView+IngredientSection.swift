@@ -36,6 +36,14 @@ extension SearchView {
                 if !viewModel.ingredientItems.isEmpty {
                     ingredientSection(layout: layout)
                 }
+                // v2 search paging: bottom spinner row while a next page is in
+                // flight, mirroring `FeedView`'s `loadingMore` ProgressView.
+                if viewModel.isLoadingMoreResults {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, DODSpacing.lg)
+                        .accessibilityIdentifier("dod.search.loadingMore")
+                }
             }
             .padding(.horizontal, DODSpacing.md)
             .padding(.bottom, DODSpacing.lg)
@@ -104,6 +112,9 @@ extension SearchView {
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )
                 .accessibilityIdentifier("dod.search.ingredientCard")
+                // v2 search paging: the ingredient tier is the visual bottom, so
+                // reaching its last rows also arms the next `?search=` page.
+                .task { await viewModel.loadMoreResultsIfNeeded(currentItem: item) }
             }
         }
     }
@@ -132,6 +143,9 @@ extension SearchView {
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )
                 .accessibilityIdentifier("dod.search.ingredientCard")
+                // v2 search paging: reaching the ingredient tier's last rows
+                // arms the next `?search=` page (see the gallery variant).
+                .task { await viewModel.loadMoreResultsIfNeeded(currentItem: item) }
             }
         }
     }
@@ -174,6 +188,8 @@ extension SearchView {
                 )
                 // T-737 / L5: stable handle mirroring `dod.feed.card`.
                 .accessibilityIdentifier("dod.search.card")
+                // v2 search paging: near-bottom trigger (mirrors FeedView).
+                .task { await viewModel.loadMoreResultsIfNeeded(currentItem: item) }
             }
         }
     }
@@ -209,6 +225,8 @@ extension SearchView {
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )
                 .accessibilityIdentifier("dod.search.card")
+                // v2 search paging: near-bottom trigger (mirrors FeedView).
+                .task { await viewModel.loadMoreResultsIfNeeded(currentItem: item) }
             }
         }
     }

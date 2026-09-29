@@ -53,4 +53,30 @@ struct CookChooserFlowTests {
                 == .upcoming
         )
     }
+
+    // MARK: - DUT-1235: campfire lock
+
+    @Test func campfireIsLockedForABrandNewCook() {
+        #expect(CookChooserFlow.isRungLocked(GuidedCookout.campfire, cookedRecipeIDs: []) == true)
+    }
+
+    @Test func campfireUnlocksAfterEitherHomeRung() {
+        #expect(
+            CookChooserFlow.isRungLocked(
+                GuidedCookout.campfire,
+                cookedRecipeIDs: [GuidedCookout.firstCookout.recipeID]
+            ) == false
+        )
+        #expect(
+            CookChooserFlow.isRungLocked(
+                GuidedCookout.campfire,
+                cookedRecipeIDs: [GuidedCookout.italianChicken.recipeID]
+            ) == false
+        )
+    }
+
+    @Test func neitherHomeRungIsEverLocked() {
+        #expect(CookChooserFlow.isRungLocked(GuidedCookout.firstCookout, cookedRecipeIDs: []) == false)
+        #expect(CookChooserFlow.isRungLocked(GuidedCookout.italianChicken, cookedRecipeIDs: []) == false)
+    }
 }

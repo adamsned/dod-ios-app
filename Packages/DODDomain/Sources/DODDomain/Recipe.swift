@@ -30,6 +30,10 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
     public let heroImageLargeURL: URL?
     public let categoryIDs: [Int]
     public let publishedAt: Date
+    /// WordPress `modified` (last-updated) UTC instant, when known (DUT-1334).
+    /// Nil for payloads/sources without it; the UI falls back to
+    /// ``publishedAt``.
+    public let updatedAt: Date?
 
     // MARK: - Detail-fetch fields (populated post JSON-LD parse)
 
@@ -77,6 +81,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         heroImageLargeURL: URL? = nil,
         categoryIDs: [Int] = [],
         publishedAt: Date,
+        updatedAt: Date? = nil,
         ingredients: [RecipeIngredient] = [],
         instructions: [RecipeInstruction] = [],
         prepTime: Duration? = nil,
@@ -101,6 +106,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.heroImageLargeURL = heroImageLargeURL
         self.categoryIDs = categoryIDs
         self.publishedAt = publishedAt
+        self.updatedAt = updatedAt
         self.ingredients = ingredients
         self.instructions = instructions
         self.prepTime = prepTime
@@ -125,7 +131,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
     /// defaults (`.recipe` and `nil` respectively).
     enum CodingKeys: String, CodingKey {
         case id, slug, title, excerpt, canonicalURL, heroImage, heroImageLargeURL
-        case categoryIDs, publishedAt, ingredients, instructions
+        case categoryIDs, publishedAt, updatedAt, ingredients, instructions
         case prepTime, cookTime, totalTime, servings, nutrition, video
         case kind, articleBodyHTML
         case recipeCategory, recipeCuisine, suitableForDiet, author
@@ -142,6 +148,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.heroImageLargeURL = try container.decodeIfPresent(URL.self, forKey: .heroImageLargeURL)
         self.categoryIDs = try container.decodeIfPresent([Int].self, forKey: .categoryIDs) ?? []
         self.publishedAt = try container.decode(Date.self, forKey: .publishedAt)
+        self.updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
         self.ingredients = try container.decodeIfPresent([RecipeIngredient].self, forKey: .ingredients) ?? []
         self.instructions = try container.decodeIfPresent([RecipeInstruction].self, forKey: .instructions) ?? []
         self.prepTime = try container.decodeIfPresent(Duration.self, forKey: .prepTime)
@@ -192,5 +199,32 @@ extension Recipe {
     /// more naturally as a Boolean question.
     public var isArticle: Bool {
         kind == .article
+    }
+
+    /// The "Dessert Recipes" WordPress category id on dutchovendaddy.com.
+    /// Kept as a named constant so the two dessert signals stay in one place.
+    public static let dessertCategoryID = 336
+
+    /// DUT-325 — true when this recipe reads as a dessert. Powers Cook Mode's
+    /// spoken completion line ("enjoy your dessert") and the Saved "Desserts"
+    /// filter. Delegates to the pure ``isDessert(categoryIDs:recipeCategory:)``
+    /// so call-sites that only have the two raw signals (e.g. the persistence
+    /// layer's `CachedRecipe`) evaluate dessert-ness identically.
+    public var isDessert: Bool {
+        Self.isDessert(categoryIDs: categoryIDs, recipeCategory: recipeCategory)
+    }
+
+    /// The dessert decision as a pure function of the two signals, so the
+    /// Domain model and the persistence layer share ONE definition. Combines
+    /// them so a dessert tagged by only one still counts: the "Dessert Recipes"
+    /// WordPress category (``dessertCategoryID``) OR a JSON-LD `recipeCategory`
+    /// course whose name contains "dessert" (case-insensitive). The earlier
+    /// detection looked at the category id alone, so desserts carrying only the
+    /// JSON-LD course were missed.
+    public static func isDessert(categoryIDs: [Int], recipeCategory: [String]) -> Bool {
+        if categoryIDs.contains(dessertCategoryID) {
+            return true
+        }
+        return recipeCategory.contains { $0.localizedCaseInsensitiveContains("dessert") }
     }
 }

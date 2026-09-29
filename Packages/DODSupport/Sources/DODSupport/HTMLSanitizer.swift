@@ -170,6 +170,12 @@ public enum HTMLSanitizer {
         // Punctuation observed on the same live pages: guillemets (breadcrumb
         // arrows) and prime marks (used for oven-size inch/foot notation, 12″).
         "laquo": "«", "raquo": "»", "prime": "′", "Prime": "″",
+        // Confirmed on live dutchovendaddy.com pages: authors use `&ordm;` (the
+        // masculine ordinal indicator, U+00BA, "º") as a degree-sign substitute
+        // in oven temperatures — "Preheat the oven to 400&ordm;F". Distinct from
+        // `&deg;` (U+00B0, "°") above; decode to its own correct glyph rather
+        // than leaving the raw entity in the highest-visibility recipe text.
+        "ordm": "\u{00BA}",
     ]
 
     /// DUT-466 (mirrors DUT-394 in `HTMLEntityDecoder`) — WP REST bodies

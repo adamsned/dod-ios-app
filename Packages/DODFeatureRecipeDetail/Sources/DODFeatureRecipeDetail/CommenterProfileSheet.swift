@@ -101,7 +101,7 @@ struct CommenterProfileSheet: View {
             case .success(let image):
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
             case .empty, .failure:
                 avatarFallback
             @unknown default:
@@ -116,7 +116,7 @@ struct CommenterProfileSheet: View {
     private var avatarFallback: some View {
         Image(systemName: "person.crop.circle.fill")
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .foregroundStyle(DODColor.labelSecondary)
             .frame(width: 72, height: 72)
     }

@@ -35,20 +35,6 @@ extension RecipeDetailView {
         }
     }
 
-    /// DUT-631/673 — the Cook Mode CTA, sitting just under the Instructions
-    /// header (inside ``instructionsSection``). Gated on a non-empty instruction
-    /// list (AC-7.1); the tap seam records the intent then presents the
-    /// full-screen cover.
-    @ViewBuilder
-    var cookModeCTA: some View {
-        if !(viewModel.recipe?.instructions.isEmpty ?? true) {
-            CookNowCTA(onTap: {
-                Task { await viewModel.didTapCookMode() }
-                isCookModePresented = true
-            })
-        }
-    }
-
     // MARK: - Ingredients + Instructions
 
     // Extracted from `RecipeDetailView` (T-804) so the main struct's body stays
@@ -91,34 +77,32 @@ extension RecipeDetailView {
         return useMetricUnits ? IngredientMetricConverter.metric(scaled) : scaled
     }
 
+    @ViewBuilder
     var instructionsSection: some View {
         // DUT-47 (temperature half): resolve the unit once per render. `nil`
         // ("Recipe default" / absent / malformed) leaves every step exactly
         // as written; otherwise each step's text is mapped through the
         // converter at display time (stored data untouched, AC-31.8-style).
         let temperatureUnit = TemperatureConverter.resolvedUnit(fromRawValue: temperatureUnitRaw)
-        return VStack(alignment: .leading, spacing: DODSpacing.md) {
-            // DUT-529: gate the header on a non-empty list so a `.ready` recipe
-            // with no instructions doesn't show a lone "Instructions" title.
-            if let instructions = viewModel.recipe?.instructions, !instructions.isEmpty {
-                Text("Instructions")
-                    .dodFont(DODType.heading)
-                    .foregroundStyle(DODColor.label)
-                    // DUT-673 — the scroll anchor lives on the header so "Jump to
-                    // Instructions" lands with "Instructions" at the top of the
-                    // viewport and the Cook Mode CTA (just below) immediately in view.
-                    .id(SectionAnchor.instructions)
-                // DUT-673 — Cook Mode CTA directly under the header, above step 1.
-                cookModeCTA
-                ForEach(instructions) { step in
-                    InstructionStepView(
-                        step: step,
-                        displayText: convertedStepText(step.text, to: temperatureUnit)
-                    )
-                }
-            }
+        // DUT-529: gate on a non-empty list so a `.ready` recipe with no
+        // instructions doesn't show a lone "Instructions" title.
+        // The header + Cook Mode CTA + steps (and the iPad-only Apple Pencil
+        // annotation layer) live in ``InstructionsSectionView``, which owns the
+        // `@State` the header toggle and the canvas overlay share. On iPhone /
+        // compact width the annotation affordance never renders (byte-identical).
+        if let instructions = viewModel.recipe?.instructions, !instructions.isEmpty {
+            InstructionsSectionView(
+                instructions: instructions,
+                displayText: { convertedStepText($0.text, to: temperatureUnit) },
+                horizontalSizeClass: horizontalSizeClass,
+                onCookMode: {
+                    Task { await viewModel.didTapCookMode() }
+                    isCookModePresented = true
+                },
+                load: { await viewModel.loadAnnotation() },
+                save: { await viewModel.saveAnnotation($0) }
+            )
         }
-        .padding(.horizontal, DODSpacing.md)
     }
 
     /// Apply the DUT-47 temperature conversion to one step's text, or return it

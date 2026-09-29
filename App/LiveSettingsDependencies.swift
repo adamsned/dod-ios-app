@@ -27,14 +27,20 @@ struct LiveSettingsDependencies: SettingsDependencies {
     typealias CookLogWrite = @Sendable (CookLogEntry) async throws -> Void
     // DUT-514 — delete one journal entry by id (cascades its photo in the store).
     typealias CookLogDelete = @Sendable (UUID) async throws -> Void
+    // DUT-162 — build the "Export My Data" file and return its URL to share.
+    typealias ExportLoad = @Sendable () async throws -> URL?
 
     let flagWrite: FlagWrite
     let statusProvider: StatusProvider
     let cookLogsLoad: CookLogsLoad
     let savedCountLoad: CountLoad
     let ratingCountLoad: CountLoad
+    // DUT-160 — Shopping List item count for the Privacy Dashboard's On Device
+    // bucket (the list is App-Group `UserDefaults`, not the SwiftData store).
+    let shoppingCountLoad: CountLoad
     let cookLogWrite: CookLogWrite
     let cookLogDelete: CookLogDelete
+    let exportLoad: ExportLoad
 
     init(
         flagWrite: @escaping FlagWrite,
@@ -42,16 +48,20 @@ struct LiveSettingsDependencies: SettingsDependencies {
         cookLogsLoad: @escaping CookLogsLoad = { [] },
         savedCountLoad: @escaping CountLoad = { 0 },
         ratingCountLoad: @escaping CountLoad = { 0 },
+        shoppingCountLoad: @escaping CountLoad = { 0 },
         cookLogWrite: @escaping CookLogWrite = { _ in },
-        cookLogDelete: @escaping CookLogDelete = { _ in }
+        cookLogDelete: @escaping CookLogDelete = { _ in },
+        exportLoad: @escaping ExportLoad = { nil }
     ) {
         self.flagWrite = flagWrite
         self.statusProvider = statusProvider
         self.cookLogsLoad = cookLogsLoad
         self.savedCountLoad = savedCountLoad
         self.ratingCountLoad = ratingCountLoad
+        self.shoppingCountLoad = shoppingCountLoad
         self.cookLogWrite = cookLogWrite
         self.cookLogDelete = cookLogDelete
+        self.exportLoad = exportLoad
     }
 
     func setCloudSyncOptIn(_ enabled: Bool) async {
@@ -71,6 +81,11 @@ struct LiveSettingsDependencies: SettingsDependencies {
     func cookLogs() async throws -> [CookLogEntry] { try await cookLogsLoad() }
     func savedRecipeCount() async throws -> Int { try await savedCountLoad() }
     func userRatingCount() async throws -> Int { try await ratingCountLoad() }
+    func shoppingListItemCount() async throws -> Int { try await shoppingCountLoad() }
     func updateCookLog(_ entry: CookLogEntry) async throws { try await cookLogWrite(entry) }
     func deleteCookLog(id: UUID) async throws { try await cookLogDelete(id) }
+
+    // MARK: - Export My Data (DUT-162)
+
+    func exportMyData() async throws -> URL? { try await exportLoad() }
 }

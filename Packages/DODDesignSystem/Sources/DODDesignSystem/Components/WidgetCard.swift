@@ -257,13 +257,13 @@ public enum WidgetCard {
                     image
                         .resizable()
                         .widgetAccentedRenderingMode(.fullColor)
-                        .aspectRatio(contentMode: .fill)
+                        .scaledToFill()
                 )
             } else {
-                return AnyView(image.resizable().aspectRatio(contentMode: .fill))
+                return AnyView(image.resizable().scaledToFill())
             }
             #else
-            return AnyView(image.resizable().aspectRatio(contentMode: .fill))
+            return AnyView(image.resizable().scaledToFill())
             #endif
         }
 

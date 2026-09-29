@@ -55,6 +55,25 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         return results[query] ?? []
     }
 
+    /// v2 search paging — later-page fixtures keyed `query -> page -> items`.
+    /// Page 1 falls back to the primary `results[query]` fixture so existing
+    /// single-page tests need no changes; seed `pagedResults[query][2]` to hand
+    /// the view model a second page. `searchMoreCalls` records each `(query,
+    /// page)` so a test can assert paging stopped (no further fetch).
+    var pagedResults: [String: [Int: [RecipeListItem]]] = [:]
+    var searchMoreCalls: [(query: String, page: Int)] = []
+    /// Optional gate to hold a `searchMore` fetch IN FLIGHT while a test bumps
+    /// the search generation (e.g. types a new query), proving the stale page is
+    /// dropped. `nil` (default) = the fetch returns immediately.
+    var searchMoreGate: (@Sendable () async -> Void)?
+
+    func searchMore(query: String, page: Int) async throws -> [RecipeListItem] {
+        searchMoreCalls.append((query: query, page: page))
+        if let searchMoreGate { await searchMoreGate() }
+        if let page = pagedResults[query]?[page] { return page }
+        return page <= 1 ? (results[query] ?? []) : []
+    }
+
     func searchIngredients(matching query: String) async throws -> [Int] {
         let normalized = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         return localIngredientIDs[normalized] ?? []

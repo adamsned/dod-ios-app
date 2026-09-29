@@ -58,44 +58,28 @@ public struct RecipeCard: View {
     /// Button wrapper).
     public var combinedAccessibilityLabel: String { accessibilityLabel }
 
+    /// Hero photo + its corner overlays. The 140pt fixed-height crop keeps every
+    /// gallery card a uniform size. The badges are alignment overlays so the time
+    /// chip (top-trailing) never collides with the "Downloaded" badge
+    /// (bottom-leading).
     private var heroSection: some View {
-        ZStack(alignment: .topTrailing) {
-            // DUT-195 — reliable cached loader instead of AsyncImage, which was
-            // dropping feed thumbnails to the broken-image placeholder on scroll.
-            ReliableImage(url: heroImageURL) { phase in
-                switch phase {
-                case .empty:
-                    LoadingSkeleton(cornerRadius: 0)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure:
-                    Image(systemName: "photo")
-                        .font(.system(size: 40))
-                        .foregroundStyle(DODColor.labelSecondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(DODColor.surface)
+        heroImage
+            .accessibilityHidden(true)
+            .overlay(alignment: .topTrailing) {
+                if let totalTimeDisplay {
+                    timeChip(totalTimeDisplay)
+                        .padding(DODSpacing.xs)
                 }
             }
-            .frame(height: 140)
-            .clipped()
-            .accessibilityHidden(true)
-
-            if let totalTimeDisplay {
-                timeChip(totalTimeDisplay)
-                    .padding(DODSpacing.xs)
+            .overlay(alignment: .bottomLeading) {
+                // T-774 / DUT-80 — "Downloaded" badge, bottom-leading so it never
+                // collides with the top-trailing time chip at the Saved tab's
+                // narrow half-width.
+                if isDownloaded {
+                    Self.downloadedBadge
+                        .padding(DODSpacing.xs)
+                }
             }
-
-            // T-774 / DUT-80 — "Downloaded" badge, bottom-leading so it never
-            // collides with the top-trailing time chip at the Saved tab's
-            // narrow half-width.
-            if isDownloaded {
-                Self.downloadedBadge
-                    .padding(DODSpacing.xs)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            }
-        }
     }
 
     private var textSection: some View {
@@ -121,7 +105,7 @@ public struct RecipeCard: View {
     private var textBlockSizer: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Text(verbatim: " ")
-                .dodFont(DODType.heading)
+                .dodFont(titleFont)
                 .lineLimit(2, reservesSpace: true)
             Text(verbatim: " ")
                 .dodFont(DODType.caption)
@@ -137,7 +121,7 @@ public struct RecipeCard: View {
     private var textBlockContent: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Self.titleText(title, highlightQuery: highlightQuery)
-                .dodFont(DODType.heading)
+                .dodFont(titleFont)
                 .foregroundStyle(DODColor.label)
                 .lineLimit(2)
                 // Title claims its full natural height (up to 2 lines) FIRST;
@@ -298,12 +282,17 @@ extension View {
     /// shared helper (which serves Feed, Search, Categories, and Saved) only
     /// grows the item on the two surfaces that pass it (Feed + Search); the other
     /// two pass `nil`, so the item doesn't render and they're unaffected.
+    /// **DUT-105 — opt-in "Add to Collection".** When `onAddToCollection` is
+    /// supplied, an item (a folder-plus glyph) opens the collection picker for
+    /// the card's recipe. Opt-in like `onAddToShoppingList`, so only the Saved
+    /// tab (which passes it) grows the item; the other surfaces pass `nil`.
     public func recipeCardContextMenu(
         isSaved: Bool,
         isDownloaded: Bool = false,
         onToggle: @escaping () -> Void,
         onRemoveDownload: (() -> Void)? = nil,
-        onAddToShoppingList: (() -> Void)? = nil
+        onAddToShoppingList: (() -> Void)? = nil,
+        onAddToCollection: (() -> Void)? = nil
     ) -> some View {
         self.contextMenu {
             Button(action: onToggle) {
@@ -311,6 +300,12 @@ extension View {
                     isSaved ? "Unsave" : "Save",
                     systemImage: isSaved ? "bookmark" : "bookmark.fill"
                 )
+            }
+            if let onAddToCollection {
+                Button(action: onAddToCollection) {
+                    Label("Add to Collection…", systemImage: "folder.badge.plus")
+                }
+                .accessibilityIdentifier("dod.card.addToCollection")
             }
             if isDownloaded, let onRemoveDownload {
                 Button(action: onRemoveDownload) {

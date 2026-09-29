@@ -16,7 +16,9 @@ public struct FeedRow: View {
         // CL-254 (feed declutter) — no cook-time chip on the Recipes feed; it
         // reads as noise there. `totalTimeDisplay` is intentionally omitted
         // (defaults to nil → no chip). Time still shows on Search + the recipe
-        // detail page for anyone who wants it.
+        // detail page for anyone who wants it. US-43 Phase b keeps the chip +
+        // excerpt AS CAPABILITIES on `RecipeCard` (Spencer's Move-6 call); the
+        // Feed's own chip-less choice is unchanged.
         RecipeCard(
             title: item.title,
             excerpt: item.excerpt,

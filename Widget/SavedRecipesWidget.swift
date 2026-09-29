@@ -29,6 +29,7 @@ struct SavedRecipesWidget: Widget {
                     // home screen.
                     DODColor.surfaceElevated
                 }
+                .dodWidgetSeasonedCastIron()  // v2 Seasoned Cast Iron → widgets
         }
         .configurationDisplayName("Saved Recipes")
         .description("Quick access to your saved recipes.")

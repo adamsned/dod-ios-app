@@ -38,7 +38,7 @@ extension RecipeDetailViewModel {
                 // as RETRYABLE: keep the user on a retry surface instead of
                 // downgrading to `.unavailable` + auto-pop on a flaky connection.
                 loadState = .retryableError
-                snackbarMessage = "Couldn't load recipe — check your connection."
+                snackbarMessage = "Couldn't load recipe. Check your connection."
             }
             return
         }
@@ -288,6 +288,10 @@ extension RecipeDetailViewModel {
             return
         }
         let fetched = try? await dependencies.relatedRecipes(forCategoryID: categoryID)
-        related = (fetched ?? []).filter { $0.id != listItem.id }
+        // Filter the current recipe out FIRST, then cap to 4 — so a self-match
+        // (this recipe appearing in its own category's listing) doesn't burn
+        // one of the 4 shown slots. `relatedRecipes` deliberately over-fetches
+        // by one for exactly this reason.
+        related = Array((fetched ?? []).filter { $0.id != listItem.id }.prefix(4))
     }
 }

@@ -43,6 +43,7 @@ struct FeaturedRecipeWidget: Widget {
                     // the placeholder state readable.
                     DODColor.surfaceElevated
                 }
+                .dodWidgetSeasonedCastIron()  // v2 Seasoned Cast Iron → widgets
         }
         .configurationDisplayName("Latest")
         .description("See the latest Dutch Oven Daddy recipe right on your home screen.")

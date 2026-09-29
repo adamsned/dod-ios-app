@@ -214,7 +214,7 @@ import os
         struct FakeError: Error {}
         let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults())
         await viewModel.clearImageCache(onClear: { throw FakeError() })
-        #expect(viewModel.snackbarMessage == "Couldn't clear cache — try again.")
+        #expect(viewModel.snackbarMessage == "Couldn't clear cache. Try again.")
     }
 
     // MARK: - US-36 AC-36.7 — Independent persistence

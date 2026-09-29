@@ -89,42 +89,82 @@ extension WPRestClient {
         return lossy.elements.first.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
     }
 
-    /// Fetch ONE random post via WP REST's `orderby=rand`, projected to a
-    /// ``RecipeListItem`` — same lightweight shape `posts()` / `post(id:)`
-    /// return. Backs the Feed's "Surprise Me" button (DUT-1062): the
-    /// original DUT-939 implementation sampled only `FeedViewModel`'s
-    /// in-memory loaded page (~20-40 recipes scrolled into memory), so
-    /// repeated taps kept resurfacing the same handful. `per_page=1` asks WP
-    /// to do the random sampling server-side over the ENTIRE posts table, so
-    /// repeated taps surface recipes the user hasn't scrolled to yet.
-    /// `_embed=wp:featuredmedia` mirrors every other post-fetch in this file.
+    /// The WP Recipe Maker recipe custom-post-type. Its `X-WP-Total` is the
+    /// count of *real recipes* — round-up / guide articles are plain posts with
+    /// NO `wprm_recipe`, so sampling this set (rather than `posts`) makes
+    /// "Surprise Me" land only on something cookable.
+    static let recipeCPTPath = "wprm_recipe"
+
+    /// Reroll budget for ``randomPost()`` — enough to skip the rare empty slot
+    /// (a recipe deleted between the count and the fetch), an orphaned recipe
+    /// (no parent post), or an unpublished parent (404), without ever looping
+    /// unbounded on a misbehaving catalog.
+    static let randomRecipeMaxAttempts = 4
+
+    /// Fetch ONE uniformly-random RECIPE from the whole catalog, projected to a
+    /// ``RecipeListItem`` — the same shape `posts()` / `post(id:)` return — for
+    /// the Feed's + Search's "Surprise Me" button (DUT-1062).
     ///
-    /// The response shape for `orderby=rand` is a normal list/collection
-    /// response (an array), NOT the single-object shape `post(id:)` decodes —
-    /// `orderby` is only meaningful on the collection endpoint — so this
-    /// decodes `LossyArray<WPDTO.Post>` like `posts()`/`search()` (DUT-575: a
-    /// malformed row elsewhere in the response, if WP ever widened
-    /// `per_page`, wouldn't fail the whole call).
+    /// Why not `orderby=rand`: the pre-fix implementation asked WP for
+    /// `orderby=rand`, but core WordPress REST rejects that value
+    /// (`rest_invalid_param`, HTTP 400 — `orderby` is a fixed enum), so every
+    /// tap silently fell through to the view model's in-memory sample (~20-40
+    /// recently-scrolled recipes). Older recipes never surfaced.
     ///
-    /// Throws ``WPClientError/underlying(message:)`` if WP returns zero posts
-    /// (an empty site) — the view-model caller falls back to sampling the
-    /// in-memory feed rather than leaving the button dead.
+    /// How it works instead (no server change required):
+    /// 1. Read `X-WP-Total` for the ``recipeCPTPath`` set — the definitive
+    ///    "real recipes" count (articles are excluded, being post-only).
+    /// 2. Roll a random `offset` in `[0, total)` and fetch that single
+    ///    `wprm_recipe`, reading its `wprm_parent_post_id` (the blog post the
+    ///    recipe belongs to — returned as a string).
+    /// 3. Resolve that post through the existing ``post(id:)`` path so the
+    ///    returned item is byte-identical to a normal feed tap (hero image,
+    ///    canonical URL, classification inputs).
+    ///
+    /// Rerolls (bounded by ``randomRecipeMaxAttempts``) skip an empty slot, an
+    /// orphaned recipe, or an unpublished parent. Throws
+    /// ``WPClientError/underlying(message:)`` when the count is unavailable or
+    /// every attempt misses — the view-model caller then falls back to sampling
+    /// the in-memory feed rather than leaving the button dead.
     ///
     /// Spec trace: DUT-1062.
     public func randomPost() async throws -> RecipeListItem {
-        let queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "orderby", value: "rand"),
-            URLQueryItem(name: "per_page", value: "1"),
-            // `_embed` and `_fields` interact badly: filtering excludes the
-            // _links field that drives embedding, so omit _fields here.
-            URLQueryItem(name: "_embed", value: "wp:featuredmedia"),
-        ]
-        // DUT-575: lossy decode — a malformed sibling row must not fail the pick.
-        let lossy: LossyArray<WPDTO.Post> = try await get(path: "posts", queryItems: queryItems)
-        guard let post = lossy.elements.first else {
-            throw WPClientError.underlying(message: "WP returned no posts for a random pick")
+        guard
+            let total = try await totalCount(
+                path: Self.recipeCPTPath,
+                queryItems: [
+                    URLQueryItem(name: "per_page", value: "1"),
+                    URLQueryItem(name: "_fields", value: "id"),
+                ]
+            ),
+            total > 0
+        else {
+            throw WPClientError.underlying(message: "No recipes available for a random pick")
         }
-        return post.toRecipeListItem(heroImage: post.inlineHeroURL)
+
+        for _ in 0..<Self.randomRecipeMaxAttempts {
+            let offset = Int.random(in: 0..<total)
+            let refs: [RecipeParentRef] = try await get(
+                path: Self.recipeCPTPath,
+                queryItems: [
+                    URLQueryItem(name: "per_page", value: "1"),
+                    URLQueryItem(name: "offset", value: String(offset)),
+                    URLQueryItem(name: "_fields", value: "wprm_parent_post_id"),
+                ]
+            )
+            // Empty slot (raced deletion) or an orphaned/draft recipe whose
+            // parent id is missing / non-numeric / zero — reroll.
+            guard let parentID = refs.first?.parentPostID, parentID > 0 else { continue }
+            do {
+                return try await post(id: parentID)
+            } catch WPClientError.httpStatus(404) {
+                // Parent post unpublished/removed since indexing — reroll.
+                continue
+            }
+        }
+        throw WPClientError.underlying(
+            message: "Could not resolve a random recipe in \(Self.randomRecipeMaxAttempts) attempts"
+        )
     }
 
     /// Search posts by query string.
@@ -161,5 +201,32 @@ extension WPRestClient {
         // DUT-575: lossy decode so one malformed search hit can't empty the results.
         let lossy: LossyArray<WPDTO.Post> = try await get(path: "posts", queryItems: queryItems)
         return lossy.elements.map { $0.toRecipeListItem(heroImage: $0.inlineHeroURL) }
+    }
+}
+
+/// Minimal projection of a `wprm_recipe` row: just the id of the blog post the
+/// recipe belongs to, which WP Recipe Maker stores (and returns) as a STRING
+/// (e.g. `"15346"`). Backs ``WPRestClient/randomPost()``'s recipe → post
+/// resolution (DUT-1062).
+private struct RecipeParentRef: Decodable {
+
+    /// The parent post id, or `nil` when it is missing, empty, non-numeric, or
+    /// zero — i.e. an orphaned recipe the caller should reroll past.
+    let parentPostID: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case wprmParentPostID = "wprm_parent_post_id"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // WPRM returns the id as a string; tolerate a numeric form too.
+        if let raw = try? container.decode(String.self, forKey: .wprmParentPostID) {
+            parentPostID = Int(raw)
+        } else if let numeric = try? container.decode(Int.self, forKey: .wprmParentPostID) {
+            parentPostID = numeric
+        } else {
+            parentPostID = nil
+        }
     }
 }

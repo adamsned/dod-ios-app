@@ -61,9 +61,10 @@ public protocol FeedDependencies: Sendable {
     /// claiming a row landed.
     func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
 
-    /// DUT-1062 — fetch ONE truly-random recipe from the full WP catalog
-    /// (server-side `orderby=rand`), backing the Feed's "Surprise Me"
-    /// button. The pre-fix implementation sampled only `items` (whatever's
+    /// DUT-1062 — fetch ONE uniformly-random recipe from the full WP catalog
+    /// (a random `offset` over the WP Recipe Maker recipe set), backing the
+    /// Feed's "Surprise Me" button. The pre-fix implementation sampled only
+    /// `items` (whatever's
     /// currently paged into memory, ~20-40 recipes), so repeated taps
     /// resurfaced the same handful. Default throws so existing fake
     /// conformers that don't care about this path get a benign failure —
@@ -174,9 +175,10 @@ public struct LiveFeedDependencies: FeedDependencies {
         try await client.postsPage(page: page)
     }
 
-    /// DUT-1062 — routes to ``WPRestClient/randomPost()`` (server-side
-    /// `orderby=rand`), giving "Surprise Me" a true full-catalog sample
-    /// instead of only whatever's paged into `FeedViewModel.items`.
+    /// DUT-1062 — routes to ``WPRestClient/randomPost()`` (a random `offset`
+    /// over the WP Recipe Maker recipe set), giving "Surprise Me" a true
+    /// full-catalog sample instead of only whatever's paged into
+    /// `FeedViewModel.items`.
     public func fetchRandomRecipe() async throws -> RecipeListItem {
         try await client.randomPost()
     }

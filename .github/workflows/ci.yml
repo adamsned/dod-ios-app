@@ -2,7 +2,12 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # `v2` is a long-lived release branch, not a topic branch, and it takes
+    # merges directly. Without it here those PRs ran NO checks at all: the
+    # DODDesignSystem test target sat un-compilable on v2 for days (a `deinit`
+    # in a Swift Testing `struct` suite) behind which two more failures hid,
+    # and nothing reported it. Any long-lived base branch belongs in this list.
+    branches: [main, v2]
     # The label-conditional `test-e2e` job (below) reads
     # `github.event.pull_request.labels.*.name`. The `labeled` /
     # `unlabeled` events are required so the job re-evaluates when an
@@ -11,7 +16,7 @@ on:
     # at PR-open time. Spec trace: AC-T5 / CL-58.
     types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
-    branches: [main]
+    branches: [main, v2]
   # L5 E2E nightly safety net + manual escape hatch. Pairs with
   # `nightly-live-api.yml`'s cron at the same 07:00 UTC so both early
   # warning surfaces fire at the same wall clock. Spec trace:
@@ -651,7 +656,9 @@ jobs:
     needs: [changes, lint, format, test-unit-packages, test-unit-app,
             test-snapshots-designsystem, build-app, test-ui-smoke,
             test-e2e]
-    if: ${{ failure() && github.ref == 'refs/heads/main' }}
+    if: >-
+      ${{ failure() && (github.ref == 'refs/heads/main'
+          || github.ref == 'refs/heads/v2') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

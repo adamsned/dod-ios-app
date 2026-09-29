@@ -79,7 +79,8 @@ extension FirstCookoutView {
         } label: {
             transportGlyph("arrow.backward")
         }
-        .buttonStyle(.plain)
+        // v2 animation refresh — shared press spring + light haptic.
+        .buttonStyle(.dodPressable)
         // Dim (not grey) + disable on the intro; there's no prior page.
         .opacity(index > 0 ? 1 : 0.35)
         .disabled(index == 0)
@@ -99,7 +100,8 @@ extension FirstCookoutView {
         } label: {
             transportGlyph(index >= lastIndex ? "checkmark" : "arrow.forward")
         }
-        .buttonStyle(.plain)
+        // v2 animation refresh — shared press spring + light haptic.
+        .buttonStyle(.dodPressable)
         .accessibilityIdentifier("first-cookout-advance")
         .accessibilityLabel(advanceAccessibilityLabel)
     }
@@ -108,6 +110,9 @@ extension FirstCookoutView {
         Image(systemName: symbol)
             .font(.system(size: 20, weight: .semibold))
             .foregroundStyle(DODColor.cream)
+            // v2 animation refresh — clean glyph swap on the advance button as it
+            // becomes the final-page checkmark (Reduce Motion → instant).
+            .dodSymbolReplace(reduceMotion: reduceMotion)
             .frame(width: buttonDiameter, height: buttonDiameter)
             .background(Circle().fill(DODColor.accent))
     }

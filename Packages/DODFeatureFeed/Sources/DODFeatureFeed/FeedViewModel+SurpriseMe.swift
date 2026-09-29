@@ -11,9 +11,10 @@ import Foundation
 
 extension FeedViewModel {
 
-    /// DUT-939 / DUT-1062 — "Surprise Me": fetch ONE truly-random recipe from
-    /// the WHOLE WP catalog (`dependencies.fetchRandomRecipe()`, server-side
-    /// `orderby=rand`) and hand it to the feed's EXISTING recipe-open path,
+    /// DUT-939 / DUT-1062 — "Surprise Me": fetch ONE uniformly-random recipe
+    /// from the WHOLE WP catalog (`dependencies.fetchRandomRecipe()`, a random
+    /// `offset` over the WP Recipe Maker recipe set) and hand it to the feed's
+    /// EXISTING recipe-open path,
     /// `onSelect` (`FeedView`'s own closure — the same one every card tap
     /// already calls, per `FeedView+ShoppingList.recipeCardTap`). The view
     /// model doesn't own navigation itself, so the caller (the button's

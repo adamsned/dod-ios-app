@@ -70,7 +70,10 @@ public struct EmptyState: View {
         // byte-identical; only wide (iPad) width is bounded + centered.
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(DODColor.surface)
+        // US-43 Phase d (T-713) — warm cream backdrop for empty states, per
+        // CL-110 ("softness when nothing is there"). This is the first view
+        // consumer of `SurfaceWarm` (collapses to the elevated surface in dark).
+        .background(DODColor.surfaceWarm)
     }
 }
 

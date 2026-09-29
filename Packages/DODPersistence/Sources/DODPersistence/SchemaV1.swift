@@ -45,6 +45,8 @@ public enum SchemaV2: VersionedSchema {
 ///   skipped — see the SchemaV4 / SchemaV5 headers. DUT-35 / DUT-6.
 /// - V5 → V6: lightweight (V6 = V5 + `CachedCookLogEntry`, the local-only
 ///   "I Made This" cook journal). DUT-104.
+/// - V6 → V7: lightweight (V7 = V6 + `SyncedRecipeCollection`, the second
+///   CloudKit-mirrored model, for recipe collections / cookbooks). DUT-105.
 ///
 /// **SchemaV4 note (US-41 / T-702).** `SchemaV4` exists as a real
 /// `VersionedSchema` in `SchemaV4.swift` and is the schema the
@@ -100,10 +102,12 @@ public enum SchemaV2: VersionedSchema {
 /// - `SchemaV6Tests.recipeEditorialColumnsInferAdditively` (the four
 ///   DUT-572 / CL-310 `CachedRecipe` columns added via same-version
 ///   inference — no new schema stage; back-compat + round-trip proven).
+/// - `SchemaV7Tests.v6ToV7LightweightMigrationOpensCleanly` (additive synced
+///   `SyncedRecipeCollection` collections model; DUT-105).
 public enum MigrationPlan: SchemaMigrationPlan {
 
     public static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self, SchemaV3.self, SchemaV5.self, SchemaV6.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self, SchemaV5.self, SchemaV6.self, SchemaV7.self]
     }
 
     public static var stages: [MigrationStage] {
@@ -120,6 +124,12 @@ public enum MigrationPlan: SchemaMigrationPlan {
             // `CachedCookLogEntry` cook-journal model. No existing field
             // changes; the new table starts empty and never mirrors to CloudKit.
             .lightweight(fromVersion: SchemaV5.self, toVersion: SchemaV6.self),
+            // V6 -> V7 (DUT-105): additive — adds the synced
+            // `SyncedRecipeCollection` model for recipe collections / cookbooks.
+            // `SyncedSavedRecipe` is untouched (membership is a plain `[Int]` id
+            // list on the new model); the new table starts empty and mirrors to
+            // CloudKit alongside the saved set when the user has opted in.
+            .lightweight(fromVersion: SchemaV6.self, toVersion: SchemaV7.self),
             // DUT-572 / CL-310: the four editorial `CachedRecipe` columns are
             // NOT a new stage — they're additive optional/defaulted attributes
             // absorbed by same-version inference (the `articleBodyHTML`

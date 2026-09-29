@@ -44,7 +44,20 @@ extension RecipeDetailViewModel {
         // DUT-677: skip only when NO real yield has parsed yet (sentinel),
         // not when the parsed yield merely happens to equal ``defaultServings``.
         guard hasParsedYield else { return }
-        userServings = clampToRange(sourceServings)
+        // Do NOT clamp here (AC-31.3): the default sync must land exactly on
+        // the source yield so `servingsScaleFactor` is 1.0 until the user
+        // deliberately changes it. `userServingsRange` (1...24) is a UI
+        // affordance for the stepper's OWN taps (AC-31.2) — `parseServings`
+        // guarantees any parsed `recipeYield` is already `> 0`, so this can
+        // never assign an invalid value, only one the stepper's range caps
+        // at. A large-batch recipe (e.g. `recipeYield: 30`, plausible for a
+        // crowd/potluck dutch-oven recipe) previously got silently clamped to
+        // 24 here, making `servingsScaleFactor` 24/30 = 0.8 on first load —
+        // every ingredient quantity rendered 20% under what the recipe
+        // actually calls for, with zero user interaction. The Stepper still
+        // reads out of `servingsRange` for +/- taps and its own
+        // `setUserServings` clamp; only the initial default-sync skips it.
+        userServings = sourceServings
     }
 
     /// DUT-315 — re-sync the stepper when a *different* recipe (new source
@@ -58,7 +71,10 @@ extension RecipeDetailViewModel {
         guard hasParsedYield else { return }
         guard let last = lastSyncedSourceServings, sourceServings != last else { return }
         lastSyncedSourceServings = sourceServings
-        userServings = clampToRange(sourceServings)
+        // Do NOT clamp — see the matching note in
+        // `resetServingsToSourceIfFirstLoad()`; this resync must land the
+        // scale factor back on 1.0 for the newly-swapped recipe too.
+        userServings = sourceServings
     }
 
     /// Clamp `count` to ``userServingsRange``. Centralized so the setter

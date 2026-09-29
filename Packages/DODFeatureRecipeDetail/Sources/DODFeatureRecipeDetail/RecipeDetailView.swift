@@ -56,23 +56,22 @@ public struct RecipeDetailView: View {
     /// is a display-time transform only — stored recipe data is untouched.
     @AppStorage(TemperatureConverter.preferenceKey)
     var temperatureUnitRaw: String = ""
-    /// DUT-517 — the "Use Metric Units" preference, read from the same
-    /// `UserDefaults` key the Settings toggle writes
-    /// (`IngredientMetricConverter.preferenceKey`) via `@AppStorage` so a
-    /// change in Settings re-renders the ingredient list in the same frame.
-    /// When `true`, each ALREADY-SCALED ingredient line is mapped through
-    /// ``DODSupport/IngredientMetricConverter/metric(_:)`` at display time;
-    /// non-convertible lines pass through unchanged. Display-time transform
-    /// only — stored recipe data is untouched (AC-31.8-style).
+    /// DUT-517 — the "Use Metric Units" preference, read via `@AppStorage` from
+    /// the same key the Settings toggle writes so a change re-renders the
+    /// ingredient list in the same frame. When `true`, each ALREADY-SCALED line
+    /// is mapped through ``DODSupport/IngredientMetricConverter/metric(_:)`` at
+    /// display time (non-convertible lines pass through); stored data untouched.
     @AppStorage(IngredientMetricConverter.preferenceKey)
     var useMetricUnits: Bool = false
     @Environment(\.dismiss) private var dismiss
-    /// T-804 — drives the iPad reading-column cap in `readyBody`. `.regular`
-    /// (iPad) bounds the content below the hero to a centered column;
-    /// `.compact` (iPhone) leaves the layout byte-identical. DUT-631 — now
-    /// `internal` (not `private`) so `RecipeDetailView+Sections.swift`'s
-    /// relocated `ingredientsInstructions(twoUp:)` can read it.
+    /// T-804 — drives the iPad reading-column cap in `readyBody` (`.regular`
+    /// bounds the content below the hero to a centered column; `.compact` leaves
+    /// it byte-identical). DUT-631 — `internal` so `+Sections.swift`'s relocated
+    /// `ingredientsInstructions(twoUp:)` can read it.
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    /// v2 animation refresh — gates the toolbar toggle glyphs' symbol `replace`
+    /// (bookmark / download); `internal` so the `+Toolbar` extension reads it.
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     public let onSelectRelated: (RecipeListItem) -> Void
     /// DUT-534 — the "View" action on the "Added to your Shopping List"
     /// Snackbar routes here. The App composition root passes a closure that
@@ -103,11 +102,26 @@ public struct RecipeDetailView: View {
     /// (previews / unwired hosts) hides the Cook Mode shortcut.
     public let heatCoachSheet: (() -> AnyView)?
 
+    /// The top safe-area inset used to size the full-bleed hero's blur band.
+    /// `nil` (the single-recipe push) reads the real inset from `readyBody`'s
+    /// GeometryReader, as before. ``RecipeDetailPager`` supplies it explicitly
+    /// because a `.page` `TabView` zeroes its pages' own safe-area insets — so
+    /// the pager reads the inset once, outside the TabView, and passes it down;
+    /// the immersive header then survives the swipe wrapper unchanged.
+    public let topInsetOverride: CGFloat?
+
     /// DUT-535 — the recipe whose ingredient-selection sheet is presented.
     /// Non-nil drives the `.sheet(item:)`; set when the toolbar `cart.badge.plus`
     /// is tapped, cleared on dismiss. `internal` (not `private`) so the
     /// `RecipeDetailView+Toolbar.swift` extension can present it.
     @State var recipeForShoppingListSheet: SheetRecipe?
+
+    /// DUT-1324 — non-nil drives the PDF share sheet; set by the toolbar.
+    @State var sharePDF: SharePDFItem?
+
+    /// DUT-1340 — drives the "Add to Collection" picker from the bookmark's
+    /// press-and-hold menu. `internal` so the `+Toolbar` extension flips it.
+    @State var showCollectionPicker = false
 
     public init(
         viewModel: RecipeDetailViewModel,
@@ -116,7 +130,8 @@ public struct RecipeDetailView: View {
         openShoppingList: (() -> Void)? = nil,
         addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)? = nil,
         openHeatCoach: ((HeatCoachSeed?) -> Void)? = nil,
-        heatCoachSheet: (() -> AnyView)? = nil
+        heatCoachSheet: (() -> AnyView)? = nil,
+        topInsetOverride: CGFloat? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         _pendingAutoCookMode = State(initialValue: autoStartCookMode)
@@ -125,6 +140,7 @@ public struct RecipeDetailView: View {
         self.addToShoppingListSheet = addToShoppingListSheet
         self.openHeatCoach = openHeatCoach
         self.heatCoachSheet = heatCoachSheet
+        self.topInsetOverride = topInsetOverride
     }
 
     public var body: some View {
@@ -132,7 +148,11 @@ public struct RecipeDetailView: View {
             content
             snackbar
         }
-        .background(DODColor.surface)
+        // DUT-1335 — fill the bottom safe area (home-indicator strip below the
+        // floating tab bar) with the brand surface. The ScrollView only ignores
+        // the TOP safe area for the immersive hero, so without this the bottom
+        // inset was left unpainted and read as a black bar. Matches CookModeView.
+        .background(DODColor.surface.ignoresSafeArea())
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         // DUT-572 / CL-312 — full-bleed hero: hide the nav-bar background so the
@@ -171,6 +191,9 @@ public struct RecipeDetailView: View {
                 viewModel.showAddToShoppingListSnackbar(for: result)
             }
         }
+        .recipePDFShareSheet($sharePDF)  // DUT-1324 (iOS-only; see +Toolbar)
+        // DUT-1340 — long-press bookmark's "Add to Collection" picker (see +Toolbar).
+        .recipeCollectionPickerSheet(isPresented: $showCollectionPicker, viewModel: viewModel)
         .task {
             await viewModel.onAppear()
             isOfflineSnapshot = await viewModel.isOffline
@@ -183,32 +206,6 @@ public struct RecipeDetailView: View {
         // changed yield so it doesn't clobber the user's manual edits.
         .onChange(of: viewModel.recipe?.servings) { _, _ in
             viewModel.resyncServingsIfSourceYieldChanged()
-        }
-    }
-
-    @ViewBuilder
-    private var cookModeCover: some View {
-        if let recipe = viewModel.recipe, !recipe.instructions.isEmpty {
-            CookModeView(
-                recipe: recipe,
-                initialCheckedIngredients: viewModel.checkedIngredientIDs,
-                ingredientScaleFactor: viewModel.servingsScaleFactor,
-                onClose: { updatedChecks in
-                    viewModel.mergeIngredientChecks(updatedChecks)
-                    isCookModePresented = false
-                },
-                // DUT-326 — persist a Cook Mode "log this cook" to the journal
-                // store. The sheet has already saved the photo + assembled the
-                // entry; the VM writes it through the dependency seam.
-                onLogCook: { entry in
-                    Task { await viewModel.logCook(entry) }
-                },
-                // T-912 / DUT-551 — forward the Heat Coach sheet builder so a
-                // heat-related Cook Mode step can present Heat Coach OVER the
-                // cover (a tab switch would be invisible under the full-screen
-                // cover). Nil when the host doesn't wire hub routing.
-                heatCoachSheet: heatCoachSheet
-            )
         }
     }
 
@@ -256,7 +253,10 @@ public struct RecipeDetailView: View {
         // passes it into `RecipeDetailHero`.
         GeometryReader { geo in
             let twoUp = geo.size.width >= 1000
-            let topInset = geo.safeAreaInsets.top
+            // `topInsetOverride` wins when the pager supplied it (a `.page`
+            // TabView zeroes this GeometryReader's own top inset); otherwise the
+            // single-recipe push reads the real inset here, unchanged.
+            let topInset = topInsetOverride ?? geo.safeAreaInsets.top
             ScrollViewReader { proxy in
                 ScrollView {
                     // DUT-573 / CL-313 + DUT-631 — iterated editorial order:
@@ -336,7 +336,7 @@ public struct RecipeDetailView: View {
     /// Mode at the top of the viewport (Instructions immediately below it).
     private func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            PublishedDateCaption(date: viewModel.listItem.publishedAt)
+            PublishedDateCaption(date: viewModel.listItem.updatedAt ?? viewModel.listItem.publishedAt)
             Spacer(minLength: DODSpacing.sm)
             if !(viewModel.recipe?.instructions.isEmpty ?? true) {
                 Button {

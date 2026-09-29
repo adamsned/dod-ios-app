@@ -23,6 +23,10 @@ extension TabStack {
         switch route {
         case .recipe(let item, let autoStartCookMode):
             recipeDestination(item: item, autoStartCookMode: autoStartCookMode) { path.append($0) }
+        case .recipeSeries(let items, let startID, let autoStartCookMode):
+            recipeSeriesDestination(items: items, startID: startID, autoStartCookMode: autoStartCookMode) {
+                path.append($0)
+            }
         case .category(let category):
             categoryDestination(category) { path.append($0) }
         }
@@ -40,6 +44,10 @@ extension TabStack {
             recipeDestination(item: item, autoStartCookMode: autoStartCookMode) {
                 searchPath.append($0)
             }
+        case .recipeSeries(let items, let startID, let autoStartCookMode):
+            recipeSeriesDestination(items: items, startID: startID, autoStartCookMode: autoStartCookMode) {
+                searchPath.append($0)
+            }
         case .category(let category):
             categoryDestination(category) { searchPath.append($0) }
         }
@@ -51,6 +59,46 @@ extension TabStack {
         autoStartCookMode: Bool,
         // v2 Search overhaul (2/3) — the caller supplies where a "related recipe"
         // tap pushes (the Feed's `path` or the search modal's `searchPath`).
+        push: @escaping (RecipeRoute) -> Void
+    ) -> some View {
+        recipeDetailView(item: item, autoStartCookMode: autoStartCookMode, push: push)
+    }
+
+    /// The feed's page-flip destination: the tapped recipe opened inside a
+    /// horizontal pager over the feed's ordered snapshot, so a left/right swipe
+    /// lands on the next/previous recipe (magazine-style). `startID` resolves to
+    /// the page to open on; a stale id falls back to the first page. Each page is
+    /// the SAME fully-wired `RecipeDetailView` a single-recipe push builds, so
+    /// every recipe you swipe to behaves identically. Cook-Mode auto-start
+    /// applies only to the opened page, never the ones swiped past.
+    @ViewBuilder
+    private func recipeSeriesDestination(
+        items: [RecipeListItem],
+        startID: Int,
+        autoStartCookMode: Bool,
+        push: @escaping (RecipeRoute) -> Void
+    ) -> some View {
+        let startIndex = items.firstIndex { $0.id == startID } ?? 0
+        RecipeDetailPager(items: items, startIndex: startIndex) { pageItem, isStart, topInset in
+            recipeDetailView(
+                item: pageItem,
+                autoStartCookMode: isStart && autoStartCookMode,
+                topInsetOverride: topInset,
+                push: push
+            )
+        }
+    }
+
+    /// The fully-wired `RecipeDetailView` for one recipe. Shared by the
+    /// single-recipe push (`recipeDestination`) and each page of the feed's
+    /// swipe pager (`recipeSeriesDestination`) so the wiring lives in one place.
+    @ViewBuilder
+    private func recipeDetailView(
+        item: RecipeListItem,
+        autoStartCookMode: Bool,
+        // Supplied by the swipe pager (the real top inset it read outside its
+        // TabView); `nil` for a single-recipe push, which reads its own.
+        topInsetOverride: CGFloat? = nil,
         push: @escaping (RecipeRoute) -> Void
     ) -> some View {
         let canonical =
@@ -78,7 +126,8 @@ extension TabStack {
             // as a sheet over the full-screen cover (a tab switch would be
             // invisible beneath it).
             openHeatCoach: openHeatCoach,
-            heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) }
+            heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) },
+            topInsetOverride: topInsetOverride
         )
         .onAppear {
             Telemetry.shared.send(.screenView(name: "recipe_detail"))

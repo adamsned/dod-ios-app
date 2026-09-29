@@ -224,7 +224,39 @@ By tag (recommended for a real release, leaves an audit trail):
 Any tag matching `release-*` triggers the workflow. The build number is still
 the UTC timestamp computed at run time, independent of the tag text.
 
-Note: the pipeline does NOT auto-deploy on every push to main, by design. If you
+Building from a development branch (for example `v2`):
+Anyone with write access can ship a TestFlight build of the branch they are
+developing on. Nothing restricts the release workflow to main.
+    gh workflow run release.yml --ref v2
+or Actions -> Release (TestFlight) -> Run workflow -> pick `v2` in the branch
+dropdown. Tagging works too: tag a commit on the branch and push it:
+    git tag release-v2-2026.09.28.1 origin/v2
+    git push origin release-v2-2026.09.28.1
+The version testers see comes from `MARKETING_VERSION` in that branch's
+`project.yml` (v2 is 2.0, main is 1.0), so each line shows up as its own
+version in TestFlight and the two never collide. Build numbers are UTC
+timestamps, so they stay unique across branches. The release workflow does
+not run tests or lint, so check CI on the branch before shipping to testers.
+
+Build automatically when a PR merges (`[testflight]`):
+Put `[testflight]` anywhere in the PR title, for example
+    [testflight] Saved tab: new empty state
+When the PR is squash-merged into `v2` (or `main`), the merge commit carries
+the tag and the release workflow starts on its own. Nobody has to watch the
+PR or run anything after the merge. This works with auto-merge too: turn on
+auto-merge, and the build starts as soon as CI goes green and GitHub merges.
+Details:
+- Only pushes to `main` or `v2` whose commit message contains `[testflight]`
+  build. Every other merge is skipped, so this never uploads by accident.
+- A PR with a single commit squashes to that commit's title, not the PR
+  title. For a one-commit PR, put `[testflight]` in the commit message too
+  (anywhere in the message works).
+- Tagged builds (`release-*`) and manual runs work exactly as before.
+- This goes live on `v2` when PR #860 merges, and on `main` once `v2` is
+  merged into it.
+
+Note: the pipeline does NOT auto-deploy on every push to main, by design
+(only `[testflight]` pushes build, see above). If you
 ever want that, replace the `push: tags:` trigger block in
 `.github/workflows/release.yml` with:
     push:

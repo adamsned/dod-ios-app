@@ -62,12 +62,20 @@ extension RecipeCard {
             self.isDownloaded = isDownloaded
         }
 
+        /// The square thumbnail edge length; the `DODRadius.inner` clip is shared.
+        private let thumbnailSize: CGFloat = 60
+
         public var body: some View {
             HStack(alignment: .center, spacing: DODSpacing.sm) {
                 thumbnail
                 VStack(alignment: .leading, spacing: DODSpacing.xxs) {
                     HStack(alignment: .firstTextBaseline, spacing: DODSpacing.xxs) {
                         RecipeCard.titleText(title, highlightQuery: highlightQuery)
+                            // Deliberately NOT the gallery card's
+                            // `DODType.displayMedium`: at title2 `.bold` the dense
+                            // row truncates names mid-word ("Garlic Butter S…"),
+                            // which is exactly what DUT-527 set out to stop. The
+                            // editorial weight belongs to the card, not the row.
                             .dodFont(DODType.heading)
                             .foregroundStyle(DODColor.label)
                             // DUT-527 — allow 2 title lines on compact (iPhone) too,
@@ -117,7 +125,7 @@ extension RecipeCard {
                 case .success(let image):
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .scaledToFill()
                 case .failure:
                     Image(systemName: "photo")
                         .foregroundStyle(DODColor.labelSecondary)
@@ -125,7 +133,7 @@ extension RecipeCard {
                         .background(DODColor.surface)
                 }
             }
-            .frame(width: 60, height: 60)
+            .frame(width: thumbnailSize, height: thumbnailSize)
             .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
             .accessibilityHidden(true)
         }

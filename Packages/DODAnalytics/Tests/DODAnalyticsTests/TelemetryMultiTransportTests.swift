@@ -7,6 +7,7 @@ import Testing
 /// - send dispatch to primary + additional transports
 /// - replaceTransport state reset
 /// Telemetry.shared is process-global; tests must run serially.
+@TelemetryTestActor
 @Suite("Telemetry multi-transport fan-out", .serialized) struct TelemetryMultiTransportTests {
 
     @Test func additionalTransportReceivesEventsAfterAddingBeforeStart() {
