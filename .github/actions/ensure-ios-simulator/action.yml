@@ -131,9 +131,30 @@ runs:
         # `-b` boots if needed and waits for the device to finish booting. This
         # removes the L3 device-matrix flake where newer/slower sims (iPhone
         # 16/17) were still settling when the first UI test ran — the failures
-        # were intermittent across devices for identical code. Tolerated on
-        # error; the job-level timeout backstops a genuinely stuck boot.
-        xcrun simctl bootstatus "$udid" -b 2>/dev/null || true
+        # were intermittent across devices for identical code.
+        #
+        # The wait is BOUNDED. An unbounded `bootstatus -b` intermittently
+        # hangs on the hosted runner, and the hang used to eat the whole job
+        # timeout (30 min) and surface as a confusing "cancelled" run on main
+        # and v2 alike. macOS ships no `timeout`, so perl's alarm does it: the
+        # exec'd command dies of SIGALRM, exit 142. On a timeout, erase the
+        # device and try once more; any other bootstatus error stays tolerated
+        # as before.
+        run_bounded() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+        wait_booted() {
+          local rc=0
+          run_bounded "$1" xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1 || rc=$?
+          [ "$rc" -ne 142 ]
+        }
+        if ! wait_booted 240; then
+          echo "::warning::'$NAME' ($udid) did not finish booting in 240s; erasing and retrying once."
+          run_bounded 60 xcrun simctl shutdown "$udid" 2>/dev/null || true
+          run_bounded 120 xcrun simctl erase "$udid" 2>/dev/null || true
+          run_bounded 60 xcrun simctl boot "$udid" 2>/dev/null || true
+          if ! wait_booted 300; then
+            unavailable "simulator did not finish booting after erase + retry"
+          fi
+        fi
 
         echo "available=true" >> "$GITHUB_OUTPUT"
         echo "destination=platform=iOS Simulator,id=$udid" >> "$GITHUB_OUTPUT"
