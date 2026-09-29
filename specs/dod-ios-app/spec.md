@@ -1068,31 +1068,6 @@ Added 2026-06-20 (DUT-140, authored by Ned). This serves the "Your First Cookout
 
 ---
 
-### US-54 — Ask about this recipe (Apple Intelligence, on-device)
-
-**As a** home cook in the middle of a recipe,
-**I want** to ask quick questions about the recipe I'm looking at (substitutions, scaling, doneness, charcoal),
-**so that** I get an answer grounded in this recipe without leaving the app or searching the web.
-
-Added 2026-09-28 (authored by Ned; Linear ID to be assigned). Constitution amended the same day (§2, §3, §9) per CL-331. v1 is a single entry point on recipe detail that opens a sheet where the user types a question and gets an answer from Apple's **on-device** model (`FoundationModels`), with the current recipe's title, ingredients, and steps supplied as context. It is a progressive enhancement: devices without Apple Intelligence never see it.
-
-**Acceptance criteria (T-934 amends; implementation task TBD — CL-331):**
-
-- **AC-54.1 (PROPOSED)** Recipe detail shows an "Ask About This Recipe" control **only** when running iOS 26+ **and** `SystemLanguageModel.default.availability == .available`. In every other case (older OS, unsupported device, Apple Intelligence off, model not ready) the control is absent and the page layout is identical to today.
-- **AC-54.2 (PROPOSED)** Tapping the control opens a sheet with a text field and a few suggested questions ("What Can I Substitute?", "How Do I Double This?", "How Many Coals?"). Submitting sends the question to a `LanguageModelSession` whose instructions scope it to Dutch oven and cast-iron cooking and whose context is the current recipe (title, ingredients, instructions, yield, and any charcoal guidance from US-50), trimmed to fit the model's context window.
-- **AC-54.3 (PROPOSED)** The answer streams into the sheet as it is generated. Follow-up questions in the same sheet continue the same session. Closing the sheet discards the session and all text (constitution §9).
-- **AC-54.4 (PROPOSED)** Every answer carries a short visible note that it was generated on-device by Apple Intelligence and may be wrong. Questions unrelated to cooking, or ones the model's guardrails refuse, get a friendly fixed decline message, never a raw error.
-- **AC-54.5 (PROPOSED)** Nothing typed or generated leaves the device or is persisted; no new analytics event is added (constitution §9). Works offline as long as the recipe is cached.
-- **AC-54.6 (PROPOSED)** Meets CC-1 (VoiceOver labels, Dynamic Type to AX5, contrast) and CC-3/CC-4 (a visible generating state within 100ms; human-readable error + Retry on failure). iPad presents the sheet at a readable width (CC-8).
-- **AC-54.7 (PROPOSED)** Tests: L1 covers the availability gate (a protocol seam over `SystemLanguageModel` so the gate and the prompt/context builder are testable on any OS), the context trimming, and the decline path; L3 covers the control's absence when the model is unavailable. Live model output is **not** asserted in CI (nondeterministic, and CI runners have no Apple Intelligence).
-
-**Constitution + spec notes:**
-
-- **Why on-device, not a cloud LLM.** Zero privacy surface, zero per-request cost, no API key to ship, works offline. The trade is iOS 26+ and supported hardware only, which is acceptable for an optional helper. Full alternatives in CL-331.
-- **Out of scope for v1 (candidates for later stories):** the cast-iron photo scanner (`backlog.md`), structured `@Generable` output (for example an editable scaled-ingredient list), Siri on-screen awareness for recipe detail, and any change to Writing Tools behavior in text fields.
-
----
-
 ## Cross-cutting acceptance criteria
 
 These apply to every screen, not just one story.
