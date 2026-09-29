@@ -4,6 +4,7 @@ import DODFeatureCategories
 import DODFeatureFeed
 import DODFeatureRecipeDetail
 import DODFeatureSearch
+import DODIntelligence
 import Foundation
 import SwiftUI
 
@@ -111,7 +112,14 @@ extension TabStack {
                 dependencies: dependencies.recipeDetailDependencies(),
                 // DUT-546 — inject the shared store so a block on one open
                 // recipe screen live-hides that author on another.
-                commentModeration: commentModeration
+                commentModeration: commentModeration,
+                // US-54 / T-932 — inject the on-device AI seam so recipe /
+                // article detail can offer "Summarize" (mirrors the Shopping
+                // List substitution wiring in GroceryTabRoot). Keeps iPhone
+                // behavior identical when unavailable: the service reports
+                // `isAvailable == false` on the sim / iOS 17-25 / no Apple
+                // Intelligence, so the affordance stays hidden.
+                intelligence: dependencies.intelligenceService()
             ),
             onSelectRelated: { related in push(.recipe(item: related)) },
             autoStartCookMode: autoStartCookMode,
