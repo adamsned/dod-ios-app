@@ -22,6 +22,28 @@ struct ShoppingListRow: View {
     let onToggle: () -> Void
     /// AC-39.5 / CL-82 — mark "I already have this" (trailing swipe removes the row).
     let onMarkAlreadyHave: () -> Void
+    /// v2 on-device AI — whether the "Substitute" affordance is offered on this
+    /// row. `false` on unsupported devices (no usable model), which hides the
+    /// swipe action + custom accessibility action entirely (no dead control).
+    let showSubstitute: Bool
+    /// v2 on-device AI — ask for a substitution for this row's ingredient.
+    let onSubstitute: () -> Void
+
+    init(
+        item: ShoppingListViewModel.Item,
+        checked: Bool,
+        onToggle: @escaping () -> Void,
+        onMarkAlreadyHave: @escaping () -> Void,
+        showSubstitute: Bool = false,
+        onSubstitute: @escaping () -> Void = {}
+    ) {
+        self.item = item
+        self.checked = checked
+        self.onToggle = onToggle
+        self.onMarkAlreadyHave = onMarkAlreadyHave
+        self.showSubstitute = showSubstitute
+        self.onSubstitute = onSubstitute
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: DODSpacing.sm) {
@@ -80,8 +102,28 @@ struct ShoppingListRow: View {
         .accessibilityAction(named: ShoppingListView.checkOffLabel(checked: checked)) {
             onToggle()
         }
-        // AC-39.5 / CL-82 — the trailing "I already have this" affordance.
+        // v2 on-device AI — the substitution custom action mirrors the trailing
+        // swipe below, exposed to VoiceOver (which swallows swipe actions on the
+        // ignore-collapsed row). Added only when the model is usable, so a
+        // VoiceOver shopper on an unsupported device isn't offered a dead action.
+        .accessibilityActions {
+            if showSubstitute {
+                Button("Suggest Substitute") { onSubstitute() }
+                    .accessibilityIdentifier("shopping-substitute-action")
+            }
+        }
+        // AC-39.5 / CL-82 — the trailing "I already have this" affordance, plus
+        // the v2 "Substitute" affordance (gated on model availability).
         .swipeActions(edge: .trailing) {
+            if showSubstitute {
+                Button {
+                    onSubstitute()
+                } label: {
+                    Label("Substitute", systemImage: "wand.and.stars")
+                }
+                .tint(DODColor.accent)
+                .accessibilityIdentifier("shopping-substitute-action")
+            }
             Button {
                 onMarkAlreadyHave()
             } label: {
