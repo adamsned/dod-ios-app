@@ -87,15 +87,9 @@ public struct ShoppingListView: View {
                     build(from: selected)
                 }
             }
-            // v2 on-device AI — substitution sheet: pick reason → Suggest → Apply.
-            .sheet(isPresented: substitutionSheetBinding) {
-                SubstitutionSheet(
-                    state: viewModel.substitution,
-                    onSuggest: { Task { await viewModel.generateSubstitution(reason: $0) } },
-                    onApply: { viewModel.applySubstitution() },
-                    onCancel: { viewModel.dismissSubstitution() }
-                )
-            }
+            // v2 on-device AI — substitution sheet (in `+SubstitutionSheet.swift`
+            // to keep this body's type-check + file length in check).
+            .shoppingSubstitutionSheet(isPresented: substitutionSheetBinding, viewModel: viewModel)
             // DUT-488 — confirm before wiping a persisted list. Destructive
             // role tints the button red; the list clears + persists empty on
             // confirm (survives close/reopen).
