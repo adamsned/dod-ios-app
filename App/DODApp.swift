@@ -138,6 +138,14 @@ struct DODApp: App {
             let defaults = UserDefaults.standard
             defaults.removeObject(forKey: "dod.moderation.blockedAuthorsV1")
             defaults.removeObject(forKey: "dod.moderation.hiddenCommentIDsV1")
+            // Same for the other UserDefaults-backed state the journeys mutate:
+            // the metric-units toggle and the shopping list (App Group suite,
+            // `ShoppingListStore.key`). CI's fresh simulator hides the leak, but
+            // on a reused simulator a prior run starts the next one in metric
+            // with a non-empty list.
+            defaults.removeObject(forKey: IngredientMetricConverter.preferenceKey)
+            UserDefaults(suiteName: WidgetSnapshotConfig.appGroupIdentifier)?
+                .removeObject(forKey: "dod.shoppingList.v1")
         }
     }
 }

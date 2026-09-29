@@ -22,6 +22,21 @@ struct E2EStubHTTPClient: HTTPClient {
         let path = url.path
         let query = Self.queryItems(url)
 
+        // DUT-1062 (#830): Surprise Me samples the WPRM recipe CPT. It reads
+        // `X-WP-Total` for the count, then fetches the row at a random
+        // `offset` for its `wprm_parent_post_id`. Serve that from the fixture
+        // recipes (articles have no recipe card, same as live). Must precede
+        // the ratings catch-all below, which also matches "wprm".
+        if path.hasSuffix("/wp/v2/wprm_recipe") {
+            let recipes = E2EFixtures.recipes
+            let offset = query["offset"].flatMap(Int.init) ?? 0
+            let rows: [[String: Any]] =
+                recipes.indices.contains(offset)
+                ? [["id": recipes[offset].id, "wprm_parent_post_id": String(recipes[offset].id)]]
+                : []
+            return Self.json(rows, url: url, extraHeaders: ["X-WP-Total": String(recipes.count)])
+        }
+
         // WPRM ratings — the live endpoint returns 401/403; mirror it so the
         // rating summary degrades to "no aggregate" without breaking the screen.
         if path.contains("wp-recipe-maker") || path.contains("wprm") {
@@ -121,16 +136,22 @@ struct E2EStubHTTPClient: HTTPClient {
         return out
     }
 
-    private static func json(_ object: Any, url: URL, status: Int = 200) -> (Data, HTTPURLResponse) {
+    private static func json(
+        _ object: Any,
+        url: URL,
+        status: Int = 200,
+        extraHeaders: [String: String] = [:]
+    ) -> (Data, HTTPURLResponse) {
         let data = (try? JSONSerialization.data(withJSONObject: object)) ?? Data("[]".utf8)
-        return response(data, contentType: "application/json", url: url, status: status)
+        return response(data, contentType: "application/json", url: url, status: status, extraHeaders: extraHeaders)
     }
 
     private static func response(
         _ data: Data,
         contentType: String = "application/json",
         url: URL,
-        status: Int = 200
+        status: Int = 200,
+        extraHeaders: [String: String] = [:]
     ) -> (Data, HTTPURLResponse) {
         // HTTPURLResponse's failable init never returns nil for a valid URL +
         // status code, so the force unwrap is safe here (test-support only).
@@ -140,6 +161,7 @@ struct E2EStubHTTPClient: HTTPClient {
             statusCode: status,
             httpVersion: "HTTP/1.1",
             headerFields: ["Content-Type": contentType, "X-WP-TotalPages": "1"]
+                .merging(extraHeaders) { _, new in new }
         )!
         // swiftlint:enable force_unwrapping
         return (data, http)
