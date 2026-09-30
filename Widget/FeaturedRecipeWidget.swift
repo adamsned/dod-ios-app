@@ -45,7 +45,7 @@ struct FeaturedRecipeWidget: Widget {
                 }
         }
         .configurationDisplayName("Latest")
-        .description("See the latest Dutch Oven Daddy recipe right on your home screen.")
+        .description("See the latest from Dutch Oven Daddy right on your home screen.")
         // T-768 / CL-165 (DUT-74) — large added alongside small + medium.
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled()

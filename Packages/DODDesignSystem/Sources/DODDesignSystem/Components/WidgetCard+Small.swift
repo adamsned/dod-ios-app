@@ -42,29 +42,33 @@ extension WidgetCard {
             #endif
         }
 
-        /// Standard-mode look: title over the hero photo, protected by the
-        /// tint-safe scrim. Legible because `.fullColor` shows the real photo.
+        /// Standard-mode look: the recipe/article name centred over the hero
+        /// photo (widget layout parity — no bottom rectangle band). A full-card
+        /// gradient scrim darkens the whole photo just enough for the centred
+        /// title to read on any image. Legible because `.fullColor` shows the
+        /// real photo; the Tinted/Vibrant path (``RenderingModeAwareSmall``)
+        /// still anchors the title on the container where contrast is
+        /// guaranteed (DUT-9).
         @ViewBuilder
         static func overlayLayout(content: Content) -> some View {
-            ZStack(alignment: .bottomLeading) {
+            ZStack {
                 Hero(url: content.heroImageURL)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // Contrast scrim behind the title. See ``TintSafeScrim`` for
-                // why this is a `.fullColor` rasterised `Image` and not a
-                // plain translucent `LinearGradient` (DUT-9 root cause).
-                TintSafeScrim()
+                LinearGradient(
+                    colors: [.black.opacity(0.25), .black.opacity(0.55)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
 
-                VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-                    if let totalTime = content.totalTimeDisplay {
-                        TimeChip(text: totalTime)
-                    }
-                    Text(content.title)
-                        .font(.system(.subheadline, design: .default, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                }
-                .padding(DODSpacing.sm)
+                Text(content.title)
+                    .font(.system(.headline, design: .default, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(4)
+                    .minimumScaleFactor(0.6)
+                    .multilineTextAlignment(.center)
+                    .padding(DODSpacing.sm)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
