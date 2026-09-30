@@ -35,37 +35,16 @@ struct SavedRecipesWidgetEntryView: View {
                 }
             }
         }
-        // Single chrome-level URL resolved from the current widget
-        // family + payload. The small widget's whole face IS one recipe
-        // row, so the entire tap target deep-links to that recipe.
-        // The medium widget overrides this per-row via `Link` for each
-        // recipe; gaps between rows fall through here to `dod://saved`
-        // (CL-29 / AC-17.4).
-        .widgetURL(chromeURL)
+        // Every size is now a per-row list (small/medium/large), so the
+        // chrome-level tap always falls through to the Saved tab; the per-row
+        // `Link`s below override this for their own hit regions, and gaps
+        // between rows land here on `dod://saved` (CL-29 / AC-17.4).
+        .widgetURL(Self.savedFallbackURL)
     }
 
-    /// URL the whole-widget tap routes to. Per-row `Link`s in
-    /// `mediumBody` override this for their hit regions only.
-    private var chromeURL: URL? {
-        switch family {
-        case .systemSmall:
-            // Small holds exactly one recipe — tap face → that recipe.
-            return entry.entries.first.flatMap { Self.deepLink(for: $0) }
-                ?? Self.savedFallbackURL
-        default:
-            // Medium + empty state: tap chrome → Saved tab.
-            return Self.savedFallbackURL
-        }
-    }
+    // MARK: - Small (up to 2 entries) — widget layout parity
 
-    // MARK: - Small (1 entry)
-
-    private var smallBody: some View {
-        let first = entry.entries.first
-        return WidgetCard.SavedSmall(row: Self.row(from: first))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(Self.smallAccessibilityLabel(for: first))
-    }
+    private var smallBody: some View { savedListBody(maxRows: WidgetCard.SavedSmall.maxRows) }
 
     // MARK: - Medium (up to 3 entries)
 
@@ -172,13 +151,6 @@ struct SavedRecipesWidgetEntryView: View {
     /// gradient fallback instead of crashing.
     static func heroImageURL(forFilename filename: String) -> URL? {
         WidgetImageBridge.fileURL(forFilename: filename)
-    }
-
-    static func smallAccessibilityLabel(for entry: SavedRecipesWidgetSnapshot.Entry?) -> String {
-        guard let entry else {
-            return "Saved recipes widget. No saved recipes yet."
-        }
-        return "Saved recipe: \(entry.title)."
     }
 
     static func rowAccessibilityLabel(for entry: SavedRecipesWidgetSnapshot.Entry) -> String {
