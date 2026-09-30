@@ -91,6 +91,27 @@ public enum DODColor {
     /// Brand accent (save bookmark, primary buttons).
     public static let accent = bundleColor("Accent")
 
+    /// Safety / alert color for high-stakes cautions — the allergy warning on an
+    /// AI ingredient substitution (US-54 follow-up). A brand-warm alert red,
+    /// deliberately distinct from the burnt-orange ``accent`` so a genuine safety
+    /// caution never reads as an ordinary highlight. Programmatic light/dark
+    /// variants (no asset); non-UIKit hosts fall back to the light value. Fixed
+    /// across appearance themes on purpose — an alert should look the same in
+    /// every theme, so it is NOT run through the OLED surface treatment.
+    public static var warning: Color {
+        #if canImport(UIKit)
+        return Color(
+            UIColor { traits in
+                traits.userInterfaceStyle == .dark
+                    ? UIColor(red: 1.0, green: 0.42, blue: 0.37, alpha: 1)  // #FF6B5E
+                    : UIColor(red: 0.75, green: 0.22, blue: 0.17, alpha: 1)  // #C0392B
+            }
+        )
+        #else
+        return Color(red: 0.75, green: 0.22, blue: 0.17)
+        #endif
+    }
+
     // MARK: - Raw brand palette (for design system internals)
 
     public static let castIronBrown = bundleColor("CastIronBrown")
