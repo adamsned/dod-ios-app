@@ -39,20 +39,26 @@ extension WidgetCard {
                         .textCase(.uppercase)
                         .tracking(0.5)
 
-                    // DUT-479 — the large size has room, so the info reads bigger
-                    // than medium/small: a `.title3` title + a 3-line excerpt.
+                    // The title is the headline of the card, so it always shows
+                    // in full (widget layout parity): up to 3 lines and a higher
+                    // `.layoutPriority` than the excerpt, so under vertical
+                    // compression the excerpt is the one that truncates while
+                    // the full recipe/article name stays visible in the bottom
+                    // section. `.minimumScaleFactor` then shrinks a 4th-line
+                    // outlier to fit rather than clipping it.
                     Text(content.title)
                         .font(.system(.title3, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.label)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.65)
                         .multilineTextAlignment(.leading)
+                        .layoutPriority(1)
 
                     if !content.excerpt.isEmpty {
                         Text(content.excerpt)
                             .font(.system(.subheadline, design: .default))
                             .foregroundStyle(DODColor.labelSecondary)
-                            .lineLimit(3)
+                            .lineLimit(2)
                             .minimumScaleFactor(0.7)
                             .multilineTextAlignment(.leading)
                     }

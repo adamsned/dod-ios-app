@@ -30,15 +30,21 @@ extension WidgetCard {
         }
     }
 
-    /// Compact small-widget layout: one saved-recipe row centred in the
-    /// 158×158pt frame.
+    /// Compact small-widget layout: the "Saved" eyebrow + up to two
+    /// thumbnail-left / title-right rows — the SAME list format as
+    /// ``SavedMedium``, just capped shorter for the square 158×158pt frame
+    /// (widget layout parity). Caller trims the array to at most ``maxRows``.
     public struct SavedSmall: View {
 
-        public let row: SavedRow
+        public let rows: [SavedRow]
 
-        public init(row: SavedRow) {
-            self.row = row
+        public init(rows: [SavedRow]) {
+            self.rows = rows
         }
+
+        /// Max rows the small size renders. The square tile fits two
+        /// thumbnail rows under the eyebrow without cramping.
+        public static let maxRows = 2
 
         public var body: some View {
             VStack(alignment: .leading, spacing: DODSpacing.xs) {
@@ -48,17 +54,14 @@ extension WidgetCard {
                     .textCase(.uppercase)
                     .tracking(0.5)
 
-                Spacer(minLength: 0)
-
-                Hero(url: row.heroImageURL)
-                    .frame(height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
-
-                Text(row.title)
-                    .font(.system(.subheadline, design: .default, weight: .semibold))
-                    .foregroundStyle(DODColor.label)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                VStack(spacing: DODSpacing.xs) {
+                    ForEach(Array(rows.prefix(Self.maxRows).enumerated()), id: \.offset) { _, row in
+                        SavedListRow(row: row)
+                    }
+                    if rows.count < Self.maxRows {
+                        Spacer(minLength: 0)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(DODSpacing.sm)
@@ -148,7 +151,7 @@ extension WidgetCard {
             HStack(spacing: DODSpacing.xs) {
                 Hero(url: row.heroImageURL)
                     .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.widgetThumbnail, style: .continuous))
 
                 Text(row.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))
@@ -164,7 +167,10 @@ extension WidgetCard {
 
 #Preview("Saved Small") {
     WidgetCard.SavedSmall(
-        row: .init(title: "Garlic Butter Skillet Corn", heroImageURL: nil)
+        rows: [
+            .init(title: "Garlic Butter Skillet Corn"),
+            .init(title: "Sourdough Bread"),
+        ]
     )
     .frame(width: 158, height: 158)
 }
