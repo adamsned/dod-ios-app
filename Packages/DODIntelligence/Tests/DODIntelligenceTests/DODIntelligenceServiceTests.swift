@@ -27,11 +27,11 @@ struct DODIntelligenceServiceTests {
 
     // MARK: - FakeIntelligenceService
 
-    @Test func fakeAvailableReturnsCannedSubstitution() async {
+    @Test func fakeAvailableReturnsCannedResult() async {
         let service = FakeIntelligenceService()
         #expect(service.isAvailable)
         let result = await service.suggestSubstitution(for: "buttermilk")
-        #expect(result == .cannedButtermilk)
+        #expect(result == .cannedButtermilkOptions)
     }
 
     @Test func fakeUnavailableHidesAvailabilityAndReturnsNil() async {
@@ -74,12 +74,48 @@ struct DODIntelligenceServiceTests {
 
     // MARK: - Reason-aware substitution + summary + answer (T-932 / T-933 / T-934)
 
-    /// The reason-carrying overload still returns the canned suggestion when the
-    /// fake is available (the reason only shapes the live prompt).
-    @Test func fakeSubstitutionAcceptsAReason() async {
+    /// The context- and reason-carrying signature still returns the canned result
+    /// when the fake is available (context + reason only shape the live prompt).
+    @Test func fakeSubstitutionAcceptsContextAndReason() async {
         let service = FakeIntelligenceService()
-        let result = await service.suggestSubstitution(for: "1 cup buttermilk", reason: .dairyFree)
-        #expect(result == .cannedButtermilk)
+        let context = RecipeContext(recipeTitle: "Asian Green Beans", otherIngredients: ["soy sauce"])
+        let result = await service.suggestSubstitution(for: "1 cup buttermilk", in: context, reason: .dairyFree)
+        #expect(result == .cannedButtermilkOptions)
+    }
+
+    // MARK: - Result verdicts + reason safety helpers (US-54 follow-up)
+
+    @Test func cannedResultFixturesCarryTheRightVerdicts() {
+        if case .options(let options) = SubstitutionResult.cannedButtermilkOptions.verdict {
+            #expect(options.count == 2)
+            #expect(options.first == .cannedButtermilk)
+        } else {
+            Issue.record("cannedButtermilkOptions should be an options verdict")
+        }
+        if case .omit = SubstitutionResult.cannedOmit.verdict {
+        } else {
+            Issue.record("cannedOmit should be an omit verdict")
+        }
+        if case .notAGoodFit = SubstitutionResult.cannedNotAGoodFit.verdict {
+        } else {
+            Issue.record("cannedNotAGoodFit should be a notAGoodFit verdict")
+        }
+    }
+
+    @Test func allergyReasonHelpers() {
+        #expect(SubstitutionReason.allergy.isAllergy)
+        #expect(SubstitutionReason.allergy.requiresAllergenWarning)
+        #expect(SubstitutionReason.sensitivity.requiresAllergenWarning)
+        #expect(!SubstitutionReason.sensitivity.isAllergy)
+        #expect(!SubstitutionReason.dairyFree.requiresAllergenWarning)
+        #expect(!SubstitutionReason.outOfIt.isAllergy)
+    }
+
+    @Test func recipeContextHoldsFields() {
+        let context = RecipeContext(recipeTitle: "Chili", otherIngredients: ["beans", "onion"])
+        #expect(context.recipeTitle == "Chili")
+        #expect(context.otherIngredients == ["beans", "onion"])
+        #expect(RecipeContext(recipeTitle: "X").otherIngredients.isEmpty)
     }
 
     /// `summarize` / `answer` return their canned strings when available and

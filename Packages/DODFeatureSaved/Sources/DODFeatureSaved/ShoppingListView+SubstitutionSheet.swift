@@ -20,7 +20,8 @@ extension View {
                 onSuggest: { reason in
                     Task { await viewModel.generateSubstitution(reason: reason) }
                 },
-                onApply: { viewModel.applySubstitution() },
+                onApply: { option in viewModel.applySubstitution(option) },
+                onOmit: { viewModel.omitIngredient() },
                 onCancel: { viewModel.dismissSubstitution() }
             )
         }

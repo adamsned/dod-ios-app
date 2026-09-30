@@ -15,23 +15,23 @@ import Foundation
 public struct FakeIntelligenceService: DODIntelligenceService {
 
     public let isAvailable: Bool
-    private let cannedSubstitution: IngredientSubstitution?
+    private let cannedSubstitution: SubstitutionResult?
     private let cannedSummary: String?
     private let cannedAnswer: String?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
     ///     unsupported device (every AI affordance stays hidden).
-    ///   - substitution: What ``suggestSubstitution(for:reason:)`` returns when
-    ///     available. Pass `nil` to model the graceful "no substitute found"
-    ///     path. Defaults to ``IngredientSubstitution/cannedButtermilk``.
+    ///   - substitution: What ``suggestSubstitution(for:in:reason:)`` returns
+    ///     when available. Pass `nil` to model the graceful "no substitute found"
+    ///     path. Defaults to ``SubstitutionResult/cannedButtermilkOptions``.
     ///   - summary: What ``summarize(_:)`` returns when available. `nil` models
     ///     the graceful no-result path.
     ///   - answer: What ``answer(_:)`` returns when available. `nil` models the
     ///     graceful no-result path.
     public init(
         isAvailable: Bool = true,
-        substitution: IngredientSubstitution? = .cannedButtermilk,
+        substitution: SubstitutionResult? = .cannedButtermilkOptions,
         summary: String? = "A quick, weeknight-friendly cast-iron recipe with simple pantry ingredients.",
         answer: String? = "Warm the pan gradually, add a thin layer of oil, and wipe out any excess before cooking."
     ) {
@@ -43,8 +43,9 @@ public struct FakeIntelligenceService: DODIntelligenceService {
 
     public func suggestSubstitution(
         for ingredient: String,
+        in context: RecipeContext?,
         reason: SubstitutionReason?
-    ) async -> IngredientSubstitution? {
+    ) async -> SubstitutionResult? {
         guard isAvailable else { return nil }
         return cannedSubstitution
     }

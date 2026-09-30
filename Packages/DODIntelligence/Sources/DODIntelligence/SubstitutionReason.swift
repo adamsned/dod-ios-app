@@ -21,6 +21,19 @@ public enum SubstitutionReason: String, CaseIterable, Sendable, Identifiable {
 
     public var id: String { rawValue }
 
+    /// A true allergy — the strongest safety framing. Drives the extra-prominent
+    /// warning and the stronger haptic cue on the result (req: allergy gets
+    /// substantially more emphasis than an ordinary swap reason).
+    public var isAllergy: Bool { self == .allergy }
+
+    /// An allergy OR an intolerance/sensitivity — the reasons that surface the
+    /// expanded allergen disclaimer (verify the actual ingredient + allergen
+    /// info yourself), since an AI swap must never be trusted as medical-grade
+    /// for these.
+    public var requiresAllergenWarning: Bool {
+        self == .allergy || self == .sensitivity
+    }
+
     /// Title Case chip label for the picker (controls → Title Case, CL-305).
     public var title: String {
         switch self {
