@@ -102,10 +102,15 @@ extension WidgetCard {
                     Text(content.title)
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.label)
-                        .lineLimit(2)
+                        // DUT-1381 — the title wins its space over the greedy
+                        // hero and may take 3 lines / scale, so a long name
+                        // isn't clipped at 2 lines (matches the Standard path).
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.8)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(DODSpacing.sm)
+                        .layoutPriority(1)
                         .widgetAccentable()
                 }
             }
