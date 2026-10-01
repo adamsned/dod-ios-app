@@ -1,9 +1,20 @@
 import Foundation
 
 #if os(iOS)
-import CoreGraphics
 import FoundationModels
+
+// The FoundationModels image-attachment API (``Attachment`` / ``ImageAttachment``)
+// only exists in the iOS 27 SDK. It must therefore be COMPILED OUT when building
+// with an older SDK (CI + release run Xcode 26 on macos-15 runners, which has no
+// iOS 27 SDK), or the build fails with "cannot find 'Attachment' in scope" even
+// though every call is `@available(iOS 27, *)` gated at runtime. `compiler(>=6.4)`
+// is the proxy: Xcode 27.1 ships Swift 6.4, Xcode 26 ships Swift 6.2. When the
+// build toolchain reaches 27.1 the image path (and ``supportsImageInput``) light
+// up automatically; until then this service is text-only. (DUT-1382.)
+#if compiler(>=6.4)
+import CoreGraphics
 import ImageIO
+#endif
 #endif
 
 /// Production ``DODIntelligenceService`` backed by Apple's on-device
@@ -39,9 +50,10 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
     }
 
     public var supportsImageInput: Bool {
-        // Image attachments are an iOS 27 FoundationModels capability; on iOS 26
-        // the model is text-only. Still requires the model to be available.
-        #if os(iOS)
+        // Image attachments are an iOS 27 FoundationModels capability that needs
+        // the iOS 27 SDK to COMPILE (see the import note). `false` whenever the
+        // build toolchain is older (text-only) or the model can't run.
+        #if os(iOS) && compiler(>=6.4)
         if #available(iOS 27, *) {
             if case .available = SystemLanguageModel.default.availability {
                 return true
@@ -93,6 +105,8 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         // An image-only ask (no text) is allowed; a fully empty ask is not.
         guard !trimmed.isEmpty || imageData != nil else { return nil }
         #if os(iOS)
+        #if compiler(>=6.4)
+        // Image path is iOS-27-SDK-only (compiled out on older toolchains).
         if let imageData, #available(iOS 27, *) {
             if let withImage = await Self.generateAnswer(question: trimmed, imageData: imageData) {
                 return withImage
@@ -100,6 +114,7 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
             // The image path yielded nothing (decode or model error); fall back
             // to a text-only answer when there's still a question to answer.
         }
+        #endif
         if #available(iOS 26, *), !trimmed.isEmpty {
             return await Self.generateText(instructions: Self.helperInstructions, prompt: trimmed)
         }
@@ -127,6 +142,10 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         }
     }
 
+    // Image-grounded answering needs the iOS 27 SDK's ``Attachment`` type, so the
+    // whole block is `compiler(>=6.4)`-gated (see the import note) and lights up
+    // once the build toolchain is Xcode 27.1+.
+    #if compiler(>=6.4)
     /// One image-grounded answer turn (iOS 27+). Decodes the attached photo and
     /// hands the model a multimodal prompt (text + image) so it can base its help
     /// on what it actually sees. Any error (bad image bytes, guardrail, model
@@ -156,6 +175,7 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
+    #endif
 
     /// Instructions for the recipe/article summary surface (T-932).
     @available(iOS 26, *)
