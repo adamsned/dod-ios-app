@@ -15,6 +15,7 @@ import Foundation
 public struct FakeIntelligenceService: DODIntelligenceService {
 
     public let isAvailable: Bool
+    public let supportsImageInput: Bool
     private let cannedSubstitution: SubstitutionResult?
     private let cannedSummary: String?
     private let cannedAnswer: String?
@@ -31,11 +32,13 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     graceful no-result path.
     public init(
         isAvailable: Bool = true,
+        supportsImageInput: Bool = true,
         substitution: SubstitutionResult? = .cannedButtermilkOptions,
         summary: String? = "A quick, weeknight-friendly cast-iron recipe with simple pantry ingredients.",
         answer: String? = "Warm the pan gradually, add a thin layer of oil, and wipe out any excess before cooking."
     ) {
         self.isAvailable = isAvailable
+        self.supportsImageInput = supportsImageInput
         self.cannedSubstitution = substitution
         self.cannedSummary = summary
         self.cannedAnswer = answer
@@ -55,7 +58,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         return cannedSummary
     }
 
-    public func answer(_ question: String) async -> String? {
+    public func answer(_ question: String, imageData: Data?) async -> String? {
         guard isAvailable else { return nil }
         return cannedAnswer
     }

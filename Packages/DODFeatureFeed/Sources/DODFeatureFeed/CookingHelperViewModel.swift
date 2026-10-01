@@ -1,17 +1,16 @@
 import DODIntelligence
 import Foundation
 
-/// T-934 (US-54 / AC-54.4) — the view model behind the Cooking Tools "Ask
-/// Dutch Oven Daddy" helper: an on-device Q&A surface for cast-iron,
-/// Dutch-oven, and technique questions.
+/// T-934 (US-54 / DUT-1382) — the view model behind the "Ask Dutch Oven Daddy"
+/// helper: an on-device, ChatGPT-style Q&A surface for any cooking or kitchen
+/// question, optionally grounded in a photo the cook attaches.
 ///
-/// This mirrors the Shopping List substitution seam (`#735`) exactly. It stores
-/// the shared ``DODIntelligenceService`` PROTOCOL (never FoundationModels),
-/// exposes ``isAvailable`` so the hub can hide the whole entry when no on-device
-/// model can run, and drives an ``AnswerState`` machine so the sheet renders a
-/// loading spinner, the answer in an elevated card, or a graceful "no answer
-/// available" when the service returns `nil` (unavailable / empty / model error
-/// / guardrail rejection — the service never throws).
+/// It stores the shared ``DODIntelligenceService`` PROTOCOL (never
+/// FoundationModels), exposes ``isAvailable`` so the hub can hide the whole
+/// entry when no on-device model can run, and ``supportsImageInput`` so the
+/// photo affordance only shows where the model can actually see images. Each
+/// ask appends a user ``Turn`` and an assistant ``Turn`` to ``turns`` so the
+/// sheet renders a scrolling conversation.
 @MainActor
 @Observable
 public final class CookingHelperViewModel {
@@ -22,58 +21,90 @@ public final class CookingHelperViewModel {
     /// FoundationModels.
     private let intelligence: (any DODIntelligenceService)?
 
-    /// The answer surface's state machine, observed so the sheet reacts.
-    public enum AnswerState: Equatable, Sendable {
-        case idle
-        case loading
-        case loaded(String)
-        case notFound
+    /// One line in the conversation transcript.
+    public struct Turn: Identifiable, Equatable, Sendable {
+        public enum Role: Sendable { case user, assistant }
+        public let id: UUID
+        public let role: Role
+        public let text: String
+        /// For a user turn: whether the cook attached a photo (so the bubble can
+        /// show a camera marker). Always `false` for assistant turns.
+        public let hasImage: Bool
+        /// For an assistant turn: `true` when the model returned nothing, so the
+        /// bubble can render the graceful "no answer" styling.
+        public let isEmptyResult: Bool
+
+        public init(id: UUID = UUID(), role: Role, text: String, hasImage: Bool = false, isEmptyResult: Bool = false) {
+            self.id = id
+            self.role = role
+            self.text = text
+            self.hasImage = hasImage
+            self.isEmptyResult = isEmptyResult
+        }
     }
 
-    /// The current question text, bound to the sheet's text field.
+    /// The current draft question, bound to the input field.
     public var question: String = ""
 
-    /// Current state of the answer surface. `internal(set)` so only ``ask()``
-    /// and ``reset()`` mutate it while the view observes it.
-    public internal(set) var answer: AnswerState = .idle
+    /// The conversation so far, oldest first. `internal(set)` so only ``ask`` /
+    /// ``reset`` mutate it while the view observes it.
+    public internal(set) var turns: [Turn] = []
 
-    /// - Parameter intelligence: The on-device AI seam backing the helper. Pass
-    ///   `nil` (or an unavailable service) to model an unsupported device — the
-    ///   hub then omits the helper entry entirely.
+    /// `true` while an answer is in flight (drives the "Thinking" row + disables
+    /// send). `internal(set)` for the same reason.
+    public internal(set) var isResponding = false
+
     public init(intelligence: (any DODIntelligenceService)?) {
         self.intelligence = intelligence
     }
 
     /// `true` only when an on-device model is usable right now. The hub renders
     /// the "Ask Dutch Oven Daddy" entry ONLY when this is `true`, so unsupported
-    /// devices (iOS 17-25, incapable hardware, no Apple Intelligence) never see
-    /// a dead control.
+    /// devices never see a dead control.
     public var isAvailable: Bool {
         intelligence?.isAvailable ?? false
     }
 
-    /// Ask the on-device model the current ``question``, driving ``answer``
-    /// through `.loading` → `.loaded` / `.notFound`. No-op when no model is
-    /// available or the question is blank, so a spurious call can't open an
-    /// empty result. A `nil` service result becomes the graceful `.notFound`.
-    public func ask() async {
-        guard let intelligence, intelligence.isAvailable else { return }
+    /// `true` when the model can also take a photo as input (iOS 27+ capable
+    /// device). The sheet shows the photo-attach button ONLY when this is `true`.
+    public var supportsImageInput: Bool {
+        intelligence?.supportsImageInput ?? false
+    }
+
+    /// Ask the model the current ``question`` plus an optional attached photo
+    /// (`imageData`, JPEG/PNG bytes). Appends the user turn, clears the draft,
+    /// runs the model, then appends the assistant turn. No-op when unavailable or
+    /// when there is neither text nor an image. A `nil`/empty service result
+    /// becomes a graceful empty-result assistant turn.
+    public func ask(imageData: Data?) async {
+        guard let intelligence, intelligence.isAvailable, !isResponding else { return }
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        answer = .loading
-        let result = await intelligence.answer(trimmed)
-        // Guard against a stale completion: if the user reset or asked a
-        // different question while this awaited, don't clobber the newer state.
-        guard answer == .loading else { return }
+        guard !trimmed.isEmpty || imageData != nil else { return }
+
+        turns.append(Turn(role: .user, text: trimmed, hasImage: imageData != nil))
+        question = ""
+        isResponding = true
+
+        let result = await intelligence.answer(trimmed, imageData: imageData)
+
+        isResponding = false
         if let result, !result.isEmpty {
-            answer = .loaded(result)
+            turns.append(Turn(role: .assistant, text: result))
         } else {
-            answer = .notFound
+            turns.append(
+                Turn(
+                    role: .assistant,
+                    text: "I couldn't answer that one. Try rewording it, or attach a clearer photo.",
+                    isEmptyResult: true
+                )
+            )
         }
     }
 
-    /// Return the answer surface to `.idle` (e.g. when the sheet is dismissed).
+    /// Clear the conversation and draft (e.g. when the sheet is dismissed).
     public func reset() {
-        answer = .idle
+        turns = []
+        question = ""
+        isResponding = false
     }
 }

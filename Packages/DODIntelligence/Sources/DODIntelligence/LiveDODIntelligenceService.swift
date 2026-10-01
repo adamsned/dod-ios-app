@@ -1,7 +1,9 @@
 import Foundation
 
 #if os(iOS)
+import CoreGraphics
 import FoundationModels
+import ImageIO
 #endif
 
 /// Production ``DODIntelligenceService`` backed by Apple's on-device
@@ -26,6 +28,21 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
     public var isAvailable: Bool {
         #if os(iOS)
         if #available(iOS 26, *) {
+            if case .available = SystemLanguageModel.default.availability {
+                return true
+            }
+        }
+        return false
+        #else
+        return false
+        #endif
+    }
+
+    public var supportsImageInput: Bool {
+        // Image attachments are an iOS 27 FoundationModels capability; on iOS 26
+        // the model is text-only. Still requires the model to be available.
+        #if os(iOS)
+        if #available(iOS 27, *) {
             if case .available = SystemLanguageModel.default.availability {
                 return true
             }
@@ -71,15 +88,20 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #endif
     }
 
-    public func answer(_ question: String) async -> String? {
+    public func answer(_ question: String, imageData: Data?) async -> String? {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
+        // An image-only ask (no text) is allowed; a fully empty ask is not.
+        guard !trimmed.isEmpty || imageData != nil else { return nil }
         #if os(iOS)
-        if #available(iOS 26, *) {
-            return await Self.generateText(
-                instructions: Self.helperInstructions,
-                prompt: trimmed
-            )
+        if let imageData, #available(iOS 27, *) {
+            if let withImage = await Self.generateAnswer(question: trimmed, imageData: imageData) {
+                return withImage
+            }
+            // The image path yielded nothing (decode or model error); fall back
+            // to a text-only answer when there's still a question to answer.
+        }
+        if #available(iOS 26, *), !trimmed.isEmpty {
+            return await Self.generateText(instructions: Self.helperInstructions, prompt: trimmed)
         }
         return nil
         #else
@@ -105,6 +127,36 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         }
     }
 
+    /// One image-grounded answer turn (iOS 27+). Decodes the attached photo and
+    /// hands the model a multimodal prompt (text + image) so it can base its help
+    /// on what it actually sees. Any error (bad image bytes, guardrail, model
+    /// error) is swallowed to `nil` so the caller can fall back to text.
+    @available(iOS 27, *)
+    private static func generateAnswer(question: String, imageData: Data) async -> String? {
+        guard case .available = SystemLanguageModel.default.availability else { return nil }
+        guard let cgImage = decodeCGImage(from: imageData) else { return nil }
+        let session = LanguageModelSession(instructions: helperInstructions)
+        let text = question.isEmpty ? "Look at this photo and help me with it." : question
+        do {
+            let reply = try await session.respond {
+                text
+                Attachment(cgImage)
+            }
+            let answer = reply.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            return answer.isEmpty ? nil : answer
+        } catch {
+            return nil
+        }
+    }
+
+    /// Decode JPEG/PNG bytes into a `CGImage` for a FoundationModels image
+    /// attachment. Returns `nil` on undecodable bytes so the caller degrades.
+    @available(iOS 27, *)
+    private static func decodeCGImage(from data: Data) -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
     /// Instructions for the recipe/article summary surface (T-932).
     @available(iOS 26, *)
     private static let summaryInstructions = """
@@ -113,13 +165,31 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         what to expect. Do not invent details that are not in the text.
         """
 
-    /// Instructions for the Cooking Tools question helper (T-934).
+    /// Instructions for the "Ask Dutch Oven Daddy" helper (T-934 / DUT-1382).
+    ///
+    /// Scope is any cooking or kitchen question (not just cast iron), and
+    /// accuracy comes before folklore: the model is told to use correct,
+    /// up-to-date knowledge and is given the soap example explicitly, because the
+    /// old prompt let it repeat the "never use soap on cast iron" myth.
     @available(iOS 26, *)
     private static let helperInstructions = """
-        You are a friendly cast-iron and Dutch-oven cooking expert. Answer the \
-        cook's question with practical, safe, step-by-step guidance in a short \
-        paragraph. Stick to cast iron, Dutch ovens, and cooking technique; if a \
-        question is outside that, say so briefly.
+        You are Dutch Oven Daddy's friendly cooking assistant. You know cast iron \
+        and Dutch ovens deeply, but you help with ANY cooking or kitchen \
+        question: techniques, recipes, ingredient swaps, measurement conversions \
+        (for example how many cups are in a gallon), food safety, and equipment. \
+        Never refuse a cooking or kitchen question for being off topic; just \
+        answer it. Only decline if a question has nothing to do with cooking or \
+        the kitchen, and then say so briefly.
+
+        Use broad, accurate, up-to-date knowledge, and value being correct over \
+        being folksy. Do not repeat outdated kitchen myths. For example, a small \
+        amount of mild dish soap is fine on modern seasoned cast iron and does \
+        not ruin the seasoning; the old "never use soap" rule came from lye-based \
+        soaps that no longer exist.
+
+        Answer in a short, practical paragraph a home cook can act on. Be warm \
+        but concise. Do not use em dashes; use periods or commas instead. When a \
+        photo is attached, look at it and base your help on what you actually see.
         """
     #endif
 }

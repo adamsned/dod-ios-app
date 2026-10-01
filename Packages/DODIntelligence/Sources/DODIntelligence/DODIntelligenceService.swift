@@ -31,6 +31,12 @@ public protocol DODIntelligenceService: Sendable {
     /// on this so unsupported devices see no dead controls.
     var isAvailable: Bool { get }
 
+    /// `true` only when the on-device model can additionally take an IMAGE as
+    /// input (iOS 27+ with a capable, available model). Callers gate the
+    /// photo-attach affordance on this so devices that can run text but not
+    /// vision never show a dead camera button. Implies ``isAvailable``.
+    var supportsImageInput: Bool { get }
+
     /// Suggest what to do about an ingredient the cook wants to change, weighing
     /// its role in the actual dish (``RecipeContext``) and why they want to swap
     /// it (``SubstitutionReason``). `context: nil` asks in isolation;
@@ -54,11 +60,14 @@ public protocol DODIntelligenceService: Sendable {
     /// affordance degrades gracefully.
     func summarize(_ text: String) async -> String?
 
-    /// Answer an on-device cast-iron / Dutch-oven / cooking-technique question
-    /// for the Cooking Tools helper (US-54 / T-934). Returns `nil` — never
-    /// throws — on unavailability / empty input / model error / guardrail
-    /// rejection, so the helper degrades gracefully.
-    func answer(_ question: String) async -> String?
+    /// Answer an on-device cooking / kitchen question for the "Ask Dutch Oven
+    /// Daddy" helper (US-54 / T-934). `imageData` is an optional JPEG/PNG the
+    /// cook attached (passed as `Data` so it stays `Sendable` across the actor
+    /// hop); the model looks at it when ``supportsImageInput`` is `true` and
+    /// otherwise answers from the text alone. Returns `nil` — never throws — on
+    /// unavailability / empty input (no text AND no image) / model error /
+    /// guardrail rejection, so the helper degrades gracefully.
+    func answer(_ question: String, imageData: Data?) async -> String?
 }
 
 extension DODIntelligenceService {
@@ -67,5 +76,11 @@ extension DODIntelligenceService {
     /// call sites that don't model either stay terse.
     public func suggestSubstitution(for ingredient: String) async -> SubstitutionResult? {
         await suggestSubstitution(for: ingredient, in: nil, reason: nil)
+    }
+
+    /// Convenience for a text-only question, so existing call sites and previews
+    /// that don't attach an image stay terse.
+    public func answer(_ question: String) async -> String? {
+        await answer(question, imageData: nil)
     }
 }
