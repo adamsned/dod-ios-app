@@ -42,11 +42,20 @@ struct SavedRecipesWidgetEntryView: View {
         .widgetURL(Self.savedFallbackURL)
     }
 
-    // MARK: - Small (up to 2 entries) — widget layout parity
+    // MARK: - Small (1 entry) — DUT-1381
 
-    // DUT-1381 — Small's rows are narrow, so allow 3 title lines (Medium/Large stay at 2).
+    /// Newest saved recipe: photo with its name centred over it (same look as
+    /// the Latest small widget). The whole tile links to that recipe.
+    @ViewBuilder
     private var smallBody: some View {
-        savedListBody(maxRows: WidgetCard.SavedSmall.maxRows, rowLines: 3)
+        if let first = entry.entries.first {
+            let url = Self.deepLink(for: first) ?? Self.savedFallbackURL
+            Link(destination: url) {
+                WidgetCard.SavedSmall(rows: [Self.row(from: first)])
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Self.rowAccessibilityLabel(for: first))
+        }
     }
 
     // MARK: - Medium (up to 3 entries)
@@ -66,7 +75,7 @@ struct SavedRecipesWidgetEntryView: View {
     /// Shared saved-list layout for the medium (3) and large (5) sizes: the
     /// "Saved" eyebrow + up to `maxRows` per-row `Link`s (each deep-links to
     /// its recipe; gaps fall through to the chrome's `dod://saved`).
-    private func savedListBody(maxRows: Int, rowLines: Int = 2) -> some View {
+    private func savedListBody(maxRows: Int) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             Text("Saved")
                 .font(.system(.caption2, design: .default, weight: .semibold))
@@ -78,7 +87,7 @@ struct SavedRecipesWidgetEntryView: View {
                 ForEach(Array(entry.entries.prefix(maxRows))) { snapshotEntry in
                     let url = Self.deepLink(for: snapshotEntry) ?? Self.savedFallbackURL
                     Link(destination: url) {
-                        WidgetCard.SavedListRow(row: Self.row(from: snapshotEntry), maxLines: rowLines)
+                        WidgetCard.SavedListRow(row: Self.row(from: snapshotEntry))
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(Self.rowAccessibilityLabel(for: snapshotEntry))
