@@ -42,9 +42,21 @@ struct SavedRecipesWidgetEntryView: View {
         .widgetURL(Self.savedFallbackURL)
     }
 
-    // MARK: - Small (up to 2 entries) — widget layout parity
+    // MARK: - Small (1 entry) — DUT-1381
 
-    private var smallBody: some View { savedListBody(maxRows: WidgetCard.SavedSmall.maxRows) }
+    /// Newest saved recipe: photo with its name centred over it (same look as
+    /// the Latest small widget). The whole tile links to that recipe.
+    @ViewBuilder
+    private var smallBody: some View {
+        if let first = entry.entries.first {
+            let url = Self.deepLink(for: first) ?? Self.savedFallbackURL
+            Link(destination: url) {
+                WidgetCard.SavedSmall(rows: [Self.row(from: first)])
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Self.rowAccessibilityLabel(for: first))
+        }
+    }
 
     // MARK: - Medium (up to 3 entries)
 

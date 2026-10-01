@@ -30,10 +30,12 @@ extension WidgetCard {
         }
     }
 
-    /// Compact small-widget layout: the "Saved" eyebrow + up to two
-    /// thumbnail-left / title-right rows — the SAME list format as
-    /// ``SavedMedium``, just capped shorter for the square 158×158pt frame
-    /// (widget layout parity). Caller trims the array to at most ``maxRows``.
+    /// Small saved-widget layout (DUT-1381): the most recently saved recipe's
+    /// photo with its name centred over it, the same look as the Latest small
+    /// widget (``Small``), so a long name is never squeezed into a narrow
+    /// title column beside a thumbnail. Tinted/Vibrant handling comes from
+    /// ``Small`` (title on the container, DUT-9). Caller passes the saved rows
+    /// newest-first; only the first is shown.
     public struct SavedSmall: View {
 
         public let rows: [SavedRow]
@@ -42,30 +44,13 @@ extension WidgetCard {
             self.rows = rows
         }
 
-        /// Max rows the small size renders. The square tile fits two
-        /// thumbnail rows under the eyebrow without cramping.
-        public static let maxRows = 2
+        /// The small size shows a single recipe.
+        public static let maxRows = 1
 
         public var body: some View {
-            VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                Text("Saved")
-                    .font(.system(.caption2, design: .default, weight: .semibold))
-                    .foregroundStyle(DODColor.burntOrange)
-                    .textCase(.uppercase)
-                    .tracking(0.5)
-
-                VStack(spacing: DODSpacing.xs) {
-                    ForEach(Array(rows.prefix(Self.maxRows).enumerated()), id: \.offset) { _, row in
-                        SavedListRow(row: row)
-                    }
-                    if rows.count < Self.maxRows {
-                        Spacer(minLength: 0)
-                    }
-                }
+            if let row = rows.first {
+                Small(content: Content(title: row.title, excerpt: "", heroImageURL: row.heroImageURL))
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(DODSpacing.sm)
-            // T-767 / CL-164 — background owned by `containerBackground` (Tinted-safe).
         }
     }
 
