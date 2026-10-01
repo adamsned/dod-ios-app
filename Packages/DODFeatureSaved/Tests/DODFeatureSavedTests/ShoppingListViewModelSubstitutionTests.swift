@@ -37,6 +37,7 @@ struct ShoppingListViewModelSubstitutionTests {
     /// recipe-aware wiring test.
     private final class CapturingIntelligence: DODIntelligenceService, @unchecked Sendable {
         let isAvailable = true
+        let supportsImageInput = false
         private(set) var capturedContext: RecipeContext?
         private let result: SubstitutionResult?
         init(result: SubstitutionResult?) { self.result = result }
@@ -49,7 +50,7 @@ struct ShoppingListViewModelSubstitutionTests {
             return result
         }
         func summarize(_ text: String) async -> String? { nil }
-        func answer(_ question: String) async -> String? { nil }
+        func answer(_ question: String, imageData: Data?) async -> String? { nil }
     }
 
     // MARK: - Availability gate
