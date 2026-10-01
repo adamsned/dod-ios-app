@@ -56,7 +56,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Take a photo of your finished cook to share it and tag Dutch Oven Daddy.</string>
+	<string>Take a photo to share your cook or to get cooking help from Dutch Oven Daddy.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>

@@ -130,6 +130,22 @@ struct DODIntelligenceServiceTests {
         #expect(await unavailable.answer("q") == nil)
     }
 
+    /// `answer(_:imageData:)` returns the canned answer whether or not a photo is
+    /// attached (the fake ignores the bytes); the live model path is iOS-only.
+    @Test func fakeAnswerAcceptsImageData() async {
+        let service = FakeIntelligenceService(answer: "A")
+        #expect(await service.answer("what's wrong with this pan?", imageData: Data([0x01])) == "A")
+        #expect(await service.answer("text only", imageData: nil) == "A")
+    }
+
+    /// Image support is injectable on the fake and `false` on the live service
+    /// without a model (the macOS test host / unsupported device).
+    @Test func imageSupportGating() {
+        #expect(FakeIntelligenceService(supportsImageInput: true).supportsImageInput)
+        #expect(!FakeIntelligenceService(supportsImageInput: false).supportsImageInput)
+        #expect(!LiveDODIntelligenceService().supportsImageInput)
+    }
+
     /// Every reason maps to a non-empty Title Case label + a prompt clause.
     @Test func substitutionReasonsHaveLabelsAndClauses() {
         for reason in SubstitutionReason.allCases {

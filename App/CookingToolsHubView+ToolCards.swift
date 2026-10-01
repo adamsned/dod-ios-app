@@ -78,8 +78,8 @@ extension CookingToolsHubView {
                     toolCard(
                         icon: "sparkles",
                         title: "Ask Dutch Oven Daddy",
-                        description: "Get on-device answers to your cast iron, Dutch oven, "
-                            + "and technique questions.",
+                        description: "Ask anything about cooking or cast iron, or attach a photo "
+                            + "for help. Runs on your device.",
                         accessibilityID: "hub-cooking-helper",
                         action: action
                     )
