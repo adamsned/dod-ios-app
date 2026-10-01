@@ -88,7 +88,7 @@ public struct CookingHelperSheet: View {
                 .foregroundStyle(DODColor.label)
                 .multilineTextAlignment(.center)
             Text(
-                "Cast iron, Dutch ovens, techniques, recipe conversions, or attach a photo of your pan or dish for a hand."
+                "Cast iron, Dutch ovens, techniques, recipe conversions, or attach a photo for help."
             )
             .dodFont(DODType.body)
             .foregroundStyle(DODColor.labelSecondary)
