@@ -56,7 +56,7 @@ extension WidgetCard {
 
                 VStack(spacing: DODSpacing.xs) {
                     ForEach(Array(rows.prefix(Self.maxRows).enumerated()), id: \.offset) { _, row in
-                        SavedListRow(row: row)
+                        SavedListRow(row: row, maxLines: 3)
                     }
                     if rows.count < Self.maxRows {
                         Spacer(minLength: 0)
@@ -142,9 +142,14 @@ extension WidgetCard {
     public struct SavedListRow: View {
 
         public let row: SavedRow
+        /// DUT-1381 — Medium/Large keep 2 lines (unchanged). Small is only ~100pt
+        /// wide beside the thumbnail, so it passes 3 (+ a little scaling) so a
+        /// long recipe name isn't ellipsized.
+        public let maxLines: Int
 
-        public init(row: SavedRow) {
+        public init(row: SavedRow, maxLines: Int = 2) {
             self.row = row
+            self.maxLines = maxLines
         }
 
         public var body: some View {
@@ -156,7 +161,8 @@ extension WidgetCard {
                 Text(row.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))
                     .foregroundStyle(DODColor.label)
-                    .lineLimit(2)
+                    .lineLimit(maxLines)
+                    .minimumScaleFactor(maxLines > 2 ? 0.85 : 1)
                     .multilineTextAlignment(.leading)
 
                 Spacer(minLength: 0)
