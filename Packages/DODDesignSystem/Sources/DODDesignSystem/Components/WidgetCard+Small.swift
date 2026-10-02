@@ -42,21 +42,27 @@ extension WidgetCard {
             #endif
         }
 
-        /// Standard-mode look: the recipe/article name centred over the hero
-        /// photo (widget layout parity — no bottom rectangle band). A full-card
-        /// gradient scrim darkens the whole photo just enough for the centred
-        /// title to read on any image. Legible because `.fullColor` shows the
-        /// real photo; the Tinted/Vibrant path (``RenderingModeAwareSmall``)
-        /// still anchors the title on the container where contrast is
-        /// guaranteed (DUT-9).
+        /// Standard-mode look (DUT-1384): the recipe/article name centred over
+        /// the hero photo, the orange "Latest Article / Latest Recipe" eyebrow
+        /// in the top-left corner, and (recipes only) the cook-time badge in the
+        /// opposite, bottom-right corner. A gradient darkens the top edge (for
+        /// the eyebrow) and the lower half (for the title) so both read on any
+        /// photo. The hero sits in a `Color.clear` overlay so a non-square photo
+        /// can never grow the card. Tinted/Vibrant keeps the container-anchored
+        /// title in ``RenderingModeAwareSmall`` (DUT-9).
         @ViewBuilder
         static func overlayLayout(content: Content) -> some View {
             ZStack {
-                Hero(url: content.heroImageURL)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Color.clear
+                    .overlay { Hero(url: content.heroImageURL) }
+                    .clipped()
 
                 LinearGradient(
-                    colors: [.black.opacity(0.25), .black.opacity(0.55)],
+                    stops: [
+                        .init(color: .black.opacity(0.65), location: 0),
+                        .init(color: .black.opacity(0.25), location: 0.35),
+                        .init(color: .black.opacity(0.55), location: 1),
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -67,8 +73,30 @@ extension WidgetCard {
                     .lineLimit(4)
                     .minimumScaleFactor(0.6)
                     .multilineTextAlignment(.center)
-                    .padding(DODSpacing.sm)
+                    .padding(.horizontal, DODSpacing.sm)
+                    // Keeps the centred title clear of the corner eyebrow + badge.
+                    .padding(.vertical, DODSpacing.lg + DODSpacing.xxs)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        Text(content.eyebrow)
+                            .font(.system(.caption2, design: .default, weight: .semibold))
+                            .foregroundStyle(DODColor.burntOrange)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    Spacer(minLength: 0)
+                    if let totalTime = content.totalTimeDisplay {
+                        HStack {
+                            Spacer(minLength: 0)
+                            TimeChip(text: totalTime)
+                        }
+                    }
+                }
+                .padding(DODSpacing.sm)
             }
         }
     }

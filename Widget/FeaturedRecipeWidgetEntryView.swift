@@ -99,7 +99,10 @@ struct FeaturedRecipeWidgetEntryView: View {
             excerpt: recipe.excerpt,
             heroImageURL: heroFileURL,
             totalTimeDisplay: recipe.totalTimeDisplay,
-            eyebrow: Self.eyebrow(for: recipe, mode: mode)
+            eyebrow: Self.eyebrow(for: recipe, mode: mode),
+            // DUT-1384 — same article/recipe call the eyebrow makes, so the Large
+            // card hides the excerpt exactly when the eyebrow says "Article".
+            isArticle: LatestWidgetEyebrowKind.resolve(isArticle: recipe.isArticle, mode: mode.eyebrowMode) == .article
         )
     }
 
