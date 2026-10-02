@@ -33,6 +33,10 @@ struct ArticleDetailView: View {
 
     let recipe: Recipe
 
+    /// DUT-1386 — runs the on-device summary; `nil` hides the Summarize link
+    /// (no model / nothing to summarize). Supplied by `RecipeDetailView`.
+    let onSummarize: (() -> Void)?
+
     /// T-806 — caps the article body to a centered reading column on iPad
     /// (`.regular`); iPhone (`.compact`) is byte-identical (the modifier
     /// returns the content unchanged), so the L4 article snapshots don't move.
@@ -44,8 +48,9 @@ struct ArticleDetailView: View {
     /// milliseconds, so the one-time cost on article open is invisible.
     @State private var blocks: [ArticleBlock]
 
-    init(recipe: Recipe) {
+    init(recipe: Recipe, onSummarize: (() -> Void)? = nil) {
         self.recipe = recipe
+        self.onSummarize = onSummarize
         // DUT-654: thread the post's canonical URL as the parse base URL so
         // protocol-/root-relative body-image sources in the article HTML resolve
         // to absolute http(s) URLs (matches the blurb/recipe path in
@@ -74,6 +79,9 @@ struct ArticleDetailView: View {
                     )
 
                     VStack(alignment: .leading, spacing: DODSpacing.md) {
+                        if let onSummarize {
+                            SummarizeButton(action: onSummarize)
+                        }
                         publishedDateCaption
                         articleBody
                     }
