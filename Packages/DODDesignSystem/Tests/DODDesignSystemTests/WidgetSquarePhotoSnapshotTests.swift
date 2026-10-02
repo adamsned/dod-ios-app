@@ -2,6 +2,7 @@
 import SnapshotTesting
 import SwiftUI
 import UIKit
+import WidgetKit
 import XCTest
 
 @testable import DODDesignSystem
@@ -84,6 +85,25 @@ final class WidgetSquarePhotoSnapshotTests: XCTestCase {
     /// Small recipe: centred title, eyebrow top-left, time badge bottom-right.
     func test_featuredSmall_squarePhoto_recipe() {
         assertWidget(WidgetCard.Small(content: Self.recipe), width: 158, height: 158)
+    }
+
+    /// DUT-1390 — Clear / Tinted home screens (`.accented`) get the SAME Plain
+    /// Header card as Standard, rasterized into one full-colour image so the
+    /// system tint can't recolour the title.
+    func test_featuredSmall_squarePhoto_recipe_accented() {
+        assertWidget(
+            WidgetCard.Small(content: Self.recipe).environment(\.widgetRenderingMode, .accented),
+            width: 158,
+            height: 158
+        )
+    }
+
+    func test_featuredSmall_squarePhoto_article_accented() {
+        assertWidget(
+            WidgetCard.Small(content: Self.article).environment(\.widgetRenderingMode, .accented),
+            width: 158,
+            height: 158
+        )
     }
 }
 #endif
