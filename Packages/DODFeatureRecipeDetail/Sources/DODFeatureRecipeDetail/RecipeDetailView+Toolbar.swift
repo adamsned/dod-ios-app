@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODDomain
+import DODSupport
 import SwiftUI
 
 #if canImport(UIKit)
@@ -50,6 +51,11 @@ extension RecipeDetailView {
                     Task { await viewModel.toggleSaved() }
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
+                // DUT-1388 — a Siri save of THIS recipe refreshes the glyph.
+                .onReceive(NotificationCenter.default.publisher(for: .dodSavedSetDidChange)) { note in
+                    guard (note.object as? Int) == viewModel.listItem.id else { return }
+                    Task { await viewModel.refreshSavedState() }
+                }
 
                 // US-39 / DUT-534 / DUT-535 — "Add to Shopping List" from ANY
                 // recipe (not just saved). DUT-535: tapping now PRESENTS the

@@ -98,3 +98,73 @@ struct ResumeVoiceIntent: AppIntent {
         return .result()
     }
 }
+
+/// DUT-1388 — ONE App Shortcut for all five hands-free commands.
+///
+/// Apple caps an app at 10 App Shortcuts, and the five voice commands above
+/// used five of them. This intent takes the command as an `AppEnum` whose case
+/// titles + synonyms are exactly the old phrases' verbs, so the single phrase
+/// "\(command) in Dutch Oven Daddy" still matches "Next step", "Go back",
+/// "Say that again", "Pause", "Continue reading", and the rest. The five
+/// single-purpose intents stay (Shortcuts the cook already built keep working);
+/// they just no longer register their own App Shortcut.
+struct CookModeCommandIntent: AppIntent {
+
+    static let title: LocalizedStringResource = "Cook Mode Command"
+    static let description = IntentDescription(
+        "Moves between steps or pauses and resumes reading in Cook Mode."
+    )
+
+    @Parameter(title: "Command")
+    var command: CookModeCommandOption
+
+    init() {}
+
+    init(command: CookModeCommandOption) {
+        self.command = command
+    }
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("\(\.$command) in Cook Mode")
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        VoiceCommandBus.shared.dispatch(command.voiceCommand)
+        return .result()
+    }
+}
+
+/// The spoken command. Titles + synonyms ARE the Siri vocabulary (see
+/// ``CookModeCommandIntent``), carried over from the five retired App Shortcuts.
+enum CookModeCommandOption: String, AppEnum {
+    case next
+    case previous
+    case `repeat`
+    case pause
+    case resume
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Cook Mode Command")
+    }
+
+    static var caseDisplayRepresentations: [CookModeCommandOption: DisplayRepresentation] {
+        [
+            .next: DisplayRepresentation(title: "Next step", synonyms: ["Next", "Go forward"]),
+            .previous: DisplayRepresentation(title: "Previous step", synonyms: ["Go back", "Back"]),
+            .repeat: DisplayRepresentation(title: "Repeat step", synonyms: ["Repeat that", "Say that again"]),
+            .pause: DisplayRepresentation(title: "Pause reading", synonyms: ["Pause"]),
+            .resume: DisplayRepresentation(title: "Resume reading", synonyms: ["Continue reading"]),
+        ]
+    }
+
+    var voiceCommand: VoiceCommand {
+        switch self {
+        case .next: .next
+        case .previous: .previous
+        case .repeat: .repeat
+        case .pause: .pause
+        case .resume: .resume
+        }
+    }
+}

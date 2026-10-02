@@ -144,7 +144,10 @@ extension TabStack {
         )
         .onAppear {
             Telemetry.shared.send(.screenView(name: "recipe_detail"))
+            // DUT-1388 — "this recipe" for Siri (Save / Add / Start Cook Mode).
+            OnscreenRecipe.shared.show(.fromListItem(item))
         }
+        .onDisappear { OnscreenRecipe.shared.hide(id: item.id) }
     }
 
     @ViewBuilder

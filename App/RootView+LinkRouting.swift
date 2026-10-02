@@ -102,6 +102,11 @@ extension RootView {
             selectedTab = .saved
             // DUT-734: land on the Saved list root (see `handle(widgetLink:)`).
             tabPaths[.saved] = []
+        case .openCollection(let id):
+            // DUT-1388 — Saved root, narrowed to the collection's shelf filter.
+            selectedTab = .saved
+            tabPaths[.saved] = []
+            savedCollectionRequest = id
         case .openRecipe(let id):
             selectedTab = .feed
             Task { @MainActor in

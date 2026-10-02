@@ -38,7 +38,11 @@ struct DODApp: App {
         // SettingsView keep it in sync on later changes.
         DODColor.isOLEDDark = AppearancePreference.fromDefaults(.standard).isOLEDDark
         // 3. Only now build the composition root (and with it the container).
-        _dependencies = State(initialValue: AppDependencies())
+        let dependencies = AppDependencies()
+        // 4. DUT-1388 — hand the Siri / Shortcuts intents their services now, not
+        //    in the scene `.task`: a background intent launch has no scene.
+        dependencies.registerAppIntents()
+        _dependencies = State(initialValue: dependencies)
     }
 
     /// One-time resolution of the iCloud-Sync opt-in default (fresh installs ON,
