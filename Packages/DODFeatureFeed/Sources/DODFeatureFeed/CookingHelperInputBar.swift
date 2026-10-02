@@ -17,6 +17,8 @@ import UIKit
 struct CookingHelperInputBar: View {
 
     @Bindable var viewModel: CookingHelperViewModel
+    /// The field's placeholder (general helper vs Cook Mode's recipe chat).
+    var placeholder = "Ask about cooking or cast iron"
     /// Fired on send with the attached photo's JPEG bytes, or `nil` for a
     /// text-only ask. The sheet calls `viewModel.ask(imageData:)` with it.
     let onSend: (Data?) -> Void
@@ -77,7 +79,7 @@ struct CookingHelperInputBar: View {
 
     private var inputField: some View {
         HStack(alignment: .bottom, spacing: DODSpacing.xxs) {
-            TextField("Ask about cooking or cast iron", text: $viewModel.question, axis: .vertical)
+            TextField(placeholder, text: $viewModel.question, axis: .vertical)
                 .lineLimit(1...5)
                 .dodFont(DODType.body)
                 .textFieldStyle(.plain)

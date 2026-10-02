@@ -58,7 +58,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         return cannedSummary
     }
 
-    public func answer(_ question: String, imageData: Data?) async -> String? {
+    public func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? {
         guard isAvailable else { return nil }
         return cannedAnswer
     }

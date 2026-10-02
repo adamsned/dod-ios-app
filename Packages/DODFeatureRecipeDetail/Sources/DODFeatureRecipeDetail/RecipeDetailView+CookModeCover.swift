@@ -27,7 +27,8 @@ extension RecipeDetailView {
                 // heat-related Cook Mode step can present Heat Coach OVER the
                 // cover (a tab switch would be invisible under the full-screen
                 // cover). Nil when the host doesn't wire hub routing.
-                heatCoachSheet: heatCoachSheet
+                heatCoachSheet: cookModeSheets.heatCoach,
+                askSheet: cookModeSheets.askAboutRecipe
             )
         }
     }

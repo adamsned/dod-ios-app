@@ -134,7 +134,12 @@ extension TabStack {
             // as a sheet over the full-screen cover (a tab switch would be
             // invisible beneath it).
             openHeatCoach: openHeatCoach,
-            heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) },
+            // DUT-1385 — plus the "Ask About This Recipe" chat over Cook Mode
+            // (nil when the on-device model can't run, hiding the button).
+            cookModeSheets: CookModeSheets(
+                heatCoach: { AnyView(NavigationStack { HeatCoachView() }) },
+                askAboutRecipe: dependencies.recipeChatSheetBuilder()
+            ),
             topInsetOverride: topInsetOverride
         )
         .onAppear {

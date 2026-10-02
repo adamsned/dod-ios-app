@@ -100,7 +100,7 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #endif
     }
 
-    public func answer(_ question: String, imageData: Data?) async -> String? {
+    public func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         // An image-only ask (no text) is allowed; a fully empty ask is not.
         guard !trimmed.isEmpty || imageData != nil else { return nil }
@@ -108,7 +108,11 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #if compiler(>=6.4)
         // Image path is iOS-27-SDK-only (compiled out on older toolchains).
         if let imageData, #available(iOS 27, *) {
-            if let withImage = await Self.generateAnswer(question: trimmed, imageData: imageData) {
+            if let withImage = await Self.generateAnswer(
+                question: trimmed,
+                imageData: imageData,
+                recipeContext: recipeContext
+            ) {
                 return withImage
             }
             // The image path yielded nothing (decode or model error); fall back
@@ -116,12 +120,29 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         }
         #endif
         if #available(iOS 26, *), !trimmed.isEmpty {
-            return await Self.generateText(instructions: Self.helperInstructions, prompt: trimmed)
+            return await Self.generateText(
+                instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
+                prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
+            )
         }
         return nil
         #else
         return nil
         #endif
+    }
+
+    /// DUT-1385 — the user turn for the helper chat. With a recipe, the recipe
+    /// text (capped so a long recipe stays inside the context window) precedes
+    /// the question; without one it is just the question.
+    static func chatPrompt(question: String, recipeContext: String?) -> String {
+        guard let recipeContext, !recipeContext.isEmpty else { return question }
+        return """
+            Here is the recipe the cook is making right now:
+
+            \(String(recipeContext.prefix(6000)))
+
+            Their question: \(question)
+            """
     }
 
     #if os(iOS)
@@ -151,11 +172,16 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
     /// on what it actually sees. Any error (bad image bytes, guardrail, model
     /// error) is swallowed to `nil` so the caller can fall back to text.
     @available(iOS 27, *)
-    private static func generateAnswer(question: String, imageData: Data) async -> String? {
+    private static func generateAnswer(question: String, imageData: Data, recipeContext: String?) async -> String? {
         guard case .available = SystemLanguageModel.default.availability else { return nil }
         guard let cgImage = decodeCGImage(from: imageData) else { return nil }
-        let session = LanguageModelSession(instructions: helperInstructions)
-        let text = question.isEmpty ? "Look at this photo and help me with it." : question
+        let session = LanguageModelSession(
+            instructions: recipeContext == nil ? helperInstructions : recipeChatInstructions
+        )
+        let text = chatPrompt(
+            question: question.isEmpty ? "Look at this photo and help me with it." : question,
+            recipeContext: recipeContext
+        )
         do {
             let reply = try await session.respond {
                 text
@@ -210,6 +236,25 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         Answer in a short, practical paragraph a home cook can act on. Be warm \
         but concise. Do not use em dashes; use periods or commas instead. When a \
         photo is attached, look at it and base your help on what you actually see.
+        """
+
+    /// DUT-1385 — instructions for Cook Mode's "Ask About This Recipe" chat:
+    /// answers stay scoped to the one recipe, and the recipe text is the source
+    /// of truth for amounts and times.
+    @available(iOS 26, *)
+    private static let recipeChatInstructions = """
+        You are Dutch Oven Daddy's cooking assistant, helping someone who is \
+        cooking the recipe they give you right now. Answer questions about this \
+        recipe only: its ingredients and amounts, steps, timing, doneness, prep \
+        and make-ahead, scaling, and swaps within it. Treat the recipe text as \
+        the source of truth and quote its amounts and times exactly. If the \
+        recipe does not say, give practical guidance and mention that the recipe \
+        does not specify it. If a question has nothing to do with this recipe or \
+        cooking it, say briefly that you can only help with this recipe.
+
+        Answer in a short, practical paragraph. Do not use em dashes; use periods \
+        or commas instead. When a photo is attached, relate what you see to this \
+        recipe.
         """
     #endif
 }
