@@ -27,9 +27,17 @@ on:
   # `release-*`) to trigger an automated TestFlight build. Tags are a
   # deliberate, auditable release signal - unlike push-to-main, which would
   # fire an upload on every merge.
+  #
+  # Opt-in merge trigger: a push to main or v2 builds ONLY when the pushed
+  # commit's message contains `[testflight]`. Put `[testflight]` in a PR title
+  # and the squash-merge commit carries it, so the build starts on merge with
+  # nobody watching. Every other push is filtered out by the job-level `if:`.
   push:
     tags:
       - "release-*"
+    branches:
+      - main
+      - v2
 
 # Never run two releases at once: a second upload racing the first can land
 # a lower build number after a higher one. Do NOT cancel an in-flight
@@ -47,6 +55,12 @@ permissions:
 jobs:
   testflight:
     name: Archive + upload to TestFlight
+    # Tags and manual runs always build; branch pushes only with `[testflight]`
+    # in the commit message (see the `push:` trigger note above).
+    if: >-
+      ${{ github.event_name != 'push'
+          || startsWith(github.ref, 'refs/tags/')
+          || contains(github.event.head_commit.message, '[testflight]') }}
     runs-on: macos-15
     timeout-minutes: 45
     env:
