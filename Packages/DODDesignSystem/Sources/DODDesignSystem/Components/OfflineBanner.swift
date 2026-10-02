@@ -31,7 +31,7 @@ public struct OfflineBanner: View {
             .padding(.horizontal, DODSpacing.md)
             .padding(.vertical, DODSpacing.xs)
             .frame(maxWidth: .infinity)
-            .background(DODColor.castIronBrown)
+            .background(DODColor.popupSurface)
             .transition(.move(edge: .top).combined(with: .opacity))
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Offline. \(message)")

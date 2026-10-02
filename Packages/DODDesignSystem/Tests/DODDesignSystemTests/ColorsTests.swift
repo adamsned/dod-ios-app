@@ -92,5 +92,24 @@ import UIKit
         #expect(rgb(DODColor.surface, dark) == [0x1B, 0x14, 0x0E])
         #expect(rgb(DODColor.surface, dark) != [0x00, 0x00, 0x00])
     }
+
+    /// DUT-1340 — the popup surface (Snackbar / OfflineBanner background) swaps
+    /// the brand cast-iron brown for the elevated OLED gray in Seasoned Cast
+    /// Iron dark, so a warm brown popup no longer stands out against the
+    /// near-black theme.
+    @Test func popupSurfaceGoesOLEDGrayInSeasonedCastIronDark() {
+        DODColor.isOLEDDark = true
+        #expect(rgb(DODColor.popupSurface, dark) == [0x1C, 0x1C, 0x1E])
+    }
+
+    /// DUT-1340 — outside Seasoned Cast Iron the popup surface is byte-identical
+    /// to the raw `castIronBrown`, so Cocoa / light (and the L4 snapshots that
+    /// render them) are untouched.
+    @Test func popupSurfaceStaysBrandBrownWhenNotOLED() {
+        DODColor.isOLEDDark = false
+        #expect(rgb(DODColor.popupSurface, dark) == rgb(DODColor.castIronBrown, dark))
+        #expect(rgb(DODColor.popupSurface, light) == rgb(DODColor.castIronBrown, light))
+        #expect(rgb(DODColor.popupSurface, dark) != [0x1C, 0x1C, 0x1E])
+    }
 }
 #endif

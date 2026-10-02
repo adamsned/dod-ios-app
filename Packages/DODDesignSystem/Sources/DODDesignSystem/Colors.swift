@@ -70,6 +70,19 @@ public enum DODColor {
     /// v2 OLED — dark trait + ``isOLEDDark`` resolves to the OLED separator gray
     /// `#38383A`.
     public static var surfaceDivider: Color { themedSurface("SurfaceDivider", oledDark: 0x38383A) }
+
+    /// Background for floating popup surfaces that carry the brand cast-iron
+    /// brown — the ``Snackbar`` toast and the ``OfflineBanner`` (DUT-1340).
+    ///
+    /// Resolves to the ``castIronBrown`` asset for every appearance EXCEPT the
+    /// true-OLED "Seasoned Cast Iron" theme in the dark trait, where a warm brown
+    /// popup clashes against the near-black surfaces (it read as a stray "Cocoa"
+    /// panel). There it resolves to the elevated OLED gray `#1C1C1E` — the same
+    /// value ``surfaceElevated`` uses — so the popup reads as part of the theme.
+    /// The cream text + warm-gold action keep the brand warmth on top. Every
+    /// non-OLED appearance is byte-identical to the old raw `castIronBrown`, so
+    /// Cocoa / light (and the L4 snapshots that render them) are unchanged.
+    public static var popupSurface: Color { themedSurface("CastIronBrown", oledDark: 0x1C1C1E) }
     /// Primary body text color.
     public static let label = bundleColor("Label")
     /// Maximum-contrast label for large screen titles (``DODScreenHeader``).
