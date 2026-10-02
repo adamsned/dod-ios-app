@@ -67,7 +67,12 @@ public protocol DODIntelligenceService: Sendable {
     /// otherwise answers from the text alone. Returns `nil` — never throws — on
     /// unavailability / empty input (no text AND no image) / model error /
     /// guardrail rejection, so the helper degrades gracefully.
-    func answer(_ question: String, imageData: Data?) async -> String?
+    ///
+    /// DUT-1385 — `recipeContext` is the plain-text recipe the cook is making
+    /// (title, ingredients, steps, current step) for Cook Mode's "Ask About This
+    /// Recipe" chat. When present the model answers about THAT recipe only and
+    /// treats the text as its source of truth; `nil` is the general helper.
+    func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
 }
 
 extension DODIntelligenceService {
@@ -78,9 +83,14 @@ extension DODIntelligenceService {
         await suggestSubstitution(for: ingredient, in: nil, reason: nil)
     }
 
+    /// Convenience for the general (not recipe-scoped) helper.
+    public func answer(_ question: String, imageData: Data?) async -> String? {
+        await answer(question, imageData: imageData, recipeContext: nil)
+    }
+
     /// Convenience for a text-only question, so existing call sites and previews
     /// that don't attach an image stay terse.
     public func answer(_ question: String) async -> String? {
-        await answer(question, imageData: nil)
+        await answer(question, imageData: nil, recipeContext: nil)
     }
 }

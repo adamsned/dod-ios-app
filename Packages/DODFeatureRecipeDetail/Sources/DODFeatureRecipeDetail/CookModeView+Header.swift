@@ -27,6 +27,17 @@ extension CookModeView {
 
             Spacer()
 
+            // DUT-1385 — "Ask About This Recipe" (on-device AI). Present only
+            // when the host injected the chat builder (model usable).
+            if askSheet != nil {
+                floatingButton(
+                    systemName: "sparkles",
+                    label: "Ask about this recipe",
+                    action: { isAskPresented = true }
+                )
+                .accessibilityIdentifier("cook-mode-ask")
+            }
+
             // DUT-599 successor — ingredients moved off the transport's carrot
             // button up here so the transport's play/pause can sit dead-center.
             floatingButton(

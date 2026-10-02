@@ -154,4 +154,22 @@ struct DODIntelligenceServiceTests {
         }
         #expect(SubstitutionReason.lowerCarb.title == "Lower Carb")
     }
+
+    // MARK: - Recipe chat prompt (DUT-1385)
+
+    @Test func chatPromptWithoutContextIsJustTheQuestion() {
+        #expect(LiveDODIntelligenceService.chatPrompt(question: "q", recipeContext: nil) == "q")
+        #expect(LiveDODIntelligenceService.chatPrompt(question: "q", recipeContext: "") == "q")
+    }
+
+    @Test func chatPromptWithContextIncludesRecipeAndQuestion() {
+        let prompt = LiveDODIntelligenceService.chatPrompt(question: "How much salt?", recipeContext: "Recipe: Chili")
+        #expect(prompt.contains("Recipe: Chili"))
+        #expect(prompt.hasSuffix("Their question: How much salt?"))
+    }
+
+    @Test func fakeAnswerAcceptsRecipeContext() async {
+        let service = FakeIntelligenceService(answer: "A")
+        #expect(await service.answer("q", imageData: nil, recipeContext: "Recipe: X") == "A")
+    }
 }

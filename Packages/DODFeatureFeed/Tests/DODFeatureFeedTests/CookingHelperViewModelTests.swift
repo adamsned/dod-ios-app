@@ -111,4 +111,48 @@ struct CookingHelperViewModelTests {
         #expect(viewModel.turns.isEmpty)
         #expect(viewModel.question.isEmpty)
     }
+
+    // MARK: - Recipe-scoped chat (DUT-1385)
+
+    /// Records the recipe context it was handed.
+    private final class ContextCapturingIntelligence: DODIntelligenceService, @unchecked Sendable {
+        let isAvailable = true
+        let supportsImageInput = false
+        private(set) var capturedContext: String?
+        func suggestSubstitution(
+            for ingredient: String,
+            in context: RecipeContext?,
+            reason: SubstitutionReason?
+        ) async -> SubstitutionResult? { nil }
+        func summarize(_ text: String) async -> String? { nil }
+        func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? {
+            capturedContext = recipeContext
+            return "Use 1 tsp."
+        }
+    }
+
+    @Test func recipeContextRidesAlongWithEachQuestion() async {
+        let capturing = ContextCapturingIntelligence()
+        let viewModel = CookingHelperViewModel(intelligence: capturing, recipeContext: "Recipe: Chili")
+        viewModel.question = "How much salt?"
+        await viewModel.ask(imageData: nil)
+        #expect(capturing.capturedContext == "Recipe: Chili")
+        #expect(viewModel.turns.last?.text == "Use 1 tsp.")
+    }
+
+    @Test func generalHelperSendsNoRecipeContext() async {
+        let capturing = ContextCapturingIntelligence()
+        let viewModel = CookingHelperViewModel(intelligence: capturing)
+        viewModel.question = "How many cups in a gallon?"
+        await viewModel.ask(imageData: nil)
+        #expect(capturing.capturedContext == nil)
+    }
+
+    @Test func recipeConfigurationUsesRecipeCopy() {
+        let config = CookingHelperSheet.Configuration.recipe("Skillet Chili")
+        #expect(config.title == "Ask About This Recipe")
+        #expect(config.emptyTitle == "Skillet Chili")
+        #expect(config.placeholder == "Ask about this recipe")
+        #expect(CookingHelperSheet.Configuration.general.title == "Ask Dutch Oven Daddy")
+    }
 }

@@ -12,9 +12,43 @@ public struct CookingHelperSheet: View {
 
     @Bindable var viewModel: CookingHelperViewModel
     let onDone: () -> Void
+    let configuration: Configuration
 
-    public init(viewModel: CookingHelperViewModel, onDone: @escaping () -> Void) {
+    /// DUT-1385 — the copy that differs between the general helper and Cook
+    /// Mode's recipe-scoped chat.
+    public struct Configuration: Sendable {
+        public let title: String
+        public let emptyTitle: String
+        public let emptyMessage: String
+        public let placeholder: String
+
+        /// The Cooking Tools "Ask Dutch Oven Daddy" helper.
+        public static let general = Configuration(
+            title: "Ask Dutch Oven Daddy",
+            emptyTitle: "Ask Dutch Oven Daddy",
+            emptyMessage: "Cast iron, Dutch ovens, techniques, recipe conversions, or attach a photo for help.",
+            placeholder: "Ask about cooking or cast iron"
+        )
+
+        /// Cook Mode's chat about the one recipe being cooked.
+        public static func recipe(_ recipeTitle: String) -> Configuration {
+            Configuration(
+                title: "Ask About This Recipe",
+                emptyTitle: recipeTitle,
+                emptyMessage: "Ask anything about this recipe while you cook: amounts, steps, timing, or what to do "
+                    + "if something looks off.",
+                placeholder: "Ask about this recipe"
+            )
+        }
+    }
+
+    public init(
+        viewModel: CookingHelperViewModel,
+        configuration: Configuration = .general,
+        onDone: @escaping () -> Void
+    ) {
         self.viewModel = viewModel
+        self.configuration = configuration
         self.onDone = onDone
     }
 
@@ -25,7 +59,7 @@ public struct CookingHelperSheet: View {
             conversation
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(DODColor.surface)
-                .navigationTitle("Ask Dutch Oven Daddy")
+                .navigationTitle(configuration.title)
                 #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
                 #endif
@@ -83,12 +117,12 @@ public struct CookingHelperSheet: View {
             Image(systemName: "sparkles")
                 .font(.system(size: 40))
                 .foregroundStyle(DODColor.accent)
-            Text("Ask Dutch Oven Daddy")
+            Text(configuration.emptyTitle)
                 .dodFont(DODType.displayMedium)
                 .foregroundStyle(DODColor.label)
                 .multilineTextAlignment(.center)
             Text(
-                "Cast iron, Dutch ovens, techniques, recipe conversions, or attach a photo for help."
+                configuration.emptyMessage
             )
             .dodFont(DODType.body)
             .foregroundStyle(DODColor.labelSecondary)
@@ -104,7 +138,7 @@ public struct CookingHelperSheet: View {
 
     private var inputArea: some View {
         VStack(spacing: DODSpacing.xxs) {
-            CookingHelperInputBar(viewModel: viewModel) { imageData in
+            CookingHelperInputBar(viewModel: viewModel, placeholder: configuration.placeholder) { imageData in
                 Task { await viewModel.ask(imageData: imageData) }
             }
             Text("Dutch Oven Daddy can make mistakes. Double-check important cooking info.")

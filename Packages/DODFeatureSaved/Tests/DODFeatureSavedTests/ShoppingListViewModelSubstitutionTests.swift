@@ -50,7 +50,7 @@ struct ShoppingListViewModelSubstitutionTests {
             return result
         }
         func summarize(_ text: String) async -> String? { nil }
-        func answer(_ question: String, imageData: Data?) async -> String? { nil }
+        func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
     }
 
     // MARK: - Availability gate

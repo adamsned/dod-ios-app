@@ -49,6 +49,8 @@ public struct CookModeView: View {
     /// a `.sheet` layers on top instead. `internal` so `CookModeView+StepBody`
     /// can flip it. Only shown when `heatCoachSheet != nil`.
     @State var isHeatCoachPresented: Bool = false
+    /// DUT-1385 — drives the "Ask About This Recipe" sheet over the cover.
+    @State var isAskPresented: Bool = false
     /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
     /// screen, regardless of which step is shown, so a running timer on a step
     /// you've navigated away from still counts down + completes.
@@ -70,10 +72,13 @@ public struct CookModeView: View {
     /// unaffected (same seam as `onLogCook`). `internal` (not `private`) so
     /// `CookModeView+StepBody.swift` can gate the shortcut on it.
     let heatCoachSheet: (() -> AnyView)?
+    /// DUT-1385 — builds the "Ask About This Recipe" chat (title, recipe text);
+    /// `nil` hides the top-bar sparkle button. See `CookModeView+Ask.swift`.
+    let askSheet: ((String, String) -> AnyView)?
     /// Scale factor inherited from the host detail screen so the drawer
     /// ingredient rows agree with the scaled list the user just left. AC-7.5
     /// + US-31 carry-over.
-    private let ingredientScaleFactor: Double
+    let ingredientScaleFactor: Double
 
     // `internal` (not `private`) so `CookModeView+StepBody.swift` can resolve
     // the temperature unit for the displayed step text (DUT-245).
@@ -118,7 +123,8 @@ public struct CookModeView: View {
         ingredientScaleFactor: Double = 1.0,
         onClose: @escaping (Set<UUID>) -> Void,
         onLogCook: ((CookLogEntry) -> Void)? = nil,
-        heatCoachSheet: (() -> AnyView)? = nil
+        heatCoachSheet: (() -> AnyView)? = nil,
+        askSheet: ((String, String) -> AnyView)? = nil
     ) {
         _viewModel = State(
             initialValue: CookModeViewModel(
@@ -130,6 +136,7 @@ public struct CookModeView: View {
         self.onClose = onClose
         self.onLogCook = onLogCook
         self.heatCoachSheet = heatCoachSheet
+        self.askSheet = askSheet
     }
 
     public var body: some View {
@@ -208,6 +215,7 @@ public struct CookModeView: View {
                 heatCoachSheet()
             }
         }
+        .sheet(isPresented: $isAskPresented) { askSheetContent }  // DUT-1385
         // DUT-328 — one-time "this may sound robotic, get a better voice" prompt
         // when Voice Mode turns on with only a robotic voice installed. Owns its
         // own state (in `CookModeView+VoicePrompt.swift`) so this body stays one

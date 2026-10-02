@@ -54,8 +54,13 @@ public final class CookingHelperViewModel {
     /// send). `internal(set)` for the same reason.
     public internal(set) var isResponding = false
 
-    public init(intelligence: (any DODIntelligenceService)?) {
+    /// DUT-1385 — the plain-text recipe for Cook Mode's "Ask About This
+    /// Recipe" chat. `nil` is the general Ask Dutch Oven Daddy helper.
+    public let recipeContext: String?
+
+    public init(intelligence: (any DODIntelligenceService)?, recipeContext: String? = nil) {
         self.intelligence = intelligence
+        self.recipeContext = recipeContext
     }
 
     /// `true` only when an on-device model is usable right now. The hub renders
@@ -85,7 +90,7 @@ public final class CookingHelperViewModel {
         question = ""
         isResponding = true
 
-        let result = await intelligence.answer(trimmed, imageData: imageData)
+        let result = await intelligence.answer(trimmed, imageData: imageData, recipeContext: recipeContext)
 
         isResponding = false
         if let result, !result.isEmpty {
