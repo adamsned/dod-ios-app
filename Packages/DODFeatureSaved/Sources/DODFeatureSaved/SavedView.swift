@@ -43,17 +43,23 @@ public struct SavedView: View {
     /// Optional + default nil so existing callers / previews / snapshots show no
     /// gear and stay unaffected. Production wires it through `TabStack`.
     public let onOpenSettings: (() -> Void)?
+    /// DUT-1388 — a collection to select from outside the tab (Siri / Shortcuts
+    /// "Open my <name> collection"). The view selects it, then clears the
+    /// binding so the request fires once. Default: never set.
+    @Binding var collectionRequest: UUID?
 
     public init(
         viewModel: SavedViewModel,
         onSelect: @escaping (Recipe) -> Void,
         onSave: ((Recipe, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
-        onOpenSettings: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        collectionRequest: Binding<UUID?> = .constant(nil)
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.onOpenSettings = onOpenSettings
+        _collectionRequest = collectionRequest
     }
 
     public var body: some View {
@@ -82,6 +88,14 @@ public struct SavedView: View {
                 // debounced re-fetch reconciles on each remote import.
                 viewModel.startObserving()
                 await viewModel.refresh()
+            }
+            // DUT-1388 — `initial: true` so a cold launch (request set before this
+            // view existed) is honored too. A deleted collection is cleared back to
+            // "All Saved" by the next collections load (`applyCollections`).
+            .onChange(of: collectionRequest, initial: true) { _, requested in
+                guard let requested else { return }
+                viewModel.selectCollection(requested)
+                collectionRequest = nil
             }
     }
 

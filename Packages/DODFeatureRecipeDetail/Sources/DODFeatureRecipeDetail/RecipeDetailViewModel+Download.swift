@@ -79,4 +79,11 @@ extension RecipeDetailViewModel {
     public var isOffline: Bool {
         get async { await !dependencies.isOnline() }
     }
+
+    /// DUT-1388 — re-read the bookmark state after a save that happened off
+    /// this screen (Siri / Shortcuts "Save this recipe" while it is open), so
+    /// the next bookmark tap doesn't act on a stale `isSaved`.
+    func refreshSavedState() async {
+        isSaved = (try? await dependencies.isSaved(id: listItem.id)) ?? isSaved
+    }
 }

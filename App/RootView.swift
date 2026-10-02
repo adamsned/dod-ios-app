@@ -93,6 +93,9 @@ struct RootView: View {
     /// DUT-461 (revised) — the hub's Cooking Tip token. The widget tap mints it;
     /// the hub consumes it via `.task(id:)` to pop to its root so the tip shows.
     @State var hubTipToken: UUID?
+    /// DUT-1388 — a Siri "Open my <name> collection" request, consumed by the
+    /// Saved tab (which selects that collection's shelf filter, then clears it).
+    @State var savedCollectionRequest: UUID?
     /// DUT — one-shot "we came here to cook" arm. The hub's Cook Mode "Find a
     /// Recipe" sets it before selecting `.feed`; the next Feed card tap consumes
     /// it, routing with `autoStartCookMode: true`, then disarms. Bound only to Feed.
@@ -198,6 +201,7 @@ struct RootView: View {
             }
         }
         .onContinueUserActivity(CSSearchableItemActionType) { handleSpotlightActivity($0) }
+        .modifier(OnscreenRecipeActivity())  // DUT-1388 — Siri onscreen awareness
         // DUT-1325 — Universal Links: a tapped dutchovendaddy.com link routes
         // in-app (see `handleUniversalLink` in RootView+LinkRouting).
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { handleUniversalLink($0) }
@@ -263,6 +267,7 @@ struct RootView: View {
                     startFirstCookout: { route(toHubTool: .firstCookout(scrollToDumpCakes: $0)) },
                     hubPendingTool: tab == .cookingTools ? $hubPendingTool : .constant(nil),
                     hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
+                    savedCollectionRequest: tab == .saved ? $savedCollectionRequest : .constant(nil),
                     cookModeFindRecipeArmed: tab == .feed ? $cookModeFindRecipeArmed : .constant(false),
                     // DUT-546 — one shared moderation store across every recipe screen.
                     commentModeration: commentModeration
@@ -348,6 +353,7 @@ struct RootView: View {
                 startFirstCookout: { route(toHubTool: .firstCookout(scrollToDumpCakes: $0)) },
                 hubPendingTool: selectedTab == .cookingTools ? $hubPendingTool : .constant(nil),
                 hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
+                savedCollectionRequest: selectedTab == .saved ? $savedCollectionRequest : .constant(nil),
                 cookModeFindRecipeArmed: selectedTab == .feed ? $cookModeFindRecipeArmed : .constant(false),
                 // DUT-546 — one shared moderation store across every recipe screen.
                 commentModeration: commentModeration
