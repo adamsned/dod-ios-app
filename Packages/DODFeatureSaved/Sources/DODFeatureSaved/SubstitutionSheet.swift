@@ -145,6 +145,11 @@ struct SubstitutionSheet: View {
                 .padding(.vertical, DODSpacing.xxs)
             }
             .accessibilityIdentifier("shopping-substitution-reasons")
+            // DUT-1387 — a warning haptic the moment Allergy is picked, so the
+            // expanded allergen disclaimer below gets the cook's attention.
+            .sensoryFeedback(.warning, trigger: selectedReason) { _, newReason in
+                newReason?.isAllergy == true
+            }
 
             Button {
                 onSuggest(selectedReason)

@@ -239,7 +239,7 @@ public struct RecipeDetailView: View {
         // body render via `ArticleDetailView` with the carried `Recipe`
         // (kind == .article, populated `articleBodyHTML`).
         case .article(let article):
-            ArticleDetailView(recipe: article)
+            ArticleDetailView(recipe: article, onSummarize: summarizeAction)
         }
     }
 
@@ -279,7 +279,7 @@ public struct RecipeDetailView: View {
                         VStack(alignment: .leading, spacing: DODSpacing.lg) {
                             // DUT-573 / CL-313 — publish date + Jump to
                             // Instructions link, right under the hero/name.
-                            dateAndJumpRow(proxy: proxy)
+                            headerRow(proxy: proxy)
                             excerptText
                             RecipeInfoCard(
                                 model: infoCardModel,
@@ -334,7 +334,7 @@ public struct RecipeDetailView: View {
     /// `ScrollViewReader`'s proxy. DUT-631 — that anchor now sits on the Cook
     /// Mode CTA that leads the Instructions section, so the jump lands with Cook
     /// Mode at the top of the viewport (Instructions immediately below it).
-    private func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
+    func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
         HStack(alignment: .firstTextBaseline) {
             PublishedDateCaption(date: viewModel.listItem.updatedAt ?? viewModel.listItem.publishedAt)
             Spacer(minLength: DODSpacing.sm)
