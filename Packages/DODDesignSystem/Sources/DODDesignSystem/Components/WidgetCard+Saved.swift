@@ -30,12 +30,10 @@ extension WidgetCard {
         }
     }
 
-    /// Small saved-widget layout (DUT-1381): the most recently saved recipe's
-    /// photo with its name centred over it, the same look as the Latest small
-    /// widget (``Small``), so a long name is never squeezed into a narrow
-    /// title column beside a thumbnail. Tinted/Vibrant handling comes from
-    /// ``Small`` (title on the container, DUT-9). Caller passes the saved rows
-    /// newest-first; only the first is shown.
+    /// Small saved-widget layout (DUT-1384): the "Saved" eyebrow + the two
+    /// newest saved recipes as thumbnail-left / title-right rows, the same list
+    /// format as ``SavedMedium`` capped for the square tile. Long names wrap to
+    /// two lines and then truncate. Caller passes rows newest-first.
     public struct SavedSmall: View {
 
         public let rows: [SavedRow]
@@ -44,13 +42,26 @@ extension WidgetCard {
             self.rows = rows
         }
 
-        /// The small size shows a single recipe.
-        public static let maxRows = 1
+        /// Rows the small size shows.
+        public static let maxRows = 2
 
         public var body: some View {
-            if let row = rows.first {
-                Small(content: Content(title: row.title, excerpt: "", heroImageURL: row.heroImageURL))
+            VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                Text("Saved")
+                    .font(.system(.caption2, design: .default, weight: .semibold))
+                    .foregroundStyle(DODColor.burntOrange)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+
+                VStack(spacing: DODSpacing.xs) {
+                    ForEach(Array(rows.prefix(Self.maxRows).enumerated()), id: \.offset) { _, row in
+                        SavedListRow(row: row)
+                    }
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(DODSpacing.sm)
+            // T-767 / CL-164 — background owned by `containerBackground` (Tinted-safe).
         }
     }
 
