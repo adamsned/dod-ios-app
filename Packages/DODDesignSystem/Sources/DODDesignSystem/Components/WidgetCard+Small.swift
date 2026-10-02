@@ -104,20 +104,51 @@ extension WidgetCard {
     #if canImport(WidgetKit)
     /// Picks the ``Small`` layout by home-screen rendering mode (DUT-9): the
     /// photo-overlay look in Standard (`.fullColor`), and a container-anchored
-    /// title in Tinted/Vibrant (`.accented`/`.vibrant`) where text-over-photo
-    /// contrast can't be guaranteed. WidgetKit-gated so the macOS test slice
-    /// still builds; on macOS ``Small`` uses the overlay layout directly.
+    /// title in Vibrant (StandBy) where text-over-photo contrast can't be
+    /// guaranteed. WidgetKit-gated so the macOS test slice still builds; on
+    /// macOS ``Small`` uses the overlay layout directly.
+    ///
+    /// DUT-1390 — Clear and Tinted home screens (iOS 26 renders both as
+    /// `.accented`) now get the SAME Plain Header look as Standard. The system
+    /// only re-colours text and shapes, never an image opted into
+    /// `.widgetAccentedRenderingMode(.fullColor)`, so the whole overlay card
+    /// (photo, gradient, title, eyebrow, time badge) is rasterized into one
+    /// such image (``Small/rasterizedOverlay(content:size:scale:colorScheme:)``).
+    /// No live `Text` is left for the tint to make dark-on-dark, which is what
+    /// sank the DUT-9 attempts that kept the title as text over the photo.
     struct RenderingModeAwareSmall: View {
 
         @Environment(\.widgetRenderingMode) private var renderingMode
+        @Environment(\.displayScale) private var displayScale
+        @Environment(\.colorScheme) private var colorScheme
 
         let content: Content
 
         var body: some View {
             if renderingMode == .fullColor {
                 Small.overlayLayout(content: content)
+            } else if renderingMode == .accented {
+                GeometryReader { proxy in
+                    if let card = Small.rasterizedOverlay(
+                        content: content,
+                        size: proxy.size,
+                        scale: displayScale,
+                        colorScheme: colorScheme
+                    ) {
+                        card
+                    } else {
+                        containerAnchoredLayout
+                    }
+                }
             } else {
-                // Tinted/Vibrant: title on the container (not over the photo)
+                containerAnchoredLayout
+            }
+        }
+
+        /// Vibrant (and the accented fallback when rasterizing isn't possible).
+        private var containerAnchoredLayout: some View {
+            Group {
+                // Vibrant: title on the container (not over the photo)
                 // so the system's accent-vs-background contrast guarantee
                 // applies — the technique that keeps ``Medium``/``Large``
                 // legible. `.widgetAccentable()` puts the title in the accent
@@ -146,3 +177,42 @@ extension WidgetCard {
     }
     #endif
 }
+
+#if canImport(WidgetKit)
+extension WidgetCard.Small {
+
+    /// DUT-1390 — the Standard overlay card drawn into ONE full-colour image at
+    /// the widget's size, for Clear / Tinted home screens (see
+    /// `RenderingModeAwareSmall`). Rendered with `.fullColor` forced so the
+    /// time chip draws its Standard style. Nil before iOS 18 (no accented mode
+    /// there), on macOS (the `swift test` slice has no `UIImage`), or for a
+    /// zero size, and the caller falls back to the container-anchored layout.
+    @MainActor
+    static func rasterizedOverlay(
+        content: WidgetCard.Content,
+        size: CGSize,
+        scale: CGFloat,
+        colorScheme: ColorScheme
+    ) -> AnyView? {
+        #if canImport(UIKit)
+        guard #available(iOS 18.0, *), size.width > 0, size.height > 0 else { return nil }
+        let renderer = ImageRenderer(
+            content: overlayLayout(content: content)
+                .frame(width: size.width, height: size.height)
+                .environment(\.widgetRenderingMode, .fullColor)
+                .environment(\.colorScheme, colorScheme)
+        )
+        renderer.scale = scale
+        guard let image = renderer.uiImage else { return nil }
+        return AnyView(
+            Image(uiImage: image)
+                .resizable()
+                .widgetAccentedRenderingMode(.fullColor)
+                .frame(width: size.width, height: size.height)
+        )
+        #else
+        return nil
+        #endif
+    }
+}
+#endif
