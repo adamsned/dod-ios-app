@@ -29,7 +29,16 @@ extension WidgetCard {
 
         public var body: some View {
             VStack(alignment: .leading, spacing: 0) {
-                Hero(url: content.heroImageURL)
+                // DUT-1384 — the site's hero photos are square. A bare
+                // `.scaledToFill()` image reports its full width as a MINIMUM
+                // height, so it starved the bottom band and pushed the title off
+                // the bottom edge (and the excerpt + time chip out entirely).
+                // Hosting it in a `Color.clear` overlay gives the photo no
+                // intrinsic size: the text block below takes its natural height
+                // and the photo fills whatever is left.
+                Color.clear
+                    .overlay { Hero(url: content.heroImageURL) }
+                    .clipped()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 VStack(alignment: .leading, spacing: DODSpacing.xs) {
@@ -39,42 +48,29 @@ extension WidgetCard {
                         .textCase(.uppercase)
                         .tracking(0.5)
 
-                    // The title is the headline of the card, so it always shows
-                    // in full (widget layout parity): up to 3 lines and a higher
-                    // `.layoutPriority` than the excerpt, so under vertical
-                    // compression the excerpt is the one that truncates while
-                    // the full recipe/article name stays visible in the bottom
-                    // section. `.minimumScaleFactor` then shrinks a 4th-line
-                    // outlier to fit rather than clipping it.
+                    // The full title always shows (up to 3 lines at its natural
+                    // height); the photo above is what gives way.
                     Text(content.title)
                         .font(.system(.title3, design: .default, weight: .semibold))
                         .foregroundStyle(DODColor.label)
                         .lineLimit(3)
-                        .minimumScaleFactor(0.65)
-                        .multilineTextAlignment(.leading)
-                        .layoutPriority(1)
+                        .minimumScaleFactor(0.8)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    if !content.excerpt.isEmpty {
+                    // DUT-1384 — articles are eyebrow + title only; recipes add a
+                    // 2-line excerpt and the time chip.
+                    if !content.isArticle, !content.excerpt.isEmpty {
                         Text(content.excerpt)
-                            .font(.system(.subheadline, design: .default))
+                            .font(.system(.subheadline))
                             .foregroundStyle(DODColor.labelSecondary)
                             .lineLimit(2)
-                            .minimumScaleFactor(0.7)
-                            .multilineTextAlignment(.leading)
                     }
 
                     if let totalTime = content.totalTimeDisplay {
                         TimeChip(text: totalTime)
-                            .padding(.top, DODSpacing.xs)
+                            .padding(.top, DODSpacing.xxs)
                     }
                 }
-                // DUT-458 — the content region wins its space over the greedy
-                // hero (`.layoutPriority(1)`, replacing DUT-75's `.fixedSize`
-                // which forced the natural height and could push the last line /
-                // time chip past the frame with long real-world content or large
-                // Dynamic Type). The `.minimumScaleFactor(0.7)` on the title +
-                // excerpt then shrinks text to fit instead of clipping; the hero
-                // shrinks toward the remainder.
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(DODSpacing.md)
                 .layoutPriority(1)

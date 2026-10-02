@@ -37,19 +37,25 @@ public enum WidgetCard {
         /// replacing the old hardcoded "New on DOD". Defaults to "Latest Recipe"
         /// so existing call sites (previews / tests) stay source-compatible.
         public let eyebrow: String
+        /// DUT-1384 — `true` when the item is an article rather than a recipe.
+        /// ``FeaturedLarge`` shows articles as eyebrow + title only, and recipes
+        /// as eyebrow + title + excerpt + time chip. Defaults to `false`.
+        public let isArticle: Bool
 
         public init(
             title: String,
             excerpt: String,
             heroImageURL: URL? = nil,
             totalTimeDisplay: String? = nil,
-            eyebrow: String = "Latest Recipe"
+            eyebrow: String = "Latest Recipe",
+            isArticle: Bool = false
         ) {
             self.title = title
             self.excerpt = excerpt
             self.heroImageURL = heroImageURL
             self.totalTimeDisplay = totalTimeDisplay
             self.eyebrow = eyebrow
+            self.isArticle = isArticle
         }
     }
 
