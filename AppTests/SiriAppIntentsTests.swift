@@ -55,9 +55,10 @@ final class SiriAppIntentsTests: XCTestCase {
 
     func test_collectionMatch_nameMatch_strongestFirst_shelfOrderOtherwise() {
         let pool = [collection("Weeknight Dinners"), collection("Desserts"), collection("Dinners")]
-        XCTAssertEqual(CollectionEntityQuery.match(pool, query: "dinners").map(\.name), ["Dinners", "Weeknight Dinners"])
-        XCTAssertEqual(CollectionEntityQuery.match(pool, query: "dessert").map(\.name), ["Desserts"])  // singular
-        XCTAssertTrue(CollectionEntityQuery.match(pool, query: "").isEmpty)
+        let names = { (query: String) in CollectionEntityQuery.match(pool, query: query).map(\.name) }
+        XCTAssertEqual(names("dinners"), ["Dinners", "Weeknight Dinners"])
+        XCTAssertEqual(names("dessert"), ["Desserts"])  // singular
+        XCTAssertTrue(names("").isEmpty)
     }
 
     func test_collectionCountText() {
@@ -69,15 +70,22 @@ final class SiriAppIntentsTests: XCTestCase {
     // MARK: - Dialog copy (no em dashes in user-facing strings)
 
     func test_findDialog() {
-        XCTAssertEqual(FindRecipesIntent.dialogText(count: 0, query: "gnocchi"), "I couldn't find a recipe matching \"gnocchi\".")
-        XCTAssertEqual(FindRecipesIntent.dialogText(count: 1, query: "gnocchi"), "Here's the recipe I found for \"gnocchi\".")
-        XCTAssertEqual(FindRecipesIntent.dialogText(count: 4, query: "chili"), "Here are 4 recipes for \"chili\".")
+        let text = FindRecipesIntent.dialogText
+        XCTAssertEqual(text(0, "gnocchi"), "I couldn't find a recipe matching \"gnocchi\".")
+        XCTAssertEqual(text(1, "gnocchi"), "Here's the recipe I found for \"gnocchi\".")
+        XCTAssertEqual(text(4, "chili"), "Here are 4 recipes for \"chili\".")
     }
 
     func test_shoppingListDialog() {
         typealias Intent = AddRecipeToShoppingListIntent
-        XCTAssertEqual(Intent.dialogText(.added(count: 1), title: "Chili"), "Added 1 ingredient from Chili to your Shopping List.")
-        XCTAssertEqual(Intent.dialogText(.added(count: 9), title: "Chili"), "Added 9 ingredients from Chili to your Shopping List.")
+        XCTAssertEqual(
+            Intent.dialogText(.added(count: 1), title: "Chili"),
+            "Added 1 ingredient from Chili to your Shopping List."
+        )
+        XCTAssertEqual(
+            Intent.dialogText(.added(count: 9), title: "Chili"),
+            "Added 9 ingredients from Chili to your Shopping List."
+        )
         XCTAssertEqual(
             Intent.dialogText(.couldntLoad, title: "Chili"),
             "I couldn't load the ingredients for Chili. Open the recipe and try again."

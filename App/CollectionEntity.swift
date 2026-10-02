@@ -75,12 +75,11 @@ struct CollectionEntityQuery: EntityQuery, EntityStringQuery {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return [] }
         // Stable sort: shelf order holds within a match tier.
-        return pool
-            .compactMap { entity in
-                TitleSearchMatcher.match(query: needle, title: entity.name).map { (kind: $0, entity: entity) }
-            }
-            .sorted { $0.kind < $1.kind }
-            .map(\.entity)
+        let scored = pool.compactMap { entity -> (kind: TitleMatchKind, entity: CollectionEntity)? in
+            guard let kind = TitleSearchMatcher.match(query: needle, title: entity.name) else { return nil }
+            return (kind, entity)
+        }
+        return scored.sorted { $0.kind < $1.kind }.map(\.entity)
     }
 }
 
