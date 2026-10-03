@@ -219,17 +219,19 @@ struct CookModePlayerControls: View {
     // MARK: - Control sizing (iPad-scaled)
     //
     // DUT-1392 — big, thumb-sized controls on both, scaled up again on iPad.
-    // Every tap target is well over 44pt. iPhone max cluster width (gaps at
-    // `clusterGap`) is 380pt and it shrinks to 340pt, so it fits a 375pt phone.
-    private var centerDiameter: CGFloat { isPad ? 116 : 84 }
-    private var centerIconSize: CGFloat { isPad ? 48 : 34 }
-    private var navDiameter: CGFloat { isPad ? 88 : 64 }
-    private var navIconSize: CGFloat { isPad ? 34 : 26 }
+    // DUT-1394 — iPhone trimmed back a little (was Play 84 / Prev-Next 64 /
+    // sides 56), about halfway to the original sizes. Every tap target is
+    // still over 44pt. iPhone max cluster width (gaps at `clusterGap`) is
+    // 342pt, so it fits a 375pt phone without the gaps shrinking.
+    private var centerDiameter: CGFloat { isPad ? 116 : 74 }
+    private var centerIconSize: CGFloat { isPad ? 48 : 30 }
+    private var navDiameter: CGFloat { isPad ? 88 : 56 }
+    private var navIconSize: CGFloat { isPad ? 34 : 23 }
     /// Replay + Speed share this width so Play sits dead-center.
-    private var sideWidth: CGFloat { isPad ? 76 : 56 }
-    private var glyphIconSize: CGFloat { isPad ? 34 : 26 }
-    private var glyphTapTarget: CGFloat { isPad ? 76 : 56 }
-    private var speedPillHeight: CGFloat { isPad ? 60 : 44 }
+    private var sideWidth: CGFloat { isPad ? 76 : 50 }
+    private var glyphIconSize: CGFloat { isPad ? 34 : 24 }
+    private var glyphTapTarget: CGFloat { isPad ? 76 : 50 }
+    private var speedPillHeight: CGFloat { isPad ? 60 : 40 }
     private var clusterGap: CGFloat { isPad ? 28 : 14 }
     private var speedPillStroke: CGFloat { isPad ? 2 : 1.5 }
     private var speedFont: Font { isPad ? DODType.displayMedium : DODType.bodyEmphasized }
