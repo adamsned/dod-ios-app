@@ -2,6 +2,10 @@ import DODDesignSystem
 import DODSupport
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// DUT-596/599 — the auto-minimizing player panel for ``CookModeView``: the
 /// transport controls plus a slim always-visible grabber, and (when collapsed)
 /// a mini prev/next nav bar. Extracted here (with the `wakeControls` /
@@ -74,27 +78,38 @@ extension CookModeView {
 
     // MARK: - Mini nav (collapsed)
 
-    /// DUT-599 — compact prev/next arrows shown in place of the transport while
-    /// the controls are collapsed (where the ingredients pull tab used to sit),
-    /// so a cook can still move between steps without expanding. Navigating keeps
-    /// the panel collapsed. Hidden on the Done card (which never collapses).
+    /// DUT-599 — prev/next arrows shown in place of the transport while the
+    /// controls are collapsed, so a cook can still move between steps without
+    /// expanding. Navigating keeps the panel collapsed. Hidden on the Done card
+    /// (which never collapses).
+    ///
+    /// DUT-1392 — two BIG buttons (minimizing leaves the room for them), in the
+    /// same cream-arrow-on-orange-circle style as the expanded transport.
     @ViewBuilder
     private var miniNav: some View {
-        HStack(spacing: DODSpacing.xl) {
-            Spacer(minLength: 0)
+        HStack(spacing: miniNavSpacing) {
             if showsMiniPrevious {
-                miniNavButton(symbol: "arrow.backward", label: "Previous Step") {
+                CookModeNavCircleButton(
+                    symbol: "arrow.backward",
+                    label: "Previous Step",
+                    diameter: miniNavDiameter,
+                    iconSize: miniNavIconSize
+                ) {
                     withAnimation(controlsAnimation) { viewModel.goBack() }
                 }
                 .accessibilityIdentifier("cook-mode-mini-previous")
             } else {
                 Color.clear.frame(width: miniNavDiameter, height: miniNavDiameter)
             }
-            miniNavButton(symbol: "arrow.forward", label: "Next Step") {
+            CookModeNavCircleButton(
+                symbol: "arrow.forward",
+                label: "Next Step",
+                diameter: miniNavDiameter,
+                iconSize: miniNavIconSize
+            ) {
                 withAnimation(controlsAnimation) { viewModel.goNext() }
             }
             .accessibilityIdentifier("cook-mode-mini-next")
-            Spacer(minLength: 0)
         }
         .padding(.vertical, DODSpacing.xs)
         .frame(maxWidth: .infinity)
@@ -105,25 +120,10 @@ extension CookModeView {
         viewModel.currentStepIndex > 0
     }
 
-    // DUT-616: 44pt minimum hit target (HIG). The glyph stays at 18pt; only the
-    // frame/hit area grows, matching the >=44pt siblings.
-    private var miniNavDiameter: CGFloat { 44 }
-
-    private func miniNavButton(
-        symbol: String,
-        label: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(DODColor.cream)
-                .frame(width: miniNavDiameter, height: miniNavDiameter)
-                .background(Circle().fill(DODColor.accent))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-    }
+    // DUT-1392 — big minimized nav (was 44pt), scaled up again on iPad.
+    private var miniNavDiameter: CGFloat { isPadIdiom ? 104 : 80 }
+    private var miniNavIconSize: CGFloat { isPadIdiom ? 40 : 32 }
+    private var miniNavSpacing: CGFloat { isPadIdiom ? 64 : 40 }
 
     // MARK: - Expand / collapse
 
@@ -194,5 +194,19 @@ extension CookModeView {
     func openIngredients() {
         wakeControls()
         ingredientsDrawerVisible = true
+    }
+}
+
+extension CookModeView {
+
+    /// DUT-1392 — iPad gets larger Cook Mode controls + hero. Gated on the DEVICE
+    /// idiom (not the width class) so an iPhone in landscape keeps iPhone sizes,
+    /// matching `CookModePlayerControls.isPad`.
+    var isPadIdiom: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
     }
 }

@@ -1,3 +1,4 @@
+import DODDesignSystem
 import DODDomain
 import DODSupport
 import SwiftUI
@@ -7,6 +8,30 @@ import SwiftUI
 // supplies what it needs: the recipe title and the recipe as plain text, built
 // at the moment the sheet opens so "this step" means the step on screen.
 extension CookModeView {
+
+    /// DUT-1392 — the "Ask About This Recipe" entry point: a plain orange label
+    /// with sparkles directly under the recipe name (no pill), matching the
+    /// Summarize link on recipe and article pages. Absent when no chat builder
+    /// was injected (model unavailable), like the old top-bar button.
+    @ViewBuilder
+    var askAboutRecipeLink: some View {
+        if askSheet != nil {
+            Button {
+                wakeControls()
+                isAskPresented = true
+            } label: {
+                Label("Ask About This Recipe", systemImage: "sparkles")
+                    .dodFont(DODType.bodyEmphasized)
+                    .foregroundStyle(DODColor.accent)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, DODSpacing.md)
+            .accessibilityIdentifier("cook-mode-ask")
+            .accessibilityHint("Ask the on-device assistant about this recipe")
+        }
+    }
 
     /// The sheet body for `isAskPresented` (empty if no builder was injected).
     @ViewBuilder

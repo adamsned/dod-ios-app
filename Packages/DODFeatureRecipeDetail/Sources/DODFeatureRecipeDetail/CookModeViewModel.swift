@@ -54,6 +54,11 @@ public final class CookModeViewModel {
     /// DUT-583 — current transport state for the center play/pause button.
     public internal(set) var playbackState: VoicePlaybackState = .idle
 
+    /// DUT-1393 — set when the step changes while the voice is PAUSED. The
+    /// paused utterance belongs to the old step, so the next resume must read
+    /// the step now on screen from the top instead of continuing it.
+    var pausedUtteranceIsStale = false
+
     /// DUT-583 — the current voice speed as a multiplier of the natural 1×
     /// rate, always one of ``VoiceReader/speedMultipliers``. Session-only; not
     /// persisted (resets to 1× each Cook Mode entry, like Voice Mode itself).
@@ -338,8 +343,9 @@ public final class CookModeViewModel {
         }
         // AC-40.3 — re-read whenever the step changes while Voice Mode is on,
         // whether the change came from an on-screen tap, a swipe, or a voice
-        // command. A no-op when Voice Mode is off.
-        speakCurrentStep()
+        // command. A no-op when Voice Mode is off. DUT-1393 — stays silent
+        // while paused.
+        voiceFollowStepChange()
     }
 
     public func goBack() {
@@ -348,7 +354,16 @@ public final class CookModeViewModel {
         } else if currentStepIndex > 0 {
             currentStepIndex -= 1
         }
-        speakCurrentStep()
+        voiceFollowStepChange()
+    }
+
+    /// DUT-1392 — jump straight to a step (the tool dock's "timer running on
+    /// Step N" row). Leaves the Done state; the voice follows like Next / Back.
+    public func goToStep(_ index: Int) {
+        guard recipe.instructions.indices.contains(index) else { return }
+        isFinished = false
+        currentStepIndex = index
+        voiceFollowStepChange()
     }
 
     // MARK: - Ingredient state
