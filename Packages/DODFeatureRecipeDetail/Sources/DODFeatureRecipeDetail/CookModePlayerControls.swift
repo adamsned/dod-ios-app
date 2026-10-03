@@ -9,12 +9,16 @@ import UIKit
 /// control cluster is short (one row, not two) and the play/pause button sits
 /// dead-center.
 ///
-/// Five equal-width slots, left to right: **Replay · Previous · Play/Pause ·
-/// Next · Speed**. Equal slots put the center Play button exactly under the ^
-/// grabber. Ingredients moved OUT of the transport up to the hero (see
+/// Five controls, left to right: **Replay · Previous · Play/Pause · Next ·
+/// Speed**. Ingredients moved OUT of the transport up to the hero (see
 /// `CookModeView.cookModeTopBar`), which is what frees the center slot for Play.
-/// Only the center control is a filled circle (podcast-transport style); the
-/// side controls are plain burnt-orange glyphs.
+///
+/// DUT-1392 — the controls are big and packed together as one centered cluster
+/// (they used to be spread across five full-width slots). Replay and Speed share
+/// one width so Play stays dead-center. Previous / Next are cream arrows on
+/// orange circles, the same style as the minimized nav, with Play the largest
+/// circle. The gaps shrink (down to `xxs`) on narrow phones so the cluster
+/// always fits.
 ///
 /// Pure presentation over ``CookModeViewModel`` — it wires the existing bindings
 /// (`goBack`/`goNext`, `togglePlayback`, `replayCurrentStep`, `cycleVoiceSpeed`/
@@ -54,22 +58,26 @@ struct CookModePlayerControls: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            slot { replayButton }
-            slot { previousButton }
-            slot { centerButton }
-            slot { nextButton }
-            slot { speedButton }
+            replayButton
+            gap
+            previousButton
+            gap
+            centerButton
+            gap
+            nextButton
+            gap
+            speedButton
         }
-        .padding(.horizontal, DODSpacing.sm)
+        .padding(.horizontal, DODSpacing.xs)
         .padding(.bottom, DODSpacing.xs)
         .frame(maxWidth: .infinity)
         .background(DODColor.surface)
     }
 
-    /// One equal-width column. Equal slots keep the center Play button aligned to
-    /// the row's center regardless of the side controls' widths.
-    private func slot<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        content().frame(maxWidth: .infinity)
+    /// DUT-1392 — the space between two controls: `clusterGap` when there's room,
+    /// shrinking toward `xxs` on a narrow phone so the cluster never overflows.
+    private var gap: some View {
+        Spacer(minLength: DODSpacing.xxs).frame(maxWidth: clusterGap)
     }
 
     // MARK: - Side controls (plain glyphs)
@@ -79,6 +87,7 @@ struct CookModePlayerControls: View {
             onInteract()
             viewModel.replayCurrentStep()
         }
+        .frame(width: sideWidth)
         .accessibilityIdentifier("cook-mode-replay-step")
         .accessibilityHint("read this step aloud once")
     }
@@ -86,19 +95,29 @@ struct CookModePlayerControls: View {
     @ViewBuilder
     private var previousButton: some View {
         if showsPrevious {
-            glyphButton(symbol: "arrow.backward", label: "Previous Step") {
+            CookModeNavCircleButton(
+                symbol: "arrow.backward",
+                label: "Previous Step",
+                diameter: navDiameter,
+                iconSize: navIconSize
+            ) {
                 onInteract()
                 withAnimation(stepChangeAnimation) { viewModel.goBack() }
             }
             .accessibilityIdentifier("cook-mode-previous")
         } else {
             // Reserve the slot so the center button stays centered on step 1.
-            Color.clear.frame(width: glyphTapTarget, height: glyphTapTarget)
+            Color.clear.frame(width: navDiameter, height: navDiameter)
         }
     }
 
     private var nextButton: some View {
-        glyphButton(symbol: "arrow.forward", label: "Next Step") {
+        CookModeNavCircleButton(
+            symbol: "arrow.forward",
+            label: "Next Step",
+            diameter: navDiameter,
+            iconSize: navIconSize
+        ) {
             onInteract()
             withAnimation(stepChangeAnimation) { viewModel.goNext() }
         }
@@ -168,7 +187,7 @@ struct CookModePlayerControls: View {
                 .dodFont(speedFont)
                 .monospacedDigit()
                 .foregroundStyle(DODColor.accent)
-                .frame(minWidth: speedPillMinWidth, minHeight: glyphTapTarget)
+                .frame(width: sideWidth, height: speedPillHeight)
                 .contentShape(Capsule())
                 .overlay(
                     Capsule().strokeBorder(DODColor.accent.opacity(0.6), lineWidth: speedPillStroke)
@@ -199,20 +218,26 @@ struct CookModePlayerControls: View {
 
     // MARK: - Control sizing (iPad-scaled)
     //
-    // iPhone returns the exact literals; iPad scales the center circle + glyphs
-    // up for the larger canvas. Tap targets stay >=44pt on both.
-    private var centerDiameter: CGFloat { isPad ? 92 : 64 }
-    private var centerIconSize: CGFloat { isPad ? 40 : 27 }
-    private var glyphIconSize: CGFloat { isPad ? 30 : 24 }
-    private var glyphTapTarget: CGFloat { isPad ? 56 : 44 }
-    private var speedPillMinWidth: CGFloat { isPad ? 72 : 52 }
+    // DUT-1392 — big, thumb-sized controls on both, scaled up again on iPad.
+    // Every tap target is well over 44pt. iPhone max cluster width (gaps at
+    // `clusterGap`) is 380pt and it shrinks to 340pt, so it fits a 375pt phone.
+    private var centerDiameter: CGFloat { isPad ? 116 : 84 }
+    private var centerIconSize: CGFloat { isPad ? 48 : 34 }
+    private var navDiameter: CGFloat { isPad ? 88 : 64 }
+    private var navIconSize: CGFloat { isPad ? 34 : 26 }
+    /// Replay + Speed share this width so Play sits dead-center.
+    private var sideWidth: CGFloat { isPad ? 76 : 56 }
+    private var glyphIconSize: CGFloat { isPad ? 34 : 26 }
+    private var glyphTapTarget: CGFloat { isPad ? 76 : 56 }
+    private var speedPillHeight: CGFloat { isPad ? 60 : 44 }
+    private var clusterGap: CGFloat { isPad ? 28 : 14 }
     private var speedPillStroke: CGFloat { isPad ? 2 : 1.5 }
     private var speedFont: Font { isPad ? DODType.displayMedium : DODType.bodyEmphasized }
 
     // MARK: - Reusable side-glyph button
 
     /// A plain (unfilled) burnt-orange glyph button with a >=44pt tap target,
-    /// used for Replay / Previous / Next so only the center Play reads as filled.
+    /// used for Replay (Previous / Next are ``CookModeNavCircleButton``s).
     private func glyphButton(
         symbol: String,
         label: String,
@@ -224,6 +249,31 @@ struct CookModePlayerControls: View {
                 .foregroundStyle(DODColor.burntOrange)
                 .frame(width: glyphTapTarget, height: glyphTapTarget)
                 .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
+/// DUT-1392 — the Previous / Next control: a cream arrow on a filled orange
+/// circle. One style for the expanded transport AND the minimized nav (only the
+/// size differs), so the two states read as the same buttons.
+struct CookModeNavCircleButton: View {
+
+    let symbol: String
+    let label: String
+    let diameter: CGFloat
+    let iconSize: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: iconSize, weight: .bold))
+                .foregroundStyle(DODColor.cream)
+                .frame(width: diameter, height: diameter)
+                .background(Circle().fill(DODColor.burntOrange))
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
