@@ -70,6 +70,20 @@ extension CookModeViewModel {
         guard !text.isEmpty else { return }
         voiceReader.speak(text)
         playbackState = .speaking
+        pausedUtteranceIsStale = false
+    }
+
+    /// DUT-1393 — the voice side of a step change (Next / Back / swipe / Siri).
+    /// While PAUSED it stays paused: the old step's half-read utterance is
+    /// dropped and the next resume reads the new step from the top. Otherwise it
+    /// re-reads as before (AC-40.3), which is a no-op with Voice Mode off.
+    func voiceFollowStepChange() {
+        guard playbackState == .paused else {
+            speakCurrentStep()
+            return
+        }
+        voiceReader.stop()
+        pausedUtteranceIsStale = true
     }
 
     /// DUT-583 — the single center play/pause control, podcast-style. Pauses
@@ -143,6 +157,7 @@ extension CookModeViewModel {
         // the transport; a one-shot replay with Voice Mode off is transient and
         // leaves the (idle) player button alone.
         if isVoiceModeEnabled { playbackState = .speaking }
+        pausedUtteranceIsStale = false  // DUT-1393 — a fresh read is current
     }
 
     // MARK: - Voice pacing (DUT-325 / DUT-583)
@@ -276,6 +291,12 @@ extension CookModeViewModel {
         // for why an ungated resume can strand the button on a "speaking"
         // state the reader never actually enters.
         guard isVoiceModeEnabled, playbackState == .paused else { return }
+        // DUT-1393 — the step changed while paused: read the step now on screen
+        // from the beginning rather than continuing the old step's sentence.
+        if pausedUtteranceIsStale {
+            speakCurrentStep()
+            return
+        }
         voiceReader.resume()
         // DUT-583 — continue from the pause point (no restart); button → pause.
         playbackState = .speaking
