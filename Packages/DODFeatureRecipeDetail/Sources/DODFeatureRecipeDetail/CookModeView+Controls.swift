@@ -72,8 +72,10 @@ extension CookModeView {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("cook-mode-controls-grabber")
-        .accessibilityLabel(controlsExpanded ? "Hide controls" : "Show controls")
-        .accessibilityHint(controlsExpanded ? "collapse the playback controls" : "show the playback controls")
+        // DUT-1394 — "simplify" (matches the Settings picker): collapsing keeps
+        // the big step buttons and drops only the voice controls.
+        .accessibilityLabel(controlsExpanded ? "Simplify controls" : "Show all controls")
+        .accessibilityHint(controlsExpanded ? "show only the step buttons" : "show the voice controls too")
     }
 
     // MARK: - Mini nav (collapsed)
