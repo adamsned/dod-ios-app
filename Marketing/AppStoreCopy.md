@@ -1,6 +1,6 @@
 # App Store Marketing Copy — v1.0
 
-**Status:** rewritten 2026-10-11 against `main` @ `123ebabf`. Every feature named here ships on `main`. Owner-approve before submission.
+**Status:** updated 2026-10-11. The promotional text, description, keywords, URLs and review notes below are what is saved on the 1.0 version page in App Store Connect; each claim was checked against `main`.
 
 ## App name (max 30 characters)
 
@@ -17,61 +17,34 @@ Cast iron cooking recipes
 ## Promotional Text (max 170 chars — editable post-launch without a new build)
 
 ```
-Cast iron and Dutch oven recipes from dutchovendaddy.com, with a hands-free Cook Mode, coal counts from Heat Coach, and your saved recipes offline.
+Step-by-step Cook Mode, a charcoal Heat Coach, and cast-iron seasoning tips for dutch oven and campfire cooking. No account required to browse, save, or cook.
 ```
 
 ## Description (max 4000 chars)
 
 ```
-Dutch Oven Daddy is the official app for dutchovendaddy.com, the cast iron and Dutch oven recipe blog. Every recipe, plus the tools to cook it, on your iPhone and iPad.
+Dutch Oven Daddy turns your iPhone or iPad into a cast-iron cooking companion: recipes, timers, and coaching built for the fire, the campsite, and the kitchen.
 
-FIND SOMETHING TO COOK
+COOK WITH CONFIDENCE
+Step-by-step Cook Mode keeps your hands free and your place in the recipe, with a built-in timer for every step, Live Activity + Dynamic Island support so your timer follows you off-screen, and a Heat Coach that helps you dial in your charcoal briquette count instead of guessing.
 
-• Browse the latest recipes and articles, or explore by category: beef, chicken, sides, desserts, sourdough, and more.
-• Search the whole blog.
-• Save recipes to read offline. Spotty campsite or kitchen Wi-Fi can't break your cook.
-• Not sure what to make? Tap Surprise Me.
+BUILT FOR REAL CAST-IRON COOKING
+Browse a growing catalog of dutch oven, cast iron skillet, and campfire recipes. Save your favorites, build a shopping list that groups ingredients by aisle, and adjust servings with automatic quantity scaling. Metric or imperial, your choice.
 
-COOK IT
+LEARN TO SEASON AND CARE FOR YOUR CAST IRON
+New to cast iron? Guided tips walk you through seasoning, cleaning, and caring for your cookware so it lasts a lifetime. No guesswork, no ruined pans.
 
-• Cook Mode walks you through one step at a time with large type, built-in step timers, and the screen kept awake.
-• Have the steps read aloud, and move through them hands-free.
-• Timers show on your Lock Screen and in the Dynamic Island.
-• Tap ingredients to check them off as you go.
-• Switch to metric units in Settings.
+YOUR COOKING, YOUR WAY
+No account required to browse, save, or cook. Set up a profile, or sign in with Apple or Google, only if you want to rate recipes or join the conversation in comments. Track what you've cooked in a private Cooking Journal that stays on your device, and keep your saved recipes in sync across your devices with iCloud.
 
-COOKING TOOLS
-
-• Heat Coach: pick your Dutch oven size and cooking style, adjust for wind, weather, and elevation, and get a starting coal count for the lid and underneath.
-• Your First Cookout: a guided first cook for beginners, from gathering gear to the finished dish.
-• Cooking Journal: log what you cooked, with photos.
-• Shopping List: keep the ingredients you need in one place.
-
-MADE FOR IPHONE AND IPAD
-
-• Home Screen and Lock Screen widgets for the latest recipe, your saved recipes, and cooking tips.
-• Siri and Shortcuts: open a recipe, start Cook Mode, or show your saved recipes.
-• Optional iCloud Sync keeps your saved recipes on all your devices.
-• A full iPad layout with a sidebar.
-
-JOIN IN
-
-• Rate recipes and leave comments.
-• Sign in with Apple or Google if you like. It is optional; the whole app works without an account.
-
-PRIVACY
-
-Your saved recipes, journal, and shopping list stay on your device. The app has no third-party ads. It sends anonymous usage data that you can turn off in Settings. Full details: dutchovendaddy.com/app-privacy/
-
-REQUIREMENTS
-
-iPhone or iPad with iOS 17 or later.
+WHY DUTCH OVEN DADDY
+Built by a lifelong Dutch oven and cast iron cook, for the community that gathers around the campfire. No clutter, no noise, just the tools you need to cook like you've been doing it for years.
 ```
 
 ## Keywords (max 100 chars total, comma-separated)
 
 ```
-cast iron,skillet,recipes,sourdough,camping,campfire,baking,bread,cooking,timer,grill,bbq,camp
+skillet,seasoning,charcoal,briquette,campfire,camping,bbq,outdoor,tips,guide,care,cookware
 ```
 
 ## What's New (release notes) for v1.0
@@ -84,7 +57,7 @@ Welcome to the Dutch Oven Daddy app! Browse, search, and save cast iron and Dutc
 
 | Field | Value |
 |---|---|
-| Support URL | `https://dutchovendaddy.com/contact/` |
+| Support URL | `https://www.dutchovendaddy.com/contact-me/` |
 | Marketing URL | `https://www.dutchovendaddy.com/` |
 | Privacy Policy URL | `https://www.dutchovendaddy.com/app-privacy/` |
 
