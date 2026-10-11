@@ -1,37 +1,39 @@
 # App Store Screenshots — v1.0
 
-**Status:** T-181 — directory + checklist staged; capture happens in Xcode/simulator.
+**Status:** T-181 / DUT-1210 — captured 2026-10-10 from `main` @ `123ebabf` (Debug simulator build, live blog content, light mode). Not yet uploaded to App Store Connect. Framing/captions and the final carousel pick are Spencer's design call.
 
 ## Required device sizes
 
-Apple requires screenshots for the largest device per family. As of iOS 17+:
+Apple requires screenshots for the largest device per family:
 
-- [ ] **iPhone 6.7"** — iPhone 16 Pro Max (or iPhone 15 Pro Max). 1290 × 2796 px.
-- [ ] **iPhone 6.5"** — only required if you ever supported iPhone 8/X line; iOS 17+ apps can skip.
-- [ ] **iPad 13"** — iPad Pro 12.9" (6th gen). 2064 × 2752 px.
+- [x] **iPhone 6.9"** — iPhone 17 Pro Max. 1320 × 2868 px.
+- [x] **iPad 13"** — iPad Pro 13-inch (M5). 2064 × 2752 px.
 
-Marketing minimum: **2 per device**. Recommended: **5 per device** to fill the carousel.
+App Previews (video) are optional and not captured.
 
-## What to capture
+## What is captured
 
-For each device size, capture these screens in this order (so the carousel tells a story):
+Six screens per device, in carousel order:
 
-1. **Feed** with a couple of clearly-photographed recipes in view. Status bar should show a clean time and full battery — use simulator's Status Bar override.
-2. **Recipe detail** (something visually appealing — the bourbon berry brown sugar cake is a known good one). Scrolled so the hero image and the start of the ingredients list are both visible.
-3. **Recipe detail** scrolled to the instructions, ideally with one ingredient checked off so the UI tells you what's interactive.
-4. **Search** showing a search like "skillet" with multiple matched results.
-5. **Saved** with 3–4 saved recipes, plus the home button glimpse showing the bookmark-filled state.
+1. **Feed** — Recipes & Articles grid.
+2. **Recipe detail** — Cast Iron Hamburger Steak with Mushroom Gravy, hero + intro.
+3. **Cook Mode** — step 4 of 10 with the 4:00 step timer.
+4. **Heat Coach** — coal count for a 12" oven, Even style.
+5. **First Cookout** — the guided path with "Start Here".
+6. **Saved** — saved recipes grid (4 on iPhone, 6 on iPad).
+
+On iPad, Heat Coach and First Cookout present as a form sheet over Cooking Tools; that is the current UI, not a capture artifact.
 
 ## How to capture
 
+Build and install a simulator build from `main`, launch with onboarding suppressed, then navigate by hand and screenshot each screen:
+
 ```bash
-# In the simulator, open the app, navigate to the screen, then:
-xcrun simctl io booted screenshot ~/Developer/DODApp/Marketing/Screenshots/iphone-6.7-feed.png
+SIMCTL_CHILD_DOD_SUPPRESS_ONBOARDING=1 xcrun simctl launch booted com.dutchovendaddy.DODApp
+xcrun simctl io booted screenshot Marketing/Screenshots/iphone-6.9-1-feed.png
 ```
 
-Or use Xcode → Devices → screenshot button.
-
-Status bar — clean it up before each shot:
+Status bar — clean it up before the first shot:
 
 ```bash
 xcrun simctl status_bar booted override \
@@ -42,26 +44,36 @@ xcrun simctl status_bar booted override \
     --wifiBars 3
 ```
 
+`simctl` writes PNGs with an alpha channel, which App Store Connect rejects. Strip it before committing:
+
+```bash
+magick mogrify -alpha off -strip Marketing/Screenshots/*.png
+```
+
+`UITests/Screenshots/ScreenshotTests.swift` is the May 2026 automated harness. It walks the old five-screen set (Feed, Detail x2, Search, Saved) against the old UI and was not used for this capture.
+
 ## File naming
 
 ```
 {device}-{order}-{screen}.png
 
-Examples:
-iphone-6.7-1-feed.png
-iphone-6.7-2-detail-hero.png
-iphone-6.7-3-detail-instructions.png
+iphone-6.9-1-feed.png
+iphone-6.9-2-recipe-detail.png
+iphone-6.9-3-cook-mode.png
+iphone-6.9-4-heat-coach.png
+iphone-6.9-5-first-cookout.png
+iphone-6.9-6-saved.png
 ipad-13-1-feed.png
-ipad-13-2-detail.png
+...
 ```
 
 This convention sorts correctly when bulk-uploading to App Store Connect.
 
 ## Pre-flight checks
 
-- [ ] App is built in Release configuration (so Debug overlay isn't visible)
-- [ ] Sample data on screen makes sense (no test placeholders, no "Lorem ipsum")
-- [ ] Status bar overridden as above
-- [ ] No notifications visible
-- [ ] No keyboard accidentally visible
-- [ ] Light mode AND dark mode versions captured separately (App Store accepts both — use light for primary slot)
+- [x] Sample data on screen makes sense (no test placeholders, no "Lorem ipsum")
+- [x] Status bar overridden as above
+- [x] No notifications visible
+- [x] No keyboard accidentally visible
+- [x] No alpha channel (`sips -g hasAlpha` reports `no`)
+- [ ] Dark mode set (optional; light is the primary slot)
