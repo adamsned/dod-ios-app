@@ -104,6 +104,12 @@ targets:
         # transport no-ops and sends NOTHING to Google.
         GA4MeasurementID: "$(GA4_MEASUREMENT_ID)"
         GA4APISecret: "$(GA4_API_SECRET)"
+        # DUT-1397: remote-push backend. Read by `PushConfig.load()`. Both come
+        # from build settings, blank in the committed App/DODApp.xcconfig (no
+        # secret in this public repo); blank = the push uploader is a logged
+        # no-op. CI injects them at archive time (release.yml).
+        DODPushBaseURL: "$(DOD_PUSH_BASE_URL)"
+        DODPushSharedSecret: "$(DOD_PUSH_APP_SECRET)"
         # Export-compliance self-classification. `false` declares the app
         # uses ONLY exempt encryption — i.e. TLS via URLSession, SHA-256
         # hashing via CryptoKit, Keychain via Security framework. Apple

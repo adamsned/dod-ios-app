@@ -242,6 +242,7 @@ struct RootView: View {
             // foregrounds us here; drain the pending-route flag and route.
             if $1 == .active {
                 consumePendingControlRoute()
+                PushRuntime.start()  // DUT-1397: token refresh + failed-upload retry
                 // DUT-635 (wire) — re-poll the Apple credential on foreground.
                 Task { await validateAppleCredentialOnForeground() }
             }

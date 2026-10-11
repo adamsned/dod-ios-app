@@ -255,6 +255,10 @@ jobs:
           # secrets are unset — the transport then no-ops and sends nothing.
           GA4_MEASUREMENT_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
           GA4_API_SECRET: ${{ secrets.GA4_API_SECRET }}
+          # DUT-1397: remote-push backend (DODPushBaseURL / DODPushSharedSecret).
+          # Empty when unset - the token uploader then no-ops.
+          DOD_PUSH_BASE_URL: ${{ secrets.DOD_PUSH_BASE_URL }}
+          DOD_PUSH_APP_SECRET: ${{ secrets.DOD_PUSH_APP_SECRET }}
         run: |
           set -euo pipefail
           if [ -z "${APPLE_TEAM_ID:-}" ]; then
@@ -276,6 +280,8 @@ jobs:
             DOD_COMMENT_API_KEY="${DOD_COMMENT_API_KEY:-}" \
             GA4_MEASUREMENT_ID="${GA4_MEASUREMENT_ID:-}" \
             GA4_API_SECRET="${GA4_API_SECRET:-}" \
+            DOD_PUSH_BASE_URL="${DOD_PUSH_BASE_URL:-}" \
+            DOD_PUSH_APP_SECRET="${DOD_PUSH_APP_SECRET:-}" \
             archive
 
       # ---------------------------------------------------------------------
