@@ -26,14 +26,13 @@ echo
 echo "==> Setting the two encrypted secrets (values are prompted; never written to the repo)"
 echo "    APPLE_PRIVATE_KEY — paste the FULL .p8 contents (including the BEGIN/END lines):"
 npx wrangler secret put APPLE_PRIVATE_KEY
-echo "    APP_SHARED_SECRET — a long random string (put the SAME value in SiwaRevokeConfig.production):"
+echo "    APP_SHARED_SECRET — a long random string (the SAME value goes in the SIWA_REVOKE_APP_SECRET GitHub secret):"
 npx wrangler secret put APP_SHARED_SECRET
 
 echo
 echo "==> Done. Two final steps:"
-echo "    1. Copy the Worker URL printed above into SiwaRevokeConfig.production.baseURLString"
-echo "       (Packages/DODSupport/Sources/DODSupport/SiwaRevokeClient.swift)."
-echo "    2. Put the same APP_SHARED_SECRET into SiwaRevokeConfig.production.appKey."
+echo "    1. gh secret set SIWA_REVOKE_BASE_URL     # the Worker URL printed above"
+echo "    2. gh secret set SIWA_REVOKE_APP_SECRET   # the same APP_SHARED_SECRET"
 echo "    Then sanity-check:  curl -sS -X POST \"\$WORKER_URL/revoke\" \\"
 echo "       -H \"X-DOD-App-Key: \$APP_SHARED_SECRET\" -H 'Content-Type: application/json' \\"
-echo "       -d '{\"refreshToken\":\"not-a-real-token\"}'   # -> {\"revoked\":false,\"appleStatus\":400}"
+echo "       -d '{\"refreshToken\":\"not-a-real-token\"}'   # -> {\"revoked\":true}"

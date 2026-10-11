@@ -92,6 +92,19 @@ struct SiwaRevokeClientTests {
         }
     }
 
+    @Test func infoDictionaryConfigNeedsBothValues() {
+        let url = "https://dod-siwa-revoke.example.workers.dev"
+        let full = SiwaRevokeConfig(infoDictionary: ["SiwaRevokeBaseURL": url, "SiwaRevokeSharedSecret": "s"])
+        #expect(full.isConfigured)
+        #expect(full.baseURLString == url)
+        #expect(full.appKey == "s")
+        // Blank is what an un-injected `$(SIWA_REVOKE_…)` build setting expands to.
+        let noSecret = SiwaRevokeConfig(infoDictionary: ["SiwaRevokeBaseURL": url, "SiwaRevokeSharedSecret": ""])
+        #expect(!noSecret.isConfigured)
+        let noURL = SiwaRevokeConfig(infoDictionary: ["SiwaRevokeBaseURL": "", "SiwaRevokeSharedSecret": "s"])
+        #expect(!noURL.isConfigured)
+    }
+
     @Test func liveConfigIsConfigured() {
         #expect(Self.liveConfig.isConfigured)
     }
