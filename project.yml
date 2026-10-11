@@ -94,6 +94,12 @@ targets:
         # secret (see .github/workflows/release.yml). Blank in dev / PR builds,
         # where the app omits the header.
         DODCommentAPIKey: "$(DOD_COMMENT_API_KEY)"
+        # DUT-98: Sign in with Apple revoke Worker (5.1.1(v)). Read by
+        # `SiwaRevokeConfig.production`. Blank in the committed xcconfig (no
+        # secret in this public repo); blank = account deletion skips the
+        # token revoke. CI injects both at archive time (release.yml).
+        SiwaRevokeBaseURL: "$(SIWA_REVOKE_BASE_URL)"
+        SiwaRevokeSharedSecret: "$(SIWA_REVOKE_APP_SECRET)"
         # DUT-680: GA4 Measurement Protocol creds, read by GA4Transport via
         # `Bundle.main.object(forInfoDictionaryKey:)` to mirror in-app
         # recipe/article OPENS into Google Analytics 4 as content traffic. The

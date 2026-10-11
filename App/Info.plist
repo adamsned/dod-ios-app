@@ -59,6 +59,10 @@
 	<string>Take a photo of your finished cook to share it and tag Dutch Oven Daddy.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>SiwaRevokeBaseURL</key>
+	<string>$(SIWA_REVOKE_BASE_URL)</string>
+	<key>SiwaRevokeSharedSecret</key>
+	<string>$(SIWA_REVOKE_APP_SECRET)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
