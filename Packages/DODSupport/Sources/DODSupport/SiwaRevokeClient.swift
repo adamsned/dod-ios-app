@@ -1,11 +1,11 @@
 import Foundation
 
 /// Configuration for the **Sign in with Apple revoke Worker** (DUT-98 / T-797):
-/// the deployed Cloudflare Worker's base URL + the shared `X-DOD-App-Key`. The
-/// owner fills ``production`` in after `wrangler deploy` (see
-/// `backend/siwa-revoke/README.md`). Until then ``isConfigured`` is `false`, so
-/// the app degrades gracefully — no exchange/revoke calls — and Sign in with
-/// Apple still works for TestFlight without the Worker.
+/// the deployed Cloudflare Worker's base URL + the shared `X-DOD-App-Key`.
+/// ``production`` reads both from the app's Info.plist, injected at archive
+/// time (see `backend/siwa-revoke/README.md`). When either is blank
+/// ``isConfigured`` is `false`, so dev / PR builds degrade gracefully — no
+/// exchange/revoke calls — and Sign in with Apple still works without the Worker.
 public struct SiwaRevokeConfig: Sendable {
 
     public let baseURLString: String
@@ -16,16 +16,22 @@ public struct SiwaRevokeConfig: Sendable {
         self.appKey = appKey
     }
 
-    /// Replace both fields after deploying the Worker. The placeholders are
-    /// sentinels — ``isConfigured`` stays `false` while they're present.
-    public static let production = SiwaRevokeConfig(
-        baseURLString: "REPLACE_WITH_WORKER_URL",
-        appKey: "REPLACE_WITH_APP_SHARED_SECRET"
-    )
+    /// Info.plist `SiwaRevokeBaseURL` / `SiwaRevokeSharedSecret`, which
+    /// project.yml fills from the `SIWA_REVOKE_BASE_URL` / `SIWA_REVOKE_APP_SECRET`
+    /// build settings — blank in the committed xcconfig (no secret in this
+    /// public repo), injected at archive time by release.yml.
+    public static let production = SiwaRevokeConfig(infoDictionary: Bundle.main.infoDictionary ?? [:])
 
-    /// `true` only once a real `https` Worker URL + a real app key are set.
+    init(infoDictionary: [String: Any]) {
+        self.init(
+            baseURLString: infoDictionary["SiwaRevokeBaseURL"] as? String ?? "",
+            appKey: infoDictionary["SiwaRevokeSharedSecret"] as? String ?? ""
+        )
+    }
+
+    /// `true` only once a real `https` Worker URL + a non-blank app key are set.
     public var isConfigured: Bool {
-        baseURLString.hasPrefix("https://") && !appKey.hasPrefix("REPLACE")
+        baseURLString.hasPrefix("https://") && !appKey.isEmpty
     }
 }
 
