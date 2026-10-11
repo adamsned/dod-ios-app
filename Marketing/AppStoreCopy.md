@@ -5,13 +5,13 @@
 ## App name (max 30 characters)
 
 ```
-Dutch Oven Daddy
+Dutch Oven Daddy: Cast Iron
 ```
 
 ## Subtitle (max 30 characters)
 
 ```
-Cast iron cooking recipes
+Skillet & Campfire Recipes
 ```
 
 ## Promotional Text (max 170 chars — editable post-launch without a new build)
@@ -44,7 +44,7 @@ Built by a lifelong Dutch oven and cast iron cook, for the community that gather
 ## Keywords (max 100 chars total, comma-separated)
 
 ```
-skillet,seasoning,charcoal,briquette,campfire,camping,bbq,outdoor,tips,guide,care,cookware
+cooking,camping,charcoal,briquette,calculator,sourdough,bread,baking,bbq,outdoor,cobbler,seasoning
 ```
 
 ## What's New (release notes) for v1.0
