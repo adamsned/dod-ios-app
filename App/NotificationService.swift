@@ -10,8 +10,8 @@ import UserNotifications
 /// requesting authorization when the Settings toggle is flipped ON
 /// (AC-42.1) and scheduling a type-aware local notification for a newly
 /// published post (AC-42.2 / AC-42.3). There is **no** Apple Push / APNs
-/// in v1 — no device token, no remote payload, no server (CL-100 decision
-/// 1). The single suppression gate (AC-42.4) lives in
+/// from this class (DUT-1397 adds remote push separately: see
+/// `RemotePushRegistrar`; this service still only schedules LOCAL ones). The single suppression gate (AC-42.4) lives in
 /// ``scheduleNewPostNotification(title:postKind:recipeID:)``: it schedules
 /// nothing unless the persisted toggle is ON **and** the OS has granted
 /// authorization, delegating that truth-table decision to the pure
@@ -74,7 +74,8 @@ final class NotificationService {
     ///   - postKind: drives the title/body copy + the deep-link host.
     ///   - recipeID: the WP post id baked into the `dod://<kind>/<id>`
     ///     deep link stamped into `userInfo` for the tap handler.
-    func scheduleNewPostNotification(title: String, postKind: PostKind, recipeID: Int) async {
+    @discardableResult
+    func scheduleNewPostNotification(title: String, postKind: PostKind, recipeID: Int) async -> Bool {
         // DUT-1333 — gate PER KIND: recipe notifications honor the "When New
         // Recipes Drop" toggle, article notifications the "When a New Article
         // Drops" toggle.
@@ -90,7 +91,7 @@ final class NotificationService {
                 systemAuthorized: authorized
             )
         else {
-            return
+            return false
         }
 
         let plan = NotificationContentBuilder.plan(
@@ -115,8 +116,20 @@ final class NotificationService {
         )
         do {
             try await center.add(request)
+            return true
         } catch {
             DODLog.app.error("notification schedule failed: \(String(describing: error))")
+            return false
         }
+    }
+
+    /// DUT-1397 — post ids of pushes still in Notification Center. A push shown
+    /// while the app was not running never reached the app, so this is how the
+    /// background poller learns the post was already announced.
+    func deliveredPostIDs() async -> Set<Int> {
+        Set(
+            await center.deliveredNotifications().compactMap {
+                NotificationCoordinator.postID(fromUserInfo: $0.request.content.userInfo)
+            })
     }
 }

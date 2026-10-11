@@ -45,6 +45,10 @@
 	<string>5</string>
 	<key>DODCommentAPIKey</key>
 	<string>$(DOD_COMMENT_API_KEY)</string>
+	<key>DODPushBaseURL</key>
+	<string>$(DOD_PUSH_BASE_URL)</string>
+	<key>DODPushSharedSecret</key>
+	<string>$(DOD_PUSH_APP_SECRET)</string>
 	<key>GA4APISecret</key>
 	<string>$(GA4_API_SECRET)</string>
 	<key>GA4MeasurementID</key>

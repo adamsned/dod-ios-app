@@ -233,6 +233,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             self?.handleNewPostsRefresh(refreshTask)
         }
         scheduleAppRefresh()
+        PushRuntime.start()  // DUT-1397: (re)register for remote push every launch
         return true
     }
 
