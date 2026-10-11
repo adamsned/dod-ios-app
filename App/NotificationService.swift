@@ -130,6 +130,7 @@ final class NotificationService {
         Set(
             await center.deliveredNotifications().compactMap {
                 NotificationCoordinator.postID(fromUserInfo: $0.request.content.userInfo)
-            })
+            }
+        )
     }
 }

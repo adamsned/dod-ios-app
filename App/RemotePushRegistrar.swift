@@ -68,13 +68,16 @@ final class RemotePushRegistrar {
 @MainActor
 enum PushRuntime {
     static let uploader = PushTokenUploader(
-        client: AppDependencies.makeHTTPClient(), config: PushConfig.load())
+        client: AppDependencies.makeHTTPClient(),
+        config: PushConfig.load()
+    )
 
     static let registrar = RemotePushRegistrar(
         isAuthorized: { await NotificationService().isAuthorized() },
         registerWithAPNs: { UIApplication.shared.registerForRemoteNotifications() },
         unregisterFromAPNs: { UIApplication.shared.unregisterForRemoteNotifications() },
-        uploader: uploader)
+        uploader: uploader
+    )
 
     private static var observer: NSObjectProtocol?
 
@@ -82,7 +85,9 @@ enum PushRuntime {
     static func start() {
         if observer == nil {
             observer = NotificationCenter.default.addObserver(
-                forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+                forName: UserDefaults.didChangeNotification,
+                object: nil,
+                queue: .main
             ) { _ in Task { @MainActor in await registrar.reconcile(force: false) } }
         }
         Task { await registrar.reconcile(force: true) }

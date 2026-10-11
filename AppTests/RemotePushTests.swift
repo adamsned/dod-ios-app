@@ -1,5 +1,5 @@
-import DODNetworking
 import DODFeatureFeed
+import DODNetworking
 import Foundation
 import Testing
 
@@ -122,7 +122,10 @@ struct RemotePushTests {
         return (reg, counter)
     }
 
-    final class Counter { var registers = 0; var unregisters = 0 }
+    final class Counter {
+        var registers = 0
+        var unregisters = 0
+    }
 
     @Test(arguments: [
         (true, false, true, true), (false, true, true, true), (true, true, true, true),
@@ -190,7 +193,8 @@ struct RemotePushTests {
 
     @Test func localNotificationUserInfoStillRoutes() {
         #expect(
-            NotificationCoordinator.intent(fromUserInfo: ["dod.deeplink": "dod://recipe/5"]) == .openRecipe(id: 5))
+            NotificationCoordinator.intent(fromUserInfo: ["dod.deeplink": "dod://recipe/5"]) == .openRecipe(id: 5)
+        )
     }
 
     // MARK: dedupe

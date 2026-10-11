@@ -12,7 +12,10 @@ extension AppDelegate {
         let registrar = PushRuntime.registrar
         Task { @MainActor in
             await PushRuntime.uploader.didReceive(
-                token: deviceToken, newRecipes: registrar.newRecipes, newArticles: registrar.newArticles)
+                token: deviceToken,
+                newRecipes: registrar.newRecipes,
+                newArticles: registrar.newArticles
+            )
         }
     }
 
