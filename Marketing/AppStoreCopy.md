@@ -113,7 +113,9 @@ App Store Connect computes the rating from these answers; do not assume 4+.
 Paste into App Store Connect → App Review Information → Notes.
 
 ```
-No account is needed to review the app. Every feature works as a guest; Sign in with Apple and Sign in with Google are optional, offered from the profile screen.
+No account, user name or password is needed to review the app. It opens straight to the recipe feed and every feature works as a guest.
+
+Rating or commenting on a recipe shows "Set Up Your Profile". Enter any display name and email to continue. The profile is stored only on the device: there is no password, no verification email and no server account, so there is no demo account to provide. Sign in with Apple and Sign in with Google are optional alternatives and can be tested with any Apple or Google account.
 
 Account deletion (5.1.1(v)): open the profile and tap Delete Profile. This erases the profile and sign-in details from the device and revokes the Sign in with Apple token through a first-party, stateless Cloudflare Worker that calls Apple's /auth/revoke. Google sign-in is disconnected the same way.
 
