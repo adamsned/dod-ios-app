@@ -1,0 +1,19 @@
+name = "dod-grocery-order"
+main = "src/index.ts"
+compatibility_date = "2026-06-20"
+
+# Non-secret config. The secrets (DOD_APP_KEY, INSTACART_API_KEY) are NOT here —
+# set them with `wrangler secret put <NAME>` so they're encrypted and never
+# committed. The non-secret config below can live here as plain vars.
+[vars]
+# Prod Instacart host. Set to "https://connect.dev.instacart.tools" for the
+# sandbox/dev key (or override per-env below).
+INSTACART_BASE_URL = "https://connect.instacart.com"
+# Optional Walmart affiliate id appended to the fallback search URL. Leave blank
+# to omit the param entirely.
+WALMART_AFFILIATE_ID = ""
+
+# Secrets to set after first deploy (encrypted, prompt for the value):
+#   wrangler secret put DOD_APP_KEY         # a long random string; the iOS app sends it as X-DOD-App-Key
+#   wrangler secret put INSTACART_API_KEY   # the Instacart IDP API key (Bearer)
+#   wrangler secret put WALMART_API_KEY     # FUTURE (walmart-api) — not used yet

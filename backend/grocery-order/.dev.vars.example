@@ -1,0 +1,12 @@
+# Copy to `.dev.vars` (gitignored) for local `wrangler dev` testing.
+# In production these are set via `wrangler secret put` (the secret ones) and
+# wrangler.toml [vars] (the non-secret config) — NOT this file.
+DOD_APP_KEY=replace-with-a-long-random-string
+INSTACART_API_KEY=your-instacart-idp-api-key
+# Point at the Instacart sandbox for the dev/sandbox key; use
+# https://connect.instacart.com for the production key.
+INSTACART_BASE_URL=https://connect.dev.instacart.tools
+# Optional — appended to the Walmart fallback search URL when set.
+WALMART_AFFILIATE_ID=
+# FUTURE (walmart-api): unlocks the real add-to-cart path. Not used yet.
+# WALMART_API_KEY=
