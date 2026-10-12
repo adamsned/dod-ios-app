@@ -43,6 +43,16 @@ import UIKit
 /// CL-136, CL-137, CL-140.
 public struct ProfileEditView: View {
 
+    /// (this bug) — Return-key focus routing for the Display Name / Email
+    /// TextFields in `+AppleSignIn.swift`'s `editableIdentityFields` (mirrors
+    /// `GuestIdentitySheet.FieldKind`). Nested here (not in the extension)
+    /// because a stored `@FocusState` property must live on the `View` struct
+    /// itself — extensions can't add stored properties.
+    enum FocusField: Hashable {
+        case displayName
+        case email
+    }
+
     let store: any ProfileStoring
     let existingProfile: UserProfile?
     /// Closure invoked after a successful save / sign-out / delete so
@@ -164,6 +174,11 @@ public struct ProfileEditView: View {
     /// dialog).
     @State var isPickerPresented = false
     #endif
+
+    /// (this bug) — Return-key focus state for the Display Name / Email
+    /// fields. Non-private so `ProfileEditView+AppleSignIn.swift`'s
+    /// `editableIdentityFields` can read/write it.
+    @FocusState var focusedField: FocusField?
 
     /// Non-private so `ProfileEditView+DirtyState.swift` can call it
     /// from the back-chevron tap closure (T-743 / CL-140 / AC-44.16).
@@ -367,6 +382,8 @@ public struct ProfileEditView: View {
     // - `signOutSection` + `profileStatsSection` (DUT-417) → `+SignOut.swift` / `+Stats.swift`.
     // - `isFormValid` + per-field errors (DUT-414 / DUT-415) → `+Validation.swift`.
     // - `handleSave()` → `+Save.swift` (T-745 / CL-142).
+    // - `editableIdentityFields` (Return-key focus routing via `FocusField` /
+    //   `focusedField` above) → `+AppleSignIn.swift` (this bug).
     // - `handleSignOut()` / `handleDelete()` / `teardown(revoke:)` → `+Teardown.swift` (DUT-217).
     // - Photo handlers (`loadPickedImage` / `handleCroppedImage` / `handleRemovePhoto`) → `+Photo.swift`.
 }

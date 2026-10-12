@@ -184,19 +184,21 @@ public struct ShoppingListView: View {
     /// append their rows. A saved recipe often arrives with empty `ingredients`
     /// (detail never fetched), so hydrating first is what makes the list
     /// actually populate. `isBuilding` gates the overlay for the fetch window.
+    ///
+    /// DUT — order fix: this used to collect the concurrent hydrations with a
+    /// bare `for await recipe in group { out.append(recipe) }`, which yields
+    /// tasks in COMPLETION order, not submission order. A cached/fast recipe
+    /// racing ahead of a slow network fetch silently reordered the rows added
+    /// to the list, breaking ``ShoppingListBuilderSheet/onBuild``'s documented
+    /// contract ("Called with the user's selected recipes (in `recipes`
+    /// order)"). ``hydrateInOrder(_:hydrate:)`` keeps the hydration concurrent
+    /// but re-seats each result at its original index, so the built list's row
+    /// order is deterministic and matches what the cook picked, regardless of
+    /// which fetch happens to land first.
     private func build(from selected: [Recipe]) {
         isBuilding = true
         Task {
-            let hydrated = await withTaskGroup(of: Recipe.self) { group in
-                for recipe in selected {
-                    group.addTask { await hydrate(recipe) }
-                }
-                var out: [Recipe] = []
-                for await recipe in group {
-                    out.append(recipe)
-                }
-                return out
-            }
+            let hydrated = await Self.hydrateInOrder(selected, hydrate: hydrate)
             // DUT — crossfade EmptyState→list when the first build populates
             // the list, mirroring the clear/last-item removal transitions
             // (skipped under Reduce Motion).
@@ -215,6 +217,9 @@ public struct ShoppingListView: View {
             isBuilding = false
         }
     }
+
+    // `hydrateInOrder(_:hydrate:)` lives in `ShoppingListView+HydrateInOrder.swift`
+    // (`file_length` cap).
 
     /// DUT-487 / T-906 — the populated-state "Add recipes" `+`. Opens the same
     /// picker as the empty state; confirming appends the new recipes' rows

@@ -40,10 +40,9 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     /// Per-recipe download-call counter so AC-35.4's "no second image
     /// fetch on re-tap" idempotency contract can be locked.
     var downloadCallCount: [Int: Int] = [:]
-    /// When non-nil, `downloadForOffline(recipe:)` throws this error
-    /// before flipping any state — lets tests cover the failure branch
-    /// without rigging up `ImageLoader` plumbing.
+    /// Throws before flipping state — covers the failure branch (no `ImageLoader` rig-up needed).
     var downloadShouldFail = false
+    var toggleSavedShouldFail = false
 
     // MARK: - Article-classification test surface (US-37 / CL-63 / T-640)
 
@@ -120,10 +119,8 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var cachedCommentWrites: [(comments: [RecipeComment], postID: Int)] = []
     var savedGuestIdentities: [(name: String, email: String)] = []
 
-    // Spy counters introduced for the rendering regression suite — they
-    // let those tests assert that `loadRatingsAndComments()` actually
-    // routed through the dependency surface, even when the cached recipe
-    // path made the fetch skip.
+    // Spy counters (rendering regression suite): prove `loadRatingsAndComments()`
+    // routed through the dependency surface, even on a cached-recipe fetch skip.
     var fetchRatingSummaryCallCount = 0
     var cachedCommentsCallCount = 0
     var fetchCommentsCallCount = 0
@@ -132,11 +129,13 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     /// returning. Lets a test prove that a hung ratings fetch never
     /// stalls the recipe-detail load state itself.
     var fetchRatingSummaryGate: (@Sendable () async -> Void)?
+    var fetchHTMLGate: (@Sendable () async -> Void)?  // DUT-1326 — mirrors the gate above.
 
     func cachedRecipe(id: Int) async throws -> Recipe? { cachedRecipes[id] }
 
     func fetchHTML(for url: URL) async throws -> String {
         fetchCount += 1
+        if let gate = fetchHTMLGate { await gate() }
         if fetchShouldFail { throw URLError(.notConnectedToInternet) }
         return htmlToReturn
     }
@@ -174,6 +173,7 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     func isSaved(id: Int) async throws -> Bool { savedIDs.contains(id) }
 
     func toggleSaved(id: Int) async throws -> Bool {
+        if toggleSavedShouldFail { throw URLError(.cannotWriteToFile) }
         if savedIDs.contains(id) {
             savedIDs.remove(id)
             return false

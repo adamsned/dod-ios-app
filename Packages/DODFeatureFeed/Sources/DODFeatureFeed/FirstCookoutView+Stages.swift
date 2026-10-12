@@ -147,6 +147,14 @@ extension FirstCookoutView {
                         .accessibilityLabel(  // DUT-401 — spell "5:03" out for VoiceOver
                             bakeCountdownLabel(active.remaining(at: context.date))
                         )
+                        // The label above ticks every second along with the
+                        // `TimelineView`. Without this trait VoiceOver re-announces the
+                        // full spelled-out remaining time on every tick — a chatty,
+                        // unusable stream while a cook is stepping away from a hands-
+                        // free bake. `.updatesFrequently` tells VoiceOver this element
+                        // updates on its own cadence, so it throttles automatic
+                        // re-announcements instead of speaking every single change.
+                        .accessibilityAddTraits(.updatesFrequently)
                 }
                 Text(bakeStepAwayText)
                     .dodFont(DODType.caption)

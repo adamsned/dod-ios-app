@@ -1,0 +1,2 @@
+timestamp	agent	model	label	task	outcome
+2026-07-18T19:48:00Z	ned/guestidentity-submit	qwen2.5-coder:14b	guestidentity-submit-fix	GuestIdentitySheet FocusState/onSubmit wiring for Name->Email->submit	ACCEPTED (matched intended API surface almost verbatim; reviewer swapped if/else-if for switch for style consistency)

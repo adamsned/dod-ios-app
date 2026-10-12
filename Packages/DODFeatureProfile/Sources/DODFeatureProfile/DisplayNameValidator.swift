@@ -30,19 +30,14 @@ public enum DisplayNameValidator {
         guard !normalized.isEmpty else { return .empty }
 
         // 1. Substring blocklist — terms long/unambiguous enough that a substring
-        //    match rarely catches an innocent name (run against the normalized,
-        //    spacing/leet-stripped form so "f.u_c k" and "phuck" are caught).
-        //    The allowlist check below is deliberately keyed on the PRE-collapse
-        //    letters-only form, not `normalized`: "niger" (the country, single
-        //    "g") and "nigger" (the slur, doubled "g") collapse to the exact
-        //    same string, so comparing against `normalized` couldn't tell them
-        //    apart and would let the slur back in. Comparing before the
-        //    repeated-letter collapse step keeps that distinction.
-        let preCollapse = Self.lettersOnlyNormalized(trimmed)
-        if !Self.substringFalsePositiveAllowlist.contains(preCollapse) {
-            for term in Self.blockedSubstrings where normalized.contains(term) {
-                return .inappropriate
-            }
+        //    match rarely catches an innocent name (run against a normalized,
+        //    spacing/leet-stripped haystack so "f.u_c k" and "phuck" are caught).
+        //    See ``substringCheckHaystack(_:)`` for why the allowlist exemption
+        //    is applied per whitespace-separated word rather than to the name
+        //    as a single blob.
+        let haystack = Self.substringCheckHaystack(trimmed)
+        for term in Self.blockedSubstrings where haystack.contains(term) {
+            return .inappropriate
         }
 
         // 2. Barred figures — match the normalized full string against notorious
@@ -121,6 +116,53 @@ public enum DisplayNameValidator {
         "0": "o", "1": "i", "!": "i", "3": "e", "4": "a", "@": "a",
         "5": "s", "$": "s", "7": "t", "8": "b", "9": "g", "2": "z",
     ]
+
+    /// The haystack the substring blocklist (``blockedSubstrings``) is scanned
+    /// against: `trimmed` split into whitespace-separated words, each checked
+    /// individually against ``substringFalsePositiveAllowlist`` (comparing its
+    /// PRE-collapse letters-only form, same reasoning as ``lettersOnlyNormalized(_:)``'s
+    /// doc — "niger" vs "nigger" only differ before the repeated-letter collapse).
+    /// A word that matches the allowlist is dropped entirely; every other word
+    /// contributes its fully-``normalize``d form, concatenated in order with no
+    /// separator (matching `normalize(_:)`'s own space-squashing shape) so a
+    /// spacing/leet evasion split across separate words — "F U C K", "@sshole"
+    /// leet WITHIN one word — still collapses back together and trips a match.
+    ///
+    /// **Why per-word and not whole-string (the pre-fix behavior).** The old
+    /// gate only exempted a name when the ENTIRE trimmed string, letters-only,
+    /// equaled exactly "niger"/"nigeria"/"nigerian"/"nigerien". That protected a
+    /// bare `"Niger"` but not `"Nigerian Chef"`, `"Team Nigeria"`, or `"Chef from
+    /// Nigeria"` — `normalize(_:)` strips ALL whitespace before the substring
+    /// scan, so those multi-word names squash to blobs like `"nigerianchef"` /
+    /// `"teamnigeria"`, which still contain `"niger"` (what the slur "nigger"
+    /// normalizes to) as a substring and got wrongly blocked. Excluding the
+    /// allowlisted word per-token — rather than requiring the whole name to
+    /// equal it — fixes every multi-word demonym case while a genuinely
+    /// inappropriate name sharing the string (`"Nigeria Fuck"`) still blocks on
+    /// its OTHER word.
+    ///
+    /// **Why split on whitespace only (not `CharacterSet.alphanumerics.inverted`,
+    /// the split rule the bottom whole-word tokenizer uses).** Leetspeak
+    /// substitutes symbols ("@", "$", "!") and digits for letters WITHIN a
+    /// single intended word. Splitting on every non-alphanumeric character
+    /// would treat those symbols as word boundaries and discard them as bare
+    /// delimiters — losing the leet substitution — before ``lettersOnlyNormalized(_:)``
+    /// ever sees them (e.g. `"@sshole"` would split into just `"sshole"`,
+    /// missing the leading "a" the "@" was standing in for, and no longer
+    /// match `"asshole"`). Whitespace is the one separator that's never itself
+    /// a leet character, so splitting only on it preserves every within-word
+    /// evasion this file already defends against.
+    private static func substringCheckHaystack(_ trimmed: String) -> String {
+        let words = trimmed.split(whereSeparator: { $0.isWhitespace })
+        var haystack = ""
+        for word in words {
+            let wordString = String(word)
+            let preCollapse = Self.lettersOnlyNormalized(wordString)
+            guard !Self.substringFalsePositiveAllowlist.contains(preCollapse) else { continue }
+            haystack += Self.normalize(wordString)
+        }
+        return haystack
+    }
 
     // MARK: - Blocklists
     //

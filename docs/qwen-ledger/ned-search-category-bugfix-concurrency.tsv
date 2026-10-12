@@ -1,0 +1,3 @@
+timestamp	model	prompt_tokens	completion_tokens	total	label
+2026-07-17T19:43:16+00:00	qwen2.5-coder:14b	1124	728	1852	dut314-hydration-clobber-fix-draft
+2026-07-17T19:43:16+00:00	qwen2.5-coder:14b	1757	600	2357	dut314-hydration-race-regression-test-draft

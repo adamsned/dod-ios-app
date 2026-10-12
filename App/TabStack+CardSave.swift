@@ -1,3 +1,4 @@
+import DODAnalytics
 import DODDomain
 import DODFeatureRecipeDetail
 import DODPersistence
@@ -25,19 +26,35 @@ extension TabStack {
     /// flip their optimistic `savedRecipeIDs` membership BEFORE calling `onSave`;
     /// on a `false` return they re-invert it so a failed write doesn't strand the
     /// menu label (and the widget snapshot) showing a save that never persisted.
+    ///
+    /// DUT-1322 — mirrors the telemetry parity of the detail-screen bookmark
+    /// tap (`RecipeDetailViewModel.toggleSaved()`): the card long-press save
+    /// path previously performed the same store write with zero analytics,
+    /// so every Feed/Search/Saved/Category card save or unsave was invisible
+    /// downstream. `recipeSaved`/`recipeUnsaved` are already allowlisted
+    /// tracked events (specs/constitution.md), so this reuses them rather
+    /// than adding a new case. `sendTelemetry` defaults to the production
+    /// singleton so all existing call sites are unaffected; it exists purely
+    /// as a test seam so unit tests never mutate the process-wide
+    /// `Telemetry.shared` singleton.
     @discardableResult
     static func saveFromCard(
         item: RecipeListItem,
         store: RecipeStore,
-        publisher: SavedRecipesWidgetPublisher
+        publisher: SavedRecipesWidgetPublisher,
+        sendTelemetry: @Sendable (AnalyticsEvent) -> Void = { Telemetry.shared.send($0) }
     ) async -> Bool {
+        let nowSaved: Bool
         do {
             try await store.cache(listItem: item)
-            _ = try await store.toggleSaved(id: item.id)
+            nowSaved = try await store.toggleSaved(id: item.id)
         } catch {
             DODLog.persistence.error("save-from-card failed: \(String(describing: error))")
             return false
         }
+        sendTelemetry(
+            nowSaved ? .recipeSaved(recipeID: item.id) : .recipeUnsaved(recipeID: item.id)
+        )
         // T-770 / CL-167 (DUT-76) — `publisher` is built by
         // `AppDependencies.savedWidgetPublisher()` with the hero-image
         // prefetcher, so saving from a card (where the recipe's hero bytes are

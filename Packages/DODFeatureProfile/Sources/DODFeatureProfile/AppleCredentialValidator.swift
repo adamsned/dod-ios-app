@@ -102,8 +102,19 @@ public struct AppleCredentialValidator: Sendable {
     /// Clear the local session immediately — used by the live
     /// `credentialRevokedNotification` observer, where the OS has already told
     /// us the credential is gone (no need to re-poll). Idempotent + best-effort.
+    ///
+    /// DUT-701 — same provider guard as ``validateOnLaunchOrForeground()``. The
+    /// session model is provider-neutral and is reused for Sign in with Google,
+    /// and this notification is posted by `ASAuthorizationAppleIDProvider`
+    /// app-wide, independent of which provider issued the app's CURRENT stored
+    /// session (e.g. a device that once used Sign in with Apple and later
+    /// switched to Sign in with Google can still see a stale Apple credential
+    /// revoked). Without this guard, that notification would wrongly clear an
+    /// unrelated, still-valid Google session — the exact hazard DUT-701 closed
+    /// on the poll path, unpatched here on the live-notification path.
     public func handleCredentialRevoked() async {
-        guard (try? sessionStore.load()) != nil else { return }
+        guard let session = try? sessionStore.load() else { return }
+        guard session.provider == .apple else { return }
         await clearSession()
     }
 

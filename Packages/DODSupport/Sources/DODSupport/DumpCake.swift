@@ -30,7 +30,17 @@ extension DumpCake {
     /// automatically) is the noted follow-up.
     public static let all: [DumpCake] = [
         DumpCake(id: 16370, slug: "lemon-blueberry-dump-cake", title: "Lemon Blueberry Dump Cake"),
-        DumpCake(id: 22294, slug: "peach-dump-cake", title: "Peach Dump Cake"),
+        // DUT-284 fix: this carried id 22294 (the Dutch Oven Heat Coach's
+        // `dutch-oven-temperature-chart` post, which is `GuidedCookout.campfire`'s
+        // `recipeID`) instead of `peach-dump-cake`'s own WP post id (546). The
+        // wrong id logged a cook here as recipeID 22294 to the cook journal (DUT-104)
+        // — colliding with the campfire capstone's id, which falsely satisfied
+        // `GuidedCookout.nextUncookedRung` and marked "Take It to the Campfire" as
+        // already cooked the first time anyone made this dump cake at home, even
+        // though they never took a dish outdoors. Confirmed against the live WP
+        // REST API (`/wp-json/wp/v2/posts?slug=peach-dump-cake` → id 546;
+        // `/wp-json/wp/v2/posts/22294` → `dutch-oven-temperature-chart`).
+        DumpCake(id: 546, slug: "peach-dump-cake", title: "Peach Dump Cake"),
         DumpCake(id: 19904, slug: "dutch-oven-peach-cobbler", title: "Dutch Oven Peach Cobbler"),
         DumpCake(id: 23570, slug: "peach-blueberry-cobbler", title: "Peach Blueberry Cobbler"),
         DumpCake(
@@ -79,7 +89,7 @@ extension GuidedCookout {
         Step(
             id: "gather-gear",
             stage: .gather,
-            title: "Round up your gear and ingredients",
+            title: "Round Up Your Gear and Ingredients",
             coaching:
                 "Three simple things: your fruit, a box of cake mix, and a stick of butter. "
                 + "That's the whole secret. Get it all out and you're halfway there."
@@ -87,7 +97,7 @@ extension GuidedCookout {
         Step(
             id: "light-coals",
             stage: .fire,
-            title: "Get your coals going",
+            title: "Get Your Coals Going",
             coaching:
                 "Coals on the bottom and the lid for a steady bake. I'll tell you exactly how "
                 + "many and where, same as always. You've done this."
@@ -95,7 +105,7 @@ extension GuidedCookout {
         Step(
             id: "dump-and-lid",
             stage: .cook,
-            title: "Dump it, dot it, lid it",
+            title: "Dump It, Dot It, Lid It",
             coaching:
                 "Dump the fruit in, spread the dry cake mix evenly over the top, and slice the "
                 + "butter across it. Do not stir. Lid on, and walk away. The Dutch oven does "
@@ -104,7 +114,7 @@ extension GuidedCookout {
         Step(
             id: "scoop-it-warm",
             stage: .celebrate,
-            title: "Lift the lid",
+            title: "Lift the Lid",
             coaching:
                 "Bubbling, golden, smells like a county fair. Scoop it warm, add ice cream if "
                 + "you've got it, and watch everyone's faces. Snap a photo first."

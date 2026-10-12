@@ -208,8 +208,11 @@ public struct AppleProfileSignIn: Sendable {
     }
 
     /// DUT-928 — the raw `OSStatus` behind a session-save error, when it was a
-    /// Keychain failure (`nil` otherwise), for the on-device diagnostic.
-    private static func keychainStatus(from error: any Error) -> OSStatus? {
+    /// Keychain failure (`nil` otherwise), for the on-device diagnostic. Not
+    /// `private`: ``GoogleProfileSignIn`` reuses this to report the same
+    /// `sessionSaveFailed` shape for its own (this bug's) session-save guard,
+    /// rather than duplicating the `AppleAuthError` unwrap.
+    static func keychainStatus(from error: any Error) -> OSStatus? {
         guard let authError = error as? AppleAuthError,
             case .keychainFailed(let code) = authError
         else { return nil }

@@ -50,7 +50,17 @@ extension SearchViewModel {
                 return
             }
             self.lastCategoryIDsByRecipe = categoryIDs
-            self.lastTotalSecondsByRecipe = totalSeconds
+            // DUT-314 concurrency fix: `kickOffCookTimeHydrationIfNeeded`
+            // (fired as a SIBLING detached Task from the same
+            // `reapplyFilters()` call) writes into this SAME dictionary via a
+            // per-key merge. A destructive full-dictionary replace here would
+            // silently erase that Task's entry whenever it lands first —
+            // merge key-by-key instead, mirroring its idiom, so neither Task
+            // can ever clobber the other's contribution regardless of
+            // completion order.
+            for (id, seconds) in totalSeconds {
+                self.lastTotalSecondsByRecipe[id] = seconds
+            }
             self.lastRecentlyViewedIDs = recentlyViewed
             self.reapplyFilters()
         }

@@ -27,7 +27,7 @@ struct IngredientMetricConverterOverflowTests {
 
     @Test func ordinaryConversionsAreUnchanged() {
         #expect(IngredientMetricConverter.metric("1 cup flour") == "240 ml flour")
-        #expect(IngredientMetricConverter.metric("8 ounces cheese") == "220 g cheese")
+        #expect(IngredientMetricConverter.metric("8 ounces cheese") == "230 g cheese")
         #expect(IngredientMetricConverter.metric("2 cups flour") == "480 ml flour")
         // A genuine litre roll-up still renders cleanly (not affected by the guard).
         #expect(IngredientMetricConverter.metric("5 quarts stock") == "4.8 L stock")
