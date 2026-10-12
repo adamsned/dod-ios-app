@@ -40,3 +40,22 @@ public enum DevDebug {
         defaults.bool(forKey: forceShowOwnerUIKey)
     }
 }
+
+// MARK: - Dev "Testing" triggers (DUT-1340 verification harness)
+//
+// The Dev Debug "Testing" buttons post these; the app-level `DevPopupHarness`
+// (App target, gated on `DevDebug.isUnlocked`) observes them and fires the
+// matching popup over the main app, so the transient Snackbar / OfflineBanner /
+// App Welcome surfaces can be reviewed on demand (e.g. to eyeball a theme).
+// Strip with the rest of Dev Debug — nothing outside the harness posts them.
+extension Notification.Name {
+
+    /// Fire a save-confirmation ``Snackbar`` toast over the app.
+    public static let devFireSaveToast = Notification.Name("dod.dev.fireSaveToast")
+
+    /// Fire the ``OfflineBanner`` over the app for a few seconds.
+    public static let devFireOfflineToast = Notification.Name("dod.dev.fireOfflineToast")
+
+    /// Re-present the App Welcome screen from the top.
+    public static let devLaunchWelcome = Notification.Name("dod.dev.launchWelcome")
+}

@@ -32,20 +32,65 @@ extension SettingsView {
                 }
                 .tint(DODColor.burntOrange)
                 .accessibilityIdentifier("dev-debug-show-owner-ui")
+
+                Button {
+                    fireDevPopup(.devFireSaveToast)
+                } label: {
+                    devTestRow("Fire Save Toast", systemImage: "bookmark.fill")
+                }
+                .accessibilityIdentifier("dev-debug-fire-save-toast")
+
+                Button {
+                    fireDevPopup(.devFireOfflineToast)
+                } label: {
+                    devTestRow("Fire Offline Toast", systemImage: "wifi.slash")
+                }
+                .accessibilityIdentifier("dev-debug-fire-offline-toast")
+
+                Button {
+                    fireDevPopup(.devLaunchWelcome)
+                } label: {
+                    devTestRow("Launch Welcome Screen", systemImage: "hand.wave.fill")
+                }
+                .accessibilityIdentifier("dev-debug-launch-welcome")
             } header: {
                 Text("Dev Debug")
                     .dodFont(DODType.heading)
                     .foregroundStyle(DODColor.label)
             } footer: {
                 Text(
-                    "Developer only. Forces the owner \u{201C}Daddy\u{2019}s Tools\u{201D} UI to show "
-                        + "for design review. It reveals the icons, it does not grant owner "
-                        + "actions. Remove this section before any public release."
+                    "Developer only. \u{201C}Show Daddy\u{2019}s Tools\u{201D} forces the owner UI "
+                        + "for design review (reveals icons, grants nothing). The buttons fire "
+                        + "each transient popup over the app so you can review it on demand "
+                        + "(handy for checking a theme); they close Settings first. Remove this "
+                        + "section before any public release."
                 )
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.labelSecondary)
             }
             .listRowBackground(DODColor.surfaceElevated)
+        }
+    }
+
+    /// One Dev Debug ▸ Testing button row: a burnt-orange SF Symbol + label.
+    private func devTestRow(_ title: String, systemImage: String) -> some View {
+        HStack(spacing: DODSpacing.sm) {
+            Image(systemName: systemImage)
+                .foregroundStyle(DODColor.burntOrange)
+            Text(title)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+        }
+    }
+
+    /// Dismiss Settings, then post the dev popup notification once the sheet has
+    /// finished animating out — so the popup fires over the main app (and the
+    /// App Welcome cover doesn't collide with the still-presented sheet). The
+    /// app-level `DevPopupHarness` observes and renders it.
+    private func fireDevPopup(_ name: Notification.Name) {
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            NotificationCenter.default.post(name: name, object: nil)
         }
     }
 }
