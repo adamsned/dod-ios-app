@@ -57,6 +57,13 @@ public struct RecipeDetailRatingsSection: View {
     /// mirroring the `openURL` access pattern above.
     @State var commenterForSheet: RecipeComment?
 
+    /// Gates the "Block This Person?" confirmation before a NAMED author's
+    /// block fires (an anonymous "Hide Comment" fallback stays immediate —
+    /// see `BlockConfirmationAlert` in `+PhaseD` for the full rationale).
+    /// Non-private so `+PhaseD`'s `requestBlock(of:)` can set it (mirrors
+    /// `commenterForSheet` above).
+    @State var pendingBlockComment: RecipeComment?
+
     public init(viewModel: RecipeDetailViewModel) {
         self.viewModel = viewModel
     }
@@ -96,6 +103,10 @@ public struct RecipeDetailRatingsSection: View {
         .sheet(item: $commenterForSheet) { comment in
             commenterProfileSheet(for: comment)
         }
+        // Confirm before an author-wide block fires — see `pendingBlockComment`.
+        // Extracted into `+PhaseD`'s `BlockConfirmationAlert` modifier (this
+        // file is near SwiftLint's `file_length` cap).
+        .blockConfirmation(viewModel: viewModel, pendingComment: $pendingBlockComment)
     }
 
     /// DUT-956 — build the commenter profile card, wiring its Report/Block hooks

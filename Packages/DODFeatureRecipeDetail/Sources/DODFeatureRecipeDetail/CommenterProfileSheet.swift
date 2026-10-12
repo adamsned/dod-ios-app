@@ -13,9 +13,17 @@ import SwiftUI
 ///   open the prefilled moderation `mailto:` + `acknowledgeReport`), wired in via
 ///   `onReport` so the sheet opens the email through the exact same path.
 /// - **Block** runs `RecipeDetailViewModel.blockAuthor(of:)` via `onBlock`.
-/// Neither the context menu nor this sheet gates the actions behind a
-/// confirmation dialog (block hides + is reversible in code; report opens Mail),
-/// so behavior is identical to the long-press path.
+/// Report fires immediately (single-comment scope, mirrors the long-press
+/// path). Block on a NAMED author confirms first — it hides every comment
+/// from that person, app-wide and going forward, with no in-app Unblock (it
+/// only clears via Sign Out / Delete Profile) — the same "irreversible,
+/// app-wide" class of action that gets a confirm dialog everywhere else in
+/// the app (Sign Out, Delete Profile, Clear Shopping List, Clear Recent
+/// Searches). The blank-name ("Anonymous") fallback stays immediate — it
+/// only hides the one comment, the same blast radius as Report. This
+/// mirrors the context menu's own gate (``RecipeDetailRatingsSection``'s
+/// `pendingBlockComment` / `requestBlock(of:)`) — same confirm-before-
+/// author-block rule, independent local state per entry point.
 ///
 /// **Layout mirrors the profile editor's shape** (``ProfileEditView``) so the
 /// per-user stats from DUT-955 drop straight in: a centered avatar + name header,
@@ -42,6 +50,13 @@ struct CommenterProfileSheet: View {
     let onBlock: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    /// Gates the "Block This Person?" confirmation for a named author — see
+    /// the type doc comment above for why. Local to this sheet (independent
+    /// of the context menu's own `pendingBlockComment` gate on
+    /// ``RecipeDetailRatingsSection``): each entry point hosts its own
+    /// confirm, mirroring how `CookJournalView` and `CookJournalEntryView`
+    /// each host their own "Delete This Cook?" alert for the same delete.
+    @State private var showingBlockConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -58,6 +73,18 @@ struct CommenterProfileSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar { toolbarContent }
+            .alert("Block This Person?", isPresented: $showingBlockConfirmation) {
+                Button("Block", role: .destructive) {
+                    onBlock()
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "This hides every comment from \(displayName) here, now and going forward. "
+                        + "There's no in-app way to undo this."
+                )
+            }
         }
     }
 
@@ -162,15 +189,21 @@ struct CommenterProfileSheet: View {
         .listRowBackground(DODColor.surfaceElevated)
     }
 
-    /// Block sits in the destructive "Delete Profile" position. Dismisses after
-    /// blocking (per DUT-956). The label mirrors the context menu's
-    /// `blockLabel(for:)` — anonymous authors can't be name-blocked, so the button
-    /// says "Hide Comment" to describe what actually happens.
+    /// Block sits in the destructive "Delete Profile" position. The label
+    /// mirrors the context menu's `blockLabel(for:)` — anonymous authors can't
+    /// be name-blocked, so the button says "Hide Comment" to describe what
+    /// actually happens. A named-author block confirms first (single-comment
+    /// scope stays immediate, matching Report); either way the sheet dismisses
+    /// once the action actually runs.
     private var blockSection: some View {
         Section {
             Button(role: .destructive) {
-                onBlock()
-                dismiss()
+                if blockRequiresConfirmation {
+                    showingBlockConfirmation = true
+                } else {
+                    onBlock()
+                    dismiss()
+                }
             } label: {
                 Label(blockLabel, systemImage: "hand.raised")
                     .dodFont(DODType.body)
@@ -179,6 +212,16 @@ struct CommenterProfileSheet: View {
             .accessibilityIdentifier("commenter-profile-block")
         }
         .listRowBackground(DODColor.surfaceElevated)
+    }
+
+    /// Whether a Block tap on this comment should confirm first (a named
+    /// author — permanent, app-wide) or fire immediately (the blank-name
+    /// fallback — single-comment scope, same blast radius as Report).
+    /// Extracted from the button action so the branch is directly testable
+    /// without simulating a tap gesture. Non-private for that reason (mirrors
+    /// `RecipeDetailRatingsSection.pendingBlockComment`'s non-private note).
+    var blockRequiresConfirmation: Bool {
+        !CommentModerationStore.isAnonymous(author: comment.authorName)
     }
 
     private var blockLabel: String {

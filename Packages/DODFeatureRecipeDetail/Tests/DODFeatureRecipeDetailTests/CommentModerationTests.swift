@@ -211,6 +211,72 @@ struct CommentModerationTests {
         #expect(makeViewModel().canModerate(comment(id: 1, author: "Other")))
     }
 
+    // MARK: - Block confirmation gate (sibling call sites for the identical
+    // action, this session's "destructive-action confirm/undo parity" sweep)
+    //
+    // Blocking a NAMED author is app-wide + permanent-feeling (no in-app
+    // Unblock; it only clears via Sign Out / Delete Profile) — the same
+    // class of irreversible action every other destructive affordance in the
+    // app gates behind a confirm dialog (Sign Out, Delete Profile, Clear
+    // Shopping List, Clear Recent Searches). It previously fired immediately
+    // from BOTH entry points (the long-press context menu AND the DUT-956
+    // commenter profile card). These pin that `requestBlock(of:)` does NOT
+    // call `blockAuthor` directly for a named author (unlike the anonymous
+    // "Hide Comment" fallback, whose single-comment blast radius matches
+    // Report's — also ungated — and still fires immediately). The `@State`
+    // gate itself (`pendingBlockComment`) drives a SwiftUI `.alert` and isn't
+    // exercised here — this repo has no precedent for asserting on bare View
+    // `@State` outside a rendered hierarchy (see e.g. `CookJournalEntryView`'s
+    // untested `showingDeleteConfirm`); these pin the observable, reliable
+    // side effect instead: the store stays untouched until the alert's own
+    // "Block" button later calls `blockAuthor` for real.
+
+    @Test func requestBlockDoesNotImmediatelyBlockANamedAuthor() {
+        let viewModel = makeViewModel()
+        let section = RecipeDetailRatingsSection(viewModel: viewModel)
+        let named = comment(id: 1, author: "Troll")
+
+        section.requestBlock(of: named)
+
+        // Gated, not fired: the underlying store is untouched, unlike calling
+        // `viewModel.blockAuthor(of:)` directly (which the tests above show
+        // blocks + snackbars at once).
+        #expect(viewModel.snackbarMessage == nil)
+        #expect(viewModel.commentModeration.blockedAuthors.isEmpty)
+    }
+
+    @Test func requestBlockFiresImmediatelyForAnAnonymousAuthor() {
+        let viewModel = makeViewModel()
+        let section = RecipeDetailRatingsSection(viewModel: viewModel)
+        let anon = comment(id: 7, author: "   ")
+
+        section.requestBlock(of: anon)
+
+        // Same single-comment blast radius as Report — no gate, fires at once.
+        #expect(viewModel.snackbarMessage != nil)
+        #expect(viewModel.visibleComments.contains(where: { $0.id == 7 }) == false)
+    }
+
+    @Test func commenterProfileSheetRequiresConfirmationForANamedAuthorBlock() {
+        let sheet = CommenterProfileSheet(
+            comment: comment(id: 1, author: "Troll"),
+            displayName: "Troll",
+            onReport: {},
+            onBlock: {}
+        )
+        #expect(sheet.blockRequiresConfirmation)
+    }
+
+    @Test func commenterProfileSheetSkipsConfirmationForAnAnonymousAuthor() {
+        let sheet = CommenterProfileSheet(
+            comment: comment(id: 7, author: "   "),
+            displayName: "Anonymous",
+            onReport: {},
+            onBlock: {}
+        )
+        #expect(sheet.blockRequiresConfirmation == false)
+    }
+
     @Test func cannotBlockYourOwnNameEvenWhenTheServerRedactsYourEmail() {
         // Signed in as "Ned Adams". The server redacts author_email on read, so an
         // OWN older comment comes back with an empty email — email-based
