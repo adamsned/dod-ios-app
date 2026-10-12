@@ -38,7 +38,11 @@ struct DODApp: App {
         // SettingsView keep it in sync on later changes.
         DODColor.isOLEDDark = AppearancePreference.fromDefaults(.standard).isOLEDDark
         // 3. Only now build the composition root (and with it the container).
-        _dependencies = State(initialValue: AppDependencies())
+        let dependencies = AppDependencies()
+        // 4. DUT-1388 — hand the Siri / Shortcuts intents their services now, not
+        //    in the scene `.task`: a background intent launch has no scene.
+        dependencies.registerAppIntents()
+        _dependencies = State(initialValue: dependencies)
     }
 
     /// One-time resolution of the iCloud-Sync opt-in default (fresh installs ON,
@@ -138,6 +142,14 @@ struct DODApp: App {
             let defaults = UserDefaults.standard
             defaults.removeObject(forKey: "dod.moderation.blockedAuthorsV1")
             defaults.removeObject(forKey: "dod.moderation.hiddenCommentIDsV1")
+            // Same for the other UserDefaults-backed state the journeys mutate:
+            // the metric-units toggle and the shopping list (App Group suite,
+            // `ShoppingListStore.key`). CI's fresh simulator hides the leak, but
+            // on a reused simulator a prior run starts the next one in metric
+            // with a non-empty list.
+            defaults.removeObject(forKey: IngredientMetricConverter.preferenceKey)
+            UserDefaults(suiteName: WidgetSnapshotConfig.appGroupIdentifier)?
+                .removeObject(forKey: "dod.shoppingList.v1")
         }
     }
 }

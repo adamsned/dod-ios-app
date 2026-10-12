@@ -173,6 +173,7 @@ final class AppDependencies {
         // accumulate toward the self-heal threshold.
         launchHealth.markLaunchHealthy()
         logSelfHealIfNeeded()
+        refreshWidgetsOnceForCurrentBuild()  // DUT-1380
         await networkMonitor.start()
         // DUT-377: ReliableImage offline disk fallback (saved/downloaded heroes).
         ReliableImageConfig.setOfflineDataProvider { [store] url in try? await store.image(url: url) }

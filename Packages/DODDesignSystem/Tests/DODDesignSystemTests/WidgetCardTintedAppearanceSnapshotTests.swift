@@ -128,8 +128,8 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
 
     // MARK: - Saved-recipes widget (US-17)
 
-    func test_savedWidget_small_oneEntry_tinted() {
-        let view = WidgetCard.SavedSmall(row: Self.savedSampleRow)
+    func test_savedWidget_small_twoEntries_tinted() {
+        let view = WidgetCard.SavedSmall(rows: Self.savedSampleRows)
             .environment(\.widgetRenderingMode, .accented)
             .frame(width: 158, height: 158)
             .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
@@ -140,8 +140,8 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
         )
     }
 
-    func test_savedWidget_small_oneEntry_vibrant() {
-        let view = WidgetCard.SavedSmall(row: Self.savedSampleRow)
+    func test_savedWidget_small_twoEntries_vibrant() {
+        let view = WidgetCard.SavedSmall(rows: Self.savedSampleRows)
             .environment(\.widgetRenderingMode, .vibrant)
             .frame(width: 158, height: 158)
             .background(DODColor.surfaceElevated)  // T-767: simulate the widget container background
@@ -210,11 +210,6 @@ final class WidgetCardTintedAppearanceSnapshotTests: XCTestCase {
             totalTimeDisplay: "15 min"
         )
     }
-
-    private static let savedSampleRow = WidgetCard.SavedRow(
-        title: "Garlic Butter Skillet Corn",
-        heroImageURL: nil
-    )
 
     private static let savedSampleRows: [WidgetCard.SavedRow] = [
         WidgetCard.SavedRow(title: "Garlic Butter Skillet Corn"),

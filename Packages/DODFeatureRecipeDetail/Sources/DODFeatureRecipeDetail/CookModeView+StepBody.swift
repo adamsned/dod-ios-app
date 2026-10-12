@@ -28,47 +28,20 @@ extension CookModeView {
         // "STEP N" eyebrow is gone — the bottom paged indicator ("Step X of Y"
         // under the dots) is the single source of position, so a second counter
         // above the step was redundant.
-        return VStack(alignment: .leading, spacing: DODSpacing.md) {
-            Text(displayText)
-                .dodFont(DODType.displayMedium)
-                .foregroundStyle(DODColor.label)
-                .lineSpacing(DODSpacing.xs)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Step \(step.step). \(displayText)")
-            if let duration = StepTimerParser.firstDuration(in: step.text) {
-                CookTimer(
-                    stepIndex: viewModel.currentStepIndex,
-                    duration: duration,
-                    viewModel: viewModel
-                )
-            }
-            heatCoachShortcut(for: step)
-        }
-        .padding(.horizontal, DODSpacing.md)
+        // DUT-1392 — the step's timer and the Heat Coach shortcut moved out of
+        // the text into the floating tool dock above the controls
+        // (`CookModeView+ToolDock.swift`).
+        return Text(displayText)
+            .dodFont(DODType.displayMedium)
+            .foregroundStyle(DODColor.label)
+            .lineSpacing(DODSpacing.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel("Step \(step.step). \(displayText)")
+            .padding(.horizontal, DODSpacing.md)
     }
 
-    /// T-912 / DUT-551 (CL-306) — a compact "Open Heat Coach" shortcut, shown
-    /// only on **heat-related** steps and only when the host wired
-    /// `heatCoachSheet`. A tab switch would be invisible under Cook Mode's
-    /// full-screen cover, so the tap presents Heat Coach as a sheet OVER the
-    /// cover (`isHeatCoachPresented`). Hidden on non-heat steps and on hosts /
-    /// previews that don't wire hub routing (same seam as `onLogCook`).
-    @ViewBuilder
-    private func heatCoachShortcut(for step: RecipeInstruction) -> some View {
-        if heatCoachSheet != nil, Self.stepIsHeatRelated(step.text) {
-            Button {
-                isHeatCoachPresented = true
-            } label: {
-                Label("Open Heat Coach", systemImage: "thermometer.medium")
-                    .dodFont(DODType.bodyEmphasized)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(DODColor.burntOrange)
-            .accessibilityIdentifier("cook-mode-heat-coach")
-        }
-    }
-
-    /// Whether a step's text is about heat — it carries an explicit-unit
+    /// T-912 / DUT-551 — whether a step's text is about heat (drives the tool
+    /// dock's Heat Coach row): it carries an explicit-unit
     /// temperature (via ``TemperatureConverter/fahrenheitValues(in:)``) OR one of
     /// a small set of coal / fire keywords. Case-insensitive substring match.
     nonisolated static func stepIsHeatRelated(_ text: String) -> Bool {

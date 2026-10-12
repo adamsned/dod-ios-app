@@ -14,6 +14,9 @@ let package = Package(
         .package(path: "../DODAnalytics"),
         .package(path: "../DODNetworking"),
         .package(path: "../DODPersistence"),
+        // v2 on-device AI — the PROTOCOL seam only (no FoundationModels import
+        // here; the Live impl lives in the leaf package and is App-injected).
+        .package(path: "../DODIntelligence"),
         // Test-only — top-level screen visual regression (US-18 / T-332).
         // Pin matches `DODDesignSystem/Package.swift` so the package graph
         // resolves a single `swift-snapshot-testing` version.
@@ -29,6 +32,7 @@ let package = Package(
                 "DODAnalytics",
                 "DODNetworking",
                 "DODPersistence",
+                "DODIntelligence",
             ]
         ),
         .testTarget(

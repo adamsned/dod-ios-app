@@ -69,6 +69,8 @@ struct TabStack: View {
     /// hub consumes it via `.task(id:)` to pop to its root so the tip banner shows.
     /// Inert for other tabs.
     @Binding var hubTipToken: UUID?
+    /// DUT-1388 — a Siri-requested collection for the Saved tab (inert elsewhere).
+    @Binding var savedCollectionRequest: UUID?
     /// DUT — the one-shot "we came here to cook" arm (owned by `RootView`, bound
     /// only into the Feed tab). The hub's Cook Mode "Find a Recipe" sets it; the
     /// next Feed card tap consumes it so that recipe opens ALREADY in Cook Mode
@@ -121,6 +123,7 @@ struct TabStack: View {
         startFirstCookout: @escaping (Bool) -> Void = { _ in },
         hubPendingTool: Binding<HubToolRoute?> = .constant(nil),
         hubTipToken: Binding<UUID?> = .constant(nil),
+        savedCollectionRequest: Binding<UUID?> = .constant(nil),
         cookModeFindRecipeArmed: Binding<Bool> = .constant(false),
         commentModeration: CommentModerationStore = CommentModerationStore()
     ) {
@@ -136,6 +139,7 @@ struct TabStack: View {
         self.startFirstCookout = startFirstCookout
         self._hubPendingTool = hubPendingTool
         self._hubTipToken = hubTipToken
+        self._savedCollectionRequest = savedCollectionRequest
         self._cookModeFindRecipeArmed = cookModeFindRecipeArmed
         self.commentModeration = commentModeration
     }
@@ -276,7 +280,8 @@ struct TabStack: View {
                         if !didSave { saveErrorMessage = Self.saveFailedMessage }  // DUT-693
                     }
                 },
-                onOpenSettings: onOpenSettings  // DUT-551 (CL-306) — header gear
+                onOpenSettings: onOpenSettings,  // DUT-551 (CL-306) — header gear
+                collectionRequest: $savedCollectionRequest  // DUT-1388 — Siri "Open collection"
             )
         case .cookingTools:
             // T-912 / DUT-551 (CL-306) — the Cooking Tools hub. Replaces the

@@ -1,6 +1,10 @@
 import DODDesignSystem
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// Cook Mode's immersive hero header — the same full-bleed, blur-strip treatment
 /// as the recipe page (``RecipeDetailHero``), tuned for the cooking surface.
 ///
@@ -11,8 +15,9 @@ import SwiftUI
 /// "album art" card + separate title bar, which reclaims the header height for
 /// the step instructions.
 ///
-/// Shorter than the recipe page's 400pt hero (`baseHeight` 200) so the step text
-/// dominates. The hero lives inside the step ScrollView, so it scrolls away on a
+/// DUT-1392 — taller than it was (200pt) so the photo reads as a real image
+/// rather than a narrow strip and the step text starts lower, nearer the thumb:
+/// 260pt on iPhone, 420pt on iPad's larger canvas. The hero lives inside the step ScrollView, so it scrolls away on a
 /// long step; the back + ingredients buttons float ABOVE it (see
 /// ``CookModeView/cookModeTopBar``) and stay pinned.
 ///
@@ -27,9 +32,15 @@ struct CookModeHero: View {
     let topInset: CGFloat
 
     /// Resting hero height below the safe area. The drawn height adds `topInset`
-    /// so the photo reaches the top of the screen. Kept compact (recipe page uses
-    /// 400) so Cook Mode's step text gets the room.
-    private let baseHeight: CGFloat = 200
+    /// so the photo reaches the top of the screen. DUT-1392 — device-idiom gated
+    /// like the transport, so an iPhone in landscape keeps the iPhone height.
+    private var baseHeight: CGFloat {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .pad ? 420 : 260
+        #else
+        260
+        #endif
+    }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {

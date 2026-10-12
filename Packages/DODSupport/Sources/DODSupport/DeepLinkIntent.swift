@@ -14,11 +14,29 @@ public enum DeepLinkIntent: Equatable, Sendable {
     case openRecipe(id: Int)
     case startCookMode(recipeID: Int)
     case openSaved
+    /// DUT-1388 — the Saved tab narrowed to one collection (Siri "Open my
+    /// <collection> collection"). `dod://collection?id=<uuid>`.
+    case openCollection(id: UUID)
 
     /// Pure function for unit testing. Returns nil for any URL that isn't
     /// a recognized `dod://` action so the caller can ignore it without
     /// touching navigation state.
     public static func parse(_ url: URL) -> DeepLinkIntent? {
+        parseCollection(url) ?? parseRecipeOrSaved(url)
+    }
+
+    /// DUT-1388 — `dod://collection?id=<uuid>` (or `dod://collection/<uuid>`).
+    /// Collection ids are UUIDs, not post ids, so they get their own host
+    /// rather than a path under `saved` (which DUT-603 keeps bare).
+    private static func parseCollection(_ url: URL) -> DeepLinkIntent? {
+        guard url.scheme?.lowercased() == "dod", url.host?.lowercased() == "collection" else { return nil }
+        let queryID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "id" })?.value
+        let raw = queryID ?? url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return UUID(uuidString: raw).map { .openCollection(id: $0) }
+    }
+
+    private static func parseRecipeOrSaved(_ url: URL) -> DeepLinkIntent? {
         // DUT-428: case-insensitive scheme, matching WidgetDeepLinkParser — iOS does
         // not normalize scheme case, so an uppercase "DOD://" would otherwise dead-end.
         guard url.scheme?.lowercased() == "dod" else { return nil }
@@ -88,6 +106,8 @@ public enum DeepLinkIntent: Equatable, Sendable {
             raw = "dod://recipe/cook?id=\(recipeID)"
         case .openSaved:
             raw = "dod://saved"
+        case .openCollection(let id):
+            raw = "dod://collection?id=\(id.uuidString)"
         }
         return URL(string: raw) ?? URL(filePath: "/")
     }

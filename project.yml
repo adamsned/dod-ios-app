@@ -57,6 +57,10 @@ packages:
     path: Packages/DODFeatureSaved
   DODFeatureProfile:
     path: Packages/DODFeatureProfile
+  # v2 on-device AI — leaf package holding the FoundationModels-backed
+  # intelligence service (the only place that imports FoundationModels).
+  DODIntelligence:
+    path: Packages/DODIntelligence
 
 targets:
   DODApp:
@@ -84,7 +88,7 @@ targets:
         # stage lets the cook snap a photo of their finished dish to share +
         # tag Dutch Oven Daddy. iOS requires this key — without it the app
         # crashes the instant the camera is accessed.
-        NSCameraUsageDescription: Take a photo of your finished cook to share it and tag Dutch Oven Daddy.
+        NSCameraUsageDescription: Take a photo to share your cook or to get cooking help from Dutch Oven Daddy.
         # DUT-23: app-identity key for anonymous comment POSTs. The app sends it
         # as the `X-DOD-App-Key` header so WordPress's
         # `rest_allow_anonymous_comments` filter accepts comment creation from
@@ -94,6 +98,12 @@ targets:
         # secret (see .github/workflows/release.yml). Blank in dev / PR builds,
         # where the app omits the header.
         DODCommentAPIKey: "$(DOD_COMMENT_API_KEY)"
+        # DUT-98: Sign in with Apple revoke Worker (5.1.1(v)). Read by
+        # `SiwaRevokeConfig.production`. Blank in the committed xcconfig (no
+        # secret in this public repo); blank = account deletion skips the
+        # token revoke. CI injects both at archive time (release.yml).
+        SiwaRevokeBaseURL: "$(SIWA_REVOKE_BASE_URL)"
+        SiwaRevokeSharedSecret: "$(SIWA_REVOKE_APP_SECRET)"
         # DUT-680: GA4 Measurement Protocol creds, read by GA4Transport via
         # `Bundle.main.object(forInfoDictionaryKey:)` to mirror in-app
         # recipe/article OPENS into Google Analytics 4 as content traffic. The
@@ -222,6 +232,8 @@ targets:
       - package: DODFeatureRecipeDetail
       - package: DODFeatureSaved
       - package: DODFeatureProfile
+      # v2 on-device AI — the Live intelligence service, App-injected.
+      - package: DODIntelligence
       # Widget extension (home-screen, US-9).
       - target: DODAppWidget
       # Live Activity extension (Cook Mode timer, US-11).

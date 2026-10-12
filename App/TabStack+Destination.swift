@@ -4,6 +4,7 @@ import DODFeatureCategories
 import DODFeatureFeed
 import DODFeatureRecipeDetail
 import DODFeatureSearch
+import DODIntelligence
 import Foundation
 import SwiftUI
 
@@ -111,7 +112,14 @@ extension TabStack {
                 dependencies: dependencies.recipeDetailDependencies(),
                 // DUT-546 — inject the shared store so a block on one open
                 // recipe screen live-hides that author on another.
-                commentModeration: commentModeration
+                commentModeration: commentModeration,
+                // US-54 / T-932 — inject the on-device AI seam so recipe /
+                // article detail can offer "Summarize" (mirrors the Shopping
+                // List substitution wiring in GroceryTabRoot). Keeps iPhone
+                // behavior identical when unavailable: the service reports
+                // `isAvailable == false` on the sim / iOS 17-25 / no Apple
+                // Intelligence, so the affordance stays hidden.
+                intelligence: dependencies.intelligenceService()
             ),
             onSelectRelated: { related in push(.recipe(item: related)) },
             autoStartCookMode: autoStartCookMode,
@@ -126,12 +134,20 @@ extension TabStack {
             // as a sheet over the full-screen cover (a tab switch would be
             // invisible beneath it).
             openHeatCoach: openHeatCoach,
-            heatCoachSheet: { AnyView(NavigationStack { HeatCoachView() }) },
+            // DUT-1385 — plus the "Ask About This Recipe" chat over Cook Mode
+            // (nil when the on-device model can't run, hiding the button).
+            cookModeSheets: CookModeSheets(
+                heatCoach: { AnyView(NavigationStack { HeatCoachView() }) },
+                askAboutRecipe: dependencies.recipeChatSheetBuilder()
+            ),
             topInsetOverride: topInsetOverride
         )
         .onAppear {
             Telemetry.shared.send(.screenView(name: "recipe_detail"))
+            // DUT-1388 — "this recipe" for Siri (Save / Add / Start Cook Mode).
+            OnscreenRecipe.shared.show(.fromListItem(item))
         }
+        .onDisappear { OnscreenRecipe.shared.hide(id: item.id) }
     }
 
     @ViewBuilder

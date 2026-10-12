@@ -30,15 +30,20 @@ extension WidgetCard {
         }
     }
 
-    /// Compact small-widget layout: one saved-recipe row centred in the
-    /// 158×158pt frame.
+    /// Small saved-widget layout (DUT-1384): the "Saved" eyebrow + the two
+    /// newest saved recipes as thumbnail-left / title-right rows, the same list
+    /// format as ``SavedMedium`` capped for the square tile. Long names wrap to
+    /// two lines and then truncate. Caller passes rows newest-first.
     public struct SavedSmall: View {
 
-        public let row: SavedRow
+        public let rows: [SavedRow]
 
-        public init(row: SavedRow) {
-            self.row = row
+        public init(rows: [SavedRow]) {
+            self.rows = rows
         }
+
+        /// Rows the small size shows.
+        public static let maxRows = 2
 
         public var body: some View {
             VStack(alignment: .leading, spacing: DODSpacing.xs) {
@@ -48,17 +53,11 @@ extension WidgetCard {
                     .textCase(.uppercase)
                     .tracking(0.5)
 
-                Spacer(minLength: 0)
-
-                Hero(url: row.heroImageURL)
-                    .frame(height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
-
-                Text(row.title)
-                    .font(.system(.subheadline, design: .default, weight: .semibold))
-                    .foregroundStyle(DODColor.label)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                VStack(spacing: DODSpacing.xs) {
+                    ForEach(Array(rows.prefix(Self.maxRows).enumerated()), id: \.offset) { _, row in
+                        SavedListRow(row: row)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(DODSpacing.sm)
@@ -148,7 +147,7 @@ extension WidgetCard {
             HStack(spacing: DODSpacing.xs) {
                 Hero(url: row.heroImageURL)
                     .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.inner, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: DODRadius.widgetThumbnail, style: .continuous))
 
                 Text(row.title)
                     .font(.system(.footnote, design: .default, weight: .semibold))
@@ -164,7 +163,10 @@ extension WidgetCard {
 
 #Preview("Saved Small") {
     WidgetCard.SavedSmall(
-        row: .init(title: "Garlic Butter Skillet Corn", heroImageURL: nil)
+        rows: [
+            .init(title: "Garlic Butter Skillet Corn"),
+            .init(title: "Sourdough Bread"),
+        ]
     )
     .frame(width: 158, height: 158)
 }

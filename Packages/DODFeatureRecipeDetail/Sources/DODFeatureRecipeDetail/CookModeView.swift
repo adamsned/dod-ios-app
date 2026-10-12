@@ -49,6 +49,8 @@ public struct CookModeView: View {
     /// a `.sheet` layers on top instead. `internal` so `CookModeView+StepBody`
     /// can flip it. Only shown when `heatCoachSheet != nil`.
     @State var isHeatCoachPresented: Bool = false
+    /// DUT-1385 — drives the "Ask About This Recipe" sheet over the cover.
+    @State var isAskPresented: Bool = false
     /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
     /// screen, regardless of which step is shown, so a running timer on a step
     /// you've navigated away from still counts down + completes.
@@ -70,10 +72,13 @@ public struct CookModeView: View {
     /// unaffected (same seam as `onLogCook`). `internal` (not `private`) so
     /// `CookModeView+StepBody.swift` can gate the shortcut on it.
     let heatCoachSheet: (() -> AnyView)?
+    /// DUT-1385 — builds the "Ask About This Recipe" chat (title, recipe text);
+    /// `nil` hides the top-bar sparkle button. See `CookModeView+Ask.swift`.
+    let askSheet: ((String, String) -> AnyView)?
     /// Scale factor inherited from the host detail screen so the drawer
     /// ingredient rows agree with the scaled list the user just left. AC-7.5
     /// + US-31 carry-over.
-    private let ingredientScaleFactor: Double
+    let ingredientScaleFactor: Double
 
     // `internal` (not `private`) so `CookModeView+StepBody.swift` can resolve
     // the temperature unit for the displayed step text (DUT-245).
@@ -118,7 +123,8 @@ public struct CookModeView: View {
         ingredientScaleFactor: Double = 1.0,
         onClose: @escaping (Set<UUID>) -> Void,
         onLogCook: ((CookLogEntry) -> Void)? = nil,
-        heatCoachSheet: (() -> AnyView)? = nil
+        heatCoachSheet: (() -> AnyView)? = nil,
+        askSheet: ((String, String) -> AnyView)? = nil
     ) {
         _viewModel = State(
             initialValue: CookModeViewModel(
@@ -130,6 +136,7 @@ public struct CookModeView: View {
         self.onClose = onClose
         self.onLogCook = onLogCook
         self.heatCoachSheet = heatCoachSheet
+        self.askSheet = askSheet
     }
 
     public var body: some View {
@@ -159,12 +166,21 @@ public struct CookModeView: View {
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                                heroView(topInset: topInset)
+                                // DUT-1392 — "Ask About This Recipe" sits right under
+                                // the recipe name (which is on the hero).
+                                VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                                    heroView(topInset: topInset)
+                                    askAboutRecipeLink
+                                }
                                 stepBody
                             }
                             .padding(.bottom, DODSpacing.md)
                         }
                         .ignoresSafeArea(.container, edges: .top)
+                        // DUT-1392 — the floating tool dock (timer / Heat Coach),
+                        // riding just above the player panel as it minimizes.
+                        .safeAreaInset(edge: .bottom, spacing: 0) { toolDock }
+                        .animation(controlsAnimation, value: toolDockContent)
                         // DUT-596/599 — a tap in the collapsed step area brings the
                         // controls back; a no-op while expanded so it never fights
                         // reading.
@@ -208,6 +224,7 @@ public struct CookModeView: View {
                 heatCoachSheet()
             }
         }
+        .sheet(isPresented: $isAskPresented) { askSheetContent }  // DUT-1385
         // DUT-328 — one-time "this may sound robotic, get a better voice" prompt
         // when Voice Mode turns on with only a robotic voice installed. Owns its
         // own state (in `CookModeView+VoicePrompt.swift`) so this body stays one
@@ -297,43 +314,6 @@ public struct CookModeView: View {
         )
     }
 
-    // MARK: - Ingredients drawer (AC-7.2, AC-7.5)
-    //
-    // DUT-599 — the old bottom "Ingredients" pull tab is gone; ingredients now
-    // open from the `carrot.fill` button in the transport's secondary row (see
-    // `CookModePlayerControls`), wired via `openIngredients()` in
-    // `CookModeView+Controls.swift`. The drawer itself is unchanged.
-
-    private var ingredientsDrawer: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                    ForEach(viewModel.recipe.ingredients) { ingredient in
-                        ingredientRow(for: ingredient)
-                    }
-                }
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.vertical, DODSpacing.md)
-            }
-            .navigationTitle("Ingredients")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            // Nav-consistency sweep: the drawer is a sheet, so it gets the app's
-            // standard trailing "Done" dismissal (plus a drag indicator on the
-            // sheet itself) instead of being a swipe-only dead end.
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        ingredientsDrawerVisible = false
-                    }
-                    .tint(DODColor.burntOrange)
-                    .accessibilityIdentifier("cook-mode-ingredients-done")
-                }
-            }
-        }
-    }
-
     // MARK: - Gestures (AC-7.4)
 
     private var swipeGesture: some Gesture {
@@ -367,23 +347,5 @@ public struct CookModeView: View {
     func close() {
         viewModel.endCookMode()
         onClose(viewModel.checkedIngredientIDs)
-    }
-}
-
-// MARK: - Ingredients drawer row
-
-extension CookModeView {
-    /// One row in the ingredients drawer with the scaled `displayText`
-    /// (US-31 / AC-31.4 carry-over into Cook Mode). Pulled into an
-    /// extension so the type body stays under the SwiftLint length cap.
-    @ViewBuilder
-    fileprivate func ingredientRow(for ingredient: RecipeIngredient) -> some View {
-        let scaled = FractionRenderer.scale(ingredient.text, by: ingredientScaleFactor)
-        IngredientCheckRow(
-            ingredient: ingredient,
-            displayText: useMetricUnits ? IngredientMetricConverter.metric(scaled) : scaled,
-            isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
-            onToggle: { viewModel.toggleIngredient(ingredient.id) }
-        )
     }
 }

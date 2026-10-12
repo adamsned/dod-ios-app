@@ -34,4 +34,10 @@ public enum DODRadius {
     /// Complementary smaller radius (15pt) for content the standard would clip;
     /// sits ~5pt below ``standard`` so nested shapes read concentrically.
     public static let inner: CGFloat = 15
+    /// Eased radius (8pt) for the small square thumbnails inside the saved-recipes
+    /// widget rows. At the widget's 36–56pt thumbnail sizes ``inner`` (15pt) reads
+    /// as an almost-fully-rounded squircle; 8pt keeps a gentle rounded-square that
+    /// matches the tighter, list-forward home-screen widget look (widget layout
+    /// parity). Scoped to widget imagery — in-app thumbnails keep ``inner``.
+    public static let widgetThumbnail: CGFloat = 8
 }

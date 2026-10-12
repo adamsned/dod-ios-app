@@ -61,6 +61,8 @@ extension WidgetCard {
                     .font(.system(.headline, design: .default, weight: .semibold))
                     // DUT-451 — was 2 lines; the dropped excerpt frees a 3rd.
                     .lineLimit(3)
+                    // DUT-1381 — shrink slightly rather than clip the 3rd line.
+                    .minimumScaleFactor(0.85)
                     .multilineTextAlignment(.leading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

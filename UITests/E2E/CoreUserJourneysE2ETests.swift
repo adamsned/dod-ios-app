@@ -268,19 +268,19 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         // candidate rows until one lands on Ingredients (the recipe-detail
         // signal), since articles render via `ArticleDetailView` and don't
         // surface an Ingredients header.
-        let recipeButtons = app.buttons.matching(
-            NSPredicate(format: "NOT (label IN %@)", Array(E2ETestSupport.tabLabels))
-        )
+        // Match feed rows by their `dod.feed.card` identifier, not "any
+        // non-tab button": v2's feed header (#827) put Settings and the search
+        // bar ahead of the rows, so positional indexing tapped into Search.
+        let recipeButtons = app.buttons.matching(identifier: "dod.feed.card")
         XCTAssertTrue(
             recipeButtons.element(boundBy: 1).waitForExistence(timeout: 20),
             "Feed should expose at least 2 recipe rows"
         )
 
-        // Walk indices 1..4 until we land on a recipe (Ingredients header).
-        // 4 candidates is enough headroom for the typical article ratio on
-        // the live blog without burning the wall-clock budget.
+        // Walk the first 4 rows until we land on a recipe (Ingredients
+        // header), skipping any article rows.
         var landed = false
-        for index in 1...4 {
+        for index in 0..<4 {
             let candidate = recipeButtons.element(boundBy: index)
             guard candidate.waitForExistence(timeout: 10) else { continue }
             candidate.tap()
@@ -583,78 +583,10 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         )
     }
 
-    /// T-638 / CL-107 / REG-21 — pins CL-106 part 3: the "Latest Recipes"
-    /// Try-pill routes to `SearchViewModel.surfaceLatestRecipes(limit:)`
-    /// (which fetches via `WPRestClient.posts(...)` — the date-desc default
-    /// endpoint), NOT to `selectCuratedSuggestion(_:)` which would run a
-    /// literal text search for "Latest Recipes" and return garbage (the
-    /// phrase appears in many unrelated articles' boilerplate).
-    ///
-    /// Discriminating assertion: the result count must land in the 3...8
-    /// range. The limit is 5 with an over-fetch of `ceil(5 * 1.5) = 8`; the
-    /// trim drops back to 5 visible recipes after article filtering. A
-    /// literal text search would return either ~0 (no boilerplate hit) or
-    /// many random matches — neither in the 3...8 range. The bound is
-    /// intentionally loose because the live blog's recent-recipes set
-    /// drifts daily; the bound catches the failure mode (zero or many) but
-    /// not legitimate fluctuation in the recent-posts queue.
-    func test_search_latest_recipes_pill_returns_recent_branch() {
-        app.launchForE2E()
-        let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
-
-        XCTAssertTrue(
-            app.openSearchFromFeed(),
-            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
-        )
-
-        // Wait for `loadCategoriesIfNeeded()` to populate
-        // `topCategorySuggestions` so the Try pills render. The pill we
-        // want is identified via T-638's `dod.search.tryPill.latestRecipes`
-        // identifier (added conditionally on the matching pill in
-        // `IdleSuggestionsView`).
-        let latestPill = app.buttons
-            .matching(identifier: "dod.search.tryPill.latestRecipes").firstMatch
-        XCTAssertTrue(
-            latestPill.waitForExistence(timeout: 30),
-            "Latest Recipes Try-pill should appear in the Try section after categories load"
-        )
-        latestPill.tap()
-
-        // Wait for results. Use the standard chrome-exclusion predicate.
-        let filterChrome: Set<String> = [
-            "All categories", "Any time", "Recently viewed",
-            "Search filters", "Clear",
-        ]
-        let exclude = E2ETestSupport.tabLabels.union(filterChrome)
-        let resultPredicate = NSPredicate(
-            format: "NOT (label IN %@) AND NOT (label BEGINSWITH 'Try')",
-            Array(exclude)
-        )
-        let resultButtons = app.buttons.matching(resultPredicate)
-        XCTAssertTrue(
-            resultButtons.firstMatch.waitForExistence(timeout: 20),
-            "Latest Recipes pill tap should surface result rows within 20s"
-        )
-
-        // Let in-flight pagination settle, then check the count is in the
-        // expected range for the recent-branch fetch.
-        Thread.sleep(forTimeInterval: 1.5)
-        let count = resultButtons.count
-
-        // limit=5, over-fetch=8, article-trim → expected 3...8 visible. A
-        // literal text search returns ~0 or many random matches.
-        XCTAssertGreaterThanOrEqual(
-            count,
-            3,
-            "Latest Recipes should return at least 3 results (limit=5 with article trim); got \(count). A regression to literal text search would return ~0."
-        )
-        XCTAssertLessThanOrEqual(
-            count,
-            8,
-            "Latest Recipes should return at most 8 results (over-fetch cap); got \(count). A regression to literal text search would return many random matches."
-        )
-    }
+    // `test_search_latest_recipes_pill_returns_recent_branch` (T-638 / REG-21)
+    // was retired on v2: #827 removed the pinned "Latest Recipes" Try pill
+    // on purpose (the Latest/Most-popular sort is moving to a browse
+    // dropdown). Re-add an E2E when that dropdown lands.
 
     // MARK: - Skipped surfaces (XCUITest can't observe these cleanly)
 

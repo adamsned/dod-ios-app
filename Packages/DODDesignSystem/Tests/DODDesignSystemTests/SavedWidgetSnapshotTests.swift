@@ -31,11 +31,6 @@ final class SavedWidgetSnapshotTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private static let savedSampleRow = WidgetCard.SavedRow(
-        title: "Garlic Butter Skillet Corn",
-        heroImageURL: nil
-    )
-
     private static let savedSampleRows: [WidgetCard.SavedRow] = [
         WidgetCard.SavedRow(title: "Garlic Butter Skillet Corn"),
         WidgetCard.SavedRow(title: "Sourdough Bread"),
@@ -48,7 +43,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     // MARK: - Small
 
     func test_savedWidget_small_oneEntry_light() {
-        let view = WidgetCard.SavedSmall(row: Self.savedSampleRow)
+        let view = WidgetCard.SavedSmall(rows: Array(Self.savedSampleRows.prefix(1)))
             .frame(width: 158, height: 158)
             .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
@@ -64,7 +59,7 @@ final class SavedWidgetSnapshotTests: XCTestCase {
     }
 
     func test_savedWidget_small_oneEntry_dark() {
-        let view = WidgetCard.SavedSmall(row: Self.savedSampleRow)
+        let view = WidgetCard.SavedSmall(rows: Array(Self.savedSampleRows.prefix(1)))
             .frame(width: 158, height: 158)
             .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
@@ -79,12 +74,11 @@ final class SavedWidgetSnapshotTests: XCTestCase {
         )
     }
 
-    /// Per CL-26 the small size only holds one recipe — when the
-    /// snapshot carries more we render just the first. Pinning this
-    /// keeps a future "render all three on small" mistake out of the
-    /// build.
-    func test_savedWidget_small_threeEntries_takesFirstOnly_light() {
-        let view = WidgetCard.SavedSmall(row: Self.savedSampleRows[0])
+    /// Widget layout parity — the small size now renders the SAME list
+    /// format as the medium, capped to ``WidgetCard/SavedSmall/maxRows``
+    /// (2) rows. Passing three rows pins that the extra one is trimmed.
+    func test_savedWidget_small_twoEntries_light() {
+        let view = WidgetCard.SavedSmall(rows: Self.savedSampleRows)
             .frame(width: 158, height: 158)
             .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(
@@ -99,8 +93,8 @@ final class SavedWidgetSnapshotTests: XCTestCase {
         )
     }
 
-    func test_savedWidget_small_threeEntries_takesFirstOnly_dark() {
-        let view = WidgetCard.SavedSmall(row: Self.savedSampleRows[0])
+    func test_savedWidget_small_twoEntries_dark() {
+        let view = WidgetCard.SavedSmall(rows: Self.savedSampleRows)
             .frame(width: 158, height: 158)
             .background(DODColor.surfaceElevated)  // T-767: simulate widget container bg
         assertSnapshot(

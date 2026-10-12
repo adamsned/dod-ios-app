@@ -95,12 +95,12 @@ public struct RecipeDetailView: View {
     /// `openShoppingList`). DUT-584 — carries an optional ``HeatCoachSeed`` so the
     /// nudge opens the coach pre-answered from the recipe's own heat profile.
     public let openHeatCoach: ((HeatCoachSeed?) -> Void)?
-    /// T-912 / DUT-551 (CL-306) — builds the Heat Coach surface presented as a
-    /// sheet OVER Cook Mode's full-screen cover. `HeatCoachView` lives in
-    /// `DODFeatureFeed` (not importable here), so the App root injects a
-    /// type-erased `AnyView` builder, forwarded to `CookModeView`. `nil`
-    /// (previews / unwired hosts) hides the Cook Mode shortcut.
-    public let heatCoachSheet: (() -> AnyView)?
+    /// T-912 / DUT-551 (CL-306) + DUT-1385 — the sheets presented OVER Cook
+    /// Mode's full-screen cover (Heat Coach, Ask About This Recipe). Their views
+    /// live in `DODFeatureFeed` (not importable here), so the App root injects
+    /// type-erased builders, forwarded to `CookModeView`. A `nil` builder
+    /// (previews / unwired hosts / no on-device model) hides that affordance.
+    public let cookModeSheets: CookModeSheets
 
     /// The top safe-area inset used to size the full-bleed hero's blur band.
     /// `nil` (the single-recipe push) reads the real inset from `readyBody`'s
@@ -130,7 +130,7 @@ public struct RecipeDetailView: View {
         openShoppingList: (() -> Void)? = nil,
         addToShoppingListSheet: ((Recipe, @escaping (AddToShoppingListResult) -> Void) -> AnyView)? = nil,
         openHeatCoach: ((HeatCoachSeed?) -> Void)? = nil,
-        heatCoachSheet: (() -> AnyView)? = nil,
+        cookModeSheets: CookModeSheets = CookModeSheets(),
         topInsetOverride: CGFloat? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
@@ -139,7 +139,7 @@ public struct RecipeDetailView: View {
         self.openShoppingList = openShoppingList
         self.addToShoppingListSheet = addToShoppingListSheet
         self.openHeatCoach = openHeatCoach
-        self.heatCoachSheet = heatCoachSheet
+        self.cookModeSheets = cookModeSheets
         self.topInsetOverride = topInsetOverride
     }
 
@@ -239,7 +239,7 @@ public struct RecipeDetailView: View {
         // body render via `ArticleDetailView` with the carried `Recipe`
         // (kind == .article, populated `articleBodyHTML`).
         case .article(let article):
-            ArticleDetailView(recipe: article)
+            ArticleDetailView(recipe: article, onSummarize: summarizeAction)
         }
     }
 
@@ -279,7 +279,7 @@ public struct RecipeDetailView: View {
                         VStack(alignment: .leading, spacing: DODSpacing.lg) {
                             // DUT-573 / CL-313 — publish date + Jump to
                             // Instructions link, right under the hero/name.
-                            dateAndJumpRow(proxy: proxy)
+                            headerRow(proxy: proxy)
                             excerptText
                             RecipeInfoCard(
                                 model: infoCardModel,
@@ -334,7 +334,7 @@ public struct RecipeDetailView: View {
     /// `ScrollViewReader`'s proxy. DUT-631 — that anchor now sits on the Cook
     /// Mode CTA that leads the Instructions section, so the jump lands with Cook
     /// Mode at the top of the viewport (Instructions immediately below it).
-    private func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
+    func dateAndJumpRow(proxy: ScrollViewProxy) -> some View {
         HStack(alignment: .firstTextBaseline) {
             PublishedDateCaption(date: viewModel.listItem.updatedAt ?? viewModel.listItem.publishedAt)
             Spacer(minLength: DODSpacing.sm)

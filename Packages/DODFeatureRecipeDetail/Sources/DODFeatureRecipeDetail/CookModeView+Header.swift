@@ -27,6 +27,9 @@ extension CookModeView {
 
             Spacer()
 
+            // DUT-1392 — "Ask About This Recipe" moved from a sparkles button
+            // here to a labeled link under the recipe name (`askAboutRecipeLink`).
+
             // DUT-599 successor — ingredients moved off the transport's carrot
             // button up here so the transport's play/pause can sit dead-center.
             floatingButton(

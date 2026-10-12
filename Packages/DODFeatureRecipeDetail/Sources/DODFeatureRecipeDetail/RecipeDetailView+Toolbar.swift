@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODDomain
+import DODSupport
 import SwiftUI
 
 #if canImport(UIKit)
@@ -19,21 +20,20 @@ extension RecipeDetailView {
     var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             HStack(spacing: DODSpacing.md) {
-                // DUT-1340 — the bookmark is now a `Menu` with a `primaryAction`.
-                // A plain TAP fires `primaryAction` (save/unsave, unchanged);
-                // press-and-hold opens the menu with "Add to Collection", which
-                // loads the collections + membership and presents the picker
-                // sheet. `Menu`+`primaryAction` is used deliberately instead of
-                // `.onLongPressGesture` (unreliable on toolbar items).
+                // DUT-1386 — the "Summarize" button moved to a labeled link under
+                // the header (`+Summarize`); its sheet is still presented below.
+
+                // DUT-1340 — a plain TAP saves/unsaves; press-and-hold opens a
+                // context menu with "Add to Collection", which loads the
+                // collections + membership and presents the picker sheet.
+                // A `Button` + `.contextMenu`, not `Menu(primaryAction:)`: on
+                // iOS 26.0.x a toolbar `Menu` never fires `primaryAction`, so
+                // the tap did nothing (DUT-1396, the L5 "Save should flip to
+                // Unsave" failures).
                 // Save haptic is wired via `.sensoryFeedback(.success, trigger:
                 // viewModel.isSaved)` on the body — no manual generator here.
-                Menu {
-                    Button {
-                        presentCollectionPicker()
-                    } label: {
-                        Label("Add to Collection", systemImage: "folder.badge.plus")
-                    }
-                    .accessibilityIdentifier("dod.detail.addToCollection.menuItem")
+                Button {
+                    Task { await viewModel.toggleSaved() }
                 } label: {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(viewModel.isSaved ? DODColor.accent : DODColor.label)
@@ -43,10 +43,21 @@ extension RecipeDetailView {
                         // DUT-572 / CL-312 — glyph shadow so state colors survive
                         // over the full-bleed hero photo (mirrors the title shadow).
                         .shadow(color: .black.opacity(0.35), radius: 3)
-                } primaryAction: {
-                    Task { await viewModel.toggleSaved() }
+                }
+                .contextMenu {
+                    Button {
+                        presentCollectionPicker()
+                    } label: {
+                        Label("Add to Collection", systemImage: "folder.badge.plus")
+                    }
+                    .accessibilityIdentifier("dod.detail.addToCollection.menuItem")
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
+                // DUT-1388 — a Siri save of THIS recipe refreshes the glyph.
+                .onReceive(NotificationCenter.default.publisher(for: .dodSavedSetDidChange)) { note in
+                    guard (note.object as? Int) == viewModel.listItem.id else { return }
+                    Task { await viewModel.refreshSavedState() }
+                }
 
                 // US-39 / DUT-534 / DUT-535 — "Add to Shopping List" from ANY
                 // recipe (not just saved). DUT-535: tapping now PRESENTS the
@@ -116,7 +127,29 @@ extension RecipeDetailView {
                 .accessibilityLabel("Share recipe")
                 #endif
             }
+            // US-54 / T-932 — the summary sheet, driven off the view model's
+            // `summary` state (no extra @State on the body, which is already at
+            // the SwiftLint length cap). Attached to the toolbar content rather
+            // than `RecipeDetailView.body` for the same reason.
+            .sheet(isPresented: summaryPresented) {
+                SummarySheet(state: viewModel.summary) {
+                    viewModel.dismissSummary()
+                }
+            }
         }
+    }
+
+    /// US-54 / T-932 — presents the summary sheet whenever ``summary`` leaves
+    /// `.idle`; dismissing it resets the state to `.idle`.
+    private var summaryPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.summary != .idle },
+            set: { presented in
+                if !presented {
+                    viewModel.dismissSummary()
+                }
+            }
+        )
     }
 
     // MARK: - Share as PDF (DUT-1324)

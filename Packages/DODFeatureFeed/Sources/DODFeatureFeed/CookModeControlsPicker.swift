@@ -2,7 +2,7 @@ import DODDesignSystem
 import DODSupport
 import SwiftUI
 
-/// DUT-596 — the "Auto Minimize Cook Mode Controls After" picker shown in
+/// DUT-596 — the "Simplify Cook Mode Controls After" picker shown in
 /// Settings ▸ Customization. Binds the shared
 /// ``CookModeControlsAutoMinimize/preferenceKey`` `@AppStorage` that Cook Mode's
 /// player panel reads, so this one control drives how long Cook Mode waits
@@ -22,7 +22,10 @@ struct CookModeControlsPicker: View {
         } label: {
             // Explicit `\n` so the (long) label stays narrow enough for the value
             // to sit to its right, matching the "Recipe Step Temperatures" row.
-            Text("Auto Minimize Cook Mode\nControls After")
+            // DUT-1394 — was "Auto Minimize". The collapsed state is no longer
+            // smaller (it swaps to two BIG step buttons), so the label says what
+            // actually happens: the voice controls drop away, leaving just steps.
+            Text("Simplify Cook Mode\nControls After")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.label)
         }

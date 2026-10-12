@@ -54,6 +54,10 @@ extension RootView {
         guard !isIndexingSpotlight else { return }
         isIndexingSpotlight = true
         defer { isIndexingSpotlight = false }
+        // DUT-1388 — collections + Siri's entity vocabulary. Cheap (a handful of
+        // collections), so it runs ahead of the recipe dirty gate below, which
+        // only tracks the recipe set.
+        await AppEntityIndex.refresh()
         do {
             let payloads = try await RecipeEntityQuery.suggestedPayloads()
             let newIdentifiers = Set(payloads.map { "dod.recipe.\($0.id)" })

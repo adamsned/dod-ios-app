@@ -14,6 +14,10 @@ let package = Package(
         .package(path: "../DODAnalytics"),
         .package(path: "../DODNetworking"),
         .package(path: "../DODPersistence"),
+        // T-934 (US-54) — the Cooking Tools AI helper depends only on the
+        // DODIntelligence PROTOCOL seam (never FoundationModels), mirroring how
+        // DODFeatureSaved consumes it for the substitution surface.
+        .package(path: "../DODIntelligence"),
         // US-44 (T-739) — Profile section + edit view at the top of
         // Settings. `DODFeatureFeed` owns `SettingsView` so it consumes
         // the Profile UI surface directly.
@@ -33,6 +37,7 @@ let package = Package(
                 "DODAnalytics",
                 "DODNetworking",
                 "DODPersistence",
+                "DODIntelligence",
                 "DODFeatureProfile",
             ]
         ),

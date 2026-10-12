@@ -87,6 +87,9 @@ public struct ShoppingListView: View {
                     build(from: selected)
                 }
             }
+            // v2 on-device AI — substitution sheet (in `+SubstitutionSheet.swift`
+            // to keep this body's type-check + file length in check).
+            .shoppingSubstitutionSheet(isPresented: substitutionSheetBinding, viewModel: viewModel)
             // DUT-488 — confirm before wiping a persisted list. Destructive
             // role tints the button red; the list clears + persists empty on
             // confirm (survives close/reopen).
@@ -152,6 +155,14 @@ public struct ShoppingListView: View {
             .sensoryFeedback(trigger: viewModel.visibleItems.count) { old, new in
                 new < old ? .impact : nil
             }
+    }
+
+    /// v2 on-device AI — sheet presented whenever substitution state != `.idle`.
+    private var substitutionSheetBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.substitution != .idle },
+            set: { if !$0 { viewModel.dismissSubstitution() } }
+        )
     }
 
     /// DUT-487 — subtle progress overlay shown while ``build(from:)`` hydrates
@@ -313,7 +324,12 @@ public struct ShoppingListView: View {
                                 withAnimation(reduceMotion ? nil : .default) {
                                     viewModel.markAlreadyHave(item)
                                 }
-                            }
+                            },
+                            // v2 on-device AI — offer "Substitute" only when a
+                            // usable model is present (no dead affordance). Opens
+                            // the reason picker; generation runs from the sheet.
+                            showSubstitute: viewModel.isSubstitutionAvailable,
+                            onSubstitute: { viewModel.beginSubstitution(for: item) }
                         )
                     }
                 } header: {
