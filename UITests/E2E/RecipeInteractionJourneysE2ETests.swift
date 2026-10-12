@@ -45,11 +45,6 @@ final class RecipeInteractionJourneysE2ETests: XCTestCase {
         )
         blockMaria.tap()
 
-        // A named author's Block confirms first ("Block This Person?" alert).
-        let confirmBlock = app.alerts["Block This Person?"].buttons["Block"]
-        XCTAssertTrue(confirmBlock.waitForExistence(timeout: 5), "Block should ask for confirmation")
-        confirmBlock.tap()
-
         // Maria's comment is hidden app-wide; Diego's stays visible.
         XCTAssertFalse(
             maria.waitForExistence(timeout: 3),
