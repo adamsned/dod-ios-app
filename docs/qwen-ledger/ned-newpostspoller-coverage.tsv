@@ -1,0 +1,2 @@
+timestamp	model	prompt_tokens	completion_tokens	total	label
+2026-07-18T12:59:32+00:00	qwen2.5-coder:14b	1773	2639	4412	newpostspoller-tests

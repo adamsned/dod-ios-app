@@ -180,7 +180,24 @@ final class MockSpeechSynthesizer: SpeechSynthesizing {
     /// the natural-voice check.
     var stubbedVoices: [VoiceDescriptor] = []
 
+    /// Real stored property overriding the `SpeechSynthesizing` extension's
+    /// no-op default, so tests can register a closure and drive it via
+    /// ``simulateQueueDrained()`` — needed to exercise ``VoiceReader``'s
+    /// session-hold-gated release path (the DUT-390 `onQueueDidEmpty` wiring),
+    /// which the no-op default silently discards.
+    var onQueueDidEmpty: (() -> Void)?
+
     func installedVoiceDescriptors() -> [VoiceDescriptor] { stubbedVoices }
+
+    /// Simulates `AVSpeechSynthesizer`'s queue draining after an utterance
+    /// finishes: the engine goes idle, then its delegate fires. Lets tests
+    /// exercise `VoiceReader`'s `onQueueDidEmpty` closure (registered at init)
+    /// without a real synthesizer delegate.
+    func simulateQueueDrained() {
+        isSpeaking = false
+        isPaused = false
+        onQueueDidEmpty?()
+    }
 
     func speak(_ text: String) {
         calls.append(.speak(text))

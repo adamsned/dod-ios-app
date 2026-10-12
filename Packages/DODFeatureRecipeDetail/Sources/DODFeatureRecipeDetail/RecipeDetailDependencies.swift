@@ -354,8 +354,8 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     }
 
     public func relatedRecipes(forCategoryID categoryID: Int) async throws -> [RecipeListItem] {
-        let items = try await client.posts(categoryID: categoryID, page: 1, perPage: 5)
-        return Array(items.prefix(4))
+        // No `prefix(4)` here: `loadRelated` drops the current recipe, then shows 4 (#728).
+        try await client.posts(categoryID: categoryID, page: 1, perPage: 5)
     }
 
     public func mergeDetail(_ recipe: Recipe) async throws {
