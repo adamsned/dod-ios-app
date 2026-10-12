@@ -36,16 +36,22 @@ npx wrangler secret put APPLE_PRIVATE_KEY   # paste the full .p8 file contents (
 npx wrangler secret put APP_SHARED_SECRET   # a long random string — also goes in the iOS app config
 ```
 
-`wrangler deploy` prints the Worker URL (e.g. `https://dod-siwa-revoke.<you>.workers.dev`). Put that URL + the `APP_SHARED_SECRET` into the iOS app's `SiwaRevokeConfig` (see `Packages/DODSupport/.../SiwaRevokeClient.swift`).
+`wrangler deploy` prints the Worker URL (e.g. `https://dod-siwa-revoke.<you>.workers.dev`). Give the iOS release build that URL + the `APP_SHARED_SECRET` as GitHub secrets (never commit them — the repo is public); `release.yml` bakes them into the archived Info.plist, where `SiwaRevokeConfig.production` reads them:
+
+```bash
+gh secret set SIWA_REVOKE_BASE_URL    # https://dod-siwa-revoke.<you>.workers.dev
+gh secret set SIWA_REVOKE_APP_SECRET  # the same value as the Worker's APP_SHARED_SECRET
+```
 
 ## Test it (after deploy)
 
 ```bash
-# revoke with a junk token should reach Apple and come back non-200 (proves wiring + auth):
+# revoke with a junk token should reach Apple and come back 200 (proves wiring + auth):
 curl -sS -X POST https://dod-siwa-revoke.<you>.workers.dev/revoke \
   -H "X-DOD-App-Key: $APP_SHARED_SECRET" -H "Content-Type: application/json" \
   -d '{"refreshToken":"not-a-real-token"}'
-# -> {"revoked":false,"appleStatus":400}   (400 from Apple = the client_secret JWT was accepted)
+# -> {"revoked":true}   (Apple answers 200 for an unknown token once it accepts the client_secret JWT;
+#    {"revoked":false,"appleStatus":400} means it REJECTED the JWT - check the key, Key ID and Team ID)
 # A missing/incorrect X-DOD-App-Key returns 401 before Apple is ever called.
 ```
 
