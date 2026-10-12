@@ -94,7 +94,22 @@ extension CookJournalView {
     /// "4.3"-style formatting for the average-rating tile, or an em dash when
     /// nothing has been rated yet (DUT-882 — no ratings shouldn't read as "0.0").
     private static func averageRatingText(_ average: Double?) -> String {
+        Self.averageRatingTextFormatted(average, locale: .current)
+    }
+
+    /// Locale-aware formatting for the average-rating stat tile text.
+    /// - Parameters:
+    ///   - average: The average rating, or nil when nothing has been rated yet.
+    ///   - locale: The locale for decimal formatting (e.g., "de_DE" uses comma).
+    ///   Defaults to `.current` for production use.
+    /// - Returns: A string like "4.3" or "4,3" in German locale, or "—" if nil.
+    static func averageRatingTextFormatted(_ average: Double?, locale: Locale = .current) -> String {
         guard let average else { return "—" }
-        return String(format: "%.1f", average)
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 1
+        formatter.locale = locale
+        return formatter.string(from: NSNumber(value: average)) ?? String(average)
     }
 }

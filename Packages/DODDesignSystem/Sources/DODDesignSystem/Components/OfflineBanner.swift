@@ -14,7 +14,7 @@ public struct OfflineBanner: View {
     public let isOffline: Bool
     public let message: String
 
-    public init(isOffline: Bool, message: String = "Offline — showing recent recipes.") {
+    public init(isOffline: Bool, message: String = "Offline. Showing recent recipes.") {
         self.isOffline = isOffline
         self.message = message
     }

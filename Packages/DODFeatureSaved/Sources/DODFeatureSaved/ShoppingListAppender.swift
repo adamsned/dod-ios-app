@@ -112,7 +112,7 @@ public struct LiveShoppingListAppender: ShoppingListAppender {
         // Still empty after hydration (offline / unfetchable / parse failure)
         // → nothing to add. Folded into `.couldntLoad` so the surface shows the
         // "open the recipe to add" copy rather than a misleading "Added 0".
-        let rows = Self.applyMetricPreference(
+        let rows = ShoppingListViewModel.applyMetricPreference(
             ShoppingListViewModel.rows(from: [resolved]),
             defaults: defaults
         )
@@ -146,41 +146,24 @@ public struct LiveShoppingListAppender: ShoppingListAppender {
         return .added(count: appendedCount)
     }
 
-    /// Rewrite each row's `ingredientText` to metric when the shared
-    /// "Use Metric Units" preference is on; a transparent pass-through
-    /// otherwise (or when a row's text isn't confidently convertible —
-    /// ``IngredientMetricConverter/metric(_:)`` already returns those
-    /// unchanged).
-    ///
-    /// **Why this exists here.** Recipe Detail's whole-recipe append already
-    /// pre-converts ingredient text client-side
-    /// (`RecipeDetailViewModel.scaledRecipe`) before it ever reaches this
-    /// appender, so for that path this second pass is a documented no-op:
-    /// `IngredientMetricConverter.metric` intentionally leaves already-metric
-    /// units (ml / L / g / kg) unchanged. Feed and Search cards, by contrast,
-    /// hand this appender a never-converted `Recipe` built fresh from a
-    /// lightweight `RecipeListItem` (see `FeedViewModel.addToShoppingList` /
-    /// `SearchViewModel.addToShoppingList`) — those two surfaces never read
-    /// the preference at all before this fix, so a metric-mode cook who
-    /// long-pressed a Feed or Search card and chose "Add to Shopping List"
-    /// got imperial rows appended onto a list that might already carry metric
-    /// rows added from Recipe Detail, a same-toggle inconsistency depending
-    /// entirely on which surface was tapped. Applying the rewrite HERE, at
-    /// the single shared append choke point, fixes both surfaces at once
-    /// without threading a `useMetric` parameter through each feature
-    /// package's own `*Dependencies` protocol.
-    private static func applyMetricPreference(
-        _ rows: [ShoppingListViewModel.Item],
-        defaults: UserDefaults
-    ) -> [ShoppingListViewModel.Item] {
-        guard defaults.bool(forKey: IngredientMetricConverter.preferenceKey) else { return rows }
-        return rows.map { row in
-            ShoppingListViewModel.Item(
-                id: row.id,
-                ingredientText: IngredientMetricConverter.metric(row.ingredientText),
-                recipeTitle: row.recipeTitle,
-                aisle: row.aisle
-            )
-        }
-    }
+    // The metric-preference rewrite itself (``ShoppingListViewModel/applyMetricPreference(_:defaults:)``)
+    // lives on `ShoppingListViewModel` — it is the single shared choke point
+    // both this appender AND `ShoppingListViewModel.add(recipes:)` (the
+    // Saved-tab bulk picker) apply to rows built by `rows(from:)`, so a cook
+    // sees the same unit system regardless of which surface they used to add.
+    //
+    // **Why this appender still needs it.** Recipe Detail's whole-recipe append
+    // already pre-converts ingredient text client-side
+    // (`RecipeDetailViewModel.scaledRecipe`) before it ever reaches this
+    // appender, so for that path the rewrite is a documented no-op:
+    // `IngredientMetricConverter.metric` intentionally leaves already-metric
+    // units (ml / L / g / kg) unchanged. Feed and Search cards, by contrast,
+    // hand this appender a never-converted `Recipe` built fresh from a
+    // lightweight `RecipeListItem` (see `FeedViewModel.addToShoppingList` /
+    // `SearchViewModel.addToShoppingList`) — those two surfaces never read the
+    // preference at all before the original fix, so a metric-mode cook who
+    // long-pressed a Feed or Search card and chose "Add to Shopping List" got
+    // imperial rows appended onto a list that might already carry metric rows
+    // added from Recipe Detail, a same-toggle inconsistency depending entirely
+    // on which surface was tapped.
 }

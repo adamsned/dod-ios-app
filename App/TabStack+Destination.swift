@@ -140,7 +140,13 @@ extension TabStack {
                 heatCoach: { AnyView(NavigationStack { HeatCoachView() }) },
                 askAboutRecipe: dependencies.recipeChatSheetBuilder()
             ),
-            topInsetOverride: topInsetOverride
+            topInsetOverride: topInsetOverride,
+            // DUT-1240 — disarm the "came here to cook" arm the instant Cook Mode
+            // actually presents: not on tap (too early, the recipe may still be
+            // loading) or on tab switch (too late, a second recipe tapped on the
+            // same Feed visit would still auto-start). A recipe that never
+            // reaches Cook Mode leaves the arm intact (DUT-1229's retry intent).
+            onAutoCookModeStarted: { cookModeFindRecipeArmed = false }
         )
         .onAppear {
             Telemetry.shared.send(.screenView(name: "recipe_detail"))

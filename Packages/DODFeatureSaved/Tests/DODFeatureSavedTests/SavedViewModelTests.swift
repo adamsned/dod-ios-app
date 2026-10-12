@@ -116,6 +116,43 @@ import Testing
         #expect(viewModel.loadState == .loaded)
     }
 
+    // DUT — haptic-consistency fix: the Saved tab's long-press Unsave now
+    // bumps `saveToggleCount` (previously absent), mirroring
+    // `FeedViewModel`/`CategoryRecipesViewModel` (DUT-697), so `SavedView` can
+    // fire the same `.sensoryFeedback(.selection, trigger:)` haptic every
+    // other card-grid surface already fires on a genuine Save/Unsave toggle.
+
+    @Test func optimisticallyRemoveBumpsSaveToggleCountOnGenuineUnsave() async {
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [
+            Self.makeRecipe(id: 1),
+            Self.makeRecipe(id: 2),
+            Self.makeRecipe(id: 3),
+        ]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+        #expect(viewModel.saveToggleCount == 0)
+
+        viewModel.optimisticallyRemove(id: 2)
+        #expect(viewModel.saveToggleCount == 1)
+
+        viewModel.optimisticallyRemove(id: 1)
+        #expect(viewModel.saveToggleCount == 2)
+    }
+
+    @Test func refreshReconciliationNeverBumpsSaveToggleCount() async {
+        // The haptic must fire ONLY on a genuine user-tap Unsave, never on the
+        // appear/pull-to-refresh/remote-change reconciliation path — otherwise
+        // every tab appearance would buzz. Multiple `refresh()` calls with no
+        // `optimisticallyRemove` call must leave the counter untouched.
+        let dependencies = FakeSavedDependencies()
+        dependencies.recipes = [Self.makeRecipe(id: 1), Self.makeRecipe(id: 2)]
+        let viewModel = SavedViewModel(dependencies: dependencies)
+        await viewModel.refresh()
+        await viewModel.refresh()
+        #expect(viewModel.saveToggleCount == 0)
+    }
+
     @Test func pendingUnsaveStaysSuppressedWithinTTL() async {
         // DUT-370: a refresh that fires before the unsave write commits (the
         // store still returns the id) must NOT resurrect the just-unsaved card.

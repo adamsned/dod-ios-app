@@ -54,6 +54,9 @@ let package = Package(
                 "DODFeatureRecipeDetail",
                 "DODAnalytics",
                 "DODCookActivity",
+                // DUT-1322 — the toolbar glyph contrast tests assert against the
+                // real `DODColor` tokens, so the test target needs their module.
+                "DODDesignSystem",
                 // US-54 / T-932 — the test injects `FakeIntelligenceService`.
                 "DODIntelligence",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
