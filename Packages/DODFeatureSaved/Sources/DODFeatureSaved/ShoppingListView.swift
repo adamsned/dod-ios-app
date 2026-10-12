@@ -218,11 +218,8 @@ public struct ShoppingListView: View {
         }
     }
 
-    // DUT — `hydrateInOrder(_:hydrate:)` (the order-preserving concurrent
-    // hydration `build(from:)` calls above) lives in
-    // `ShoppingListView+HydrateInOrder.swift` to keep this file under
-    // SwiftLint's `file_length` (400-line) cap — same split pattern used
-    // across the codebase (e.g. `ShoppingListViewModel+Dedup.swift`).
+    // `hydrateInOrder(_:hydrate:)` lives in `ShoppingListView+HydrateInOrder.swift`
+    // (`file_length` cap).
 
     /// DUT-487 / T-906 — the populated-state "Add recipes" `+`. Opens the same
     /// picker as the empty state; confirming appends the new recipes' rows
