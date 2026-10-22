@@ -36,7 +36,11 @@ private final class StubCategoriesHTTPClient: HTTPClient, @unchecked Sendable {
         record(url)
         guard
             let response = HTTPURLResponse(
-                url: url, statusCode: status, httpVersion: nil, headerFields: headers)
+                url: url,
+                statusCode: status,
+                httpVersion: nil,
+                headerFields: headers
+            )
         else { throw URLError(.badServerResponse) }
         return (body, response)
     }
@@ -77,7 +81,7 @@ private final class StubCategoriesHTTPClient: HTTPClient, @unchecked Sendable {
             _ = try await live.fetchCategories()
         }
     }
-    
+
     @Test func postsPageReturnsEmptyForInvalidID() async throws {
         let json = """
             []
@@ -87,7 +91,7 @@ private final class StubCategoriesHTTPClient: HTTPClient, @unchecked Sendable {
         #expect(items.isEmpty)
         #expect(totalPages == 1)
     }
-    
+
     @Test func postsPageReturnsCorrectData() async throws {
         let json = """
             [{"id":1,"title":"Post 1","excerpt":"","heroImage":null,"publishedAt":"2023-01-01T00:00:00Z","totalTimeDisplay":"30m"}]
@@ -97,7 +101,7 @@ private final class StubCategoriesHTTPClient: HTTPClient, @unchecked Sendable {
         #expect(items.count == 1)
         #expect(totalPages == 1)
     }
-    
+
     @Test func postsPageHandlesHTTPFailure() async throws {
         let (live, _) = try makeLive(json: "[]", status: 404)
         await #expect(throws: WPClientError.self) {
