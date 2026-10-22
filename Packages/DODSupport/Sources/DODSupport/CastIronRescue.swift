@@ -75,4 +75,18 @@ public enum CastIronRescue {
 
     /// All rescues in display order.
     public static var all: [Rescue] { Problem.allCases.map(rescue(for:)) }
+
+    /// Recipe-specific nudge, or nil when the problem isn't heat-related or the
+    /// recipe has no confident temperature (never fabricate one).
+    public static func heatTip(for problem: Problem, profile: RecipeHeatProfile.Derived?) -> String? {
+        guard let profile else { return nil }
+        switch problem {
+        case .tooHot, .browningTooFast:
+            return "This recipe wants about \(profile.ovenTempF)°F. If you're running hotter, pull a few coals."
+        case .underdoneCenter:
+            return "Aim for about \(profile.ovenTempF)°F and hold it steady while the center catches up."
+        case .sticking, .flareUp:
+            return nil
+        }
+    }
 }
