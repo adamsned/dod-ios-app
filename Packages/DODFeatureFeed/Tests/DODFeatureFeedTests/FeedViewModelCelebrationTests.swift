@@ -127,7 +127,8 @@ import Testing
     /// DUT-625 — a first-ever cook that is an off-path DUMP CAKE must NOT fire a
     /// rank-up. The rank ladder counts the path population only (graduation is
     /// path-only), so an "Anytime Treat" can't spuriously bump the rank.
-    @Test func firstEverDumpCakeDoesNotFireARankUp() async {
+    /// DUT-983: now fires firstCookEver instead of rankUp.
+    @Test func firstEverDumpCakeFiresFirstCookEverNotARankUp() async {
         let dependencies = FakeFeedDependencies()  // no prior cooks
         let viewModel = FeedViewModel(dependencies: dependencies)
         guard let cake = DumpCake.all.first else {
@@ -137,7 +138,7 @@ import Testing
 
         await viewModel.logCook(makeCook(cake.id))  // 1st cook overall, but off-path
 
-        #expect(viewModel.celebration == nil)
+        #expect(viewModel.celebration == .firstCookEver)
     }
 
     /// DUT-625 — dump-cake cooks are excluded from the rank ladder, so they
@@ -157,6 +158,27 @@ import Testing
         } else {
             Issue.record("expected Fire Starter rank-up, got \(String(describing: viewModel.celebration))")
         }
+    }
+
+    /// DUT-983: the first cook on the guided path is the first-ever moment, not a Fire Starter rank-up.
+    @Test func firstEverPathCookFiresFirstCookEverInsteadOfRankUp() async {
+        let dependencies = FakeFeedDependencies()  // no prior cooks
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        await viewModel.logCook(makeCook(GuidedCookout.firstCookout.recipeID))
+
+        #expect(viewModel.celebration == .firstCookEver)
+    }
+
+    /// DUT-983: only the very first cook; a second cook never re-fires it.
+    @Test func secondCookDoesNotFireFirstCookEver() async {
+        let dependencies = FakeFeedDependencies()
+        dependencies.cooks = [makeCook(9001)]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        await viewModel.logCook(makeCook(9002))
+
+        #expect(viewModel.celebration != .firstCookEver)
     }
 
     @Test func dismissingClearsTheCelebration() async {
