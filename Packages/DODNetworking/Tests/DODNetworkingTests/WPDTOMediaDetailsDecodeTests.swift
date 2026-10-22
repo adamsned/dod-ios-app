@@ -33,4 +33,30 @@ import Testing
         let details = try decodeDetails(#"{"sizes":{}}"#)
         #expect(details.sizes?.isEmpty == true)
     }
+
+    @Test func sizesAsStringGivesNilWithoutThrowing() throws {
+        let details = try decodeDetails(#"{"sizes":"oops"}"#)
+        #expect(details.sizes == nil)
+    }
+
+    @Test func sizesAsNonEmptyArrayGivesNilWithoutThrowing() throws {
+        let details = try decodeDetails(#"{"sizes":[1,2,3]}"#)
+        #expect(details.sizes == nil)
+    }
+
+    @Test func sizesAsNumberGivesNil() throws {
+        let details = try decodeDetails(#"{"sizes":7}"#)
+        #expect(details.sizes == nil)
+    }
+
+    @Test func sizesNullGivesNil() throws {
+        let details = try decodeDetails(#"{"sizes":null}"#)
+        #expect(details.sizes == nil)
+    }
+
+    @Test func oneWrongTypedEntryNilsTheWholeSizesDictionary() throws {
+        let json = #"{"sizes":{"large":{"source_url":"https://example.com/l.jpg","width":"wide"}}}"#
+        let details = try decodeDetails(json)
+        #expect(details.sizes == nil)
+    }
 }
