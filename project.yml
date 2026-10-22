@@ -71,6 +71,8 @@ targets:
       # DUT-692 — the Control Center action intent is compiled into the APP too
       # (not just the widget) so `openAppWhenRun` can run it in the app process.
       - path: Shared/CookingToolIntents.swift
+      # DUT-988 — Live Activity buttons; `perform()` runs in the app process.
+      - path: Shared/CookActivityIntents.swift
     info:
       path: App/Info.plist
       # These keys MUST live here in project.yml. `xcodegen generate`

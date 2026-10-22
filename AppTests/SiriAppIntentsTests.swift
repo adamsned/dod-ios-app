@@ -149,18 +149,14 @@ final class SiriAppIntentsTests: XCTestCase {
 
     // MARK: - Live Activity Intents
 
-    @Test @MainActor
-    func routerForwardsCommands() {
+    func test_liveActivityIntents_forwardToTheRouter() async throws {
         var receivedCommands: [CookActivityIntentCommand] = []
         CookActivityIntentRouter.handler = { command in
             receivedCommands.append(command)
         }
 
-        // Test PulledItIntent
-        XCTAssertNoThrow(try await PulledItIntent().perform())
-
-        // Test SnoozeTimerIntent
-        XCTAssertNoThrow(try await SnoozeTimerIntent().perform())
+        _ = try await PulledItIntent().perform()
+        _ = try await SnoozeTimerIntent().perform()
 
         // Verify both commands were received
         XCTAssertEqual(receivedCommands, [.pulledIt, .snooze])
