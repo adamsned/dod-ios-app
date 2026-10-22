@@ -14,4 +14,15 @@ import Testing
     @Test func allMatchesCaseCount() {
         #expect(CastIronRescue.all.count == CastIronRescue.Problem.allCases.count)
     }
+    @Test func heatTipUsesTemperatureWhenConfident() {
+        let profile = RecipeHeatProfile.Derived(ovenTempF: 375, task: .bake)
+        #expect(CastIronRescue.heatTip(for: .tooHot, profile: profile)?.contains("375") == true)
+        #expect(CastIronRescue.heatTip(for: .underdoneCenter, profile: profile)?.contains("375") == true)
+    }
+    @Test func heatTipNilWithoutProfileOrForNonHeatProblems() {
+        #expect(CastIronRescue.heatTip(for: .tooHot, profile: nil) == nil)
+        let profile = RecipeHeatProfile.Derived(ovenTempF: 375, task: .bake)
+        #expect(CastIronRescue.heatTip(for: .sticking, profile: profile) == nil)
+        #expect(CastIronRescue.heatTip(for: .flareUp, profile: profile) == nil)
+    }
 }
