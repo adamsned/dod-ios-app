@@ -30,6 +30,6 @@ import Testing
 
     @Test func emptyStringsAreAllowed() {
         let empty = FeelCue(title: "", onTrack: "", adjust: "")
-        #expect(empty.id == "")
+        #expect(empty.id.isEmpty)
     }
 }
