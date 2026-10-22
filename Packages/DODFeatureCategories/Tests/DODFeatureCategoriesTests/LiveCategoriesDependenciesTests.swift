@@ -59,6 +59,23 @@ private final class StubCategoriesHTTPClient: HTTPClient, @unchecked Sendable {
         return (live, http)
     }
 
+    private func makeLiveWithStore() throws -> (LiveCategoriesDependencies, RecipeStore) {
+        let store = RecipeStore(modelContainer: try RecipeStore.inMemoryContainer())
+        let http = StubCategoriesHTTPClient(json: "[]")
+        return (LiveCategoriesDependencies(client: WPRestClient(httpClient: http), store: store), store)
+    }
+
+    private func item(_ id: Int) -> RecipeListItem {
+        RecipeListItem(
+            id: id,
+            title: "Recipe \(id)",
+            excerpt: "",
+            heroImage: nil,
+            publishedAt: Date(timeIntervalSince1970: 1),
+            totalTimeDisplay: nil
+        )
+    }
+
     @Test func fetchCategoriesSortsAlphabeticallyAndHidesEmpty() async throws {
         let json = """
             [{"id":2,"name":"beta","slug":"beta","count":3},
@@ -141,5 +158,32 @@ private final class StubCategoriesHTTPClient: HTTPClient, @unchecked Sendable {
         await #expect(throws: WPClientError.self) {
             _ = try await live.fetchPosts(categoryID: 1, page: 1)
         }
+    }
+
+    @Test func cacheThenCachedListItemsRoundTripsInRequestedOrder() async throws {
+        let (live, _) = try makeLiveWithStore()
+        try await live.cache(listItems: [item(1), item(2), item(3)])
+        let cached = try await live.cachedListItems(forIDs: [3, 1])
+        #expect(cached.map(\.id) == [3, 1])
+    }
+
+    @Test func cachedListItemsForEmptyIDsIsEmpty() async throws {
+        let (live, _) = try makeLiveWithStore()
+        #expect(try await live.cachedListItems(forIDs: []).isEmpty)
+    }
+
+    @Test func cachedListItemsSkipsUncachedIDs() async throws {
+        let (live, _) = try makeLiveWithStore()
+        try await live.cache(listItems: [item(1)])
+        let cached = try await live.cachedListItems(forIDs: [1, 99])
+        #expect(cached.map(\.id) == [1])
+    }
+
+    @Test func savedRecipeIDsIsEmptyThenReflectsASavedRecipe() async throws {
+        let (live, store) = try makeLiveWithStore()
+        #expect(try await live.savedRecipeIDs().isEmpty)
+        try await live.cache(listItems: [item(7)])
+        try await store.toggleSaved(id: 7)
+        #expect(try await live.savedRecipeIDs() == [7])
     }
 }
