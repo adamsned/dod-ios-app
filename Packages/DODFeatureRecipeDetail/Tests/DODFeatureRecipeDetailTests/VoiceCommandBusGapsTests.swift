@@ -11,13 +11,14 @@ import Testing
 
     /// Records which handler method fired; stands in for live ``CookModeViewModel``.
     final class SpyHandler: VoiceCommandHandler {
-        enum Call: Equatable { case advance, previous, repeatStep, pause, resume }
+        enum Call: Equatable { case advance, previous, repeatStep, pause, resume, snooze }
         private(set) var calls: [Call] = []
         func advanceStep() { calls.append(.advance) }
         func previousStep() { calls.append(.previous) }
         func repeatCurrentStep() { calls.append(.repeatStep) }
         func pauseVoice() { calls.append(.pause) }
         func resumeVoice() { calls.append(.resume) }
+        func snoozeTimer() { calls.append(.snooze) }
     }
 
     /// ResumeVoiceIntent → resumeVoice(). Mirrors pauseCommandPauses test
