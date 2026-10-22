@@ -258,4 +258,22 @@ struct CookModeViewModelTimersTests {
                 == 60
         )
     }
+
+    @Test func snoozeRestartsCompletedTimerForTwoMinutes() {
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1)
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 10, now: t0)
+        vm.tickTimers(now: t0.addingTimeInterval(11))  // completes
+        #expect(vm.timer(forStep: 0)?.didComplete == true)
+
+        let t1 = t0.addingTimeInterval(11)
+        #expect(vm.snoozeCompletedTimer(now: t1))
+
+        #expect(vm.timer(forStep: 0)?.isRunning == true)
+        #expect(vm.timer(forStep: 0)?.remaining(at: t1) == 120)
+    }
+
+    @Test func snoozeWithNoCompletedTimerIsANoOp() {
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1)
+        #expect(vm.snoozeCompletedTimer(now: t0) == false)
+    }
 }
