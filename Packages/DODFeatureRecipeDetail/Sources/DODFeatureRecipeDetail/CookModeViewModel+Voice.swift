@@ -301,4 +301,10 @@ extension CookModeViewModel {
         // DUT-583 — continue from the pause point (no restart); button → pause.
         playbackState = .speaking
     }
+
+    /// DUT-988 — "2 More Min" from the Live Activity buzzer card. Restarts the
+    /// timer that just finished for two minutes; no-op when none has buzzed.
+    public func snoozeTimer() {
+        snoozeCompletedTimer(minutes: 2)
+    }
 }

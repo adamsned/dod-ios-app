@@ -276,4 +276,12 @@ struct CookModeViewModelTimersTests {
         let vm = CookModeViewModelTests.makeViewModel(stepCount: 1)
         #expect(vm.snoozeCompletedTimer(now: t0) == false)
     }
+
+    @Test func snoozeTimerViaHandlerRestartsBuzzedTimer() {
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 1)
+        vm.startOrResumeTimer(forStep: 0, totalSeconds: 10, now: t0)
+        vm.tickTimers(now: t0.addingTimeInterval(11))  // completes
+        vm.snoozeTimer()  // should restart the timer for 2 minutes (120 seconds)
+        #expect(vm.timer(forStep: 0)?.isRunning == true)
+    }
 }
