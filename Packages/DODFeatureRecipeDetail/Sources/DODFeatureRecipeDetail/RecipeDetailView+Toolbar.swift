@@ -126,6 +126,7 @@ extension RecipeDetailView {
                     Image(systemName: "square.and.arrow.up")
                         .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
                 }
+                .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Share recipe")
                 #endif
             }
