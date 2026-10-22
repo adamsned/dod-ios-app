@@ -108,4 +108,38 @@ private final class StubCategoriesHTTPClient: HTTPClient, @unchecked Sendable {
             _ = try await live.fetchPosts(categoryID: 1, page: 1)
         }
     }
+
+    @Test func fetchPostsReadsTotalPagesFromHeader() async throws {
+        let (live, _) = try makeLive(json: "[]", headers: ["X-WP-TotalPages": "4"])
+        let result = try await live.fetchPosts(categoryID: 336, page: 1)
+        #expect(result.totalPages == 4)
+        #expect(result.items.isEmpty)
+    }
+
+    @Test func fetchPostsDefaultsTotalPagesToOneWhenHeaderMissing() async throws {
+        let (live, _) = try makeLive(json: "[]")
+        let result = try await live.fetchPosts(categoryID: 336, page: 1)
+        #expect(result.totalPages == 1)
+    }
+
+    @Test func fetchPostsClampsZeroTotalPagesToOne() async throws {
+        let (live, _) = try makeLive(json: "[]", headers: ["X-WP-TotalPages": "0"])
+        let result = try await live.fetchPosts(categoryID: 336, page: 1)
+        #expect(result.totalPages == 1)
+    }
+
+    @Test func fetchPostsSendsCategoryAndPageInTheQuery() async throws {
+        let (live, http) = try makeLive(json: "[]")
+        _ = try await live.fetchPosts(categoryID: 336, page: 2)
+        let query = http.requestedURLs.first?.query ?? ""
+        #expect(query.contains("categories=336"))
+        #expect(query.contains("page=2"))
+    }
+
+    @Test func fetchPostsPropagatesHTTPFailure() async throws {
+        let (live, _) = try makeLive(json: "[]", status: 404)
+        await #expect(throws: WPClientError.self) {
+            _ = try await live.fetchPosts(categoryID: 1, page: 1)
+        }
+    }
 }
