@@ -146,4 +146,26 @@ final class SiriAppIntentsTests: XCTestCase {
         let named = RecipeEntity(payload: payload(7, "Named"))
         XCTAssertEqual(OnscreenRecipe.resolve(named)?.id, 7)
     }
+
+    // MARK: - Live Activity Intents
+
+    @Test @MainActor
+    func routerForwardsCommands() {
+        var receivedCommands: [CookActivityIntentCommand] = []
+        CookActivityIntentRouter.handler = { command in
+            receivedCommands.append(command)
+        }
+
+        // Test PulledItIntent
+        XCTAssertNoThrow(try await PulledItIntent().perform())
+
+        // Test SnoozeTimerIntent
+        XCTAssertNoThrow(try await SnoozeTimerIntent().perform())
+
+        // Verify both commands were received
+        XCTAssertEqual(receivedCommands, [.pulledIt, .snooze])
+
+        // Reset the handler
+        CookActivityIntentRouter.handler = nil
+    }
 }
