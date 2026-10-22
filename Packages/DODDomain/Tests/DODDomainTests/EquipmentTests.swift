@@ -30,6 +30,6 @@ struct EquipmentTests {
     }
 
     @Test func emptyNameIsKept() {
-        #expect(Equipment(name: "").name == "")
+        #expect(Equipment(name: "").name.isEmpty)
     }
 }
