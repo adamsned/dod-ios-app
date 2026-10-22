@@ -32,4 +32,23 @@ import Testing
         let empty = FeelCue(title: "", onTrack: "", adjust: "")
         #expect(empty.id.isEmpty)
     }
+
+    @Test func shippedCuesHaveUniqueIDs() {
+        let ids = DutchOvenHeatCoach.feelCues.map(\.id)
+        #expect(Set(ids).count == ids.count)
+    }
+
+    @Test func shippedCueIDsEqualTheirTitles() {
+        for cue in DutchOvenHeatCoach.feelCues {
+            #expect(cue.id == cue.title)
+        }
+    }
+
+    @Test func shippedCuesCanKeyADictionaryWithoutCollision() {
+        let byID = Dictionary(
+            uniqueKeysWithValues: DutchOvenHeatCoach.feelCues.map { ($0.id, $0) }
+        )
+        #expect(byID.count == DutchOvenHeatCoach.feelCues.count)
+        #expect(byID["Hand Test"]?.title == "Hand Test")
+    }
 }
