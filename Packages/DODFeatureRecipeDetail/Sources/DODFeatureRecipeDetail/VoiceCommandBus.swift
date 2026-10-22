@@ -13,6 +13,7 @@ public enum VoiceCommand: Sendable, Hashable {
     case `repeat`
     case pause
     case resume
+    case snooze
 }
 
 /// The surface a ``VoiceCommandBus`` forwards commands to. ``CookModeViewModel``
@@ -28,6 +29,11 @@ public protocol VoiceCommandHandler: AnyObject {
     func repeatCurrentStep()
     func pauseVoice()
     func resumeVoice()
+    func snoozeTimer()
+}
+
+extension VoiceCommandHandler {
+    public func snoozeTimer() {}
 }
 
 /// Process-wide message bus between the Voice Mode `AppIntent`s (which run
@@ -96,25 +102,29 @@ public final class VoiceCommandBus {
         case .repeat: handler.repeatCurrentStep()
         case .pause: handler.pauseVoice()
         case .resume: handler.resumeVoice()
+        case .snooze: handler.snoozeTimer()
         }
         // DUT-637 — emit the `voiceCommandFired` telemetry only once a handler
         // has actually CONSUMED the command (past the `guard let handler`). The
         // intents used to fire it unconditionally, so a Siri command with no
         // foreground Cook Mode session (the common lock-screen case) logged a
         // phantom "fired" event even though the command was a silent no-op.
-        Telemetry.shared.send(.voiceCommandFired(command: Self.telemetryName(for: command)))
+        if let name = Self.telemetryName(for: command) {
+            Telemetry.shared.send(.voiceCommandFired(command: name))
+        }
     }
 
     /// DUT-637 — map the bus command onto the analytics `VoiceCommandName`. The
     /// two enums are intentionally 1:1; kept as an explicit switch so a future
     /// command can't silently drift the mapping.
-    private static func telemetryName(for command: VoiceCommand) -> VoiceCommandName {
+    private static func telemetryName(for command: VoiceCommand) -> VoiceCommandName? {
         switch command {
         case .next: return .next
         case .previous: return .previous
         case .repeat: return .repeat
         case .pause: return .pause
         case .resume: return .resume
+        case .snooze: return nil
         }
     }
 }

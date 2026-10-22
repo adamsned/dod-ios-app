@@ -15,13 +15,14 @@ import Testing
     /// Records which handler method fired so each command can be asserted in
     /// isolation. Stands in for the live `CookModeViewModel`.
     final class SpyHandler: VoiceCommandHandler {
-        enum Call: Equatable { case advance, previous, repeatStep, pause, resume }
+        enum Call: Equatable { case advance, previous, repeatStep, pause, resume, snooze }
         private(set) var calls: [Call] = []
         func advanceStep() { calls.append(.advance) }
         func previousStep() { calls.append(.previous) }
         func repeatCurrentStep() { calls.append(.repeatStep) }
         func pauseVoice() { calls.append(.pause) }
         func resumeVoice() { calls.append(.resume) }
+        func snoozeTimer() { calls.append(.snooze) }
     }
 
     /// Each command maps to exactly one handler method (AC-40.5). Uses the
@@ -150,5 +151,16 @@ import Testing
         VoiceCommandBus.shared.deliver(.next)
 
         #expect(viewModel.currentStepIndex == 1)
+    }
+
+    /// SnoozeVoiceIntent → snoozeTimer().
+    @Test func snoozeCommandSnoozes() {
+        let spy = SpyHandler()
+        VoiceCommandBus.shared.handler = spy
+        defer { VoiceCommandBus.shared.handler = nil }
+
+        VoiceCommandBus.shared.deliver(.snooze)
+
+        #expect(spy.calls == [.snooze])
     }
 }
