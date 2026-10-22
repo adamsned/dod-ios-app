@@ -12,4 +12,14 @@ import Testing
     @Test func headlineFallsBackToDishTitleWhenNoNote() {
         #expect(CookWinCardContent(entry: entry(note: nil)).headline == "I made Lasagna!")
     }
+
+    @Test func headlineUsesFirstNonEmptyNoteLine() {
+        let card = CookWinCardContent(entry: entry(note: "\n  My first lasagna, fed 8\nmore text"))
+        #expect(card.headline == "My first lasagna, fed 8")
+    }
+
+    @Test func winIsCappedAt140Characters() {
+        let card = CookWinCardContent(entry: entry(note: String(repeating: "a", count: 300)))
+        #expect(card.win?.count == 140)
+    }
 }

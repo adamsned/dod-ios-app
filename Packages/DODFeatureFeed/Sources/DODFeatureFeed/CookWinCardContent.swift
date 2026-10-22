@@ -12,7 +12,11 @@ struct CookWinCardContent: Equatable {
 
     init(entry: CookLogEntry) {
         dishTitle = entry.recipeTitle
-        win = nil  // note parsing is added in the next sub-ticket
+        let firstLine = (entry.note ?? "")
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
+        win = firstLine.map { String($0.prefix(140)) }
     }
 
     /// Big line on the card: the win if the cook wrote one, else "I made <dish>!".
