@@ -59,6 +59,17 @@ public struct CookActivityLockScreenView: View {
                     .dodFont(DODType.caption)
                     .foregroundStyle(DODColor.labelSecondary)
                     .lineLimit(1)
+                    // Dynamic Type: `recipeTitle` is the same unbounded,
+                    // WPRM-authored recipe name DUT-527 found truncating to
+                    // "Veget…" elsewhere at large accessibility text sizes —
+                    // and this view renders on both the Lock Screen and the
+                    // Dynamic Island expanded region, where every OTHER
+                    // single-line text below (the countdown numeral, the
+                    // compact-trailing countdown) already shrinks via
+                    // `.minimumScaleFactor` (DUT-694, DUT-662) instead of
+                    // clipping. The title was the one line in this file that
+                    // hadn't gotten that same treatment.
+                    .minimumScaleFactor(0.7)
                 Spacer()
                 if isCompleted {
                     // DUT-491: the DUT-354 buzzer moment is "Done", not "Paused".

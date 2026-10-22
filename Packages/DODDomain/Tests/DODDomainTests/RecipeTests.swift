@@ -96,37 +96,6 @@ import Testing
         #expect(recipe.hasDetail)
     }
 
-    // MARK: - isDessert (DUT-325)
-
-    @Test func isDessertFalseForOrdinarySavory() {
-        let recipe = Self.makeRecipe(id: 1)
-        #expect(!recipe.isDessert)
-    }
-
-    @Test func isDessertTrueFromWordPressCategory() {
-        let recipe = Self.makeRecipe(id: 1, categoryIDs: [12, Recipe.dessertCategoryID])
-        #expect(recipe.isDessert)
-    }
-
-    @Test func isDessertTrueFromJSONLDCourse() {
-        // Tagged only by the JSON-LD course, not the WP category — the old
-        // category-only check missed these.
-        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["Dessert"])
-        #expect(recipe.isDessert)
-    }
-
-    @Test func isDessertCourseMatchIsCaseInsensitive() {
-        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["dessert"])
-        #expect(recipe.isDessert)
-    }
-
-    @Test func isDessertFalseForOtherCourses() {
-        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["Main Course", "Side Dish"])
-        #expect(!recipe.isDessert)
-    }
-
-    // MARK: - hasDetail article branch (#799)
-
     @Test func hasDetailTrueWhenArticleHasNonEmptyBody() {
         let recipe = Self.makeRecipe(
             id: 1,
@@ -170,6 +139,35 @@ import Testing
             articleBodyHTML: "<p>This should be ignored</p>"
         )
         #expect(!recipe.hasDetail)
+    }
+
+    // MARK: - isDessert (DUT-325)
+
+    @Test func isDessertFalseForOrdinarySavory() {
+        let recipe = Self.makeRecipe(id: 1)
+        #expect(!recipe.isDessert)
+    }
+
+    @Test func isDessertTrueFromWordPressCategory() {
+        let recipe = Self.makeRecipe(id: 1, categoryIDs: [12, Recipe.dessertCategoryID])
+        #expect(recipe.isDessert)
+    }
+
+    @Test func isDessertTrueFromJSONLDCourse() {
+        // Tagged only by the JSON-LD course, not the WP category (the old
+        // category-only check missed these).
+        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["Dessert"])
+        #expect(recipe.isDessert)
+    }
+
+    @Test func isDessertCourseMatchIsCaseInsensitive() {
+        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["dessert"])
+        #expect(recipe.isDessert)
+    }
+
+    @Test func isDessertFalseForOtherCourses() {
+        let recipe = Self.makeRecipe(id: 1, recipeCategory: ["Main Course", "Side Dish"])
+        #expect(!recipe.isDessert)
     }
 
     private static func makeRecipe(
