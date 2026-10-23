@@ -210,6 +210,9 @@ import Testing
             AnalyticsEvent.syncDisabled.name,
             AnalyticsEvent.syncCompletedSuccessfully.name,
             AnalyticsEvent.syncFailed(errorCategory: .other).name,
+            AnalyticsEvent.reviewPromptEligible.name,
+            AnalyticsEvent.reviewPromptShown.name,
+            AnalyticsEvent.reviewManualRateTapped.name,
         ]
         #expect(Set(allNames).count == allNames.count)
     }
