@@ -31,9 +31,27 @@ private struct AnnouncementDTO: Decodable {
     func toAnnouncement() -> Announcement {
         Announcement(
             id: id,
-            title: title.rendered,
-            bodyMarkdown: content.rendered,
-            publishedAt: WPDTO.parseWPDate(dateGMT)
+            title: HTMLSanitizer.plainText(from: title.rendered),
+            bodyMarkdown: HTMLSanitizer.plainText(from: content.rendered),
+            imageURL: nil,
+            publishedAt: WPDTO.parseWPDate(dateGMT),
+            deepLink: firstLinkDeepLink()
         )
+    }
+
+    /// First `<a href>` in the rendered content that maps to an in-app deep link.
+    private func firstLinkDeepLink() -> Announcement.DeepLink? {
+        let pattern = #"href=\"([^\"]+)\""#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let html = content.rendered
+        let range = NSRange(html.startIndex..., in: html)
+        for match in regex.matches(in: html, range: range) {
+            guard let hrefRange = Range(match.range(at: 1), in: html),
+                let url = URL(string: String(html[hrefRange])),
+                let link = Announcement.DeepLink(url: url)
+            else { continue }
+            return link
+        }
+        return nil
     }
 }
