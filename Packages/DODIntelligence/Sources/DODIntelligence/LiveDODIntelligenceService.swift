@@ -100,6 +100,19 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #endif
     }
 
+    public func explainStep(_ step: String, nextStep: String?) async -> StepExplanation? {
+        let trimmed = step.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateStepExplanation(step: trimmed, nextStep: nextStep)
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
     public func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         // An image-only ask (no text) is allowed; a fully empty ask is not.
