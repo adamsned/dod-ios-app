@@ -234,6 +234,24 @@ import Testing
         #expect(after.map(\.id) == [keep.id])  // list reload reflects the delete → stats recompute
     }
 
+    @Test func clearCookHistoryEmptiesTheJournal() async throws {
+        let dependencies = FakeFeedDependencies()
+        dependencies.cooks = [Self.makeCook(recipeID: 1), Self.makeCook(recipeID: 2)]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        #expect(await viewModel.clearCookHistory())
+        #expect(dependencies.deleteAllCookLogsCalls == 1)
+        #expect(await viewModel.cookLogs().isEmpty)
+    }
+
+    @Test func clearCookHistoryReportsFailureAndKeepsEntries() async throws {
+        let dependencies = FakeFeedDependencies()
+        dependencies.cooks = [Self.makeCook(recipeID: 1)]
+        dependencies.deleteAllCookLogsShouldFail = true
+        let viewModel = FeedViewModel(dependencies: dependencies)
+        #expect(await viewModel.clearCookHistory() == false)
+        #expect(await viewModel.cookLogs().count == 1)
+    }
+
     @Test func deleteAllCookLogsEmptiesTheFakeJournal() async throws {
         let dependencies = FakeFeedDependencies()
         dependencies.cooks = [Self.makeCook(recipeID: 1), Self.makeCook(recipeID: 2)]

@@ -42,6 +42,19 @@ extension FeedViewModel {
         }
     }
 
+    /// DUT-199 — clear the whole Cooking Journal (every cook + its photo file).
+    /// Returns whether it succeeded so the journal view can surface a failure
+    /// instead of silently reloading the old entries. Like `deleteCook`, this
+    /// changes the cook count, so the view re-runs its `load` closure after.
+    public func clearCookHistory() async -> Bool {
+        do {
+            try await dependencies.deleteAllCookLogs()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// DUT-625 / DUT-685 — the cook count that feeds the RANK ladder (journal
     /// minus off-path dump-cake cooks). Forwards to ``CookLogStats/rankLadderCookCount(_:)``
     /// (DODSupport), the single source of truth shared by the rank-up CELEBRATION
