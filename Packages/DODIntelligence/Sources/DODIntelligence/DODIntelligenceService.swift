@@ -73,6 +73,12 @@ public protocol DODIntelligenceService: Sendable {
     /// Recipe" chat. When present the model answers about THAT recipe only and
     /// treats the text as its source of truth; `nil` is the general helper.
     func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
+
+    /// DUT-1003 — judge VISUAL doneness of a dish from a photo, given the current recipe step text.
+    /// `photo` is JPEG/PNG `Data` (stays on device). Returns `nil` — never throws — when unavailable,
+    /// `supportsImageInput` is false, the photo or step is empty, the model errors, or a guardrail rejects it.
+    /// Never makes temperature or food-safety claims.
+    func checkDoneness(photo: Data, stepText: String) async -> DonenessCheckResult?
 }
 
 extension DODIntelligenceService {
@@ -93,4 +99,7 @@ extension DODIntelligenceService {
     public func answer(_ question: String) async -> String? {
         await answer(question, imageData: nil, recipeContext: nil)
     }
+
+    /// DUT-1003 — default implementation for older conformers to keep compiling.
+    public func checkDoneness(photo: Data, stepText: String) async -> DonenessCheckResult? { nil }
 }
