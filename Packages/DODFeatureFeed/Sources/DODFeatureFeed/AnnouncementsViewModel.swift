@@ -26,4 +26,16 @@ public final class AnnouncementsViewModel {
     }
 
     public var unreadCount: Int { tracker.unreadCount(in: items) }
+
+    public func load() async {
+        state = .loading
+        do {
+            let result = try await fetch()
+            items = result.sorted { $0.publishedAt > $1.publishedAt }
+            state = items.isEmpty ? .empty : .loaded
+        } catch {
+            // Keep any previously loaded items visible; only show offline when we have nothing.
+            state = items.isEmpty ? .offline : .loaded
+        }
+    }
 }
