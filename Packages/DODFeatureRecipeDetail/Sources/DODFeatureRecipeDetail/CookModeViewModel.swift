@@ -1,6 +1,7 @@
 import DODAnalytics
 import DODCookActivity
 import DODDomain
+import DODSupport
 import Foundation
 import Observation
 
@@ -342,6 +343,9 @@ public final class CookModeViewModel {
     public func endTimerLiveActivity() {
         liveActivity.end()
     }
+
+    /// Heat profile for the cast-iron rescue tips; `nil` without an explicit temperature.
+    public var rescueHeatProfile: RecipeHeatProfile.Derived? { RecipeHeatProfile.derive(from: recipe) }
 
     // MARK: - Navigation
 
