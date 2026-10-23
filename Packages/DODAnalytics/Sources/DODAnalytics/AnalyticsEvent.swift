@@ -109,6 +109,10 @@ public enum AnalyticsEvent: Sendable, Hashable {
     case reviewPromptShown
     /// DUT-157 — user tapped Settings > Rate Dutch Oven Daddy. Counts only.
     case reviewManualRateTapped
+    /// DUT-117 — the Recipe of the Day hero card was shown. Payload: recipe id only.
+    case recipeOfTheDayShown(recipeID: Int)
+    /// DUT-117 — the Recipe of the Day hero card was tapped. Payload: recipe id only.
+    case recipeOfTheDayTapped(recipeID: Int)
 }
 
 /// The closed set of Siri voice commands Cook Mode exposes (US-40 / AC-40.5).
@@ -201,6 +205,8 @@ extension AnalyticsEvent {
         case .reviewPromptEligible: "review_prompt_eligible"
         case .reviewPromptShown: "review_prompt_shown"
         case .reviewManualRateTapped: "review_manual_rate_tapped"
+        case .recipeOfTheDayShown: "recipe_of_the_day_shown"
+        case .recipeOfTheDayTapped: "recipe_of_the_day_tapped"
         }
     }
 
@@ -257,6 +263,8 @@ extension AnalyticsEvent {
             ["error_category": errorCategory.rawValue]
         case .reviewPromptEligible, .reviewPromptShown, .reviewManualRateTapped:
             [:]
+        case .recipeOfTheDayShown(let recipeID), .recipeOfTheDayTapped(let recipeID):
+            ["recipe_id": String(recipeID)]
         }
     }
 }
