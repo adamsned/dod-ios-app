@@ -5,6 +5,8 @@ import Testing
 
 @testable import DODFeatureFeed
 
+// swiftlint:disable file_length
+
 @MainActor
 @Suite("FeedViewModel (T-081, T-086)") struct FeedViewModelTests {
 
@@ -232,6 +234,14 @@ import Testing
         #expect(after.map(\.id) == [keep.id])  // list reload reflects the delete → stats recompute
     }
 
+    @Test func deleteAllCookLogsEmptiesTheFakeJournal() async throws {
+        let dependencies = FakeFeedDependencies()
+        dependencies.cooks = [Self.makeCook(recipeID: 1), Self.makeCook(recipeID: 2)]
+        try await dependencies.deleteAllCookLogs()
+        #expect(dependencies.deleteAllCookLogsCalls == 1)
+        #expect(try await dependencies.cookLogs().isEmpty)
+    }
+
     static func makeCook(recipeID: Int) -> CookLogEntry {
         CookLogEntry(
             id: UUID(),
@@ -270,6 +280,9 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     var deletedCookPhotoIDs: [String] = []
     /// DUT-514 — records the ids the view model asked to delete from the journal.
     var deletedCookLogIDs: [UUID] = []
+    /// DUT-199 — counts `deleteAllCookLogs()` calls; `deleteAllCookLogsShouldFail` makes it throw.
+    var deleteAllCookLogsCalls = 0
+    var deleteAllCookLogsShouldFail = false
     /// DUT-237: override the reported `X-WP-TotalPages`. When nil, it derives
     /// from the highest page index that has data, so a short final page still
     /// ends pagination (matching the pre-DUT-237 `< 20` heuristic for tests
@@ -349,6 +362,11 @@ final class FakeFeedDependencies: FeedDependencies, @unchecked Sendable {
     func deleteCookLog(id: UUID) async throws {
         deletedCookLogIDs.append(id)
         cooks.removeAll { $0.id == id }
+    }
+    func deleteAllCookLogs() async throws {
+        deleteAllCookLogsCalls += 1
+        if deleteAllCookLogsShouldFail { throw URLError(.cannotWriteToFile) }
+        cooks.removeAll()
     }
 
     // DUT-534 Part 2 — the Shopping List append seam. `shoppingListResult`
