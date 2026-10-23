@@ -1,3 +1,4 @@
+import DODDomain
 import Foundation
 import Testing
 
@@ -190,5 +191,21 @@ struct DODIntelligenceServiceTests {
 
         let bare = Bare()
         #expect(await bare.checkDoneness(photo: Data([1]), stepText: "Bake until golden") == nil)
+    }
+
+    private struct LegacyService: DODIntelligenceService {
+        var isAvailable: Bool { true }
+        var supportsImageInput: Bool { true }
+        func suggestSubstitution(
+            for ingredient: String,
+            in context: RecipeContext?,
+            reason: SubstitutionReason?
+        ) async -> SubstitutionResult? { nil }
+        func summarize(_ text: String) async -> String? { nil }
+        func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+    }
+
+    @Test func scanRecipeCardDefaultsToNil() async {
+        #expect(await LegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
     }
 }
