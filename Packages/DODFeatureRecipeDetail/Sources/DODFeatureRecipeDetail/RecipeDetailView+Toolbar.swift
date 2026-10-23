@@ -119,6 +119,18 @@ extension RecipeDetailView {
                 }
                 .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Share recipe")
+
+                // DUT-977 — the tent card glyph opens the full iOS share sheet with
+                // the QR tent card. This reuses the existing share sheet, so the
+                // card can go to Print or AirDrop.
+                Button {
+                    prepareTentCardShare()
+                } label: {
+                    Image(systemName: "qrcode")
+                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
+                }
+                .disabled(viewModel.recipe == nil)
+                .accessibilityLabel("Share table tent card")
                 #else
                 // macOS `swift test` slice: no UIKit share sheet — keep a plain
                 // URL ShareLink so the toolbar still compiles cross-platform.
@@ -183,6 +195,13 @@ extension RecipeDetailView {
         } catch {
             // Best-effort: temp dir is writable in practice; if not, no sheet.
         }
+    }
+
+    /// DUT-977 — render the at-the-table QR tent card and present the share sheet over it.
+    func prepareTentCardShare() {
+        guard let recipe = viewModel.recipe else { return }
+        guard let fileURL = RecipeTentCardRenderer.writeFile(recipe: recipe, hostName: nil) else { return }
+        sharePDF = SharePDFItem(pdfURL: fileURL, linkURL: recipe.canonicalURL)
     }
 
     /// Pure PDF bytes for a recipe at the current servings/units. `static` +
