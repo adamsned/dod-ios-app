@@ -37,5 +37,22 @@ import UIKit
         let hosted = await host(fetch: { throw Boom() })
         #expect(hosted.view != nil)
     }
+
+    @Test func rendersLoadedState() async {
+        let link = URL(string: "https://www.dutchovendaddy.com/tip-jar/") ?? URL(fileURLWithPath: "/")
+        let items = [
+            Announcement(
+                id: 2,
+                title: "New recipe",
+                bodyMarkdown: "Try **this** one",
+                imageURL: URL(string: "https://example.com/a.jpg"),
+                publishedAt: Date(timeIntervalSince1970: 200),
+                deepLink: Announcement.DeepLink(url: link)
+            ),
+            Announcement(id: 1, title: "Hello", bodyMarkdown: "Plain", publishedAt: Date(timeIntervalSince1970: 100)),
+        ]
+        let hosted = await host(fetch: { items })
+        #expect(hosted.view != nil)
+    }
 }
 #endif
