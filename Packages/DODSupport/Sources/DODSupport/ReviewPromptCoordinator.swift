@@ -24,6 +24,21 @@ public final class ReviewPromptCoordinator {
     public func recordSession() { store.recordSession() }
     public func recordRecipeView() { store.recordRecipeView() }
 
+    /// Call at a moment of delight (e.g. a cook finished, user back on the detail screen after completion).
+    public func recordCompletedCookAndMaybePrompt(isCooking: Bool, hadRecentError: Bool) {
+        store.recordCompletedCook()
+        maybePrompt(isCooking: isCooking, hadRecentError: hadRecentError)
+    }
+
+    public func maybePrompt(isCooking: Bool, hadRecentError: Bool) {
+        let snap = store.snapshot(isCooking: isCooking, hadRecentError: hadRecentError)
+        guard ReviewPromptPolicy.isEligible(snap, now: now()) else { return }
+        report(.eligible)
+        store.lastPromptDate = now()
+        requestReview()
+        report(.shown)
+    }
+
     /// User explicitly declined; suppress all future automatic prompts.
     public func markDeclined() { store.declined = true }
 }
