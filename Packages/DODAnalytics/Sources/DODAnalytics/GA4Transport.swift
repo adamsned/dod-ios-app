@@ -151,7 +151,7 @@ public final class GA4Transport: TelemetryTransport, @unchecked Sendable {
     static func ga4Event(for event: AnalyticsEvent) -> GA4Event? {
         let recipeID: Int
         switch event {
-        case .recipeView(let id), .offlineRead(let id):
+        case .recipeView(let id), .offlineRead(let id), .recipeOfTheDayShown(let id), .recipeOfTheDayTapped(let id):
             recipeID = id
         default:
             // Not a content open — TelemetryDeck still records it, GA4 ignores it.
