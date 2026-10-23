@@ -102,6 +102,13 @@ public enum AnalyticsEvent: Sendable, Hashable {
     /// string — never the raw `CKError` code/message (constitution §9: no free
     /// text / no PII). Authorized by CL-124. Dispatch lands with T-705.
     case syncFailed(errorCategory: SyncErrorCategory)
+
+    /// DUT-157 — the engagement gate passed and the app is eligible to ask for a review. Counts only.
+    case reviewPromptEligible
+    /// DUT-157 — the system review request was issued. Counts only.
+    case reviewPromptShown
+    /// DUT-157 — user tapped Settings > Rate Dutch Oven Daddy. Counts only.
+    case reviewManualRateTapped
 }
 
 /// The closed set of Siri voice commands Cook Mode exposes (US-40 / AC-40.5).
@@ -191,6 +198,9 @@ extension AnalyticsEvent {
         case .syncDisabled: "sync_disabled"
         case .syncCompletedSuccessfully: "sync_completed_successfully"
         case .syncFailed: "sync_failed"
+        case .reviewPromptEligible: "review_prompt_eligible"
+        case .reviewPromptShown: "review_prompt_shown"
+        case .reviewManualRateTapped: "review_manual_rate_tapped"
         }
     }
 
@@ -245,6 +255,8 @@ extension AnalyticsEvent {
         case .syncFailed(let errorCategory):
             // Closed-set category only — never the raw CKError. Constitution §9.
             ["error_category": errorCategory.rawValue]
+        case .reviewPromptEligible, .reviewPromptShown, .reviewManualRateTapped:
+            [:]
         }
     }
 }
