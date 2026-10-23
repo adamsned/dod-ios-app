@@ -172,4 +172,23 @@ struct DODIntelligenceServiceTests {
         let service = FakeIntelligenceService(answer: "A")
         #expect(await service.answer("q", imageData: nil, recipeContext: "Recipe: X") == "A")
     }
+
+    /// Test the default implementation of checkDoneness for older conformers
+    @Test func checkDonenessReturnsNilWithDefaultImplementation() async {
+        // Create a minimal struct that only implements the existing requirements
+        struct Bare: DODIntelligenceService {
+            var isAvailable: Bool { true }
+            var supportsImageInput: Bool { true }
+            func suggestSubstitution(
+                for ingredient: String,
+                in context: RecipeContext?,
+                reason: SubstitutionReason?
+            ) async -> SubstitutionResult? { nil }
+            func summarize(_ text: String) async -> String? { nil }
+            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+        }
+
+        let bare = Bare()
+        #expect(await bare.checkDoneness(photo: Data([1]), stepText: "Bake until golden") == nil)
+    }
 }
