@@ -1,3 +1,4 @@
+import DODDomain
 import Foundation
 
 /// The app's shared on-device intelligence seam.
@@ -79,6 +80,12 @@ public protocol DODIntelligenceService: Sendable {
     /// `supportsImageInput` is false, the photo or step is empty, the model errors, or a guardrail rejects it.
     /// Never makes temperature or food-safety claims.
     func checkDoneness(photo: Data, stepText: String) async -> DonenessCheckResult?
+
+    /// DUT-1004: OCR + structure a photographed recipe card (JPEG/PNG bytes)
+    /// into a local-only ``FamilyRecipe``. On-device only. Returns `nil` —
+    /// never throws — when unavailable, the bytes are not a decodable image,
+    /// no text is recognised, or the text has no ingredient / step lines.
+    func scanRecipeCard(imageData: Data) async -> FamilyRecipe?
 }
 
 extension DODIntelligenceService {
@@ -102,4 +109,7 @@ extension DODIntelligenceService {
 
     /// DUT-1003 — default implementation for older conformers to keep compiling.
     public func checkDoneness(photo: Data, stepText: String) async -> DonenessCheckResult? { nil }
+
+    /// Default for conformers that predate DUT-1004: scanning is unsupported.
+    public func scanRecipeCard(imageData: Data) async -> FamilyRecipe? { nil }
 }
