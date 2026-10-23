@@ -44,3 +44,18 @@ public enum ReviewPromptPolicy {
             || snapshot.recipeViewCount >= minRecipeViews
     }
 }
+
+extension ReviewPromptStore {
+    /// Maps the store's persisted values plus two live flags into a policy snapshot.
+    public func snapshot(isCooking: Bool, hadRecentError: Bool) -> ReviewPromptPolicy.Snapshot {
+        ReviewPromptPolicy.Snapshot(
+            sessionCount: sessionCount,
+            recipeViewCount: recipeViewCount,
+            completedCookCount: completedCookCount,
+            lastPromptDate: lastPromptDate,
+            declined: declined,
+            isCooking: isCooking,
+            hadRecentError: hadRecentError
+        )
+    }
+}
