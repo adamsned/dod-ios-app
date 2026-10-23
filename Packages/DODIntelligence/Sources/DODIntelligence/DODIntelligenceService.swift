@@ -83,6 +83,11 @@ public protocol DODIntelligenceService: Sendable {
 
 extension DODIntelligenceService {
 
+    /// DUT-1005 — the tier this service runs on. Defaults to on-device, the
+    /// cost-free architecture default. A conformer that routes to Private Cloud
+    /// Compute must override this explicitly, never implicitly.
+    public var tier: IntelligenceTier { .default }
+
     /// Convenience for a context- and reason-free substitution, so previews and
     /// call sites that don't model either stay terse.
     public func suggestSubstitution(for ingredient: String) async -> SubstitutionResult? {
