@@ -56,3 +56,26 @@ public enum PinnedCollectionsWidgetSnapshotConfig {
     /// Large widget shows 6, medium 3; both take prefix(N) client-side.
     public static let maxRecipesPerCollection = 6
 }
+
+extension WidgetSnapshotStore {
+    @discardableResult
+    public func writePinnedCollections(_ snapshot: PinnedCollectionsWidgetSnapshot) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(snapshot)
+        defaults.set(data, forKey: PinnedCollectionsWidgetSnapshotConfig.userDefaultsKey)
+        return data
+    }
+
+    /// nil when nothing was written or the schema version mismatches.
+    public func readPinnedCollections() -> PinnedCollectionsWidgetSnapshot? {
+        guard let data = defaults.data(forKey: PinnedCollectionsWidgetSnapshotConfig.userDefaultsKey)
+        else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let snapshot = try? decoder.decode(PinnedCollectionsWidgetSnapshot.self, from: data),
+            snapshot.schemaVersion == PinnedCollectionsWidgetSnapshot.currentSchemaVersion
+        else { return nil }
+        return snapshot
+    }
+}
