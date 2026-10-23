@@ -86,6 +86,12 @@ public protocol DODIntelligenceService: Sendable {
     /// never throws — when unavailable, the bytes are not a decodable image,
     /// no text is recognised, or the text has no ingredient / step lines.
     func scanRecipeCard(imageData: Data) async -> FamilyRecipe?
+
+    /// DUT-1021 — rephrase one cook-mode step for a beginner. `step` is the step text, `nextStep` the
+    /// adjacent step for continuity (may be nil). Returns `nil` — never throws — when unavailable, `step`
+    /// is empty, the model errors, a guardrail rejects it, or the result invents a temperature/time not in
+    /// `step` (see ``StepExplanation/isGrounded(in:)``).
+    func explainStep(_ step: String, nextStep: String?) async -> StepExplanation?
 }
 
 extension DODIntelligenceService {
@@ -117,4 +123,7 @@ extension DODIntelligenceService {
 
     /// Default for conformers that predate DUT-1004: scanning is unsupported.
     public func scanRecipeCard(imageData: Data) async -> FamilyRecipe? { nil }
+
+    /// DUT-1021 — default implementation for older conformers to keep compiling.
+    public func explainStep(_ step: String, nextStep: String?) async -> StepExplanation? { nil }
 }

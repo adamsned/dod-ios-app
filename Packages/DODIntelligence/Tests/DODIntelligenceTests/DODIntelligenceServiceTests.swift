@@ -208,4 +208,16 @@ struct DODIntelligenceServiceTests {
     @Test func scanRecipeCardDefaultsToNil() async {
         #expect(await LegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
     }
+
+    // MARK: - Explain Step (DUT-1021)
+
+    @Test func fakeExplainStepReturnsCannedWhenAvailable() async {
+        let service = FakeIntelligenceService()
+        #expect(await service.explainStep("Fold in the egg whites", nextStep: nil) == .canned)
+    }
+
+    @Test func fakeExplainStepNilWhenUnavailable() async {
+        let service = FakeIntelligenceService(isAvailable: false)
+        #expect(await service.explainStep("Fold in the egg whites", nextStep: nil) == nil)
+    }
 }
