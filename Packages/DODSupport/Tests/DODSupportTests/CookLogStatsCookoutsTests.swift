@@ -30,4 +30,37 @@ struct CookLogStatsCookoutsTests {
         #expect(group.averageRating == 4.0)
         #expect(group.dishCount == 2)
     }
+
+    @Test func groupsSameDayEntries() {
+        let entries = [
+            entry(1, "A", at: date(2026, 1, 4)),
+            entry(2, "B", at: date(2026, 1, 4)),
+            entry(3, "C", at: date(2026, 1, 4)),
+            entry(4, "D", at: date(2026, 1, 5)),
+        ]
+        let result = CookLogStats.cookouts(entries, calendar: calendar)
+        #expect(result.count == 1)
+        #expect(result[0].dishCount == 3)
+    }
+
+    @Test func dropsSingleDishDays() {
+        let single = entry(1, "A", at: date(2026, 1, 4))
+        #expect(CookLogStats.cookouts([single], calendar: calendar).isEmpty)
+    }
+
+    @Test func newestDayFirst() {
+        let entries = [
+            entry(1, "A", at: date(2026, 1, 4)),
+            entry(2, "B", at: date(2026, 1, 4)),
+            entry(3, "C", at: date(2026, 1, 9)),
+            entry(4, "D", at: date(2026, 1, 9)),
+        ]
+        let result = CookLogStats.cookouts(entries, calendar: calendar)
+        #expect(
+            result.map(\.day) == [
+                calendar.startOfDay(for: date(2026, 1, 9)),
+                calendar.startOfDay(for: date(2026, 1, 4)),
+            ]
+        )
+    }
 }
