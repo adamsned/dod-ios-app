@@ -103,6 +103,33 @@ final class RecipeTentCardRendererTests: XCTestCase {
             try? FileManager.default.removeItem(at: url)
         }
     }
+
+    /// DUT-977 — test that tent card sharing produces a valid file
+    func testTentCardShareProducesFile() {
+        let recipe = Recipe(
+            id: 123,
+            title: "Test Recipe",
+            description: "A test recipe",
+            canonicalURL: URL(string: "https://example.com/recipe/123")!,
+            heroImage: nil,
+            heroImageLargeURL: nil
+        )
+
+        let url = RecipeTentCardRenderer.writeFile(recipe: recipe, hostName: "Test Host")
+        XCTAssertNotNil(url)
+
+        // Verify the file exists and has content
+        if let fileUrl = url {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: fileUrl.path))
+            // Check that it's a valid PDF (at least not empty)
+            do {
+                let fileSize = try FileManager.default.attributesOfItem(atPath: fileUrl.path)[.size] as? UInt64
+                XCTAssertGreaterThan(fileSize ?? 0, 0)
+            } catch {
+                XCTFail("Could not check file size: \(error)")
+            }
+        }
+    }
 }
 
 #endif
