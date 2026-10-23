@@ -20,6 +20,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedSummary: String?
     private let cannedAnswer: String?
     private let cannedDoneness: DonenessCheckResult?
+    private let cannedExplanation: StepExplanation?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
@@ -33,6 +34,8 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     graceful no-result path.
     ///   - doneness: What ``checkDoneness(photo:stepText:)`` returns when available. `nil` models
     ///     the graceful no-result path.
+    ///   - explanation: What ``explainStep(_:)`` returns when available. `nil` models
+    ///     the graceful no-result path. Defaults to ``StepExplanation/canned``.
     public init(
         isAvailable: Bool = true,
         supportsImageInput: Bool = true,
@@ -43,7 +46,8 @@ public struct FakeIntelligenceService: DODIntelligenceService {
             verdict: .looksDone,
             confidence: 0.9,
             reassurance: "The crust is an even golden brown and the edges look set."
-        )
+        ),
+        explanation: StepExplanation? = .canned
     ) {
         self.isAvailable = isAvailable
         self.supportsImageInput = supportsImageInput
@@ -51,6 +55,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         self.cannedSummary = summary
         self.cannedAnswer = answer
         self.cannedDoneness = doneness
+        self.cannedExplanation = explanation
     }
 
     public func suggestSubstitution(
@@ -75,5 +80,10 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     public func checkDoneness(photo: Data, stepText: String) async -> DonenessCheckResult? {
         guard isAvailable, supportsImageInput, !photo.isEmpty else { return nil }
         return cannedDoneness
+    }
+
+    public func explainStep(_ step: String, nextStep: String?) async -> StepExplanation? {
+        guard isAvailable else { return nil }
+        return cannedExplanation
     }
 }
