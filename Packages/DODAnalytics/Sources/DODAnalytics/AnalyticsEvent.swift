@@ -102,6 +102,14 @@ public enum AnalyticsEvent: Sendable, Hashable {
     /// string — never the raw `CKError` code/message (constitution §9: no free
     /// text / no PII). Authorized by CL-124. Dispatch lands with T-705.
     case syncFailed(errorCategory: SyncErrorCategory)
+
+    /// DUT-174 — the post-update "What's New" sheet auto-presented. The payload is the
+    /// app version string (e.g. "2.1"), which is not PII.
+    case changelogShown(version: String)
+    /// DUT-174 — the user dismissed the "What's New" sheet ("Got it" or swipe).
+    case changelogDismissed(version: String)
+    /// DUT-174 — the user opened "What's New" from Settings.
+    case changelogOpenedFromSettings
 }
 
 /// The closed set of Siri voice commands Cook Mode exposes (US-40 / AC-40.5).
@@ -191,6 +199,9 @@ extension AnalyticsEvent {
         case .syncDisabled: "sync_disabled"
         case .syncCompletedSuccessfully: "sync_completed_successfully"
         case .syncFailed: "sync_failed"
+        case .changelogShown: "changelog_shown"
+        case .changelogDismissed: "changelog_dismissed"
+        case .changelogOpenedFromSettings: "changelog_opened_from_settings"
         }
     }
 
@@ -245,6 +256,12 @@ extension AnalyticsEvent {
         case .syncFailed(let errorCategory):
             // Closed-set category only — never the raw CKError. Constitution §9.
             ["error_category": errorCategory.rawValue]
+        case .changelogShown(let version):
+            ["version": version]
+        case .changelogDismissed(let version):
+            ["version": version]
+        case .changelogOpenedFromSettings:
+            [:]
         }
     }
 }
