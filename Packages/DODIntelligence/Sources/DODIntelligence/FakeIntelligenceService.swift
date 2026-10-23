@@ -19,6 +19,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedSubstitution: SubstitutionResult?
     private let cannedSummary: String?
     private let cannedAnswer: String?
+    private let cannedDoneness: DonenessCheckResult?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
@@ -30,18 +31,26 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     the graceful no-result path.
     ///   - answer: What ``answer(_:)`` returns when available. `nil` models the
     ///     graceful no-result path.
+    ///   - doneness: What ``checkDoneness(photo:stepText:)`` returns when available. `nil` models
+    ///     the graceful no-result path.
     public init(
         isAvailable: Bool = true,
         supportsImageInput: Bool = true,
         substitution: SubstitutionResult? = .cannedButtermilkOptions,
         summary: String? = "A quick, weeknight-friendly cast-iron recipe with simple pantry ingredients.",
-        answer: String? = "Warm the pan gradually, add a thin layer of oil, and wipe out any excess before cooking."
+        answer: String? = "Warm the pan gradually, add a thin layer of oil, and wipe out any excess before cooking.",
+        doneness: DonenessCheckResult? = DonenessCheckResult(
+            verdict: .looksDone,
+            confidence: 0.9,
+            reassurance: "The crust is an even golden brown and the edges look set."
+        )
     ) {
         self.isAvailable = isAvailable
         self.supportsImageInput = supportsImageInput
         self.cannedSubstitution = substitution
         self.cannedSummary = summary
         self.cannedAnswer = answer
+        self.cannedDoneness = doneness
     }
 
     public func suggestSubstitution(
@@ -61,5 +70,10 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     public func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? {
         guard isAvailable else { return nil }
         return cannedAnswer
+    }
+
+    public func checkDoneness(photo: Data, stepText: String) async -> DonenessCheckResult? {
+        guard isAvailable, supportsImageInput, !photo.isEmpty else { return nil }
+        return cannedDoneness
     }
 }
