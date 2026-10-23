@@ -27,6 +27,16 @@ public final class AnnouncementsViewModel {
 
     public var unreadCount: Int { tracker.unreadCount(in: items) }
 
+    /// Call when the feed screen appears: clears the badge and logs the impression.
+    public func markOpened() {
+        tracker.markAllRead(items)
+        log("announcement_feed_viewed")
+    }
+
+    public func didTapDeepLink(_ announcement: Announcement) {
+        log("announcement_deeplink_tapped")
+    }
+
     public func load() async {
         state = .loading
         do {

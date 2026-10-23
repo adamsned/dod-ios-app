@@ -54,4 +54,38 @@ struct AnnouncementsViewModelTests {
         await vm.load()
         #expect(vm.state == .offline)
     }
+
+    @Test("markOpened takes unreadCount from 3 to 0 and logs the view event")
+    func markOpenedClearsBadge() async {
+        let recorder = EventRecorder()
+        let vm = AnnouncementsViewModel(
+            fetch: { [self.item(1), self.item(2), self.item(3)] },
+            tracker: AnnouncementReadTracker(defaults: makeDefaults()),
+            log: { recorder.record($0) }
+        )
+        await vm.load()
+        #expect(vm.unreadCount == 3)
+        vm.markOpened()
+        #expect(vm.unreadCount == 0)
+        #expect(recorder.events == ["announcement_feed_viewed"])
+    }
+
+    @Test("didTapDeepLink logs the tap event")
+    func deepLinkTapLogs() {
+        let recorder = EventRecorder()
+        let vm = AnnouncementsViewModel(
+            fetch: { [] },
+            tracker: AnnouncementReadTracker(defaults: makeDefaults()),
+            log: { recorder.record($0) }
+        )
+        vm.didTapDeepLink(item(1))
+        #expect(recorder.events == ["announcement_deeplink_tapped"])
+    }
+}
+
+private final class EventRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String] = []
+    var events: [String] { lock.withLock { storage } }
+    func record(_ name: String) { lock.withLock { storage.append(name) } }
 }
