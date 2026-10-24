@@ -16,9 +16,10 @@ import Testing
 // no such constraint: swift-testing runs its `@Test` methods concurrently
 // by default, and they raced on the shared singleton — one test's recorder
 // observed OTHER tests' `.recipeSaved` events. `.serialized` fixes the
-// intra-suite race. It does NOT fix a cross-suite race against
-// `CookModeVoiceModeTests` (a different, non-serialized suite touching the
-// same singleton) — that risk still exists and is unaddressed here.
+// intra-suite race. The cross-suite race against `CookModeVoiceModeTests`
+// (a different suite touching the same singleton) is harmless (DUT-2199):
+// each test only counts `.recipeSaved` events for its own, uniquely-numbered
+// recipe via `recordedSavedRecipeIDs(_:for:)`, so other suites' events never matter.
 @Suite(
     "LiveRecipeDetailDependencies.downloadForOffline image caching (DUT-418)",
     .serialized
