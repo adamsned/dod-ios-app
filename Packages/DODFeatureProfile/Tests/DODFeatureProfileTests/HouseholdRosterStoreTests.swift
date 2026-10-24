@@ -1,0 +1,18 @@
+import Foundation
+import Testing
+
+@testable import DODFeatureProfile
+
+@Suite("HouseholdRosterStore (DUT-1775)")
+struct HouseholdRosterStoreTests {
+    @Test func inMemoryRoundTrip() async {
+        let store = InMemoryHouseholdRosterStore()
+        let members = [
+            HouseholdMember(name: "Sam", ageBand: .kid, flags: [.nuts]),
+            HouseholdMember(name: "Alex", ageBand: .teenOrAdult, flags: [.dairy, .gluten]),
+        ]
+        await store.save(members)
+        let loaded = await store.load()
+        #expect(loaded == members)
+    }
+}
