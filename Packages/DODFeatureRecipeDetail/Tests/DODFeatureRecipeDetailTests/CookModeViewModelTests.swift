@@ -290,6 +290,13 @@ import Testing
         #expect(activity.lastInitialState?.remainingSeconds == 30)
     }
 
+    // MARK: - Cast-Iron Rescue (DUT-970)
+
+    @Test func rescueHeatProfileIsNilWhenRecipeHasNoTemperature() {
+        let viewModel = Self.makeViewModel(stepCount: 2)
+        #expect(viewModel.rescueHeatProfile == nil)
+    }
+
     // MARK: - Helpers
 
     static func makeViewModel(
