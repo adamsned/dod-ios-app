@@ -23,6 +23,9 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings-link-about")
 
+            // DUT-157 — manual, always-available path to the App Store review page.
+            rateAppLink
+
             // DUT-502 — a published Contact / Support affordance in-app
             // (Guideline 1.2). See `SettingsView+PolicyLinks.swift`.
             contactSupportLink

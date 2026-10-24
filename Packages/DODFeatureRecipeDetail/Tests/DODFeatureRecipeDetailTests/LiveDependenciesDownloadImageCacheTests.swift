@@ -16,9 +16,10 @@ import Testing
 // no such constraint: swift-testing runs its `@Test` methods concurrently
 // by default, and they raced on the shared singleton — one test's recorder
 // observed OTHER tests' `.recipeSaved` events. `.serialized` fixes the
-// intra-suite race. It does NOT fix a cross-suite race against
-// `CookModeVoiceModeTests` (a different, non-serialized suite touching the
-// same singleton) — that risk still exists and is unaddressed here.
+// intra-suite race. The cross-suite race against `CookModeVoiceModeTests`
+// (a different suite touching the same singleton) is harmless (DUT-2199):
+// each test only counts `.recipeSaved` events for its own, uniquely-numbered
+// recipe via `recordedSavedRecipeIDs(_:for:)`, so other suites' events never matter.
 @Suite(
     "LiveRecipeDetailDependencies.downloadForOffline image caching (DUT-418)",
     .serialized
@@ -315,13 +316,13 @@ struct LiveDependenciesDownloadImageCacheTests {
 
         let fakeClient = FakeHTTPClient()
         let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
-        let recipe = makeRecipe(id: 200)
+        let recipe = makeRecipe(id: 9_100_001)
         try await insertRecipeIntoStore(store, recipe: recipe)
         #expect(try await !store.isSaved(id: recipe.id), "Precondition: recipe starts unsaved")
 
         _ = try await deps.downloadForOffline(recipe: recipe)
 
-        #expect(recordedSavedRecipeIDs(recorder) == [recipe.id])
+        #expect(recordedSavedRecipeIDs(recorder, for: recipe.id) == [recipe.id])
     }
 
     /// Downloading a recipe that is ALREADY saved must send ZERO
@@ -334,13 +335,13 @@ struct LiveDependenciesDownloadImageCacheTests {
 
         let fakeClient = FakeHTTPClient()
         let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
-        let recipe = makeRecipe(id: 201)
+        let recipe = makeRecipe(id: 9_100_002)
         try await insertRecipeIntoStore(store, recipe: recipe)
         _ = try await store.markSaved(id: recipe.id)  // pre-saved, outside the download flow
 
         _ = try await deps.downloadForOffline(recipe: recipe)
 
-        #expect(recordedSavedRecipeIDs(recorder).isEmpty)
+        #expect(recordedSavedRecipeIDs(recorder, for: recipe.id).isEmpty)
     }
 
     /// A second download tap on an already-downloaded (and now already-saved)
@@ -353,7 +354,7 @@ struct LiveDependenciesDownloadImageCacheTests {
 
         let fakeClient = FakeHTTPClient()
         let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
-        let recipe = makeRecipe(id: 202)
+        let recipe = makeRecipe(id: 9_100_003)
         try await insertRecipeIntoStore(store, recipe: recipe)
 
         let firstOutcome = try await deps.downloadForOffline(recipe: recipe)
@@ -361,15 +362,20 @@ struct LiveDependenciesDownloadImageCacheTests {
         let secondOutcome = try await deps.downloadForOffline(recipe: recipe)
         #expect(secondOutcome == .alreadyDownloaded)
 
-        #expect(recordedSavedRecipeIDs(recorder) == [recipe.id])
+        #expect(recordedSavedRecipeIDs(recorder, for: recipe.id) == [recipe.id])
     }
 
-    /// Extract the recipe IDs of every `.recipeSaved` event the recorder saw.
-    private func recordedSavedRecipeIDs(_ recorder: RecordingTelemetryTransport) -> [Int] {
-        recorder.events.compactMap { event in
-            if case .recipeSaved(let recipeID) = event { return recipeID }
+    /// Extract the recipe IDs of `.recipeSaved` events the recorder saw for
+    /// `recipeID` only, so other suites' events on `Telemetry.shared` are ignored.
+    private func recordedSavedRecipeIDs(
+        _ recorder: RecordingTelemetryTransport,
+        for recipeID: Int
+    ) -> [Int] {
+        recorder.events.compactMap { event -> Int? in
+            if case .recipeSaved(let savedID) = event { return savedID }
             return nil
         }
+        .filter { $0 == recipeID }
     }
 }
 
