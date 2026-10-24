@@ -224,6 +224,12 @@ struct DODIntelligenceServiceTests {
         #expect(await service.scanRecipeCard(imageData: Data([1])) == nil)
     }
 
+    @Test func liveScanRejectsEmptyAndGarbageBytes() async {
+        let service = LiveDODIntelligenceService()
+        #expect(await service.scanRecipeCard(imageData: Data()) == nil)
+        #expect(await service.scanRecipeCard(imageData: Data([0, 1, 2, 3])) == nil)
+    }
+
     // MARK: - Explain Step (DUT-1021)
 
     @Test func fakeExplainStepReturnsCannedWhenAvailable() async {
