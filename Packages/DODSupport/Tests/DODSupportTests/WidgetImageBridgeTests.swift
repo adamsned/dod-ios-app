@@ -3,6 +3,10 @@ import Testing
 
 @testable import DODSupport
 
+// iOS only: on macOS (`swift test` on a Mac, as autodev's quick check runs it) the App Group lookup returns a
+// real ~/Library/Group Containers path that the test process may not write, so the file round-trips fail there.
+// CI runs this suite on the iOS simulator, where the lookup returns nil as the comment below expects.
+#if os(iOS)
 /// Round-trip tests for the image bridge that lets the home-screen widget
 /// extensions render real recipe hero images without a network fetch
 /// (spec.md US-21 / AC-21.2..AC-21.4, CL-35). The bridge owns:
@@ -276,3 +280,4 @@ import Testing
         }
     }
 }
+#endif
