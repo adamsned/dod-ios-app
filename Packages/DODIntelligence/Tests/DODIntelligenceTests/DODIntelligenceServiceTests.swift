@@ -209,6 +209,21 @@ struct DODIntelligenceServiceTests {
         #expect(await LegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
     }
 
+    @Test func fakeScanReturnsCannedRecipe() async {
+        let result = await FakeIntelligenceService().scanRecipeCard(imageData: Data([1]))
+        #expect(result?.title == "Grandma's Gumbo")
+    }
+
+    @Test func fakeScanNilWhenUnavailable() async {
+        let service = FakeIntelligenceService(isAvailable: false)
+        #expect(await service.scanRecipeCard(imageData: Data([1])) == nil)
+    }
+
+    @Test func fakeScanNilWithoutImageSupport() async {
+        let service = FakeIntelligenceService(supportsImageInput: false)
+        #expect(await service.scanRecipeCard(imageData: Data([1])) == nil)
+    }
+
     // MARK: - Explain Step (DUT-1021)
 
     @Test func fakeExplainStepReturnsCannedWhenAvailable() async {
