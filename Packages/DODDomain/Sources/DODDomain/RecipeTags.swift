@@ -19,3 +19,22 @@ public enum RecipeOccasion: String, Sendable, Hashable, Codable, CaseIterable {
 public enum RecipeTagSource: String, Sendable, Hashable, Codable {
     case auto, manual
 }
+
+public struct RecipeTags: Sendable, Hashable, Codable {
+    public let difficulty: RecipeDifficulty
+    public let techniques: [RecipeTechnique]
+    public let occasions: [RecipeOccasion]
+    public let source: RecipeTagSource
+
+    public init(
+        difficulty: RecipeDifficulty,
+        techniques: [RecipeTechnique] = [],
+        occasions: [RecipeOccasion] = [],
+        source: RecipeTagSource = .auto
+    ) {
+        self.difficulty = difficulty
+        self.techniques = techniques
+        self.occasions = occasions
+        self.source = source
+    }
+}
