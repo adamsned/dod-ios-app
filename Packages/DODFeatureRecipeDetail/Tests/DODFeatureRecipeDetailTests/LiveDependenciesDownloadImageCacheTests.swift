@@ -321,7 +321,7 @@ struct LiveDependenciesDownloadImageCacheTests {
 
         _ = try await deps.downloadForOffline(recipe: recipe)
 
-        #expect(recordedSavedRecipeIDs(recorder) == [recipe.id])
+        #expect(recordedSavedRecipeIDs(recorder, for: recipe.id) == [recipe.id])
     }
 
     /// Downloading a recipe that is ALREADY saved must send ZERO
@@ -340,7 +340,7 @@ struct LiveDependenciesDownloadImageCacheTests {
 
         _ = try await deps.downloadForOffline(recipe: recipe)
 
-        #expect(recordedSavedRecipeIDs(recorder).isEmpty)
+        #expect(recordedSavedRecipeIDs(recorder, for: recipe.id).isEmpty)
     }
 
     /// A second download tap on an already-downloaded (and now already-saved)
@@ -361,15 +361,20 @@ struct LiveDependenciesDownloadImageCacheTests {
         let secondOutcome = try await deps.downloadForOffline(recipe: recipe)
         #expect(secondOutcome == .alreadyDownloaded)
 
-        #expect(recordedSavedRecipeIDs(recorder) == [recipe.id])
+        #expect(recordedSavedRecipeIDs(recorder, for: recipe.id) == [recipe.id])
     }
 
-    /// Extract the recipe IDs of every `.recipeSaved` event the recorder saw.
-    private func recordedSavedRecipeIDs(_ recorder: RecordingTelemetryTransport) -> [Int] {
-        recorder.events.compactMap { event in
-            if case .recipeSaved(let recipeID) = event { return recipeID }
+    /// Extract the recipe IDs of `.recipeSaved` events the recorder saw for
+    /// `recipeID` only, so other suites' events on `Telemetry.shared` are ignored.
+    private func recordedSavedRecipeIDs(
+        _ recorder: RecordingTelemetryTransport,
+        for recipeID: Int
+    ) -> [Int] {
+        recorder.events.compactMap { event -> Int? in
+            if case .recipeSaved(let savedID) = event { return savedID }
             return nil
         }
+        .filter { $0 == recipeID }
     }
 }
 
