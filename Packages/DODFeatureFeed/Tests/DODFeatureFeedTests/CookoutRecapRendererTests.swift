@@ -12,5 +12,26 @@ import Testing
         #expect(CookoutRecapRenderer.fileName(for: day) == CookoutRecapRenderer.fileName(for: day))
         #expect(CookoutRecapRenderer.fileName(for: day).hasSuffix(".png"))
     }
+
+    @Test func rendersNonEmptyPNG() {
+        let card = CookoutRecapCard(
+            headline: "Sunday cookout — 2 dishes",
+            dishTitles: ["Chili", "Cornbread"],
+            averageRatingText: "4.0",
+            cover: nil
+        )
+        let data = CookoutRecapRenderer.pngData(card)
+        #expect(data != nil)
+        #expect(data.map { Array($0.prefix(4)) } == [0x89, 0x50, 0x4E, 0x47])
+    }
+
+    @Test func writeFileCreatesPNGOnDisk() throws {
+        let card = CookoutRecapCard(headline: "Test", dishTitles: ["Chili"], averageRatingText: nil, cover: nil)
+        let day = Date(timeIntervalSince1970: 1_700_000_001)
+        let url = try #require(CookoutRecapRenderer.writeFile(card, day: day))
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(url.lastPathComponent == CookoutRecapRenderer.fileName(for: day))
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
 }
 #endif

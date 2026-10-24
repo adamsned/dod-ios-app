@@ -1,3 +1,4 @@
+import DODDomain
 import Foundation
 
 /// A deterministic ``DODIntelligenceService`` for L1 tests, SwiftUI previews,
@@ -34,6 +35,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     graceful no-result path.
     ///   - doneness: What ``checkDoneness(photo:stepText:)`` returns when available. `nil` models
     ///     the graceful no-result path.
+    ///   - recipeCard: What ``scanRecipeCard(imageData:)`` returns when available and image input is supported. `nil` models the graceful no-result path.
     ///   - explanation: What ``explainStep(_:)`` returns when available. `nil` models
     ///     the graceful no-result path. Defaults to ``StepExplanation/canned``.
     public init(

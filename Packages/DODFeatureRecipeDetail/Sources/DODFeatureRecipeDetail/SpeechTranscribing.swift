@@ -17,3 +17,14 @@ public protocol SpeechTranscribing: AnyObject {
     /// Stop capturing and finish the stream. Safe to call when not listening.
     func stopListening()
 }
+
+/// Default used when no real transcriber is injected (macOS test slice, older iOS).
+@MainActor
+public final class UnavailableSpeechTranscriber: SpeechTranscribing {
+    public init() {}
+    public var isAvailable: Bool { false }
+    public func startListening() -> AsyncStream<String> {
+        AsyncStream { $0.finish() }
+    }
+    public func stopListening() {}
+}

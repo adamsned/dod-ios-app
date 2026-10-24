@@ -51,6 +51,8 @@ public struct CookModeView: View {
     @State var isHeatCoachPresented: Bool = false
     /// DUT-1385 — drives the "Ask About This Recipe" sheet over the cover.
     @State var isAskPresented: Bool = false
+    /// DUT-970 — drives the Cast-Iron Rescue sheet.
+    @State var isRescuePresented: Bool = false
     /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
     /// screen, regardless of which step is shown, so a running timer on a step
     /// you've navigated away from still counts down + completes.
@@ -171,6 +173,20 @@ public struct CookModeView: View {
                                 VStack(alignment: .leading, spacing: DODSpacing.xs) {
                                     heroView(topInset: topInset)
                                     askAboutRecipeLink
+                                    Button {
+                                        wakeControls()
+                                        isRescuePresented = true
+                                    } label: {
+                                        Label("Something not going right?", systemImage: "lifepreserver")
+                                            .dodFont(DODType.bodyEmphasized)
+                                            .foregroundStyle(DODColor.accent)
+                                            .frame(minHeight: 44)
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.horizontal, DODSpacing.md)
+                                    .accessibilityIdentifier("cook-mode-rescue")
+                                    .accessibilityHint("Quick fixes for sticking, heat and other cooking problems")
                                 }
                                 stepBody
                             }
@@ -225,6 +241,10 @@ public struct CookModeView: View {
             }
         }
         .sheet(isPresented: $isAskPresented) { askSheetContent }  // DUT-1385
+        .sheet(isPresented: $isRescuePresented) {  // DUT-970
+            CookModeRescueSheet(heatProfile: viewModel.rescueHeatProfile)
+                .presentationDetents([.medium, .large])
+        }
         // DUT-328 — one-time "this may sound robotic, get a better voice" prompt
         // when Voice Mode turns on with only a robotic voice installed. Owns its
         // own state (in `CookModeView+VoicePrompt.swift`) so this body stays one
