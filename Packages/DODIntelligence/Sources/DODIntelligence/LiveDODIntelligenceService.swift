@@ -210,7 +210,7 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
     /// Decode JPEG/PNG bytes into a `CGImage` for a FoundationModels image
     /// attachment. Returns `nil` on undecodable bytes so the caller degrades.
     @available(iOS 27, *)
-    private static func decodeCGImage(from data: Data) -> CGImage? {
+    static func decodeCGImage(from data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
