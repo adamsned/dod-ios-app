@@ -114,4 +114,22 @@ struct CookJournalAndCookPhotoA11yTests {
         )
         #expect(text == "4,7")
     }
+
+    // MARK: - DUT-966 — Share Your Win button
+
+    @Test func journalEntryViewInitializesWithNilShareItem() {
+        let entry = CookLogEntry(
+            id: UUID(),
+            recipeID: 12345,
+            recipeTitle: "Test Recipe",
+            cookedAt: Date(),
+            note: "This is a test note.",
+            personalRating: 5,
+            photoLocalID: nil
+        )
+        let view = CookJournalEntryView(entry: entry, onSave: { _ in })
+        // Test that the view builds successfully and shareItem is initially nil
+        _ = view.body
+        #expect(view.shareItem == nil)
+    }
 }
