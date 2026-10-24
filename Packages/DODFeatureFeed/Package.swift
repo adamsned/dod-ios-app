@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "DODFeatureFeed",
+    defaultLocalization: "en",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "DODFeatureFeed", targets: ["DODFeatureFeed"])
@@ -39,7 +40,8 @@ let package = Package(
                 "DODPersistence",
                 "DODIntelligence",
                 "DODFeatureProfile",
-            ]
+            ],
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "DODFeatureFeedTests",

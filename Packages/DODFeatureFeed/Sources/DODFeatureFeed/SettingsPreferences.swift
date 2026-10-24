@@ -98,6 +98,9 @@ public enum AppearancePreference: String, CaseIterable, Sendable, Hashable {
 /// ``linkAndText`` case is persisted but not yet consumed: a future
 /// task wires the recipe excerpt into the share payload.
 ///
+/// The ``imageCard`` case makes Recipe Detail's share action share a
+/// rendered branded image card instead of the link (DUT-123).
+///
 /// Raw values are the on-disk wire format — same caveat as
 /// ``AppearancePreference``: don't rename without a migration shim.
 ///
@@ -105,12 +108,14 @@ public enum AppearancePreference: String, CaseIterable, Sendable, Hashable {
 public enum ShareFormatPreference: String, CaseIterable, Sendable, Hashable {
     case linkOnly
     case linkAndText
+    case imageCard
 
     /// Human-readable label rendered in the picker row.
     public var displayName: String {
         switch self {
         case .linkOnly: "Just the link"
         case .linkAndText: "Link + recipe text"
+        case .imageCard: "Branded image card"
         }
     }
 

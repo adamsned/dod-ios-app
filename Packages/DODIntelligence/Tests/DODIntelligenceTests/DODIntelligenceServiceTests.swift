@@ -1,3 +1,4 @@
+import DODDomain
 import Foundation
 import Testing
 
@@ -171,5 +172,67 @@ struct DODIntelligenceServiceTests {
     @Test func fakeAnswerAcceptsRecipeContext() async {
         let service = FakeIntelligenceService(answer: "A")
         #expect(await service.answer("q", imageData: nil, recipeContext: "Recipe: X") == "A")
+    }
+
+    /// Test the default implementation of checkDoneness for older conformers
+    @Test func checkDonenessReturnsNilWithDefaultImplementation() async {
+        // Create a minimal struct that only implements the existing requirements
+        struct Bare: DODIntelligenceService {
+            var isAvailable: Bool { true }
+            var supportsImageInput: Bool { true }
+            func suggestSubstitution(
+                for ingredient: String,
+                in context: RecipeContext?,
+                reason: SubstitutionReason?
+            ) async -> SubstitutionResult? { nil }
+            func summarize(_ text: String) async -> String? { nil }
+            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+        }
+
+        let bare = Bare()
+        #expect(await bare.checkDoneness(photo: Data([1]), stepText: "Bake until golden") == nil)
+    }
+
+    private struct LegacyService: DODIntelligenceService {
+        var isAvailable: Bool { true }
+        var supportsImageInput: Bool { true }
+        func suggestSubstitution(
+            for ingredient: String,
+            in context: RecipeContext?,
+            reason: SubstitutionReason?
+        ) async -> SubstitutionResult? { nil }
+        func summarize(_ text: String) async -> String? { nil }
+        func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+    }
+
+    @Test func scanRecipeCardDefaultsToNil() async {
+        #expect(await LegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
+    }
+
+    @Test func fakeScanReturnsCannedRecipe() async {
+        let result = await FakeIntelligenceService().scanRecipeCard(imageData: Data([1]))
+        #expect(result?.title == "Grandma's Gumbo")
+    }
+
+    @Test func fakeScanNilWhenUnavailable() async {
+        let service = FakeIntelligenceService(isAvailable: false)
+        #expect(await service.scanRecipeCard(imageData: Data([1])) == nil)
+    }
+
+    @Test func fakeScanNilWithoutImageSupport() async {
+        let service = FakeIntelligenceService(supportsImageInput: false)
+        #expect(await service.scanRecipeCard(imageData: Data([1])) == nil)
+    }
+
+    // MARK: - Explain Step (DUT-1021)
+
+    @Test func fakeExplainStepReturnsCannedWhenAvailable() async {
+        let service = FakeIntelligenceService()
+        #expect(await service.explainStep("Fold in the egg whites", nextStep: nil) == .canned)
+    }
+
+    @Test func fakeExplainStepNilWhenUnavailable() async {
+        let service = FakeIntelligenceService(isAvailable: false)
+        #expect(await service.explainStep("Fold in the egg whites", nextStep: nil) == nil)
     }
 }
