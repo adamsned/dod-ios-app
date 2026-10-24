@@ -315,7 +315,7 @@ struct LiveDependenciesDownloadImageCacheTests {
 
         let fakeClient = FakeHTTPClient()
         let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
-        let recipe = makeRecipe(id: 200)
+        let recipe = makeRecipe(id: 9_100_001)
         try await insertRecipeIntoStore(store, recipe: recipe)
         #expect(try await !store.isSaved(id: recipe.id), "Precondition: recipe starts unsaved")
 
@@ -334,7 +334,7 @@ struct LiveDependenciesDownloadImageCacheTests {
 
         let fakeClient = FakeHTTPClient()
         let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
-        let recipe = makeRecipe(id: 201)
+        let recipe = makeRecipe(id: 9_100_002)
         try await insertRecipeIntoStore(store, recipe: recipe)
         _ = try await store.markSaved(id: recipe.id)  // pre-saved, outside the download flow
 
@@ -353,7 +353,7 @@ struct LiveDependenciesDownloadImageCacheTests {
 
         let fakeClient = FakeHTTPClient()
         let (store, deps) = try makeDeps(fakeHTTPClient: fakeClient)
-        let recipe = makeRecipe(id: 202)
+        let recipe = makeRecipe(id: 9_100_003)
         try await insertRecipeIntoStore(store, recipe: recipe)
 
         let firstOutcome = try await deps.downloadForOffline(recipe: recipe)
