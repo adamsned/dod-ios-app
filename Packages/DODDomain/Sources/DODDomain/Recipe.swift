@@ -74,6 +74,12 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
     /// Nil until background tagging has run.
     public let tags: RecipeTags?
 
+    /// DUT-982 — difficulty level for first-time cooks.
+    public var difficulty: Difficulty?
+
+    /// DUT-982 — how forgiving a recipe is for a first cook.
+    public enum Difficulty: String, Codable, Sendable, CaseIterable { case beginner, intermediate, advanced }
+
     public init(
         id: Int,
         slug: String,
@@ -99,7 +105,8 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         recipeCuisine: [String] = [],
         suitableForDiet: [String] = [],
         author: String? = nil,
-        tags: RecipeTags? = nil
+        tags: RecipeTags? = nil,
+        difficulty: Difficulty? = nil
     ) {
         self.id = id
         self.slug = slug
@@ -126,6 +133,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.suitableForDiet = suitableForDiet
         self.author = author
         self.tags = tags
+        self.difficulty = difficulty
     }
 
     // MARK: - Codable (back-compat for older payloads pre-kind)
@@ -139,7 +147,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         case categoryIDs, publishedAt, updatedAt, ingredients, instructions
         case prepTime, cookTime, totalTime, servings, nutrition, video
         case kind, articleBodyHTML
-        case recipeCategory, recipeCuisine, suitableForDiet, author, tags
+        case recipeCategory, recipeCuisine, suitableForDiet, author, tags, difficulty
     }
 
     public init(from decoder: Decoder) throws {
@@ -175,6 +183,8 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.author = try container.decodeIfPresent(String.self, forKey: .author)
         // DUT-1022: back-compat — older payloads predate `tags`.
         self.tags = try container.decodeIfPresent(RecipeTags.self, forKey: .tags)
+        // DUT-982: back-compat — older payloads predate `difficulty`.
+        self.difficulty = try container.decodeIfPresent(Difficulty.self, forKey: .difficulty)
     }
 }
 
