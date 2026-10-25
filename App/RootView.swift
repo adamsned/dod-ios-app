@@ -51,6 +51,8 @@ struct RootView: View {
     /// Non-private so the `+Onboarding.swift` extension's `onboardingCover`
     /// (extracted for file_length) can read/flip it (DUT-529).
     @State var showOnboarding: Bool
+    /// DUT-982 — shows the first-cook quiz after onboarding is complete.
+    @State var showFirstCookQuiz = false
     /// US-36 AC-36.2 — user-selected appearance preference (key
     /// `dod.settings.appearance`), applied to the root `Group` via
     /// `.preferredColorScheme(...)`; `.system` yields `nil` (OS drives it).
@@ -261,6 +263,13 @@ struct RootView: View {
         // resolved at launch and disclosed by the welcome screen's standing
         // disclosure line (pinned above the CTA, not a scrollable bullet).
         .fullScreenCover(isPresented: $showOnboarding) { onboardingCover }
+        // DUT-982 — show the first-cook quiz after onboarding is complete
+        .sheet(isPresented: $showFirstCookQuiz) {
+            FirstCookQuizView { intake in
+                CookerIntakeStore.save(intake)
+                showFirstCookQuiz = false
+            }
+        }
         // ⚠️ DEV DEBUG (strip before public release) — fires the Dev Debug
         // "Testing" popups (Snackbar / OfflineBanner / App Welcome) over the app.
         // Inert unless Dev Debug is unlocked. See `RootView+DevHarness.swift`.

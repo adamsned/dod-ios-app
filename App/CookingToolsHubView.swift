@@ -289,7 +289,7 @@ struct CookingToolsHubView: View {
                 // rung 1. `cookedRecipeIDs` is ALWAYS the real set so a fresh
                 // cook's rungs aren't all painted done (DUT-381).
                 recommended: cookStateLoaded
-                    ? GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
+                    ? GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs, intake: CookerIntakeStore.load())
                     : nil,
                 cookedRecipeIDs: cookedRecipeIDs,
                 scrollToDumpCakes: scrollToDumpCakes,
