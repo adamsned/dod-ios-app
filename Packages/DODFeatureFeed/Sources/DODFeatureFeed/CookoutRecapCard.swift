@@ -14,6 +14,7 @@ struct CookoutRecapCard: View {
 
     /// Titles shown on the card, with a "+N more" tail when truncated.
     static func visibleDishLines(_ titles: [String]) -> [String] {
+        guard !titles.isEmpty else { return titles }
         guard titles.count > maxListedDishes else { return titles }
         return Array(titles.prefix(maxListedDishes)) + ["+\(titles.count - maxListedDishes) more"]
     }
