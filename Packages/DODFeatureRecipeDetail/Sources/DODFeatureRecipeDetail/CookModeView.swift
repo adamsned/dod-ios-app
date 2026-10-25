@@ -214,6 +214,22 @@ public struct CookModeView: View {
                 }
                 // Floating back + ingredients controls over the hero's blur strip.
                 cookModeTopBar()
+                // DUT-102 - one-tap Campfire Mode entry, below the top bar.
+                if !campfire.isActive && !viewModel.isFinished {
+                    Button {
+                        campfire.enter()
+                    } label: {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(DODColor.burntOrange)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Campfire Mode")
+                    .accessibilityIdentifier("cook-mode-campfire")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.top, 56)
+                    .padding(.trailing, DODSpacing.md + 48)
+                }
             }
             // The whole Cook Mode surface uses `surface` — the SAME token the
             // player panel + the rest of the app use — so it reads as one uniform
