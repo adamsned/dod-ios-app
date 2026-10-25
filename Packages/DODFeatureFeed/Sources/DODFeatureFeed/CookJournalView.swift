@@ -178,6 +178,11 @@ public struct CookJournalView: View {
 // `private` state (`cooks`, `thumbnails`) stays reachable.
 extension CookJournalView {
 
+    /// DUT-976 — cookouts (same-day groups of 2+ dishes) shown as recap rows, newest first.
+    static func recapGroups(_ cooks: [CookLogEntry]) -> [CookoutGroup] {
+        CookLogStats.cookouts(cooks)
+    }
+
     private var emptyState: some View {
         VStack(spacing: DODSpacing.md) {
             Image(systemName: "book.closed")
