@@ -119,6 +119,9 @@ public struct CookModeView: View {
     /// `CookModeView+Controls.swift` owns its lifecycle.
     @State var minimizeTask: Task<Void, Never>?
 
+    /// DUT-102 - Campfire Mode (max brightness, XXL text, Day/Night).
+    @State private var campfire = CampfireSession()
+
     public init(
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
@@ -285,8 +288,8 @@ public struct CookModeView: View {
             wakeControls()
         }
         .onDisappear {
-            // DUT-596 — cancel the in-flight minimize task so it can't fire into
-            // a torn-down view.
+            campfire.exit()
+            // DUT-596 — cancel the in-flight minimize task ...
             minimizeTask?.cancel()
             minimizeTask = nil
             viewModel.endCookMode()
@@ -298,6 +301,7 @@ public struct CookModeView: View {
         // the `didBegin` / `priorIdleTimerDisabled` symmetry, so they never
         // double-restore against the `.onDisappear` `endCookMode` above.
         .onChange(of: scenePhase) { _, newPhase in
+            if newPhase != .active { campfire.exit() }
             Self.handleScenePhaseChange(newPhase, viewModel: viewModel)
         }
     }
@@ -358,6 +362,7 @@ public struct CookModeView: View {
     /// `internal` (not `private`) so the header's Done button in
     /// `CookModeView+Header.swift` can call it.
     func close() {
+        campfire.exit()
         viewModel.endCookMode()
         onClose(viewModel.checkedIngredientIDs)
     }
