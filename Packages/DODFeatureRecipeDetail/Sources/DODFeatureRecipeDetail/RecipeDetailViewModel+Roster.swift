@@ -19,4 +19,10 @@ extension RecipeDetailViewModel {
         }
         return lines
     }
+
+    nonisolated static func rosterPortionMessage(recipe: Recipe, members: [HouseholdMember]) -> String? {
+        HouseholdPortionCheck.message(
+            for: HouseholdPortionCheck.verdict(members: members, servings: recipe.servings)
+        )
+    }
 }

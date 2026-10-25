@@ -63,4 +63,17 @@ struct RecipeDetailViewModelRosterTests {
         let member = HouseholdMember(name: "Emma", flags: [.dairy])
         #expect(RecipeDetailViewModel.rosterHeadsUps(recipe: recipe, members: [member]).isEmpty)
     }
+
+    @Test func portionMessageIsNonNilForServings4AndTwoAdults() {
+        let sample = recipe(servings: 4)
+        let members = [HouseholdMember(name: "Emma"), HouseholdMember(name: "Sam")]
+        #expect(RecipeDetailViewModel.rosterPortionMessage(recipe: sample, members: members) != nil)
+    }
+
+    @Test func portionMessageIsNilWithoutServings() {
+        let sample = recipe(servings: nil)
+        #expect(
+            RecipeDetailViewModel.rosterPortionMessage(recipe: sample, members: [HouseholdMember(name: "Emma")]) == nil
+        )
+    }
 }
