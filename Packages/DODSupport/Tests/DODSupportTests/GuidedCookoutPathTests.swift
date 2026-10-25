@@ -129,4 +129,27 @@ struct GuidedCookoutPathTests {
         #expect(indoor.ingredients.isEmpty == false)
         #expect(!GuidedCookout.path.contains { $0.recipeID == indoor.recipeID })
     }
+
+    /// DUT-982 — the first rung matched to the cook's intake
+    @Test func nilIntakeKeepsLasagna() {
+        #expect(GuidedCookout.firstRung(for: nil).recipeID == GuidedCookout.firstCookout.recipeID)
+    }
+
+    @Test func indoorOnlyGetsIndoorFirstCook() {
+        let intake = CookerIntake(hasDutchOven: true, ovenSizeInches: 12, setup: .indoor, experience: .none)
+        #expect(GuidedCookout.firstRung(for: intake).recipeID == GuidedCookout.indoorFirstCook.recipeID)
+    }
+
+    @Test func outdoorGetsLasagna() {
+        let intake = CookerIntake(hasDutchOven: true, ovenSizeInches: 12, setup: .outdoor, experience: .none)
+        #expect(GuidedCookout.firstRung(for: intake).recipeID == GuidedCookout.firstCookout.recipeID)
+    }
+
+    @Test func intakeIgnoredOnceSomethingCooked() {
+        let intake = CookerIntake(hasDutchOven: true, ovenSizeInches: 12, setup: .indoor, experience: .none)
+        #expect(
+            GuidedCookout.nextUncookedRung(cookedRecipeIDs: [1459], intake: intake)?.recipeID
+                == GuidedCookout.italianChicken.recipeID
+        )
+    }
 }

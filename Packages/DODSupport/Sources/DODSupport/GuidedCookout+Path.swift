@@ -251,6 +251,20 @@ extension GuidedCookout {
         path.first { !cookedRecipeIDs.contains($0.recipeID) }
     }
 
+    /// DUT-982 — the first rung matched to the cook's intake. No intake (nil) keeps today's
+    /// behavior (the lasagna). No outdoor fire access gets the indoor dish instead of a forced mismatch.
+    public static func firstRung(for intake: CookerIntake?) -> GuidedCookout {
+        guard let intake else { return firstCookout }
+        if !intake.hasOutdoorFire { return indoorFirstCook }
+        return firstCookout
+    }
+
+    /// Same as `nextUncookedRung`, but when NOTHING is cooked yet the intake picks the first rung.
+    public static func nextUncookedRung(cookedRecipeIDs: Set<Int>, intake: CookerIntake?) -> GuidedCookout? {
+        if cookedRecipeIDs.isEmpty { return firstRung(for: intake) }
+        return nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
+    }
+
     /// True when this cookout is the first rung of the path — drives the
     /// "Your First Cookout" vs "Your Next Cookout" hero framing.
     public var isFirstRung: Bool {
