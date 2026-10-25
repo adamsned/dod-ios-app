@@ -192,4 +192,40 @@ import Testing
         #expect(read.suitableForDiet == ["https://schema.org/LowFatDiet"])
         #expect(read.author == "Chef Ned")
     }
+
+    @Test func tagsJSONColumnRoundTripsAndDefaultsToNil() throws {
+        let container = try RecipeStore.inMemoryContainer()
+        let context = ModelContext(container)
+        let blob = Data("{}".utf8)
+        context.insert(
+            CachedRecipe(
+                id: 71,
+                slug: "a",
+                title: "A",
+                excerptText: "",
+                canonicalURLString: "https://example.com/71",
+                publishedAt: .distantPast,
+                tagsJSON: blob
+            )
+        )
+        context.insert(
+            CachedRecipe(
+                id: 72,
+                slug: "b",
+                title: "B",
+                excerptText: "",
+                canonicalURLString: "https://example.com/72",
+                publishedAt: .distantPast
+            )
+        )
+        try context.save()
+        let withTags = try #require(
+            try context.fetch(FetchDescriptor<CachedRecipe>(predicate: #Predicate { $0.id == 71 })).first
+        )
+        let without = try #require(
+            try context.fetch(FetchDescriptor<CachedRecipe>(predicate: #Predicate { $0.id == 72 })).first
+        )
+        #expect(withTags.tagsJSON == blob)
+        #expect(without.tagsJSON == nil)
+    }
 }
