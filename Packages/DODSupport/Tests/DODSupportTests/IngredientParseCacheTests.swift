@@ -4,6 +4,11 @@ import Testing
 
 @testable import DODSupport
 
+actor Counter {
+    private(set) var count = 0
+    func increment() { count += 1 }
+}
+
 @Suite struct IngredientParseCacheTests {
     @Test func storeThenCachedReturnsValueAndNilIsDistinctFromMiss() async {
         let cache = IngredientParseCache()
@@ -26,5 +31,33 @@ import Testing
         await cache.removeAll()
         let after = await cache.cached(for: ing.id)
         #expect(after == nil)
+    }
+
+    @Test func sameIngredientParsedOnce() async {
+        let cache = IngredientParseCache()
+        let counter = Counter()
+        let ing = RecipeIngredient(text: "2 cups flour")
+        let parser: @Sendable (String) async -> IngredientParse? = { _ in
+            await counter.increment()
+            return IngredientParse(quantity: 2, unit: "cups", item: "flour", prep: nil)
+        }
+        let first = await cache.parse(ing, using: parser)
+        let second = await cache.parse(ing, using: parser)
+        #expect(first == second)
+        #expect(await counter.count == 1)
+    }
+
+    @Test func nilResultIsCached() async {
+        let cache = IngredientParseCache()
+        let counter = Counter()
+        let ing = RecipeIngredient(text: "2 cups flour")
+        let parser: @Sendable (String) async -> IngredientParse? = { _ in
+            await counter.increment()
+            return nil
+        }
+        _ = await cache.parse(ing, using: parser)
+        let again = await cache.parse(ing, using: parser)
+        #expect(again == nil)
+        #expect(await counter.count == 1)
     }
 }
