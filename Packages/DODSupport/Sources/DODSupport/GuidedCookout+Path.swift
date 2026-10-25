@@ -89,6 +89,72 @@ extension GuidedCookout {
         ]
     )
 
+    /// DUT-982 — indoor-friendly first cook for cooks with no outdoor fire.
+    /// Oven-baked, no coals. NOT part of ``path`` (the outdoor ladder); chosen by `firstRung(for:)`.
+    public static let indoorFirstCook = GuidedCookout(
+        recipeSlug: "dutch-oven-bread",
+        recipeID: 684,
+        dishTitle: "No-Knead Dutch Oven Bread",
+        whyThisDish:
+            "This is your first indoor-friendly cookout. We're baking bread in a Dutch oven "
+            + "instead of using fire. It's an easy, reliable way to build on your first win "
+            + "and learn the basics of Dutch oven cooking.",
+        steps: [
+            Step(
+                id: "gather-gear",
+                stage: .gather,
+                title: "Round Up Your Gear and Ingredients",
+                coaching:
+                    "Same gear as last time. This one is barely more than a dump and "
+                    + "braise, so getting it all out first makes it feel effortless."
+            ),
+            Step(
+                id: "preheat-oven",
+                stage: .fire,
+                title: "Preheat Your Oven and Pot",
+                coaching:
+                    "Preheat your oven to 450°F. Place your Dutch oven inside to heat up "
+                    + "for 30 minutes. This is the key to good bread."
+            ),
+            Step(
+                id: "mix-and-bake",
+                stage: .cook,
+                title: "Mix, Shape, and Bake",
+                coaching:
+                    "Mix your ingredients, shape into a round, and place in the Dutch oven "
+                    + "with the lid on. Bake for 45 minutes, then remove the lid for the last "
+                    + "10 minutes."
+            ),
+            Step(
+                id: "lift-the-lid",
+                stage: .celebrate,
+                title: "Lift the Lid and Enjoy",
+                coaching:
+                    "The bread is ready! The crust should be golden brown and sound hollow when "
+                    + "you tap it. Let it cool a bit, then dig in with your family."
+            ),
+        ],
+        celebrationMessage:
+            "You've got your first indoor-friendly cookout under your belt. This is the start "
+            + "of your Dutch oven journey, and you're building on that first win.",
+        nextStepPrompt:
+            "Now that you've baked bread indoors, it's time to try something outdoors with fire.",
+        ovenTempF: 450,
+        ovenDiameterInches: 12,
+        bakeMinutes: 45,
+        gear: [
+            "Dutch oven with a lid",
+            "Oven mitts",
+            "Parchment paper",
+        ],
+        ingredients: [
+            "3 cups flour",
+            "1½ tsp salt",
+            "¼ tsp yeast",
+            "1½ cups water",
+        ]
+    )
+
     /// The capstone (DUT-192) — **Take It to the Campfire**. The path's peak: the
     /// hero who built confidence at home now cooks outdoors, over a real fire,
     /// for the people they love. Dish-agnostic (bring a dish you've already
