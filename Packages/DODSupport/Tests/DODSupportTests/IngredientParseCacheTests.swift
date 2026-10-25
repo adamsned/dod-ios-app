@@ -60,4 +60,34 @@ actor Counter {
         #expect(again == nil)
         #expect(await counter.count == 1)
     }
+
+    @Test func differentIngredientsEachParseOnce() async {
+        let cache = IngredientParseCache()
+        let counter = Counter()
+        let parser: @Sendable (String) async -> IngredientParse? = { text in
+            await counter.increment()
+            return IngredientParse(quantity: nil, unit: nil, item: text, prep: nil)
+        }
+        let flour = RecipeIngredient(text: "2 cups flour")
+        let salt = RecipeIngredient(text: "1 tsp salt")
+        _ = await cache.parse(flour, using: parser)
+        _ = await cache.parse(salt, using: parser)
+        _ = await cache.parse(flour, using: parser)
+        _ = await cache.parse(salt, using: parser)
+        #expect(await counter.count == 2)
+    }
+
+    @Test func removeAllForcesReparse() async {
+        let cache = IngredientParseCache()
+        let counter = Counter()
+        let ing = RecipeIngredient(text: "2 cups flour")
+        let parser: @Sendable (String) async -> IngredientParse? = { _ in
+            await counter.increment()
+            return nil
+        }
+        _ = await cache.parse(ing, using: parser)
+        await cache.removeAll()
+        _ = await cache.parse(ing, using: parser)
+        #expect(await counter.count == 2)
+    }
 }
