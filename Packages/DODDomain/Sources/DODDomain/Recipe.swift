@@ -70,6 +70,9 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
     public let suitableForDiet: [String]
     /// Author name from JSON-LD `author` (Person/Organization). Nil when absent.
     public let author: String?
+    /// DUT-1022: auto/manual catalog tags (difficulty, technique, occasion).
+    /// Nil until background tagging has run.
+    public let tags: RecipeTags?
 
     public init(
         id: Int,
@@ -95,7 +98,8 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         recipeCategory: [String] = [],
         recipeCuisine: [String] = [],
         suitableForDiet: [String] = [],
-        author: String? = nil
+        author: String? = nil,
+        tags: RecipeTags? = nil
     ) {
         self.id = id
         self.slug = slug
@@ -121,6 +125,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.recipeCuisine = recipeCuisine
         self.suitableForDiet = suitableForDiet
         self.author = author
+        self.tags = tags
     }
 
     // MARK: - Codable (back-compat for older payloads pre-kind)
@@ -134,7 +139,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         case categoryIDs, publishedAt, updatedAt, ingredients, instructions
         case prepTime, cookTime, totalTime, servings, nutrition, video
         case kind, articleBodyHTML
-        case recipeCategory, recipeCuisine, suitableForDiet, author
+        case recipeCategory, recipeCuisine, suitableForDiet, author, tags
     }
 
     public init(from decoder: Decoder) throws {
@@ -168,6 +173,8 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.recipeCuisine = try container.decodeIfPresent([String].self, forKey: .recipeCuisine) ?? []
         self.suitableForDiet = try container.decodeIfPresent([String].self, forKey: .suitableForDiet) ?? []
         self.author = try container.decodeIfPresent(String.self, forKey: .author)
+        // DUT-1022: back-compat — older payloads predate `tags`.
+        self.tags = try container.decodeIfPresent(RecipeTags.self, forKey: .tags)
     }
 }
 
