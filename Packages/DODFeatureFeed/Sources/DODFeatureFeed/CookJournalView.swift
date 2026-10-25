@@ -29,7 +29,7 @@ public struct CookJournalView: View {
     /// old synchronous full-res `photoStore.data(forID:)` + `UIImage(data:)`
     /// decode that ran per row in the view body.
     @State private var thumbnails = CookThumbnailLoader()
-    @State private var cooks: [CookLogEntry] = []
+    @State var cooks: [CookLogEntry] = []
     @State private var loaded = false
     /// DUT-514 — the entry the user is confirming a delete for (drives the alert).
     @State private var pendingDelete: CookLogEntry?
@@ -214,6 +214,7 @@ extension CookJournalView {
                 // last 30 days), derived from the same `stats` (recomputed in
                 // `.onChange(of: cooks)`) the header above already reads.
                 statsSummaryCard(stats: stats)
+                cookoutRecapRows
                 ForEach(cooks) { cook in
                     // CL-273 — tap an entry to open its personal page (write a
                     // reflection, add a photo). Reload after a save so the row
