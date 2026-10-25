@@ -2,6 +2,21 @@ import DODDomain
 import DODFeatureProfile
 import Foundation
 
+/// A simple banner structure for displaying roster warnings and portion messages
+public struct RosterHeadsUpBanner: Equatable {
+    public let warnings: [String]
+    public let portionMessage: String?
+
+    public init(warnings: [String], portionMessage: String?) {
+        self.warnings = warnings
+        self.portionMessage = portionMessage
+    }
+
+    public var isEmpty: Bool {
+        warnings.isEmpty && portionMessage == nil
+    }
+}
+
 extension RecipeDetailViewModel {
     /// DUT-993: plain-language heads-up lines, e.g. "Contains dairy - flagged for Emma". Reminder, not medical-grade.
     nonisolated static func rosterHeadsUps(recipe: Recipe, members: [HouseholdMember]) -> [String] {
