@@ -75,6 +75,8 @@ public final class CookModeViewModel {
     let voiceReader: VoiceReader
     /// DUT-328 — device language captured at init, for the natural-voice check; read by `+Voice`.
     let voiceLanguageCode: String?
+    /// DUT-1003 — on-device "Is It Done?" photo check; driven by `CookModeViewModel+Doneness.swift`.
+    public let donenessCoach: DonenessCoach
     private var priorIdleTimerDisabled: Bool = false
     private var didBegin: Bool = false
 
@@ -107,6 +109,7 @@ public final class CookModeViewModel {
         liveActivity: any CookLiveActivityController = SystemCookLiveActivityController(),
         stepTimerNotifier: any CookStepTimerNotifying = SystemCookStepTimerNotifier(),
         voiceReader: VoiceReader = VoiceReader(),
+        donenessCoach: DonenessCoach = DonenessCoach(intelligence: nil),
         locale: Locale = .current
     ) {
         self.recipe = recipe
@@ -115,6 +118,7 @@ public final class CookModeViewModel {
         self.liveActivity = liveActivity
         self.stepTimerNotifier = stepTimerNotifier
         self.voiceReader = voiceReader
+        self.donenessCoach = donenessCoach
         self.voiceLanguageCode = locale.language.languageCode?.identifier
         // DUT-583 — when a step finishes reading on its own, drop the play/pause
         // button back to the idle "play" glyph. Guard on `.speaking` so a stale
