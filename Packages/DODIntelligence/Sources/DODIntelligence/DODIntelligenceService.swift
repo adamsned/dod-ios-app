@@ -92,6 +92,12 @@ public protocol DODIntelligenceService: Sendable {
     /// is empty, the model errors, a guardrail rejects it, or the result invents a temperature/time not in
     /// `step` (see ``StepExplanation/isGrounded(in:)``).
     func explainStep(_ step: String, nextStep: String?) async -> StepExplanation?
+
+    /// DUT-1026 — last-resort recipe extraction. `body` is the sanitized post text
+    /// (from `ArticleBodyExtractor.extract`). Returns `nil` — never throws — when
+    /// unavailable, the body is empty, the model errors, a guardrail rejects it, or
+    /// nothing was found. Chunks internally when the body exceeds the context window.
+    func extractRecipe(fromBody body: String) async -> ExtractedRecipe?
 }
 
 extension DODIntelligenceService {
@@ -126,4 +132,7 @@ extension DODIntelligenceService {
 
     /// DUT-1021 — default implementation for older conformers to keep compiling.
     public func explainStep(_ step: String, nextStep: String?) async -> StepExplanation? { nil }
+
+    /// DUT-1026 — default implementation for older conformers to keep compiling.
+    public func extractRecipe(fromBody body: String) async -> ExtractedRecipe? { nil }
 }
