@@ -122,6 +122,41 @@ struct AddRecipeToShoppingListIntent: AppIntent {
     }
 }
 
+/// DUT-990 - hands-free preflight: Siri speaks the gear + coal estimate.
+struct WhatDoINeedIntent: AppIntent {
+
+    static let title: LocalizedStringResource = "What Do I Need"
+    static let description = IntentDescription(
+        "Reads back the gear and charcoal you need for a recipe, or the one you're looking at."
+    )
+
+    @Parameter(title: "Recipe")
+    var recipe: RecipeEntity?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("What do I need for \(\.$recipe)")
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let target = OnscreenRecipe.resolve(recipe) else {
+            throw $recipe.needsValueError("Which recipe do you want to prepare for?")
+        }
+        return .result(dialog: IntentDialog(stringLiteral: Self.dialogText(title: target.title)))
+    }
+
+    /// Pure dialog copy (unit-tested). No equipment source is wired onto `Recipe` yet,
+    /// so this speaks the fallback gear and a default 12-inch / 350F coal estimate.
+    static func dialogText(title: String, equipment: [String] = [], ovenDiameterInches: Int = 12) -> String {
+        let coals = CharcoalRecipeConverter.recommend(
+            ovenTempF: 350,
+            ovenDiameterInches: ovenDiameterInches,
+            task: .roast
+        )
+        return SpokenPreflight.script(title: title, equipment: equipment, coals: coals)
+    }
+}
+
 /// Failures the action intents surface to Siri as a spoken error.
 enum RecipeActionError: Error, CustomLocalizedStringResourceConvertible {
     /// Fired before the app finished launching (no store / actions yet).
