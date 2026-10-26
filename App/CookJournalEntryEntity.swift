@@ -47,6 +47,37 @@ struct CookJournalEntryEntity: AppEntity, IndexedEntity {
     }
 }
 
-struct CookJournalEntryEntityQuery: EntityQuery {
-    func entities(for identifiers: [UUID]) async throws -> [CookJournalEntryEntity] { [] }
+struct CookJournalEntryEntityQuery: EntityQuery, EntityStringQuery {
+    func entities(for identifiers: [UUID]) async throws -> [CookJournalEntryEntity] {
+        let wanted = Set(identifiers)
+        return await Self.allEntries().filter { wanted.contains($0.id) }.map(CookJournalEntryEntity.init(entry:))
+    }
+
+    func suggestedEntities() async throws -> [CookJournalEntryEntity] {
+        await Self.allEntries().prefix(30).map(CookJournalEntryEntity.init(entry:))
+    }
+
+    func entities(matching string: String) async throws -> [CookJournalEntryEntity] {
+        Self.filter(await Self.allEntries(), matching: string).map(CookJournalEntryEntity.init(entry:))
+    }
+
+    static func allEntries() async -> [CookLogEntry] {
+        guard let store = AppIntentEnvironment.store else { return [] }
+        return (try? await store.allCookLogs()) ?? []
+    }
+
+    /// Pure filter: case-insensitive match on recipe title, note, or the long/abbreviated date text.
+    static func filter(_ entries: [CookLogEntry], matching query: String) -> [CookLogEntry] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !needle.isEmpty else { return [] }
+        return entries.filter { entry in
+            let haystacks = [
+                entry.recipeTitle,
+                entry.note ?? "",
+                entry.cookedAt.formatted(date: .long, time: .omitted),
+                entry.cookedAt.formatted(date: .abbreviated, time: .omitted),
+            ]
+            return haystacks.contains { $0.lowercased().contains(needle) }
+        }
+    }
 }
