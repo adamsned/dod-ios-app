@@ -88,4 +88,55 @@ import Testing
         let logs = try await store.allCookLogs()
         #expect(logs.isEmpty)
     }
+
+    @Test func cookLogOccasionColumnsRoundTrip() throws {
+        let container = try RecipeStore.inMemoryContainer()
+        let context = ModelContext(container)
+
+        // Insert a row with the new occasionRaw and recipient values
+        context.insert(
+            CachedCookLogEntry(
+                id: UUID(),
+                recipeID: 42,
+                recipeTitle: "Dutch Oven Lasagna",
+                cookedAt: Date(timeIntervalSince1970: 1000),
+                occasionRaw: "comfort",
+                recipient: "Mom"
+            )
+        )
+
+        try context.save()
+
+        let rows = try context.fetch(
+            FetchDescriptor<CachedCookLogEntry>()
+        )
+
+        #expect(rows.count == 1)
+        #expect(rows.first?.occasionRaw == "comfort")
+        #expect(rows.first?.recipient == "Mom")
+
+        // Insert a row without the new values to test nil defaults
+        context.insert(
+            CachedCookLogEntry(
+                id: UUID(),
+                recipeID: 43,
+                recipeTitle: "Chicken Soup",
+                cookedAt: Date(timeIntervalSince1970: 2000)
+            )
+        )
+
+        try context.save()
+
+        let allRows = try context.fetch(
+            FetchDescriptor<CachedCookLogEntry>()
+        )
+
+        #expect(allRows.count == 2)
+        // First row should have the values
+        #expect(allRows[0].occasionRaw == "comfort")
+        #expect(allRows[0].recipient == "Mom")
+        // Second row should have nil values
+        #expect(allRows[1].occasionRaw == nil)
+        #expect(allRows[1].recipient == nil)
+    }
 }
