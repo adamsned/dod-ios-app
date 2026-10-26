@@ -8,10 +8,12 @@ struct TripPlanningTests {
     @Test func slotCountIsDaysTimesMeals() {
         #expect(TripPlanConstraints(headcount: 6, days: 3, mealsPerDay: 2).slotCount == 6)
     }
+
     @Test func clampsNonPositiveInputs() {
         let constraints = TripPlanConstraints(headcount: 0, days: 0, mealsPerDay: -1)
         #expect(constraints.headcount == 1 && constraints.slotCount == 1)
     }
+
     @Test func totalBriquettesSumsSlotsAndSkipsNil() {
         let charcoalRecommendation = CharcoalRecommendation(
             totalBriquettes: 24,
@@ -101,6 +103,27 @@ struct TripPlanningTests {
         #expect(slot.charcoal == nil)
     }
 
+    @Test func fuelLedgerCalculatesBriquettesPerDay() {
+        let ledger = makeFuelLedgerWithTestData()
+        #expect(ledger.briquettesPerDay == [52, 24])
+        #expect(ledger.totalBriquettes == 76)
+        #expect(ledger.bags == 2)  // 76 briquettes with 40 per bag rounds up to 2 bags
+    }
+
+    @Test func fuelLedgerHandlesNoCharcoal() {
+        let ledger = makeFuelLedgerWithNoCharcoal()
+        #expect(ledger.briquettesPerDay == [0])
+        #expect(ledger.totalBriquettes == 0)
+        #expect(ledger.bags == 0)
+    }
+
+    @Test func fuelLedgerClampsDayBeyondDays() {
+        let ledger = makeFuelLedgerWithClampedDay()
+        #expect(ledger.briquettesPerDay == [0, 24])  // Should clamp to day 2 (index 1)
+        #expect(ledger.totalBriquettes == 24)
+        #expect(ledger.bags == 1)  // 24 briquettes with 40 per bag equals 1 bag
+    }
+
     @Test func filtersByDietaryTags() {
         // Create test recipes with different dietary tags
         let recipes = makeTestRecipes()
@@ -124,6 +147,8 @@ struct TripPlanningTests {
         // Test: Articles are excluded
         testArticleExclusion(recipes: recipes, constraints: constraints)
     }
+
+    // MARK: - Private helper methods
 
     private func makeTestRecipes() -> [Recipe] {
         [
