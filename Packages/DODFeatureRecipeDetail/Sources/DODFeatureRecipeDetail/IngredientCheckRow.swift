@@ -26,27 +26,45 @@ public struct IngredientCheckRow: View {
         self.onToggle = onToggle
     }
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var checkbox: some View {
+        Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isChecked ? DODColor.accent : DODColor.labelSecondary)
+            .font(.title3)
+            .dynamicTypeSize(.accessibility1)
+    }
+
+    private var label: some View {
+        Text(displayText)
+            .dodFont(DODType.body)
+            .foregroundStyle(isChecked ? DODColor.labelSecondary : DODColor.label)
+            .strikethrough(isChecked, color: DODColor.labelSecondary)
+            .animation(.easeInOut(duration: 0.15), value: isChecked)
+            // DUT-17: wrap long ingredient text to multiple lines
+            // instead of letting it overflow the row's trailing edge
+            // (which made the recipe detail scroll horizontally).
+            // `.frame(maxWidth: .infinity)` alone leaves the Text free
+            // to take its single-line ideal width; pinning the
+            // horizontal axis forces it to honor the proposed width
+            // and grow vertically instead.
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     public var body: some View {
         Button(action: onToggle) {
-            HStack(spacing: DODSpacing.sm) {
-                Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isChecked ? DODColor.accent : DODColor.labelSecondary)
-                    .font(.title3)
-                Text(displayText)
-                    .dodFont(DODType.body)
-                    .foregroundStyle(isChecked ? DODColor.labelSecondary : DODColor.label)
-                    .strikethrough(isChecked, color: DODColor.labelSecondary)
-                    .animation(.easeInOut(duration: 0.15), value: isChecked)
-                    // DUT-17: wrap long ingredient text to multiple lines
-                    // instead of letting it overflow the row's trailing edge
-                    // (which made the recipe detail scroll horizontally).
-                    // `.frame(maxWidth: .infinity)` alone leaves the Text free
-                    // to take its single-line ideal width; pinning the
-                    // horizontal axis forces it to honor the proposed width
-                    // and grow vertically instead.
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: DODSpacing.sm) {
+                    checkbox
+                    label
+                }
+                VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                    checkbox
+                    label
+                }
             }
+            .frame(minHeight: 44)
             .padding(.vertical, DODSpacing.xs)
         }
         .buttonStyle(.plain)
