@@ -1,6 +1,7 @@
 import DODAnalytics
 import DODCookActivity
 import DODDomain
+import DODSupport
 import Foundation
 import Observation
 
@@ -70,13 +71,12 @@ public final class CookModeViewModel {
     /// backgrounded step timer still alerts (the in-app buzzer only fires on the
     /// foreground tick). `internal` so the `+Timers` extension drives it.
     let stepTimerNotifier: any CookStepTimerNotifying
-    /// `internal` (not `private`) so the Voice Mode + pacing methods in
-    /// `CookModeViewModel+Voice.swift` can drive the reader from a sibling file.
+    /// `internal` so `CookModeViewModel+Voice.swift` can drive the reader.
     let voiceReader: VoiceReader
-    /// DUT-328 — the device language (captured at init, matching the reader's
-    /// default locale), for the "get a better voice" natural-voice check.
-    /// Internal (not private) so the `+Voice` extension can read it.
+    /// DUT-328 — device language captured at init, for the natural-voice check; read by `+Voice`.
     let voiceLanguageCode: String?
+    /// DUT-1003 — on-device "Is It Done?" photo check; driven by `CookModeViewModel+Doneness.swift`.
+    public let donenessCoach: DonenessCoach
     private var priorIdleTimerDisabled: Bool = false
     private var didBegin: Bool = false
 
@@ -98,11 +98,8 @@ public final class CookModeViewModel {
     /// while it lingers. Cleared when a running timer takes the card over or the
     /// activity ends.
     var liveActivityShowingCompleted = false
-    /// DUT-558: latched true once a `startTimerLiveActivity` attempt fails while
-    /// the controller reports Live Activities are unavailable (disabled in
-    /// Settings / over quota). While set, `reconcileLiveActivity` stops
-    /// re-attempting the start every ~1s tick (DUT-492 kept retrying forever).
-    /// Recheck on scene-activate via `revalidateLiveActivityAvailability()`.
+    /// DUT-558: latched when a Live Activity start fails as unavailable, so the ~1s tick stops retrying.
+    /// Rechecked on scene-activate via `revalidateLiveActivityAvailability()`.
     var liveActivityUnavailable = false
 
     public init(
@@ -112,6 +109,7 @@ public final class CookModeViewModel {
         liveActivity: any CookLiveActivityController = SystemCookLiveActivityController(),
         stepTimerNotifier: any CookStepTimerNotifying = SystemCookStepTimerNotifier(),
         voiceReader: VoiceReader = VoiceReader(),
+        donenessCoach: DonenessCoach = DonenessCoach(intelligence: nil),
         locale: Locale = .current
     ) {
         self.recipe = recipe
@@ -120,6 +118,7 @@ public final class CookModeViewModel {
         self.liveActivity = liveActivity
         self.stepTimerNotifier = stepTimerNotifier
         self.voiceReader = voiceReader
+        self.donenessCoach = donenessCoach
         self.voiceLanguageCode = locale.language.languageCode?.identifier
         // DUT-583 — when a step finishes reading on its own, drop the play/pause
         // button back to the idle "play" glyph. Guard on `.speaking` so a stale
@@ -342,6 +341,9 @@ public final class CookModeViewModel {
     public func endTimerLiveActivity() {
         liveActivity.end()
     }
+
+    /// Heat profile for the cast-iron rescue tips; `nil` without an explicit temperature.
+    public var rescueHeatProfile: RecipeHeatProfile.Derived? { RecipeHeatProfile.derive(from: recipe) }
 
     // MARK: - Navigation
 

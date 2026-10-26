@@ -1,3 +1,5 @@
+import DODDomain
+import DODSupport
 import Foundation
 
 /// The app's shared on-device intelligence seam.
@@ -73,9 +75,57 @@ public protocol DODIntelligenceService: Sendable {
     /// Recipe" chat. When present the model answers about THAT recipe only and
     /// treats the text as its source of truth; `nil` is the general helper.
     func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
+
+    /// DUT-1008 — draft a short, celebratory caption for a personal cook-log
+    /// moment from its photo + note, entirely on-device. Returns `nil` (never
+    /// throws) when unavailable, when `request.hasMoment` is false, on model
+    /// error, or on a guardrail rejection. The photo is only used when
+    /// ``supportsImageInput`` is `true`; otherwise the note alone is used.
+    func captionMoment(_ request: MomentCaptionRequest) async -> String?
+
+    /// DUT-1003 — judge VISUAL doneness of a dish from a photo, given the current recipe step text.
+    /// `photo` is JPEG/PNG `Data` (stays on device). Returns `nil` — never throws — when unavailable,
+    /// `supportsImageInput` is false, the photo or step is empty, the model errors, or a guardrail rejects it.
+    /// Never makes temperature or food-safety claims.
+    func checkDoneness(photo: Data, stepText: String) async -> DonenessCheckResult?
+
+    /// DUT-1004: OCR + structure a photographed recipe card (JPEG/PNG bytes)
+    /// into a local-only ``FamilyRecipe``. On-device only. Returns `nil` —
+    /// never throws — when unavailable, the bytes are not a decodable image,
+    /// no text is recognised, or the text has no ingredient / step lines.
+    func scanRecipeCard(imageData: Data) async -> FamilyRecipe?
+
+    /// DUT-1021 — rephrase one cook-mode step for a beginner. `step` is the step text, `nextStep` the
+    /// adjacent step for continuity (may be nil). Returns `nil` — never throws — when unavailable, `step`
+    /// is empty, the model errors, a guardrail rejects it, or the result invents a temperature/time not in
+    /// `step` (see ``StepExplanation/isGrounded(in:)``).
+    func explainStep(_ step: String, nextStep: String?) async -> StepExplanation?
+
+    /// DUT-1026 — last-resort recipe extraction. `body` is the sanitized post text
+    /// (from `ArticleBodyExtractor.extract`). Returns `nil` — never throws — when
+    /// unavailable, the body is empty, the model errors, a guardrail rejects it, or
+    /// nothing was found. Chunks internally when the body exceeds the context window.
+    func extractRecipe(fromBody body: String) async -> ExtractedRecipe?
+
+    /// DUT-1006: classify an ingredient line the static keyword map could not place
+    /// into one of the six store aisles, strictly on-device. Returns `nil` — never
+    /// throws — when unavailable, the input is empty, the model errors, or a
+    /// guardrail rejects it; callers then keep `.other`.
+    func classifyAisle(_ ingredient: String) async -> IngredientAisleClassifier.Aisle?
+
+    /// DUT-1023 — distill approved comment bodies into a tips/gotchas digest.
+    /// `comments` are plain-text bodies, already filtered to `.approved`.
+    /// Returns `nil` — never throws — on unavailability, empty input, model error
+    /// or guardrail rejection.
+    func summarizeComments(_ comments: [String]) async -> CommentDigest?
 }
 
 extension DODIntelligenceService {
+
+    /// DUT-1005 — the tier this service runs on. Defaults to on-device, the
+    /// cost-free architecture default. A conformer that routes to Private Cloud
+    /// Compute must override this explicitly, never implicitly.
+    public var tier: IntelligenceTier { .default }
 
     /// Convenience for a context- and reason-free substitution, so previews and
     /// call sites that don't model either stay terse.
@@ -93,4 +143,27 @@ extension DODIntelligenceService {
     public func answer(_ question: String) async -> String? {
         await answer(question, imageData: nil, recipeContext: nil)
     }
+
+    /// DUT-1003 — default implementation for older conformers to keep compiling.
+    public func checkDoneness(photo: Data, stepText: String) async -> DonenessCheckResult? { nil }
+
+    /// Default for conformers that predate DUT-1004: scanning is unsupported.
+    public func scanRecipeCard(imageData: Data) async -> FamilyRecipe? { nil }
+
+    /// DUT-1021 — default implementation for older conformers to keep compiling.
+    public func explainStep(_ step: String, nextStep: String?) async -> StepExplanation? { nil }
+
+    /// DUT-1026 — default implementation for older conformers to keep compiling.
+    public func extractRecipe(fromBody body: String) async -> ExtractedRecipe? { nil }
+
+    /// Default: no on-device classifier (previews, tests, older OS) → `nil`.
+    public func classifyAisle(_ ingredient: String) async -> IngredientAisleClassifier.Aisle? {
+        nil
+    }
+
+    /// Default so older conformers (test doubles) need not implement it.
+    public func summarizeComments(_ comments: [String]) async -> CommentDigest? { nil }
+
+    /// Default for conformers that don't implement Hero Moment captions.
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? { nil }
 }

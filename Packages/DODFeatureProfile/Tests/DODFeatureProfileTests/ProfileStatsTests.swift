@@ -34,4 +34,10 @@ struct ProfileStatsTests {
         let caption = ProfileEditView.rankProgressCaption(totalCooks: 50)
         #expect(caption == "Top rank reached. You're a true Cast Iron Legend.")
     }
+
+    @Test func techniqueLine() {
+        #expect(ProfileEditView.techniqueLine(nil) == nil)
+        #expect(ProfileEditView.techniqueLine("  ") == nil)
+        #expect(ProfileEditView.techniqueLine(" You've now seared in cast iron. ") == "You've now seared in cast iron.")
+    }
 }

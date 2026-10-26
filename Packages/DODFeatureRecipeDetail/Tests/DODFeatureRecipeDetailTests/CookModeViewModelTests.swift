@@ -290,15 +290,25 @@ import Testing
         #expect(activity.lastInitialState?.remainingSeconds == 30)
     }
 
-    // MARK: - Helpers
+    // MARK: - Cast-Iron Rescue (DUT-970)
 
+    @Test func rescueHeatProfileIsNilWhenRecipeHasNoTemperature() {
+        let viewModel = Self.makeViewModel(stepCount: 2)
+        #expect(viewModel.rescueHeatProfile == nil)
+    }
+
+    // MARK: - Helpers
+}
+
+extension CookModeViewModelTests {
     static func makeViewModel(
         stepCount: Int,
         seed: Set<UUID> = [],
         idleTimer: IdleTimerController = FakeIdleTimerController(),
         liveActivity: any CookLiveActivityController = FakeLiveActivityController(),
         stepTimerNotifier: any CookStepTimerNotifying = FakeCookStepTimerNotifier(),
-        voiceReader: VoiceReader = VoiceReader()
+        voiceReader: VoiceReader = VoiceReader(),
+        donenessCoach: DonenessCoach = DonenessCoach(intelligence: nil)
     ) -> CookModeViewModel {
         let instructions = (1...max(stepCount, 1)).map { index in
             RecipeInstruction(step: index, text: "Step \(index) body.")
@@ -318,7 +328,8 @@ import Testing
             idleTimer: idleTimer,
             liveActivity: liveActivity,
             stepTimerNotifier: stepTimerNotifier,
-            voiceReader: voiceReader
+            voiceReader: voiceReader,
+            donenessCoach: donenessCoach
         )
     }
 }

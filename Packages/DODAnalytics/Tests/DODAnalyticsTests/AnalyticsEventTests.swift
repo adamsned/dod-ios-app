@@ -210,7 +210,28 @@ import Testing
             AnalyticsEvent.syncDisabled.name,
             AnalyticsEvent.syncCompletedSuccessfully.name,
             AnalyticsEvent.syncFailed(errorCategory: .other).name,
+            AnalyticsEvent.reviewPromptEligible.name,
+            AnalyticsEvent.reviewPromptShown.name,
+            AnalyticsEvent.reviewManualRateTapped.name,
+            AnalyticsEvent.recipeOfTheDayShown(recipeID: 1).name,
+            AnalyticsEvent.recipeOfTheDayTapped(recipeID: 1).name,
+            AnalyticsEvent.feedbackStarted.name,
+            AnalyticsEvent.feedbackSent(category: "bug").name,
         ]
         #expect(Set(allNames).count == allNames.count)
+    }
+
+    @Test func recipeOfTheDayEventsCarryOnlyTheRecipeID() {
+        #expect(AnalyticsEvent.recipeOfTheDayShown(recipeID: 7).payload == ["recipe_id": "7"])
+        #expect(AnalyticsEvent.recipeOfTheDayTapped(recipeID: 7).payload == ["recipe_id": "7"])
+        #expect(AnalyticsEvent.recipeOfTheDayShown(recipeID: 7).name == "recipe_of_the_day_shown")
+        #expect(AnalyticsEvent.recipeOfTheDayTapped(recipeID: 7).name == "recipe_of_the_day_tapped")
+    }
+
+    @Test func feedbackEventsCarryNoFreeText() {
+        #expect(AnalyticsEvent.feedbackStarted.name == "feedback_started")
+        #expect(AnalyticsEvent.feedbackStarted.payload.isEmpty)
+        #expect(AnalyticsEvent.feedbackSent(category: "bug").name == "feedback_sent")
+        #expect(AnalyticsEvent.feedbackSent(category: "bug").payload == ["category": "bug"])
     }
 }
