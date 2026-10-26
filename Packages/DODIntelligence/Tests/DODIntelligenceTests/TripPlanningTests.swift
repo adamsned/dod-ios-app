@@ -221,4 +221,35 @@ struct TripPlanningTests {
         let candidatesWithArticle = TripCandidateFilter.candidates(from: withArticle, constraints: constraints)
         #expect(candidatesWithArticle.count == 2)  // Article should be excluded
     }
+
+    @Test func estimateTokens() {
+        #expect(TripTokenBudget.estimateTokens("abcdefgh") == 2)
+    }
+
+    @Test func needsEscalationWithShortCandidates() {
+        // With 3 short candidates and `slotCount: 2`, `needsEscalation` is false.
+        let recipes = [
+            Recipe(id: 1, title: "A", suitableForDiet: []),
+            Recipe(id: 2, title: "B", suitableForDiet: []),
+            Recipe(id: 3, title: "C", suitableForDiet: []),
+        ]
+        #expect(!TripTokenBudget.needsEscalation(candidates: recipes, slotCount: 2))
+    }
+
+    @Test func needsEscalationWithLargeSlotCount() {
+        // With `slotCount: 400`, `needsEscalation` is true.
+        let recipes = [
+            Recipe(id: 1, title: "A", suitableForDiet: [])
+        ]
+        #expect(TripTokenBudget.needsEscalation(candidates: recipes, slotCount: 400))
+    }
+
+    @Test func needsEscalationWithManyLongCandidates() {
+        // With 200 candidates carrying very long titles and `slotCount: 1`, `needsEscalation` is true.
+        let recipes = Array(
+            repeating: Recipe(id: 1, title: String(repeating: "A", count: 100), suitableForDiet: []),
+            count: 200
+        )
+        #expect(TripTokenBudget.needsEscalation(candidates: recipes, slotCount: 1))
+    }
 }
