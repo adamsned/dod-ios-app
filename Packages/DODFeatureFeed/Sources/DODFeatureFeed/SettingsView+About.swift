@@ -16,6 +16,8 @@ extension SettingsView {
         // MARK: US-32 About + version
 
         Section {
+            FromNedSettingsLink(unreadCount: fromNedUnreadCount)
+
             NavigationLink {
                 AboutNedView()
             } label: {

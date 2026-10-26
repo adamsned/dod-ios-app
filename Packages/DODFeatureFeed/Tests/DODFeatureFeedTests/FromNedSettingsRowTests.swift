@@ -1,5 +1,6 @@
 import DODDomain
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import DODFeatureFeed
@@ -25,5 +26,11 @@ import Testing
     @Test @MainActor func fromNedLinkBuilds() {
         _ = FromNedSettingsLink(unreadCount: 3).body
         _ = FromNedSettingsLink(unreadCount: 0).body
+    }
+
+    @Test @MainActor func settingsViewBuildsWithFromNedRow() {
+        let view = NavigationStack { SettingsView() }
+        _ = view
+        #expect(SettingsView().fromNedUnreadCount == 0)
     }
 }
