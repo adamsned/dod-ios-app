@@ -37,6 +37,8 @@ public final class CachedCookLogEntry {
     /// Optional local identifier for an attached photo (resolved by the photo
     /// store in a later slice).
     public var photoLocalID: String?
+    /// DUT-975 — optional private 1–5 "how did that feel?" confidence read.
+    public var confidence: Int?
 
     public init(
         id: UUID,
@@ -45,7 +47,8 @@ public final class CachedCookLogEntry {
         cookedAt: Date,
         note: String? = nil,
         personalRating: Int? = nil,
-        photoLocalID: String? = nil
+        photoLocalID: String? = nil,
+        confidence: Int? = nil
     ) {
         self.id = id
         self.recipeID = recipeID
@@ -54,5 +57,6 @@ public final class CachedCookLogEntry {
         self.note = note
         self.personalRating = personalRating
         self.photoLocalID = photoLocalID
+        self.confidence = confidence
     }
 }
