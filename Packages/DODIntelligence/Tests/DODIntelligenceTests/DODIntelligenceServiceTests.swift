@@ -303,4 +303,19 @@ struct DODIntelligenceServiceTests {
         let bare = Bare()
         #expect(await bare.summarizeComments(["x"]) == nil)
     }
+
+    @Test func fakeReturnsCannedDigestWhenAvailable() async {
+        let service = FakeIntelligenceService(commentDigest: .canned)
+        #expect(await service.summarizeComments(["a"]) == .canned)
+    }
+
+    @Test func fakeReturnsNilWhenUnavailable() async {
+        let service = FakeIntelligenceService(isAvailable: false, commentDigest: .canned)
+        #expect(await service.summarizeComments(["a"]) == nil)
+    }
+
+    @Test func fakeNilDigestModelsNoResult() async {
+        let service = FakeIntelligenceService(commentDigest: nil)
+        #expect(await service.summarizeComments(["a"]) == nil)
+    }
 }

@@ -23,6 +23,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedDoneness: DonenessCheckResult?
     private let cannedExplanation: StepExplanation?
     private let cannedExtraction: ExtractedRecipe?
+    private let cannedDigest: CommentDigest?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
@@ -41,6 +42,8 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     the graceful no-result path. Defaults to ``StepExplanation/canned``.
     ///   - extraction: What ``extractRecipe(fromBody:)`` returns when available. `nil` models
     ///     the graceful no-result path.
+    ///   - commentDigest: What ``summarizeComments(_:)`` returns when available. `nil` models
+    ///     the graceful no-result path. Defaults to ``CommentDigest/canned``.
     public init(
         isAvailable: Bool = true,
         supportsImageInput: Bool = true,
@@ -53,7 +56,8 @@ public struct FakeIntelligenceService: DODIntelligenceService {
             reassurance: "The crust is an even golden brown and the edges look set."
         ),
         explanation: StepExplanation? = .canned,
-        extraction: ExtractedRecipe? = nil
+        extraction: ExtractedRecipe? = nil,
+        commentDigest: CommentDigest? = .canned
     ) {
         self.isAvailable = isAvailable
         self.supportsImageInput = supportsImageInput
@@ -63,6 +67,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         self.cannedDoneness = doneness
         self.cannedExplanation = explanation
         self.cannedExtraction = extraction
+        self.cannedDigest = commentDigest
     }
 
     public func suggestSubstitution(
@@ -97,5 +102,10 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     public func extractRecipe(fromBody body: String) async -> ExtractedRecipe? {
         guard isAvailable else { return nil }
         return cannedExtraction
+    }
+
+    public func summarizeComments(_ comments: [String]) async -> CommentDigest? {
+        guard isAvailable else { return nil }
+        return cannedDigest
     }
 }
