@@ -21,4 +21,9 @@ import Testing
     @Test func placeholderCategoryIDIsZero() {
         #expect(SettingsView.announcementsCategoryID == 0)
     }
+
+    @Test @MainActor func fromNedLinkBuilds() {
+        _ = FromNedSettingsLink(unreadCount: 3).body
+        _ = FromNedSettingsLink(unreadCount: 0).body
+    }
 }
