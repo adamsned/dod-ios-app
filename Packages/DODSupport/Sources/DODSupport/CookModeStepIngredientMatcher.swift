@@ -22,7 +22,7 @@ public enum CookModeStepIngredientMatcher {
 
     private static func words(in text: String) -> [String] {
         text.lowercased()
-            .components(separatedBy: CharacterSet.letters.inverted)
+            .components(separatedBy: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz").inverted)
             .filter { !$0.isEmpty }
     }
 }
