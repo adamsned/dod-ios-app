@@ -285,4 +285,22 @@ struct DODIntelligenceServiceTests {
         let service = FakeIntelligenceService()  // match the init style used in this file
         #expect(await service.classifyAisle("1 tbsp gochujang") == nil)
     }
+
+    @Test func defaultSummarizeCommentsIsNil() async {
+        // Create a minimal struct that only implements the existing requirements
+        struct Bare: DODIntelligenceService {
+            var isAvailable: Bool { true }
+            var supportsImageInput: Bool { true }
+            func suggestSubstitution(
+                for ingredient: String,
+                in context: RecipeContext?,
+                reason: SubstitutionReason?
+            ) async -> SubstitutionResult? { nil }
+            func summarize(_ text: String) async -> String? { nil }
+            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+        }
+
+        let bare = Bare()
+        #expect(await bare.summarizeComments(["x"]) == nil)
+    }
 }
