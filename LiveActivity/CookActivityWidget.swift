@@ -4,6 +4,35 @@ import DODDesignSystem
 import SwiftUI
 import WidgetKit
 
+/// DUT-991: picks the StandBy face vs. the Lock Screen card.
+@available(iOS 16.1, *)
+private struct CookActivityPresentationView: View {
+    let attributes: CookActivityAttributes
+    let state: CookActivityAttributes.ContentState
+    @Environment(\.isActivityFullscreen) private var isFullscreen
+
+    var body: some View {
+        if isFullscreen {
+            CookActivityStandByView(
+                recipeTitle: attributes.recipeTitle,
+                model: CookActivityStandByModel(state: state)
+            )
+        } else {
+            CookActivityLockScreenView(
+                recipeTitle: attributes.recipeTitle,
+                stepText: state.stepText,
+                remainingSeconds: state.remainingSeconds,
+                totalSeconds: attributes.totalSeconds,
+                isPaused: state.isPaused,
+                endDate: state.endDate,
+                isCompleted: state.isCompleted
+            )
+            .padding(.horizontal, DODSpacing.sm)
+            .padding(.vertical, DODSpacing.xs)
+        }
+    }
+}
+
 /// `ActivityConfiguration` for the Cook Mode timer Live Activity (US-11).
 ///
 /// Wires ``CookActivityAttributes`` to the lock-screen and Dynamic Island
@@ -15,26 +44,12 @@ import WidgetKit
 struct CookActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: CookActivityAttributes.self) { context in
-            CookActivityLockScreenView(
-                recipeTitle: context.attributes.recipeTitle,
-                stepText: context.state.stepText,
-                remainingSeconds: context.state.remainingSeconds,
-                totalSeconds: context.attributes.totalSeconds,
-                isPaused: context.state.isPaused,
-                endDate: context.state.endDate,
-                isCompleted: context.state.isCompleted
-            )
-            .padding(.horizontal, DODSpacing.sm)
-            .padding(.vertical, DODSpacing.xs)
-            // DUT-403: tapping the Live Activity opens the recipe the timer belongs to.
-            // DUT-666: a non-positive `recipeID` (unknown recipe) has no
-            // `dod://recipe/<id>` target, so fall back to `dod://feed` rather than
-            // emitting a dead `dod://recipe/0` tap.
-            .widgetURL(
-                context.attributes.recipeID > 0
-                    ? URL(string: "dod://recipe/\(context.attributes.recipeID)")
-                    : URL(string: "dod://feed")
-            )
+            CookActivityPresentationView(attributes: context.attributes, state: context.state)
+                .widgetURL(
+                    context.attributes.recipeID > 0
+                        ? URL(string: "dod://recipe/\(context.attributes.recipeID)")
+                        : URL(string: "dod://feed")
+                )
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
