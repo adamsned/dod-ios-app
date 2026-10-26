@@ -227,6 +227,42 @@ struct ContentStateEquatableHashableTests {
     }
 }
 
+// MARK: - ContentState coachNudge (DUT-967)
+
+/// L1 tests for the new `coachNudge` field on ``CookActivityAttributes/ContentState``.
+@Suite("ContentState coachNudge (DUT-967)")
+struct ContentStateCoachNudgeTests {
+
+    @Test("roundTripsCoachNudge")
+    func roundTripsCoachNudge() throws {
+        let original = CookActivityAttributes.ContentState(
+            remainingSeconds: 120,
+            stepText: "Sear",
+            isPaused: false,
+            endDate: nil,
+            isCompleted: false,
+            coachNudge: "You're doing great"
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(
+            CookActivityAttributes.ContentState.self,
+            from: data
+        )
+        #expect(decoded == original)
+    }
+
+    @Test("omittedCoachNudgeDecodesNil")
+    func omittedCoachNudgeDecodesNil() throws {
+        // Pre-DUT-967 payload: no coachNudge key → must decode with coachNudge == nil.
+        let json = "{\"remainingSeconds\":120,\"stepText\":\"Sear\",\"isPaused\":false}"
+        let decoded = try JSONDecoder().decode(
+            CookActivityAttributes.ContentState.self,
+            from: Data(json.utf8)
+        )
+        #expect(decoded.coachNudge == nil)
+    }
+}
+
 // MARK: - CookActivityAttributes Equatable
 
 /// L1 tests for the synthesized ``Equatable`` conformance on
