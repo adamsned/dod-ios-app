@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 
 @testable import DODFeatureRecipeDetail
@@ -52,5 +53,12 @@ struct CookModeProgressTests {
         let mid = CookModeProgress(currentStepIndex: 9, stepCount: 20, isFinished: false)
         #expect(mid.fraction == 0.5)
         #expect(mid.counterLabel == "Step 10 of 20")
+    }
+
+    @Test func stepLayoutStacksOnlyAtAccessibilitySizes() {
+        #expect(CookModeStepLayout.stacksCounter(for: .large) == false)
+        #expect(CookModeStepLayout.stacksCounter(for: .xxxLarge) == false)
+        #expect(CookModeStepLayout.stacksCounter(for: .accessibility1) == true)
+        #expect(CookModeStepLayout.stacksCounter(for: .accessibility5) == true)
     }
 }

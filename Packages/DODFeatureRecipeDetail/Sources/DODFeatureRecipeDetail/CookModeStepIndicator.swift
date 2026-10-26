@@ -101,6 +101,14 @@ struct CookModeStepIndicator: View {
     }
 }
 
+/// DUT-118: below this size the counter sits inline with the bar; at or above
+/// it the counter stacks under the bar.
+enum CookModeStepLayout {
+    static func stacksCounter(for size: DynamicTypeSize) -> Bool {
+        size.isAccessibilitySize
+    }
+}
+
 /// DUT-596 — the pure progress model behind ``CookModeStepIndicator``. Extracted
 /// so the fraction, the star-filled decision, and the caption/accessibility copy
 /// are unit-testable without booting SwiftUI.
