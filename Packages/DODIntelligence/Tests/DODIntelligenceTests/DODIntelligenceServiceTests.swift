@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 import Testing
 
@@ -278,5 +279,10 @@ struct DODIntelligenceServiceTests {
     @Test func fakeExtractRecipeReturnsNilWithDefault() async {
         let service = FakeIntelligenceService()
         #expect(await service.extractRecipe(fromBody: "some body") == nil)
+    }
+
+    @Test func fakeServiceClassifyAisleDefaultsToNil() async {
+        let service = FakeIntelligenceService()  // match the init style used in this file
+        #expect(await service.classifyAisle("1 tbsp gochujang") == nil)
     }
 }
