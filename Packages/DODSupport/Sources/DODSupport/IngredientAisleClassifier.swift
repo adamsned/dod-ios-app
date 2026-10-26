@@ -83,6 +83,20 @@ public enum IngredientAisleClassifier {
         return .other
     }
 
+    /// DUT-1006: async fallback seam. Returns the closure's verdict only when the
+    /// static keyword map yields `.other`. A `nil` verdict keeps `.other`.
+    /// A non-`.other` keyword hit never calls `fallback` (fast, deterministic path).
+    public static func classify(
+        _ ingredientName: String,
+        fallback: @Sendable (String) async -> Aisle?
+    ) async -> Aisle {
+        let fast = classify(ingredientName)
+        guard fast == .other else { return fast }
+        let trimmed = ingredientName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .other }
+        return await fallback(trimmed) ?? .other
+    }
+
     /// True when `keyword` occurs in `haystack` beginning AND ending at a word
     /// boundary — the match is preceded by the start of the string or a
     /// non-letter, AND followed by the end of the string, a non-letter, or a
