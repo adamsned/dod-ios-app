@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 
 /// The app's shared on-device intelligence seam.
@@ -98,6 +99,12 @@ public protocol DODIntelligenceService: Sendable {
     /// unavailable, the body is empty, the model errors, a guardrail rejects it, or
     /// nothing was found. Chunks internally when the body exceeds the context window.
     func extractRecipe(fromBody body: String) async -> ExtractedRecipe?
+
+    /// DUT-1006: classify an ingredient line the static keyword map could not place
+    /// into one of the six store aisles, strictly on-device. Returns `nil` — never
+    /// throws — when unavailable, the input is empty, the model errors, or a
+    /// guardrail rejects it; callers then keep `.other`.
+    func classifyAisle(_ ingredient: String) async -> IngredientAisleClassifier.Aisle?
 }
 
 extension DODIntelligenceService {
@@ -135,4 +142,9 @@ extension DODIntelligenceService {
 
     /// DUT-1026 — default implementation for older conformers to keep compiling.
     public func extractRecipe(fromBody body: String) async -> ExtractedRecipe? { nil }
+
+    /// Default: no on-device classifier (previews, tests, older OS) → `nil`.
+    public func classifyAisle(_ ingredient: String) async -> IngredientAisleClassifier.Aisle? {
+        nil
+    }
 }
