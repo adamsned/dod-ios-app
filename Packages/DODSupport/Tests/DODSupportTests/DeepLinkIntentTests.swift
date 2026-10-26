@@ -130,4 +130,23 @@ import Testing
         let empty = try #require(URL(string: "dod://article"))
         #expect(DeepLinkIntent.parse(empty) == nil)
     }
+
+    // MARK: - DUT-992 `dod://pancheck`
+
+    @Test func panCheckURLParsesVerdict() throws {
+        let url = try #require(URL(string: "dod://pancheck?verdict=rustOrCarbon"))
+        #expect(DeepLinkIntent.parse(url) == .openPanCheck(verdict: .rustOrCarbon))
+    }
+
+    @Test func panCheckURLWithNoVerdictParsesAsUnclear() throws {
+        let url = try #require(URL(string: "dod://pancheck"))
+        #expect(DeepLinkIntent.parse(url) == .openPanCheck(verdict: .unclear))
+    }
+
+    @Test func panCheckRoundTrip() {
+        for verdict in PanCheck.Verdict.allCases {
+            let intent = DeepLinkIntent.openPanCheck(verdict: verdict)
+            #expect(DeepLinkIntent.parse(intent.url) == intent)
+        }
+    }
 }
