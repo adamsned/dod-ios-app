@@ -318,4 +318,9 @@ struct DODIntelligenceServiceTests {
         let service = FakeIntelligenceService(commentDigest: nil)
         #expect(await service.summarizeComments(["a"]) == nil)
     }
+
+    @Test func liveIdentifyIngredientsIsEmptyWithoutModel() async {
+        let result = await LiveDODIntelligenceService().identifyIngredients(imageData: Data([0x00]))
+        #expect(result.isEmpty)
+    }
 }
