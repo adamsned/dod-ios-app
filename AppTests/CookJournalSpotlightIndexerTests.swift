@@ -1,4 +1,5 @@
 import CoreSpotlight
+import DODSupport
 import Foundation
 import XCTest
 

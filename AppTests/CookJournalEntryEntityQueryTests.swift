@@ -4,10 +4,8 @@ import XCTest
 
 @testable import DODApp
 
-@Suite("CookJournalEntryEntityQuery filter")
-struct CookJournalEntryEntityQueryTests {
-    @Test("matchesRecipeTitleCaseInsensitively")
-    func matchesRecipeTitleCaseInsensitively() {
+final class CookJournalEntryEntityQueryTests: XCTestCase {
+    func testMatchesRecipeTitleCaseInsensitively() {
         let entries = [
             CookLogEntry(
                 id: UUID(),
@@ -32,8 +30,7 @@ struct CookJournalEntryEntityQueryTests {
         XCTAssertEqual(result[0].recipeTitle, "Lasagna")
     }
 
-    @Test("matchesNote")
-    func matchesNote() {
+    func testMatchesNote() {
         let entries = [
             CookLogEntry(
                 id: UUID(),
@@ -50,8 +47,7 @@ struct CookJournalEntryEntityQueryTests {
         XCTAssertEqual(result[0].note, "Sunday dinner")
     }
 
-    @Test("emptyQueryReturnsNothing")
-    func emptyQueryReturnsNothing() {
+    func testEmptyQueryReturnsNothing() {
         let entries = [
             CookLogEntry(
                 id: UUID(),
