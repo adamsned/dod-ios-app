@@ -95,6 +95,15 @@ final class SiriAppIntentsTests: XCTestCase {
         }
     }
 
+    func test_whatDoINeedDialog() {
+        let text = WhatDoINeedIntent.dialogText(title: "Chili")
+        XCTAssertTrue(text.hasPrefix("For Chili you need"))
+        XCTAssertTrue(text.contains("chimney starter"))
+        XCTAssertTrue(text.contains("about 24 briquettes"))
+        XCTAssertFalse(text.contains("\u{2014}"))
+        XCTAssertTrue(WhatDoINeedIntent.dialogText(title: "X", equipment: ["Tongs"]).contains("Tongs"))
+    }
+
     // MARK: - Donations
 
     func test_donationMapping() {
