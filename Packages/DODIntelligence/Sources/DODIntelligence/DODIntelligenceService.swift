@@ -76,6 +76,13 @@ public protocol DODIntelligenceService: Sendable {
     /// treats the text as its source of truth; `nil` is the general helper.
     func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
 
+    /// DUT-1008 — draft a short, celebratory caption for a personal cook-log
+    /// moment from its photo + note, entirely on-device. Returns `nil` (never
+    /// throws) when unavailable, when `request.hasMoment` is false, on model
+    /// error, or on a guardrail rejection. The photo is only used when
+    /// ``supportsImageInput`` is `true`; otherwise the note alone is used.
+    func captionMoment(_ request: MomentCaptionRequest) async -> String?
+
     /// DUT-1003 — judge VISUAL doneness of a dish from a photo, given the current recipe step text.
     /// `photo` is JPEG/PNG `Data` (stays on device). Returns `nil` — never throws — when unavailable,
     /// `supportsImageInput` is false, the photo or step is empty, the model errors, or a guardrail rejects it.
@@ -156,4 +163,7 @@ extension DODIntelligenceService {
 
     /// Default so older conformers (test doubles) need not implement it.
     public func summarizeComments(_ comments: [String]) async -> CommentDigest? { nil }
+
+    /// Default for conformers that don't implement Hero Moment captions.
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? { nil }
 }
