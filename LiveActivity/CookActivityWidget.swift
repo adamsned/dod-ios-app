@@ -25,7 +25,8 @@ private struct CookActivityPresentationView: View {
                 totalSeconds: attributes.totalSeconds,
                 isPaused: state.isPaused,
                 endDate: state.endDate,
-                isCompleted: state.isCompleted
+                isCompleted: state.isCompleted,
+                coachNudge: state.coachNudge
             )
             .padding(.horizontal, DODSpacing.sm)
             .padding(.vertical, DODSpacing.xs)
