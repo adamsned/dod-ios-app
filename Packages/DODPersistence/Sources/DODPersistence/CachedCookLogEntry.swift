@@ -37,6 +37,10 @@ public final class CachedCookLogEntry {
     /// Optional local identifier for an attached photo (resolved by the photo
     /// store in a later slice).
     public var photoLocalID: String?
+    /// DUT-994: raw `CookOccasion` string; nil on pre-DUT-994 rows (reads as `.everyday`).
+    public var occasionRaw: String?
+    /// DUT-994: optional private recipient label for comfort cooks.
+    public var recipient: String?
 
     public init(
         id: UUID,
@@ -45,7 +49,9 @@ public final class CachedCookLogEntry {
         cookedAt: Date,
         note: String? = nil,
         personalRating: Int? = nil,
-        photoLocalID: String? = nil
+        photoLocalID: String? = nil,
+        occasionRaw: String? = nil,
+        recipient: String? = nil
     ) {
         self.id = id
         self.recipeID = recipeID
@@ -54,5 +60,7 @@ public final class CachedCookLogEntry {
         self.note = note
         self.personalRating = personalRating
         self.photoLocalID = photoLocalID
+        self.occasionRaw = occasionRaw
+        self.recipient = recipient
     }
 }
