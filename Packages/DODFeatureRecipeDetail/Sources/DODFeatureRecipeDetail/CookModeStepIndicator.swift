@@ -22,6 +22,8 @@ struct CookModeStepIndicator: View {
     /// Motion (the swap still happens, just without the scale/pop).
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     /// DUT — iPad enlarges the progress bar, star, width, and caption for the
     /// larger canvas; ALL iPhones keep the shipped sizes byte-for-byte. Gated on
     /// the DEVICE IDIOM (not the width class) so an iPhone Pro Max in landscape —
@@ -39,7 +41,17 @@ struct CookModeStepIndicator: View {
 
     /// Height of the progress track.
     private var barHeight: CGFloat { isPad ? 8 : 6 }
-    private var counterFont: Font { isPad ? DODType.detail : DODType.caption }
+    private var counterFont: Font {
+        isPad ? DODType.detail : DODType.caption
+    }
+
+    /// DUT-1581: Adjust counter font size for accessibility sizes
+    private var adjustedCounterFont: Font {
+        if dynamicTypeSize.isAccessibilitySize {
+            return .system(.caption2, design: .monospaced)
+        }
+        return counterFont
+    }
 
     private var progress: CookModeProgress {
         CookModeProgress(
@@ -50,9 +62,15 @@ struct CookModeStepIndicator: View {
     }
 
     var body: some View {
-        HStack(spacing: DODSpacing.sm) {
-            progressBar
-            trailingStatus
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: DODSpacing.sm) {
+                progressBar
+                trailingStatus
+            }
+            VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                progressBar
+                trailingStatus
+            }
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.xs)
@@ -92,10 +110,10 @@ struct CookModeStepIndicator: View {
                 .accessibilityHidden(true)
         } else {
             Text(progress.counterLabel)
-                .dodFont(counterFont)
+                .dodFont(adjustedCounterFont)
                 .foregroundStyle(DODColor.labelSecondary)
                 .monospacedDigit()
-                .fixedSize()
+                .fixedSize(horizontal: false, vertical: true)
                 .transition(.opacity)
         }
     }
