@@ -100,4 +100,100 @@ struct TripPlanningTests {
 
         #expect(slot.charcoal == nil)
     }
+
+    @Test func filtersByDietaryTags() {
+        // Create test recipes with different dietary tags
+        let recipes = makeTestRecipes()
+
+        // Test: GlutenFreeDiet constraint keeps only recipes tagged GlutenFreeDiet
+        let constraints = TripPlanConstraints(headcount: 4, dietaryTags: ["GlutenFreeDiet"])
+        let candidates = TripCandidateFilter.candidates(from: recipes, constraints: constraints)
+        #expect(candidates.count == 2)
+        #expect(candidates.contains { $0.title == "Gluten Free Cake" })
+        #expect(candidates.contains { $0.title == "Gluten Free Vegan Cake" })
+
+        // Test: Empty tag list keeps all non-article recipes
+        let emptyConstraints = TripPlanConstraints(headcount: 4, dietaryTags: [])
+        let emptyCandidates = TripCandidateFilter.candidates(from: recipes, constraints: emptyConstraints)
+        #expect(emptyCandidates.count == 4)  // All recipes except articles
+
+        // Test: limit: 2 truncates to 2
+        let limitedCandidates = TripCandidateFilter.candidates(from: recipes, constraints: constraints, limit: 2)
+        #expect(limitedCandidates.count == 2)
+
+        // Test: Articles are excluded
+        testArticleExclusion(recipes: recipes, constraints: constraints)
+    }
+
+    private func makeTestRecipes() -> [Recipe] {
+        [
+            Recipe(
+                id: 1,
+                title: "Gluten Free Cake",
+                suitableForDiet: ["GlutenFreeDiet"],
+                ingredients: [],
+                steps: [],
+                prepTime: nil,
+                cookTime: nil,
+                totalTime: nil,
+                difficulty: .easy,
+                tags: []
+            ),
+            Recipe(
+                id: 2,
+                title: "Vegan Smoothie",
+                suitableForDiet: ["VeganDiet"],
+                ingredients: [],
+                steps: [],
+                prepTime: nil,
+                cookTime: nil,
+                totalTime: nil,
+                difficulty: .easy,
+                tags: []
+            ),
+            Recipe(
+                id: 3,
+                title: "Gluten Free Vegan Cake",
+                suitableForDiet: ["GlutenFreeDiet", "VeganDiet"],
+                ingredients: [],
+                steps: [],
+                prepTime: nil,
+                cookTime: nil,
+                totalTime: nil,
+                difficulty: .easy,
+                tags: []
+            ),
+            Recipe(
+                id: 4,
+                title: "Regular Cake",
+                suitableForDiet: [],
+                ingredients: [],
+                steps: [],
+                prepTime: nil,
+                cookTime: nil,
+                totalTime: nil,
+                difficulty: .easy,
+                tags: []
+            ),
+        ]
+    }
+
+    private func testArticleExclusion(recipes: [Recipe], constraints: TripPlanConstraints) {
+        let articleRecipe = Recipe(
+            id: 5,
+            title: "Article",
+            kind: .article,
+            suitableForDiet: ["GlutenFreeDiet"],
+            ingredients: [],
+            steps: [],
+            prepTime: nil,
+            cookTime: nil,
+            totalTime: nil,
+            difficulty: .easy,
+            tags: []
+        )
+        let withArticle = recipes + [articleRecipe]
+        let candidatesWithArticle = TripCandidateFilter.candidates(from: withArticle, constraints: constraints)
+        #expect(candidatesWithArticle.count == 2)  // Article should be excluded
+    }
 }
