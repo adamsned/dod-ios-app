@@ -19,6 +19,9 @@ extension ProfileEditView {
                 VStack(alignment: .leading, spacing: DODSpacing.md) {
                     rankHero(stats: stats)
                     countsGrid(stats: stats)
+                    if let line = Self.techniqueLine(stats.techniqueSummary) {
+                        techniqueRow(line)
+                    }
                 }
                 .padding(.vertical, DODSpacing.xs)
 
@@ -151,6 +154,30 @@ extension ProfileEditView {
         .padding(.vertical, DODSpacing.sm)
         .background(DODColor.surface, in: RoundedRectangle(cornerRadius: DODRadius.inner))
         .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Technique mastery (DUT-973)
+
+    /// Pure helper (static for L1 tests): trims; nil/blank hides the row.
+    static func techniqueLine(_ summary: String?) -> String? {
+        guard let trimmed = summary?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !trimmed.isEmpty
+        else { return nil }
+        return trimmed
+    }
+
+    private func techniqueRow(_ line: String) -> some View {
+        HStack(spacing: DODSpacing.sm) {
+            Image(systemName: "flame.fill")
+                .foregroundStyle(DODColor.accent)
+                .accessibilityHidden(true)
+            Text(line)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("profile-technique-summary")
     }
 
     // MARK: - Journal link
