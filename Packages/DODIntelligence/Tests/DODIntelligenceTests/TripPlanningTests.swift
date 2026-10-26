@@ -1,3 +1,4 @@
+import DODSupport
 import Testing
 
 @testable import DODIntelligence
@@ -10,5 +11,35 @@ struct TripPlanningTests {
     @Test func clampsNonPositiveInputs() {
         let constraints = TripPlanConstraints(headcount: 0, days: 0, mealsPerDay: -1)
         #expect(constraints.headcount == 1 && constraints.slotCount == 1)
+    }
+    @Test func totalBriquettesSumsSlotsAndSkipsNil() {
+        let charcoalRecommendation = CharcoalRecommendation(
+            totalBriquettes: 24,
+            bottom: 8,
+            top: 16,
+            refreshIntervalMinutes: 45
+        )
+        let plan = TripPlan(slots: [
+            TripMealSlot(
+                day: 1,
+                meal: 1,
+                recipeID: 1,
+                recipeTitle: "A",
+                servings: 4,
+                scaleFactor: 1,
+                charcoal: charcoalRecommendation
+            ),
+            TripMealSlot(day: 1, meal: 2, recipeID: 2, recipeTitle: "B", servings: 4, scaleFactor: 1, charcoal: nil),
+            TripMealSlot(
+                day: 2,
+                meal: 1,
+                recipeID: 3,
+                recipeTitle: "C",
+                servings: 4,
+                scaleFactor: 1,
+                charcoal: charcoalRecommendation
+            ),
+        ])
+        #expect(plan.totalBriquettes == 48)
     }
 }
