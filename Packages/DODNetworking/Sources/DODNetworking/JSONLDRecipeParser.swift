@@ -189,16 +189,22 @@ public enum JSONLDRecipeParser {
     ) -> (ingredients: [RecipeIngredient], instructions: [RecipeInstruction]) {
         var ingredients = mapIngredients(jsonLD["recipeIngredient"])
         var instructions = mapInstructions(jsonLD["recipeInstructions"])
-        guard ingredients.isEmpty || instructions.isEmpty else {
-            return (ingredients, instructions)
-        }
         let card = WPRMRecipeCardParser.parse(html: html)
         if ingredients.isEmpty {
             ingredients = RecipeIngredient.list(from: card.ingredients)
         }
         if instructions.isEmpty {
             instructions = card.instructions.enumerated().map { index, text in
-                RecipeInstruction(step: index + 1, text: text)
+                RecipeInstruction(
+                    step: index + 1,
+                    text: text,
+                    imageURL: index < card.instructionImages.count ? card.instructionImages[index] : nil
+                )
+            }
+        } else if card.instructionImages.count == instructions.count {
+            // DUT-170 — same step count => safe to pair card photos by index.
+            instructions = zip(instructions, card.instructionImages).map { step, url in
+                RecipeInstruction(id: step.id, step: step.step, text: step.text, imageURL: url)
             }
         }
         return (ingredients, instructions)
