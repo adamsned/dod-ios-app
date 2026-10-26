@@ -260,4 +260,23 @@ struct DODIntelligenceServiceTests {
         let result = bare.extractRecipe(fromBody: "x")
         #expect(result == nil)
     }
+
+    @Test func fakeExtractRecipeReturnsCannedWhenAvailable() async {
+        let extraction = ExtractedRecipe(ingredients: ["1 cup flour"], instructions: ["Mix."])
+        let service = FakeIntelligenceService(extraction: extraction)
+        #expect(await service.extractRecipe(fromBody: "some body") == extraction)
+    }
+
+    @Test func fakeExtractRecipeReturnsNilWhenUnavailable() async {
+        let service = FakeIntelligenceService(
+            isAvailable: false,
+            extraction: ExtractedRecipe(ingredients: ["1 cup flour"], instructions: ["Mix."])
+        )
+        #expect(await service.extractRecipe(fromBody: "some body") == nil)
+    }
+
+    @Test func fakeExtractRecipeReturnsNilWithDefault() async {
+        let service = FakeIntelligenceService()
+        #expect(await service.extractRecipe(fromBody: "some body") == nil)
+    }
 }
