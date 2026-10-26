@@ -196,6 +196,18 @@ struct DODShortcuts: AppShortcutsProvider {
             shortTitle: "Open Collection",
             systemImageName: "folder"
         )
+        // DUT-990 - spoken preflight: Siri reads back gear + coal estimate.
+        AppShortcut(
+            intent: WhatDoINeedIntent(),
+            phrases: [
+                "What do I need for \(\.$recipe) in \(.applicationName)",
+                "What do I need tonight in \(.applicationName)",
+                "Am I ready for tonight in \(.applicationName)",
+                "What do I need to bring in \(.applicationName)",
+            ],
+            shortTitle: "What Do I Need",
+            systemImageName: "checklist"
+        )
         // Voice Mode hands-free commands (US-40 / AC-40.5, CL-83). The
         // AppIntents metadata processor requires **every** utterance to contain
         // `\(.applicationName)` (not just phrases that interpolate a

@@ -173,4 +173,8 @@ final class SiriAppIntentsTests: XCTestCase {
         // Reset the handler
         CookActivityIntentRouter.handler = nil
     }
+
+    func test_shortcutsStayUnderAppleCap() {
+        XCTAssertLessThanOrEqual(DODShortcuts.appShortcuts.count, 10)
+    }
 }
