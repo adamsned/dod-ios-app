@@ -105,6 +105,12 @@ public protocol DODIntelligenceService: Sendable {
     /// throws — when unavailable, the input is empty, the model errors, or a
     /// guardrail rejects it; callers then keep `.other`.
     func classifyAisle(_ ingredient: String) async -> IngredientAisleClassifier.Aisle?
+
+    /// DUT-1023 — distill approved comment bodies into a tips/gotchas digest.
+    /// `comments` are plain-text bodies, already filtered to `.approved`.
+    /// Returns `nil` — never throws — on unavailability, empty input, model error
+    /// or guardrail rejection.
+    func summarizeComments(_ comments: [String]) async -> CommentDigest?
 }
 
 extension DODIntelligenceService {
@@ -147,4 +153,7 @@ extension DODIntelligenceService {
     public func classifyAisle(_ ingredient: String) async -> IngredientAisleClassifier.Aisle? {
         nil
     }
+
+    /// Default so older conformers (test doubles) need not implement it.
+    public func summarizeComments(_ comments: [String]) async -> CommentDigest? { nil }
 }
