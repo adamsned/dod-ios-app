@@ -28,4 +28,13 @@ public struct CookoutMemory: Codable, Sendable, Equatable, Identifiable {
     public func count(of reaction: Reaction) -> Int {
         reactions.filter { $0 == reaction }.count
     }
+
+    /// One-line story, e.g. "Fed 12 with Chili & Cobbler — 3 asked for the recipe".
+    public var headline: String {
+        let dishes = dishTitles.joined(separator: " & ")
+        var line = "Fed \(guestCount)" + (dishes.isEmpty ? "" : " with \(dishes)")
+        let asks = count(of: .askedForRecipe)
+        if asks > 0 { line += " — \(asks) asked for the recipe" }
+        return line
+    }
 }
