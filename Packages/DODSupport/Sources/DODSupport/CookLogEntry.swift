@@ -25,6 +25,10 @@ public struct CookLogEntry: Identifiable, Sendable, Equatable {
     /// Optional local identifier for an attached photo (resolved by the photo
     /// store in a later slice). Kept as a string so this type has no UIKit dep.
     public let photoLocalID: String?
+    /// DUT-994: why this was cooked. Defaults to `.everyday` so existing call sites compile unchanged.
+    public let occasion: CookOccasion
+    /// DUT-994: optional private first name or label of who it was cooked for (comfort cooks).
+    public let recipient: String?
 
     public init(
         id: UUID,
@@ -33,7 +37,9 @@ public struct CookLogEntry: Identifiable, Sendable, Equatable {
         cookedAt: Date,
         note: String? = nil,
         personalRating: Int? = nil,
-        photoLocalID: String? = nil
+        photoLocalID: String? = nil,
+        occasion: CookOccasion = .everyday,
+        recipient: String? = nil
     ) {
         self.id = id
         self.recipeID = recipeID
@@ -43,5 +49,8 @@ public struct CookLogEntry: Identifiable, Sendable, Equatable {
         // Clamp a personal rating into 1...5 (or nil) so downstream UI can trust it.
         self.personalRating = personalRating.map { min(5, max(1, $0)) }
         self.photoLocalID = photoLocalID
+        self.occasion = occasion
+        let trimmed = recipient?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.recipient = (trimmed?.isEmpty ?? true) ? nil : trimmed
     }
 }
