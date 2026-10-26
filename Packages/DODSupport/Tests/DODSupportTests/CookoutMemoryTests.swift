@@ -32,4 +32,21 @@ import Testing
         let decoded = try JSONDecoder().decode(CookoutMemory.self, from: data)
         #expect(decoded == memory)
     }
+
+    @Test func headlineTellsTheStoryWithDishesAndAsks() {
+        let dishes = [
+            CookoutPlan.Dish(recipeID: 1, title: "Chili", sourceServings: 6, cookMinutes: 90),
+            CookoutPlan.Dish(recipeID: 2, title: "Cobbler", sourceServings: 8, isBaking: true, cookMinutes: 45),
+        ]
+        let memory = CookoutMemory(
+            plan: Self.plan(dishes: dishes),
+            reactions: [.askedForRecipe, .askedForRecipe, .askedForRecipe]
+        )
+        #expect(memory.headline == "Fed 12 with Chili & Cobbler — 3 asked for the recipe")
+    }
+
+    @Test func headlineWithNoDishesAndNoReactionsIsJustFed() {
+        let memory = CookoutMemory(plan: Self.plan())
+        #expect(memory.headline == "Fed 12")
+    }
 }
