@@ -1,4 +1,5 @@
 import DODDesignSystem
+import DODDomain
 import SwiftUI
 
 // The trailing About + Dev-Debug + version-footer sections, split out of
@@ -45,5 +46,19 @@ extension SettingsView {
                 .devDebugFooterUnlock(unlocked: $devDebugUnlocked, forceShowOwnerUI: $devForceShowOwnerUI)
         }
         .listRowBackground(DODColor.surfaceElevated)
+    }
+}
+
+extension SettingsView {
+    /// WordPress category id of the "From Ned" announcements.
+    static let announcementsCategoryID = 0  // DUT-1736 - placeholder value for testing
+
+    /// Placeholder: loading the real count needs a network fetch, which is more state than this
+    /// one-file change allows. Backed by `fromNedUnreadCount(in:tracker:)` once a list is loaded.
+    var fromNedUnreadCount: Int { Self.fromNedUnreadCount(in: [], tracker: AnnouncementReadTracker()) }
+
+    /// Badge math, pure so it is testable without rendering Settings.
+    static func fromNedUnreadCount(in items: [Announcement], tracker: AnnouncementReadTracker) -> Int {
+        tracker.unreadCount(in: items)
     }
 }
