@@ -36,4 +36,12 @@ import Testing
         #expect(report2.body.contains("App version: 1.0"))
         #expect(report2.body.contains("Screen: feed"))
     }
+
+    @Test func currentDiagnosticsAreFilledAndCarryTheScreen() {
+        let diagnostics = FeedbackDiagnostics.current(screen: "saved")
+        #expect(diagnostics.currentScreen == "saved")
+        #expect(!diagnostics.appVersion.isEmpty)
+        #expect(!diagnostics.deviceModel.isEmpty)
+        #expect(diagnostics.osVersion.split(separator: ".").count == 3)
+    }
 }

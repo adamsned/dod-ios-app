@@ -67,3 +67,34 @@ public struct FeedbackReport: Sendable, Equatable {
         return components.url
     }
 }
+
+extension FeedbackDiagnostics {
+    /// Local, anonymous context. `screen` is a stable screen id such as "feed" or "saved".
+    public static func current(
+        screen: String,
+        bundle: Bundle = .main,
+        processInfo: ProcessInfo = .processInfo
+    ) -> FeedbackDiagnostics {
+        let info = bundle.infoDictionary ?? [:]
+        let version = info["CFBundleShortVersionString"] as? String ?? "unknown"
+        let build = info["CFBundleVersion"] as? String ?? "unknown"
+        let os = processInfo.operatingSystemVersion
+        return FeedbackDiagnostics(
+            appVersion: "\(version) (\(build))",
+            osVersion: "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
+            deviceModel: machineIdentifier(),
+            currentScreen: screen
+        )
+    }
+
+    private static func machineIdentifier() -> String {
+        var sys = utsname()
+        uname(&sys)
+        let mirror = Mirror(reflecting: sys.machine)
+        let id = mirror.children.reduce("") { acc, element in
+            guard let value = element.value as? Int8, value != 0 else { return acc }
+            return acc + String(UnicodeScalar(UInt8(value)))
+        }
+        return id.isEmpty ? "unknown" : id
+    }
+}
