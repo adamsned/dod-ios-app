@@ -241,4 +241,23 @@ struct DODIntelligenceServiceTests {
         let service = FakeIntelligenceService(isAvailable: false)
         #expect(await service.explainStep("Fold in the egg whites", nextStep: nil) == nil)
     }
+
+    @Test func defaultExtractRecipeReturnsNil() {
+        // Create a minimal struct that only implements the existing requirements
+        struct Bare: DODIntelligenceService {
+            var isAvailable: Bool { true }
+            var supportsImageInput: Bool { true }
+            func suggestSubstitution(
+                for ingredient: String,
+                in context: RecipeContext?,
+                reason: SubstitutionReason?
+            ) async -> SubstitutionResult? { nil }
+            func summarize(_ text: String) async -> String? { nil }
+            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+        }
+
+        let bare = Bare()
+        let result = bare.extractRecipe(fromBody: "x")
+        #expect(result == nil)
+    }
 }
