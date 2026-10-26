@@ -238,6 +238,22 @@ public struct CookModeView: View {
             .background(DODColor.surface.ignoresSafeArea())
         }
         .gesture(swipeGesture)
+        .overlay {
+            if campfire.isActive {
+                CampfireModeView(
+                    variant: campfire.variant,
+                    stepText: viewModel.currentStep.map { convertedStepText($0.text) } ?? "",
+                    stepLabel: stepCounterLabel,
+                    isFinished: viewModel.isFinished,
+                    timers: viewModel.stepTimers,
+                    currentStepIndex: viewModel.currentStepIndex,
+                    onPrev: { viewModel.goBack() },
+                    onNext: { advance() },
+                    onToggleVariant: { campfire.toggleVariant() },
+                    onExit: { campfire.exit() }
+                )
+            }
+        }
         .sheet(isPresented: $ingredientsDrawerVisible) {
             ingredientsDrawer
                 .presentationDetents([.medium, .large])
@@ -366,7 +382,6 @@ public struct CookModeView: View {
     }
 
     // MARK: - Helpers
-
     private func advance() {
         if viewModel.isFinished {
             close()
