@@ -22,6 +22,9 @@ public struct CookLogEntry: Identifiable, Sendable, Equatable {
     /// Optional private 1–5 rating the user gives their own result. Distinct
     /// from the public star rating posted to the blog.
     public let personalRating: Int?
+    /// DUT-975 — optional private 1–5 "how did that feel?" confidence read
+    /// (1 = felt hard, 5 = felt easy). Distinct from `personalRating` (result quality).
+    public let confidence: Int?
     /// Optional local identifier for an attached photo (resolved by the photo
     /// store in a later slice). Kept as a string so this type has no UIKit dep.
     public let photoLocalID: String?
@@ -38,6 +41,7 @@ public struct CookLogEntry: Identifiable, Sendable, Equatable {
         note: String? = nil,
         personalRating: Int? = nil,
         photoLocalID: String? = nil,
+        confidence: Int? = nil,
         occasion: CookOccasion = .everyday,
         recipient: String? = nil
     ) {
@@ -49,6 +53,7 @@ public struct CookLogEntry: Identifiable, Sendable, Equatable {
         // Clamp a personal rating into 1...5 (or nil) so downstream UI can trust it.
         self.personalRating = personalRating.map { min(5, max(1, $0)) }
         self.photoLocalID = photoLocalID
+        self.confidence = confidence.map { min(5, max(1, $0)) }
         self.occasion = occasion
         let trimmed = recipient?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.recipient = (trimmed?.isEmpty ?? true) ? nil : trimmed
