@@ -23,6 +23,7 @@ struct RecipeDetailVideoSection: View {
 
     let video: RecipeVideo
     let isOfflineSnapshot: Bool
+    var title: String = "Recipe video"
 
     /// Caps a portrait clip so it doesn't tower over the page; a landscape clip
     /// fills the column width and lands well under this.
@@ -75,17 +76,34 @@ struct RecipeDetailVideoSection: View {
                 // muted; the default `.soloAmbient` category was silencing it when
                 // the ringer switch was off. Idempotent, so repeats are harmless.
                 RecipeVideoAudioSession.activateForPlayback()
+                #if os(iOS)
+                if let player {
+                    RecipeVideoRemoteCommands.register(for: player)
+                    publishNowPlaying(player, isPlaying: true)
+                }
+                #endif
             case .paused:
                 // DUT-683 — the video paused/ended, so hand the `.playback`
                 // session back with `.notifyOthersOnDeactivation` — otherwise the
                 // user's background music/podcast, grabbed on the first tap, never
                 // resumes. GUARDED inside `deactivate()` to release only a session
                 // this video path activated, never a live Voice Mode session.
+                #if os(iOS)
+                if let player {
+                    publishNowPlaying(player, isPlaying: false)
+                }
+                #endif
                 RecipeVideoAudioSession.deactivate()
             case .waitingToPlay:
                 // Buffering — neither grab nor release; wait for a real play/pause.
                 break
             }
+        }
+        .onDisappear {
+            #if os(iOS)
+            RecipeVideoRemoteCommands.unregister()
+            RecipeVideoNowPlaying.clear()
+            #endif
         }
     }
 
@@ -120,6 +138,18 @@ struct RecipeDetailVideoSection: View {
         let height = abs(displaySize.height)
         guard width > 0, height > 0 else { return nil }
         return width / height
+    }
+
+    private func publishNowPlaying(_ player: AVPlayer, isPlaying: Bool) {
+        #if os(iOS)
+        let secs = player.currentItem?.duration.seconds
+        RecipeVideoNowPlaying(
+            title: title,
+            elapsed: player.currentTime().seconds,
+            duration: (secs?.isFinite == true) ? secs : nil,
+            isPlaying: isPlaying
+        ).publish()
+        #endif
     }
 }
 
