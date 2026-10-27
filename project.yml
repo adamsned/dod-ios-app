@@ -196,6 +196,7 @@ targets:
         UIBackgroundModes:
           - remote-notification
           - fetch
+          - audio      # DUT-1961: Now Playing / CarPlay controls for recipe video audio keep working on lock (owner OK 2026-10-27)
         # DUT-938 — must list every identifier passed to
         # `BGTaskScheduler.shared.register(forTaskWithIdentifier:...)`
         # (App/DODApp.swift `AppDelegate`) or registration is refused at
