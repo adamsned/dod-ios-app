@@ -32,3 +32,15 @@ struct EvalReport: Sendable {
             .joined(separator: "\n")
     }
 }
+
+/// Runs `grade` over every case and collects the outcomes.
+func runEval<Input: Sendable>(
+    _ cases: [EvalCase<Input>],
+    grade: (Input) async -> [String]
+) async -> EvalReport {
+    var outcomes: [EvalOutcome] = []
+    for evalCase in cases {
+        outcomes.append(EvalOutcome(caseName: evalCase.name, failures: await grade(evalCase.input)))
+    }
+    return EvalReport(outcomes: outcomes)
+}
