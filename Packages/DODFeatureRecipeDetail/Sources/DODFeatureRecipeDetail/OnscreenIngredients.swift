@@ -35,6 +35,18 @@ public final class OnscreenIngredients {
     public func clear(recipeID: Int) {
         entries.removeAll { $0.recipeID == recipeID }
     }
+
+    /// Resolve a spoken phrase against the on-screen set.
+    /// - Empty / "that" / "this" / "it" (or nil): the LAST entry that appeared, else nil.
+    /// - Otherwise: the first entry whose displayText contains `query`
+    ///   (case-insensitive, diacritic-insensitive), else nil.
+    public func resolve(_ query: String?) -> Entry? {
+        let queryLowercased = (query ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if queryLowercased.isEmpty || ["that", "this", "it"].contains(queryLowercased) { return entries.last }
+        return entries.first {
+            $0.displayText.range(of: queryLowercased, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
+    }
 }
 
 extension OnscreenIngredients.Entry {
