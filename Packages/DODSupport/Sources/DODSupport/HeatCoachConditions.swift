@@ -29,7 +29,7 @@ public struct HeatCoachConditions: Equatable, Sendable {
             temperatureF >= hotAtOrAboveF ? .hot : (temperatureF <= coldAtOrBelowF ? .cold : .mild)
         let feet = Int(exactly: (max(0, altitudeMeters) * 3.28084).rounded()) ?? 0
         // Round to the nearest 500 ft so it matches the Elevation stepper (step 500, max 15000).
-        let stepped = min(15000, Int(exactly: (Double(feet) / 500.0).rounded()) ?? 0 * 500)
+        let stepped = min(15000, (Int(exactly: (Double(feet) / 500.0).rounded()) ?? 0) * 500)
         return HeatCoachConditions(
             elevationFeet: stepped,
             ambient: ambient,
