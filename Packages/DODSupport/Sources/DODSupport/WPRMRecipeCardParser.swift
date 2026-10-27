@@ -50,10 +50,13 @@ public enum WPRMRecipeCardParser {
     public struct Card: Sendable, Equatable {
         public let ingredients: [String]
         public let instructions: [String]
+        /// DUT-984 — plain-text equipment names, document order.
+        public let equipment: [String]
 
-        public init(ingredients: [String], instructions: [String]) {
+        public init(ingredients: [String], instructions: [String], equipment: [String] = []) {
             self.ingredients = ingredients
             self.instructions = instructions
+            self.equipment = equipment
         }
     }
 
@@ -77,6 +80,8 @@ public enum WPRMRecipeCardParser {
     /// subtree carries a screen-reader ballot-box glyph (`&#9634;`) and is
     /// dropped before the row text is extracted.
     static let checkboxContainerToken = "wprm-checkbox-container"
+    /// Class token on each equipment name `<div>` inside the WPRM equipment list (DUT-984).
+    static let equipmentNameToken = "wprm-recipe-equipment-name"
 
     /// Parse the WPRM card out of a rendered post page.
     ///
