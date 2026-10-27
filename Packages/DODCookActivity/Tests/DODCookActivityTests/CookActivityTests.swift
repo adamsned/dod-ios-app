@@ -302,3 +302,18 @@ struct CookActivityAttributesEquatableTests {
         #expect(lhs != rhs)
     }
 }
+
+// MARK: - CookActivityLandscapeExpandedView
+
+/// L1 tests for the new landscape-expanded Dynamic Island view.
+@Suite("CookActivityLandscapeExpandedView")
+struct CookActivityLandscapeExpandedViewTests {
+    @Test func completedShowsDone() {
+        let view = CookActivityLandscapeExpandedView(remainingSeconds: 0, isPaused: true, isCompleted: true)
+        #expect(view.statusLabel == "Done")
+    }
+    @Test func runningHasNoStatus() {
+        let view = CookActivityLandscapeExpandedView(remainingSeconds: 90)
+        #expect(view.statusLabel == nil)
+    }
+}
