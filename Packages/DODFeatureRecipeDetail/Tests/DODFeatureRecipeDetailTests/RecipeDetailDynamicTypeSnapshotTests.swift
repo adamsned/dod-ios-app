@@ -39,5 +39,25 @@ final class RecipeDetailDynamicTypeSnapshotTests: XCTestCase {
             .environment(\.dynamicTypeSize, .accessibility5)
         assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
     }
+
+    @MainActor
+    func test_infoCard_accessibility5() async {
+        let model = RecipeInfoCard.Model(
+            prepTime: "15 min",
+            cookTime: "1 hr 30 min",
+            totalTime: "1 hr 45 min",
+            course: "Main Course",
+            cuisine: "American",
+            diet: "Gluten Free",
+            servings: "6",
+            calories: "450 kcal",
+            author: "Dutch Oven Daddy"
+        )
+
+        let view = RecipeInfoCard(model: model)
+            .frame(width: 390)
+            .environment(\.dynamicTypeSize, .accessibility5)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+    }
 }
 #endif
