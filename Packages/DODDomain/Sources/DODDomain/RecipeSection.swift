@@ -13,4 +13,24 @@ public struct RecipeSection: Sendable, Hashable, Identifiable, Codable {
         self.ingredientIDs = ingredientIDs
         self.instructionIDs = instructionIDs
     }
+
+    /// Build sections from ordered (label, ingredientCount) groups over a flat list.
+    /// Groups with a blank label or count 0 are skipped; counts past the end are clamped.
+    public static func make(
+        groups: [(label: String, count: Int)],
+        ingredients: [RecipeIngredient]
+    ) -> [RecipeSection] {
+        var cursor = 0
+        var result: [RecipeSection] = []
+        for group in groups {
+            let end = min(cursor + max(group.count, 0), ingredients.count)
+            let ids = ingredients[cursor..<end].map(\.id)
+            cursor = end
+            let label = group.label.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !label.isEmpty, !ids.isEmpty {
+                result.append(RecipeSection(label: label, ingredientIDs: ids))
+            }
+        }
+        return result
+    }
 }
