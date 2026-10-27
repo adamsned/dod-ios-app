@@ -28,4 +28,36 @@ import Testing
         ]
         #expect(all.count == 6)
     }
+
+    @Test @MainActor func fakePublisherRoutesCommandsAndPublishes() {
+        let fake = FakeNowPlayingPublisher()
+        let publisher: any NowPlayingPublishing = fake
+        var received: [NowPlayingRemoteCommand] = []
+        publisher.activate { received.append($0) }
+        fake.handler?(.nextStep)
+        publisher.publish(makeSnapshot())
+        publisher.deactivate()
+        #expect(received == [.nextStep])
+        #expect(fake.published.count == 1)
+        #expect(fake.deactivateCount == 1)
+        #expect(fake.handler == nil)
+    }
+}
+
+@MainActor
+private final class FakeNowPlayingPublisher: NowPlayingPublishing {
+    var handler: (@MainActor (NowPlayingRemoteCommand) -> Void)?
+    var published: [NowPlayingSnapshot] = []
+    var deactivateCount = 0
+
+    func activate(onCommand: @escaping @MainActor (NowPlayingRemoteCommand) -> Void) {
+        handler = onCommand
+    }
+
+    func publish(_ snapshot: NowPlayingSnapshot) { published.append(snapshot) }
+
+    func deactivate() {
+        handler = nil
+        deactivateCount += 1
+    }
 }

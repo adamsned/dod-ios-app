@@ -35,3 +35,13 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
 public enum NowPlayingRemoteCommand: Sendable, Hashable {
     case play, pause, togglePlayPause, nextStep, previousStep, replayStep
 }
+
+/// Seam over the system Now Playing surface so the view model is testable.
+@MainActor
+public protocol NowPlayingPublishing: AnyObject {
+    /// Begin receiving remote commands; `onCommand` is invoked on the main actor.
+    func activate(onCommand: @escaping @MainActor (NowPlayingRemoteCommand) -> Void)
+    func publish(_ snapshot: NowPlayingSnapshot)
+    /// Clear the Now Playing info and remove command targets.
+    func deactivate()
+}
