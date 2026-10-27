@@ -18,4 +18,10 @@ public enum ServingsScaleRequest {
             userInfo: [servingsKey: servings]
         )
     }
+
+    /// The requested count if `note` targets `recipeID`, else nil.
+    public static func servings(from note: Notification, forRecipeID recipeID: Int) -> Int? {
+        guard (note.object as? Int) == recipeID else { return nil }
+        return note.userInfo?[servingsKey] as? Int
+    }
 }
