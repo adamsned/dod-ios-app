@@ -2,6 +2,10 @@ import Testing
 
 @testable import DODFeatureRecipeDetail
 
+#if os(iOS)
+import MediaPlayer
+#endif
+
 @Suite("RecipeVideoNowPlaying (DUT-1013)")
 struct RecipeVideoNowPlayingTests {
     @Test func playbackRate() {
@@ -29,4 +33,13 @@ struct RecipeVideoNowPlayingTests {
         let noDuration = RecipeVideoNowPlaying(title: "Test", elapsed: 10, duration: nil, isPlaying: true)
         #expect(noDuration.clampedElapsed == 10)
     }
+
+    #if os(iOS)
+    @Test func infoDictionaryCarriesTitleAndRate() {
+        let video = RecipeVideoNowPlaying(title: "Brisket", elapsed: 12, duration: 60, isPlaying: true)
+        #expect(video.infoDictionary[MPMediaItemPropertyTitle] as? String == "Brisket")
+        #expect(video.infoDictionary[MPNowPlayingInfoPropertyPlaybackRate] as? Double == 1.0)
+        #expect(video.infoDictionary[MPMediaItemPropertyPlaybackDuration] as? TimeInterval == 60)
+    }
+    #endif
 }
