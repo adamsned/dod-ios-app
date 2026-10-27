@@ -76,6 +76,10 @@ public protocol DODIntelligenceService: Sendable {
     /// treats the text as its source of truth; `nil` is the general helper.
     func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
 
+    /// DUT-1028 — answer a question about the loaded recipe by letting the model call
+    /// tools over `toolbox` (no prompt-stuffing). Returns nil on unavailability/error.
+    func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String?
+
     /// DUT-1008 — draft a short, celebratory caption for a personal cook-log
     /// moment from its photo + note, entirely on-device. Returns `nil` (never
     /// throws) when unavailable, when `request.hasMoment` is false, on model
@@ -126,6 +130,9 @@ extension DODIntelligenceService {
     /// cost-free architecture default. A conformer that routes to Private Cloud
     /// Compute must override this explicitly, never implicitly.
     public var tier: IntelligenceTier { .default }
+
+    /// DUT-1028 — conformers that cannot run the tool-calling session answer nil.
+    public func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String? { nil }
 
     /// Convenience for a context- and reason-free substitution, so previews and
     /// call sites that don't model either stay terse.
