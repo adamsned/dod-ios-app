@@ -3,6 +3,24 @@ import DODDomain
 import DODNetworking
 import SwiftUI
 
+/// DUT-176 — Settings row that presents the feedback compose sheet.
+struct SendFeedbackRow: View {
+    @State private var isPresenting = false
+    var body: some View {
+        Button {
+            isPresenting = true
+        } label: {
+            Text("Send Feedback")
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.accent)
+        }
+        .accessibilityIdentifier("settings-send-feedback")
+        .sheet(isPresented: $isPresenting) {
+            FeedbackSheetView(currentScreen: "settings")
+        }
+    }
+}
+
 // The trailing About + Dev-Debug + version-footer sections, split out of
 // `SettingsView.swift` so that host file stays under the SwiftLint 400-line
 // `file_length` cap (the same partitioning rule the Bindings / Feedback splits
@@ -31,6 +49,9 @@ extension SettingsView {
             // DUT-502 — a published Contact / Support affordance in-app
             // (Guideline 1.2). See `SettingsView+PolicyLinks.swift`.
             contactSupportLink
+
+            // DUT-176 — private feedback channel (mailto:). See `FeedbackSheetView`.
+            SendFeedbackRow()
         }
         .listRowBackground(DODColor.surfaceElevated)
 
