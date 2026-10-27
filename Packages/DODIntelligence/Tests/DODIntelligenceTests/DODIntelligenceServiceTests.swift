@@ -306,9 +306,24 @@ struct DODIntelligenceServiceTests {
         #expect(await service.captionMoment(emptyRequest) == nil)
     }
 
-    // MARK: - Helper functions
+    @Test func fakeHeatCoachReturnsCannedWhenAvailable() async {
+        let service = FakeIntelligenceService()
+        #expect(await service.askHeatCoach("windy at 6000ft?", ovenDiameterInches: 12, isBaking: false) != nil)
+    }
 
-    private func makeBareService() -> some DODIntelligenceService {
+    @Test func fakeHeatCoachNilWhenUnavailableOrEmpty() async {
+        #expect(
+            await FakeIntelligenceService(isAvailable: false).askHeatCoach("x", ovenDiameterInches: 12, isBaking: false)
+                == nil
+        )
+        #expect(await FakeIntelligenceService().askHeatCoach("   ", ovenDiameterInches: 12, isBaking: false) == nil)
+    }
+}
+
+// MARK: - Helper functions
+
+extension DODIntelligenceServiceTests {
+    fileprivate func makeBareService() -> some DODIntelligenceService {
         struct Bare: DODIntelligenceService {
             var isAvailable: Bool { true }
             var supportsImageInput: Bool { true }
@@ -323,7 +338,7 @@ struct DODIntelligenceServiceTests {
         return Bare()
     }
 
-    private func makeLegacyService() -> some DODIntelligenceService {
+    fileprivate func makeLegacyService() -> some DODIntelligenceService {
         struct LegacyService: DODIntelligenceService {
             var isAvailable: Bool { true }
             var supportsImageInput: Bool { true }
