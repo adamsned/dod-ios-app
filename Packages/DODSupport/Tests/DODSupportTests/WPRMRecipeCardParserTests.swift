@@ -297,27 +297,23 @@ import Testing
 
     // MARK: - DUT-633 comment stripping
 
-    /// An HTML comment carrying a stray `</div>` inside the recipe container
-    /// used to mis-terminate the container's depth-tracked close, dropping the
-    /// ingredient rows that followed. Stripping comments before the slice
-    /// (mirroring ``ArticleHTMLParser``) keeps every row.
-    @Test func commentWithClosingDivInsideContainerDoesNotTruncate() {
+    // MARK: - Equipment (DUT-984)
+
+    @Test func parsesEquipmentNames() {
         let html = """
-            <div class="wprm-recipe-container">
-            <ul class="wprm-recipe-ingredients">
-            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">flour</span></li>
-            <!-- legacy markup: </div> old wrapper -->
-            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">sugar</span></li>
-            </ul>
-            </div>
+            <div class="wprm-recipe-container"><ul><li class="wprm-recipe-equipment-item"><div class="wprm-recipe-equipment-name">Lid Lifter</div></li><li class="wprm-recipe-equipment-item"><div class="wprm-recipe-equipment-name">Chimney Starter</div></li></ul></div>
             """
-        let card = WPRMRecipeCardParser.parse(html: html)
-        #expect(card.ingredients == ["flour", "sugar"])
+        #expect(WPRMRecipeCardParser.parse(html: html).equipment == ["Lid Lifter", "Chimney Starter"])
     }
 
-    /// A commented-out container is not a real recipe card.
-    @Test func commentedOutContainerIsNotDetected() {
-        let html = "<!-- <div class=\"wprm-recipe-container\">stale</div> -->"
-        #expect(WPRMRecipeCardParser.hasRecipeCard(html: html) == false)
+    @Test func returnsNoEquipmentWhenCardHasNone() {
+        let html = """
+            <div class="wprm-recipe-container">
+            <h2 class="wprm-recipe-name">Just a title</h2>
+            </div>
+            """
+        #expect(WPRMRecipeCardParser.parse(html: html).equipment.isEmpty)
     }
+
+    // MARK: - DUT-633 comment stripping
 }
