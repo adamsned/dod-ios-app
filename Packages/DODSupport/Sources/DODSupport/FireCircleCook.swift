@@ -40,3 +40,18 @@ public struct FireCircleCook: Codable, Sendable, Equatable, Identifiable {
         self.sentAt = sentAt
     }
 }
+
+extension FireCircleCook {
+    /// JSON with millisecond-epoch dates, as exchanged between peers.
+    public func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        return try encoder.encode(self)
+    }
+
+    public static func decode(_ data: Data) throws -> FireCircleCook {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .millisecondsSince1970
+        return try decoder.decode(FireCircleCook.self, from: data)
+    }
+}
