@@ -22,6 +22,9 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedAnswer: String?
     private let cannedDoneness: DonenessCheckResult?
     private let cannedExplanation: StepExplanation?
+    private let cannedExtraction: ExtractedRecipe?
+    private let cannedDigest: CommentDigest?
+    private let cannedMomentCaption: String?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
@@ -38,6 +41,12 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///   - recipeCard: What ``scanRecipeCard(imageData:)`` returns when available and image input is supported. `nil` models the graceful no-result path.
     ///   - explanation: What ``explainStep(_:)`` returns when available. `nil` models
     ///     the graceful no-result path. Defaults to ``StepExplanation/canned``.
+    ///   - extraction: What ``extractRecipe(fromBody:)`` returns when available. `nil` models
+    ///     the graceful no-result path.
+    ///   - commentDigest: What ``summarizeComments(_:)`` returns when available. `nil` models
+    ///     the graceful no-result path. Defaults to ``CommentDigest/canned``.
+    ///   - momentCaption: What ``captionMoment(_:)`` returns when available. `nil` models
+    ///     the graceful no-result path.
     public init(
         isAvailable: Bool = true,
         supportsImageInput: Bool = true,
@@ -49,7 +58,10 @@ public struct FakeIntelligenceService: DODIntelligenceService {
             confidence: 0.9,
             reassurance: "The crust is an even golden brown and the edges look set."
         ),
-        explanation: StepExplanation? = .canned
+        explanation: StepExplanation? = .canned,
+        extraction: ExtractedRecipe? = nil,
+        commentDigest: CommentDigest? = .canned,
+        momentCaption: String? = "Look at that golden crust — you made this, and everyone is going to ask for seconds."
     ) {
         self.isAvailable = isAvailable
         self.supportsImageInput = supportsImageInput
@@ -58,6 +70,9 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         self.cannedAnswer = answer
         self.cannedDoneness = doneness
         self.cannedExplanation = explanation
+        self.cannedExtraction = extraction
+        self.cannedDigest = commentDigest
+        self.cannedMomentCaption = momentCaption
     }
 
     public func suggestSubstitution(
@@ -87,5 +102,20 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     public func explainStep(_ step: String, nextStep: String?) async -> StepExplanation? {
         guard isAvailable else { return nil }
         return cannedExplanation
+    }
+
+    public func extractRecipe(fromBody body: String) async -> ExtractedRecipe? {
+        guard isAvailable else { return nil }
+        return cannedExtraction
+    }
+
+    public func summarizeComments(_ comments: [String]) async -> CommentDigest? {
+        guard isAvailable else { return nil }
+        return cannedDigest
+    }
+
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? {
+        guard isAvailable, request.hasMoment else { return nil }
+        return cannedMomentCaption
     }
 }

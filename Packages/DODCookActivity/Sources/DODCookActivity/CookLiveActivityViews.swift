@@ -27,6 +27,8 @@ public struct CookActivityLockScreenView: View {
     /// DUT-490 / DUT-491: the DUT-354 buzzer linger — a done (not paused) timer.
     /// When set, the status pill reads "Done" instead of "Paused".
     public let isCompleted: Bool
+    /// DUT-967: calm coaching line; nil → no row.
+    public let coachNudge: String?
 
     public init(
         recipeTitle: String,
@@ -35,7 +37,8 @@ public struct CookActivityLockScreenView: View {
         totalSeconds: Int,
         isPaused: Bool,
         endDate: Date? = nil,
-        isCompleted: Bool = false
+        isCompleted: Bool = false,
+        coachNudge: String? = nil
     ) {
         self.recipeTitle = recipeTitle
         self.stepText = stepText
@@ -44,6 +47,7 @@ public struct CookActivityLockScreenView: View {
         self.isPaused = isPaused
         self.endDate = endDate
         self.isCompleted = isCompleted
+        self.coachNudge = coachNudge
     }
 
     public var body: some View {
@@ -107,6 +111,12 @@ public struct CookActivityLockScreenView: View {
                         .dodFont(DODType.body)
                         .foregroundStyle(DODColor.label)
                         .lineLimit(2)
+                    if let coachNudge, !coachNudge.isEmpty {
+                        Text(coachNudge)
+                            .dodFont(DODType.caption)
+                            .foregroundStyle(DODColor.accent)
+                            .lineLimit(2)
+                    }
                     if let endDate, isSelfTicking {
                         // Self-updating on the Lock Screen even while the app
                         // is backgrounded — same primitive as the numeral.

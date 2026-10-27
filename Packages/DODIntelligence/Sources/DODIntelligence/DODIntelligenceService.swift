@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 
 /// The app's shared on-device intelligence seam.
@@ -75,6 +76,13 @@ public protocol DODIntelligenceService: Sendable {
     /// treats the text as its source of truth; `nil` is the general helper.
     func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
 
+    /// DUT-1008 — draft a short, celebratory caption for a personal cook-log
+    /// moment from its photo + note, entirely on-device. Returns `nil` (never
+    /// throws) when unavailable, when `request.hasMoment` is false, on model
+    /// error, or on a guardrail rejection. The photo is only used when
+    /// ``supportsImageInput`` is `true`; otherwise the note alone is used.
+    func captionMoment(_ request: MomentCaptionRequest) async -> String?
+
     /// DUT-1003 — judge VISUAL doneness of a dish from a photo, given the current recipe step text.
     /// `photo` is JPEG/PNG `Data` (stays on device). Returns `nil` — never throws — when unavailable,
     /// `supportsImageInput` is false, the photo or step is empty, the model errors, or a guardrail rejects it.
@@ -92,6 +100,24 @@ public protocol DODIntelligenceService: Sendable {
     /// is empty, the model errors, a guardrail rejects it, or the result invents a temperature/time not in
     /// `step` (see ``StepExplanation/isGrounded(in:)``).
     func explainStep(_ step: String, nextStep: String?) async -> StepExplanation?
+
+    /// DUT-1026 — last-resort recipe extraction. `body` is the sanitized post text
+    /// (from `ArticleBodyExtractor.extract`). Returns `nil` — never throws — when
+    /// unavailable, the body is empty, the model errors, a guardrail rejects it, or
+    /// nothing was found. Chunks internally when the body exceeds the context window.
+    func extractRecipe(fromBody body: String) async -> ExtractedRecipe?
+
+    /// DUT-1006: classify an ingredient line the static keyword map could not place
+    /// into one of the six store aisles, strictly on-device. Returns `nil` — never
+    /// throws — when unavailable, the input is empty, the model errors, or a
+    /// guardrail rejects it; callers then keep `.other`.
+    func classifyAisle(_ ingredient: String) async -> IngredientAisleClassifier.Aisle?
+
+    /// DUT-1023 — distill approved comment bodies into a tips/gotchas digest.
+    /// `comments` are plain-text bodies, already filtered to `.approved`.
+    /// Returns `nil` — never throws — on unavailability, empty input, model error
+    /// or guardrail rejection.
+    func summarizeComments(_ comments: [String]) async -> CommentDigest?
 }
 
 extension DODIntelligenceService {
@@ -126,4 +152,18 @@ extension DODIntelligenceService {
 
     /// DUT-1021 — default implementation for older conformers to keep compiling.
     public func explainStep(_ step: String, nextStep: String?) async -> StepExplanation? { nil }
+
+    /// DUT-1026 — default implementation for older conformers to keep compiling.
+    public func extractRecipe(fromBody body: String) async -> ExtractedRecipe? { nil }
+
+    /// Default: no on-device classifier (previews, tests, older OS) → `nil`.
+    public func classifyAisle(_ ingredient: String) async -> IngredientAisleClassifier.Aisle? {
+        nil
+    }
+
+    /// Default so older conformers (test doubles) need not implement it.
+    public func summarizeComments(_ comments: [String]) async -> CommentDigest? { nil }
+
+    /// Default for conformers that don't implement Hero Moment captions.
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? { nil }
 }
