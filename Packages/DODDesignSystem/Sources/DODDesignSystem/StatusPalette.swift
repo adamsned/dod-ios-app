@@ -7,13 +7,13 @@ import UIKit
 /// Views must use these instead of raw `.red` / `.green`.
 extension DODColor {
     /// Ready / success: bluish green. Light #009E73, dark #2FD0A3.
-    public static let statusReady = dynamic(light: 0x009E73, dark: 0x2FD0A3)
+    public static let statusReady = statusColor(light: 0x009E73, dark: 0x2FD0A3)
     /// Caution / too cool: orange-yellow. Light #E69F00, dark #F5B83A.
-    public static let statusCaution = dynamic(light: 0xB87400, dark: 0xF5B83A)
+    public static let statusCaution = statusColor(light: 0xB87400, dark: 0xF5B83A)
     /// Danger / too hot / failed: vermillion. Light #D55E00, dark #FF8A3D.
-    public static let statusDanger = dynamic(light: 0xC24E00, dark: 0xFF8A3D)
+    public static let statusDanger = statusColor(light: 0xC24E00, dark: 0xFF8A3D)
     /// Neutral / info: blue. Light #0072B2, dark #56B4E9.
-    public static let statusInfo = dynamic(light: 0x0072B2, dark: 0x56B4E9)
+    public static let statusInfo = statusColor(light: 0x0072B2, dark: 0x56B4E9)
 
     private static func statusColor(light: UInt32, dark: UInt32) -> Color {
         Color(
