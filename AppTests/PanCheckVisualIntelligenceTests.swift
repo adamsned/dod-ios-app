@@ -17,4 +17,10 @@ final class PanCheckVisualIntelligenceTests: XCTestCase {
         let found = try await PanCheckQuery().entities(for: ["wellSeasoned"])
         XCTAssertEqual(found.count, 1)
     }
+
+    func testIntentExposesTargetVerdict() {
+        var intent = OpenPanCheckIntent()
+        intent.target = PanCheckEntity(id: "wellSeasoned")
+        XCTAssertEqual(intent.target.verdict, .wellSeasoned)
+    }
 }
