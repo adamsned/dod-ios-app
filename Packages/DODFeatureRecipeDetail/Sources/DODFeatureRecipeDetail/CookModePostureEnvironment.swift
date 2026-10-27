@@ -1,5 +1,9 @@
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 private struct CookModePostureKey: EnvironmentKey {
     static let defaultValue: CookModePosture = .flat
 }
@@ -18,4 +22,29 @@ extension View {
     func cookModePosture(hingeAngle: Double?) -> some View {
         environment(\.cookModePosture, CookModePosture.resolve(hingeAngle: hingeAngle))
     }
+}
+
+/// DUT-1017 — the only place that touches the OS foldable API. `hingeAngle` is
+/// in degrees and stays nil on devices without a hinge and on OSes before 27.1.
+@Observable @MainActor
+final class CookModeHingeMonitor {
+    private(set) var hingeAngle: Double?
+
+    init() {}
+
+    nonisolated static func degrees(fromRadians radians: Double) -> Double {
+        radians * 180 / .pi
+    }
+
+    // UIHingeInteraction is in the iOS 27.1 SDK only; CI still builds with Xcode 26 (Swift 6.4 ships with Xcode 27).
+    #if canImport(UIKit) && compiler(>=6.4)
+    /// Starts observing the hinge that belongs to `view`'s hierarchy.
+    @available(iOS 27.1, *)
+    func attach(to view: UIView) {
+        let interaction = UIHingeInteraction { [weak self] _, update in
+            self?.hingeAngle = update.hinge.map { Self.degrees(fromRadians: Double($0.angle)) }
+        }
+        view.addInteraction(interaction)
+    }
+    #endif
 }
