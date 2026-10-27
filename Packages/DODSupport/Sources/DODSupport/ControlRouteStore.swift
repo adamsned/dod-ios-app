@@ -29,6 +29,9 @@ public struct ControlRouteStore: @unchecked Sendable {
         case firstCookout = "first-cookout"
         case cookMode = "cook-mode"
         case buyBuzzyWaxx = "buzzywaxx"
+        /// DUT-989 — the "Tonight's Rung" control: open Cook Mode for the recipe in
+        /// the TonightsRungSnapshot.
+        case tonightsRung = "tonights-rung"
     }
 
     private let defaults: UserDefaults
