@@ -207,7 +207,11 @@ extension RecipeDetailViewModel {
             updatedAt: listItem.updatedAt,
             ingredients: RecipeIngredient.list(from: card.ingredients),  // DUT-705 — index-aware ids
             instructions: card.instructions.enumerated().map { index, text in
-                RecipeInstruction(step: index + 1, text: text)
+                RecipeInstruction(
+                    step: index + 1,
+                    text: text,
+                    imageURL: index < card.instructionImages.count ? card.instructionImages[index] : nil
+                )
             }
         )
     }
