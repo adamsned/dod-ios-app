@@ -24,4 +24,22 @@ import Testing
         #expect(cook.id == "peer-1")
         #expect(cook.schemaVersion == FireCircleCook.currentSchemaVersion)
     }
+
+    @Test func encodedThenDecodeRoundTrips() throws {
+        let cook = Self.sample()
+        #expect(try FireCircleCook.decode(cook.encoded()) == cook)
+    }
+
+    @Test func roundTripPreservesNilEndDate() throws {
+        let cook = Self.sample(endDate: nil)
+        let decoded = try FireCircleCook.decode(cook.encoded())
+        #expect(decoded == cook)
+        #expect(decoded.endDate == nil)
+    }
+
+    @Test func decodeGarbageThrows() {
+        #expect(throws: (any Error).self) {
+            try FireCircleCook.decode(Data("not json".utf8))
+        }
+    }
 }
