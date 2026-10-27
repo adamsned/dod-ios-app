@@ -50,10 +50,12 @@ public enum WPRMRecipeCardParser {
     public struct Card: Sendable, Equatable {
         public let ingredients: [String]
         public let instructions: [String]
+        public let instructionImages: [URL?]  // parallel to `instructions`; same count
 
-        public init(ingredients: [String], instructions: [String]) {
+        public init(ingredients: [String], instructions: [String], instructionImages: [URL?] = []) {
             self.ingredients = ingredients
             self.instructions = instructions
+            self.instructionImages = instructionImages
         }
     }
 
@@ -96,7 +98,8 @@ public enum WPRMRecipeCardParser {
         }
         return Card(
             ingredients: parseIngredients(in: card),
-            instructions: parseInstructions(in: card, page: stripped)
+            instructions: parseInstructions(in: card, page: stripped),
+            instructionImages: parseInstructionImages(in: card)
         )
     }
 
@@ -255,6 +258,23 @@ public enum WPRMRecipeCardParser {
         return HTMLSanitizer.plainText(from: rowInner)
     }
 
+    /// DUT-170 — one entry per NON-BLANK `wprm-recipe-instruction` row.
+    static func parseInstructionImages(in card: String) -> [URL?] {
+        collectElementTexts(in: card, tag: "li", classToken: instructionRowToken) { rowInner in
+            guard !instructionRowText(rowInner).isEmpty else { return "" }
+            return firstImageSource(in: rowInner) ?? "-"
+        }.map { $0 == "-" ? nil : URL(string: $0) }
+    }
+
+    /// `src` of the first `<img>` in `html` (https only), else nil.
+    static func firstImageSource(in html: String) -> String? {
+        guard let open = html.range(of: "<img", options: .caseInsensitive),
+            let close = html.range(of: ">", range: open.upperBound..<html.endIndex)
+        else { return nil }
+        let src = ArticleHTMLParser.attributeValue("src", in: html[open.upperBound..<close.lowerBound])
+        return src.hasPrefix("https://") ? src : nil
+    }
+
     // MARK: - Generic element collection
 
     /// Walk `html` collecting the transformed inner text of every
@@ -312,76 +332,5 @@ public enum WPRMRecipeCardParser {
             }
         }
         return results
-    }
-
-    /// Collect the raw (untransformed) inner body of every `<tag …>…</tag>` in
-    /// `html` whose `class=` contains `classToken`, depth-tracking `<tag>`
-    /// nesting. Order-preserving. Used to gather the `<ol>` step lists before
-    /// their `<li>` rows are extracted.
-    static func collectElementInners(in html: String, tag: String, classToken: String) -> [String] {
-        var results: [String] = []
-        var cursor = html.startIndex
-        let openMarker = "<\(tag)"
-        let closeMarker = "</\(tag)>"
-        while cursor < html.endIndex {
-            guard
-                let openStart = html.range(of: openMarker, options: .caseInsensitive, range: cursor..<html.endIndex)
-            else {
-                break
-            }
-            guard let openEnd = html.range(of: ">", range: openStart.upperBound..<html.endIndex) else {
-                break
-            }
-            let attributes = html[openStart.upperBound..<openEnd.lowerBound]
-            guard ArticleBodyExtractor.hasClassToken(attributes: attributes, token: classToken) else {
-                cursor = openEnd.upperBound
-                continue
-            }
-            guard
-                let inner = ArticleBodyExtractor.sliceUntilMatchingClose(
-                    in: html,
-                    openTag: openMarker,
-                    closeTag: closeMarker,
-                    bodyStart: openEnd.upperBound
-                )
-            else {
-                cursor = openEnd.upperBound
-                continue
-            }
-            results.append(inner)
-            cursor = html.index(openEnd.upperBound, offsetBy: inner.count)
-            if let closeRange = html.range(of: closeMarker, range: cursor..<html.endIndex) {
-                cursor = closeRange.upperBound
-            }
-        }
-        return results
-    }
-
-    /// Return the inner body of the first `<tag …>…</tag>` in `html` whose
-    /// `class=` contains `classToken`, or nil when none is present.
-    static func firstElementInner(in html: String, tag: String, classToken: String) -> String? {
-        var cursor = html.startIndex
-        let openMarker = "<\(tag)"
-        while cursor < html.endIndex {
-            guard
-                let openStart = html.range(of: openMarker, options: .caseInsensitive, range: cursor..<html.endIndex)
-            else {
-                return nil
-            }
-            guard let openEnd = html.range(of: ">", range: openStart.upperBound..<html.endIndex) else {
-                return nil
-            }
-            let attributes = html[openStart.upperBound..<openEnd.lowerBound]
-            if ArticleBodyExtractor.hasClassToken(attributes: attributes, token: classToken) {
-                return ArticleBodyExtractor.sliceUntilMatchingClose(
-                    in: html,
-                    openTag: openMarker,
-                    closeTag: "</\(tag)>",
-                    bodyStart: openEnd.upperBound
-                )
-            }
-            cursor = openEnd.upperBound
-        }
-        return nil
     }
 }
