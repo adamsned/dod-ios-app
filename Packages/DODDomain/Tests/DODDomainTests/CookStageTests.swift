@@ -15,4 +15,9 @@ struct CookStageTests {
         #expect(CookStage.kitchenPrep.rawValue == "kitchenPrep")
         #expect(CookStage.campfireFinish.rawValue == "campfireFinish")
     }
+
+    @Test func displayNames() {
+        #expect(CookStage.kitchenPrep.displayName == "Kitchen prep")
+        #expect(CookStage.campfireFinish.displayName == "Campfire finish")
+    }
 }

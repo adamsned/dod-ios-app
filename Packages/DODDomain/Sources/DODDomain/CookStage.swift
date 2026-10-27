@@ -6,4 +6,11 @@ public enum CookStage: String, Sendable, Hashable, Codable, CaseIterable {
     case kitchenPrep
     /// Finished at the campsite over coals.
     case campfireFinish
+
+    public var displayName: String {
+        switch self {
+        case .kitchenPrep: return "Kitchen prep"
+        case .campfireFinish: return "Campfire finish"
+        }
+    }
 }
