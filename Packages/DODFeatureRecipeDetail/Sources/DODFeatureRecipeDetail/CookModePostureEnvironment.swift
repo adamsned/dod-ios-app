@@ -36,7 +36,8 @@ final class CookModeHingeMonitor {
         radians * 180 / .pi
     }
 
-    #if canImport(UIKit)
+    // UIHingeInteraction is in the iOS 27.1 SDK only; CI still builds with Xcode 26 (Swift 6.4 ships with Xcode 27).
+    #if canImport(UIKit) && compiler(>=6.4)
     /// Starts observing the hinge that belongs to `view`'s hierarchy.
     @available(iOS 27.1, *)
     func attach(to view: UIView) {
