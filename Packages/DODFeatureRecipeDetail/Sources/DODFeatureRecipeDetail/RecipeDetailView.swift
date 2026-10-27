@@ -304,8 +304,12 @@ public struct RecipeDetailView: View {
                                 showsServingWarning: viewModel.shouldShowServingWarning
                             )
                             heatCoachNudge
-                            if let video = viewModel.recipe?.video {
-                                RecipeDetailVideoSection(video: video, isOfflineSnapshot: isOfflineSnapshot)
+                            if let recipe = viewModel.recipe, let video = recipe.video {
+                                RecipeDetailVideoSection(
+                                    video: video,
+                                    isOfflineSnapshot: isOfflineSnapshot,
+                                    title: recipe.title
+                                )
                             }
                         }
                         .readableContentColumn(horizontalSizeClass)
