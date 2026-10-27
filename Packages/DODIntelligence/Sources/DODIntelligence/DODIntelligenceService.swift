@@ -76,6 +76,14 @@ public protocol DODIntelligenceService: Sendable {
     /// treats the text as its source of truth; `nil` is the general helper.
     func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
 
+    /// DUT-1007 — Heat Coach follow-up ("what if it's windy and I'm at 6000ft?").
+    /// The model CALLS the pure `DutchOvenHeatCoach` functions as tools, so the coal
+    /// numbers are grounded, then wraps them in a short reassuring sentence.
+    /// `ovenDiameterInches` and `isBaking` give the baseline. Returns `nil` — never
+    /// throws — when unavailable, the question is empty, the model errors, or a
+    /// guardrail rejects it.
+    func askHeatCoach(_ question: String, ovenDiameterInches: Int, isBaking: Bool) async -> String?
+
     /// DUT-1028 — answer a question about the loaded recipe by letting the model call
     /// tools over `toolbox` (no prompt-stuffing). Returns nil on unavailability/error.
     func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String?
@@ -125,6 +133,10 @@ public protocol DODIntelligenceService: Sendable {
 }
 
 extension DODIntelligenceService {
+
+    public func askHeatCoach(_ question: String, ovenDiameterInches: Int, isBaking: Bool) async -> String? {
+        nil
+    }
 
     /// DUT-1005 — the tier this service runs on. Defaults to on-device, the
     /// cost-free architecture default. A conformer that routes to Private Cloud
