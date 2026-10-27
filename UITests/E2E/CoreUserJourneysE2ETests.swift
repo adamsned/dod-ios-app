@@ -676,6 +676,10 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         // end-state.
         let nextButton = app.buttons["cook-mode-next"]
         if nextButton.waitForExistence(timeout: 3) {
+            // The controls re-render while Cook Mode settles; wait until Next is tappable, then tap (DUT-2384).
+            let tappable = expectation(for: NSPredicate(format: "exists == true AND hittable == true"),
+                                       evaluatedWith: nextButton)
+            wait(for: [tappable], timeout: 8)
             nextButton.tap()
             let stepTwo = app.staticTexts.matching(
                 NSPredicate(format: "label BEGINSWITH 'Step 2 of'")
