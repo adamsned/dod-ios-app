@@ -263,6 +263,24 @@ struct ContentStateCoachNudgeTests {
     }
 }
 
+// MARK: - CookActivityIslandLayout
+
+/// L1 tests for the Dynamic Island layout helpers.
+@Suite("CookActivityIslandLayout")
+struct CookActivityIslandLayoutTests {
+    @Test func limitedWidthPicksLandscape() {
+        #expect(cookActivityIslandLayout(isLimitedInWidth: true) == .landscape)
+    }
+    @Test func normalWidthPicksStandard() {
+        #expect(cookActivityIslandLayout(isLimitedInWidth: false) == .standard)
+    }
+    @Test func statusLabelPrecedence() {
+        #expect(cookActivityStatusLabel(isCompleted: true, isPaused: true) == "Done")
+        #expect(cookActivityStatusLabel(isCompleted: false, isPaused: true) == "Paused")
+        #expect(cookActivityStatusLabel(isCompleted: false, isPaused: false) == nil)
+    }
+}
+
 // MARK: - CookActivityAttributes Equatable
 
 /// L1 tests for the synthesized ``Equatable`` conformance on
