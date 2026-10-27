@@ -31,13 +31,18 @@ extension CookModeView {
         // DUT-1392 — the step's timer and the Heat Coach shortcut moved out of
         // the text into the floating tool dock above the controls
         // (`CookModeView+ToolDock.swift`).
-        return Text(displayText)
-            .dodFont(DODType.displayMedium)
-            .foregroundStyle(DODColor.label)
-            .lineSpacing(DODSpacing.xs)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel("Step \(step.step). \(displayText)")
-            .padding(.horizontal, DODSpacing.md)
+        return VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            if let imageURL = step.imageURL {
+                CookModeStepImage(url: imageURL)
+            }
+            Text(displayText)
+                .dodFont(DODType.displayMedium)
+                .foregroundStyle(DODColor.label)
+                .lineSpacing(DODSpacing.xs)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Step \(step.step). \(displayText)")
+        }
+        .padding(.horizontal, DODSpacing.md)
     }
 
     /// T-912 / DUT-551 — whether a step's text is about heat (drives the tool
