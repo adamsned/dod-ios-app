@@ -318,6 +318,14 @@ struct DODIntelligenceServiceTests {
         )
         #expect(await FakeIntelligenceService().askHeatCoach("   ", ovenDiameterInches: 12, isBaking: false) == nil)
     }
+
+    @Test func liveCaptionMomentNilOnTestHost() async {
+        #expect(await LiveDODIntelligenceService().captionMoment(.init(recipeTitle: "X", note: "great")) == nil)
+    }
+
+    @Test func liveCaptionMomentNilWithoutMoment() async {
+        #expect(await LiveDODIntelligenceService().captionMoment(.init(recipeTitle: "X", note: "")) == nil)
+    }
 }
 
 // MARK: - Helper functions
