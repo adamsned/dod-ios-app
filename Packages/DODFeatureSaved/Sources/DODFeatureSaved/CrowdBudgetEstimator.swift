@@ -28,4 +28,29 @@ public enum CrowdBudgetEstimator {
         guard let servings = recipe.servings, servings > 0 else { return 4 }
         return servings
     }
+
+    /// Estimate for `recipes` scaled to feed `headcount` people (headcount clamped to >= 1).
+    /// Each recipe is scaled by headcount / baseServings; cost of one recipe
+    /// = sum of costPerRow[IngredientAisleClassifier.classify(text)] over its ingredients.
+    public static func estimate(recipes: [Recipe], headcount: Int) -> Estimate {
+        let people = max(headcount, 1)
+        var total = 0.0
+        for recipe in recipes {
+            let base = recipe.ingredients.reduce(0.0) { sum, ingredient in
+                sum + (costPerRow[IngredientAisleClassifier.classify(ingredient.text)] ?? 1.0)
+            }
+            total += base * Double(people) / Double(baseServings(for: recipe))
+        }
+        let factor: Double
+        if let first = recipes.first {
+            factor = Double(people) / Double(baseServings(for: first))
+        } else {
+            factor = 1.0
+        }
+        return Estimate(
+            totalCost: total,
+            perPersonCost: total / Double(people),
+            scaleFactor: factor
+        )
+    }
 }
