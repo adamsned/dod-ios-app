@@ -144,6 +144,18 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #endif
     }
 
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? {
+        guard request.hasMoment else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateMomentCaption(request)
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
     /// DUT-1385 — the user turn for the helper chat. With a recipe, the recipe
     /// text (capped so a long recipe stays inside the context window) precedes
     /// the question; without one it is just the question.
