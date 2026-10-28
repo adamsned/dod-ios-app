@@ -93,5 +93,23 @@ final class FoldableFlowTests: XCTestCase {
             app.buttons["hub-first-cookout"].waitForExistence(timeout: 8),
             "Cooking Tools hub should render its first row"
         )
+
+        // Settings — open the sheet, assert its main content, then go back.
+        // On the tab-bar layout the gear lives in the Feed header, so return to Recipes first.
+        if hasTabBar {
+            goToTab(phoneLabel: "Recipes", padTitle: "Recipes & Articles")
+        }
+        openSettings()
+        XCTAssertTrue(
+            app.buttons["settings-link-profile"].waitForExistence(timeout: 12),
+            "Settings should render its Profile row"
+        )
+        let done = app.buttons["settings-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 6), "Settings should host a Done button")
+        done.tap()
+        XCTAssertTrue(
+            done.waitForNonExistence(timeout: 6),
+            "Tapping Done should dismiss Settings"
+        )
     }
 }
