@@ -19,8 +19,9 @@ final class FoldableFlowTests: XCTestCase {
 
     // MARK: - Layout-agnostic navigation
 
-    /// True when the bottom tab bar is showing (folded / phone layout).
-    private var hasTabBar: Bool { app.tabBars.firstMatch.exists }
+    /// True when tabs are showing instead of the sidebar. iOS 27 shows the unfolded Duo's tabs as a floating strip that
+    /// is not a tab bar element, so the short "Tools" tab button (the sidebar says "Cooking Tools") counts too.
+    private var hasTabBar: Bool { app.tabBars.firstMatch.exists || app.buttons["Tools"].exists }
 
     /// Wait until the first screen is interactive on either layout (same probe
     /// as `SmokeTests.waitForAppReady`).
@@ -44,7 +45,7 @@ final class FoldableFlowTests: XCTestCase {
     /// via the sidebar row (button / cell / static text).
     private func goToTab(phoneLabel: String, padTitle: String) {
         if hasTabBar {
-            app.tabBars.firstMatch.buttons[phoneLabel].tap()
+            app.buttons[phoneLabel].firstMatch.tap()
             return
         }
         for element in [app.buttons[padTitle], app.cells[padTitle], app.staticTexts[padTitle]] {
