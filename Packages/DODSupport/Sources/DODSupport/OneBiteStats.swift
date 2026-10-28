@@ -20,4 +20,18 @@ public enum OneBiteStats {
             .map(\.recipeID)
         return Set(ids).count
     }
+
+    /// "Jake's tried 4 new things this month." nil when the count is 0, so
+    /// the UI shows nothing rather than a discouraging zero.
+    public static func monthlyHeadline(
+        dinerKey: String,
+        dinerName: String,
+        in entries: [DinerReactionEntry],
+        asOf now: Date,
+        calendar: Calendar = .current
+    ) -> String? {
+        let newThingsCount = newThingsTried(dinerKey: dinerKey, in: entries, asOf: now, calendar: calendar)
+        guard newThingsCount > 0 else { return nil }
+        return "\(dinerName)'s tried \(newThingsCount) new \(newThingsCount == 1 ? "thing" : "things") this month."
+    }
 }

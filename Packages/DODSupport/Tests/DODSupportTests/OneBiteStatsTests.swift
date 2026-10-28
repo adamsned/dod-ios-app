@@ -80,4 +80,47 @@ struct OneBiteStatsTests {
         #expect(jakeResult == 1)
         #expect(miaResult == 1)
     }
+
+    @Test("headlineSingularPluralAndNil")
+    func headlineSingularPluralAndNil() {
+        let now = date(2026, 3, 20)
+
+        // With no entries, expect nil
+        #expect(
+            OneBiteStats.monthlyHeadline(
+                dinerKey: "jake",
+                dinerName: "Jake",
+                in: [],
+                asOf: now,
+                calendar: calendar
+            ) == nil
+        )
+
+        // With one .tried entry for recipe 1 in March, expect "Jake's tried 1 new thing this month."
+        let singleEntry = [e("jake", 1, .tried, date(2026, 3, 5))]
+        #expect(
+            OneBiteStats.monthlyHeadline(
+                dinerKey: "jake",
+                dinerName: "Jake",
+                in: singleEntry,
+                asOf: now,
+                calendar: calendar
+            ) == "Jake's tried 1 new thing this month."
+        )
+
+        // With a second entry for recipe 2 added, expect "Jake's tried 2 new things this month."
+        let twoEntries = [
+            e("jake", 1, .tried, date(2026, 3, 5)),
+            e("jake", 2, .tried, date(2026, 3, 10)),
+        ]
+        #expect(
+            OneBiteStats.monthlyHeadline(
+                dinerKey: "jake",
+                dinerName: "Jake",
+                in: twoEntries,
+                asOf: now,
+                calendar: calendar
+            ) == "Jake's tried 2 new things this month."
+        )
+    }
 }
