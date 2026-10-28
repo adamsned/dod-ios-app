@@ -72,5 +72,26 @@ final class FoldableFlowTests: XCTestCase {
 
     func testMainDestinationsRenderOnFoldable() {
         XCTAssertTrue(waitForAppReady(timeout: 20), "App should be ready within 20 s")
+
+        // Recipes (Feed) — default destination; header search button is the main element.
+        goToTab(phoneLabel: "Recipes", padTitle: "Recipes & Articles")
+        XCTAssertTrue(
+            app.buttons["feed-open-search"].waitForExistence(timeout: 8),
+            "Recipes should render its header search button"
+        )
+
+        // Saved — fresh in-memory store, so the empty state is the main element.
+        goToTab(phoneLabel: "Saved", padTitle: "Saved")
+        XCTAssertTrue(
+            app.staticTexts["saved.emptyState"].firstMatch.waitForExistence(timeout: 6),
+            "Saved should render its empty state"
+        )
+
+        // Tools — Cooking Tools hub keystone row.
+        goToTab(phoneLabel: "Tools", padTitle: "Cooking Tools")
+        XCTAssertTrue(
+            app.buttons["hub-first-cookout"].waitForExistence(timeout: 8),
+            "Cooking Tools hub should render its first row"
+        )
     }
 }
