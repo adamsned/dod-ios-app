@@ -308,6 +308,8 @@ targets:
     platform: iOS
     sources:
       - path: LiveActivity
+      # DUT-1534 — the Live Activity's buttons use the same intents as the app.
+      - path: Shared/CookActivityIntents.swift
     info:
       path: LiveActivity/Info.plist
       properties:
