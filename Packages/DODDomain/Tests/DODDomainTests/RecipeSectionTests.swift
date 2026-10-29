@@ -59,4 +59,15 @@ import Testing
         let result = RecipeSection.make(groups: [("Empty", 0)], ingredients: ings)
         #expect(result.isEmpty)
     }
+
+    @Test func nilLabelGroupConsumesIngredientsButIsSkipped() {
+        let ings = RecipeIngredient.list(from: ["Flour", "Butter", "Apples"])
+        let result = RecipeSection.make(
+            groups: [(nil, 1), ("Filling", 2)],
+            ingredients: ings
+        )
+        #expect(result.count == 1)
+        #expect(result[0].label == "Filling")
+        #expect(result[0].ingredientIDs == [ings[1].id, ings[2].id])
+    }
 }
