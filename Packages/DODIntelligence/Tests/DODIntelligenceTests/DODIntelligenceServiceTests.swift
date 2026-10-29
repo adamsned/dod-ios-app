@@ -336,7 +336,7 @@ struct DODIntelligenceServiceTests {
 // MARK: - Helper functions
 
 extension DODIntelligenceServiceTests {
-    fileprivate func makeBareService() -> some DODIntelligenceService {
+    private func makeBareService() -> some DODIntelligenceService {
         struct Bare: DODIntelligenceService {
             var isAvailable: Bool { true }
             var supportsImageInput: Bool { true }
@@ -351,7 +351,7 @@ extension DODIntelligenceServiceTests {
         return Bare()
     }
 
-    fileprivate func makeLegacyService() -> some DODIntelligenceService {
+    private func makeLegacyService() -> some DODIntelligenceService {
         struct LegacyService: DODIntelligenceService {
             var isAvailable: Bool { true }
             var supportsImageInput: Bool { true }

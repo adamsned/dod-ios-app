@@ -34,6 +34,10 @@ import Testing
         #expect(StepTimerParser.firstDuration(in: "Whisk for 45 seconds") == .seconds(45))
     }
 
+    @Test func halfAnHour() {
+        #expect(StepTimerParser.firstDuration(in: "Rest half an hour") == .seconds(1800))
+    }
+
     @Test func wordNumeralIsRejected() {
         // We deliberately don't parse word numerals — call site shows no timer.
         #expect(StepTimerParser.firstDuration(in: "Boil ten minutes") == nil)
