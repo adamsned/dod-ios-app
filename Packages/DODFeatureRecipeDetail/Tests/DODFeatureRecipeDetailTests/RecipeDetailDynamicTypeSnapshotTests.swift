@@ -59,5 +59,20 @@ final class RecipeDetailDynamicTypeSnapshotTests: XCTestCase {
             .environment(\.dynamicTypeSize, .accessibility5)
         assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
     }
+
+    @MainActor
+    func test_ingredientRow_accessibility5() async {
+        let text =
+            "2 1/2 cups freshly grated sharp aged white cheddar cheese, plus extra for topping, at room temperature"
+        let view = IngredientCheckRow(
+            ingredient: RecipeIngredient(text: text),
+            displayText: text,
+            isChecked: false,
+            onToggle: {}
+        )
+        .frame(width: 390)
+        .environment(\.dynamicTypeSize, .accessibility5)
+        assertSnapshot(of: view, as: .image(layout: .sizeThatFits))
+    }
 }
 #endif
