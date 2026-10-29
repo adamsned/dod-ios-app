@@ -169,6 +169,10 @@ final class SiriAppIntentsTests: XCTestCase {
         XCTAssertEqual(ScaleServingsIntent.dialogText(servings: 1, title: "Chili"), "Scaled Chili to serve 1.")
     }
 
+    func test_shortcuts_stayUnderAppleCap() {
+        XCTAssertLessThanOrEqual(DODShortcuts.appShortcuts.count, 10)
+    }
+
     // MARK: - Live Activity Intents
 
     func test_liveActivityIntents_forwardToTheRouter() async throws {
