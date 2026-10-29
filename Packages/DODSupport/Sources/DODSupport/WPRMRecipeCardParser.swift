@@ -22,6 +22,10 @@ public enum WPRMRecipeCardParser {
             self.instructions = instructions
             self.equipment = equipment
         }
+
+        public static func == (lhs: Card, rhs: Card) -> Bool {
+            lhs.ingredients == rhs.ingredients && lhs.instructions == rhs.instructions && lhs.equipment == rhs.equipment
+        }
     }
 
     /// Class token on the wrapper div every WPRM theme renders.
