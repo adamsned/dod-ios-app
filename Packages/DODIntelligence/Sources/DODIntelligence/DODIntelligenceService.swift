@@ -76,6 +76,25 @@ public protocol DODIntelligenceService: Sendable {
     /// treats the text as its source of truth; `nil` is the general helper.
     func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
 
+    /// DUT-1007 — Heat Coach follow-up ("what if it's windy and I'm at 6000ft?").
+    /// The model CALLS the pure `DutchOvenHeatCoach` functions as tools, so the coal
+    /// numbers are grounded, then wraps them in a short reassuring sentence.
+    /// `ovenDiameterInches` and `isBaking` give the baseline. Returns `nil` — never
+    /// throws — when unavailable, the question is empty, the model errors, or a
+    /// guardrail rejects it.
+    func askHeatCoach(_ question: String, ovenDiameterInches: Int, isBaking: Bool) async -> String?
+
+    /// DUT-1028 — answer a question about the loaded recipe by letting the model call
+    /// tools over `toolbox` (no prompt-stuffing). Returns nil on unavailability/error.
+    func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String?
+
+    /// DUT-1008 — draft a short, celebratory caption for a personal cook-log
+    /// moment from its photo + note, entirely on-device. Returns `nil` (never
+    /// throws) when unavailable, when `request.hasMoment` is false, on model
+    /// error, or on a guardrail rejection. The photo is only used when
+    /// ``supportsImageInput`` is `true`; otherwise the note alone is used.
+    func captionMoment(_ request: MomentCaptionRequest) async -> String?
+
     /// DUT-1003 — judge VISUAL doneness of a dish from a photo, given the current recipe step text.
     /// `photo` is JPEG/PNG `Data` (stays on device). Returns `nil` — never throws — when unavailable,
     /// `supportsImageInput` is false, the photo or step is empty, the model errors, or a guardrail rejects it.
@@ -122,10 +141,17 @@ public protocol DODIntelligenceService: Sendable {
 
 extension DODIntelligenceService {
 
+    public func askHeatCoach(_ question: String, ovenDiameterInches: Int, isBaking: Bool) async -> String? {
+        nil
+    }
+
     /// DUT-1005 — the tier this service runs on. Defaults to on-device, the
     /// cost-free architecture default. A conformer that routes to Private Cloud
     /// Compute must override this explicitly, never implicitly.
     public var tier: IntelligenceTier { .default }
+
+    /// DUT-1028 — conformers that cannot run the tool-calling session answer nil.
+    public func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String? { nil }
 
     /// Convenience for a context- and reason-free substitution, so previews and
     /// call sites that don't model either stay terse.
@@ -166,4 +192,7 @@ extension DODIntelligenceService {
 
     /// DUT-1009 — default implementation for older conformers to keep compiling.
     public func identifyIngredients(imageData: Data) async -> [String] { [] }
+
+    /// Default for conformers that don't implement Hero Moment captions.
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? { nil }
 }

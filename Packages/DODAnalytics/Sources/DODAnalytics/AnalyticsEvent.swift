@@ -113,6 +113,15 @@ public enum AnalyticsEvent: Sendable, Hashable {
     case recipeOfTheDayShown(recipeID: Int)
     /// DUT-117 — the Recipe of the Day hero card was tapped. Payload: recipe id only.
     case recipeOfTheDayTapped(recipeID: Int)
+
+    /// DUT-176 — the feedback compose sheet was presented (Settings row or shake). Counts only.
+    case feedbackStarted
+
+    /// DUT-176 — a feedback report was handed off for sending. Payload: closed-set category only, never the text.
+    case feedbackSent(category: String)
+
+    /// DUT-178 — a recipe problem report was handed off for sending. Payload: recipe id + closed-set problem type, never the note.
+    case recipeProblemReported(recipeID: Int, problemType: String)
 }
 
 /// The closed set of Siri voice commands Cook Mode exposes (US-40 / AC-40.5).
@@ -207,6 +216,9 @@ extension AnalyticsEvent {
         case .reviewManualRateTapped: "review_manual_rate_tapped"
         case .recipeOfTheDayShown: "recipe_of_the_day_shown"
         case .recipeOfTheDayTapped: "recipe_of_the_day_tapped"
+        case .feedbackStarted: "feedback_started"
+        case .feedbackSent: "feedback_sent"
+        case .recipeProblemReported: "recipe_problem_reported"
         }
     }
 
@@ -265,6 +277,12 @@ extension AnalyticsEvent {
             [:]
         case .recipeOfTheDayShown(let recipeID), .recipeOfTheDayTapped(let recipeID):
             ["recipe_id": String(recipeID)]
+        case .feedbackStarted:
+            [:]
+        case .feedbackSent(let category):
+            ["category": category]
+        case .recipeProblemReported(let recipeID, let problemType):
+            ["recipe_id": String(recipeID), "problem_type": problemType]
         }
     }
 }

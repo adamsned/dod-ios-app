@@ -500,9 +500,20 @@ final class CoreUserJourneysE2ETests: XCTestCase {
             "Search should surface the corn fixture card"
         )
 
-        // Capture initial count. The short settle lets the result render fully;
-        // `count` is a snapshot at the moment of access.
-        Thread.sleep(forTimeInterval: 0.5)
+        // Capture initial count once the result set has stopped changing
+        // (stable across two consecutive polls) rather than a fixed sleep.
+        var lastSeenCount = -1
+        let settledPredicate = NSPredicate { _, _ in
+            let current = resultCards.count
+            defer { lastSeenCount = current }
+            return current > 0 && current == lastSeenCount
+        }
+        let settledExpectation = XCTNSPredicateExpectation(predicate: settledPredicate, object: nil)
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [settledExpectation], timeout: 10),
+            .completed,
+            "Search results for 'corn' should settle"
+        )
         let initialCount = resultCards.count
         XCTAssertGreaterThan(
             initialCount,
@@ -676,6 +687,10 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         // end-state.
         let nextButton = app.buttons["cook-mode-next"]
         if nextButton.waitForExistence(timeout: 3) {
+            // The controls re-render while Cook Mode settles; wait until Next is tappable, then tap (DUT-2384).
+            let tappable = expectation(for: NSPredicate(format: "exists == true AND hittable == true"),
+                                       evaluatedWith: nextButton)
+            wait(for: [tappable], timeout: 8)
             nextButton.tap()
             let stepTwo = app.staticTexts.matching(
                 NSPredicate(format: "label BEGINSWITH 'Step 2 of'")

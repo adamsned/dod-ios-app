@@ -88,4 +88,18 @@ extension WPRMRecipeCardParser {
     static func groupContainsLineRow(_ groupInner: String) -> Bool {
         firstElementInner(in: groupInner, tag: "li", classToken: ingredientRowToken) != nil
     }
+
+    /// DUT-1024: (label, lines) per ingredient group, in document order. `label`
+    /// is nil when the group has no `<h4>` name or is header-only (its name IS the
+    /// ingredient, see DUT-42/550). Empty when the card has no grouped structure.
+    static func labelledIngredientGroups(in card: String) -> [(label: String?, lines: [String])] {
+        collectElementInners(in: card, tag: "div", classToken: ingredientGroupToken).map { inner in
+            let lines = ingredientsInGroup(inner)
+            guard groupContainsLineRow(inner),
+                let name = firstElementInner(in: inner, tag: "h4", classToken: ingredientGroupNameToken)
+            else { return (nil, lines) }
+            let text = HTMLSanitizer.plainText(from: name)
+            return (text.isEmpty ? nil : text, lines)
+        }
+    }
 }

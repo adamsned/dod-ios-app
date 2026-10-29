@@ -177,10 +177,14 @@ struct DODIntelligenceServiceTests {
 
     /// Test the default implementation of checkDoneness for older conformers
     @Test func checkDonenessReturnsNilWithDefaultImplementation() async {
-        // Create a minimal struct that only implements the existing requirements
+        let bare = makeBareService()
+        #expect(await bare.checkDoneness(photo: Data([1]), stepText: "Bake until golden") == nil)
+    }
+
+    @Test func defaultAskHeatCoachReturnsNil() async {
         struct Bare: DODIntelligenceService {
             var isAvailable: Bool { true }
-            var supportsImageInput: Bool { true }
+            var supportsImageInput: Bool { false }
             func suggestSubstitution(
                 for ingredient: String,
                 in context: RecipeContext?,
@@ -189,25 +193,11 @@ struct DODIntelligenceServiceTests {
             func summarize(_ text: String) async -> String? { nil }
             func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
         }
-
-        let bare = Bare()
-        #expect(await bare.checkDoneness(photo: Data([1]), stepText: "Bake until golden") == nil)
-    }
-
-    private struct LegacyService: DODIntelligenceService {
-        var isAvailable: Bool { true }
-        var supportsImageInput: Bool { true }
-        func suggestSubstitution(
-            for ingredient: String,
-            in context: RecipeContext?,
-            reason: SubstitutionReason?
-        ) async -> SubstitutionResult? { nil }
-        func summarize(_ text: String) async -> String? { nil }
-        func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+        #expect(await Bare().askHeatCoach("windy?", ovenDiameterInches: 12, isBaking: false) == nil)
     }
 
     @Test func scanRecipeCardDefaultsToNil() async {
-        #expect(await LegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
+        #expect(await makeLegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
     }
 
     @Test func fakeScanReturnsCannedRecipe() async {
@@ -244,20 +234,7 @@ struct DODIntelligenceServiceTests {
     }
 
     @Test func defaultExtractRecipeReturnsNil() {
-        // Create a minimal struct that only implements the existing requirements
-        struct Bare: DODIntelligenceService {
-            var isAvailable: Bool { true }
-            var supportsImageInput: Bool { true }
-            func suggestSubstitution(
-                for ingredient: String,
-                in context: RecipeContext?,
-                reason: SubstitutionReason?
-            ) async -> SubstitutionResult? { nil }
-            func summarize(_ text: String) async -> String? { nil }
-            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
-        }
-
-        let bare = Bare()
+        let bare = makeBareService()
         let result = bare.extractRecipe(fromBody: "x")
         #expect(result == nil)
     }
@@ -287,20 +264,7 @@ struct DODIntelligenceServiceTests {
     }
 
     @Test func defaultSummarizeCommentsIsNil() async {
-        // Create a minimal struct that only implements the existing requirements
-        struct Bare: DODIntelligenceService {
-            var isAvailable: Bool { true }
-            var supportsImageInput: Bool { true }
-            func suggestSubstitution(
-                for ingredient: String,
-                in context: RecipeContext?,
-                reason: SubstitutionReason?
-            ) async -> SubstitutionResult? { nil }
-            func summarize(_ text: String) async -> String? { nil }
-            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
-        }
-
-        let bare = Bare()
+        let bare = makeBareService()
         #expect(await bare.summarizeComments(["x"]) == nil)
     }
 
@@ -322,5 +286,83 @@ struct DODIntelligenceServiceTests {
     @Test func liveIdentifyIngredientsIsEmptyWithoutModel() async {
         let result = await LiveDODIntelligenceService().identifyIngredients(imageData: Data([0x00]))
         #expect(result.isEmpty)
+    }
+
+    @Test func captionMomentDefaultsToNil() async {
+        let request = MomentCaptionRequest(recipeTitle: "X", note: "n")
+        #expect(await makeBareService().captionMoment(request) == nil)
+    }
+
+    @Test func fakeCaptionMomentReturnsCannedWhenAvailable() async {
+        let service = FakeIntelligenceService()
+        let request = MomentCaptionRequest(recipeTitle: "X", note: "yum")
+        #expect(await service.captionMoment(request) != nil)
+    }
+
+    @Test func fakeCaptionMomentNilWhenUnavailableOrEmptyMoment() async {
+        // unavailable service returns nil
+        let unavailableService = FakeIntelligenceService(isAvailable: false)
+        let request = MomentCaptionRequest(recipeTitle: "X", note: "yum")
+        #expect(await unavailableService.captionMoment(request) == nil)
+
+        // empty moment (title only) returns nil
+        let service = FakeIntelligenceService()
+        let emptyRequest = MomentCaptionRequest(recipeTitle: "X", note: "")
+        #expect(await service.captionMoment(emptyRequest) == nil)
+    }
+
+    @Test func fakeHeatCoachReturnsCannedWhenAvailable() async {
+        let service = FakeIntelligenceService()
+        #expect(await service.askHeatCoach("windy at 6000ft?", ovenDiameterInches: 12, isBaking: false) != nil)
+    }
+
+    @Test func fakeHeatCoachNilWhenUnavailableOrEmpty() async {
+        #expect(
+            await FakeIntelligenceService(isAvailable: false).askHeatCoach("x", ovenDiameterInches: 12, isBaking: false)
+                == nil
+        )
+        #expect(await FakeIntelligenceService().askHeatCoach("   ", ovenDiameterInches: 12, isBaking: false) == nil)
+    }
+
+    @Test func liveCaptionMomentNilOnTestHost() async {
+        #expect(await LiveDODIntelligenceService().captionMoment(.init(recipeTitle: "X", note: "great")) == nil)
+    }
+
+    @Test func liveCaptionMomentNilWithoutMoment() async {
+        #expect(await LiveDODIntelligenceService().captionMoment(.init(recipeTitle: "X", note: "")) == nil)
+    }
+}
+
+// MARK: - Helper functions
+
+extension DODIntelligenceServiceTests {
+    fileprivate func makeBareService() -> some DODIntelligenceService {
+        struct Bare: DODIntelligenceService {
+            var isAvailable: Bool { true }
+            var supportsImageInput: Bool { true }
+            func suggestSubstitution(
+                for ingredient: String,
+                in context: RecipeContext?,
+                reason: SubstitutionReason?
+            ) async -> SubstitutionResult? { nil }
+            func summarize(_ text: String) async -> String? { nil }
+            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+        }
+        return Bare()
+    }
+
+    fileprivate func makeLegacyService() -> some DODIntelligenceService {
+        struct LegacyService: DODIntelligenceService {
+            var isAvailable: Bool { true }
+            var supportsImageInput: Bool { true }
+            func suggestSubstitution(
+                for ingredient: String,
+                in context: RecipeContext?,
+                reason: SubstitutionReason?
+            ) async -> SubstitutionResult? { nil }
+            func summarize(_ text: String) async -> String? { nil }
+            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+        }
+        return LegacyService()
     }
 }

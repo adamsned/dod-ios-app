@@ -82,6 +82,20 @@ final class CookLiveActivitySnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: .image(layout: .fixed(width: 360, height: 140)))
     }
 
+    /// DUT-967 — test the coach nudge rendering
+    func test_lockScreen_withCoachNudge() {
+        let view = CookActivityLockScreenView(
+            recipeTitle: "Dutch Oven Pot Roast",
+            stepText: "Cover and braise for 2 hours, basting every 30 min.",
+            remainingSeconds: 900,
+            totalSeconds: 1_800,
+            isPaused: false,
+            coachNudge: "You're doing great — rotate the lid a quarter turn."
+        )
+        .frame(width: 360, height: 160)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 360, height: 160)))
+    }
+
     func test_dynamicIsland_compactLeading() {
         let view = CookActivityCompactLeadingView()
             .frame(width: 30, height: 30)

@@ -22,8 +22,11 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedAnswer: String?
     private let cannedDoneness: DonenessCheckResult?
     private let cannedExplanation: StepExplanation?
+    private let cannedRecipeAnswer: String?
     private let cannedExtraction: ExtractedRecipe?
     private let cannedDigest: CommentDigest?
+    private let cannedMomentCaption: String?
+    private let cannedHeatCoachAnswer: String?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
@@ -44,6 +47,10 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     the graceful no-result path.
     ///   - commentDigest: What ``summarizeComments(_:)`` returns when available. `nil` models
     ///     the graceful no-result path. Defaults to ``CommentDigest/canned``.
+    ///   - momentCaption: What ``captionMoment(_:)`` returns when available. `nil` models
+    ///     the graceful no-result path.
+    ///   - recipeAnswer: What ``askRecipe(_:toolbox:)`` returns when available. nil models the no-result path.
+    ///   - heatCoachAnswer: What ``askHeatCoach(_:ovenDiameterInches:isBaking:)`` returns when available. `nil` models the graceful no-result path.
     public init(
         isAvailable: Bool = true,
         supportsImageInput: Bool = true,
@@ -56,8 +63,12 @@ public struct FakeIntelligenceService: DODIntelligenceService {
             reassurance: "The crust is an even golden brown and the edges look set."
         ),
         explanation: StepExplanation? = .canned,
+        recipeAnswer: String? = "Yes. Chill it overnight and reheat gently.",
         extraction: ExtractedRecipe? = nil,
-        commentDigest: CommentDigest? = .canned
+        commentDigest: CommentDigest? = .canned,
+        momentCaption: String? = "Look at that golden crust — you made this, and everyone is going to ask for seconds.",
+        heatCoachAnswer: String? =
+            "Add about 5 coals for the wind and altitude, keep an eye on the lid, and you're golden."
     ) {
         self.isAvailable = isAvailable
         self.supportsImageInput = supportsImageInput
@@ -66,8 +77,11 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         self.cannedAnswer = answer
         self.cannedDoneness = doneness
         self.cannedExplanation = explanation
+        self.cannedRecipeAnswer = recipeAnswer
         self.cannedExtraction = extraction
         self.cannedDigest = commentDigest
+        self.cannedMomentCaption = momentCaption
+        self.cannedHeatCoachAnswer = heatCoachAnswer
     }
 
     public func suggestSubstitution(
@@ -107,5 +121,21 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     public func summarizeComments(_ comments: [String]) async -> CommentDigest? {
         guard isAvailable else { return nil }
         return cannedDigest
+    }
+
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? {
+        guard isAvailable, request.hasMoment else { return nil }
+        return cannedMomentCaption
+    }
+
+    public func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String? {
+        guard isAvailable else { return nil }
+        return cannedRecipeAnswer
+    }
+
+    public func askHeatCoach(_ question: String, ovenDiameterInches: Int, isBaking: Bool) async -> String? {
+        guard isAvailable else { return nil }
+        guard !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return cannedHeatCoachAnswer
     }
 }
