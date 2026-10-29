@@ -1,0 +1,6 @@
+# Copy to `.dev.vars` (gitignored) for local `wrangler dev` testing.
+APNS_KEY_ID=YOUR_APNS_KEY_ID
+APNS_TEAM_ID=YOUR_APPLE_TEAM_ID
+APNS_TOPIC=com.dutchovendaddy.DODApp
+APNS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIG...\n-----END PRIVATE KEY-----"
+APP_SHARED_SECRET=replace-with-a-long-random-string
