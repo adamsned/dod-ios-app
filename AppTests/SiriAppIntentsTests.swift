@@ -156,6 +156,19 @@ final class SiriAppIntentsTests: XCTestCase {
         XCTAssertEqual(OnscreenRecipe.resolve(named)?.id, 7)
     }
 
+    // MARK: - Scale servings
+
+    func test_scaleServings_clampsToStepperRange() {
+        XCTAssertEqual(ScaleServingsIntent.clamp(12), 12)
+        XCTAssertEqual(ScaleServingsIntent.clamp(99), 24)
+        XCTAssertEqual(ScaleServingsIntent.clamp(0), 1)
+    }
+
+    func test_scaleServings_dialogCopy() {
+        XCTAssertEqual(ScaleServingsIntent.dialogText(servings: 12, title: "Chili"), "Scaled Chili to serve 12.")
+        XCTAssertEqual(ScaleServingsIntent.dialogText(servings: 1, title: "Chili"), "Scaled Chili to serve 1.")
+    }
+
     // MARK: - Live Activity Intents
 
     func test_liveActivityIntents_forwardToTheRouter() async throws {
