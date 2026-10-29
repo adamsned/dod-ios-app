@@ -1,6 +1,7 @@
 import BackgroundTasks
 import DODDesignSystem
 import DODFeatureFeed
+import DODFeatureRecipeDetail
 import DODNetworking
 import DODPersistence
 import DODSupport
@@ -43,6 +44,14 @@ struct DODApp: App {
         //    in the scene `.task`: a background intent launch has no scene.
         dependencies.registerAppIntents()
         _dependencies = State(initialValue: dependencies)
+
+        // DUT-988 — Live Activity buzzer buttons route into the live Cook Mode session.
+        CookActivityIntentRouter.handler = { command in
+            switch command {
+            case .pulledIt: VoiceCommandBus.shared.dispatch(.next)
+            case .snooze: VoiceCommandBus.shared.dispatch(.snooze)
+            }
+        }
     }
 
     /// One-time resolution of the iCloud-Sync opt-in default (fresh installs ON,
