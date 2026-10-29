@@ -55,16 +55,38 @@ extension RecipeDetailView {
                 // Source recipe `ingredient.text` stays untouched (AC-31.8).
                 let factor = viewModel.servingsScaleFactor
                 ForEach(ingredients) { ingredient in
-                    IngredientCheckRow(
+                    let shown = displayIngredientText(ingredient.text, scaledBy: factor)
+                    annotated(
+                        IngredientCheckRow(
+                            ingredient: ingredient,
+                            displayText: shown,
+                            isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
+                            onToggle: { viewModel.toggleIngredient(ingredient.id) }
+                        ),
                         ingredient: ingredient,
-                        displayText: displayIngredientText(ingredient.text, scaledBy: factor),
-                        isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
-                        onToggle: { viewModel.toggleIngredient(ingredient.id) }
+                        displayText: shown
                     )
                 }
             }
         }
         .padding(.horizontal, DODSpacing.md)
+    }
+
+    /// DUT-1014: applies the on-screen ingredient annotation once the recipe is
+    /// loaded; passes the row through untouched while it is nil.
+    @ViewBuilder
+    private func annotated<V: View>(
+        _ row: V,
+        ingredient: RecipeIngredient,
+        displayText: String
+    ) -> some View {
+        if let recipe = viewModel.recipe {
+            row.ingredientAnnotation(
+                .make(recipe: recipe, ingredient: ingredient, displayText: displayText)
+            )
+        } else {
+            row
+        }
     }
 
     /// The display string for one ingredient row: scale the source text for the
