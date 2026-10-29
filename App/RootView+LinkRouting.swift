@@ -1,3 +1,4 @@
+import CoreSpotlight
 import DODAnalytics
 import DODDesignSystem
 import DODFeatureFeed
@@ -11,6 +12,27 @@ import SwiftUI
 // `RootView` for exactly this cross-file access.
 
 extension RootView {
+
+    /// DUT-1325 — route a Universal Link (a tapped dutchovendaddy.com web URL,
+    /// delivered as a browsing-web activity) via the shared `openRecipeLink`,
+    /// which resolves the `/<slug>/` permalink to its post and routes it in-app,
+    /// falling back to the system browser for any non-recipe / off-site URL.
+    /// Extracted here (not inline in `RootView.body`) to keep that file under the
+    /// SwiftLint `file_length` cap.
+    func handleUniversalLink(_ activity: NSUserActivity) {
+        guard let url = activity.webpageURL else { return }
+        Task { @MainActor in _ = await openRecipeLink(url) }
+    }
+
+    /// Route a Spotlight result tap to its recipe (US-10 / DUT-12). Extracted
+    /// alongside `handleUniversalLink` for the same file-length reason.
+    func handleSpotlightActivity(_ activity: NSUserActivity) {
+        guard
+            let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+            let id = identifier.split(separator: ".").last.flatMap({ Int($0) })
+        else { return }
+        handle(intent: .openRecipe(id: id))
+    }
 
     /// Widget URL handler (spec.md US-9 AC-9.2, US-17 AC-17.4). Recipe + feed
     /// routes switch to Feed and hand the link to the TabStack via
@@ -80,6 +102,15 @@ extension RootView {
             selectedTab = .saved
             // DUT-734: land on the Saved list root (see `handle(widgetLink:)`).
             tabPaths[.saved] = []
+        case .openCollection(let id):
+            // DUT-1388 — Saved root, narrowed to the collection's shelf filter.
+            selectedTab = .saved
+            tabPaths[.saved] = []
+            savedCollectionRequest = id
+        case .openPanCheck:
+            // DUT-1826 — no dedicated pan-check screen yet; land on the Feed root.
+            selectedTab = .feed
+            tabPaths[.feed] = []
         case .openRecipe(let id):
             selectedTab = .feed
             Task { @MainActor in
@@ -197,15 +228,15 @@ extension RootView {
         route(control: pending)
     }
 
-    /// The external-route sink for one tab. Feed/Saved/Search each own a
-    /// FIFO queue so both layouts (phone tabs + iPad split detail) can hand
-    /// every `TabStack` its own; Settings renders no article surface, so it
-    /// keeps the inert constant.
+    /// The external-route sink for one tab. Feed/Saved each own a FIFO queue so
+    /// both layouts (phone tabs + iPad split detail) can hand every `TabStack`
+    /// its own; the Cooking Tools hub renders no article surface, so it keeps
+    /// the inert constant. Search is no longer a tab (v2 Search overhaul 1/3) —
+    /// it's pushed within the Feed stack, so its article links ride the Feed sink.
     func externalRouteBinding(for tab: AppTab) -> Binding<ExternalRouteQueue> {
         switch tab {
         case .feed: return $feedExternalRoute
         case .saved: return $savedExternalRoute
-        case .search: return $searchExternalRoute
         // T-912 / DUT-551 — the Cooking Tools hub renders no article surface, so
         // it keeps the inert constant (as the retired Grocery/Settings tabs did).
         case .cookingTools: return .constant(ExternalRouteQueue())
@@ -309,8 +340,7 @@ extension RootView {
         switch destination {
         case .feed: feedExternalRoute.enqueue(.push(route))
         case .saved: savedExternalRoute.enqueue(.push(route))
-        case .search: searchExternalRoute.enqueue(.push(route))
-        // unreachable: linkRoutingDestination only ever yields feed/saved/search
+        // unreachable: linkRoutingDestination only ever yields feed/saved
         // (it redirects the Cooking Tools hub — no article stack — to feed).
         case .cookingTools: break
         }

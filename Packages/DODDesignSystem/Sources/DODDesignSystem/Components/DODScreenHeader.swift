@@ -21,19 +21,24 @@ public struct DODScreenHeader<Trailing: View>: View {
 
     public var body: some View {
         HStack(alignment: .center, spacing: DODSpacing.sm) {
-            Text(title)
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                // DUT-263 — true black/white (`labelStrong`), not the warmer brand
-                // grey/cream `label`, so every tab's large title reads identically.
-                .foregroundStyle(DODColor.labelStrong)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityAddTraits(.isHeader)
+            titleText
             trailing
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.top, DODSpacing.sm)
         .padding(.bottom, DODSpacing.xs)
+    }
+
+    /// The large section title. DUT-263 — true black/white (`labelStrong`), not
+    /// the warmer brand grey/cream `label`, so every tab's large title reads
+    /// identically.
+    private var titleText: some View {
+        Text(title)
+            .font(.largeTitle)
+            .fontWeight(.bold)
+            .foregroundStyle(DODColor.labelStrong)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -72,7 +77,7 @@ extension View {
 #Preview("Header") {
     VStack(spacing: 0) {
         DODScreenHeader("Recipes & Articles") {
-            Image(systemName: "frying.pan.fill").foregroundStyle(DODColor.burntOrange)
+            Image(systemName: "magnifyingglass").foregroundStyle(DODColor.burntOrange)
         }
         DODScreenHeader("Search")
     }

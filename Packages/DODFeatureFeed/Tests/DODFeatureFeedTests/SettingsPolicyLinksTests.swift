@@ -16,7 +16,7 @@ import Testing
     @Test func privacyPolicyURLIsAValidHTTPSLinkOnTheOwnedDomain() throws {
         #expect(
             SettingsViewModel.privacyPolicyURLString
-                == "https://dutchovendaddy.com/privacy-policy/"
+                == "https://dutchovendaddy.com/app-privacy/"
         )
         let url = try #require(URL(string: SettingsViewModel.privacyPolicyURLString))
         #expect(url.scheme == "https")

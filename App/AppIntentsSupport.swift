@@ -35,6 +35,40 @@ public enum AppIntentEnvironment {
         defer { lock.unlock() }
         return _store
     }
+
+    nonisolated(unsafe) private static var _actions: AppIntentActions?
+
+    /// DUT-1388 — registered once from `AppDependencies.bootstrap()`.
+    static func register(actions: AppIntentActions) {
+        lock.lock()
+        defer { lock.unlock() }
+        _actions = actions
+    }
+
+    /// The network + side-effect actions, or nil before bootstrap (callers
+    /// degrade to store-only behavior or a "try again" dialog).
+    static var actions: AppIntentActions? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _actions
+    }
+}
+
+/// DUT-1388 — what the Siri / Shortcuts intents need beyond the store: the
+/// network (search the whole site, fetch a recipe that was never opened) and the
+/// app's own save + Shopping List paths, so a Siri "Save this recipe" has the
+/// exact side effects of a tap (widget republish, hero pin, ingredient parse).
+/// Built by `AppDependencies.registerAppIntents()`.
+struct AppIntentActions: Sendable {
+    /// Site search (WP `search`), unranked.
+    let searchRecipes: @Sendable (String) async throws -> [RecipeListItem]
+    /// One post by id, for a recipe that isn't in the local cache.
+    let fetchPost: @Sendable (Int) async throws -> RecipeListItem
+    /// The card long-press save path (`TabStack.saveFromCard`). It TOGGLES,
+    /// so callers check `isSaved` first. Returns whether the write succeeded.
+    let save: @MainActor @Sendable (RecipeListItem) async -> Bool
+    /// The Shopping List appender (hydrates ingredients when needed).
+    let addToShoppingList: @MainActor @Sendable (Recipe) async -> AddToShoppingListResult
 }
 
 /// Lightweight projection of a recipe used by App Intents / Spotlight.
@@ -65,6 +99,17 @@ public struct RecipeEntityPayload: Sendable, Hashable, Identifiable {
             excerpt: recipe.excerpt,
             heroImage: recipe.heroImage,
             canonicalURL: recipe.canonicalURL
+        )
+    }
+
+    /// DUT-1388 — a network hit (site search / fetch by id) as a payload.
+    public static func fromListItem(_ item: RecipeListItem) -> RecipeEntityPayload {
+        RecipeEntityPayload(
+            id: item.id,
+            title: item.title,
+            excerpt: item.excerpt,
+            heroImage: item.heroImage,
+            canonicalURL: item.canonicalURL
         )
     }
 

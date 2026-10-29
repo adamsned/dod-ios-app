@@ -259,10 +259,21 @@ jobs:
           # Empty when unset - the token uploader then no-ops.
           DOD_PUSH_BASE_URL: ${{ secrets.DOD_PUSH_BASE_URL }}
           DOD_PUSH_APP_SECRET: ${{ secrets.DOD_PUSH_APP_SECRET }}
+          # DUT-98: baked into the archived Info.plist (SiwaRevokeBaseURL /
+          # SiwaRevokeSharedSecret) so Delete Account revokes the Sign in with
+          # Apple token (App Store 5.1.1(v)). See backend/siwa-revoke/README.md.
+          SIWA_REVOKE_BASE_URL: ${{ secrets.SIWA_REVOKE_BASE_URL }}
+          SIWA_REVOKE_APP_SECRET: ${{ secrets.SIWA_REVOKE_APP_SECRET }}
         run: |
           set -euo pipefail
           if [ -z "${APPLE_TEAM_ID:-}" ]; then
             echo "::error::APPLE_TEAM_ID secret is not set (the Apple Developer Team ID)."
+            exit 1
+          fi
+          # Unlike the optional keys above, a build without these ships a
+          # Delete Account that silently leaves the Apple token un-revoked.
+          if [ -z "${SIWA_REVOKE_BASE_URL:-}" ] || [ -z "${SIWA_REVOKE_APP_SECRET:-}" ]; then
+            echo "::error::SIWA_REVOKE_BASE_URL / SIWA_REVOKE_APP_SECRET secrets are not set (see backend/siwa-revoke/README.md)."
             exit 1
           fi
           xcodebuild \
@@ -282,6 +293,8 @@ jobs:
             GA4_API_SECRET="${GA4_API_SECRET:-}" \
             DOD_PUSH_BASE_URL="${DOD_PUSH_BASE_URL:-}" \
             DOD_PUSH_APP_SECRET="${DOD_PUSH_APP_SECRET:-}" \
+            SIWA_REVOKE_BASE_URL="$SIWA_REVOKE_BASE_URL" \
+            SIWA_REVOKE_APP_SECRET="$SIWA_REVOKE_APP_SECRET" \
             archive
 
       # ---------------------------------------------------------------------

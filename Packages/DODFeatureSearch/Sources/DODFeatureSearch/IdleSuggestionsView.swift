@@ -17,9 +17,16 @@ import SwiftUI
 /// by the `.idle` arm of `SearchView`'s `content` switch.
 struct IdleSuggestionsView: View {
     let recents: [String]
-    let topCategories: [DODDomain.Category]
+    /// v2 Search overhaul (3/3) — the curated "Try Searching" chips. Sourced
+    /// from `SearchViewModel/displayedTrySlate` (a per-cold-launch shuffle
+    /// over the 100-term ``SearchTryChips/pool``, Latest Recipes pinned
+    /// first). Each carries a raw search `query` + a Title-Cased `display`.
+    let tryChips: [SearchTryChip]
     let onRecentTap: (String) -> Void
-    let onCategoryTap: (DODDomain.Category) -> Void
+    /// Tap a "Try" chip → run a text search for its raw `query` (the pinned
+    /// Latest Recipes chip runs its own recent-posts fetch). Host routes both
+    /// via `SearchView`.
+    let onTryChipTap: (SearchTryChip) -> Void
     let onClearRecents: () -> Void
     /// US-33 / AC-33.3 / CL-57: per-term context-menu removal.
     let onRemoveRecent: (String) -> Void
@@ -32,6 +39,15 @@ struct IdleSuggestionsView: View {
     /// Tap a category row → push that category's recipe list
     /// (`CategoryRecipesView`); `TabStack` wires it to `path.append(.category)`.
     let onCategorySelect: (DODDomain.Category) -> Void
+    /// v2 Search overhaul (1/3) — true while the "Surprise Me" random-recipe
+    /// fetch is in flight; the button shows a spinner in place of the dice and
+    /// disables re-tapping. Bound from ``SearchViewModel/isSurpriseMeLoading``.
+    let isSurpriseMeLoading: Bool
+    /// v2 Search overhaul (1/3) — tap the "Surprise Me" affordance. Surprise Me
+    /// moved OFF the Feed header and ONTO this idle page. `SearchView` wires this
+    /// to `viewModel.surpriseMe(onSelect:)`, which fetches a random recipe and
+    /// navigates to it via the screen's existing `onSelect`.
+    let onSurpriseMe: () -> Void
 
     /// DUT — "Clear All" wipes the persisted recent-searches store, an
     /// irreversible destructive action. Gate it behind a confirmation, mirroring
@@ -45,15 +61,22 @@ struct IdleSuggestionsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        if recents.isEmpty && topCategories.isEmpty && categories.isEmpty {
-            EmptyState(
-                systemImage: "magnifyingglass",
-                title: "Find a recipe",
-                message: "Type at least 2 characters to search."
-            )
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: DODSpacing.lg) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DODSpacing.lg) {
+                // v2 Search overhaul (1/3) — Surprise Me pinned at the top of the
+                // idle page (moved here from the Feed header). Always visible so a
+                // cook can jump to a random recipe before typing anything.
+                surpriseMeButton
+                if recents.isEmpty && tryChips.isEmpty && categories.isEmpty {
+                    // No recents / categories yet (e.g. first launch offline): keep
+                    // the legacy "type 2 characters" hint below Surprise Me.
+                    EmptyState(
+                        systemImage: "magnifyingglass",
+                        title: "Find a Recipe",
+                        message: "Type at least 2 characters to search."
+                    )
+                    .frame(maxWidth: .infinity)
+                } else {
                     if !recents.isEmpty {
                         // US-29 / AC-29.2 / CL-49.2: the "Recent" section
                         // header is rendered with the title at the
@@ -63,31 +86,26 @@ struct IdleSuggestionsView: View {
                         // via `RecentSearches.clear()`.
                         recentsSection
                     }
-                    if !topCategories.isEmpty {
+                    if !tryChips.isEmpty {
+                        // v2 Search overhaul (3/3) — curated "Try Searching"
+                        // chips. Each pill's raw `query` runs a normal text
+                        // search on tap (Latest Recipes runs its own fetch),
+                        // and the label is the Title-Cased `display`.
                         section(title: "Try Searching") {
                             FlowLayout(spacing: DODSpacing.xs) {
-                                ForEach(topCategories) { category in
-                                    pill(text: category.name, systemImage: "magnifyingglass") {
-                                        onCategoryTap(category)
+                                ForEach(tryChips) { chip in
+                                    pill(text: chip.display, systemImage: "magnifyingglass") {
+                                        onTryChipTap(chip)
                                     }
-                                    // T-638 / CL-107 — stable test handle for the
-                                    // L5 E2E `test_search_latest_recipes_pill_returns_recent_branch`
-                                    // (taps the matching pill → asserts the
-                                    // result count lands in the 3...8 range,
-                                    // discriminating against the failure mode
-                                    // of a literal text search returning either
-                                    // ~0 or many random matches — pins CL-106
-                                    // part 3 + REG-21). Case-insensitive name
-                                    // match mirrors the same check `SearchView`
-                                    // uses to route the tap to
-                                    // `surfaceLatestRecipes(...)`; the
-                                    // `topCategorySuggestions` rank can drift
-                                    // as recipe counts change so a per-pill
-                                    // identifier on the matching one is the
-                                    // robust hook.
+                                    // The pinned Latest Recipes chip keeps its
+                                    // T-638 / CL-107 handle for the L5 E2E
+                                    // `test_search_latest_recipes_pill_returns_recent_branch`;
+                                    // every curated pool chip gets the stable
+                                    // `search-try-chip` handle so the smoke /
+                                    // XCUITest can find and tap one.
                                     .accessibilityIdentifier(
-                                        SearchViewModel.isLatestRecipesCategory(category)
-                                            ? "dod.search.tryPill.latestRecipes" : ""
+                                        chip.isLatestRecipes
+                                            ? "dod.search.tryPill.latestRecipes" : "search-try-chip"
                                     )
                                 }
                             }
@@ -100,13 +118,62 @@ struct IdleSuggestionsView: View {
                         categoriesSection
                     }
                 }
-                .padding(DODSpacing.md)
-                // DUT — bound the idle content to a comfortable reading column on
-                // iPad (regular width) instead of stretching edge-to-edge across
-                // the split-view pane; compact returns self → iPhone unchanged.
-                .readableContentColumn(horizontalSizeClass)
             }
+            .padding(DODSpacing.md)
+            // DUT — bound the idle content to a comfortable reading column on
+            // iPad (regular width) instead of stretching edge-to-edge across
+            // the split-view pane; compact returns self → iPhone unchanged.
+            .readableContentColumn(horizontalSizeClass)
         }
+    }
+
+    /// v2 Search overhaul (1/3) — the "Surprise Me" affordance. Surprise Me
+    /// moved OFF the Feed header and ONTO this idle page: it fetches a random
+    /// recipe and navigates straight to it via the screen's `onSelect`. Rendered
+    /// as a card/cell (`DODRadius.standard`, per the corner-radius token rule)
+    /// with the burnt-orange accent on the dice ICON only (never a full fill),
+    /// matching the header-affordance treatment. While a fetch is in flight the
+    /// dice swaps for a spinner and re-tapping is disabled.
+    private var surpriseMeButton: some View {
+        Button {
+            onSurpriseMe()
+        } label: {
+            HStack(spacing: DODSpacing.sm) {
+                Group {
+                    if isSurpriseMeLoading {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "dice.fill")
+                            .foregroundStyle(DODColor.burntOrange)
+                    }
+                }
+                .frame(width: 24)
+                Text("Surprise Me")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                Spacer(minLength: DODSpacing.xs)
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, DODSpacing.md)
+            .padding(.vertical, DODSpacing.sm)
+            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                    .fill(DODColor.surfaceElevated)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isSurpriseMeLoading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Surprise Me")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("search-surprise-me")
+        // DUT — pointer lift on iPad (see `categoryRow`); no-op on iPhone.
+        .pointerHoverHighlight()
     }
 
     private var recentsSection: some View {

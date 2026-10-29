@@ -87,6 +87,9 @@ public struct ShoppingListView: View {
                     build(from: selected)
                 }
             }
+            // v2 on-device AI — substitution sheet (in `+SubstitutionSheet.swift`
+            // to keep this body's type-check + file length in check).
+            .shoppingSubstitutionSheet(isPresented: substitutionSheetBinding, viewModel: viewModel)
             // DUT-488 — confirm before wiping a persisted list. Destructive
             // role tints the button red; the list clears + persists empty on
             // confirm (survives close/reopen).
@@ -154,6 +157,14 @@ public struct ShoppingListView: View {
             }
     }
 
+    /// v2 on-device AI — sheet presented whenever substitution state != `.idle`.
+    private var substitutionSheetBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.substitution != .idle },
+            set: { if !$0 { viewModel.dismissSubstitution() } }
+        )
+    }
+
     /// DUT-487 — subtle progress overlay shown while ``build(from:)`` hydrates
     /// the picked recipes. Matches the app's scrim style (a translucent
     /// `DODColor.surface` veil + a centered `ProgressView`).
@@ -207,11 +218,8 @@ public struct ShoppingListView: View {
         }
     }
 
-    // DUT — `hydrateInOrder(_:hydrate:)` (the order-preserving concurrent
-    // hydration `build(from:)` calls above) lives in
-    // `ShoppingListView+HydrateInOrder.swift` to keep this file under
-    // SwiftLint's `file_length` (400-line) cap — same split pattern used
-    // across the codebase (e.g. `ShoppingListViewModel+Dedup.swift`).
+    // `hydrateInOrder(_:hydrate:)` lives in `ShoppingListView+HydrateInOrder.swift`
+    // (`file_length` cap).
 
     /// DUT-487 / T-906 — the populated-state "Add recipes" `+`. Opens the same
     /// picker as the empty state; confirming appends the new recipes' rows
@@ -321,7 +329,12 @@ public struct ShoppingListView: View {
                                 withAnimation(reduceMotion ? nil : .default) {
                                     viewModel.markAlreadyHave(item)
                                 }
-                            }
+                            },
+                            // v2 on-device AI — offer "Substitute" only when a
+                            // usable model is present (no dead affordance). Opens
+                            // the reason picker; generation runs from the sheet.
+                            showSubstitute: viewModel.isSubstitutionAvailable,
+                            onSubstitute: { viewModel.beginSubstitution(for: item) }
                         )
                     }
                 } header: {

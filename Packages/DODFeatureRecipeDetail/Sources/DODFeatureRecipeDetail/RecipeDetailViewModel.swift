@@ -1,6 +1,7 @@
 import DODAnalytics
 import DODDomain
 import DODFeatureProfile
+import DODIntelligence
 import DODNetworking
 import DODSupport
 import Foundation
@@ -72,6 +73,17 @@ public final class RecipeDetailViewModel {
     /// extractor's `paragraphLimit`; ``hasExpandableBlurb`` (in
     /// `RecipeDetailViewModel+Blurb.swift`) is the visibility gate.
     public internal(set) var blurbBlocks: [ArticleBlock] = []
+
+    // MARK: - Add to Collection picker (DUT-1340)
+
+    /// Every collection the long-press "Add to Collection" picker renders.
+    /// Loaded by ``loadCollectionsForPicker()`` right before the sheet presents.
+    /// The commit + create action methods live in
+    /// `RecipeDetailViewModel+Collections.swift` (`file_length` discipline).
+    public internal(set) var pickerCollections: [RecipeCollection] = []
+    /// The collection ids the recipe already belongs to — the picker's seed
+    /// selection (its checkmarks). Loaded alongside ``pickerCollections``.
+    public internal(set) var pickerInitialSelection: Set<UUID> = []
 
     // MARK: - Servings scaler (US-31)
 
@@ -203,16 +215,33 @@ public final class RecipeDetailViewModel {
     /// surface is otherwise private to the view-model module.
     let dependencies: RecipeDetailDependencies
 
+    /// US-54 / T-932 — the on-device AI seam backing the "Summarize" affordance
+    /// (App-injected in production; a ``FakeIntelligenceService`` in tests).
+    /// `nil` when unwired — then ``isSummaryAvailable`` is `false` and the
+    /// affordance stays hidden. Mirrors the Shopping List substitution seam
+    /// (#735): depends only on the DODIntelligence PROTOCOL, never on
+    /// FoundationModels. State machine lives in `+Summary`.
+    let intelligence: (any DODIntelligenceService)?
+
+    /// US-54 / T-932 — the recipe/article summary surface state, driving the
+    /// summary sheet. `internal(set)` so the same-module `+Summary` extension
+    /// drives the state machine.
+    public internal(set) var summary: SummaryState = .idle
+
     public init(
         listItem: RecipeListItem,
         canonicalURL: URL,
         dependencies: RecipeDetailDependencies,
-        commentModeration: CommentModerationStore = CommentModerationStore()  // DUT-546 gap 3
+        commentModeration: CommentModerationStore = CommentModerationStore(),  // DUT-546 gap 3
+        // US-54 / T-932 — defaults to `nil` so existing call sites, tests, and
+        // previews compile unchanged; the App injects the real service.
+        intelligence: (any DODIntelligenceService)? = nil
     ) {
         self.listItem = listItem
         self.canonicalURL = canonicalURL
         self.dependencies = dependencies
         self.commentModeration = commentModeration
+        self.intelligence = intelligence
     }
 
     public func onAppear() async {
@@ -278,38 +307,6 @@ public final class RecipeDetailViewModel {
             checkedIngredientIDs.remove(id)
         } else {
             checkedIngredientIDs.insert(id)
-        }
-    }
-
-    public func toggleSaved() async {
-        do {
-            let nowSaved = try await dependencies.toggleSaved(id: listItem.id)
-            isSaved = nowSaved
-            if nowSaved {
-                await dependencies.sendTelemetry(.recipeSaved(recipeID: listItem.id))
-                snackbarMessage = "Saved."  // T-761 / CL-158 — lightweight favorite.
-            } else {
-                await dependencies.sendTelemetry(.recipeUnsaved(recipeID: listItem.id))
-                snackbarMessage = "Removed from saved."
-            }
-            // Refresh the saved-recipes home-screen widget snapshot so its
-            // timeline reflects the new state without waiting for
-            // WidgetKit's default 15-minute refresh (US-17 / AC-17.3 +
-            // AC-17.6). Fire-and-forget; errors are logged inside the
-            // dependency, never thrown.
-            await dependencies.publishSavedWidgetSnapshot()
-        } catch {
-            DODLog.persistence.error("toggle save failed: \(String(describing: error))")
-            // The store write never landed, so `isSaved` is deliberately left
-            // untouched above (no false flip) — but a silent no-op would leave
-            // the tap with zero feedback. Mirror `downloadForOffline()` /
-            // `removeDownload()` (`RecipeDetailViewModel+Download.swift`),
-            // which both surface a "Couldn't ... — try again." snackbar on
-            // catch instead of only logging.
-            snackbarMessage =
-                isSaved
-                ? "Couldn't remove from saved. Try again."
-                : "Couldn't save recipe. Try again."
         }
     }
 

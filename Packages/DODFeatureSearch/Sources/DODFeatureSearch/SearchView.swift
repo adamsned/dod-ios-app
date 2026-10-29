@@ -10,6 +10,12 @@ public struct SearchView: View {
     // when rendering the ingredient tier. Same cross-file-extension reason
     // the `SearchViewModel` storage was promoted from `private` (CL-106).
     @State var viewModel: SearchViewModel
+    /// v2 Search overhaul (2/3) — tracks search-field keyboard focus so the
+    /// type-ahead suggestions only show WHILE the user is actively typing (they
+    /// hide once the keyboard dismisses / a card is tapped). Fed by
+    /// `DODSearchField`'s `onFocusChange`. `internal` so the
+    /// `SearchView+Suggestions.swift` extension can gate the list on it.
+    @State var isFieldFocused = false
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     // DUT-700 PR-A — Reduce-Motion gate for the shopping-list snackbar ease.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -36,6 +42,15 @@ public struct SearchView: View {
     /// Optional + default nil so existing callers / previews / snapshots show no
     /// gear and stay unaffected. Production wires it through `TabStack`.
     public let onOpenSettings: (() -> Void)?
+    /// v2 Search overhaul (2/3) — Search is now presented as a bottom-up modal
+    /// (`.sheet`) from the Feed header's magnifying glass, not a pushed screen.
+    /// A sheet dismisses via a top-right "Done" (the repo nav convention —
+    /// system chevron for pushes, Done for sheets). When wired, the header's
+    /// trailing slot shows this Done button instead of the Settings gear (the
+    /// modal is a focused search context; Settings stays on the Feed root).
+    /// Optional + default nil so existing callers / previews / snapshots are
+    /// unaffected. Production wires it through `TabStack`.
+    public let onDone: (() -> Void)?
 
     public init(
         viewModel: SearchViewModel,
@@ -43,7 +58,8 @@ public struct SearchView: View {
         onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         onSelectCategory: @escaping (DODDomain.Category) -> Void = { _ in },
         openShoppingList: (() -> Void)? = nil,
-        onOpenSettings: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        onDone: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
@@ -51,6 +67,7 @@ public struct SearchView: View {
         self.onSelectCategory = onSelectCategory
         self.openShoppingList = openShoppingList
         self.onOpenSettings = onOpenSettings
+        self.onDone = onDone
     }
 
     public var body: some View {
@@ -60,9 +77,22 @@ public struct SearchView: View {
             // Recipes / Saved / Settings instead of a native white nav title.
             // DUT-551 (CL-306) — Settings gear in the trailing slot when wired.
             DODScreenHeader("Search") {
-                // DUT-572 — gear only in compact width (iPhone); iPad's sidebar
-                // already has a Settings row, so it's redundant in regular width.
-                if let onOpenSettings, horizontalSizeClass == .compact {
+                // v2 Search overhaul (2/3) — presented as a bottom-up `.sheet`,
+                // so the trailing slot hosts a "Done" dismissal (the repo
+                // sheet convention). It takes precedence over the Settings gear:
+                // the modal is a focused search context and the Feed root
+                // already owns the Settings gear.
+                if let onDone {
+                    Button("Done") { onDone() }
+                        .dodFont(DODType.bodyEmphasized)
+                        .tint(DODColor.burntOrange)
+                        // 44pt HIG tap target (matches DODHeaderGearButton).
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                        .accessibilityIdentifier("search-done")
+                } else if let onOpenSettings, horizontalSizeClass == .compact {
+                    // DUT-572 — gear only in compact width (iPhone); iPad's
+                    // sidebar already has a Settings row, redundant in regular.
                     DODHeaderGearButton { onOpenSettings() }
                 }
             }
@@ -76,6 +106,8 @@ public struct SearchView: View {
                 // T-779 / DUT-85: record a Recent on keyboard dismissal (focus
                 // loss), not on every live debounced search.
                 onFocusChange: { focused in
+                    // v2 Search overhaul (2/3): drive the type-ahead visibility.
+                    isFieldFocused = focused
                     if !focused { viewModel.commitRecentSearch() }
                 }
             )
@@ -83,6 +115,12 @@ public struct SearchView: View {
             .onSubmit { viewModel.commitRecentSearch() }
             .padding(DODSpacing.md)
             .accessibilityIdentifier("dod.search.field.search")
+            // v2 Search overhaul (2/3) — type-ahead suggestions, shown directly
+            // under the field WHILE it's focused and the local title pool
+            // yielded matches. Lives in `SearchView+Suggestions.swift`.
+            if isFieldFocused, !viewModel.suggestions.isEmpty {
+                suggestionsList
+            }
             // US-12 / AC-12.2 amendment / CL-106 (T-637): hide the filter
             // chip row while idle — the `IdleSuggestionsView` "Try" /
             // "Recent" layout below already serves as the discovery
@@ -224,31 +262,41 @@ public struct SearchView: View {
         case .idle:
             IdleSuggestionsView(
                 recents: viewModel.recentSearches,
-                // T-639 / CL-117: source the Try pills from the rotating
-                // `displayedTrySlate` (per-cold-launch shuffle, stable
-                // within session, Latest Recipes pinned first) instead
-                // of the pre-rotation `topCategorySuggestions` top-5.
-                topCategories: viewModel.displayedTrySlate,
+                // v2 Search overhaul (3/3): source the Try chips from
+                // `displayedTrySlate` — a per-cold-launch shuffle over the
+                // curated 100-term `SearchTryChips.pool` (stable within
+                // session; the pinned Latest Recipes pill was dropped in the
+                // v2 feed-search redesign, so all slots are pool terms).
+                tryChips: viewModel.displayedTrySlate,
                 onRecentTap: { viewModel.selectRecent($0) },
-                // DUT-1233: tapping a "Try" category pill BROWSES that
-                // category (like the "Categories" rows below already do),
-                // except "Latest Recipes" which keeps its own bespoke feed
-                // fetch. See `categoryTapAction(for:)` in
-                // `SearchView+CategoryTap.swift` for the full reasoning.
-                onCategoryTap: { category in
-                    switch Self.categoryTapAction(for: category) {
-                    case .surfaceLatestRecipes:
-                        Task { await viewModel.surfaceLatestRecipes() }
-                    case .browseCategory:
-                        onSelectCategory(category)
-                    }
+                // v2 Search overhaul (3/3): tapping a "Try" chip runs a normal
+                // TEXT search for its RAW `query` (the Title-Cased label is
+                // display-only), through the same debounce path as typing.
+                //
+                // REG-19 / CL-66 / T-670: route through
+                // `selectCuratedSuggestion(_:)` (not raw `query = ...`) so the
+                // resulting REST search does NOT persist the tapped term into
+                // the recent-searches store. The user tapped a curated chip;
+                // they did not type the term. Persisting it makes Clear All
+                // look broken because the same curated terms reappear under
+                // Recent.
+                onTryChipTap: { chip in
+                    // Every "Try" chip now runs a normal curated text search
+                    // (the special pinned "Latest Recipes" pill was removed in
+                    // the v2 feed-search redesign — the feed already surfaces
+                    // the latest recipes).
+                    viewModel.selectCuratedSuggestion(chip.query)
                 },
                 onClearRecents: { viewModel.clearRecentSearches() },
                 // US-33 / AC-33.3 / CL-57: per-term context-menu Clear.
                 onRemoveRecent: { viewModel.removeRecentSearch($0) },
                 // T-799 / CL-193: browse-categories list + tap handler.
                 categories: viewModel.browseCategories,
-                onCategorySelect: onSelectCategory
+                onCategorySelect: onSelectCategory,
+                // v2 Search overhaul (1/3) — Surprise Me lives on the idle page now
+                // (moved off the Feed header); it opens a random recipe via `onSelect`.
+                isSurpriseMeLoading: viewModel.isSurpriseMeLoading,
+                onSurpriseMe: { Task { await viewModel.surpriseMe(onSelect: onSelect) } }
             )
         case .searching:
             ProgressView()
@@ -300,83 +348,8 @@ public struct SearchView: View {
             resultsScroll(layout: RecipeListLayout(rawValue: layoutRaw) ?? .gallery)
         }
     }
-
-    /// US-38 / AC-38.3 — existing 2-col grid. Body byte-identical to the
-    /// pre-T-650 `.results` rendering. DUT-11: `internal` so the
-    /// `+IngredientSection` extension's `resultsScroll` can compose it.
-    var galleryResults: some View {
-        LazyVGrid(
-            columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
-            spacing: DODSpacing.md
-        ) {
-            ForEach(viewModel.items) { item in
-                // CL-255 — cook-time chip omitted (browse declutter); Search's
-                // time filter covers cook time for those who want it.
-                RecipeCard(
-                    title: item.title,
-                    excerpt: item.excerpt,
-                    heroImageURL: item.heroImage,
-                    // Highlight the COMMITTED query (`lastQuery`), not the live
-                    // `query` keystroke: the debounced fetch leaves stale cards
-                    // on screen, so the live term re-highlighted every card each
-                    // keystroke over the wrong substring ("chick" vs "chic").
-                    highlightQuery: viewModel.lastQuery
-                )
-                .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(
-                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
-                    onToggle: {
-                        // DUT-629 — optimistic flip, re-inverted on write failure.
-                        viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item) { didSave in
-                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
-                        }
-                    },
-                    // DUT-534 Part 2 — Search opts into the shared helper's
-                    // "Add to Shopping List" item (Categories/Saved don't).
-                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
-                )
-                // T-737 / L5: stable handle mirroring `dod.feed.card`.
-                .accessibilityIdentifier("dod.search.card")
-            }
-        }
-    }
-
-    /// US-38 / AC-38.4 — dense single-column variant. Composes the same
-    /// tap + context-menu modifiers as the gallery so US-34 / AC-34.1
-    /// / AC-34.6 long-press-Save/Unsave works identically. DUT-11:
-    /// `internal` so the `+IngredientSection` extension can compose it.
-    var listResults: some View {
-        // T-782 / DUT-88 — iPad tiles the rows into a multi-column grid; iPhone
-        // keeps the single-column LazyVStack.
-        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
-            ForEach(viewModel.items) { item in
-                // CL-255 — cook-time chip omitted (browse declutter); Search's
-                // time filter covers cook time for those who want it.
-                RecipeCard.ListRow(
-                    title: item.title,
-                    excerpt: item.excerpt,
-                    heroImageURL: item.heroImage,
-                    // Committed query — see the gallery call site's rationale.
-                    highlightQuery: viewModel.lastQuery
-                )
-                .recipeCardTap { onSelect(item) }
-                .recipeCardContextMenu(
-                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
-                    onToggle: {
-                        // DUT-629 — optimistic flip, re-inverted on write failure.
-                        viewModel.applyOptimisticSaveToggle(id: item.id)
-                        onSave?(item) { didSave in
-                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
-                        }
-                    },
-                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
-                )
-                .accessibilityIdentifier("dod.search.card")
-            }
-        }
-    }
 }
 
-// `FlowLayout`, `FilterChipRow`, `IdleSuggestionsView`, and the DUT-25
-// search-field affordance each live in their own file (400-line cap).
+// `FlowLayout`, `FilterChipRow`, `IdleSuggestionsView` (which hosts the v2
+// Surprise Me affordance), and the DUT-25 search-field affordance each live in
+// their own file (400-line cap).

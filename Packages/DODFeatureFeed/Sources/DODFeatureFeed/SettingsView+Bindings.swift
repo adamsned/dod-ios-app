@@ -49,7 +49,20 @@ extension SettingsView {
     var appearanceBinding: Binding<AppearancePreference> {
         Binding(
             get: { viewModel.appearance },
-            set: { viewModel.appearance = $0 }
+            // v2 "Seasoned Cast Iron" — flip the OLED-surface global here, at the
+            // actual mutation point (always runs, even though the `.id`-keyed
+            // Settings content is torn down + rebuilt on the same change). Setting
+            // it BEFORE the picker's new value propagates means the rebuilt
+            // sheet content re-resolves its dynamic surface colors against the
+            // correct flag. RootView's `@AppStorage` observer keeps the main
+            // window in sync too.
+            set: {
+                DODColor.isOLEDDark = $0.isOLEDDark
+                viewModel.appearance = $0
+                // v2 Seasoned Cast Iron → widgets: revert/apply the widget flag
+                // when the appearance itself changes (e.g. Seasoned → Cocoa).
+                syncWidgetSeasonedCastIron(for: $0)
+            }
         )
     }
 

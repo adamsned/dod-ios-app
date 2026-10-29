@@ -11,10 +11,10 @@ import XCTest
 /// fraction is still a callout aimed at the wrong tab.
 final class FirstCookoutCalloutAnchorTests: XCTestCase {
 
-    /// Tools is currently 3rd of 4 (Recipes, Saved, Tools, Search), so an evenly
-    /// distributed bar centers it at (2 + 0.5) / 4.
+    /// Tools is currently 3rd of 3 (Recipes, Saved, Tools; v2 moved Search to a
+    /// modal), so an evenly distributed bar centers it at (2 + 0.5) / 3.
     func test_toolsTabTailFraction_matchesToolsPositionInTheTabBar() {
-        XCTAssertEqual(RootView.toolsTabTailFraction, 0.625, accuracy: 0.0001)
+        XCTAssertEqual(RootView.toolsTabTailFraction, 2.5 / 3, accuracy: 0.0001)
     }
 
     /// The fraction must be DERIVED from `AppTab.allCases` — the single source of

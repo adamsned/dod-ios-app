@@ -45,6 +45,11 @@ extension RecipeStore {
     func tearDownUnsavedPins(_ row: CachedRecipe) throws {
         row.downloadedAt = nil
         try unpinImages(forRecipeID: row.id)
+        // DUT-105: an unsaved recipe leaves every collection too, so membership
+        // stays a subset of the saved set. Runs on both unsave paths (explicit
+        // `toggleSaved` + the `mergeDetail` cross-device unsave) because both go
+        // through here; the caller's `save()` commits the collection edits too.
+        try pruneRecipeFromCollections(id: row.id)
     }
 
     /// T-761 / CL-158 (DUT-67) — idempotently pin a recipe SAVED without

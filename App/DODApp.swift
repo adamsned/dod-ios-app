@@ -1,4 +1,7 @@
 import BackgroundTasks
+import DODDesignSystem
+import DODFeatureFeed
+import DODFeatureRecipeDetail
 import DODNetworking
 import DODPersistence
 import DODSupport
@@ -25,21 +28,34 @@ struct DODApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
-        // 1. Launch overrides first — they can clear/set the onboarding flag the
-        //    sync default is derived from.
+        // 1. Launch overrides first (they can clear/set the onboarding flag the
+        //    sync default is derived from).
         Self.applyTestLaunchOverrides()
-        // 2. Resolve the iCloud-Sync default while nothing has read it yet.
+        // 2. Resolve the iCloud-Sync default while nothing has read it yet (DUT-1090).
         Self.resolveCloudKitSyncDefaultIfNeeded()
+        // v2 "Seasoned Cast Iron": seed the OLED-surface global from the saved
+        // appearance BEFORE first render (a dynamic UIColor provider only re-runs
+        // on a trait change, which cold launch does not supply). RootView +
+        // SettingsView keep it in sync on later changes.
+        DODColor.isOLEDDark = AppearancePreference.fromDefaults(.standard).isOLEDDark
         // 3. Only now build the composition root (and with it the container).
-        _dependencies = State(initialValue: AppDependencies())
+        let dependencies = AppDependencies()
+        // 4. DUT-1388 — hand the Siri / Shortcuts intents their services now, not
+        //    in the scene `.task`: a background intent launch has no scene.
+        dependencies.registerAppIntents()
+        _dependencies = State(initialValue: dependencies)
+
+        // DUT-988 — Live Activity buzzer buttons route into the live Cook Mode session.
+        CookActivityIntentRouter.handler = { command in
+            switch command {
+            case .pulledIt: VoiceCommandBus.shared.dispatch(.next)
+            case .snooze: VoiceCommandBus.shared.dispatch(.snooze)
+            }
+        }
     }
 
-    /// One-time resolution of the iCloud-Sync opt-in default (fresh installs ON).
-    ///
-    /// `RecipeStore.cloudKitSyncOptIn(in:)` is a plain `defaults.bool(...)`, so an
-    /// unset key reads `false`. Rather than change that read (the container logic
-    /// and the DUT-630 simulator guard both depend on its exact semantics), we
-    /// materialize the key ONCE, here, before anything reads it.
+    /// One-time resolution of the iCloud-Sync opt-in default (fresh installs ON,
+    /// DUT-1090), run once at launch before the container reads the flag.
     ///
     /// The gate is deliberately narrow — only a genuinely fresh install defaults
     /// ON, disclosed by the welcome screen's standing disclosure line (which
@@ -144,6 +160,14 @@ struct DODApp: App {
             let defaults = UserDefaults.standard
             defaults.removeObject(forKey: "dod.moderation.blockedAuthorsV1")
             defaults.removeObject(forKey: "dod.moderation.hiddenCommentIDsV1")
+            // Same for the other UserDefaults-backed state the journeys mutate:
+            // the metric-units toggle and the shopping list (App Group suite,
+            // `ShoppingListStore.key`). CI's fresh simulator hides the leak, but
+            // on a reused simulator a prior run starts the next one in metric
+            // with a non-empty list.
+            defaults.removeObject(forKey: IngredientMetricConverter.preferenceKey)
+            UserDefaults(suiteName: WidgetSnapshotConfig.appGroupIdentifier)?
+                .removeObject(forKey: "dod.shoppingList.v1")
         }
     }
 }

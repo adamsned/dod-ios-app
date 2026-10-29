@@ -20,12 +20,13 @@ struct SearchResultMergerTests {
         #expect(merged.map(\.id) == [1, 2], "Exact tier must rank above substring tier")
     }
 
-    @Test func bodyOnlyMatchesAreDropped() {
-        // CL-120 / T-642: the merger now applies a title-precision
-        // filter. A REST hit whose title does NOT contain the query
-        // (in any tier — exact / substring / fuzzy) is dropped, no
-        // matter what WP returned it for. This is the verbatim
-        // false-positive contract from the round-9 backlog entry.
+    @Test func bodyOnlyMatchesAreDroppedFromTheTitleTier() {
+        // CL-120 / T-642: `merge` returns the TITLE tier only. A REST hit
+        // whose title does NOT contain the query (in any tier — exact /
+        // substring / fuzzy) is not part of that tier. v2 Search overhaul
+        // (2/3): the body-only hit is no longer globally discarded — it
+        // survives via `partition(...).contentMatches` (see below) — but
+        // `merge`'s title-precision contract is unchanged.
         let titleHit = item(1, title: "Cast Iron Skillet Nachos", excerpt: "x")
         let bodyOnly = item(2, title: "Cast Iron Bacon Wrapped Pickles", excerpt: "x")
         let merged = SearchResultMerger.merge(
@@ -35,8 +36,43 @@ struct SearchResultMergerTests {
         )
         #expect(
             merged.map(\.id) == [1],
-            "Body-only matches must not surface — title-precision contract (CL-120)"
+            "Only the title match is in the primary tier (CL-120)"
         )
+    }
+
+    // MARK: - v2 Search overhaul (2/3): partition surfaces content matches
+
+    @Test func partitionSplitsTitleAndContentTiers() {
+        // The body-only WP hit that `merge` drops from the title tier is
+        // exactly what `partition` exposes as a content match — the recipe
+        // that USES the term. Title tier stays tier-ordered; content tier
+        // preserves WP's arrival (relevance) order.
+        let exact = item(1, title: "Buttermilk", excerpt: "x")
+        let substring = item(2, title: "Buttermilk Biscuits", excerpt: "x")
+        let contentA = item(3, title: "Fried Chicken", excerpt: "uses buttermilk")
+        let contentB = item(4, title: "Ranch Dressing", excerpt: "uses buttermilk")
+        let partition = SearchResultMerger.partition(
+            query: "buttermilk",
+            restResults: [contentA, substring, contentB, exact]
+        )
+        #expect(partition.titleMatches.map(\.id) == [1, 2], "Title tier: exact then substring")
+        #expect(
+            partition.contentMatches.map(\.id) == [3, 4],
+            "Content tier: body-only hits survive, in WP relevance order"
+        )
+    }
+
+    @Test func partitionDedupesAcrossTiersById() {
+        // An id repeated in the response is collapsed; a title match never
+        // leaks into the content tier.
+        let titleHit = item(1, title: "Beef Chili", excerpt: "x")
+        let contentHit = item(2, title: "Cornbread", excerpt: "chili in body")
+        let partition = SearchResultMerger.partition(
+            query: "chili",
+            restResults: [titleHit, contentHit, titleHit, contentHit]
+        )
+        #expect(partition.titleMatches.map(\.id) == [1])
+        #expect(partition.contentMatches.map(\.id) == [2])
     }
 
     @Test func localIngredientHitsAreDroppedInV1OfCL120() {

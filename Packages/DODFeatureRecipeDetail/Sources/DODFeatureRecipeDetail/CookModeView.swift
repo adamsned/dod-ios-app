@@ -49,6 +49,10 @@ public struct CookModeView: View {
     /// a `.sheet` layers on top instead. `internal` so `CookModeView+StepBody`
     /// can flip it. Only shown when `heatCoachSheet != nil`.
     @State var isHeatCoachPresented: Bool = false
+    /// DUT-1385 — drives the "Ask About This Recipe" sheet over the cover.
+    @State var isAskPresented: Bool = false
+    /// DUT-970 — drives the Cast-Iron Rescue sheet.
+    @State var isRescuePresented: Bool = false
     /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
     /// screen, regardless of which step is shown, so a running timer on a step
     /// you've navigated away from still counts down + completes.
@@ -70,10 +74,12 @@ public struct CookModeView: View {
     /// unaffected (same seam as `onLogCook`). `internal` (not `private`) so
     /// `CookModeView+StepBody.swift` can gate the shortcut on it.
     let heatCoachSheet: (() -> AnyView)?
+    /// DUT-1385 — builds the "Ask About This Recipe" chat (title, recipe text);
+    /// `nil` hides the top-bar sparkle button. See `CookModeView+Ask.swift`.
+    let askSheet: ((String, String) -> AnyView)?
     /// Scale factor inherited from the host detail screen so the drawer
     /// ingredient rows agree with the scaled list the user just left. AC-7.5
     /// + US-31 carry-over.
-    /// `internal` so the drawer rows in `CookModeView+Ingredients.swift` can read it.
     let ingredientScaleFactor: Double
 
     // `internal` (not `private`) so `CookModeView+StepBody.swift` can resolve
@@ -113,13 +119,17 @@ public struct CookModeView: View {
     /// `CookModeView+Controls.swift` owns its lifecycle.
     @State var minimizeTask: Task<Void, Never>?
 
+    /// DUT-102 - Campfire Mode (max brightness, XXL text, Day/Night).
+    @State private var campfire = CampfireSession()
+
     public init(
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
         ingredientScaleFactor: Double = 1.0,
         onClose: @escaping (Set<UUID>) -> Void,
         onLogCook: ((CookLogEntry) -> Void)? = nil,
-        heatCoachSheet: (() -> AnyView)? = nil
+        heatCoachSheet: (() -> AnyView)? = nil,
+        askSheet: ((String, String) -> AnyView)? = nil
     ) {
         _viewModel = State(
             initialValue: CookModeViewModel(
@@ -131,6 +141,7 @@ public struct CookModeView: View {
         self.onClose = onClose
         self.onLogCook = onLogCook
         self.heatCoachSheet = heatCoachSheet
+        self.askSheet = askSheet
     }
 
     public var body: some View {
@@ -160,7 +171,26 @@ public struct CookModeView: View {
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                                heroView(topInset: topInset)
+                                // DUT-1392 — "Ask About This Recipe" sits right under
+                                // the recipe name (which is on the hero).
+                                VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                                    heroView(topInset: topInset)
+                                    askAboutRecipeLink
+                                    Button {
+                                        wakeControls()
+                                        isRescuePresented = true
+                                    } label: {
+                                        Label("Something not going right?", systemImage: "lifepreserver")
+                                            .dodFont(DODType.bodyEmphasized)
+                                            .foregroundStyle(DODColor.accent)
+                                            .frame(minHeight: 44)
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.horizontal, DODSpacing.md)
+                                    .accessibilityIdentifier("cook-mode-rescue")
+                                    .accessibilityHint("Quick fixes for sticking, heat and other cooking problems")
+                                }
                                 stepBody
                             }
                             .padding(.bottom, DODSpacing.md)
@@ -184,6 +214,22 @@ public struct CookModeView: View {
                 }
                 // Floating back + ingredients controls over the hero's blur strip.
                 cookModeTopBar()
+                // DUT-102 - one-tap Campfire Mode entry, below the top bar.
+                if !campfire.isActive && !viewModel.isFinished {
+                    Button {
+                        campfire.enter()
+                    } label: {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(DODColor.burntOrange)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Campfire Mode")
+                    .accessibilityIdentifier("cook-mode-campfire")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.top, 56)
+                    .padding(.trailing, DODSpacing.md + 48)
+                }
             }
             // The whole Cook Mode surface uses `surface` — the SAME token the
             // player panel + the rest of the app use — so it reads as one uniform
@@ -192,6 +238,22 @@ public struct CookModeView: View {
             .background(DODColor.surface.ignoresSafeArea())
         }
         .gesture(swipeGesture)
+        .overlay {
+            if campfire.isActive {
+                CampfireModeView(
+                    variant: campfire.variant,
+                    stepText: viewModel.currentStep.map { convertedStepText($0.text) } ?? "",
+                    stepLabel: stepCounterLabel,
+                    isFinished: viewModel.isFinished,
+                    timers: viewModel.stepTimers,
+                    currentStepIndex: viewModel.currentStepIndex,
+                    onPrev: { viewModel.goBack() },
+                    onNext: { advance() },
+                    onToggleVariant: { campfire.toggleVariant() },
+                    onExit: { campfire.exit() }
+                )
+            }
+        }
         .sheet(isPresented: $ingredientsDrawerVisible) {
             ingredientsDrawer
                 .presentationDetents([.medium, .large])
@@ -212,6 +274,11 @@ public struct CookModeView: View {
             if let heatCoachSheet {
                 heatCoachSheet()
             }
+        }
+        .sheet(isPresented: $isAskPresented) { askSheetContent }  // DUT-1385
+        .sheet(isPresented: $isRescuePresented) {  // DUT-970
+            CookModeRescueSheet(heatProfile: viewModel.rescueHeatProfile)
+                .presentationDetents([.medium, .large])
         }
         // DUT-328 — one-time "this may sound robotic, get a better voice" prompt
         // when Voice Mode turns on with only a robotic voice installed. Owns its
@@ -253,8 +320,8 @@ public struct CookModeView: View {
             wakeControls()
         }
         .onDisappear {
-            // DUT-596 — cancel the in-flight minimize task so it can't fire into
-            // a torn-down view.
+            campfire.exit()
+            // DUT-596 — cancel the in-flight minimize task ...
             minimizeTask?.cancel()
             minimizeTask = nil
             viewModel.endCookMode()
@@ -266,6 +333,7 @@ public struct CookModeView: View {
         // the `didBegin` / `priorIdleTimerDisabled` symmetry, so they never
         // double-restore against the `.onDisappear` `endCookMode` above.
         .onChange(of: scenePhase) { _, newPhase in
+            if newPhase != .active { campfire.exit() }
             Self.handleScenePhaseChange(newPhase, viewModel: viewModel)
         }
     }
@@ -314,7 +382,6 @@ public struct CookModeView: View {
     }
 
     // MARK: - Helpers
-
     private func advance() {
         if viewModel.isFinished {
             close()
@@ -326,6 +393,7 @@ public struct CookModeView: View {
     /// `internal` (not `private`) so the header's Done button in
     /// `CookModeView+Header.swift` can call it.
     func close() {
+        campfire.exit()
         viewModel.endCookMode()
         onClose(viewModel.checkedIngredientIDs)
     }

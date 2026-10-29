@@ -199,41 +199,19 @@ struct RecipeEntityQueryTests {
 
     // MARK: - entities(matching:)
 
-    @Test func entitiesMatchingIsCaseInsensitiveSubstringMatch() async throws {
-        let store = try await makeRegisteredStore()
-        for (id, title) in titledFixtures {
-            try await store.cache(listItem: makeListItem(id: id, title: title))
+    /// v2: `entities(matching:)` also searches the site (DUT-1388), so calling it
+    /// here would hit the network. Pin the case-insensitive title match on the
+    /// pure `rank` it delegates to. (A blank query is covered in
+    /// `SiriAppIntentsTests`.)
+    @Test func rankIsCaseInsensitiveTitleMatch() {
+        let local = titledFixtures.map {
+            RecipeEntityPayload.fromListItem(makeListItem(id: $0.id, title: $0.title))
         }
 
-        let result = try await RecipeEntityQuery().entities(matching: "BOURBON")
-        let first = try #require(result.first)
+        let result = RecipeEntityQuery.rank(local: local, remote: [], query: "BOURBON", limit: 10)
         #expect(result.count == 1)
-        #expect(first.id == 1)
-        #expect(first.title == "Bourbon Berry Cake")
-    }
-
-    /// Empirically verified (NOT the naive assumption from just reading the
-    /// source): with `Foundation` imported — as `RecipeEntity.swift` does —
-    /// `String.contains(_:)` resolves to Foundation's `NSString`-bridged
-    /// range-search overload, which treats an EMPTY needle as "not found"
-    /// (mirrors `NSString.range(of: "").location == NSNotFound`), NOT the
-    /// pure stdlib `Collection.contains` semantics (which would say every
-    /// string trivially contains the empty one). Confirmed with a minimal
-    /// `import Foundation; "x".contains("")` repro outside this test target:
-    /// `false` — the opposite of the pure-stdlib answer (`true` with no
-    /// Foundation import). So a blank Siri transcription matches NOTHING
-    /// here, not "everything" — arguably the more sensible outcome for a
-    /// search feature, and not reachable in practice (Siri won't hand this
-    /// method a blank transcription), but worth pinning since it inverts
-    /// what the source reads like it should do.
-    @Test func entitiesMatchingEmptyStringMatchesNothing() async throws {
-        let store = try await makeRegisteredStore()
-        for (id, title) in titledFixtures {
-            try await store.cache(listItem: makeListItem(id: id, title: title))
-        }
-
-        let result = try await RecipeEntityQuery().entities(matching: "")
-        #expect(result.isEmpty, "Foundation's contains(\"\") is false, so a blank query matches nothing")
+        #expect(result.first?.id == 1)
+        #expect(result.first?.title == "Bourbon Berry Cake")
     }
 
     // MARK: - entities(for identifiers:)

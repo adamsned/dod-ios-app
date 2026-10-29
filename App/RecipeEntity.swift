@@ -2,6 +2,7 @@ import AppIntents
 import CoreSpotlight
 import DODDomain
 import DODPersistence
+import DODSupport
 import Foundation
 
 /// `AppEntity` that exposes a Dutch Oven Daddy recipe to App Intents, Siri,
@@ -45,6 +46,11 @@ extension RecipeEntity {
         self.canonicalURL = payload.canonicalURL
     }
 
+    /// DUT-1388 — back to the value payload (for the save / Shopping List paths).
+    var payload: RecipeEntityPayload {
+        RecipeEntityPayload(id: id, title: title, excerpt: excerpt, heroImage: heroImage, canonicalURL: canonicalURL)
+    }
+
     /// Custom Spotlight attributes. The `IndexedEntity` protocol synthesizes
     /// a default `CSSearchableItemAttributeSet` from `displayRepresentation`,
     /// but we want the recipe excerpt searchable too and a stable content
@@ -73,11 +79,10 @@ struct RecipeEntityQuery: EntityQuery, EntityStringQuery {
     /// Look up specific entities by id. Called when the system has stored
     /// an entity identifier and needs to re-fetch the full payload.
     func entities(for identifiers: [RecipeEntity.ID]) async throws -> [RecipeEntity] {
-        guard let store = AppIntentEnvironment.store else { return [] }
         var result: [RecipeEntity] = []
         for id in identifiers {
-            if let recipe = try? await store.recipeWithoutTouching(id: id) {
-                result.append(RecipeEntity(payload: .fromRecipe(recipe)))
+            if let payload = await RecipeEntityQuery.payload(id: id) {
+                result.append(RecipeEntity(payload: payload))
             }
         }
         return result
@@ -89,18 +94,55 @@ struct RecipeEntityQuery: EntityQuery, EntityStringQuery {
         try await RecipeEntityQuery.suggestedPayloads().map(RecipeEntity.init(payload:))
     }
 
-    /// Fuzzy-name match for `EntityStringQuery`. The system passes the
-    /// raw transcription (e.g. "bourbon berry cake") and expects matching
-    /// entities back. We do a case-insensitive contains across saved +
-    /// recent — keeping the surface small means simple linear search is
-    /// fine here.
+    /// Name match for `EntityStringQuery`. The system passes the raw
+    /// transcription (e.g. "bourbon berry cake") and expects matching entities
+    /// back. DUT-1388 — searches the whole site, not just saved + recent, so
+    /// "Open <any recipe>" resolves (see ``searchPayloads(query:limit:)``).
     func entities(matching string: String) async throws -> [RecipeEntity] {
-        let needle = string.lowercased()
-        let pool = try await RecipeEntityQuery.suggestedPayloads()
-        return
-            pool
-            .filter { $0.title.lowercased().contains(needle) }
-            .map(RecipeEntity.init(payload:))
+        await RecipeEntityQuery.searchPayloads(query: string).map(RecipeEntity.init(payload:))
+    }
+
+    /// DUT-1388 — one recipe by id: the local cache first (network-free for
+    /// anything saved or opened), then the site for a recipe never opened here.
+    static func payload(id: Int) async -> RecipeEntityPayload? {
+        if let recipe = try? await AppIntentEnvironment.store?.recipeWithoutTouching(id: id) {
+            return .fromRecipe(recipe)
+        }
+        guard let item = try? await AppIntentEnvironment.actions?.fetchPost(id) else { return nil }
+        return .fromListItem(item)
+    }
+
+    /// DUT-1388 — title search across saved + recent AND the site, strongest
+    /// title match first. Local hits lead (they're the ones the cook knows);
+    /// a network failure (offline) degrades to local-only.
+    static func searchPayloads(query: String, limit: Int = 10) async -> [RecipeEntityPayload] {
+        let local = (try? await suggestedPayloads()) ?? []
+        let remote = ((try? await AppIntentEnvironment.actions?.searchRecipes(query)) ?? [])
+            .map(RecipeEntityPayload.fromListItem)
+        return rank(local: local, remote: remote, query: query, limit: limit)
+    }
+
+    /// Pure ranking for ``searchPayloads(query:limit:)``: keeps only TITLE
+    /// matches (``TitleSearchMatcher`` — the same precision rule in-app search
+    /// uses, so a body-only WP hit never wins), strongest tier first, local
+    /// before remote within a tier, de-duplicated by id.
+    static func rank(
+        local: [RecipeEntityPayload],
+        remote: [RecipeEntityPayload],
+        query: String,
+        limit: Int
+    ) -> [RecipeEntityPayload] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return [] }
+        var seen: Set<Int> = []
+        let scored = (local + remote).compactMap { payload -> (kind: TitleMatchKind, payload: RecipeEntityPayload)? in
+            guard seen.insert(payload.id).inserted,
+                let kind = TitleSearchMatcher.match(query: needle, title: payload.title)
+            else { return nil }
+            return (kind, payload)
+        }
+        // Swift's sort is stable, so local-before-remote order holds within a tier.
+        return scored.sorted { $0.kind < $1.kind }.prefix(limit).map(\.payload)
     }
 
     /// Shared payload assembly used by suggestions, string match, and

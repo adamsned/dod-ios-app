@@ -108,6 +108,10 @@ struct ToolbarGlyphChip: ViewModifier {
 
     let foreground: Color
 
+    /// v2 — the glyph color on iOS 26, where the system pill is the backdrop and
+    /// v2 keeps its existing state colors. `nil` falls back to ``foreground``.
+    var systemPillForeground: Color?
+
     func body(content: Content) -> some View {
         // DUT-1327 — iOS 26 groups the `.primaryAction` toolbar items in its own
         // system Liquid-Glass pill, so the per-glyph chip becomes a redundant
@@ -122,7 +126,7 @@ struct ToolbarGlyphChip: ViewModifier {
         // package's min deployment target, so that path must stay.
         if #available(iOS 26, *) {
             content
-                .foregroundStyle(foreground)
+                .foregroundStyle(systemPillForeground ?? foreground)
                 .shadow(color: .black.opacity(0.35), radius: 3)
         } else {
             content
@@ -143,8 +147,8 @@ extension View {
     /// `.ultraThinMaterial` circle with a fixed supplementary tint
     /// underneath. See ``ToolbarGlyphChip`` for the empirical verification
     /// behind this combination.
-    func toolbarGlyphChip(foreground: Color) -> some View {
-        modifier(ToolbarGlyphChip(foreground: foreground))
+    func toolbarGlyphChip(foreground: Color, systemPillForeground: Color? = nil) -> some View {
+        modifier(ToolbarGlyphChip(foreground: foreground, systemPillForeground: systemPillForeground))
     }
 }
 

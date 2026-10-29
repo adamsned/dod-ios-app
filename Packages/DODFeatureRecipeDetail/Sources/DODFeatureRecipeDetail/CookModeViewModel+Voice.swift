@@ -160,6 +160,46 @@ extension CookModeViewModel {
         pausedUtteranceIsStale = false  // DUT-1393 — a fresh read is current
     }
 
+    // MARK: - System Now Playing (DUT-1012)
+
+    /// The transport state Voice Mode publishes to the Lock Screen / Control Center.
+    public var nowPlayingSnapshot: NowPlayingSnapshot {
+        let state: NowPlayingSnapshot.State
+        switch playbackState {
+        case .speaking: state = .playing
+        case .paused: state = .paused
+        case .idle: state = .stopped
+        }
+        let shown = min(currentStepIndex + 1, max(stepCount, 1))
+        return NowPlayingSnapshot(
+            state: state,
+            title: isFinished ? "All done" : "Step \(shown) of \(stepCount)",
+            subtitle: recipe.title,
+            stepIndex: currentStepIndex,
+            stepCount: stepCount,
+            playbackRate: state == .playing ? voiceSpeedMultiplier : 0
+        )
+    }
+
+    /// Route a system transport command to the same methods the on-screen
+    /// controls and the Siri intents use.
+    public func handleNowPlayingCommand(_ command: NowPlayingRemoteCommand) {
+        switch command {
+        case .play:
+            if playbackState != .speaking { togglePlayback() }
+        case .pause:
+            pauseVoice()
+        case .togglePlayPause:
+            togglePlayback()
+        case .nextStep:
+            advanceStep()
+        case .previousStep:
+            previousStep()
+        case .replayStep:
+            replayCurrentStep()
+        }
+    }
+
     // MARK: - Voice pacing (DUT-325 / DUT-583)
 
     /// DUT-583 — the current speed as a display label for the speed button:
@@ -300,5 +340,11 @@ extension CookModeViewModel {
         voiceReader.resume()
         // DUT-583 — continue from the pause point (no restart); button → pause.
         playbackState = .speaking
+    }
+
+    /// DUT-988 — "2 More Min" from the Live Activity buzzer card. Restarts the
+    /// timer that just finished for two minutes; no-op when none has buzzed.
+    public func snoozeTimer() {
+        snoozeCompletedTimer(minutes: 2)
     }
 }

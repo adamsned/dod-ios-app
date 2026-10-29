@@ -16,7 +16,7 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     CODE_SIGN_STYLE: Automatic
     GENERATE_INFOPLIST_FILE: NO
-    MARKETING_VERSION: "1.0"
+    MARKETING_VERSION: "2.0"
     CURRENT_PROJECT_VERSION: "4"
 
 # Signing team is injected from a gitignored xcconfig so the Apple Team ID
@@ -57,6 +57,10 @@ packages:
     path: Packages/DODFeatureSaved
   DODFeatureProfile:
     path: Packages/DODFeatureProfile
+  # v2 on-device AI — leaf package holding the FoundationModels-backed
+  # intelligence service (the only place that imports FoundationModels).
+  DODIntelligence:
+    path: Packages/DODIntelligence
 
 targets:
   DODApp:
@@ -67,6 +71,8 @@ targets:
       # DUT-692 — the Control Center action intent is compiled into the APP too
       # (not just the widget) so `openAppWhenRun` can run it in the app process.
       - path: Shared/CookingToolIntents.swift
+      # DUT-988 — Live Activity buttons; `perform()` runs in the app process.
+      - path: Shared/CookActivityIntents.swift
     info:
       path: App/Info.plist
       # These keys MUST live here in project.yml. `xcodegen generate`
@@ -84,7 +90,7 @@ targets:
         # stage lets the cook snap a photo of their finished dish to share +
         # tag Dutch Oven Daddy. iOS requires this key — without it the app
         # crashes the instant the camera is accessed.
-        NSCameraUsageDescription: Take a photo of your finished cook to share it and tag Dutch Oven Daddy.
+        NSCameraUsageDescription: Take a photo to share your cook or to get cooking help from Dutch Oven Daddy.
         # DUT-23: app-identity key for anonymous comment POSTs. The app sends it
         # as the `X-DOD-App-Key` header so WordPress's
         # `rest_allow_anonymous_comments` filter accepts comment creation from
@@ -94,6 +100,12 @@ targets:
         # secret (see .github/workflows/release.yml). Blank in dev / PR builds,
         # where the app omits the header.
         DODCommentAPIKey: "$(DOD_COMMENT_API_KEY)"
+        # DUT-98: Sign in with Apple revoke Worker (5.1.1(v)). Read by
+        # `SiwaRevokeConfig.production`. Blank in the committed xcconfig (no
+        # secret in this public repo); blank = account deletion skips the
+        # token revoke. CI injects both at archive time (release.yml).
+        SiwaRevokeBaseURL: "$(SIWA_REVOKE_BASE_URL)"
+        SiwaRevokeSharedSecret: "$(SIWA_REVOKE_APP_SECRET)"
         # DUT-680: GA4 Measurement Protocol creds, read by GA4Transport via
         # `Bundle.main.object(forInfoDictionaryKey:)` to mirror in-app
         # recipe/article OPENS into Google Analytics 4 as content traffic. The
@@ -127,6 +139,13 @@ targets:
         # this from `CURRENT_PROJECT_VERSION`; it hardcodes "1" as the
         # default unless explicitly set here.
         CFBundleVersion: "5"
+        # The marketing/display version the Settings footer shows
+        # (SettingsViewModel.versionFooter reads CFBundleShortVersionString).
+        # Tied to MARKETING_VERSION so there's ONE source of truth — XcodeGen
+        # otherwise defaults this key to a literal "1.0" in the generated
+        # Info.plist, decoupled from the build setting. Bump MARKETING_VERSION
+        # (settings.base) to move both.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         LSRequiresIPhoneOS: true
         # UILaunchScreen is required for iOS to render edge-to-edge on
         # modern devices (notch, Dynamic Island, home indicator). Without
@@ -183,6 +202,7 @@ targets:
         UIBackgroundModes:
           - remote-notification
           - fetch
+          - audio      # DUT-1961: Now Playing / CarPlay controls for recipe video audio keep working on lock (owner OK 2026-10-27)
         # DUT-938 — must list every identifier passed to
         # `BGTaskScheduler.shared.register(forTaskWithIdentifier:...)`
         # (App/DODApp.swift `AppDelegate`) or registration is refused at
@@ -221,6 +241,8 @@ targets:
       - package: DODFeatureRecipeDetail
       - package: DODFeatureSaved
       - package: DODFeatureProfile
+      # v2 on-device AI — the Live intelligence service, App-injected.
+      - package: DODIntelligence
       # Widget extension (home-screen, US-9).
       - target: DODAppWidget
       # Live Activity extension (Cook Mode timer, US-11).
@@ -266,6 +288,9 @@ targets:
         # extension contract — version skew between host + extension
         # rejected at upload).
         CFBundleVersion: "5"
+        # Match the host app's display version (Apple rejects skew between an
+        # app and its extensions). Tracks MARKETING_VERSION like the app.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -289,6 +314,8 @@ targets:
     platform: iOS
     sources:
       - path: LiveActivity
+      # DUT-1534 — the Live Activity's buttons use the same intents as the app.
+      - path: Shared/CookActivityIntents.swift
     info:
       path: LiveActivity/Info.plist
       properties:
@@ -296,6 +323,9 @@ targets:
         # MUST match the host app's CFBundleVersion (Apple's bundle-
         # extension contract).
         CFBundleVersion: "5"
+        # Match the host app's display version (Apple rejects skew between an
+        # app and its extensions). Tracks MARKETING_VERSION like the app.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

@@ -25,7 +25,11 @@ public struct FeedView: View {
     /// 2-column grid byte-for-byte for users who never tap the toggle.
     @AppStorage(RecipeListLayout.storageKey) private var layoutRaw: String =
         RecipeListLayout.gallery.rawValue
-    public let onSelect: (RecipeListItem) -> Void
+    /// Tap-to-open. The second argument is the ORDERED list the tap came from
+    /// (the feed's current items), so the host can open the recipe inside a
+    /// left/right swipe pager over that list. Surprise Me passes just `[item]`
+    /// (a one-recipe context — nothing to page through).
+    public let onSelect: (RecipeListItem, [RecipeListItem]) -> Void
     /// US-34 / AC-34.1 — long-press → "Save" context menu wiring. Optional
     /// so existing callers (tests, previews) don't need to plumb it. nil
     /// here means the context menu still appears but the Save button is a
@@ -49,26 +53,40 @@ public struct FeedView: View {
     /// existing callers (tests / previews) can omit it; nil renders no gear.
     /// Production wires it through `TabStack` → `RootView.showSettingsSheet`.
     public let onOpenSettings: (() -> Void)?
+    /// v2 Search overhaul (1/3) — the header's magnifying-glass button opens the
+    /// Search screen, PUSHED within the Feed tab's own navigation stack (Search
+    /// is no longer a tab). `DODFeatureFeed` must not import `DODFeatureSearch`
+    /// (no feature→feature edge, CL-122), so the button calls this INJECTED
+    /// closure and the App shell fulfills it by appending the `.search` route to
+    /// the Feed path (mirrors `onOpenSettings`). Optional
+    /// so tests / previews can omit it — nil renders no search button.
+    public let onOpenSearch: (() -> Void)?
+
     /// Daddy Mode (Phase 1, cosmetic) — whether the signed-in user is the app
     /// owner, resolved once on appear (avoids a Keychain read per body
     /// recompute). Gates the owner-only compose button; OFF for everyone until
     /// Dad's real `sub` is configured in `OwnerGate`.
     @State private var isOwnerComposer = false
+    /// ⚠️ DEV DEBUG (strip before public release — see DevDebug.swift) — the
+    /// Settings "Dev Debug" toggle force-shows this owner UI for design review.
+    @AppStorage(DevDebug.forceShowOwnerUIKey) private var devForceShowOwnerUI = false
     /// Daddy Mode (Phase 1, cosmetic) — presents the honest compose placeholder.
     @State private var showingComposeSheet = false
 
     public init(
         viewModel: FeedViewModel,
-        onSelect: @escaping (RecipeListItem) -> Void,
+        onSelect: @escaping (RecipeListItem, [RecipeListItem]) -> Void,
         onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         openShoppingList: (() -> Void)? = nil,
-        onOpenSettings: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        onOpenSearch: (() -> Void)? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
         self.onSave = onSave
         self.openShoppingList = openShoppingList
         self.onOpenSettings = onOpenSettings
+        self.onOpenSearch = onOpenSearch
     }
 
     public var body: some View {
@@ -82,7 +100,15 @@ public struct FeedView: View {
                 // (CL-306) — the trailing slot now hosts the Settings gear (the
                 // old Cooking Tools menu + its onboarding callout are retired; the
                 // tools moved to the first-class Cooking Tools hub tab).
-                DODScreenHeader("Recipes & Articles") { headerTrailing }
+                DODScreenHeader("Recipes & Articles") {
+                    headerTrailing
+                }
+                // v2 feed-search redesign — the search entry is a full-width
+                // search bar under the title (Messages-style) instead of a
+                // corner glyph. Tapping it opens the Search screen (its rich
+                // idle: categories, Try chips, Surprise Me), via the same
+                // injected `onOpenSearch` seam the old button used.
+                searchBar
                 content
             }
         }
@@ -94,7 +120,9 @@ public struct FeedView: View {
         // the shopping-list one above since the two are effectively mutually
         // exclusive in practice (unrelated actions).
         .overlay(alignment: .bottom) { cookLogFailureSnackbar }
-        .background(DODColor.surface)
+        // DUT-1335 — fill the bottom safe area so no black bar shows under the
+        // floating tab bar (matches the detail screens + CookModeView).
+        .background(DODColor.surface.ignoresSafeArea())
         // DUT-275 — nav bar hidden: the header button lives in the pinned header
         // row above (next to the title) instead of the nav bar, so no nav-bar
         // height is reserved and the title sits at the same top Y as every other
@@ -119,58 +147,59 @@ public struct FeedView: View {
         .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
-    /// T-912 / DUT-551 (CL-306) — the Settings gear in the Feed header trailing
-    /// slot. Settings left the tab bar; the gear opens it as a sheet via the
-    /// injected `onOpenSettings` closure (`RootView.showSettingsSheet`). Rendered
-    /// only when wired, so tests / previews that omit the closure show no gear.
-    /// Uses the shared, bigger ``DODHeaderGearButton`` so the gear matches the
-    /// Saved / Cooking Tools / Search headers exactly.
-    /// The Feed header's trailing slot. Groups the owner-only compose button
-    /// (Daddy Mode, Phase 1) with the long-standing Settings gear in one HStack
-    /// (`DODScreenHeader`'s trailing is a single `@ViewBuilder`). The compose
-    /// button self-gates on owner status, so non-owners see only the gear —
-    /// byte-identical to the pre-Daddy-Mode header.
+    /// The Feed header's trailing slot: the owner-only compose button (Daddy
+    /// Mode, Phase 1) + the Settings gear, in one HStack (`DODScreenHeader`'s
+    /// trailing is a single `@ViewBuilder`). Search moved OFF the corner into a
+    /// full-width `searchBar` under the title (v2 feed-search redesign). The
+    /// compose button self-gates on owner status; the gear opens Settings via the
+    /// injected `onOpenSettings` closure using the shared ``DODHeaderGearButton``.
     @ViewBuilder
     private var headerTrailing: some View {
         HStack(spacing: DODSpacing.xs) {
-            surpriseMeButton
             composeButton
             settingsGear
         }
     }
 
-    /// DUT-939 — "Surprise Me" (Android parity: Android already ships a
-    /// random-recipe entry point, iOS didn't). Mirrors ``composeButton``'s
-    /// styling (44pt hit target, burnt-orange tint) so it reads as the same
-    /// family of header affordance as the gear/compose buttons. Disabled
-    /// (not hidden) while the feed has no items yet, so the header layout
-    /// never shifts as the initial load resolves.
-    ///
-    /// DUT-1062: `surpriseMe(onSelect:)` is now `async` — it fetches a truly
-    /// random recipe from the full WP catalog (falling back to the old
-    /// in-memory sample only if that fetch fails), so the tap now spawns a
-    /// `Task` and the button shows a spinner in place of the dice glyph
-    /// while `isSurpriseMeLoading`, plus disables re-tapping mid-fetch.
+    /// v2 feed-search redesign — the Search entry point: a full-width search
+    /// BAR under the "Recipes & Articles" title (replacing the old corner
+    /// magnifying-glass), styled to match the brand ``DODSearchField`` (a
+    /// `surfaceElevated` capsule with a leading glyph + soft shadow). It's a
+    /// read-only affordance: tapping calls the injected ``onOpenSearch`` — the
+    /// same seam the old button used, which the App shell fulfills by opening
+    /// the Search screen (its rich idle: categories, Try chips, Surprise Me).
+    /// Keeps the `feed-open-search` id so the existing UI/E2E journeys still
+    /// find it. Rendered only when wired, so tests / previews that omit the
+    /// closure show no bar and the layout stays byte-identical for them.
     @ViewBuilder
-    private var surpriseMeButton: some View {
-        Button {
-            Task { await viewModel.surpriseMe(onSelect: onSelect) }
-        } label: {
-            Group {
-                if viewModel.isSurpriseMeLoading {
-                    ProgressView()
-                } else {
-                    Image(systemName: "dice.fill")
-                        .font(.title2)
+    private var searchBar: some View {
+        if let onOpenSearch {
+            Button {
+                onOpenSearch()
+            } label: {
+                HStack(spacing: DODSpacing.xs) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(DODColor.labelSecondary)
+                        .accessibilityHidden(true)
+                    Text("Search Recipes")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.labelSecondary)
+                    Spacer(minLength: 0)
                 }
+                .padding(.vertical, DODSpacing.sm)
+                .padding(.horizontal, DODSpacing.md)
+                .background(Capsule(style: .continuous).fill(DODColor.surfaceElevated))
+                .shadow(color: DODColor.charcoal.opacity(0.12), radius: 4, x: 0, y: 1)
+                .contentShape(Capsule())
             }
-            .accessibilityLabel("Surprise Me")
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .padding(.horizontal, DODSpacing.md)
+            .padding(.top, DODSpacing.xs)
+            .padding(.bottom, DODSpacing.sm)
+            .accessibilityIdentifier("feed-open-search")
+            .accessibilityLabel("Search recipes")
+            .accessibilityAddTraits(.isSearchField)
         }
-        .tint(DODColor.burntOrange)
-        .accessibilityIdentifier("feed-surprise-me")
-        .disabled(viewModel.items.isEmpty || viewModel.isSurpriseMeLoading)
     }
 
     /// Daddy Mode (Phase 1, cosmetic) — the owner-only compose entry point.
@@ -179,17 +208,22 @@ public struct FeedView: View {
     /// authorizes nothing. Hidden entirely for non-owners.
     @ViewBuilder
     private var composeButton: some View {
-        if isOwnerComposer {
+        // ⚠️ DEV DEBUG (strip before public release) — `devForceShowOwnerUI`
+        // reveals this owner button for design review; it stays a placeholder.
+        if isOwnerComposer || devForceShowOwnerUI {
             Button {
                 showingComposeSheet = true
             } label: {
                 Image(systemName: "square.and.pencil")
                     .font(.title2)
+                    // v2 animation refresh — explicit foreground (was `.tint`)
+                    // for the pressable style; renders byte-identically.
+                    .foregroundStyle(DODColor.burntOrange)
                     .accessibilityLabel("Compose Post")
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .tint(DODColor.burntOrange)
+            .buttonStyle(.dodPressable)
             .accessibilityIdentifier("feed-compose-button")
         }
     }

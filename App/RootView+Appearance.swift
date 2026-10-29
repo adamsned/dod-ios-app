@@ -1,3 +1,4 @@
+import DODDesignSystem
 import DODFeatureFeed
 import SwiftUI
 
@@ -19,5 +20,15 @@ extension RootView {
     /// ``AppearancePreference/colorScheme`` (RootView + SettingsView agree).
     func preferredColorScheme(for value: AppearancePreference) -> ColorScheme? {
         value.colorScheme
+    }
+
+    /// v2 "Seasoned Cast Iron" — mirror the current appearance preference onto
+    /// the `DODColor.isOLEDDark` process-global (DODDesignSystem can't import
+    /// this module, so the flag is a plain bool the app owns). Called on appear
+    /// and on every appearance change; `DODApp.init` seeds it before first
+    /// render. Only the OLED theme sets it `true`, so Cocoa's asset-catalog dark
+    /// surfaces are untouched.
+    func syncOLEDDarkFlag() {
+        DODColor.isOLEDDark = appearance.isOLEDDark
     }
 }

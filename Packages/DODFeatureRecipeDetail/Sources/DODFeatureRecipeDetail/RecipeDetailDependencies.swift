@@ -165,8 +165,7 @@ public protocol RecipeDetailDependencies: Sendable {
     //
     // Two narrow reads that let the ratings section attach the CURRENT user's
     // Cook Rank (+ owner badge) to their OWN comment rows. Defaults + live impls
-    // live in `RecipeDetailDependencies+Profile.swift`. Both are safe no-ops by
-    // default so existing fakes keep compiling; display-only, authorize nothing.
+    // live in `RecipeDetailDependencies+Profile.swift`; display-only.
 
     /// The local rank-ladder cook count (`CookLogStats.rankLadderCookCount`),
     /// which `CookProgression.currentRank` maps to the user's Cook Rank.
@@ -177,15 +176,30 @@ public protocol RecipeDetailDependencies: Sendable {
 
     // MARK: - Add to Shopping List (US-39 / DUT-534)
 
-    /// DUT-534 — append this recipe's ingredients to the Shopping List. Recipe
-    /// Detail carries a fully-loaded `recipe` (ingredients populated), so no
-    /// hydration happens here; the live wiring routes to
-    /// `DODFeatureSaved.LiveShoppingListAppender` (App-Group store), which this
-    /// package can't import directly — hence the seam. Returns the appended-row
-    /// count / `.couldntLoad` so the view model picks the Snackbar copy. Default
-    /// `.couldntLoad` so fakes that don't model the list keep compiling — the
-    /// default impl lives in the extension below.
+    /// DUT-534 — append this recipe's ingredients to the Shopping List. The live
+    /// wiring routes to `DODFeatureSaved.LiveShoppingListAppender` (App-Group
+    /// store), which this package can't import directly — hence the seam. Default
+    /// `.couldntLoad` lives in the extension below so fakes keep compiling.
     func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult
+
+    // MARK: - Handwritten annotations (iPad + Apple Pencil, v2)
+    //
+    // Per-recipe PencilKit drawing persistence. Defaults + the live file-store
+    // routing live in `RecipeDetailDependencies+Annotations.swift`; the record
+    // is Foundation-only `Data` so this seam stays platform-agnostic.
+    func loadRecipeAnnotation(recipeID: Int) async -> RecipeAnnotationRecord?
+    func saveRecipeAnnotation(_ record: RecipeAnnotationRecord, recipeID: Int) async
+
+    // MARK: - Recipe collections (DUT-1340)
+    //
+    // Data-only seam for the long-press "Add to Collection" picker. Routes to
+    // `RecipeStore`'s public collection CRUD so detail never depends on
+    // `DODFeatureSaved`. Defaults + live impls live in
+    // `RecipeDetailDependencies+Collections.swift`.
+    func collections() async throws -> [RecipeCollection]
+    func createCollection(name: String) async throws -> RecipeCollection
+    func collectionIDs(forRecipe recipeID: Int) async throws -> Set<UUID>
+    func setCollections(forRecipe recipeID: Int, to collectionIDs: Set<UUID>) async throws
 }
 
 extension RecipeDetailDependencies {
@@ -210,8 +224,7 @@ extension RecipeDetailDependencies {
     public func cachePendingComment(_ comment: RecipeComment, postID: Int) async {}
 
     /// DUT-534 — default `.couldntLoad` so fakes that don't model the Shopping
-    /// List keep compiling. ``LiveRecipeDetailDependencies`` overrides to route
-    /// to `DODFeatureSaved.LiveShoppingListAppender` via the App-wired closure.
+    /// List keep compiling. ``LiveRecipeDetailDependencies`` overrides it.
     public func addToShoppingList(_ recipe: Recipe) async -> AddToShoppingListResult {
         .couldntLoad
     }
@@ -340,14 +353,8 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
         try JSONLDRecipeParser.parse(html: html, merging: merging, canonicalURL: canonicalURL)
     }
 
-    /// Fetches 5 (one more than the 4 the strip shows) so the caller's
-    /// self-exclusion filter (`loadRelated` drops the recipe currently being
-    /// viewed, which can appear in its own category's listing) still has a
-    /// full 4 to show after filtering. Deliberately does NOT truncate to 4
-    /// here — truncating before the caller filters could drop the one buffer
-    /// item that would have backfilled a self-match, silently under-filling
-    /// the strip to 3.
     public func relatedRecipes(forCategoryID categoryID: Int) async throws -> [RecipeListItem] {
+        // No `prefix(4)` here: `loadRelated` drops the current recipe, then shows 4 (#728).
         try await client.posts(categoryID: categoryID, page: 1, perPage: 5)
     }
 

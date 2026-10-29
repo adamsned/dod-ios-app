@@ -43,33 +43,30 @@ public struct SettingsView: View {
     /// `internal` (not `private`) so `snackbarOverlay` in `SettingsView+Feedback.swift`
     /// reads it across the file_length split (DUT-694).
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    /// Closure the Clear Cache row delegates to. Returns the total
-    /// bytes freed so the snackbar can format the "Freed X.X MB" copy.
-    /// Optional so previews + snapshot tests don't need to plumb a
-    /// `RecipeStore` — the button surfaces the zero-bytes copy when
-    /// nil. Production callers (composition root, FeedView's gear icon)
-    /// always pass a non-nil closure.
+    /// Clear Cache row's delegate; returns bytes freed for the "Freed X.X MB"
+    /// snackbar. Optional so previews / snapshot tests skip plumbing a
+    /// `RecipeStore` (nil surfaces the zero-bytes copy); production always wires it.
     public let onClearImageCache: (() async throws -> Int)?
-    /// DUT-572 — hides the top Profile section when true. Injected from RootView's
-    /// real device size class because this sheet always reports `.compact` on iPad
-    /// (see ``ProfileSettingsSection``); hides on iPad, shows on iPhone.
+    /// DUT-572 — hides the top Profile section on iPad (this sheet always reports
+    /// `.compact`, so RootView injects the real size class). See ``ProfileSettingsSection``.
     private let hidesProfile: Bool
-    /// DUT-941 — threaded down through `ProfileSettingsSection` to
-    /// `OwnerToolsPlaceholderView`'s owner-only "Send Test New-Post
-    /// Notification" button. `nil` by default so existing callers/previews
-    /// compile unchanged (button hidden).
+    /// DUT-941 — threaded through `ProfileSettingsSection` to the owner-only
+    /// recipe test-fire button. `nil` by default (button hidden for non-owners).
     private let sendTestNotification: (() async -> Void)?
     /// DUT-1333 — companion closure for the article test-fire button.
     private let sendTestArticleNotification: (() async -> Void)?
-    /// DUT-694 (PR-D) — in-flight guard for the Clear Cache row. Set while a clear
-    /// runs so a double-tap can't kick off two overlapping clears (which showed
-    /// contradictory snackbars). Also `.disabled`-s the button. `internal` so the
-    /// action in `SettingsView+Feedback.swift` can flip it across the file split.
+    /// DUT-694 (PR-D) — in-flight guard for the Clear Cache row (blocks a
+    /// double-tap double-clear). `internal` for `SettingsView+Feedback.swift`.
     @State var isClearingCache = false
-    // DUT-162: Export My Data in-flight guard + the generated-file box that
-    // drives the share sheet (see `SettingsView+Export.swift`).
+    // DUT-162 — Export My Data: in-flight guard + the generated-file box that
+    // drives the share `.sheet(item:)` (see `SettingsView+Export.swift`).
     @State var isExporting = false
     @State var exportItem: ExportShareItem?
+    // ⚠️ DEV DEBUG — strip before public; see SettingsView+DevDebug.swift.
+    @AppStorage(DevDebug.unlockedKey) var devDebugUnlocked = false
+    @AppStorage(DevDebug.forceShowOwnerUIKey) var devForceShowOwnerUI = false
+    @State var devDebugIsOwner = false
+    @AppStorage(Self.appearanceAppliesToWidgetsKey) var appearanceAppliesToWidgets = false
 
     public init(
         viewModel: SettingsViewModel? = nil,
@@ -96,6 +93,14 @@ public struct SettingsView: View {
         VStack(spacing: 0) {
             content
         }
+        // v2 "Seasoned Cast Iron" — force the sheet's content subtree to
+        // re-resolve its dynamic surface colors when the theme changes.
+        // Cocoa→Seasoned is a dark→dark switch, so `.preferredColorScheme`
+        // below reports no trait change and the `DODColor` UIColor providers
+        // wouldn't otherwise re-run. Keyed here (inside the NavigationStack the
+        // sheet wraps in `RootView+Settings.swift`) so the nav chrome + Done
+        // button survive; the List may reset its scroll offset on a theme pick.
+        .id(viewModel.appearance)
         .background(DODColor.surface)
         // DUT-551 (CL-306) — Settings is now a pushed-feeling sheet: an inline
         // nav title + a leading back button (below) that dismisses it, replacing
@@ -208,11 +213,9 @@ public struct SettingsView: View {
 
             // MARK: T-750 / CL-147 — Notification Settings group
 
-            // DUT-1333 — the recipe-drop toggle (US-36 AC-36.1) + the new
-            // "When a New Article Drops" toggle (replaced the never-deliverable
-            // comment-reply toggle) grouped under one header. The article toggle
-            // persists + secures notification permission; delivery follows the
-            // DUT-1332 APNs trigger.
+            // DUT-1333 — recipe-drop toggle (US-36 AC-36.1) + the new article-drop
+            // toggle (replaced the never-deliverable comment-reply one); delivery
+            // follows the DUT-1332 APNs trigger.
             Section {
                 Toggle(isOn: notificationsEnabledBinding) {
                     Text("When New Recipes Drop")
@@ -238,9 +241,8 @@ public struct SettingsView: View {
 
             // MARK: T-752 / CL-149 — Customization group
 
-            // DUT-58 — Appearance picker + the Cook Mode Voice rows
-            // (`VoiceRows`, `SettingsView+Voice.swift`) grouped under one
-            // "Customization" header.
+            // DUT-58 — Appearance picker + Cook Mode Voice rows (`VoiceRows`),
+            // grouped under one "Customization" header.
             Section {
                 Picker(selection: appearanceBinding) {
                     ForEach(AppearancePreference.allCases, id: \.self) { value in
@@ -256,6 +258,7 @@ public struct SettingsView: View {
                 // default system blue).
                 .tint(DODColor.burntOrange)
                 .accessibilityIdentifier("settings-picker-appearance")
+                appliesToWidgetsToggle  // v2 Seasoned Cast Iron → widgets
                 LayoutSettingPicker()
 
                 VoiceRows(viewModel: viewModel)
@@ -323,8 +326,8 @@ public struct SettingsView: View {
             }
             .listRowBackground(DODColor.surfaceElevated)
 
-            // About + version footer (split into `SettingsView+About.swift`
-            // to keep this file under the SwiftLint 400-line file_length cap).
+            // About + Dev Debug + version footer (split into `SettingsView+About.swift`
+            // to keep this file under the SwiftLint 400-line `file_length` cap).
             aboutAndVersionSections
         }
         .scrollContentBackground(.hidden)
@@ -335,8 +338,9 @@ public struct SettingsView: View {
         // `snackbarMessage`) so error + notification-deny snackbars don't buzz, and
         // the system switches keep self-haptic-ing without a duplicate here.
         .sensoryFeedback(.success, trigger: viewModel.cacheClearSuccessCount)
-        // DUT-162: present the export file in the system share sheet (iOS-only).
+        // DUT-162 — present the export file in the system share sheet (iOS-only).
         .exportDataShareSheet($exportItem)
+        .task { devDebugIsOwner = OwnerGate.isCurrentUserOwner() }  // ⚠️ DEV DEBUG
 
         #if os(iOS)
         baseList.listStyle(.insetGrouped)

@@ -80,6 +80,30 @@ extension RecipeStore {
         return Set(try modelContext.fetch(descriptor).map(\.id))
     }
 
+    /// DUT-1339 — the id set of cached recipes that read as a dessert, so the
+    /// Saved tab's "Desserts" filter chip can narrow to them. Dessert-ness is a
+    /// pure function of the recipe's own `categoryIDs` + `recipeCategory`
+    /// (``Recipe/isDessert(categoryIDs:recipeCategory:)`` — the same decision
+    /// Cook Mode's spoken line uses, DUT-325), so it's computed from the LOCAL
+    /// ``CachedRecipe`` cache rather than persisted on the CloudKit-mirrored
+    /// ``SyncedSavedRecipe`` (no mirrored-schema change, nothing to deploy).
+    /// The two dessert signals can't be expressed in a `#Predicate` (an OR over
+    /// a whole-word course match), so this fetches and filters in memory; the
+    /// cache is LRU-bounded (NFR-1), and the Saved tab intersects the result
+    /// with its displayed saved set. A recipe saved on another device but never
+    /// opened here has no `CachedRecipe` row yet, so it simply isn't flagged a
+    /// dessert until its detail first hydrates the cache — best-effort, exactly
+    /// like the download-badge / widget projections.
+    public func dessertRecipeIDs() throws -> Set<Int> {
+        let rows = try modelContext.fetch(FetchDescriptor<CachedRecipe>())
+        return Set(
+            rows.filter {
+                Recipe.isDessert(categoryIDs: $0.categoryIDs, recipeCategory: $0.recipeCategory)
+            }
+            .map(\.id)
+        )
+    }
+
     /// Fetch the most-recently-saved recipes, projected into the narrow
     /// shape the saved-recipes widget snapshot needs (spec.md US-17 /
     /// AC-17.3). Sorted by `lastViewedAt` descending, capped at `limit`.

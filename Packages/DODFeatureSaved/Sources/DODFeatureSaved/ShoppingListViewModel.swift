@@ -1,4 +1,5 @@
 import DODDomain
+import DODIntelligence
 import DODSupport
 import Foundation
 import Observation
@@ -84,7 +85,7 @@ public final class ShoppingListViewModel {
     }
 
     /// Every row in the list, in insertion order (per-recipe, un-merged).
-    public private(set) var items: [Item]
+    public internal(set) var items: [Item]
 
     /// Rows the user has checked off while shopping (AC-39.5). Ephemeral.
     public private(set) var checkedIDs: Set<UUID> = []
@@ -97,6 +98,21 @@ public final class ShoppingListViewModel {
     /// inits and for any environment where the App Group suite can't be opened —
     /// in that case the list is in-memory-only exactly as it was under CL-82.
     private let store: ShoppingListStore?
+
+    /// v2 on-device AI seam (App-injected ``LiveDODIntelligenceService`` in
+    /// production; a ``FakeIntelligenceService`` in tests / previews). `nil`
+    /// when no service is wired — then ``isSubstitutionAvailable`` is `false`
+    /// and the substitution affordance stays hidden. The VM depends only on the
+    /// DODIntelligence PROTOCOL — it never imports FoundationModels.
+    let intelligence: (any DODIntelligenceService)?
+
+    /// Current state of the ingredient-substitution surface (US-v2 AI). Drives
+    /// ``ShoppingListView``'s substitution sheet. Observed so the sheet reacts
+    /// to the loading → loaded / notFound transition. See
+    /// `ShoppingListViewModel+Substitution.swift` for the request flow.
+    /// `internal(set)` (not `private(set)`) so the same-module substitution
+    /// extension in the sibling file can drive the state machine.
+    public internal(set) var substitution: SubstitutionState = .idle
 
     /// The `UserDefaults` the shared "Use Metric Units" preference
     /// (``IngredientMetricConverter/preferenceKey``) is read from by
@@ -119,15 +135,20 @@ public final class ShoppingListViewModel {
     ///   - items: The rows to seed the list with (explicit, authoritative).
     ///   - store: Where later mutations persist to. Defaults to the real
     ///     App-Group store; pass `nil` (mock/preview/tests) to stay in memory.
+    ///   - intelligence: The on-device AI seam backing the substitution
+    ///     affordance. Defaults to `nil` (affordance hidden) so explicit-data
+    ///     inits stay AI-free unless a caller opts in.
     ///   - defaults: where the "Use Metric Units" preference is read from by
     ///     a later ``add(recipes:)`` call. Defaults to `.standard`; pass a
     ///     test-scoped suite in tests.
     public init(
         items: [Item],
         store: ShoppingListStore? = ShoppingListStore(),
+        intelligence: (any DODIntelligenceService)? = nil,
         defaults: UserDefaults = .standard
     ) {
         self.store = store
+        self.intelligence = intelligence
         self.defaults = defaults
         self.items = items
         rebuildVisibleItems()
@@ -139,8 +160,16 @@ public final class ShoppingListViewModel {
     /// from it so opening the list shows exactly what the cook last saw; with no
     /// saved list it starts empty-first (DUT-487 / T-906). Explicit-data inits
     /// deliberately do NOT take this path — see ``init(items:store:)``.
-    public init(store: ShoppingListStore? = ShoppingListStore(), defaults: UserDefaults = .standard) {
+    ///
+    /// - Parameter intelligence: The on-device AI seam backing the substitution
+    ///   affordance (App-injected in production). `nil` hides the affordance.
+    public init(
+        store: ShoppingListStore? = ShoppingListStore(),
+        intelligence: (any DODIntelligenceService)? = nil,
+        defaults: UserDefaults = .standard
+    ) {
         self.store = store
+        self.intelligence = intelligence
         self.defaults = defaults
         if let snapshot = store?.load() {
             self.items = snapshot.items
@@ -227,7 +256,7 @@ public final class ShoppingListViewModel {
     /// `markAlreadyHave`, `clearAll`) so the one filter runs on change instead of
     /// per-access. `toggleChecked` is deliberately NOT a caller — it touches only
     /// `checkedIDs`, which doesn't affect which rows are visible.
-    private func rebuildVisibleItems() {
+    func rebuildVisibleItems() {
         visibleItems = items.filter { !alreadyHaveIDs.contains($0.id) }
     }
 
@@ -265,14 +294,11 @@ public final class ShoppingListViewModel {
         persist()
     }
 
-    /// Mark a row "I already have this" — it drops out of the still-need list
-    /// (CL-82). The row is REMOVED from `items` outright (DUT-589) rather than
-    /// merely masked by `alreadyHaveIDs`, so the persisted App-Group blob shrinks
-    /// with it instead of growing without bound; its id is also purged from both
-    /// ephemeral sets so no parallel bookkeeping lingers. The trailing-swipe UX
-    /// (ShoppingListView) is unchanged — the row still disappears from the list,
-    /// and every other row's checked state survives (only this row's state is
-    /// dropped). Persists (DUT-488).
+    /// Mark a row "I already have this" (the trailing trash button) — it drops
+    /// out of the still-need list (CL-82). The row is REMOVED from `items`
+    /// outright (DUT-589) rather than masked by `alreadyHaveIDs`, so the persisted
+    /// App-Group blob shrinks with it; its id is purged from both ephemeral sets.
+    /// Persists (DUT-488).
     public func markAlreadyHave(_ item: Item) {
         items.removeAll { $0.id == item.id }
         alreadyHaveIDs.remove(item.id)
@@ -324,66 +350,7 @@ public final class ShoppingListViewModel {
     /// Save the current list state to ``store`` (DUT-488). No-op when `store` is
     /// nil (mock / preview / no App Group), and never throws — see
     /// ``ShoppingListStore``.
-    private func persist() {
+    func persist() {
         store?.save(items: items, checked: checkedIDs, alreadyHave: alreadyHaveIDs)
     }
-}
-
-// MARK: - Construction from recipes
-
-extension ShoppingListViewModel {
-
-    /// Build a view-model from recipes, exploding each recipe's ingredients
-    /// into per-recipe rows classified by ``IngredientAisleClassifier``
-    /// (CL-77 — no cross-recipe merge). This is the shape T-680c's production
-    /// initializer reuses once the entry surfaces feed real recipes in. Takes
-    /// the exploded rows AS-IS through ``init(items:store:)`` (DUT-488) — it is
-    /// NOT auto-loaded, so an explicit recipe build is never clobbered by a
-    /// saved list. `store` defaults to the real App-Group store; pass `nil` to
-    /// build in memory only.
-    public convenience init(
-        recipes: [Recipe],
-        store: ShoppingListStore? = ShoppingListStore(),
-        defaults: UserDefaults = .standard
-    ) {
-        self.init(
-            items: Self.applyMetricPreference(Self.rows(from: recipes), defaults: defaults),
-            store: store,
-            defaults: defaults
-        )
-    }
-
-    /// Explode `recipes` into per-recipe ``Item`` rows, each classified through
-    /// ``IngredientAisleClassifier`` (CL-77 — no cross-recipe merge). Shared by
-    /// ``init(recipes:)`` and ``add(recipes:)`` (DUT-487 / T-906) so the initial
-    /// build and later appends produce identical rows. DUT-534 — module-internal
-    /// (was `private`) so ``LiveShoppingListAppender`` builds the exact same rows
-    /// when appending from Recipe Detail / a card, rather than duplicating the
-    /// explode-and-classify logic.
-    static func rows(from recipes: [Recipe]) -> [Item] {
-        recipes.flatMap { recipe in
-            recipe.ingredients.compactMap { ingredient -> Item? in
-                // Defense-in-depth (DUT-587): drop any ingredient whose text
-                // trims to empty so a blank/whitespace line — even one that
-                // slips past the parser — never becomes a garbage row.
-                guard
-                    !ingredient.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                else {
-                    return nil
-                }
-                return Item(
-                    ingredientText: ingredient.text,
-                    recipeTitle: recipe.title,
-                    aisle: IngredientAisleClassifier.classify(ingredient.text)
-                )
-            }
-        }
-    }
-
-    // DUT-648: the append de-dup (`dedupedAppend` / `occurrenceKeys` / `RowKey`)
-    // lives in `ShoppingListViewModel+Dedup.swift`; the metric-preference
-    // rewrite (`applyMetricPreference`) lives in
-    // `ShoppingListViewModel+MetricPreference.swift`; the CL-82 mock fixture
-    // lives in `ShoppingListViewModel+Mock.swift` — all to keep this file under
-    // SwiftLint's `file_length` cap.
 }

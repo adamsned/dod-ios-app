@@ -14,6 +14,11 @@ let package = Package(
         .package(path: "../DODAnalytics"),
         .package(path: "../DODNetworking"),
         .package(path: "../DODPersistence"),
+        // US-54 / T-932 — the shared on-device AI seam (protocol + value types
+        // + FakeIntelligenceService). This package depends ONLY on the
+        // DODIntelligence protocol, NEVER on FoundationModels (the Live impl is
+        // a leaf module the App injects), mirroring DODFeatureSaved.
+        .package(path: "../DODIntelligence"),
         // DUT-295 — the Cook Mode Live Activity payload + view layouts live in
         // this SDK-free leaf module (shared with the appex, which must NOT pull
         // this whole feature → GoogleSignIn).
@@ -38,6 +43,7 @@ let package = Package(
                 "DODAnalytics",
                 "DODNetworking",
                 "DODPersistence",
+                "DODIntelligence",
                 "DODCookActivity",
                 "DODFeatureProfile",
             ]
@@ -48,11 +54,11 @@ let package = Package(
                 "DODFeatureRecipeDetail",
                 "DODAnalytics",
                 "DODCookActivity",
-                // DUT-1322 — the toolbar glyph contrast tests assert directly
-                // against the real `DODColor.accent` / `.label` / `.burntOrange`
-                // tokens (rather than re-declaring their hex values), so the
-                // test target needs the module those live in.
+                // DUT-1322 — the toolbar glyph contrast tests assert against the
+                // real `DODColor` tokens, so the test target needs their module.
                 "DODDesignSystem",
+                // US-54 / T-932 — the test injects `FakeIntelligenceService`.
+                "DODIntelligence",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             ],
             resources: [.process("__Snapshots__")]

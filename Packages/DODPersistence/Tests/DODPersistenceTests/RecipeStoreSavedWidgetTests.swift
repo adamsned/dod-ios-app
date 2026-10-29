@@ -137,6 +137,22 @@ import Testing
         #expect(try await store.isDownloaded(id: 201) == true)
     }
 
+    /// DUT-1339 — ``RecipeStore/dessertRecipeIDs()`` returns the cached ids that
+    /// read as a dessert by EITHER signal — the "Dessert Recipes" WP category
+    /// (336) or a JSON-LD `recipeCategory` course "Dessert" — and excludes
+    /// savory rows. This is what the Saved tab's "Desserts" filter narrows on.
+    @Test func dessertRecipeIDsMatchesEitherSignal() async throws {
+        let store = try await makeStore()
+        // 301: dessert via the WP category. 302: dessert via the JSON-LD course.
+        // 303: savory (neither signal). 304: course match is case-insensitive.
+        try await store.insertDessertFixture(id: 301, categoryIDs: [12, 336], recipeCategory: [])
+        try await store.insertDessertFixture(id: 302, categoryIDs: [], recipeCategory: ["Dessert"])
+        try await store.insertDessertFixture(id: 303, categoryIDs: [12], recipeCategory: ["Main Course"])
+        try await store.insertDessertFixture(id: 304, categoryIDs: [], recipeCategory: ["dessert"])
+        #expect(try await store.dessertRecipeIDs() == [301, 302, 304])
+        #expect(try await store.dessertRecipeIDs().contains(303) == false)
+    }
+
     // MARK: - Helpers
 
     /// Local helper that mirrors `makeListItem(id:title:)` but populates
@@ -170,6 +186,28 @@ extension RecipeStore {
             canonicalURLString: "",
             publishedAt: .now,
             isSaved: true
+        )
+        modelContext.insert(row)
+        try modelContext.save()
+    }
+
+    /// DUT-1339 test seam: insert a saved CachedRecipe carrying the given
+    /// dessert signals, so `dessertRecipeIDs()` has category data to evaluate.
+    fileprivate func insertDessertFixture(
+        id: Int,
+        categoryIDs: [Int],
+        recipeCategory: [String]
+    ) throws {
+        let row = CachedRecipe(
+            id: id,
+            slug: "d-\(id)",
+            title: "Fixture \(id)",
+            excerptText: "",
+            canonicalURLString: "https://www.dutchovendaddy.com/d/\(id)/",
+            categoryIDs: categoryIDs,
+            publishedAt: .now,
+            isSaved: true,
+            recipeCategory: recipeCategory
         )
         modelContext.insert(row)
         try modelContext.save()

@@ -21,7 +21,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -60,9 +60,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Take a photo of your finished cook to share it and tag Dutch Oven Daddy.</string>
+	<string>Take a photo to share your cook or to get cooking help from Dutch Oven Daddy.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>SiwaRevokeBaseURL</key>
+	<string>$(SIWA_REVOKE_BASE_URL)</string>
+	<key>SiwaRevokeSharedSecret</key>
+	<string>$(SIWA_REVOKE_APP_SECRET)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

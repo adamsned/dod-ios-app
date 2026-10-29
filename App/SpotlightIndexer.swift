@@ -83,13 +83,18 @@ struct SpotlightIndexer {
                 // now a small thumbnail, not a full-res JPEG.
                 set.thumbnailData = downsample(raw, thumbnailMaxPixel)
             }
-            batch.append(
-                CSSearchableItem(
-                    uniqueIdentifier: "dod.recipe.\(payload.id)",
-                    domainIdentifier: SpotlightIndexer.recipeDomainIdentifier,
-                    attributeSet: set
-                )
+            let item = CSSearchableItem(
+                uniqueIdentifier: "dod.recipe.\(payload.id)",
+                domainIdentifier: SpotlightIndexer.recipeDomainIdentifier,
+                attributeSet: set
             )
+            // DUT-1388 — tie the row to its `RecipeEntity`, so Spotlight's semantic
+            // search + Siri treat it as that recipe (and its `OpenRecipeIntent`
+            // runs on tap) rather than as an opaque search item.
+            if #available(iOS 18, *) {
+                item.associateAppEntity(entity, priority: 1)
+            }
+            batch.append(item)
             if batch.count >= batchSize {
                 try await indexBatch(batch)
                 batch.removeAll(keepingCapacity: true)

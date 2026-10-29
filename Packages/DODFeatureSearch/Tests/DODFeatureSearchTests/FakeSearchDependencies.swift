@@ -55,6 +55,25 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         return results[query] ?? []
     }
 
+    /// v2 search paging — later-page fixtures keyed `query -> page -> items`.
+    /// Page 1 falls back to the primary `results[query]` fixture so existing
+    /// single-page tests need no changes; seed `pagedResults[query][2]` to hand
+    /// the view model a second page. `searchMoreCalls` records each `(query,
+    /// page)` so a test can assert paging stopped (no further fetch).
+    var pagedResults: [String: [Int: [RecipeListItem]]] = [:]
+    var searchMoreCalls: [(query: String, page: Int)] = []
+    /// Optional gate to hold a `searchMore` fetch IN FLIGHT while a test bumps
+    /// the search generation (e.g. types a new query), proving the stale page is
+    /// dropped. `nil` (default) = the fetch returns immediately.
+    var searchMoreGate: (@Sendable () async -> Void)?
+
+    func searchMore(query: String, page: Int) async throws -> [RecipeListItem] {
+        searchMoreCalls.append((query: query, page: page))
+        if let searchMoreGate { await searchMoreGate() }
+        if let page = pagedResults[query]?[page] { return page }
+        return page <= 1 ? (results[query] ?? []) : []
+    }
+
     func searchIngredients(matching query: String) async throws -> [Int] {
         let normalized = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         return localIngredientIDs[normalized] ?? []
@@ -226,5 +245,26 @@ final class FakeSearchDependencies: SearchDependencies, @unchecked Sendable {
         appendedRecipes.append(recipe)
         if let appendGate { await appendGate() }
         return shoppingListResult
+    }
+
+    // v2 Search overhaul (1/3) — the "Surprise Me" full-catalog random fetch.
+    // `randomRecipe` stubs the returned pick; `randomShouldThrow` simulates the
+    // offline / server-error branch so `surpriseMe` falls back to the in-memory
+    // `RandomRecipePicker` sample. `randomRecipeCallCount` lets a re-entrancy
+    // test assert an in-flight second tap was dropped.
+    var randomRecipe: RecipeListItem?
+    var randomShouldThrow = false
+    var randomRecipeCallCount = 0
+    /// Optional gate so a test can hold a random fetch IN FLIGHT while it
+    /// launches a second concurrent `surpriseMe`, proving the `isSurpriseMeLoading`
+    /// guard drops the duplicate. `nil` (default) = the fetch returns immediately.
+    var randomGate: (@Sendable () async -> Void)?
+    func fetchRandomRecipe() async throws -> RecipeListItem {
+        randomRecipeCallCount += 1
+        if let randomGate { await randomGate() }
+        guard !randomShouldThrow, let randomRecipe else {
+            throw NSError(domain: "FakeSearchDependencies", code: -1062)
+        }
+        return randomRecipe
     }
 }

@@ -3,42 +3,6 @@ import Foundation
 /// Extracts ingredient + instruction text from the WP Recipe Maker (WPRM)
 /// recipe card embedded in a rendered `dutchovendaddy.com` post page.
 ///
-/// **Why this exists (DUT-42).** ``DODNetworking/JSONLDRecipeParser`` is the
-/// primary source for recipe detail: it reads `recipeIngredient` /
-/// `recipeInstructions` off the page's JSON-LD `Recipe` node. Some posts ship
-/// a `Recipe` node that OMITS those fields even though the data is present in
-/// the page as server-rendered WPRM HTML (confirmed: `dutch-oven-7-can-soup`,
-/// 2026-06-04 — its JSON-LD `Recipe` has `name` but no
-/// `recipeIngredient`/`recipeInstructions`). Those recipes rendered with an
-/// empty ingredient + instruction list. This parser is the per-field
-/// fallback: when the JSON-LD list is empty, fill it from the WPRM card.
-///
-/// **Strategy.** A custom string tokenizer (NO HTML-parser dependency — the
-/// constitution forbids adding one, and this mirrors ``ArticleBodyExtractor``,
-/// whose `hasClassToken` / `sliceUntilMatchingClose` scanning helpers this type
-/// reuses):
-/// 1. Slice the `<div class="wprm-recipe-container">` block (the wrapper every
-///    WPRM theme emits). Nothing outside it is considered.
-/// 2. Ingredients — collect every `<li class="wprm-recipe-ingredient">` row,
-///    dropping its leading `<span class="wprm-checkbox-container">` subtree (a
-///    screen-reader checkbox glyph that must not leak into the text), then
-///    plain-texting the amount / unit / name / notes spans that remain. Then
-///    append the group name of every HEADER-ONLY ingredient group (a
-///    `wprm-recipe-ingredient-group` `<div>` with a
-///    `<h4 class="wprm-recipe-ingredient-group-name">` but no line-row `<li>`):
-///    with no line rows of its own, that group name IS the ingredient (the 7
-///    Can Soup shape — all groups header-only — and, per DUT-550, cards that MIX
-///    line-row groups with header-only groups, so no ingredient is dropped).
-///    Groups that carry line rows keep their name dropped (it's a label).
-/// 3. Instructions — collect every `<li class="wprm-recipe-instruction">` row
-///    (inner `wprm-recipe-instruction-text`, else the whole row). When the card
-///    has NO instruction rows (7 Can Soup / DUT-538 — steps live as a numbered
-///    "How to Make" list in the post body), fall back to the Gutenberg
-///    `is-style-circle-number-list` rows found within the post's instructions /
-///    "How to Make" region only (DUT-544 — scoped to the region between the
-///    instructions `<h2>` and the next section so an unrelated author-styled
-///    numbered list can't be injected as steps).
-///
 /// Not a general-purpose HTML parser — handles the narrow, well-formed shape
 /// WPRM produces. Robust to attribute re-ordering and extra whitespace; assumes
 /// well-formed closing tags. Returns empty lists when no card / no rows are
@@ -50,10 +14,17 @@ public enum WPRMRecipeCardParser {
     public struct Card: Sendable, Equatable {
         public let ingredients: [String]
         public let instructions: [String]
+        /// DUT-984 — plain-text equipment names, document order.
+        public let equipment: [String]
 
-        public init(ingredients: [String], instructions: [String]) {
+        public init(ingredients: [String], instructions: [String], equipment: [String] = []) {
             self.ingredients = ingredients
             self.instructions = instructions
+            self.equipment = equipment
+        }
+
+        public static func == (lhs: Card, rhs: Card) -> Bool {
+            lhs.ingredients == rhs.ingredients && lhs.instructions == rhs.instructions && lhs.equipment == rhs.equipment
         }
     }
 
@@ -77,6 +48,8 @@ public enum WPRMRecipeCardParser {
     /// subtree carries a screen-reader ballot-box glyph (`&#9634;`) and is
     /// dropped before the row text is extracted.
     static let checkboxContainerToken = "wprm-checkbox-container"
+    /// Class token on each equipment name `<div>` inside the WPRM equipment list (DUT-984).
+    static let equipmentNameToken = "wprm-recipe-equipment-name"
 
     /// Parse the WPRM card out of a rendered post page.
     ///
@@ -96,7 +69,8 @@ public enum WPRMRecipeCardParser {
         }
         return Card(
             ingredients: parseIngredients(in: card),
-            instructions: parseInstructions(in: card, page: stripped)
+            instructions: parseInstructions(in: card, page: stripped),
+            equipment: parseEquipment(in: card)
         )
     }
 
@@ -217,6 +191,21 @@ public enum WPRMRecipeCardParser {
             cursor = openEnd.upperBound
         }
         return rowInner
+    }
+
+    // MARK: - Equipment
+
+    /// DUT-984 — plain-text name of every `wprm-recipe-equipment-name` element, document order.
+    static func parseEquipment(in card: String) -> [String] {
+        let names = collectElementTexts(
+            in: card,
+            tag: "div",
+            classToken: equipmentNameToken
+        ) {
+            HTMLSanitizer.plainText(from: $0)
+        }
+        var seen = Set<String>()
+        return names.filter { seen.insert($0).inserted }
     }
 
     // MARK: - Instructions

@@ -36,6 +36,14 @@ extension SearchView {
                 if !viewModel.ingredientItems.isEmpty {
                     ingredientSection(layout: layout)
                 }
+                // v2 search paging: bottom spinner row while a next page is in
+                // flight, mirroring `FeedView`'s `loadingMore` ProgressView.
+                if viewModel.isLoadingMoreResults {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, DODSpacing.lg)
+                        .accessibilityIdentifier("dod.search.loadingMore")
+                }
             }
             .padding(.horizontal, DODSpacing.md)
             .padding(.bottom, DODSpacing.lg)
@@ -52,7 +60,11 @@ extension SearchView {
                 .dodFont(DODType.heading)
                 .foregroundStyle(DODColor.label)
                 .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("dod.search.ingredientSection.header")
+                // v2 Search overhaul (2/3): this tier now carries the SERVER
+                // content matches (catalog-wide recipes that USE the term) plus
+                // the local ingredient supplement — hence the task-stable
+                // `search-results-using-header` id.
+                .accessibilityIdentifier("search-results-using-header")
             switch layout {
             case .gallery:
                 ingredientGallery
@@ -100,6 +112,9 @@ extension SearchView {
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )
                 .accessibilityIdentifier("dod.search.ingredientCard")
+                // v2 search paging: the ingredient tier is the visual bottom, so
+                // reaching its last rows also arms the next `?search=` page.
+                .task { await viewModel.loadMoreResultsIfNeeded(currentItem: item) }
             }
         }
     }
@@ -128,6 +143,90 @@ extension SearchView {
                     onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
                 )
                 .accessibilityIdentifier("dod.search.ingredientCard")
+                // v2 search paging: reaching the ingredient tier's last rows
+                // arms the next `?search=` page (see the gallery variant).
+                .task { await viewModel.loadMoreResultsIfNeeded(currentItem: item) }
+            }
+        }
+    }
+
+    /// US-38 / AC-38.3 — the title tier's 2-col grid. Body byte-identical to the
+    /// pre-T-650 `.results` rendering. Moved here from `SearchView.swift`
+    /// (file-length relief for the v2 Surprise Me wiring); `resultsScroll`
+    /// composes it. `internal` so the shared body can reach it.
+    var galleryResults: some View {
+        LazyVGrid(
+            columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+            spacing: DODSpacing.md
+        ) {
+            ForEach(viewModel.items) { item in
+                // CL-255 — cook-time chip omitted (browse declutter); Search's
+                // time filter covers cook time for those who want it.
+                RecipeCard(
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    heroImageURL: item.heroImage,
+                    // Highlight the COMMITTED query (`lastQuery`), not the live
+                    // `query` keystroke: the debounced fetch leaves stale cards
+                    // on screen, so the live term re-highlighted every card each
+                    // keystroke over the wrong substring ("chick" vs "chic").
+                    highlightQuery: viewModel.lastQuery
+                )
+                .recipeCardTap { onSelect(item) }
+                .recipeCardContextMenu(
+                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
+                    onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
+                        }
+                    },
+                    // DUT-534 Part 2 — Search opts into the shared helper's
+                    // "Add to Shopping List" item (Categories/Saved don't).
+                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
+                )
+                // T-737 / L5: stable handle mirroring `dod.feed.card`.
+                .accessibilityIdentifier("dod.search.card")
+                // v2 search paging: near-bottom trigger (mirrors FeedView).
+                .task { await viewModel.loadMoreResultsIfNeeded(currentItem: item) }
+            }
+        }
+    }
+
+    /// US-38 / AC-38.4 — the title tier's dense single-column variant. Composes
+    /// the same tap + context-menu modifiers as the gallery so US-34 / AC-34.1 /
+    /// AC-34.6 long-press-Save/Unsave works identically. Moved here alongside
+    /// `galleryResults` (file-length relief).
+    var listResults: some View {
+        // T-782 / DUT-88 — iPad tiles the rows into a multi-column grid; iPhone
+        // keeps the single-column LazyVStack.
+        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
+            ForEach(viewModel.items) { item in
+                // CL-255 — cook-time chip omitted (browse declutter); Search's
+                // time filter covers cook time for those who want it.
+                RecipeCard.ListRow(
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    heroImageURL: item.heroImage,
+                    // Committed query — see the gallery call site's rationale.
+                    highlightQuery: viewModel.lastQuery
+                )
+                .recipeCardTap { onSelect(item) }
+                .recipeCardContextMenu(
+                    isSaved: viewModel.savedRecipeIDs.contains(item.id),
+                    onToggle: {
+                        // DUT-629 — optimistic flip, re-inverted on write failure.
+                        viewModel.applyOptimisticSaveToggle(id: item.id)
+                        onSave?(item) { didSave in
+                            if !didSave { viewModel.revertOptimisticSaveToggle(id: item.id) }
+                        }
+                    },
+                    onAddToShoppingList: { Task { await viewModel.addToShoppingList(item) } }
+                )
+                .accessibilityIdentifier("dod.search.card")
+                // v2 search paging: near-bottom trigger (mirrors FeedView).
+                .task { await viewModel.loadMoreResultsIfNeeded(currentItem: item) }
             }
         }
     }

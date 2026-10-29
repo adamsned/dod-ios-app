@@ -4,6 +4,57 @@ import DODDesignSystem
 import SwiftUI
 import WidgetKit
 
+/// DUT-991: picks the StandBy face vs. the Lock Screen card.
+@available(iOS 16.1, *)
+private struct CookActivityPresentationView: View {
+    let attributes: CookActivityAttributes
+    let state: CookActivityAttributes.ContentState
+    @Environment(\.isActivityFullscreen) private var isFullscreen
+
+    var body: some View {
+        if isFullscreen {
+            CookActivityStandByView(
+                recipeTitle: attributes.recipeTitle,
+                model: CookActivityStandByModel(state: state)
+            )
+        } else {
+            VStack(spacing: 0) {
+                CookActivityLockScreenView(
+                    recipeTitle: attributes.recipeTitle,
+                    stepText: state.stepText,
+                    remainingSeconds: state.remainingSeconds,
+                    totalSeconds: attributes.totalSeconds,
+                    isPaused: state.isPaused,
+                    endDate: state.endDate,
+                    isCompleted: state.isCompleted,
+                    coachNudge: state.coachNudge
+                )
+                if state.isCompleted { CookActivityBuzzerButtons() }
+            }
+            .padding(.horizontal, DODSpacing.sm)
+            .padding(.vertical, DODSpacing.xs)
+        }
+    }
+}
+
+/// DUT-988 — one-tap buzzer actions. Only shown on the completed (buzzer) card.
+@available(iOS 17.0, *)
+private struct CookActivityBuzzerButtons: View {
+    var body: some View {
+        HStack(spacing: DODSpacing.sm) {
+            Button(intent: PulledItIntent()) {
+                Text("Pulled It").frame(maxWidth: .infinity)
+            }
+            .tint(DODColor.accent)
+            Button(intent: SnoozeTimerIntent()) {
+                Text("2 More Min").frame(maxWidth: .infinity)
+            }
+            .tint(DODColor.burntOrange)
+        }
+        .buttonStyle(.borderedProminent)
+    }
+}
+
 /// `ActivityConfiguration` for the Cook Mode timer Live Activity (US-11).
 ///
 /// Wires ``CookActivityAttributes`` to the lock-screen and Dynamic Island
@@ -15,26 +66,12 @@ import WidgetKit
 struct CookActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: CookActivityAttributes.self) { context in
-            CookActivityLockScreenView(
-                recipeTitle: context.attributes.recipeTitle,
-                stepText: context.state.stepText,
-                remainingSeconds: context.state.remainingSeconds,
-                totalSeconds: context.attributes.totalSeconds,
-                isPaused: context.state.isPaused,
-                endDate: context.state.endDate,
-                isCompleted: context.state.isCompleted
-            )
-            .padding(.horizontal, DODSpacing.sm)
-            .padding(.vertical, DODSpacing.xs)
-            // DUT-403: tapping the Live Activity opens the recipe the timer belongs to.
-            // DUT-666: a non-positive `recipeID` (unknown recipe) has no
-            // `dod://recipe/<id>` target, so fall back to `dod://feed` rather than
-            // emitting a dead `dod://recipe/0` tap.
-            .widgetURL(
-                context.attributes.recipeID > 0
-                    ? URL(string: "dod://recipe/\(context.attributes.recipeID)")
-                    : URL(string: "dod://feed")
-            )
+            CookActivityPresentationView(attributes: context.attributes, state: context.state)
+                .widgetURL(
+                    context.attributes.recipeID > 0
+                        ? URL(string: "dod://recipe/\(context.attributes.recipeID)")
+                        : URL(string: "dod://feed")
+                )
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -51,15 +88,18 @@ struct CookActivityWidget: Widget {
                     .padding(.trailing, DODSpacing.xs)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    CookActivityLockScreenView(
-                        recipeTitle: context.attributes.recipeTitle,
-                        stepText: context.state.stepText,
-                        remainingSeconds: context.state.remainingSeconds,
-                        totalSeconds: context.attributes.totalSeconds,
-                        isPaused: context.state.isPaused,
-                        endDate: context.state.endDate,
-                        isCompleted: context.state.isCompleted
-                    )
+                    VStack(spacing: 0) {
+                        CookActivityLockScreenView(
+                            recipeTitle: context.attributes.recipeTitle,
+                            stepText: context.state.stepText,
+                            remainingSeconds: context.state.remainingSeconds,
+                            totalSeconds: context.attributes.totalSeconds,
+                            isPaused: context.state.isPaused,
+                            endDate: context.state.endDate,
+                            isCompleted: context.state.isCompleted
+                        )
+                        if context.state.isCompleted { CookActivityBuzzerButtons() }
+                    }
                 }
             } compactLeading: {
                 CookActivityCompactLeadingView()

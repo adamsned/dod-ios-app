@@ -252,7 +252,8 @@ struct CookModePlayerControls: View {
                 .frame(width: glyphTapTarget, height: glyphTapTarget)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        // v2 animation refresh — shared press spring + light haptic.
+        .buttonStyle(.dodPressable)
         .accessibilityLabel(label)
     }
 }
@@ -277,7 +278,8 @@ struct CookModeNavCircleButton: View {
                 .background(Circle().fill(DODColor.burntOrange))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        // v2 animation refresh — shared press spring + light haptic.
+        .buttonStyle(.dodPressable)
         .accessibilityLabel(label)
     }
 }

@@ -10,11 +10,15 @@ public enum CookCelebration: Equatable, Identifiable, Sendable {
     case rankUp(CookRank)
     /// A logged cook completed the whole First Cookout path (every rung cooked).
     case graduatedFirstCookout
+    /// The user's very first logged cook, off ANY recipe (DUT-983). The identity
+    /// moment: distinct from a routine rank-up.
+    case firstCookEver
 
     public var id: String {
         switch self {
         case .rankUp(let rank): return "rank-\(rank.threshold)"
         case .graduatedFirstCookout: return "graduated"
+        case .firstCookEver: return "first-cook-ever"
         }
     }
 }
@@ -81,6 +85,7 @@ public struct CookCelebrationView: View {
         switch celebration {
         case .rankUp(let rank): return rank.emoji
         case .graduatedFirstCookout: return "🎓"
+        case .firstCookEver: return "🔥"
         }
     }
 
@@ -88,6 +93,7 @@ public struct CookCelebrationView: View {
         switch celebration {
         case .rankUp: return "Rank up"
         case .graduatedFirstCookout: return "Path complete"
+        case .firstCookEver: return "First cook ever"
         }
     }
 
@@ -95,6 +101,7 @@ public struct CookCelebrationView: View {
         switch celebration {
         case .rankUp(let rank): return "You're a \(rank.title)"
         case .graduatedFirstCookout: return "You're a Dutch Oven Cook"
+        case .firstCookEver: return "You're one of us now"
         }
     }
 
@@ -110,6 +117,8 @@ public struct CookCelebrationView: View {
         case .graduatedFirstCookout:
             return "You cooked every dish on the path, from your first cookout to the "
                 + "campfire. That's not beginner stuff anymore."
+        case .firstCookEver:
+            return "You just fed someone in cast iron. You're one of us now."
         }
     }
 
@@ -117,6 +126,7 @@ public struct CookCelebrationView: View {
         switch celebration {
         case .rankUp: return "Keep Cooking"
         case .graduatedFirstCookout: return "What's Next"
+        case .firstCookEver: return "Keep Cooking"
         }
     }
 }

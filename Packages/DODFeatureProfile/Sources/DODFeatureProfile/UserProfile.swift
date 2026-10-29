@@ -51,18 +51,23 @@ public struct UserProfile: Codable, Equatable, Sendable {
     /// decode cleanly into the new struct shape).
     public var photoOriginalFilename: String?
 
+    /// DUT-982 — gear the cook owns (e.g. "dutch-oven-12"). Optional so legacy Keychain rows decode cleanly.
+    public var ownedEquipment: [String]?
+
     public init(
         id: UUID,
         displayName: String,
         email: String,
         photoFilename: String? = nil,
-        photoOriginalFilename: String? = nil
+        photoOriginalFilename: String? = nil,
+        ownedEquipment: [String]? = nil
     ) {
         self.id = id
         self.displayName = displayName
         self.email = email
         self.photoFilename = photoFilename
         self.photoOriginalFilename = photoOriginalFilename
+        self.ownedEquipment = ownedEquipment
     }
 
     // MARK: - Validation

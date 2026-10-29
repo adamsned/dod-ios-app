@@ -9,7 +9,9 @@ import Foundation
 
 extension SettingsViewModel {
 
-    /// The public Privacy Policy page the Settings → Data & Privacy row opens.
+    /// The app's own Privacy Policy page the Settings → Data & Privacy row opens
+    /// (the same URL given to App Store Connect; `/privacy-policy/` is the
+    /// website's policy and does not cover the app).
     ///
     /// App Store Review Guideline 5.1.1(i) requires an in-app link to the app's
     /// privacy policy; the Data & Privacy section surfaces it via a SwiftUI
@@ -20,7 +22,7 @@ extension SettingsViewModel {
     /// SwiftLint-clean (`force_unwrapping` is an error in this repo) and the L1
     /// suite can pin the literal; the row builds the `URL` with `if let`.
     public nonisolated static let privacyPolicyURLString =
-        "https://dutchovendaddy.com/privacy-policy/"
+        "https://dutchovendaddy.com/app-privacy/"
 
     /// The public Terms of Use page the Settings → Data & Privacy row opens.
     ///

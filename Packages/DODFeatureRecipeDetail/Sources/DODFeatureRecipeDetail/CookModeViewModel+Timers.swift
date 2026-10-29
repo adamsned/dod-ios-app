@@ -83,6 +83,26 @@ extension CookModeViewModel {
         cancelStepDoneNotification(forStep: index)
     }
 
+    /// DUT-988 — "2 More Min": restart the timer that just buzzed. Targets the
+    /// step driving the Live Activity card, else the highest completed step.
+    /// No-op when no timer is `.completed`. Returns true when it snoozed.
+    @discardableResult
+    public func snoozeCompletedTimer(minutes: Int = 2, now: Date = Date()) -> Bool {
+        let key =
+            liveActivityStepKey.flatMap { stepTimers[$0]?.state == .completed ? $0 : nil }
+            ?? stepTimers.filter { $0.value.state == .completed }.keys.max()
+        guard let key, var timer = stepTimers[key], minutes > 0 else { return false }
+        let seconds = minutes * 60
+        timer.state = .running(endDate: now.addingTimeInterval(TimeInterval(seconds)))
+        stepTimers[key] = timer
+        liveActivityShowingCompleted = false
+        reconcileLiveActivity(now: now)
+        let recipeID = recipe.id
+        let delay = TimeInterval(seconds)
+        Task { await stepTimerNotifier.scheduleStepDone(after: delay, recipeID: recipeID, stepIndex: key) }
+        return true
+    }
+
     /// DUT-604 — cancel the pending AND delivered background alert for `index`.
     /// For explicit user-driven stops/resets, which acknowledge the alert.
     /// Fire-and-forget wrapper so the timer methods read cleanly.

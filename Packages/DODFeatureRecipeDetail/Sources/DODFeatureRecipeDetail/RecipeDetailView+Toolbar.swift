@@ -1,5 +1,6 @@
 import DODDesignSystem
 import DODDomain
+import DODSupport
 import SwiftUI
 
 #if canImport(UIKit)
@@ -19,20 +20,53 @@ extension RecipeDetailView {
     var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             HStack(spacing: DODSpacing.md) {
+                // DUT-1386 — the "Summarize" button moved to a labeled link under
+                // the header (`+Summarize`); its sheet is still presented below.
+
+                // DUT-1340 — a plain TAP saves/unsaves; press-and-hold opens a
+                // context menu with "Add to Collection", which loads the
+                // collections + membership and presents the picker sheet.
+                // A `Button` + `.contextMenu`, not `Menu(primaryAction:)`: on
+                // iOS 26.0.x a toolbar `Menu` never fires `primaryAction`, so
+                // the tap did nothing (DUT-1396, the L5 "Save should flip to
+                // Unsave" failures).
                 // Save haptic is wired via `.sensoryFeedback(.success, trigger:
                 // viewModel.isSaved)` on the body — no manual generator here.
                 Button {
                     Task { await viewModel.toggleSaved() }
                 } label: {
                     Image(systemName: viewModel.isSaved ? "bookmark.fill" : "bookmark")
-                        // DUT-1322 — circular scrim (replaces the old bare
-                        // `.foregroundStyle` + `.shadow`) so the glyph reads over
-                        // BOTH the full-bleed hero photo AND the plain
-                        // `DODColor.surface` once scrolled past it. See
-                        // `ToolbarGlyphChip.swift` for the contrast math.
-                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.save(isSaved: viewModel.isSaved))
+                        // v2 animation refresh — clean fill↔outline symbol swap
+                        // on save/unsave (Reduce Motion → instant).
+                        .dodSymbolReplace(reduceMotion: reduceMotion)
+                        // DUT-1322 — on iOS 17-25 a circular scrim keeps the glyph
+                        // legible once scrolled past the hero (see
+                        // `ToolbarGlyphChip.swift`); iOS 26 keeps v2's colors + shadow.
+                        .toolbarGlyphChip(
+                            foreground: ToolbarGlyphForeground.save(isSaved: viewModel.isSaved),
+                            systemPillForeground: viewModel.isSaved ? DODColor.accent : DODColor.label
+                        )
+                }
+                .contextMenu {
+                    Button {
+                        presentCollectionPicker()
+                    } label: {
+                        Label("Add to Collection", systemImage: "folder.badge.plus")
+                    }
+                    .accessibilityIdentifier("dod.detail.addToCollection.menuItem")
                 }
                 .accessibilityLabel(viewModel.isSaved ? "Unsave recipe" : "Save recipe")
+                // DUT-1388 — a Siri save of THIS recipe refreshes the glyph.
+                .onReceive(NotificationCenter.default.publisher(for: .dodSavedSetDidChange)) { note in
+                    guard (note.object as? Int) == viewModel.listItem.id else { return }
+                    Task { await viewModel.refreshSavedState() }
+                }
+                // DUT-1016 - a Siri "scale this to serve N" for THIS recipe moves the stepper.
+                .onReceive(NotificationCenter.default.publisher(for: .dodServingsScaleRequested)) { note in
+                    guard let count = ServingsScaleRequest.servings(from: note, forRecipeID: viewModel.listItem.id)
+                    else { return }
+                    viewModel.scaleServings(to: count)
+                }
 
                 // US-39 / DUT-534 / DUT-535 — "Add to Shopping List" from ANY
                 // recipe (not just saved). DUT-535: tapping now PRESENTS the
@@ -46,7 +80,6 @@ extension RecipeDetailView {
                     presentAddToShoppingList()
                 } label: {
                     Image(systemName: "cart.badge.plus")
-                        // DUT-1322 — see the Save button above.
                         .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
                 }
                 .disabled(viewModel.recipe == nil)
@@ -67,9 +100,11 @@ extension RecipeDetailView {
                             ? "square.and.arrow.down.fill"
                             : "square.and.arrow.down"
                     )
-                    // DUT-1322 — see the Save button above.
+                    // v2 animation refresh — outline↔fill swap on download toggle.
+                    .dodSymbolReplace(reduceMotion: reduceMotion)
                     .toolbarGlyphChip(
-                        foreground: ToolbarGlyphForeground.download(isDownloaded: viewModel.isDownloaded)
+                        foreground: ToolbarGlyphForeground.download(isDownloaded: viewModel.isDownloaded),
+                        systemPillForeground: viewModel.isDownloaded ? DODColor.burntOrange : DODColor.label
                     )
                 }
                 .accessibilityLabel(viewModel.isDownloaded ? "Remove download" : "Download for offline use")
@@ -86,7 +121,6 @@ extension RecipeDetailView {
                     Task { await prepareRecipePDFShare() }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
-                        // DUT-1322 — see the Save button above.
                         .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
                 }
                 .disabled(viewModel.recipe == nil)
@@ -98,10 +132,33 @@ extension RecipeDetailView {
                     Image(systemName: "square.and.arrow.up")
                         .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
                 }
+                .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Share recipe")
                 #endif
             }
+            // US-54 / T-932 — the summary sheet, driven off the view model's
+            // `summary` state (no extra @State on the body, which is already at
+            // the SwiftLint length cap). Attached to the toolbar content rather
+            // than `RecipeDetailView.body` for the same reason.
+            .sheet(isPresented: summaryPresented) {
+                SummarySheet(state: viewModel.summary) {
+                    viewModel.dismissSummary()
+                }
+            }
         }
+    }
+
+    /// US-54 / T-932 — presents the summary sheet whenever ``summary`` leaves
+    /// `.idle`; dismissing it resets the state to `.idle`.
+    private var summaryPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.summary != .idle },
+            set: { presented in
+                if !presented {
+                    viewModel.dismissSummary()
+                }
+            }
+        )
     }
 
     // MARK: - Share as PDF (DUT-1324)
@@ -169,6 +226,7 @@ extension RecipeDetailView {
     #endif
 
     // MARK: - Add to Shopping List (DUT-535)
+    // (see the `View.recipePDFShareSheet` helper at the end of this file)
 
     /// Handle the `cart.badge.plus` tap. DUT-535 — present the ingredient-
     /// selection sheet for the loaded recipe when the sheet seam is wired
@@ -189,6 +247,20 @@ extension RecipeDetailView {
             recipeForShoppingListSheet = SheetRecipe(recipe: scaled)
         } else {
             Task { await viewModel.addToShoppingList(useMetric: useMetricUnits) }
+        }
+    }
+
+    // MARK: - Add to Collection (DUT-1340)
+
+    /// Handle the bookmark menu's "Add to Collection" item. Loads the
+    /// collections + the recipe's current membership into the view model, THEN
+    /// flips the presentation flag so the picker sheet opens pre-populated.
+    /// Guarded on `recipe != nil` (the picker acts on the loaded recipe).
+    private func presentCollectionPicker() {
+        guard viewModel.recipe != nil else { return }
+        Task {
+            await viewModel.loadCollectionsForPicker()
+            showCollectionPicker = true
         }
     }
 
@@ -220,6 +292,43 @@ extension RecipeDetailView {
         return Snackbar.Action(title: title) {
             viewModel.dismissSnackbar()
             openShoppingList()
+        }
+    }
+}
+
+extension View {
+    /// DUT-1324 — presents the full iOS share sheet over the generated recipe
+    /// PDF (`SharePDFItem`). iOS-only; a no-op on the macOS `swift test` slice.
+    /// Lives here (not inline in `RecipeDetailView.body`) to keep that file under
+    /// the SwiftLint 400-line cap.
+    @ViewBuilder
+    func recipePDFShareSheet(_ item: Binding<SharePDFItem?>) -> some View {
+        #if os(iOS)
+        sheet(item: item) { ShareSheet(items: [$0.pdfURL, LinkActivityItemSource($0.linkURL)]) }
+        #else
+        self
+        #endif
+    }
+
+    /// DUT-1340 — presents the self-contained "Add to Collection" picker
+    /// (`RecipeCollectionPickerSheet`) over the recipe. Factored out of
+    /// `RecipeDetailView.body` to keep that file under the SwiftLint length cap.
+    /// The view model supplies the collections + seed selection (loaded by the
+    /// menu action) and receives the create + commit callbacks.
+    func recipeCollectionPickerSheet(
+        isPresented: Binding<Bool>,
+        viewModel: RecipeDetailViewModel
+    ) -> some View {
+        sheet(isPresented: isPresented) {
+            RecipeCollectionPickerSheet(
+                recipeTitle: viewModel.recipe?.title ?? viewModel.listItem.title,
+                collections: viewModel.pickerCollections,
+                initialSelection: viewModel.pickerInitialSelection,
+                onCreate: { name in await viewModel.createCollectionFromPicker(name: name) },
+                onCommit: { ids in
+                    Task { await viewModel.commitCollections(ids) }
+                }
+            )
         }
     }
 }

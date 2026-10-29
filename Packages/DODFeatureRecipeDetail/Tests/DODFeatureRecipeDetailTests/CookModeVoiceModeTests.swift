@@ -290,8 +290,9 @@ import Testing
     /// idempotent re-set (same value) does not re-fire.
     @Test func togglingVoiceModeFiresAnalyticsOnFlipOnly() {
         let recorder = RecordingTelemetryTransport()
-        Telemetry.shared.replaceTransport(recorder)
-        defer { Telemetry.shared.replaceTransport(RecordingTelemetryTransport()) }
+        // DUT-2228: add, don't replace — replacing the shared transport drops the
+        // events of save-telemetry tests running in parallel in another suite.
+        Telemetry.shared.addTransport(recorder)
 
         let mock = MockSpeechSynthesizer()
         let viewModel = CookModeViewModelTests.makeViewModel(

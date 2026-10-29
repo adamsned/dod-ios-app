@@ -69,17 +69,23 @@ import Testing
         let defaultStoreURL = dir.appendingPathComponent("default.store")
         let syncedStoreURL = dir.appendingPathComponent("SyncedSaved.store")
 
+        // DUT-105: the migration plan's terminal schema is now V7 (the added
+        // `SyncedRecipeCollection`), so the container + its per-store configs must
+        // declare the V7 model sets to match — otherwise the plan migrates the
+        // store to V7 while a config only knows V6's entities, and the new entity
+        // lands in no store ("Can't assign an object to a store…"). Opening at the
+        // current schema is exactly what this test means by "through the plan".
         func open() throws -> ModelContainer {
             try ModelContainer(
-                for: Schema(SchemaV6.models),
+                for: Schema(SchemaV7.models),
                 migrationPlan: MigrationPlan.self,
                 configurations: ModelConfiguration(
-                    schema: Schema(SchemaV6.localModels),
+                    schema: Schema(SchemaV7.localModels),
                     url: defaultStoreURL,
                     cloudKitDatabase: .none
                 ),
                 ModelConfiguration(
-                    schema: Schema(SchemaV6.syncedModels),
+                    schema: Schema(SchemaV7.syncedModels),
                     url: syncedStoreURL,
                     cloudKitDatabase: .none
                 )

@@ -111,13 +111,15 @@ final class SmokeTests: XCTestCase {
         try XCTSkipIf(isPad, "Bottom tabs are iPhone-only; iPad uses a sidebar.")
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 12))
-        // Tab order is Recipes → Saved → Tools → Search (Categories folded into
-        // Search in T-800 / CL-194; the Grocery List + Settings tabs retired in
-        // T-912 / CL-306 — the Shopping List folded into the new Cooking Tools
-        // hub tab, whose bottom-tab label is "Tools", and Settings moved to a
-        // header gear). Iteration order here is purely "do they all open?"; the
-        // positional guard lives in `test_tabBarOrderMatchesSpec`. Spec: AC-16.1.
-        for tabName in ["Recipes", "Saved", "Tools", "Search"] {
+        // Tab order is Recipes → Saved → Tools (Categories folded into Search in
+        // T-800 / CL-194; the Grocery List + Settings tabs retired in T-912 /
+        // CL-306 — the Shopping List folded into the new Cooking Tools hub tab,
+        // whose bottom-tab label is "Tools", and Settings moved to a header gear;
+        // the Search tab retired in the v2 Search overhaul (1/3) — Search now
+        // pushes within the Feed stack via the header magnifying glass).
+        // Iteration order here is purely "do they all open?"; the positional
+        // guard lives in `test_tabBarOrderMatchesSpec`. Spec: AC-16.1.
+        for tabName in ["Recipes", "Saved", "Tools"] {
             let button = tabBar.buttons[tabName]
             XCTAssertTrue(button.exists, "Missing tab: \(tabName)")
             button.tap()
@@ -131,27 +133,31 @@ final class SmokeTests: XCTestCase {
     /// than silently changing the user-visible layout.
     ///
     /// Asserts both directly (the button at index 1 is "Saved", index 2 is
-    /// "Tools", index 3 is "Search") and behaviorally (tapping each lands on the
-    /// expected screen — Saved shows the empty-state title from AC-5.8 on a fresh
-    /// install; the Cooking Tools hub shows its header; Search shows its search
-    /// field placeholder).
+    /// "Tools") and behaviorally (tapping each lands on the expected screen —
+    /// Saved shows the empty-state title from AC-5.8 on a fresh install; the
+    /// Cooking Tools hub shows its header). v2 Search overhaul (1/3) — Search is
+    /// no longer a 4th tab; the final assertion instead confirms the Feed
+    /// header's magnifying-glass button (`feed-open-search`) opens the Search
+    /// screen. v2 Search overhaul (2/3) — Search now presents as a BOTTOM-UP
+    /// modal (`.sheet`) rather than a push, so the tail of this test also
+    /// verifies the "Done" button (`search-done`) dismisses it back to the Feed.
     func test_tabBarOrderMatchesSpec() throws {
         try XCTSkipIf(isPad, "Bottom-tab order is an iPhone-only contract; iPad uses a sidebar (US-38 / DUT-89).")
         let tabBar = app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
         let tabButtons = tabBar.buttons.allElementsBoundByIndex
-        XCTAssertEqual(tabButtons.count, 4, "Expected exactly 4 top-level tabs")
+        XCTAssertEqual(tabButtons.count, 3, "Expected exactly 3 top-level tabs")
 
         // Position-by-position (left → right). The labels here are what a real
         // user sees on the tab bar, so they double as a readable record of the
         // spec'd order. T-912 / DUT-551 (CL-306) retired the Grocery List +
         // Settings tabs (Shopping List folded into the Cooking Tools hub, whose
-        // bottom-tab label is "Tools"; Settings moved to a header gear).
+        // bottom-tab label is "Tools"; Settings moved to a header gear). The v2
+        // Search overhaul (1/3) retired the Search tab.
         XCTAssertEqual(tabButtons[0].label, "Recipes", "Tab 1 should be Recipes")
         XCTAssertEqual(tabButtons[1].label, "Saved", "Tab 2 should be Saved")
         XCTAssertEqual(tabButtons[2].label, "Tools", "Tab 3 should be Cooking Tools (label 'Tools')")
-        XCTAssertEqual(tabButtons[3].label, "Search", "Tab 4 should be Search")
 
         // Behavioral check: tapping the second tab actually lands on Saved,
         // not on a mislabeled screen. AC-5.8 empty-state title is the
@@ -172,15 +178,146 @@ final class SmokeTests: XCTestCase {
             "Third tab should land on the Cooking Tools hub (its header is visible)"
         )
 
-        // Behavioral check: fourth tab is Search. SearchView uses a
-        // plain `TextField` (not `.searchable`) with the placeholder
-        // "Search Recipes", so the search input shows up under
-        // `app.textFields`, not `app.searchFields`.
-        tabButtons[3].tap()
+        // v2 Search overhaul (2/3) — Search is reached from the Feed header's
+        // magnifying-glass button, which now presents the Search screen as a
+        // BOTTOM-UP modal (`.sheet`). Return to Recipes, tap `feed-open-search`,
+        // and confirm SearchView's "Search Recipes" field appears in the sheet
+        // (SearchView uses a plain `TextField`, so it shows under `app.textFields`).
+        tabButtons[0].tap()
+        let openSearch = app.buttons["feed-open-search"]
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 6),
+            "The Feed header should host the magnifying-glass search button (feed-open-search)"
+        )
+        openSearch.tap()
         let searchField = app.textFields["Search Recipes"]
         XCTAssertTrue(
             searchField.waitForExistence(timeout: 6),
-            "Fourth tab should land on the Search screen (Search Recipes field visible)"
+            "Tapping feed-open-search should present the Search modal (Search Recipes field visible)"
+        )
+
+        // v2 Search overhaul (2/3) — the modal dismisses via its top-right
+        // "Done" (`search-done`, the repo sheet convention). Tapping it should
+        // tear the sheet down so the search field is gone and we're back on the
+        // Feed (its magnifying-glass button is visible again).
+        let searchDone = app.buttons["search-done"]
+        XCTAssertTrue(
+            searchDone.waitForExistence(timeout: 6),
+            "The Search modal should host a top-right Done button (search-done)"
+        )
+        searchDone.tap()
+        XCTAssertTrue(
+            searchField.waitForNonExistence(timeout: 6),
+            "Tapping Done should dismiss the Search modal (Search Recipes field gone)"
+        )
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 6),
+            "Dismissing the Search modal should return to the Feed (search button visible)"
+        )
+    }
+
+    /// v2 Search overhaul (2/3) — typing an ingredient into the Search modal
+    /// must surface catalog-wide recipes that USE it. Before this overhaul the
+    /// server's content matches were discarded by the title-precision filter, so
+    /// an ingredient query returned only the handful of recipes with the term in
+    /// the title (often zero). This test opens Search from the Feed header, types
+    /// a common ingredient, and asserts a result card OR the "Recipes Using"
+    /// section header appears — i.e. content matches now survive. Hits the live
+    /// API, so the timeouts are generous.
+    func test_searchIngredientSurfacesResults() throws {
+        XCTAssertTrue(waitForAppReady(), "App should reach an interactive first screen")
+
+        let openSearch = app.buttons["feed-open-search"]
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 8),
+            "The Feed header should host the magnifying-glass search button (feed-open-search)"
+        )
+        openSearch.tap()
+
+        let searchField = app.textFields["Search Recipes"]
+        XCTAssertTrue(
+            searchField.waitForExistence(timeout: 8),
+            "Tapping feed-open-search should present the Search modal (Search Recipes field visible)"
+        )
+        searchField.tap()
+        searchField.typeText("chicken")
+
+        // A title card (`dod.search.card`), an ingredient/content card
+        // (`dod.search.ingredientCard`), or the "Recipes Using" header
+        // (`search-results-using-header`) — any one proves results surfaced.
+        let anyResult = NSPredicate(
+            format: "identifier == %@ OR identifier == %@ OR identifier == %@",
+            "dod.search.card",
+            "dod.search.ingredientCard",
+            "search-results-using-header"
+        )
+        let result =
+            app.descendants(matching: .any)
+            .matching(anyResult)
+            .firstMatch
+        XCTAssertTrue(
+            result.waitForExistence(timeout: 20),
+            "Searching an ingredient should surface recipe results (title or 'Recipes Using' tier)"
+        )
+    }
+
+    /// v2 Search overhaul (3/3) — the idle "Try Searching" chips now draw from
+    /// a curated 100-term pool of specific SEARCH terms (not categories), and
+    /// tapping one runs a normal TEXT search for that term (like typing it),
+    /// not a category fetch. Open Search from the Feed header, wait for a
+    /// `search-try-chip` to render, tap it, and assert the tap ran a search:
+    /// the search field now holds a term AND a result surface (title card,
+    /// content card, or the "Recipes Using" header) appears. Hits the live
+    /// API, so the timeouts are generous.
+    func test_searchTryChipRunsTextSearch() throws {
+        XCTAssertTrue(waitForAppReady(), "App should reach an interactive first screen")
+
+        let openSearch = app.buttons["feed-open-search"]
+        XCTAssertTrue(
+            openSearch.waitForExistence(timeout: 8),
+            "The Feed header should host the magnifying-glass search button (feed-open-search)"
+        )
+        openSearch.tap()
+
+        let searchField = app.textFields["Search Recipes"]
+        XCTAssertTrue(
+            searchField.waitForExistence(timeout: 8),
+            "Tapping feed-open-search should present the Search modal (Search Recipes field visible)"
+        )
+
+        // The curated chips render immediately (the pool is a constant, not an
+        // async category fetch), so a `search-try-chip` should exist without
+        // waiting on the network.
+        let chip = app.buttons.matching(identifier: "search-try-chip").firstMatch
+        XCTAssertTrue(
+            chip.waitForExistence(timeout: 8),
+            "The idle Search page should render curated 'Try Searching' chips (search-try-chip)"
+        )
+        chip.tap()
+
+        // The tap runs a text search: the field is populated with the term...
+        let fieldValue = (searchField.value as? String) ?? ""
+        XCTAssertFalse(
+            fieldValue.isEmpty || fieldValue == "Search Recipes",
+            "Tapping a Try chip should populate the search field with its term; got '\(fieldValue)'"
+        )
+
+        // ...and a result surface appears (title card, content card, or the
+        // "Recipes Using" header — every pool term is pre-validated to return
+        // results, so at least one should land).
+        let anyResult = NSPredicate(
+            format: "identifier == %@ OR identifier == %@ OR identifier == %@",
+            "dod.search.card",
+            "dod.search.ingredientCard",
+            "search-results-using-header"
+        )
+        let result =
+            app.descendants(matching: .any)
+            .matching(anyResult)
+            .firstMatch
+        XCTAssertTrue(
+            result.waitForExistence(timeout: 20),
+            "Tapping a Try chip should run a text search that surfaces results"
         )
     }
 

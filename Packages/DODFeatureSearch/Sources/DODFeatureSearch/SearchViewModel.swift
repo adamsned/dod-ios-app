@@ -39,6 +39,9 @@ public final class SearchViewModel {
             // the items array still reflects the latest-recipes fetch.
             lastSurface = .textQuery
             scheduleSearch()
+            // v2 Search overhaul (2/3): type-ahead suggestions run on their own
+            // (shorter) debounce so they surface BEFORE the result fetch settles.
+            scheduleAutocomplete()
         }
     }
 
@@ -105,6 +108,13 @@ public final class SearchViewModel {
     /// DUT — bumped only on a genuine Save/Unsave (see `+SavedState`); drives
     /// `SearchView`'s `.selection` haptic. Mirrors Categories' `saveToggleCount`.
     public internal(set) var saveToggleCount: Int = 0
+    /// v2 Search overhaul (1/3) — Surprise Me state (behavior lives in
+    /// `SearchViewModel+SurpriseMe.swift`; stored here because extensions can't add
+    /// stored properties). `lastSurpriseID` avoids an immediate repeat via
+    /// `RandomRecipePicker`; `isSurpriseMeLoading` drives the idle button's spinner
+    /// + in-flight guard. `internal(set)` so the extension advances them.
+    public internal(set) var lastSurpriseID: Int?
+    public internal(set) var isSurpriseMeLoading = false
     /// DUT-534 Part 2 — Shopping List snackbar copy + optional trailing action
     /// title ("View"), driven by `SearchViewModel+ShoppingList`, rendered by
     /// `SearchView`. `nil` message hides the snackbar.
@@ -124,12 +134,13 @@ public final class SearchViewModel {
         Array(availableCategories.sorted { $0.count > $1.count }.prefix(5))
     }
 
-    /// US-29 amendment / CL-117 / T-639: the rotating Try slate's storage
-    /// + helpers (`topTrySlatePool`, `displayedTrySlate`, `pickTrySlate`)
-    /// live in `SearchViewModel+T639.swift` to keep this file under
-    /// SwiftLint's `file_length` cap. The backing cache is here because
-    /// stored properties can't live in extensions.
-    var cachedTrySlate: [DODDomain.Category]?
+    /// US-29 amendment / CL-117 / T-639 → v2 Search overhaul (3/3): the "Try"
+    /// slate's storage + helpers (`displayedTrySlate`, `pickTrySlate`) live in
+    /// `SearchViewModel+T639.swift` to keep this file under SwiftLint's
+    /// `file_length` cap. The backing cache is here because stored properties
+    /// can't live in extensions. Wave 3 changed the element type from
+    /// `DODDomain.Category` to `SearchTryChip` (curated 100-term pool).
+    var cachedTrySlate: [SearchTryChip]?
 
     /// Newest-first recent queries. T-779 / DUT-85: `internal(set)` (was
     /// `private(set)`) so the `+Recents` extension can refresh it on commit.
@@ -138,6 +149,28 @@ public final class SearchViewModel {
     /// CL-127 (T-649): "did you mean?" suggestion populated by the
     /// `+T643` finalize hop when results settle < 3 items.
     public internal(set) var didYouMean: String?
+
+    /// v2 Search overhaul (2/3) — type-ahead suggestions shown under the
+    /// search field WHILE the user types, before the (slower) result fetch
+    /// settles. Sourced from the local cached-title pool (offline, instant);
+    /// tapping one runs that search. Populated by `SearchViewModel+Autocomplete`.
+    public internal(set) var suggestions: [String] = []
+    /// The cached recipe-title pool backing `suggestions`, loaded once
+    /// (lazily) so per-keystroke suggestion computation is synchronous +
+    /// offline — typing never blocks on the network. `internal` so the
+    /// `+Autocomplete` extension can hydrate + read it (stored props can't
+    /// live in extensions).
+    var cachedTitlePool: [String] = []
+    var didLoadTitlePool = false
+    /// Autocomplete debounce task + its own monotonic generation token, so a
+    /// slow pool-load for an earlier keystroke can't clobber a newer query's
+    /// suggestions. Mirrors the search pipeline's `searchGeneration` stale-drop.
+    var autocompleteTask: Task<Void, Never>?
+    var autocompleteGeneration = 0
+    /// Autocomplete debounce (120ms — deliberately shorter than the 150ms
+    /// result-fetch debounce so suggestions lead the results). Public so tests
+    /// can drive timing.
+    public var autocompleteDebounceMilliseconds: Int = 120
 
     // CL-106 (T-637): the next five caches and `dependencies` are
     // `internal` (no access modifier) rather than `private` so the
@@ -171,6 +204,34 @@ public final class SearchViewModel {
     /// `+T637`'s `surfaceLatestRecipes` can claim a generation too.
     var searchGeneration = 0
 
+    // MARK: - Infinite-scroll paging (v2 search paging)
+    /// Highest `?search=` page already folded into the visible result set for
+    /// the CURRENT text query. Reset to 1 whenever `finishTextSearch` commits a
+    /// fresh page-1 set (a new query resets paging); `loadMoreResults` advances
+    /// it. Paging applies only to the plain text-search path — the
+    /// Latest-Recipes (`+T637`) and category-fetch (Path B) surfaces don't page.
+    var searchResultsPage = 1
+    /// Latches `true` once a fetched page comes back empty or short (fewer than
+    /// `searchResultsPageSize` rows = WP's last page), so the near-bottom trigger
+    /// stops firing. Reset on every fresh page-1 commit.
+    var searchResultsReachedEnd = false
+    /// Single-flight guard for concurrent page fetches (mirrors `FeedViewModel`'s
+    /// `isLoading`): the near-bottom trigger can fire several times per scroll,
+    /// so `loadMoreResults` bails while a page is already in flight. Drives the
+    /// bottom spinner row in `SearchView`. `public internal(set)` so the view can
+    /// observe it while only the `+Paging` extension advances it.
+    public internal(set) var isLoadingMoreResults = false
+    /// The `?search=` per-page size the pipeline pages at. Matches
+    /// `WPRestClient.searchPageSize` (100) so a page returning fewer than this
+    /// reliably signals WP's last page (the "short page stops" rule). Kept at 100
+    /// (not dropped smaller) so paged pages share page 1's title-precision recall
+    /// window (CL-120) and each append pulls a full batch in one round trip.
+    static let searchResultsPageSize = 100
+    /// Near-bottom trigger window: the trailing N combined rows (title tier +
+    /// "Recipes Using" tier) whose appearance arms the next page fetch, mirroring
+    /// `FeedViewModel.loadMoreIfNeeded`'s `items.suffix(3)`.
+    static let loadMoreTailWindow = 3
+
     /// DUT-541: in-flight guard for card "Add to Shopping List". A rapid double
     /// long-press fires two independent `Task { await addToShoppingList(item) }`
     /// with no gate, and `ShoppingListStore.append` is additive (CL-77), so the
@@ -196,6 +257,12 @@ public final class SearchViewModel {
         // slow query already past the debounce (awaiting the REST fan-out) bails
         // in `finishTextSearch` rather than repainting over the now-idle screen.
         debounceTask?.cancel()
+        // v2 Search overhaul (2/3): cancel the autocomplete debounce + bump its
+        // generation so an in-flight suggestion pass can't repaint the now-idle
+        // field, and wipe the surfaced suggestions.
+        autocompleteTask?.cancel()
+        autocompleteGeneration &+= 1
+        suggestions = []
         searchGeneration &+= 1
         query = ""
         items = []
@@ -207,6 +274,7 @@ public final class SearchViewModel {
         lastSurface = .textQuery
         didYouMean = nil  // CL-127 (T-649): wipe the rescue banner too.
         filterSupportHydrated = false  // DUT-505: re-arm lazy filter-support hydration.
+        resetResultsPaging()  // v2 search paging: re-arm the page cursor for the next query.
     }
 
     /// Surface a stored query (e.g. user tapped a recent chip). Sets the
@@ -264,86 +332,12 @@ public final class SearchViewModel {
         await performSearch()
     }
 
-    private func scheduleSearch() {
-        debounceTask?.cancel()
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 2 else {
-            // DUT-221: bump the generation so an earlier ≥2-char search in flight bails.
-            searchGeneration &+= 1
-            items = []
-            ingredientItems = []  // DUT-11: don't strand a stale tier.
-            state = .idle
-            didYouMean = nil  // DUT-568: parity with clear() — wipe the rescue banner.
-            filterSupportHydrated = false  // DUT-505: re-arm lazy filter-support hydration.
-            return
-        }
-        debounceTask = Task { [weak self] in
-            guard let self else { return }
-            let delay = self.debounceMilliseconds
-            try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
-            if Task.isCancelled { return }
-            await self.performSearch()
-        }
-    }
-
-    private func performSearch() async {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 2 else { return }
-        // H1: claim a new generation; stale async completions check it + bail.
-        searchGeneration &+= 1
-        let generation = searchGeneration
-
-        // The local ingredient index works offline; the REST pass does not. We
-        // try both and gracefully degrade (see the DUT-11 tier below).
-        let online = await dependencies.isOnline()
-        // H1: a newer search may have settled to `.results` mid-await; without
-        // this, `state = .searching` below strands the UI in a spinner.
-        guard generation == searchGeneration else { return }
-        state = .searching
-        let fanOut = await fanOutSearchPaths(trimmed: trimmed, online: online)
-
-        // DUT-11: the local "Recipes using <term>" tier — works offline.
-        let localItems =
-            (try? await dependencies.recipesUsingIngredient(matching: trimmed)) ?? []
-
-        let titleMerged = SearchResultMerger.merge(
-            query: trimmed,
-            restResults: fanOut.restResults,
-            localIngredientResults: localItems
-        )
-        // T-643 / CL-121: union the title-tier-ordered Path A results
-        // with the category-fetched Path B results, deduped by post id.
-        // Path A's tier ordering (exact → substring → fuzzy) survives the
-        // union; Path B-only contributions append in WP's natural date-
-        // desc order. See `CategoryNameMatcher` doc-comment for the rule.
-        let merged = mergeWithCategoryResults(
-            titleMerged: titleMerged,
-            categoryResults: fanOut.categoryResults
-        )
-
-        // DUT-11: dedup ingredient tier + offline guard + cache stash
-        // (`finishTextSearch` lives in `+T643`). DUT-622: `restFailed` rides
-        // along so a failed request with no fallback surfaces `.error`.
-        await finishTextSearch(
-            merged: merged,
-            localItems: localItems,
-            trimmed: trimmed,
-            network: .init(online: online, restFailed: fanOut.restFailed),
-            generation: generation
-        )
-    }
-
-    // CL-121 (T-643) + DUT-11: the `performSearch` helpers (fan-out / Path A / B
-    // / merge / finish / finalize) live in `SearchViewModel+T643.swift`.
-
-    /// Send the AC-3.6 SHA-256-hashed query to analytics on each completed
-    /// search. T-779 / DUT-85 moved recent-recording out of this path into
-    /// ``commitRecentSearch()`` (Return / keyboard dismissal only), so this no
-    /// longer persists to the recents store. `+T643`'s finalize hop calls it.
-    func sendSearchTelemetry(trimmed: String) async {
-        let hash = StringHasher.sha256Hex(trimmed)
-        await dependencies.sendSearchTelemetry(queryHash: hash)
-    }
+    // v2 Search overhaul (2/3): `scheduleSearch()` + `performSearch()` moved to
+    // `SearchViewModel+Pipeline.swift` (file-length relief after the autocomplete
+    // storage + partition wiring landed). CL-121 (T-643) + DUT-11: the
+    // `performSearch` helpers (fan-out / Path A / B / merge / finish / finalize)
+    // — and `sendSearchTelemetry(trimmed:)`, which that finalize hop calls — live
+    // in `SearchViewModel+T643.swift`.
 
     /// Re-rank the cached merged set when filters change. Pure function over
     /// stored state — no I/O (apart from the optional cook-time hydration

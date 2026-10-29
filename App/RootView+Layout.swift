@@ -31,6 +31,7 @@ extension RootView {
                     openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
                     hubPendingTool: tab == .cookingTools ? $hubPendingTool : .constant(nil),
                     hubTipToken: tab == .cookingTools ? $hubTipToken : .constant(nil),
+                    savedCollectionRequest: tab == .saved ? $savedCollectionRequest : .constant(nil),
                     cookModeFindRecipeArmed: tab == .feed ? $cookModeFindRecipeArmed : .constant(false),
                     // DUT-546 — one shared moderation store across every recipe screen.
                     commentModeration: commentModeration
@@ -134,6 +135,7 @@ extension RootView {
                 openHeatCoach: { seed in routeToHeatCoach(seed: seed) },
                 hubPendingTool: selectedTab == .cookingTools ? $hubPendingTool : .constant(nil),
                 hubTipToken: selectedTab == .cookingTools ? $hubTipToken : .constant(nil),
+                savedCollectionRequest: selectedTab == .saved ? $savedCollectionRequest : .constant(nil),
                 cookModeFindRecipeArmed: selectedTab == .feed ? $cookModeFindRecipeArmed : .constant(false),
                 // DUT-546 — one shared moderation store across every recipe screen.
                 commentModeration: commentModeration

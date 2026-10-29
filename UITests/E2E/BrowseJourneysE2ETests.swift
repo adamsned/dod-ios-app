@@ -31,7 +31,10 @@ final class BrowseJourneysE2ETests: XCTestCase {
             "feed should load before switching to Search"
         )
 
-        tabBar.buttons["Search"].tap()
+        XCTAssertTrue(
+            app.openSearchFromFeed(),
+            "v2 Search overhaul (1/3): open Search via the Feed header magnifying glass"
+        )
 
         // The idle Search tab lists the fixture categories. Tap "Mains".
         let mains = app.buttons["Mains, 2 recipes"]

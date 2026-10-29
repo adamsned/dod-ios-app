@@ -30,7 +30,7 @@ import Testing
         // finalize carries a now-stale generation and must NOT clobber items.
         await viewModel.finishTextSearch(
             merged: [Self.makeItem(2, title: "Chicken Pot Pie")],
-            localItems: [],
+            usingSources: .init(contentMatches: [], localItems: []),
             trimmed: "chick",
             network: .init(online: true, restFailed: false),
             generation: currentGeneration - 1
@@ -40,7 +40,7 @@ import Testing
         // The guard isn't over-eager: a finalize at the CURRENT generation applies.
         await viewModel.finishTextSearch(
             merged: [Self.makeItem(2, title: "Chicken Pot Pie")],
-            localItems: [],
+            usingSources: .init(contentMatches: [], localItems: []),
             trimmed: "chicken",
             network: .init(online: true, restFailed: false),
             generation: currentGeneration
@@ -72,7 +72,7 @@ import Testing
         // The slow query now returns; its finalize must NOT repaint over idle.
         await viewModel.finishTextSearch(
             merged: [Self.makeItem(9, title: "Chicken Soup")],
-            localItems: [],
+            usingSources: .init(contentMatches: [], localItems: []),
             trimmed: "chicken",
             network: .init(online: true, restFailed: false),
             generation: inFlightGeneration

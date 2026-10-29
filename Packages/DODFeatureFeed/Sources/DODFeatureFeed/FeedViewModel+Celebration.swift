@@ -42,12 +42,18 @@ extension FeedViewModel {
         // Graduating the whole First Cookout path is the bigger beat → priority.
         let wasGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedBefore) == nil
         let isGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedAfter) == nil
+        let isFirstCookEver = logsBefore.isEmpty && !logsAfter.isEmpty
         if isGraduate && !wasGraduate {
             pendingCelebration = .graduatedFirstCookout
-        } else if !OwnerGate.isCurrentUserOwner() {
+        } else if OwnerGate.isCurrentUserOwner() {
             // Daddy Mode (owner rank) — the owner's rank is fixed at "The Dutch Oven
             // Daddy", so he never "ranks up". Suppress the rank-up celebration for
             // him (a "You're a Cast Iron Legend" beat would contradict his rank).
+        } else if isFirstCookEver {
+            // DUT-983: any recipe, including off-path ones. Replaces the
+            // Fire Starter rank-up a first path cook would otherwise earn.
+            pendingCelebration = .firstCookEver
+        } else {
             let reached = CookProgression.rankUp(
                 from: Self.rankLadderCookCount(logsBefore),
                 to: Self.rankLadderCookCount(logsAfter)

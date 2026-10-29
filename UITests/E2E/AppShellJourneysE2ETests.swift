@@ -158,11 +158,10 @@ final class AppShellJourneysE2ETests: XCTestCase {
             app.staticTexts["Cooking Tools"].waitForExistence(timeout: 8),
             "the Cooking Tools hub tab should render its header"
         )
-        tabBar.buttons["Search"].tap()
-        XCTAssertTrue(
-            app.textFields.firstMatch.waitForExistence(timeout: 8),
-            "the Search tab should render its search field"
-        )
+        // v2 Search overhaul (1/3) — Search is no longer a tab (it pushes within
+        // the Feed stack via the header magnifying glass), so it's dropped from
+        // this cross-tab sweep. The remaining tabs still exercise the "tab swap
+        // is not a pop" contract this journey pins.
 
         // Return to Recipes — the pushed detail is still there (not popped).
         tabBar.buttons["Recipes"].tap()

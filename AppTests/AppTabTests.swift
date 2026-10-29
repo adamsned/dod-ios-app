@@ -10,24 +10,28 @@ import XCTest
 /// AC-16.4 (telemetry names stable). CL-24, CL-25, CL-194 (the Categories
 /// tab was removed in T-800 — its browse list moved into Search, CL-193),
 /// CL-306 (T-912 / DUT-551 — the Grocery List + Settings tabs retired for the
-/// Cooking Tools hub + a header Settings gear).
+/// Cooking Tools hub + a header Settings gear). v2 Search overhaul (1/3) — the
+/// Search tab itself was retired: Search is now PUSHED within the Feed tab's
+/// stack via the header's magnifying-glass button, not a 4th tab.
 final class AppTabTests: XCTestCase {
 
     /// AC-16.1 / CL-25 / CL-194 / CL-306: bottom tab-bar order is **Recipes →
-    /// Saved → Cooking Tools → Search** (Categories folded into Search in T-800;
-    /// the Grocery List + Settings tabs retired in T-912 / DUT-551 — the Shopping
+    /// Saved → Cooking Tools** (Categories folded into Search in T-800; the
+    /// Grocery List + Settings tabs retired in T-912 / DUT-551 — the Shopping
     /// List folded into the new Cooking Tools hub tab, and Settings moved to a
-    /// header gear). `AppTab.allCases` is the single source of truth for that
-    /// order (RootView's phoneTabs iterates it directly), so asserting on the
-    /// enum is the cheapest possible regression guard.
+    /// header gear; the Search tab retired in the v2 Search overhaul (1/3) — the
+    /// Feed header's magnifying glass PUSHES Search within the Feed stack).
+    /// `AppTab.allCases` is the single source of truth for that order (RootView's
+    /// phoneTabs iterates it directly), so asserting on the enum is the cheapest
+    /// possible regression guard.
     func test_allCasesOrderMatchesSpec() {
         XCTAssertEqual(
             AppTab.allCases,
-            [.feed, .saved, .cookingTools, .search],
+            [.feed, .saved, .cookingTools],
             "Bottom tab bar order is the single source of truth in AppTab.allCases. "
                 + "Changing the order here is a user-visible product change — update the "
-                + "spec (US-16 / AC-16.1) before touching this test. T-912 / DUT-551 (CL-306) "
-                + "replaced the Grocery List + Settings tabs with the Cooking Tools hub."
+                + "spec (US-16 / AC-16.1) before touching this test. The v2 Search overhaul "
+                + "(1/3) retired the Search tab (Search now pushes within the Feed stack)."
         )
     }
 
@@ -47,7 +51,6 @@ final class AppTabTests: XCTestCase {
     /// passes.
     func test_otherTabs_systemImagesUnchanged() {
         XCTAssertEqual(AppTab.feed.systemImage, "house")
-        XCTAssertEqual(AppTab.search.systemImage, "magnifyingglass")
         // T-912 / DUT-551 (CL-306) — the Cooking Tools hub uses `frying.pan`
         // (SwiftUI swaps to `frying.pan.fill` on selection), matching the glyph
         // the retired Cooking Tools menu used.
@@ -62,7 +65,6 @@ final class AppTabTests: XCTestCase {
     func test_telemetryNames_areStable() {
         XCTAssertEqual(AppTab.feed.telemetryName, "feed")
         XCTAssertEqual(AppTab.saved.telemetryName, "saved")
-        XCTAssertEqual(AppTab.search.telemetryName, "search")
         // T-912 / DUT-551 (CL-306) — the Cooking Tools hub's stable token.
         XCTAssertEqual(AppTab.cookingTools.telemetryName, "cooking_tools")
     }
@@ -77,7 +79,6 @@ final class AppTabTests: XCTestCase {
     func test_titles_matchSpec() {
         XCTAssertEqual(AppTab.feed.title, "Recipes & Articles")
         XCTAssertEqual(AppTab.saved.title, "Saved")
-        XCTAssertEqual(AppTab.search.title, "Search")
         // T-912 / DUT-551 (CL-306) — the hub header reads the full "Cooking
         // Tools"; the bottom-tab label is the shorter "Tools" (see below).
         XCTAssertEqual(AppTab.cookingTools.title, "Cooking Tools")
@@ -93,7 +94,6 @@ final class AppTabTests: XCTestCase {
     func test_tabLabels_matchSpec() {
         XCTAssertEqual(AppTab.feed.tabLabel, "Recipes")
         XCTAssertEqual(AppTab.saved.tabLabel, "Saved")
-        XCTAssertEqual(AppTab.search.tabLabel, "Search")
         // T-912 / DUT-551 (CL-306) — short "Tools" for the ~80pt slot.
         XCTAssertEqual(AppTab.cookingTools.tabLabel, "Tools")
     }

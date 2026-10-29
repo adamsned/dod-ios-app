@@ -2,11 +2,14 @@
 ///
 /// Case order is the **single source of truth** for the bottom tab-bar
 /// order. Reordering here changes what the user sees; see AC-16.1 / CL-25.
-/// The visual order is **Recipes → Saved → Cooking Tools → Search** — the
-/// Categories tab was folded into Search in T-800 (CL-194 / DUT-113), and the
-/// Grocery List + Settings tabs were retired in T-912 (CL-306 / DUT-551): the
-/// Shopping List folded into the new **Cooking Tools** hub and Settings moved
-/// to a header gear button.
+/// The visual order is **Recipes → Saved → Cooking Tools** — the Categories
+/// tab was folded into Search in T-800 (CL-194 / DUT-113); the Grocery List +
+/// Settings tabs were retired in T-912 (CL-306 / DUT-551): the Shopping List
+/// folded into the new **Cooking Tools** hub and Settings moved to a header
+/// gear button. The **Search tab itself was retired in the v2 Search overhaul
+/// (1/3)**: Search is no longer a tab — the Feed header's dice button became a
+/// magnifying glass that PUSHES ``DODFeatureSearch/SearchView`` within the Feed
+/// tab's own navigation stack, and Surprise Me moved onto that search page.
 enum AppTab: Hashable, CaseIterable, Identifiable {
     case feed
     case saved
@@ -19,7 +22,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
     // storage / deep-link keys the old Grocery tab used (`dod.shoppingList.v1`,
     // `dod://shopping-list`) are UNCHANGED; only the entry surface moved.
     case cookingTools
-    case search
 
     var id: Self { self }
 
@@ -47,7 +49,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         // (`telemetryName`, AC-16.4) is unchanged to preserve funnel
         // comparisons across both renames.
         case .feed: "Recipes & Articles"
-        case .search: "Search"
         case .saved: "Saved"
         // T-912 / DUT-551 (CL-306) — the hub header + `DODScreenHeader` read the
         // full "Cooking Tools"; the bottom-tab label is the shorter "Tools"
@@ -74,7 +75,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
         // the pre-T-640 wording; the full "Recipes & Articles" still
         // drives `FeedView.navigationTitle`.
         case .feed: "Recipes"
-        case .search: "Search"
         case .saved: "Saved"
         // T-912 / DUT-551 (CL-306) — short "Tools" for the ~80pt tab slot;
         // "Cooking Tools" (~13 chars) would truncate. The full name lives in
@@ -90,7 +90,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .feed: "house"
-        case .search: "magnifyingglass"
         // T-912 / DUT-551 (CL-306) — `frying.pan` (outline) unselected,
         // `frying.pan.fill` selected; SwiftUI's tab styling swaps to the filled
         // variant automatically. Matches the glyph the retired Cooking Tools
@@ -111,7 +110,6 @@ enum AppTab: Hashable, CaseIterable, Identifiable {
     var telemetryName: String {
         switch self {
         case .feed: "feed"
-        case .search: "search"
         case .saved: "saved"
         // T-912 / DUT-551 (CL-306) — telemetry name is the stable code
         // identifier "cooking_tools" (added to the constitution §9 allowlist).

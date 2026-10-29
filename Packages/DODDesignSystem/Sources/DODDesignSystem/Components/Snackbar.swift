@@ -95,7 +95,7 @@ public struct Snackbar: View {
         .padding(.vertical, DODSpacing.sm)
         .background(
             RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                .fill(DODColor.castIronBrown)
+                .fill(DODColor.popupSurface)
         )
         .padding(.horizontal, DODSpacing.md)
         .accessibilityElement(children: .combine)

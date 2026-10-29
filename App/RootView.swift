@@ -57,6 +57,10 @@ struct RootView: View {
     /// Non-private so `RootView+Appearance.swift` decodes it.
     @AppStorage(SettingsViewModel.appearancePreferenceKey)
     var appearanceRaw: String = AppearancePreference.system.rawValue
+    // ⚠️ DEV DEBUG (strip before public release) — gates `DevPopupHarness`, the
+    // app-level test harness for the Dev Debug ▸ Testing buttons. Locked builds
+    // wire no observers or overlays. See `RootView+DevHarness.swift`.
+    @AppStorage(DevDebug.unlockedKey) var devDebugUnlocked = false
     /// Widget deep link (spec.md US-9 AC-9.2). Feed tab consumes via .task(id:).
     /// Non-private so `+LinkRouting.swift`'s `handle(widgetLink:)` can set it.
     @State var pendingDeepLink: WidgetDeepLink?
@@ -67,8 +71,11 @@ struct RootView: View {
     @State var deepLinkErrorMessage: String?
     // Per-tab external-route sinks. Feed carries deep links (App Intents /
     // Spotlight, spec.md US-10, replace semantics) AND in-app link taps;
-    // Saved + Search exist so an article link tapped there opens in place
-    // instead of yanking the user to Feed (DUT-243, push semantics).
+    // Saved exists so an article link tapped there opens in place instead of
+    // yanking the user to Feed (DUT-243, push semantics). The retired Search
+    // tab (v2 Search overhaul 1/3) no longer needs its own sink — Search is
+    // now a bottom-up modal presented over the Feed (overhaul 2/3) hosting its
+    // own NavigationStack, so it doesn't participate in the per-tab route sinks.
     // Non-private so the `+LinkRouting.swift` extension can write them.
     //
     // DUT-463 / DUT-464 / DUT-319 — these were single-slot `ExternalRoute?`
@@ -78,7 +85,6 @@ struct RootView: View {
     // route and `TabStack` drains it on appear + on change, dropping stale ones.
     @State var feedExternalRoute = ExternalRouteQueue()
     @State var savedExternalRoute = ExternalRouteQueue()
-    @State var searchExternalRoute = ExternalRouteQueue()
     /// DUT-250 — per-tab navigation stacks, hoisted out of `TabStack`'s local
     /// `@State` into `RootView` so they SURVIVE the iPad size-class flip. `body`
     /// swaps structurally different trees at the `.regular` boundary —
@@ -102,6 +108,9 @@ struct RootView: View {
     /// DUT-461 (revised) — the hub's Cooking Tip token. The widget tap mints it;
     /// the hub consumes it via `.task(id:)` to pop to its root so the tip shows.
     @State var hubTipToken: UUID?
+    /// DUT-1388 — a Siri "Open my <name> collection" request, consumed by the
+    /// Saved tab (which selects that collection's shelf filter, then clears it).
+    @State var savedCollectionRequest: UUID?
     /// The "we came here to cook" arm (Feed-only). DUT-1229 fix: used to disarm
     /// on the FIRST pick, so picking a different recipe next stopped
     /// auto-starting; now stays armed until leaving Feed (`disarmCookModeFindIfNeeded`).
@@ -164,12 +173,21 @@ struct RootView: View {
     var body: some View {
         Group {
             if horizontalSizeClass == .regular {
-                iPadSplit
+                // v2 "Seasoned Cast Iron" — `.id(appearance)` on the tab CONTENT
+                // (not the outer `Group`, so the Settings `.sheet` stays
+                // presented) forces re-resolution of the dynamic surface colors:
+                // Cocoa→Seasoned is a dark→dark switch, so the `DODColor` UIColor
+                // providers wouldn't otherwise re-run. See `syncOLEDDarkFlag()`.
+                iPadSplit.id(appearance)
             } else {
-                phoneTabs
+                phoneTabs.id(appearance)
             }
         }
         .preferredColorScheme(preferredColorScheme(for: appearance))
+        // v2 — keep `DODColor.isOLEDDark` in lock-step with the preference so the
+        // forced re-resolution above reads the correct flag (see extension).
+        .onAppear { syncOLEDDarkFlag() }
+        .onChange(of: appearance) { syncOLEDDarkFlag() }
         .animation(.easeInOut(duration: 0.2), value: appearance)
         .onChange(of: selectedTab) { _, newTab in disarmCookModeFindIfNeeded(forTab: newTab) }
         .task {
@@ -215,27 +233,11 @@ struct RootView: View {
                 handle(intent: intent)
             }
         }
-        .onContinueUserActivity(CSSearchableItemActionType) { activity in
-            guard
-                let identifier = activity.userInfo?[
-                    CSSearchableItemActivityIdentifier
-                ] as? String,
-                let id = identifier.split(separator: ".").last.flatMap({ Int($0) })
-            else { return }
-            handle(intent: .openRecipe(id: id))
-        }
-        // DUT-1325 — Universal Links. A tapped dutchovendaddy.com link (from
-        // Messages, Mail, social, a newsletter) arrives here as a browsing-web
-        // activity carrying the https URL. Reuse `openRecipeLink`, which resolves
-        // a `/<slug>/` permalink to its post and routes it in-app, and falls back
-        // to the system browser for any non-recipe / off-site URL. Inert until
-        // the Associated Domains entitlement is provisioned AND the site serves
-        // the apple-app-site-association file (see the entitlements file + the
-        // Marketing/universal-links runbook).
-        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
-            guard let url = activity.webpageURL else { return }
-            Task { @MainActor in _ = await openRecipeLink(url) }
-        }
+        .onContinueUserActivity(CSSearchableItemActionType) { handleSpotlightActivity($0) }
+        .modifier(OnscreenRecipeActivity())  // DUT-1388 — Siri onscreen awareness
+        // DUT-1325 — Universal Links: a tapped dutchovendaddy.com link routes
+        // in-app (see `handleUniversalLink` in RootView+LinkRouting).
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { handleUniversalLink($0) }
         .onChange(of: scenePhase) {
             reindexSpotlightOnForeground($1)
             // DUT-480 — a Control Center tap set `openAppWhenRun`, so it
@@ -260,10 +262,15 @@ struct RootView: View {
         // resolved at launch and disclosed by the welcome screen's standing
         // disclosure line (pinned above the CTA, not a scrollable bullet).
         .fullScreenCover(isPresented: $showOnboarding) { onboardingCover }
+        // ⚠️ DEV DEBUG (strip before public release) — fires the Dev Debug
+        // "Testing" popups (Snackbar / OfflineBanner / App Welcome) over the app.
+        // Inert unless Dev Debug is unlocked. See `RootView+DevHarness.swift`.
+        .modifier(DevPopupHarness(enabled: devDebugUnlocked, showOnboarding: $showOnboarding))
         // T-912 / DUT-551 (CL-306) — Settings sheet. The iPhone gear + iPad
         // sidebar row both flip `showSettingsSheet`. Content in
         // `RootView+Settings.swift` (file_length split, DUT-941).
         .sheet(isPresented: $showSettingsSheet) { settingsSheet }
+        .modifier(ShakeToReport(currentScreen: selectedTab.shakeScreenID))
         // DUT-549 — transient "couldn't open that recipe" toast for a failed
         // deep-link resolve (modifier + copy in `RootView+LinkRouting.swift`).
         .modifier(DeepLinkErrorSnackbar(message: $deepLinkErrorMessage))
