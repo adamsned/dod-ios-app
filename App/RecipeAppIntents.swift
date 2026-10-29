@@ -187,6 +187,16 @@ struct DODShortcuts: AppShortcutsProvider {
             systemImageName: "cart.badge.plus"
         )
         AppShortcut(
+            intent: ScaleServingsIntent(),
+            phrases: [
+                "Scale \(\.$recipe) in \(.applicationName)",
+                "Scale this recipe in \(.applicationName)",
+                "Change servings in \(.applicationName)",
+            ],
+            shortTitle: "Scale Servings",
+            systemImageName: "person.2"
+        )
+        AppShortcut(
             intent: OpenCollectionIntent(),
             phrases: [
                 "Open my \(\.$target) collection in \(.applicationName)",
