@@ -44,3 +44,48 @@ public struct BringList: Codable, Sendable, Equatable {
         }
     }
 }
+
+extension BringList {
+    /// Seed from planned recipes. `equipment` is the union of each recipe's `[Equipment]`.
+    /// De-dupes by lowercased trimmed name (first image wins), skips blank names, then adds
+    /// a charcoal row and, unless an oven is already present, a default Dutch oven row.
+    public static func seed(equipment: [Equipment], totalServings: Int?) -> BringList {
+        var items: [BringListItem] = []
+        var seen = Set<String>()
+        for gear in equipment {
+            let trimmed = gear.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = trimmed.lowercased()
+            guard !key.isEmpty, seen.insert(key).inserted else { continue }
+            items.append(
+                BringListItem(
+                    id: key,
+                    name: trimmed,
+                    category: BringListGearClassifier.classify(trimmed),
+                    imageURL: gear.imageURL
+                )
+            )
+        }
+        let coalName = "Charcoal briquettes"
+        if seen.insert(coalName.lowercased()).inserted {
+            items.append(
+                BringListItem(
+                    id: coalName.lowercased(),
+                    name: coalName,
+                    category: .fuel,
+                    quantity: BringListCoalPlanner.briquettesToPack(servings: totalServings)
+                )
+            )
+        }
+        if !items.contains(where: { $0.category == .ovens }) {
+            items.append(
+                BringListItem(
+                    id: "dutch oven",
+                    name: "Dutch oven",
+                    category: .ovens,
+                    quantity: BringListCoalPlanner.ovenCount(servings: totalServings)
+                )
+            )
+        }
+        return BringList(items: items)
+    }
+}
