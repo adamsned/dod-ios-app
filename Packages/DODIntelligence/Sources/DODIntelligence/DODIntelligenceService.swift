@@ -130,6 +130,13 @@ public protocol DODIntelligenceService: Sendable {
     /// Returns `nil` — never throws — on unavailability, empty input, model error
     /// or guardrail rejection.
     func summarizeComments(_ comments: [String]) async -> CommentDigest?
+
+    /// DUT-1009 — identify the food items visible in a fridge/pantry photo.
+    /// `imageData` is JPEG/PNG bytes (`Data` stays Sendable across the actor
+    /// hop). Returns ingredient names (lowercase, singular-ish, e.g. "eggs",
+    /// "cheddar"). Returns `[]` — never throws — when unavailable, the image is
+    /// undecodable, the model errors, or a guardrail rejects it.
+    func identifyIngredients(imageData: Data) async -> [String]
 }
 
 extension DODIntelligenceService {
@@ -182,6 +189,9 @@ extension DODIntelligenceService {
 
     /// Default so older conformers (test doubles) need not implement it.
     public func summarizeComments(_ comments: [String]) async -> CommentDigest? { nil }
+
+    /// DUT-1009 — default implementation for older conformers to keep compiling.
+    public func identifyIngredients(imageData: Data) async -> [String] { [] }
 
     /// Default for conformers that don't implement Hero Moment captions.
     public func captionMoment(_ request: MomentCaptionRequest) async -> String? { nil }
