@@ -90,6 +90,8 @@ extension RootView {
         case .cookMode: self.route(toHubTool: .cookMode)
         case .buyBuzzyWaxx:
             if let url = URL(string: SettingsViewModel.buyBuzzyWaxxURLString) { systemOpenURL(url) }
+        // DUT-989 — Tonight's Rung; opens Cook Mode until a later piece routes to the snapshot's recipe.
+        case .tonightsRung: self.route(toHubTool: .cookMode)
         }
     }
 
