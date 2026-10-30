@@ -49,4 +49,32 @@ struct CookLogStatsOwnItTests {
         ]
         #expect(CookLogStats.ownItProgress(recipeID: 1, in: entries)?.title == "New Name")
     }
+
+    @Test func rotationEmptyIsEmpty() {
+        #expect(CookLogStats.onYourWayToOwning([]).isEmpty)
+    }
+
+    @Test func rotationExcludesOwnedRecipes() {
+        #expect(CookLogStats.onYourWayToOwning(cooks(3)).isEmpty)
+    }
+
+    @Test func rotationOrdersClosestToOwnedFirst() {
+        let entries = cooks(1, recipeID: 2) + cooks(2, recipeID: 1)
+        let result = CookLogStats.onYourWayToOwning(entries)
+        #expect(result.map(\.recipeID) == [1, 2])
+    }
+
+    @Test func rotationHonorsLimit() {
+        let entries = (1...5).flatMap { cooks(1, recipeID: $0) }
+        #expect(CookLogStats.onYourWayToOwning(entries, limit: 3).count == 3)
+    }
+
+    @Test func rotationTieBreaksByMostRecentCook() {
+        let entries = [
+            entry(1, "Old", at: Date(timeIntervalSince1970: 0)),
+            entry(2, "New", at: Date(timeIntervalSince1970: 86_400)),
+        ]
+        let result = CookLogStats.onYourWayToOwning(entries)
+        #expect(result.map(\.recipeID) == [2, 1])
+    }
 }
