@@ -22,4 +22,12 @@ extension LiveRecipeDetailDependencies {
         // `logCook`, so delete it here rather than orphan it.
         CookPhotoStore().delete(id: id)
     }
+
+    /// DUT-985 — true total cook count (not the dump-cake-excluding rank count),
+    /// from the same `RecipeStore.allCookLogs()` read `loadRankLadderCookCount` uses.
+    /// On a read failure return 1 so a disk hiccup never nags with the first-cook screen.
+    public func loadTotalCookCount() async -> Int {
+        guard let logs = try? await store.allCookLogs() else { return 1 }
+        return CookLogStats.totalCooks(logs)
+    }
 }
