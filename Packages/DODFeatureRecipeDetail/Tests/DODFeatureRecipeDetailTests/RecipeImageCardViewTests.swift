@@ -43,7 +43,7 @@ final class RecipeImageCardViewTests: XCTestCase {
         let view = RecipeImageCardView(content: content, heroImage: nil, logo: nil, qrImage: nil)
         let controller = UIHostingController(rootView: view)
         controller.loadViewIfNeeded()
-        return controller.view.sizeThatFits(in: CGSize(width: 2000, height: 3000))
+        return controller.view.sizeThatFits(CGSize(width: 2000, height: 3000))
     }
 
     @MainActor
