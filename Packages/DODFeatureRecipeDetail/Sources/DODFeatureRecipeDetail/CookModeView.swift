@@ -38,6 +38,10 @@ public struct CookModeView: View {
     /// `internal` (not `private`) so `CookModeView+Controls.swift` can gate the
     /// panel's collapse/expand animation on Reduce Motion (constitution §7).
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    /// DUT-116 — VoiceOver-aware layout switch; `internal` for the extension files.
+    @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
+    /// DUT-116 — lets the step card take VoiceOver focus when the step changes.
+    @AccessibilityFocusState var stepFocused: Bool
     // `internal` (not `private`) so the step-body composition in
     // `CookModeView+StepBody.swift` can present the journal-log sheet.
     /// DUT-326 — drives the "Add to Cooking Journal" capture sheet on the
@@ -231,8 +235,7 @@ public struct CookModeView: View {
                     .padding(.trailing, DODSpacing.md + 48)
                 }
             }
-            // The whole Cook Mode surface uses `surface` — the SAME token the
-            // player panel + the rest of the app use — so it reads as one uniform
+            // The whole Cook Mode surface uses the shared `surface` token.
             // color per appearance (Flour #F2F1EC, Cocoa #1B140E, Seasoned Cast
             // Iron OLED #000000), not the old mismatched `surfaceWarm` panel.
             .background(DODColor.surface.ignoresSafeArea())
@@ -295,23 +298,16 @@ public struct CookModeView: View {
         .sensoryFeedback(.success, trigger: viewModel.timerCompletionTick)
         // DUT-693 (PR3) — buzz when the cook completes (Done card flip).
         .sensoryFeedback(.success, trigger: viewModel.isFinished)
-        // DUT-693 (PR3) — light selection tick on every step change; keyed on
-        // the current-step index so it covers the Next/Back buttons, the swipe
-        // gesture, and the mini-nav arrows with one modifier.
+        // DUT-693 (PR3) — light selection tick on every step change.
         .sensoryFeedback(.selection, trigger: viewModel.currentStepIndex)
         // DUT — Cook Mode haptics: ingredient check/uncheck impact + play/pause tick.
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.checkedIngredientIDs.count)
         .sensoryFeedback(.selection, trigger: viewModel.isPlaying)
-        // DUT-401 — a step timer reaching 00:00 had only visual + haptic
-        // feedback; announce it so a cook who set the phone down (or a
-        // VoiceOver user) hears it. Paired with the same completion trigger the
-        // haptic uses. Skip the initial 0 so mounting doesn't announce.
+        // DUT-401 — announce timer completion (skip the initial 0 so mounting is silent).
         .onChange(of: viewModel.timerCompletionTick) { _, tick in
             if tick > 0 { announce("Timer complete.") }
         }
-        // DUT-401 — advancing/going back swaps the step silently; announce the
-        // new step (or the completion state) so VoiceOver users aren't left
-        // hunting for the changed text after tapping Next.
+        // DUT-401 — announce the new step so VoiceOver users aren't left hunting for it.
         .onChange(of: viewModel.currentStepIndex) { _, _ in announceCurrentStep() }
         .onChange(of: viewModel.isFinished) { _, _ in
             announceCurrentStep()

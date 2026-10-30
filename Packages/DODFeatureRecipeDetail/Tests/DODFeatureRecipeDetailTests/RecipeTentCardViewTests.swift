@@ -24,7 +24,7 @@ final class RecipeTentCardViewTests: XCTestCase {
         let controller = UIHostingController(rootView: view)
         controller.loadViewIfNeeded()
 
-        let size = controller.view.sizeThatFits(in: CGSize(width: 1000, height: 1000))
+        let size = controller.view.sizeThatFits(CGSize(width: 1000, height: 1000))
         XCTAssertEqual(size, RecipeTentCardView.cardSize)
     }
 }
