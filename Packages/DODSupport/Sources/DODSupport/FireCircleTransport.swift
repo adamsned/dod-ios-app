@@ -6,7 +6,7 @@ public enum FireCircleEvent: Sendable, Equatable {
 }
 
 @MainActor
-public protocol FireCircleTransport: AnyObject {
+public protocol FireCircleTransport: AnyObject, Sendable {
     var isRunning: Bool { get }
     /// Number of currently connected peers.
     var connectedPeerCount: Int { get }
