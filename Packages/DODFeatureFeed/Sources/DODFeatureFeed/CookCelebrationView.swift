@@ -13,12 +13,15 @@ public enum CookCelebration: Equatable, Identifiable, Sendable {
     /// The user's very first logged cook, off ANY recipe (DUT-983). The identity
     /// moment: distinct from a routine rank-up.
     case firstCookEver
+    /// DUT-974 — a recipe was cooked its 3rd time: it's the user's own.
+    case ownedIt(title: String)
 
     public var id: String {
         switch self {
         case .rankUp(let rank): return "rank-\(rank.threshold)"
         case .graduatedFirstCookout: return "graduated"
         case .firstCookEver: return "first-cook-ever"
+        case .ownedIt(let title): return "owned-\(title)"
         }
     }
 }
@@ -86,6 +89,7 @@ public struct CookCelebrationView: View {
         case .rankUp(let rank): return rank.emoji
         case .graduatedFirstCookout: return "🎓"
         case .firstCookEver: return "🔥"
+        case .ownedIt: return "🏆"
         }
     }
 
@@ -94,6 +98,7 @@ public struct CookCelebrationView: View {
         case .rankUp: return "Rank up"
         case .graduatedFirstCookout: return "Path complete"
         case .firstCookEver: return "First cook ever"
+        case .ownedIt: return "You own it"
         }
     }
 
@@ -102,6 +107,7 @@ public struct CookCelebrationView: View {
         case .rankUp(let rank): return "You're a \(rank.title)"
         case .graduatedFirstCookout: return "You're a Dutch Oven Cook"
         case .firstCookEver: return "You're one of us now"
+        case .ownedIt(let name): return "\(name) is yours now"
         }
     }
 
@@ -119,6 +125,8 @@ public struct CookCelebrationView: View {
                 + "campfire. That's not beginner stuff anymore."
         case .firstCookEver:
             return "You just fed someone in cast iron. You're one of us now."
+        case .ownedIt:
+            return "Three cooks in. You can pull this off relaxed on a busy Tuesday, no recipe open."
         }
     }
 
@@ -127,6 +135,7 @@ public struct CookCelebrationView: View {
         case .rankUp: return "Keep Cooking"
         case .graduatedFirstCookout: return "What's Next"
         case .firstCookEver: return "Keep Cooking"
+        case .ownedIt: return "Keep Cooking"
         }
     }
 }
