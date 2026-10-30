@@ -78,6 +78,10 @@ public protocol RecipeDetailDependencies: Sendable {
     /// wiring routes to ``CookPhotoStore/delete(id:)``.
     func deleteCookPhoto(id: String) async
 
+    /// DUT-985 — true total of logged cooks (`CookLogStats.totalCooks`), used to
+    /// gate the one-time first-cook pep talk. Default `1` so fakes never show it.
+    func loadTotalCookCount() async -> Int
+
     // MARK: - Comments + ratings (US-13/14/15)
 
     /// Fetch the public WPRM rating summary. Never throws — degrades to a
@@ -218,6 +222,11 @@ extension RecipeDetailDependencies {
     /// ``CookPhotoStore/delete(id:)``.
     public func deleteCookPhoto(id: String) async {}
 
+    /// DUT-985 — default `1` (not `0`) so existing fakes and tests keep the old
+    /// behaviour and never get the first-cook pep talk. The live wiring will
+    /// override this in a later piece.
+    public func loadTotalCookCount() async -> Int { 1 }
+
     /// DUT-387 — default no-op so fakes that don't model the pending-comment
     /// bucket keep compiling. ``LiveRecipeDetailDependencies`` overrides to
     /// route to ``RecipeStore/upsertPendingComment(_:)``.
@@ -272,7 +281,7 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     let profilePhotoStore: (any ProfilePhotoStoring)?
     #endif
     let imageLoader: ImageLoader
-    private let savedWidgetPublisher: SavedRecipesWidgetPublisher?
+    let savedWidgetPublisher: SavedRecipesWidgetPublisher?
 
     /// DUT-534 — the App-wired append seam. `LiveRecipeDetailDependencies` lives
     /// in `DODFeatureRecipeDetail`, which does NOT depend on `DODFeatureSaved`
@@ -381,20 +390,4 @@ public struct LiveRecipeDetailDependencies: RecipeDetailDependencies {
     public func sendTelemetry(_ event: AnalyticsEvent) async {
         Telemetry.shared.send(event)
     }
-
-    /// Re-publish the saved-recipes home-screen widget snapshot (US-17 /
-    /// AC-17.3, AC-17.6). Called by the view model after every save /
-    /// unsave. Fire-and-forget — all error paths are logged inside
-    /// ``SavedRecipesWidgetPublisher.publish()``.
-    public func publishSavedWidgetSnapshot() async {
-        await savedWidgetPublisher?.publish()
-    }
-
-    // US-13/14/15 — WPRM ratings + WP comments + guest identity live
-    // impls live in `RecipeDetailDependencies+CommentsRatings.swift`.
-    // US-44 / CL-138 — Phase c profile-gate live impls live in
-    // `RecipeDetailDependencies+Profile.swift`. Snapshot-bridging
-    // helpers live in `RecipeDetailDependencies+SnapshotBridging.swift`.
-    // The split keeps this file under the SwiftLint 400-line
-    // `file_length` cap.
 }
