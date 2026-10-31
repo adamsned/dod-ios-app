@@ -55,15 +55,21 @@ public final class CookModeViewModel {
     /// DUT-583 — current transport state for the center play/pause button.
     public internal(set) var playbackState: VoicePlaybackState = .idle
 
-    /// DUT-1393 — set when the step changes while the voice is PAUSED. The
-    /// paused utterance belongs to the old step, so the next resume must read
-    /// the step now on screen from the top instead of continuing it.
+    /// DUT-1393 — step changed while paused; next resume re-reads the new step from the top.
     var pausedUtteranceIsStale = false
 
     /// DUT-583 — the current voice speed as a multiplier of the natural 1×
     /// rate, always one of ``VoiceReader/speedMultipliers``. Session-only; not
     /// persisted (resets to 1× each Cook Mode entry, like Voice Mode itself).
     public internal(set) var voiceSpeedMultiplier: Double = 1.0
+
+    /// DUT-986 — true only on the user's first-ever cook; set by the host, default false.
+    public var isFirstCookEver: Bool = false
+    /// DUT-986 — first-cook reassurance + checkpoint for the current step, else nil.
+    public var trainingWheelsNote: TrainingWheels.Note? {
+        guard !isFinished, let step = currentStep else { return nil }
+        return TrainingWheels.note(forStepText: step.text, isFirstCookEver: isFirstCookEver)
+    }
 
     private let idleTimer: any IdleTimerController
     private let liveActivity: any CookLiveActivityController
@@ -353,10 +359,7 @@ public final class CookModeViewModel {
         } else {
             isFinished = true
         }
-        // AC-40.3 — re-read whenever the step changes while Voice Mode is on,
-        // whether the change came from an on-screen tap, a swipe, or a voice
-        // command. A no-op when Voice Mode is off. DUT-1393 — stays silent
-        // while paused.
+        // AC-40.3 — re-read on any step change while Voice Mode is on; silent while paused (DUT-1393).
         voiceFollowStepChange()
     }
 
@@ -391,8 +394,5 @@ public final class CookModeViewModel {
 
 // MARK: - Voice command handler conformance (US-40 / AC-40.5)
 
-/// The four hands-free control methods (declared above for the in-app wiring
-/// in T-690b) *are* the ``VoiceCommandHandler`` surface — declaring the
-/// conformance lets ``VoiceCommandBus`` forward Siri commands straight into the
-/// live session with no adapter (CL-83).
+/// The hands-free control methods *are* the ``VoiceCommandHandler`` surface (CL-83).
 extension CookModeViewModel: VoiceCommandHandler {}
