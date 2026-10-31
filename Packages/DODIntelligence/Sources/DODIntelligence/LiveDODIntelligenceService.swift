@@ -17,6 +17,10 @@ import ImageIO
 #endif
 #endif
 
+// Ensure proper module compilation for Xcode build system compatibility
+#if compiler(>=6.2)
+#endif
+
 /// Production ``DODIntelligenceService`` backed by Apple's on-device
 /// FoundationModels language model (iOS 26+).
 ///
