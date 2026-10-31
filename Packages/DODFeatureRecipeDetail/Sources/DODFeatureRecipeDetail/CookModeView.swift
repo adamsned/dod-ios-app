@@ -133,14 +133,15 @@ public struct CookModeView: View {
         onClose: @escaping (Set<UUID>) -> Void,
         onLogCook: ((CookLogEntry) -> Void)? = nil,
         heatCoachSheet: (() -> AnyView)? = nil,
-        askSheet: ((String, String) -> AnyView)? = nil
+        askSheet: ((String, String) -> AnyView)? = nil,
+        isFirstCookEver: Bool = false
     ) {
-        _viewModel = State(
-            initialValue: CookModeViewModel(
-                recipe: recipe,
-                initialCheckedIngredients: initialCheckedIngredients
-            )
+        let model = CookModeViewModel(
+            recipe: recipe,
+            initialCheckedIngredients: initialCheckedIngredients
         )
+        model.isFirstCookEver = isFirstCookEver
+        _viewModel = State(initialValue: model)
         self.ingredientScaleFactor = ingredientScaleFactor
         self.onClose = onClose
         self.onLogCook = onLogCook
@@ -266,6 +267,7 @@ public struct CookModeView: View {
             // DUT-326 — self-contained capture sheet (equivalent to the Feed
             // package's CookJournalEntryView, which this package can't import).
             CookModeJournalLogSheet(recipe: viewModel.recipe) { entry in
+                viewModel.isFirstCookEver = false
                 onLogCook?(entry)
             }
         }
