@@ -41,3 +41,53 @@ public struct CookIntakeProfile: Sendable, Equatable, Codable {
         self.biggestWorry = biggestWorry.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
+
+extension CookIntakeProfile {
+
+    /// Maps loose model strings onto the typed enums.
+    /// Unknown fear -> .cautious, unknown occasion -> .other.
+    public static func normalized(
+        fear: String,
+        occasion: String,
+        household: Int,
+        worry: String
+    ) -> CookIntakeProfile {
+        let fearText = fear.lowercased()
+        let occasionText = occasion.lowercased()
+
+        let level: FearLevel
+        if fearText.contains("nerv") {
+            level = .nervous
+        } else if fearText.contains("conf") {
+            level = .confident
+        } else {
+            level = .cautious
+        }
+
+        let mapped: Occasion
+        if occasionText.contains("camp") {
+            mapped = .campout
+        } else if occasionText.contains("week") && occasionText.contains("night") {
+            mapped = .weeknightDinner
+        } else if occasionText.contains("tuesday") {
+            mapped = .weeknightDinner
+        } else if occasionText.contains("weekend") {
+            mapped = .weekendCook
+        } else if occasionText.contains("entertain") {
+            mapped = .entertaining
+        } else if occasionText.contains("party") {
+            mapped = .entertaining
+        } else if occasionText.contains("guest") {
+            mapped = .entertaining
+        } else {
+            mapped = .other
+        }
+
+        return CookIntakeProfile(
+            fearLevel: level,
+            occasion: mapped,
+            householdSize: household,
+            biggestWorry: worry
+        )
+    }
+}
