@@ -17,4 +17,9 @@ public enum MealPlanWeek {
     public static func days(inWeekStarting weekStart: Date, calendar: Calendar = .current) -> [Date] {
         (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
     }
+
+    /// `weekStart` shifted by `weeks` (negative = earlier). Used for paging.
+    public static func weekStart(byAdding weeks: Int, to weekStart: Date, calendar: Calendar = .current) -> Date {
+        calendar.date(byAdding: .weekOfYear, value: weeks, to: weekStart) ?? weekStart
+    }
 }
