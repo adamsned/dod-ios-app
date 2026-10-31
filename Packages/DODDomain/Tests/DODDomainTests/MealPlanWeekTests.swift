@@ -41,4 +41,13 @@ struct MealPlanWeekTests {
         let diff = cal.dateComponents([.day], from: first, to: last).day
         #expect(diff == 6)
     }
+
+    @Test func pagingForwardAndBackRoundTrips() {
+        let cal = Self.calendar
+        let start = Self.date(2026, 10, 19)
+        let forward = MealPlanWeek.weekStart(byAdding: 1, to: start, calendar: cal)
+        #expect(forward == Self.date(2026, 10, 26))
+        let back = MealPlanWeek.weekStart(byAdding: -1, to: forward, calendar: cal)
+        #expect(back == start)
+    }
 }
