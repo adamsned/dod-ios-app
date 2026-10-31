@@ -107,10 +107,10 @@ extension RootView {
             selectedTab = .saved
             tabPaths[.saved] = []
             savedCollectionRequest = id
-        case .openPanCheck:
-            // DUT-1826 — no dedicated pan-check screen yet; land on the Feed root.
-            selectedTab = .feed
-            tabPaths[.feed] = []
+        case .openPanCheck(let verdict):
+            // DUT-992 — land on the Cooking Tools hub and show the verdict's advice in the existing snackbar.
+            selectedTab = .cookingTools
+            deepLinkErrorMessage = "\(verdict.headline). \(verdict.advice)"
         case .openRecipe(let id):
             selectedTab = .feed
             Task { @MainActor in
