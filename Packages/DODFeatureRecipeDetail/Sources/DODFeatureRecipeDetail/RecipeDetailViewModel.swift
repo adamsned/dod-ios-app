@@ -228,6 +228,9 @@ public final class RecipeDetailViewModel {
     /// drives the state machine.
     public internal(set) var summary: SummaryState = .idle
 
+    /// DUT-1028 — Ask-The-Recipe chat transcript. Driven by `+AskRecipe`.
+    public var askMessages: [AskRecipeMessage] = []
+
     public init(
         listItem: RecipeListItem,
         canonicalURL: URL,
