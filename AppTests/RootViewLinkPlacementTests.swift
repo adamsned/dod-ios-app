@@ -35,4 +35,10 @@ final class RootViewLinkPlacementTests: XCTestCase {
         let placement = RootView.linkPlacement(for: sampleRoute(), external: false, originTab: .cookingTools)
         XCTAssertEqual(placement.tab, .feed)
     }
+
+    func testExternalLinkFromSavedIsReplaceStackNotPush() {
+        let placement = RootView.linkPlacement(for: sampleRoute(), external: true, originTab: .saved)
+        XCTAssertEqual(placement.route, .replaceStack(sampleRoute()))
+        XCTAssertNotEqual(placement.route, .push(sampleRoute()))
+    }
 }
