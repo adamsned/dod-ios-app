@@ -29,7 +29,7 @@ struct FindRecipesIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ReturnsValue<[RecipeEntity]> & ProvidesDialog {
-        let results = await RecipeEntityQuery.searchPayloads(query: query).map(RecipeEntity.init(payload:))
+        let results = await RecipeEntity.withLocalThumbnails(await RecipeEntityQuery.searchPayloads(query: query))
         return .result(value: results, dialog: Self.dialog(count: results.count, query: query))
     }
 
