@@ -17,10 +17,31 @@ public enum WPRMRecipeCardParser {
         /// DUT-984 — plain-text equipment names, document order.
         public let equipment: [String]
 
-        public init(ingredients: [String], instructions: [String], equipment: [String] = []) {
+        /// DUT-1024: a run of `count` consecutive entries of `ingredients`. `label` is nil for an
+        /// unlabelled group. Callers must treat `ingredientGroups` as ordered runs that cover
+        /// `ingredients` from the start; dropping the unlabelled ones breaks the offset math, so
+        /// skip nil labels only when building sections (`RecipeSection.make`).
+        public struct Group: Sendable, Equatable {
+            public let label: String?
+            public let count: Int
+            public init(label: String?, count: Int) {
+                self.label = label
+                self.count = count
+            }
+        }
+
+        public let ingredientGroups: [Group]
+
+        public init(
+            ingredients: [String],
+            instructions: [String],
+            equipment: [String] = [],
+            ingredientGroups: [Group] = []
+        ) {
             self.ingredients = ingredients
             self.instructions = instructions
             self.equipment = equipment
+            self.ingredientGroups = ingredientGroups
         }
 
         public static func == (lhs: Card, rhs: Card) -> Bool {
@@ -67,10 +88,14 @@ public enum WPRMRecipeCardParser {
         guard let card = sliceRecipeContainer(in: stripped) else {
             return Card(ingredients: [], instructions: [])
         }
+        let groups = labelledIngredientGroups(in: card).map {
+            Card.Group(label: $0.label, count: $0.lines.count)
+        }
         return Card(
             ingredients: parseIngredients(in: card),
             instructions: parseInstructions(in: card, page: stripped),
-            equipment: parseEquipment(in: card)
+            equipment: parseEquipment(in: card),
+            ingredientGroups: groups
         )
     }
 
@@ -257,57 +282,16 @@ public enum WPRMRecipeCardParser {
         classToken: String?,
         transform: (String) -> String
     ) -> [String] {
-        var results: [String] = []
-        var cursor = html.startIndex
-        let openMarker = "<\(tag)"
-        let closeMarker = "</\(tag)>"
-        while cursor < html.endIndex {
-            guard
-                let openStart = html.range(of: openMarker, options: .caseInsensitive, range: cursor..<html.endIndex)
-            else {
-                break
-            }
-            guard let openEnd = html.range(of: ">", range: openStart.upperBound..<html.endIndex) else {
-                break
-            }
-            let attributes = html[openStart.upperBound..<openEnd.lowerBound]
-            let skipTag = classToken.map {
-                !ArticleBodyExtractor.hasClassToken(attributes: attributes, token: $0)
-            }
-            if skipTag == true {
-                cursor = openEnd.upperBound
-                continue
-            }
-            guard
-                let inner = ArticleBodyExtractor.sliceUntilMatchingClose(
-                    in: html,
-                    openTag: openMarker,
-                    closeTag: closeMarker,
-                    bodyStart: openEnd.upperBound
-                )
-            else {
-                cursor = openEnd.upperBound
-                continue
-            }
-            let text = transform(inner)
-            if !text.isEmpty {
-                results.append(text)
-            }
-            // Advance past this element's matching close so nested same-tag
-            // children aren't re-collected as separate rows.
-            cursor = html.index(openEnd.upperBound, offsetBy: inner.count)
-            if let closeRange = html.range(of: closeMarker, range: cursor..<html.endIndex) {
-                cursor = closeRange.upperBound
-            }
-        }
-        return results
+        collectElementInners(in: html, tag: tag, classToken: classToken)
+            .map(transform)
+            .filter { !$0.isEmpty }
     }
 
     /// Collect the raw (untransformed) inner body of every `<tag …>…</tag>` in
     /// `html` whose `class=` contains `classToken`, depth-tracking `<tag>`
     /// nesting. Order-preserving. Used to gather the `<ol>` step lists before
     /// their `<li>` rows are extracted.
-    static func collectElementInners(in html: String, tag: String, classToken: String) -> [String] {
+    static func collectElementInners(in html: String, tag: String, classToken: String?) -> [String] {
         var results: [String] = []
         var cursor = html.startIndex
         let openMarker = "<\(tag)"
@@ -322,7 +306,7 @@ public enum WPRMRecipeCardParser {
                 break
             }
             let attributes = html[openStart.upperBound..<openEnd.lowerBound]
-            guard ArticleBodyExtractor.hasClassToken(attributes: attributes, token: classToken) else {
+            if let classToken, !ArticleBodyExtractor.hasClassToken(attributes: attributes, token: classToken) {
                 cursor = openEnd.upperBound
                 continue
             }
