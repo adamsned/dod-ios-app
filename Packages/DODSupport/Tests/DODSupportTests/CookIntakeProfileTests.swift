@@ -32,4 +32,23 @@ struct CookIntakeProfileTests {
         #expect(decoded == original)
         #expect(decoded.biggestWorry == "heat")
     }
+
+    @Test func normalizedMapsLooseStrings() {
+        let profile = CookIntakeProfile.normalized(
+            fear: "Nervous",
+            occasion: "a campout",
+            household: 4,
+            worry: " seasoning "
+        )
+        #expect(profile.fearLevel == .nervous)
+        #expect(profile.occasion == .campout)
+        #expect(profile.householdSize == 4)
+        #expect(profile.biggestWorry == "seasoning")
+    }
+
+    @Test func normalizedUnknownsFallBack() {
+        let profile = CookIntakeProfile.normalized(fear: "??", occasion: "zzz", household: 2, worry: "")
+        #expect(profile.fearLevel == .cautious)
+        #expect(profile.occasion == .other)
+    }
 }
