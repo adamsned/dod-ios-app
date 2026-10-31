@@ -42,7 +42,7 @@ public enum DeepLinkIntent: Equatable, Sendable {
         guard url.scheme?.lowercased() == "dod", url.host?.lowercased() == "pancheck" else { return nil }
         let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.first(where: { $0.name == "verdict" })?.value
-        return raw.flatMap(PanCheck.Verdict.init(rawValue:)).map { .openPanCheck(verdict: $0) }
+        return .openPanCheck(verdict: raw.flatMap(PanCheck.Verdict.init(rawValue:)) ?? .unclear)
     }
 
     private static func parseRecipeOrSaved(_ url: URL) -> DeepLinkIntent? {

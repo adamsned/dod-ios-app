@@ -11,7 +11,18 @@ import Testing
         }
     }
 
-    @Test func rejectsUnknownVerdict() throws {
-        #expect(DeepLinkIntent.parse(try #require(URL(string: "dod://pancheck?verdict=nope"))) == nil)
+    @Test func unknownVerdictFallsBackToUnclear() throws {
+        let url = try #require(URL(string: "dod://pancheck?verdict=nope"))
+        #expect(DeepLinkIntent.parse(url) == .openPanCheck(verdict: .unclear))
+    }
+
+    @Test func parsesRustOrCarbon() throws {
+        let url = try #require(URL(string: "dod://pancheck?verdict=rustOrCarbon"))
+        #expect(DeepLinkIntent.parse(url) == .openPanCheck(verdict: .rustOrCarbon))
+    }
+
+    @Test func missingVerdictIsUnclear() throws {
+        let url = try #require(URL(string: "dod://pancheck"))
+        #expect(DeepLinkIntent.parse(url) == .openPanCheck(verdict: .unclear))
     }
 }
