@@ -3,6 +3,33 @@ import DODDomain
 import DODSupport
 import SwiftUI
 
+/// DUT-1903: one row of the detail ingredient list — either a section header
+/// or an ingredient. Pure layout so it can be unit tested without a view.
+enum IngredientListItem: Equatable {
+    case header(String)
+    case ingredient(RecipeIngredient)
+
+    /// Interleave section headers before the first ingredient of each section.
+    /// With no sections, returns the flat list unchanged.
+    static func layout(
+        ingredients: [RecipeIngredient],
+        sections: [RecipeSection]
+    ) -> [IngredientListItem] {
+        var headerBefore: [UUID: String] = [:]
+        for section in sections {
+            if let first = section.ingredientIDs.first {
+                headerBefore[first] = section.label
+            }
+        }
+        return ingredients.flatMap { ingredient -> [IngredientListItem] in
+            if let label = headerBefore[ingredient.id] {
+                return [.header(label), .ingredient(ingredient)]
+            }
+            return [.ingredient(ingredient)]
+        }
+    }
+}
+
 extension RecipeDetailView {
 
     // MARK: - Ingredients + Instructions layout
@@ -54,18 +81,29 @@ extension RecipeDetailView {
                 // US-31 / AC-31.4 + AC-31.5: scale at render time.
                 // Source recipe `ingredient.text` stays untouched (AC-31.8).
                 let factor = viewModel.servingsScaleFactor
-                ForEach(ingredients) { ingredient in
-                    let shown = displayIngredientText(ingredient.text, scaledBy: factor)
-                    annotated(
-                        IngredientCheckRow(
+                let items = IngredientListItem.layout(
+                    ingredients: ingredients,
+                    sections: viewModel.recipe?.sections ?? []
+                )
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    switch item {
+                    case .header(let label):
+                        Text(label)
+                            .dodFont(DODType.heading)
+                            .foregroundStyle(DODColor.label)
+                    case .ingredient(let ingredient):
+                        let shown = displayIngredientText(ingredient.text, scaledBy: factor)
+                        annotated(
+                            IngredientCheckRow(
+                                ingredient: ingredient,
+                                displayText: shown,
+                                isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
+                                onToggle: { viewModel.toggleIngredient(ingredient.id) }
+                            ),
                             ingredient: ingredient,
-                            displayText: shown,
-                            isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
-                            onToggle: { viewModel.toggleIngredient(ingredient.id) }
-                        ),
-                        ingredient: ingredient,
-                        displayText: shown
-                    )
+                            displayText: shown
+                        )
+                    }
                 }
             }
         }
