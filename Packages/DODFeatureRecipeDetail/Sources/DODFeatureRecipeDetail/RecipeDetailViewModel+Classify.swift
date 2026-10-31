@@ -194,7 +194,13 @@ extension RecipeDetailViewModel {
         listItem: RecipeListItem,
         canonicalURL: URL
     ) -> Recipe {
-        Recipe(
+        let ingredients = RecipeIngredient.list(from: card.ingredients)  // DUT-705 — index-aware ids
+        let sections = RecipeSection.make(
+            groups: card.ingredientGroups.map { group in (label: group.label, count: group.count) },
+            ingredients: ingredients
+        )
+
+        return Recipe(
             id: listItem.id,
             slug: canonicalURL.lastPathComponent,
             title: listItem.title,
@@ -205,10 +211,11 @@ extension RecipeDetailViewModel {
             categoryIDs: listItem.categoryIDs ?? [],
             publishedAt: listItem.publishedAt,
             updatedAt: listItem.updatedAt,
-            ingredients: RecipeIngredient.list(from: card.ingredients),  // DUT-705 — index-aware ids
+            ingredients: ingredients,
             instructions: card.instructions.enumerated().map { index, text in
                 RecipeInstruction(step: index + 1, text: text)
-            }
+            },
+            sections: sections
         )
     }
 }
