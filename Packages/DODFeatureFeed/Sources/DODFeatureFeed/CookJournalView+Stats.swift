@@ -24,6 +24,8 @@ extension CookJournalView {
         var averageRating: Double?
         /// DUT-882 — cooks logged in the trailing 30-calendar-day window.
         var last30Days = 0
+        /// DUT-974 — gateway dishes on their way to being owned (closest first).
+        var ownIt: [CookLogStats.OwnItProgress] = []
     }
 
     /// Derive the header stats from a cook history. Pure + static so the
@@ -42,7 +44,8 @@ extension CookJournalView {
             streak: CookLogStats.currentWeeklyStreak(cooks, asOf: .now, calendar: weekCalendar),
             mostCooked: CookLogStats.mostCooked(cooks),
             averageRating: CookLogStats.averageRating(cooks),
-            last30Days: CookLogStats.cooksInLast30Days(cooks, asOf: .now, calendar: weekCalendar)
+            last30Days: CookLogStats.cooksInLast30Days(cooks, asOf: .now, calendar: weekCalendar),
+            ownIt: CookLogStats.onYourWayToOwning(cooks)
         )
     }
 
