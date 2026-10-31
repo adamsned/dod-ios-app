@@ -21,5 +21,15 @@ import Testing
         #expect(info[MPNowPlayingInfoPropertyChapterNumber] as? Int == 2)
         #expect(info[MPNowPlayingInfoPropertyChapterCount] as? Int == 8)
     }
+
+    #if os(iOS)
+    @Test @MainActor func activateThenDeactivateLeavesNoTargets() {
+        let publisher = SystemNowPlayingPublisher()
+        publisher.activate { _ in }
+        publisher.deactivate()
+        #expect(MPNowPlayingInfoCenter.default().nowPlayingInfo == nil)
+        #expect(publisher.targets.isEmpty)
+    }
+    #endif
 }
 #endif
