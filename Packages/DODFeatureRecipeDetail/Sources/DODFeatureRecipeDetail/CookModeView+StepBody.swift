@@ -31,13 +31,18 @@ extension CookModeView {
         // DUT-1392 — the step's timer and the Heat Coach shortcut moved out of
         // the text into the floating tool dock above the controls
         // (`CookModeView+ToolDock.swift`).
-        return Text(displayText)
-            .dodFont(DODType.displayMedium)
-            .foregroundStyle(DODColor.label)
-            .lineSpacing(DODSpacing.xs)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel("Step \(step.step). \(displayText)")
-            .padding(.horizontal, DODSpacing.md)
+        return VStack(alignment: .leading, spacing: DODSpacing.md) {
+            Text(displayText)
+                .dodFont(DODType.displayMedium)
+                .foregroundStyle(DODColor.label)
+                .lineSpacing(DODSpacing.xs)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Step \(step.step). \(displayText)")
+            if let note = viewModel.trainingWheelsNote {
+                trainingWheelsCard(note)
+            }
+        }
+        .padding(.horizontal, DODSpacing.md)
     }
 
     /// T-912 / DUT-551 — whether a step's text is about heat (drives the tool
@@ -148,5 +153,22 @@ extension CookModeView {
                 announce("Step \(step.step). \(convertedStepText(step.text))")
             }
         }
+    }
+
+    /// DUT-986 — first-cook-only reassurance + explicit checkpoint.
+    private func trainingWheelsCard(_ note: TrainingWheels.Note) -> some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            Text(note.reassurance)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+            Text(note.checkpoint)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelSecondary)
+        }
+        .padding(DODSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DODColor.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("cook-mode-training-wheels")
     }
 }
