@@ -21,7 +21,7 @@ extension RootView {
     /// SwiftLint `file_length` cap.
     func handleUniversalLink(_ activity: NSUserActivity) {
         guard let url = activity.webpageURL else { return }
-        Task { @MainActor in _ = await openRecipeLink(url) }
+        Task { @MainActor in _ = await openRecipeLink(url, external: true) }
     }
 
     /// Route a Spotlight result tap to its recipe (US-10 / DUT-12). Extracted
@@ -306,7 +306,7 @@ extension RootView {
     /// resolvable recipe (offline; or a slug that maps to a WP page, like the
     /// campfire heat-and-coals guide) falls back to the system browser and
     /// returns `false` so a covering sheet knows to stay put.
-    func openRecipeLink(_ url: URL) async -> Bool {
+    func openRecipeLink(_ url: URL, external: Bool = false) async -> Bool {
         guard AppDependencies.recipeSlug(fromDODURL: url) != nil else {
             systemOpenURL(url)
             return false
@@ -321,7 +321,7 @@ extension RootView {
             systemOpenURL(url)
             return false
         }
-        route(.recipe(item: item, autoStartCookMode: false), from: originTab)
+        route(.recipe(item: item, autoStartCookMode: false), from: originTab, external: external)
         return true
     }
 
@@ -332,17 +332,13 @@ extension RootView {
     /// notifications — see `handle(intent:)`) and for Settings, which has no
     /// article surface of its own. DUT-462: routes into `originTab` (captured
     /// at tap time), not `selectedTab` read after the resolve.
-    private func route(_ route: RecipeRoute, from originTab: AppTab) {
-        let destination = Self.linkRoutingDestination(for: originTab)
-        // Settings has no article surface, so a link tapped there also brings
-        // the user to Feed; every other tab keeps its own stack.
-        if destination != originTab { selectedTab = destination }
-        switch destination {
-        case .feed: feedExternalRoute.enqueue(.push(route))
-        case .saved: savedExternalRoute.enqueue(.push(route))
-        // unreachable: linkRoutingDestination only ever yields feed/saved
-        // (it redirects the Cooking Tools hub — no article stack — to feed).
-        case .cookingTools: break
+    private func route(_ route: RecipeRoute, from originTab: AppTab, external: Bool) {
+        let placement = Self.linkPlacement(for: route, external: external, originTab: originTab)
+        if placement.tab != selectedTab { selectedTab = placement.tab }
+        switch placement.tab {
+        case .feed: feedExternalRoute.enqueue(placement.route)
+        case .saved: savedExternalRoute.enqueue(placement.route)
+        case .cookingTools: break  // unreachable: placement only yields feed/saved
         }
     }
 
