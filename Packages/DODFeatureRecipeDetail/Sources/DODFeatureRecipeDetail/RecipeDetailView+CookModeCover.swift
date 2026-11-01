@@ -32,4 +32,39 @@ extension RecipeDetailView {
             )
         }
     }
+
+    /// DUT-985 — the one-time first-cook expectation screen.
+    @ViewBuilder
+    var pepTalkCover: some View {
+        if let recipe = viewModel.recipe {
+            CookPepTalkView(
+                recipe: recipe,
+                onStart: {
+                    viewModel.pepTalkStartRequested = true
+                    viewModel.isPepTalkPresented = false
+                },
+                onCancel: { viewModel.isPepTalkPresented = false }
+            )
+        }
+    }
+
+    /// DUT-985 — single entry point for 'start Cook Mode'. Shows the pep talk
+    /// first when the journal is empty, otherwise opens Cook Mode directly.
+    func requestCookMode() {
+        Task {
+            await viewModel.didTapCookMode()
+            if await viewModel.shouldShowPepTalk() {
+                viewModel.isPepTalkPresented = true
+            } else {
+                isCookModePresented = true
+            }
+        }
+    }
+
+    /// Called from the pep talk cover's onDismiss: open Cook Mode only if the user tapped Start.
+    func pepTalkDidDismiss() {
+        guard viewModel.pepTalkStartRequested else { return }
+        viewModel.pepTalkStartRequested = false
+        isCookModePresented = true
+    }
 }
