@@ -28,7 +28,9 @@ extension RecipeDetailView {
                 // cover (a tab switch would be invisible under the full-screen
                 // cover). Nil when the host doesn't wire hub routing.
                 heatCoachSheet: cookModeSheets.heatCoach,
-                askSheet: cookModeSheets.askAboutRecipe
+                askSheet: cookModeSheets.askAboutRecipe,
+                // DUT-986 — first-cook-only training wheels (off once any cook is logged)
+                isFirstCookEver: viewModel.isFirstCookEver
             )
         }
     }
