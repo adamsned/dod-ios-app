@@ -19,6 +19,7 @@ extension CookModeView {
         .frame(maxHeight: .infinity)
         .animation(controlsAnimation, value: toolDockContent)
         .accessibilityIdentifier("cook-mode-pinned-pane")
+        .dynamicTypeSize(.accessibility3)
     }
 
     /// The scrolling step area (hero, Ask link, rescue link, step body). The
@@ -59,5 +60,15 @@ extension CookModeView {
         // a no-op while expanded so it never fights reading.
         .contentShape(Rectangle())
         .onTapGesture { if !controlsExpanded { wakeControls() } }
+    }
+}
+
+extension CookModeLayout {
+    /// Pinned pane width clamped so Stage Manager's smallest regular windows still
+    /// leave the step pane at least 320pt and the pinned pane at least 280pt.
+    static func clampedPinnedPaneWidth(containerWidth: CGFloat) -> CGFloat {
+        let ideal = pinnedPaneWidth(containerWidth: containerWidth)
+        let maxPane = max(280, containerWidth - 320)
+        return min(max(ideal, 280), maxPane)
     }
 }
