@@ -14,5 +14,6 @@ import WidgetKit
 struct DODAppLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         CookActivityWidget()
+        ServeActivityWidget()
     }
 }
