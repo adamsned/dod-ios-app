@@ -86,6 +86,7 @@ extension CookModeView {
             // on first and the "tap the checkmark" instruction reads as the
             // quieter follow-up.
             logCookButton
+            guestReactionButton
             Text("Tap the checkmark below to leave Cook Mode.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
@@ -125,6 +126,28 @@ extension CookModeView {
             .accessibilityLabel("Add this cook to your Cooking Journal")
         }
     }
+
+    /// DUT-981 — nudge the host to capture a guest's praise and post it publicly.
+    @ViewBuilder
+    private var guestReactionButton: some View {
+        if onPostGuestReaction != nil {
+            Button {
+                isGuestReactionPresented = true
+            } label: {
+                Label("Share a Guest's Praise", systemImage: "quote.bubble.fill")
+                    .multilineTextAlignment(.center)
+                    .frame(width: logCookButtonWidth)
+                    .padding(.vertical, DODSpacing.sm)
+            }
+            .buttonStyle(.bordered)
+            .tint(DODColor.accent)
+            .accessibilityIdentifier("cook-mode-guest-reaction")
+            .accessibilityLabel("Share a guest's praise as a public review")
+        }
+    }
+
+    /// DUT-981 — helper for testing the show/hide logic
+    nonisolated static func showsGuestReactionCTA(isFinished: Bool, hasSink: Bool) -> Bool { isFinished && hasSink }
 
     // MARK: - VoiceOver announcements (DUT-401)
 
