@@ -188,6 +188,11 @@ public final class RecipeDetailViewModel {
     /// fires at most one telemetry event (spec AC-7.7).
     private var cookModeTelemetrySentThisSession: Bool = false
 
+    /// DUT-985 — drives the first-cook pep talk cover.
+    public var isPepTalkPresented: Bool = false
+    /// DUT-985 — set when the user taps 'Start cooking' on the pep talk; consumed by the cover's onDismiss.
+    public var pepTalkStartRequested: Bool = false
+
     /// DUT-634 — tracks whether `offlineRead` has already been sent this session
     /// for this recipe, so a re-appear (deep-link push, background→foreground)
     /// fires at most one `offline_read` event per view session — mirrors the
