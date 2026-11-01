@@ -102,6 +102,10 @@ extension RootView {
             selectedTab = .saved
             // DUT-734: land on the Saved list root (see `handle(widgetLink:)`).
             tabPaths[.saved] = []
+        case .openFeed:
+            // DUT-2039 — streak-nudge tap: land on the Feed tab root.
+            selectedTab = .feed
+            tabPaths[.feed] = []
         case .openCollection(let id):
             // DUT-1388 — Saved root, narrowed to the collection's shelf filter.
             selectedTab = .saved
