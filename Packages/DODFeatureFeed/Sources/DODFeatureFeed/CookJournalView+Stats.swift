@@ -91,7 +91,41 @@ extension CookJournalView {
                 statTile(stats.mostCooked?.title ?? "—", "most cooked")
                 statTile("\(stats.last30Days)", "cooks (30d)")
             }
+            if !stats.ownIt.isEmpty { ownItCard(stats.ownIt) }
         }
+    }
+
+    /// DUT-974 — nudge copy for a recipe on its way to being owned.
+    nonisolated static func ownItCaption(_ progress: CookLogStats.OwnItProgress) -> String {
+        progress.remaining == 1
+            ? "1 more cook and this is yours"
+            : "\(progress.remaining) more cooks and this is yours"
+    }
+
+    /// DUT-974 — the "On your way to owning" card listing gateway dishes.
+    func ownItCard(_ items: [CookLogStats.OwnItProgress]) -> some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            Text("On your way to owning")
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.burntOrange)
+            ForEach(items, id: \.recipeID) { item in
+                VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                    Text(item.title)
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                    Text(Self.ownItCaption(item))
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(DODSpacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                .fill(DODColor.surfaceElevated)
+        )
     }
 
     /// "4.3"-style formatting for the average-rating tile, or an em dash when

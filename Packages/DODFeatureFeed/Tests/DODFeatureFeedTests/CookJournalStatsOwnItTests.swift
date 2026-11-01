@@ -35,4 +35,21 @@ struct CookJournalStatsOwnItTests {
         let stats = CookJournalView.computeStats(entries)
         #expect(stats.ownIt.isEmpty)
     }
+
+    @Test func captionWithTwoRemainingIsPlural() throws {
+        let entries = [entry(1, "Bread", at: Date(timeIntervalSince1970: 0))]
+        let progress = try #require(CookLogStats.ownItProgress(recipeID: 1, in: entries))
+        #expect(progress.remaining == 2)
+        #expect(CookJournalView.ownItCaption(progress) == "2 more cooks and this is yours")
+    }
+
+    @Test func captionWithOneRemainingIsSingular() throws {
+        let entries = [
+            entry(1, "Bread", at: Date(timeIntervalSince1970: 0)),
+            entry(1, "Bread", at: Date(timeIntervalSince1970: 86_400)),
+        ]
+        let progress = try #require(CookLogStats.ownItProgress(recipeID: 1, in: entries))
+        #expect(progress.remaining == 1)
+        #expect(CookJournalView.ownItCaption(progress) == "1 more cook and this is yours")
+    }
 }
