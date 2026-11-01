@@ -19,4 +19,30 @@ struct RecipeDetailFirstCookFlagTests {
         )
         #expect(vm.isFirstCookEver == false)
     }
+
+    @Test func refreshProfileSetsFlagWhenNoCooks() async {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.rankLadderCount = 0
+        let vm = RecipeDetailViewModel(
+            listItem: RecipeDetailTestFixtures.makeListItem(id: 2080),
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/2080/")
+                ?? URL(filePath: "/"),
+            dependencies: dependencies
+        )
+        await vm.refreshProfile()
+        #expect(vm.isFirstCookEver == true)
+    }
+
+    @Test func refreshProfileClearsFlagWhenCooksExist() async {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.rankLadderCount = 3
+        let vm = RecipeDetailViewModel(
+            listItem: RecipeDetailTestFixtures.makeListItem(id: 2080),
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/2080/")
+                ?? URL(filePath: "/"),
+            dependencies: dependencies
+        )
+        await vm.refreshProfile()
+        #expect(vm.isFirstCookEver == false)
+    }
 }
