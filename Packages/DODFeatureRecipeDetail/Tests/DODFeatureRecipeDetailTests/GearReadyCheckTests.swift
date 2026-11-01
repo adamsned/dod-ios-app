@@ -1,5 +1,6 @@
 import DODDomain
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import DODFeatureRecipeDetail
@@ -46,5 +47,16 @@ struct GearReadyCheckTests {
     @Test
     func unknownToolHasNoTip() {
         #expect(GearReadyCheck.substitutionTip(for: "Whisk") == nil)
+    }
+
+    @MainActor
+    @Test
+    func initBuildsView() {
+        let view = GearReadyCheckView(
+            equipment: [Equipment(name: "Lid Lifter")],
+            onStart: {},
+            onCancel: {}
+        )
+        _ = view
     }
 }
