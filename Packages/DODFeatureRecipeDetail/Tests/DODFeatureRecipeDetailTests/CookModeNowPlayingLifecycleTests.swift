@@ -37,6 +37,31 @@ final class SpyNowPlayingPublisher: NowPlayingPublishing {
         )
     }
 
+    private static func makeViewModel(
+        stepCount: Int,
+        spy: SpyNowPlayingPublisher
+    ) -> CookModeViewModel {
+        let instructions = (1...stepCount).map { RecipeInstruction(step: $0, text: "Step \($0) body.") }
+        let recipe = Recipe(
+            id: 100,
+            slug: "cook-mode-recipe",
+            title: "Cook Mode Recipe",
+            excerpt: "",
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/100/") ?? URL(filePath: "/"),
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            instructions: instructions
+        )
+        return CookModeViewModel(
+            recipe: recipe,
+            initialCheckedIngredients: [],
+            idleTimer: FakeIdleTimerController(),
+            liveActivity: FakeLiveActivityController(),
+            stepTimerNotifier: FakeCookStepTimerNotifier(),
+            voiceReader: VoiceReader(synthesizer: MockSpeechSynthesizer()),
+            nowPlayingPublisher: spy
+        )
+    }
+
     @Test func endCookModeDeactivatesPublisher() {
         let spy = SpyNowPlayingPublisher()
         let viewModel = CookModeViewModel(
@@ -63,5 +88,46 @@ final class SpyNowPlayingPublisher: NowPlayingPublishing {
         viewModel.beginCookMode()
         viewModel.endCookMode()
         #expect(viewModel.nowPlayingPublisher == nil)
+    }
+
+    @Test func enablingVoiceModeActivatesAndPublishesPlaying() {
+        let spy = SpyNowPlayingPublisher()
+        let viewModel = Self.makeViewModel(stepCount: 3, spy: spy)
+        viewModel.setVoiceMode(true)
+        #expect(spy.activateCount == 1)
+        #expect(spy.published.last?.state == .playing)
+    }
+
+    @Test func pausePublishesPaused() {
+        let spy = SpyNowPlayingPublisher()
+        let viewModel = Self.makeViewModel(stepCount: 3, spy: spy)
+        viewModel.setVoiceMode(true)
+        viewModel.pauseVoice()
+        #expect(spy.published.last?.state == .paused)
+    }
+
+    @Test func resumePublishesPlaying() {
+        let spy = SpyNowPlayingPublisher()
+        let viewModel = Self.makeViewModel(stepCount: 3, spy: spy)
+        viewModel.setVoiceMode(true)
+        viewModel.pauseVoice()
+        viewModel.resumeVoice()
+        #expect(spy.published.last?.state == .playing)
+    }
+
+    @Test func advancePublishesNewStepTitle() {
+        let spy = SpyNowPlayingPublisher()
+        let viewModel = Self.makeViewModel(stepCount: 3, spy: spy)
+        viewModel.setVoiceMode(true)
+        viewModel.advanceStep()
+        #expect(spy.published.last?.title == "Step 2 of \(viewModel.stepCount)")
+    }
+
+    @Test func disablingVoiceModeDeactivates() {
+        let spy = SpyNowPlayingPublisher()
+        let viewModel = Self.makeViewModel(stepCount: 3, spy: spy)
+        viewModel.setVoiceMode(true)
+        viewModel.setVoiceMode(false)
+        #expect(spy.deactivateCount == 1)
     }
 }
