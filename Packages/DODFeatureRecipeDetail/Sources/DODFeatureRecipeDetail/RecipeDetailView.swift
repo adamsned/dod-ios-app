@@ -321,6 +321,11 @@ public struct RecipeDetailView: View {
                                 onSelect: onSelectRelated
                             )
                             RecipeDetailRatingsSection(viewModel: viewModel)
+                            // DUT-178 — private problem report, pre-scoped to this recipe.
+                            ReportRecipeProblemButton(
+                                recipeID: viewModel.listItem.id,
+                                recipeTitle: viewModel.recipe?.title ?? viewModel.listItem.title
+                            )
                         }
                         .readableContentColumn(horizontalSizeClass)
                     }
