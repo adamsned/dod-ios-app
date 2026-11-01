@@ -29,4 +29,9 @@ extension RecipeDetailViewModel {
             snackbarMessage = "Couldn't save to your journal. Try again from the journal."
         }
     }
+
+    /// DUT-985 — true only for the very first cook (journal empty).
+    public func shouldShowPepTalk() async -> Bool {
+        await dependencies.loadTotalCookCount() == 0
+    }
 }
