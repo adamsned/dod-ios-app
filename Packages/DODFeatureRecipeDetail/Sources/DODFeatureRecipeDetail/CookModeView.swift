@@ -180,7 +180,7 @@ public struct CookModeView: View {
                         HStack(spacing: 0) {
                             stepScroll(topInset: topInset, showsToolDock: false)
                             pinnedPane
-                                .frame(width: CookModeLayout.pinnedPaneWidth(containerWidth: geo.size.width))
+                                .frame(width: CookModeLayout.clampedPinnedPaneWidth(containerWidth: geo.size.width))
                         }
                     } else {
                         stepScroll(topInset: topInset, showsToolDock: true)
