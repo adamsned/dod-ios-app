@@ -353,7 +353,7 @@ public struct CookModeView: View {
 
     /// The immersive hero, shared by the scrolling step layout and the centered
     /// Done layout.
-    private func heroView(topInset: CGFloat) -> some View {
+    func heroView(topInset: CGFloat) -> some View {
         CookModeHero(
             url: viewModel.recipe.heroImageLargeURL ?? viewModel.recipe.heroImage,
             title: viewModel.recipe.title,
