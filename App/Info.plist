@@ -59,8 +59,12 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Dutch Oven Daddy connects to your Bluetooth thermometer probe to show live temperatures while you cook.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo to share your cook or to get cooking help from Dutch Oven Daddy.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Dutch Oven Daddy uses your approximate location to fill in local weather conditions for the Heat Coach.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>SiwaRevokeBaseURL</key>
