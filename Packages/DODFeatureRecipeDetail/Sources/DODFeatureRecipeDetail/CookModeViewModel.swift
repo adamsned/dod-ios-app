@@ -79,6 +79,8 @@ public final class CookModeViewModel {
     let stepTimerNotifier: any CookStepTimerNotifying
     /// `internal` so `CookModeViewModel+Voice.swift` can drive the reader.
     let voiceReader: VoiceReader
+    /// DUT-1012 - system Now Playing surface; nil in tests and previews.
+    let nowPlayingPublisher: (any NowPlayingPublishing)?
     /// DUT-328 — device language captured at init, for the natural-voice check; read by `+Voice`.
     let voiceLanguageCode: String?
     /// DUT-1003 — on-device "Is It Done?" photo check; driven by `CookModeViewModel+Doneness.swift`.
@@ -115,6 +117,7 @@ public final class CookModeViewModel {
         liveActivity: any CookLiveActivityController = SystemCookLiveActivityController(),
         stepTimerNotifier: any CookStepTimerNotifying = SystemCookStepTimerNotifier(),
         voiceReader: VoiceReader = VoiceReader(),
+        nowPlayingPublisher: (any NowPlayingPublishing)? = nil,
         donenessCoach: DonenessCoach = DonenessCoach(intelligence: nil),
         locale: Locale = .current
     ) {
@@ -124,22 +127,20 @@ public final class CookModeViewModel {
         self.liveActivity = liveActivity
         self.stepTimerNotifier = stepTimerNotifier
         self.voiceReader = voiceReader
+        self.nowPlayingPublisher = nowPlayingPublisher
         self.donenessCoach = donenessCoach
         self.voiceLanguageCode = locale.language.languageCode?.identifier
-        // DUT-583 — when a step finishes reading on its own, drop the play/pause
-        // button back to the idle "play" glyph. Guard on `.speaking` so a stale
-        // drain callback can't stomp a `.paused` state the user just set.
+        // DUT-583 — a step finishing on its own drops the transport to idle;
+        // guard on `.speaking` so a stale callback can't stomp `.paused`.
         voiceReader.onDidFinishSpeaking = { [weak self] in
             guard let self, self.playbackState == .speaking else { return }
             self.playbackState = .idle
         }
-        // DUT-595 — an audio interruption (call / Siri / timer alarm) ended
-        // WITHOUT `.shouldResume`, so the reader left playback parked and iOS
-        // cancelled the in-flight utterance. Drop the transport to idle so its
-        // glyph shows "play" (not a stuck "pause"), a single tap does a fresh
-        // `speakCurrentStep()` (not a no-op `pauseVoice()`), and VoiceOver stops
-        // mis-reporting "playing." Guard on `.speaking` so a stale callback
-        // can't stomp a `.paused`/idle state the user just set.
+        // DUT-595 — an audio interruption ended WITHOUT `.shouldResume`; iOS
+        // cancelled the utterance. Drop the transport to idle so the glyph shows
+        // "play", a tap does a fresh `speakCurrentStep()`, and VoiceOver stops
+        // reporting "playing." Guard on `.speaking` so a stale callback can't
+        // stomp a `.paused`/idle state the user just set.
         voiceReader.onDidPauseForInterruption = { [weak self] in
             guard let self, self.playbackState == .speaking else { return }
             self.playbackState = .idle
@@ -227,6 +228,7 @@ public final class CookModeViewModel {
         isVoiceModeEnabled = false
         // DUT-583 — a re-entry starts clean: idle transport + natural pace.
         playbackState = .idle
+        nowPlayingPublisher?.deactivate()
         voiceSpeedMultiplier = 1.0
         // Unregister from the Voice Mode command bus so a Siri command fired
         // after Cook Mode closes is a no-op rather than driving a stale session
