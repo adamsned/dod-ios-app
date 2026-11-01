@@ -1,5 +1,6 @@
 #if os(iOS) && canImport(UIKit)
 
+import DODDomain
 import XCTest
 import SwiftUI
 import UIKit
@@ -10,11 +11,15 @@ final class RecipeTentCardViewTests: XCTestCase {
     @MainActor
     func testRecipeTentCardViewSize() throws {
         // Build a TentCardContent (copy the Recipe construction from RecipePDFRendererTests)
-        let content = TentCardContent(
-            dishName: "Test Dish Name",
-            byline: "Test Byline",
-            qrPayload: "https://example.com/test"
+        let recipe = Recipe(
+            id: 1,
+            slug: "test-dish",
+            title: "Test Dish Name",
+            excerpt: "",
+            canonicalURL: URL(string: "https://example.com/test")!,
+            publishedAt: Date(timeIntervalSince1970: 0)
         )
+        let content = TentCardContent(recipe: recipe, hostName: "Sam")
 
         // Build RecipeTentCardView
         let qrImage = QRCodeImage.make(from: content.qrPayload)
