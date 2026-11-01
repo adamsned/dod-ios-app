@@ -31,24 +31,24 @@ public final class SettingsViewModel {
     /// AC-32.4 — "Use metric units" toggle key.
     public nonisolated static let useMetricUnitsKey = "dod.settings.useMetricUnits"
 
-    /// AC-36.1 — "When New Recipes Drop" toggle key (the row was renamed
-    /// from "Notify me when new recipes drop" in T-750 / CL-147; the key
-    /// is unchanged so the persisted preference survives the rename).
-    /// Defaults OFF on first launch; T-631 follow-up wires APNs
-    /// authorization when the user flips it ON.
+    /// AC-36.1 — "When New Recipes Drop" toggle key (renamed in T-750 /
+    /// CL-147; key unchanged so the preference survives). Defaults OFF;
+    /// T-631 follow-up wires APNs authorization when flipped ON.
     public nonisolated static let notificationsEnabledKey = "dod.settings.notificationsEnabled"
 
-    /// DUT-1333 — "When a New Article Drops" toggle key (replaces the
-    /// never-deliverable comment-reply toggle). Defaults OFF. Secures
-    /// notification permission on enable like ``notificationsEnabledKey``;
-    /// article-alert delivery follows the same DUT-1332 APNs trigger that
-    /// recipe alerts need.
+    /// DUT-1333 — "When a New Article Drops" toggle key. Defaults OFF.
+    /// Secures notification permission on enable like
+    /// ``notificationsEnabledKey``; delivery follows the DUT-1332 APNs trigger.
     public nonisolated static let articleNotificationsEnabledKey =
         "dod.settings.articleNotificationsEnabled"
 
-    /// AC-36.2 — Appearance preference key. Value is the raw value of
-    /// ``AppearancePreference`` (`"system"` / `"light"` / `"dark"`).
-    /// Defaults to `.system` (no explicit preferredColorScheme override).
+    /// DUT-972 — streak reminders toggle key (default OFF).
+    public nonisolated static let streakNudgesEnabledKey = "dod.settings.streakNudgesEnabled"
+    /// DUT-972 — `Date` of the last streak nudge (frequency cap).
+    public nonisolated static let streakNudgeLastSentKey = "dod.settings.streakNudgeLastSent"
+
+    /// AC-36.2 — Appearance preference key (raw ``AppearancePreference``:
+    /// `"system"` / `"light"` / `"dark"`). Defaults to `.system`.
     public nonisolated static let appearancePreferenceKey = "dod.settings.appearance"
 
     /// AC-36.3 — Default share format preference key. Value is the raw
