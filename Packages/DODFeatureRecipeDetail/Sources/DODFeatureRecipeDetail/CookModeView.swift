@@ -32,6 +32,9 @@ public struct CookModeView: View {
     /// re-arms it on return to `.active` if the session is still up. Both
     /// `begin`/`endCookMode` are idempotent, so this never double-restores.
     @Environment(\.scenePhase) private var scenePhase
+    /// DUT-137 — re-evaluated live on Stage Manager / Split View resize; state in
+    /// `viewModel` is untouched so no cook state is lost.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// DUT-529 — when Reduce Motion is on, drop the step-change slide/scale
     /// animation (constitution §7); the step swap still happens, just without the
     /// motion. Mirrors the `LoadingSkeleton` shimmer guard.
@@ -173,43 +176,14 @@ public struct CookModeView: View {
                             Spacer(minLength: 0)
                         }
                         .ignoresSafeArea(.container, edges: .top)
-                    } else {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                                // DUT-1392 — "Ask About This Recipe" sits right under
-                                // the recipe name (which is on the hero).
-                                VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                                    heroView(topInset: topInset)
-                                    askAboutRecipeLink
-                                    Button {
-                                        wakeControls()
-                                        isRescuePresented = true
-                                    } label: {
-                                        Label("Something not going right?", systemImage: "lifepreserver")
-                                            .dodFont(DODType.bodyEmphasized)
-                                            .foregroundStyle(DODColor.accent)
-                                            .frame(minHeight: 44)
-                                            .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .padding(.horizontal, DODSpacing.md)
-                                    .accessibilityIdentifier("cook-mode-rescue")
-                                    .accessibilityHint("Quick fixes for sticking, heat and other cooking problems")
-                                }
-                                stepBody
-                            }
-                            .padding(.bottom, DODSpacing.md)
+                    } else if CookModeLayout.resolve(horizontalSizeClass: horizontalSizeClass) == .twoPane {
+                        HStack(spacing: 0) {
+                            stepScroll(topInset: topInset, showsToolDock: false)
+                            pinnedPane
+                                .frame(width: CookModeLayout.pinnedPaneWidth(containerWidth: geo.size.width))
                         }
-                        .ignoresSafeArea(.container, edges: .top)
-                        // DUT-1392 — the floating tool dock (timer / Heat Coach),
-                        // riding just above the player panel as it minimizes.
-                        .safeAreaInset(edge: .bottom, spacing: 0) { toolDock }
-                        .animation(controlsAnimation, value: toolDockContent)
-                        // DUT-596/599 — a tap in the collapsed step area brings the
-                        // controls back; a no-op while expanded so it never fights
-                        // reading.
-                        .contentShape(Rectangle())
-                        .onTapGesture { if !controlsExpanded { wakeControls() } }
+                    } else {
+                        stepScroll(topInset: topInset, showsToolDock: true)
                     }
                     // DUT-596 — the auto-minimizing player panel + the progress
                     // footer (bar + counter, which becomes the star on Done).
