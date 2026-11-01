@@ -45,11 +45,11 @@ public struct CookModeView: View {
     @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
     /// DUT-116 — lets the step card take VoiceOver focus when the step changes.
     @AccessibilityFocusState var stepFocused: Bool
-    // `internal` (not `private`) so the step-body composition in
-    // `CookModeView+StepBody.swift` can present the journal-log sheet.
-    /// DUT-326 — drives the "Add to Cooking Journal" capture sheet on the
-    /// Done card.
+    // `internal` so `CookModeView+StepBody.swift` can present the journal-log sheet.
+    /// DUT-326 — drives the "Add to Cooking Journal" sheet on the Done card.
     @State var isJournalLogPresented: Bool = false
+    /// DUT-981 — drives the "Share the Praise" sheet; `internal` for `CookModeView+StepBody.swift`.
+    @State var isGuestReactionPresented: Bool = false
     /// T-912 / DUT-551 (CL-306) — drives the Heat Coach sheet presented OVER
     /// Cook Mode's full-screen cover from a heat-related step's shortcut. Cook
     /// Mode is a `.fullScreenCover`, so a tab switch would be invisible under it;
@@ -72,21 +72,16 @@ public struct CookModeView: View {
     /// default) hides the CTA entirely — previews and hosts that don't wire
     /// persistence stay unaffected.
     public let onLogCook: ((CookLogEntry) -> Void)?
-    /// T-912 / DUT-551 (CL-306) — builds the Heat Coach surface for the
-    /// heat-step shortcut. Presented as a `.sheet` OVER this full-screen cover
-    /// (see `isHeatCoachPresented`). The `HeatCoachView` lives in
-    /// `DODFeatureFeed`, which this package must not import, so the host injects
-    /// a type-erased `AnyView` builder. `nil` (the default) hides the shortcut on
-    /// every step — previews and hosts that don't wire hub routing stay
-    /// unaffected (same seam as `onLogCook`). `internal` (not `private`) so
-    /// `CookModeView+StepBody.swift` can gate the shortcut on it.
+    /// DUT-981 — posts (quote, guest name, rating) as a public comment; `nil` hides the CTA.
+    public let onPostGuestReaction: ((String, String, Int?) async -> Bool)?
+    /// T-912 / DUT-551 — host-injected `AnyView` builder for the Heat Coach sheet
+    /// (`HeatCoachView` lives in `DODFeatureFeed`, which this package can't import).
+    /// `nil` hides the heat shortcut. `internal` so `CookModeView+StepBody.swift` can gate on it.
     let heatCoachSheet: (() -> AnyView)?
     /// DUT-1385 — builds the "Ask About This Recipe" chat (title, recipe text);
     /// `nil` hides the top-bar sparkle button. See `CookModeView+Ask.swift`.
     let askSheet: ((String, String) -> AnyView)?
-    /// Scale factor inherited from the host detail screen so the drawer
-    /// ingredient rows agree with the scaled list the user just left. AC-7.5
-    /// + US-31 carry-over.
+    /// Scale factor from the host detail screen so drawer rows match the scaled list (AC-7.5 / US-31).
     let ingredientScaleFactor: Double
 
     // `internal` (not `private`) so `CookModeView+StepBody.swift` can resolve
@@ -135,6 +130,7 @@ public struct CookModeView: View {
         ingredientScaleFactor: Double = 1.0,
         onClose: @escaping (Set<UUID>) -> Void,
         onLogCook: ((CookLogEntry) -> Void)? = nil,
+        onPostGuestReaction: ((String, String, Int?) async -> Bool)? = nil,
         heatCoachSheet: (() -> AnyView)? = nil,
         askSheet: ((String, String) -> AnyView)? = nil,
         isFirstCookEver: Bool = false
@@ -156,6 +152,7 @@ public struct CookModeView: View {
         self.ingredientScaleFactor = ingredientScaleFactor
         self.onClose = onClose
         self.onLogCook = onLogCook
+        self.onPostGuestReaction = onPostGuestReaction
         self.heatCoachSheet = heatCoachSheet
         self.askSheet = askSheet
     }
@@ -251,6 +248,11 @@ public struct CookModeView: View {
             CookModeJournalLogSheet(recipe: viewModel.recipe) { entry in
                 viewModel.isFirstCookEver = false
                 onLogCook?(entry)
+            }
+        }
+        .sheet(isPresented: $isGuestReactionPresented) {
+            if let onPostGuestReaction {
+                GuestReactionSheet(onPost: onPostGuestReaction)
             }
         }
         // T-912 / DUT-551 — Heat Coach, presented as a sheet OVER this
