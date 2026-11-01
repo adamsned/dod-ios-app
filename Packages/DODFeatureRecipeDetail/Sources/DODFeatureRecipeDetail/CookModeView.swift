@@ -139,10 +139,18 @@ public struct CookModeView: View {
         askSheet: ((String, String) -> AnyView)? = nil,
         isFirstCookEver: Bool = false
     ) {
+        #if canImport(MediaPlayer)
+        let model = CookModeViewModel(
+            recipe: recipe,
+            initialCheckedIngredients: initialCheckedIngredients,
+            nowPlayingPublisher: SystemNowPlayingPublisher()
+        )
+        #else
         let model = CookModeViewModel(
             recipe: recipe,
             initialCheckedIngredients: initialCheckedIngredients
         )
+        #endif
         model.isFirstCookEver = isFirstCookEver
         _viewModel = State(initialValue: model)
         self.ingredientScaleFactor = ingredientScaleFactor
