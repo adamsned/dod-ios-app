@@ -211,6 +211,11 @@ public enum IngredientLineParser {
         return collapsed.isEmpty ? nil : collapsed
     }
 
+    /// Canonical singular unit for any known spelling (`"Cups"` → `"cup"`), else nil.
+    static func canonicalUnit(_ raw: String) -> String? {
+        unitAliases[raw.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "., "))]
+    }
+
     // MARK: - Scanning
 
     /// Scan a run of ASCII digits. DUT-393: `Character.isNumber` is `true` for

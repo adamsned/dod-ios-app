@@ -17,12 +17,16 @@ public enum DeepLinkIntent: Equatable, Sendable {
     /// DUT-1388 — the Saved tab narrowed to one collection (Siri "Open my
     /// <collection> collection"). `dod://collection?id=<uuid>`.
     case openCollection(id: UUID)
+    /// DUT-1826 — Visual Intelligence "Check My Pan" result. `dod://pancheck?verdict=<raw>`.
+    case openPanCheck(verdict: PanCheck.Verdict)
+    /// DUT-2039 — the Feed tab root (streak-nudge notification). `dod://feed`.
+    case openFeed
 
     /// Pure function for unit testing. Returns nil for any URL that isn't
     /// a recognized `dod://` action so the caller can ignore it without
     /// touching navigation state.
     public static func parse(_ url: URL) -> DeepLinkIntent? {
-        parseCollection(url) ?? parseRecipeOrSaved(url)
+        parsePanCheck(url) ?? parseCollection(url) ?? parseRecipeOrSaved(url)
     }
 
     /// DUT-1388 — `dod://collection?id=<uuid>` (or `dod://collection/<uuid>`).
@@ -34,6 +38,13 @@ public enum DeepLinkIntent: Equatable, Sendable {
             .queryItems?.first(where: { $0.name == "id" })?.value
         let raw = queryID ?? url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return UUID(uuidString: raw).map { .openCollection(id: $0) }
+    }
+
+    private static func parsePanCheck(_ url: URL) -> DeepLinkIntent? {
+        guard url.scheme?.lowercased() == "dod", url.host?.lowercased() == "pancheck" else { return nil }
+        let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "verdict" })?.value
+        return .openPanCheck(verdict: raw.flatMap(PanCheck.Verdict.init(rawValue:)) ?? .unclear)
     }
 
     private static func parseRecipeOrSaved(_ url: URL) -> DeepLinkIntent? {
@@ -51,14 +62,25 @@ public enum DeepLinkIntent: Equatable, Sendable {
         let idString = comps?.queryItems?.first(where: { $0.name == "id" })?.value
         let id = idString.flatMap(Int.init)
 
-        // DUT-603 — constrain `saved` to the bare host (empty path) or the
-        // path-only `dod:///saved` form, matching WidgetDeepLinkParser's
-        // `isBare` gate. A path-bearing variant (`dod://saved/123`) is
-        // malformed and must not route.
+        // Handle saved and feed cases first to reduce complexity
         if host == "saved" {
             return trimmedPath.isEmpty ? .openSaved : nil
         }
 
+        if host == "feed" {
+            return trimmedPath.isEmpty ? .openFeed : nil
+        }
+
+        // Handle the remaining cases with a switch statement
+        return parseRecipeOrSavedSwitch(host, path, trimmedPath, id)
+    }
+
+    private static func parseRecipeOrSavedSwitch(
+        _ host: String?,
+        _ path: String,
+        _ trimmedPath: String,
+        _ id: Int?
+    ) -> DeepLinkIntent? {
         switch (host, path) {
         case (nil, "/saved"):
             return .openSaved
@@ -106,8 +128,12 @@ public enum DeepLinkIntent: Equatable, Sendable {
             raw = "dod://recipe/cook?id=\(recipeID)"
         case .openSaved:
             raw = "dod://saved"
+        case .openFeed:
+            raw = "dod://feed"
         case .openCollection(let id):
             raw = "dod://collection?id=\(id.uuidString)"
+        case .openPanCheck(let verdict):
+            raw = "dod://pancheck?verdict=\(verdict.rawValue)"
         }
         return URL(string: raw) ?? URL(filePath: "/")
     }

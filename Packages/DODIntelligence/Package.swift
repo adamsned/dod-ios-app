@@ -21,7 +21,7 @@ let package = Package(
         ),
         .testTarget(
             name: "DODIntelligenceTests",
-            dependencies: ["DODIntelligence"]
+            dependencies: ["DODIntelligence", "DODSupport"]
         ),
     ]
 )

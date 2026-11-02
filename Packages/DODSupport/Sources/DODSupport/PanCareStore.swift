@@ -21,4 +21,12 @@ public struct PanCareStore: @unchecked Sendable {
         else { return [] }
         return decoded.sorted { $0.careAt > $1.careAt }
     }
+
+    @discardableResult
+    public func logCare(at date: Date) -> PanCareEntry {
+        let entry = PanCareEntry(careAt: date)
+        let updated = Array(([entry] + entries()).sorted { $0.careAt > $1.careAt }.prefix(Self.maxEntries))
+        if let data = try? JSONEncoder().encode(updated) { defaults.set(data, forKey: Self.key) }
+        return entry
+    }
 }

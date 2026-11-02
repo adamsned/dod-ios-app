@@ -1,0 +1,13 @@
+{
+  "sourceLanguage" : "en",
+  "version" : "1.0",
+  "strings" : {
+    "Use Metric Units" : { "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Usar unidades métricas" } } } },
+    "When New Recipes Drop" : { "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Cuando salgan recetas nuevas" } } } },
+    "App Appearance" : { "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Apariencia de la app" } } } },
+    "Share Anonymous Usage Data" : { "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Compartir datos de uso anónimos" } } } },
+    "Clear Cached Recipe Images" : { "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Borrar imágenes de recetas en caché" } } } },
+    "Alerts are delivered on this device only." : { "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Las alertas se entregan solo en este dispositivo." } } } },
+    "Measurements & Units" : { "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Medidas y unidades" } } } }
+  }
+}

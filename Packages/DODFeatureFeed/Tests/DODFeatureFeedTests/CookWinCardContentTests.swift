@@ -22,4 +22,10 @@ import Testing
         let card = CookWinCardContent(entry: entry(note: String(repeating: "a", count: 300)))
         #expect(card.win?.count == 140)
     }
+
+    @Test func shareCaptionEndsWithAttribution() {
+        let card = CookWinCardContent(entry: entry(note: nil))
+        #expect(card.shareCaption == "I made Lasagna! — Made with Dutch Oven Daddy")
+        #expect(card.shareCaption.hasSuffix(CookWinCardContent.attribution))
+    }
 }

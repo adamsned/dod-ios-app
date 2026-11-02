@@ -146,6 +146,20 @@ public struct ShoppingListStore: @unchecked Sendable {
         return newRows.count
     }
 
+    /// DUT-1015 — add one free-text line (e.g. from Siri "add butter"). Same
+    /// dedup as `append(rows:)`. Returns true when a row was actually added.
+    @discardableResult
+    public func addItem(text: String, recipeTitle: String = "Siri") -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let row = ShoppingListViewModel.Item(
+            ingredientText: trimmed,
+            recipeTitle: recipeTitle,
+            aisle: IngredientAisleClassifier.classify(trimmed)
+        )
+        return append(rows: [row]) == 1
+    }
+
     /// Test-only accessor for the backing `UserDefaults`, so tests can assert on
     /// the raw persisted blob size (DUT-589 — proving the blob stays bounded).
     var debugDefaults: UserDefaults { defaults }

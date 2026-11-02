@@ -24,6 +24,7 @@ extension WPRestClient {
     /// Spec trace: AC-1.1, AC-1.2, AC-2.3, DUT-237.
     public func postsPage(
         categoryID: Int? = nil,
+        tagIDs: [Int] = [],
         page: Int = 1,
         perPage: Int = WPRestClient.defaultPageSize
     ) async throws -> (items: [RecipeListItem], totalPages: Int) {
@@ -36,6 +37,10 @@ extension WPRestClient {
         ]
         if let categoryID {
             queryItems.append(URLQueryItem(name: "categories", value: String(categoryID)))
+        }
+        if !tagIDs.isEmpty {
+            // WP ORs comma-separated tag ids.
+            queryItems.append(URLQueryItem(name: "tags", value: tagIDs.map(String.init).joined(separator: ",")))
         }
         // DUT-575: decode the page lossily so a single malformed post (e.g.
         // `title: null`) is skipped instead of emptying the whole feed.
