@@ -58,6 +58,37 @@ private final class DefaultsOnlyPreviewer: VoicePreviewing {
             #expect(SystemVoicePreviewer.descriptor(for: voice).quality == expected)
         }
     }
+
+    @Test func installedVoicesProjectsTheWholeLiveCatalogInOrder() {
+        let previewer = SystemVoicePreviewer()
+        let expected = AVSpeechSynthesisVoice.speechVoices().map(\.identifier)
+        #expect(previewer.installedVoices().map(\.identifier) == expected)
+    }
+
+    @Test func resolvedVoiceNameWithNilLanguageMatchesTheSelectorPick() {
+        let previewer = SystemVoicePreviewer()
+        let id = VoiceSelector.bestVoiceIdentifier(
+            from: previewer.installedVoices(),
+            languageCode: nil
+        )
+        let expected = id.flatMap { AVSpeechSynthesisVoice(identifier: $0)?.name }
+        #expect(previewer.resolvedVoiceName(languageCode: nil) == expected)
+    }
+
+    @Test func resolvedVoiceNameForEnglishMatchesSelectorOrLanguageFallback() {
+        let previewer = SystemVoicePreviewer()
+        let id = VoiceSelector.bestVoiceIdentifier(
+            from: previewer.installedVoices(),
+            languageCode: "en-US"
+        )
+        let expected: String?
+        if let id {
+            expected = AVSpeechSynthesisVoice(identifier: id)?.name
+        } else {
+            expected = AVSpeechSynthesisVoice(language: "en-US")?.name
+        }
+        #expect(previewer.resolvedVoiceName(languageCode: "en-US") == expected)
+    }
 }
 
 #endif
