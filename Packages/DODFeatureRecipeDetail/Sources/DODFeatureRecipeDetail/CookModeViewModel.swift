@@ -85,6 +85,8 @@ public final class CookModeViewModel {
     let voiceLanguageCode: String?
     /// DUT-1003 — on-device "Is It Done?" photo check; driven by `CookModeViewModel+Doneness.swift`.
     public let donenessCoach: DonenessCoach
+    /// DUT-135 — live meat-probe state (reading, target, banner); see `CookModeViewModel+Probe.swift`.
+    public let probe = ProbeSession()
     private var priorIdleTimerDisabled: Bool = false
     private var didBegin: Bool = false
 
@@ -394,7 +396,5 @@ public final class CookModeViewModel {
     }
 }
 
-// MARK: - Voice command handler conformance (US-40 / AC-40.5)
-
-/// The hands-free control methods *are* the ``VoiceCommandHandler`` surface (CL-83).
+/// Voice command surface (US-40 / AC-40.5, CL-83): the hands-free control methods.
 extension CookModeViewModel: VoiceCommandHandler {}
