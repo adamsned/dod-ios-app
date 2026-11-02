@@ -156,8 +156,8 @@ extension RecipeDetailView {
                 displayText: { convertedStepText($0.text, to: temperatureUnit) },
                 horizontalSizeClass: horizontalSizeClass,
                 onCookMode: {
-                    Task { await viewModel.didTapCookMode() }
-                    isCookModePresented = true
+                    // DUT-985 — pep talk first on the very first cook; telemetry is sent inside.
+                    requestCookMode()
                 },
                 load: { await viewModel.loadAnnotation() },
                 save: { await viewModel.saveAnnotation($0) }
