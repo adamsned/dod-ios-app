@@ -31,6 +31,8 @@ import UIKit
 public final class CookModeViewModel {
 
     public let recipe: Recipe
+    /// DUT-168 — per-step matched ingredients, computed once at init, index-aligned with `recipe.instructions`.
+    let stepIngredients: [[RecipeIngredient]]
     public private(set) var currentStepIndex: Int = 0
     public private(set) var isFinished: Bool = false
     public var checkedIngredientIDs: Set<UUID>
@@ -98,11 +100,9 @@ public final class CookModeViewModel {
     /// while it lingers. Cleared when a running timer takes the card over or the
     /// activity ends.
     var liveActivityShowingCompleted = false
-    /// DUT-558: latched true once a `startTimerLiveActivity` attempt fails while
-    /// the controller reports Live Activities are unavailable (disabled in
-    /// Settings / over quota). While set, `reconcileLiveActivity` stops
-    /// re-attempting the start every ~1s tick (DUT-492 kept retrying forever).
-    /// Recheck on scene-activate via `revalidateLiveActivityAvailability()`.
+    /// DUT-558: latched true once a `startTimerLiveActivity` start fails while Live
+    /// Activities are unavailable, so `reconcileLiveActivity` stops retrying every
+    /// tick. Recheck via `revalidateLiveActivityAvailability()`.
     var liveActivityUnavailable = false
 
     public init(
@@ -115,6 +115,10 @@ public final class CookModeViewModel {
         locale: Locale = .current
     ) {
         self.recipe = recipe
+        self.stepIngredients = StepIngredientMatcher.mapping(
+            instructions: recipe.instructions,
+            ingredients: recipe.ingredients
+        )
         self.checkedIngredientIDs = initialCheckedIngredients
         self.idleTimer = idleTimer
         self.liveActivity = liveActivity
@@ -141,9 +145,7 @@ public final class CookModeViewModel {
         }
     }
 
-    /// Total number of steps, derived from the recipe. Zero if the recipe
-    /// has no instructions parsed (Cook Mode shouldn't even be presented in
-    /// that case — guarded by the entry CTA).
+    /// Total number of steps in the recipe (zero when none were parsed).
     public var stepCount: Int {
         recipe.instructions.count
     }
