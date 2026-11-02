@@ -39,6 +39,25 @@ private final class DefaultsOnlyPreviewer: VoicePreviewing {
         let previewer: any VoicePreviewing = SystemVoicePreviewer()
         #expect(previewer is SystemVoicePreviewer)
     }
+
+    @Test func descriptorCopiesIdentifierAndLanguage() throws {
+        let voice = try #require(AVSpeechSynthesisVoice.speechVoices().first)
+        let descriptor = SystemVoicePreviewer.descriptor(for: voice)
+        #expect(descriptor.identifier == voice.identifier)
+        #expect(descriptor.languageCode == voice.language)
+    }
+
+    @Test func descriptorMapsQualityTierForEveryInstalledVoice() {
+        for voice in AVSpeechSynthesisVoice.speechVoices() {
+            let expected: VoiceQuality
+            switch voice.quality {
+            case .premium: expected = .premium
+            case .enhanced: expected = .enhanced
+            default: expected = .default
+            }
+            #expect(SystemVoicePreviewer.descriptor(for: voice).quality == expected)
+        }
+    }
 }
 
 #endif
