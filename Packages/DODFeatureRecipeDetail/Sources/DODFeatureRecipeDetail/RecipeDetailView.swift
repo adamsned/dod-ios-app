@@ -160,25 +160,16 @@ public struct RecipeDetailView: View {
             content
             snackbar
         }
-        // DUT-1335 — fill the bottom safe area (home-indicator strip below the
-        // floating tab bar) with the brand surface. The ScrollView only ignores
-        // the TOP safe area for the immersive hero, so without this the bottom
-        // inset was left unpainted and read as a black bar. Matches CookModeView.
+        // DUT-1335 — paint the bottom safe area with the brand surface (matches CookModeView).
         .background(DODColor.surface.ignoresSafeArea())
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        // DUT-572 / CL-312 — full-bleed hero: hide the nav-bar background so the
-        // hero photo reaches the top of the screen, and force a dark color
-        // scheme so the system chrome (back chevron + our glyphs) renders light
-        // over the photo.
+        // DUT-572 / CL-312 — full-bleed hero: hide the nav-bar background and force a
+        // dark color scheme so the chrome renders light over the hero photo.
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         #endif
         .toolbar { toolbarItems }
-        // Note: T-302 originally added a sticky `RecipeDetailFloatingActions`
-        // overlay anchored to `.bottomTrailing` here. Removed by T-410 /
-        // CL-42 — the nav-bar Save + Share (AC-4.7 + AC-4.8) are the
-        // single in-recipe affordance for both actions. See US-26 / AC-26.1.
         // Toolbar haptics: Save + Download success ticks; Share light tick (DUT).
         .sensoryFeedback(.success, trigger: viewModel.isSaved)
         .sensoryFeedback(.success, trigger: viewModel.isDownloaded)
@@ -188,10 +179,20 @@ public struct RecipeDetailView: View {
         .fullScreenCover(isPresented: $isCookModePresented) {
             cookModeCover
         }
+        .fullScreenCover(  // DUT-985 — one-time first-cook pep talk
+            isPresented: Bindable(viewModel).isPepTalkPresented,
+            onDismiss: { pepTalkDidDismiss() },
+            content: { pepTalkCover }
+        )
         #else
         .sheet(isPresented: $isCookModePresented) {
             cookModeCover
         }
+        .sheet(
+            isPresented: Bindable(viewModel).isPepTalkPresented,
+            onDismiss: { pepTalkDidDismiss() },
+            content: { pepTalkCover }
+        )
         #endif
         // DUT-535 — the ingredient-selection sheet. Presented when the toolbar
         // `cart.badge.plus` is tapped (see `RecipeDetailView+Toolbar.swift`),
