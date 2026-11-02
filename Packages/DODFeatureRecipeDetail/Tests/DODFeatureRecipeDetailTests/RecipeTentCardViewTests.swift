@@ -12,12 +12,12 @@ final class RecipeTentCardViewTests: XCTestCase {
     func testRecipeTentCardViewSize() throws {
         // Build a TentCardContent (copy the Recipe construction from RecipePDFRendererTests)
         let recipe = Recipe(
-            id: 1,
-            slug: "test-dish",
+            id: 42,
+            slug: "test-recipe",
             title: "Test Dish Name",
-            excerpt: "",
-            canonicalURL: URL(string: "https://example.com/test")!,
-            publishedAt: Date(timeIntervalSince1970: 0)
+            excerpt: "Test excerpt",
+            canonicalURL: try XCTUnwrap(URL(string: "https://example.com/recipe")),
+            publishedAt: Date()
         )
         let content = TentCardContent(recipe: recipe, hostName: "Sam")
 
