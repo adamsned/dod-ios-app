@@ -131,4 +131,71 @@ import Testing
         )
         #expect(instructions.map(\.step) == [1, 2])
     }
+
+    /// DUT-170: When JSON-LD has instructions and WPRM card has matching step count,
+    /// merge images by index.
+    @Test func mergesInstructionImagesWhenCountsMatch() {
+        let jsonLD: [String: Any] = [
+            "recipeInstructions": [
+                ["@type": "HowToStep", "text": "Preheat the oven."],
+                ["@type": "HowToStep", "text": "Mix ingredients."],
+            ]
+        ]
+
+        // WPRM card with 2 instruction rows, first has an image
+        let wprmCardWithImages = """
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">Ingredient</span></li>
+            </ul>
+            <ul class="wprm-recipe-instructions">
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Preheat the oven.</span></div><img src="https://e.com/a.jpg"></li>
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Mix ingredients.</span></div></li>
+            </ul>
+            </div>
+            """
+
+        let (ingredients, instructions) = JSONLDRecipeParser.ingredientsAndInstructions(
+            jsonLD: jsonLD,
+            html: wprmCardWithImages
+        )
+
+        // First instruction should have image URL, second should be nil
+        #expect(instructions[0].imageURL == URL(string: "https://e.com/a.jpg"))
+        #expect(instructions[1].imageURL == nil)
+    }
+
+    /// DUT-170: When JSON-LD and WPRM card step counts don't match,
+    /// leave all imageURLs nil.
+    @Test func leavesImageURLNilWhenStepCountsMismatch() {
+        let jsonLD: [String: Any] = [
+            "recipeInstructions": [
+                ["@type": "HowToStep", "text": "Preheat the oven."],
+                ["@type": "HowToStep", "text": "Mix ingredients."],
+            ]
+        ]
+
+        // WPRM card with 3 instruction rows (mismatched count)
+        let wprmCardWithThreeSteps = """
+            <div class="wprm-recipe-container">
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">Ingredient</span></li>
+            </ul>
+            <ul class="wprm-recipe-instructions">
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Preheat the oven.</span></div></li>
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Mix ingredients.</span></div></li>
+            <li class="wprm-recipe-instruction"><div class="wprm-recipe-instruction-text"><span style="display: block;">Bake for 30 minutes.</span></div></li>
+            </ul>
+            </div>
+            """
+
+        let (ingredients, instructions) = JSONLDRecipeParser.ingredientsAndInstructions(
+            jsonLD: jsonLD,
+            html: wprmCardWithThreeSteps
+        )
+
+        // Both instructions should have nil imageURLs due to mismatched counts
+        #expect(instructions[0].imageURL == nil)
+        #expect(instructions[1].imageURL == nil)
+    }
 }

@@ -8,10 +8,13 @@ public struct RecipeInstruction: Sendable, Hashable, Identifiable, Codable {
     /// 1-based step number.
     public let step: Int
     public let text: String
+    /// DUT-170 — optional WPRM step photo; nil for text-only steps.
+    public let imageURL: URL?
 
-    public init(id: UUID = UUID(), step: Int, text: String) {
+    public init(id: UUID = UUID(), step: Int, text: String, imageURL: URL? = nil) {
         self.id = id
         self.step = step
         self.text = text
+        self.imageURL = imageURL
     }
 }
