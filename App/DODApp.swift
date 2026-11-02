@@ -300,12 +300,27 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             restClient: WPRestClient(httpClient: AppDependencies.makeHTTPClient()),
             notificationService: NotificationService()
         )
-        let pollTask = Task {
+        let pollTask = Task { @MainActor in
             await poller.poll()
+            if let entries = try? await Self.loadCookLogEntries() {
+                await StreakNudgeNotifier().evaluateAndSchedule(entries: entries)
+            }
             task.setTaskCompleted(success: true)
         }
         task.expirationHandler = {
             pollTask.cancel()
         }
+    }
+
+    /// Opens the SwiftData store directly (no `AppDependencies()`) and reads
+    /// every cook-log entry for the streak-nudge evaluation. Mirrors the
+    /// in-memory seam `AppDependencies.init` uses so the L5 harness never
+    /// touches the on-disk store.
+    private static func loadCookLogEntries() async throws -> [CookLogEntry] {
+        let container =
+            AppDependencies.useInMemoryStore()
+            ? try RecipeStore.inMemoryContainer()
+            : try RecipeStore.productionContainer()
+        return try await RecipeStore(modelContainer: container).allCookLogs()
     }
 }
