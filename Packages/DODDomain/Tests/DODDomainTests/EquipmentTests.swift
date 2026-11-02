@@ -66,4 +66,35 @@ struct EquipmentTests {
         ]
         #expect(set.count == 2)
     }
+
+    @Test func jsonRoundTripPreservesAllFields() throws {
+        let image = try #require(URL(string: "https://example.com/oven.jpg"))
+        let link = try #require(URL(string: "https://example.com/buy"))
+        let original = Equipment(name: "Dutch oven", imageURL: image, link: link)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Equipment.self, from: data)
+        #expect(decoded == original)
+    }
+
+    @Test func decodesWithOnlyIDAndNameLeavingURLsNil() throws {
+        let json = #"{"id":"55555555-5555-5555-5555-555555555555","name":"Tongs"}"#
+        let decoded = try JSONDecoder().decode(Equipment.self, from: Data(json.utf8))
+        #expect(decoded.name == "Tongs")
+        #expect(decoded.imageURL == nil)
+        #expect(decoded.link == nil)
+    }
+
+    @Test func decodingWithoutANameThrows() {
+        let json = #"{"id":"55555555-5555-5555-5555-555555555555"}"#
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(Equipment.self, from: Data(json.utf8))
+        }
+    }
+
+    @Test func decodingWithoutAnIDThrows() {
+        let json = #"{"name":"Tongs"}"#
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(Equipment.self, from: Data(json.utf8))
+        }
+    }
 }
