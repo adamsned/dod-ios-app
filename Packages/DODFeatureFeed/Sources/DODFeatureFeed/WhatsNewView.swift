@@ -35,10 +35,17 @@ public struct WhatsNewView: View {
                 Text(release.title)
                     .dodFont(DODType.displayMedium)
                     .accessibilityAddTraits(.isHeader)
+                #if compiler(>=6.4)
                 ForEach(Array(Self.visibleBullets(release.bullets).enumerated()), id: \.offset) { _, bullet in
                     Label(bullet, systemImage: "checkmark.circle.fill")
                         .dodFont(DODType.body)
                 }
+                #else
+                ForEach(Array(Self.visibleBullets(release.bullets)).enumerated(), id: \.offset) { _, bullet in
+                    Label(bullet, systemImage: "checkmark.circle.fill")
+                        .dodFont(DODType.body)
+                }
+                #endif
                 Button(action: onDismiss) {
                     Text("Got it")
                         .dodFont(DODType.bodyEmphasized)
