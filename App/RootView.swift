@@ -244,6 +244,7 @@ struct RootView: View {
             // foregrounds us here; drain the pending-route flag and route.
             if $1 == .active {
                 consumePendingControlRoute()
+                PushRuntime.start()  // DUT-1397: token refresh + failed-upload retry
                 // DUT-635 (wire) — re-poll the Apple credential on foreground.
                 Task { await validateAppleCredentialOnForeground() }
             }
@@ -269,6 +270,9 @@ struct RootView: View {
         // sidebar row both flip `showSettingsSheet`. Content in
         // `RootView+Settings.swift` (file_length split, DUT-941).
         .sheet(isPresented: $showSettingsSheet) { settingsSheet }
+        // DUT-174 — post-update "What's New" sheet, once per version (`RootView+WhatsNew.swift`).
+        .whatsNewOnUpdate()
+        .modifier(ShakeToReport(currentScreen: selectedTab.shakeScreenID))
         // DUT-549 — transient "couldn't open that recipe" toast for a failed
         // deep-link resolve (modifier + copy in `RootView+LinkRouting.swift`).
         .modifier(DeepLinkErrorSnackbar(message: $deepLinkErrorMessage))

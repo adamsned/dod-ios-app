@@ -38,7 +38,32 @@ public struct AnnouncementsView: View {
 
     private var list: some View {
         List(viewModel.items) { item in
-            Text(item.title).dodFont(DODType.heading)
+            VStack(alignment: .leading, spacing: 8) {
+                if let url = item.imageURL {
+                    AsyncImage(url: url) { image in
+                        image.resizable().scaledToFit()
+                    } placeholder: {
+                        Color.clear.frame(height: 1)
+                    }
+                }
+                Text(item.title)
+                    .dodFont(DODType.heading)
+                    .foregroundStyle(DODColor.labelStrong)
+                // Body is Markdown; Text(.init(String)) uses LocalizedStringKey rendering.
+                Text(.init(item.bodyMarkdown))
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.label)
+                Text(item.publishedAt, style: .date)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                if let link = item.deepLink {
+                    Button("Open") {
+                        viewModel.didTapDeepLink(item)
+                        onOpenDeepLink(link)
+                    }
+                    .accessibilityIdentifier("from-ned-link-\(item.id)")
+                }
+            }
         }
         .accessibilityIdentifier("from-ned-list")
     }

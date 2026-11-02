@@ -31,13 +31,18 @@ extension CookModeView {
         // DUT-1392 — the step's timer and the Heat Coach shortcut moved out of
         // the text into the floating tool dock above the controls
         // (`CookModeView+ToolDock.swift`).
-        return Text(displayText)
-            .dodFont(DODType.displayMedium)
-            .foregroundStyle(DODColor.label)
-            .lineSpacing(DODSpacing.xs)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel("Step \(step.step). \(displayText)")
-            .padding(.horizontal, DODSpacing.md)
+        return VStack(alignment: .leading, spacing: DODSpacing.md) {
+            Text(displayText)
+                .dodFont(DODType.displayMedium)
+                .foregroundStyle(DODColor.label)
+                .lineSpacing(DODSpacing.xs)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Step \(step.step). \(displayText)")
+            if let note = viewModel.trainingWheelsNote {
+                trainingWheelsCard(note)
+            }
+        }
+        .padding(.horizontal, DODSpacing.md)
     }
 
     /// T-912 / DUT-551 — whether a step's text is about heat (drives the tool
@@ -81,6 +86,7 @@ extension CookModeView {
             // on first and the "tap the checkmark" instruction reads as the
             // quieter follow-up.
             logCookButton
+            guestReactionButton
             Text("Tap the checkmark below to leave Cook Mode.")
                 .dodFont(DODType.body)
                 .foregroundStyle(DODColor.labelSecondary)
@@ -121,6 +127,28 @@ extension CookModeView {
         }
     }
 
+    /// DUT-981 — nudge the host to capture a guest's praise and post it publicly.
+    @ViewBuilder
+    private var guestReactionButton: some View {
+        if onPostGuestReaction != nil {
+            Button {
+                isGuestReactionPresented = true
+            } label: {
+                Label("Share a Guest's Praise", systemImage: "quote.bubble.fill")
+                    .multilineTextAlignment(.center)
+                    .frame(width: logCookButtonWidth)
+                    .padding(.vertical, DODSpacing.sm)
+            }
+            .buttonStyle(.bordered)
+            .tint(DODColor.accent)
+            .accessibilityIdentifier("cook-mode-guest-reaction")
+            .accessibilityLabel("Share a guest's praise as a public review")
+        }
+    }
+
+    /// DUT-981 — helper for testing the show/hide logic
+    nonisolated static func showsGuestReactionCTA(isFinished: Bool, hasSink: Bool) -> Bool { isFinished && hasSink }
+
     // MARK: - VoiceOver announcements (DUT-401)
 
     /// Post a VoiceOver announcement for a Cook Mode state change. A no-op when
@@ -148,5 +176,22 @@ extension CookModeView {
                 announce("Step \(step.step). \(convertedStepText(step.text))")
             }
         }
+    }
+
+    /// DUT-986 — first-cook-only reassurance + explicit checkpoint.
+    private func trainingWheelsCard(_ note: TrainingWheels.Note) -> some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            Text(note.reassurance)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.label)
+            Text(note.checkpoint)
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelSecondary)
+        }
+        .padding(DODSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DODColor.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("cook-mode-training-wheels")
     }
 }

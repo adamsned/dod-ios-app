@@ -50,6 +50,9 @@ public struct HeatCoachView: View {
     @State var elevationFeet: Int = 0
     @State var ambient: AmbientCondition = .mild
     @State var windy: Bool = false
+    /// DUT-998 — one-line status under the "Fill from my location" row.
+    @State var conditionsStatus: String?
+    @State var isFetchingConditions = false
     /// DUT-584 — expands the optional conditions group (default collapsed so the
     /// answer isn't buried under fine-tuning most cooks never need).
     @State var showConditions = false
@@ -118,6 +121,7 @@ public struct HeatCoachView: View {
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: expandedFeelCue)
         }
         .background(DODColor.surface)
+        .onAppear { loadCachedConditions() }
         .navigationTitle("Heat Coach")
         .dodInlineNavTitle()
         .toolbar {
@@ -223,5 +227,54 @@ extension View {
         HeatCoachView(
             seed: HeatCoachSeed(ovenDiameterInches: 12, style: .baking, targetTemperatureF: 350)
         )
+    }
+}
+
+extension HeatCoachView {
+    /// Only pre-fill while every condition is still at its default, so a recipe-seeded or hand-edited state is never overwritten.
+    nonisolated static func shouldApplyCached(elevationFeet: Int, ambient: AmbientCondition, windy: Bool) -> Bool {
+        elevationFeet == 0 && ambient == .mild && !windy
+    }
+
+    func applyConditions(_ conditions: HeatCoachConditions) {
+        elevationFeet = conditions.elevationFeet
+        ambient = conditions.ambient
+        windy = conditions.windy
+    }
+
+    /// Pre-fill from cache without any network, so a cook with no signal still gets last-known conditions.
+    func loadCachedConditions() {
+        guard Self.shouldApplyCached(elevationFeet: elevationFeet, ambient: ambient, windy: windy),
+            let cached = HeatCoachConditionsStore().load()
+        else { return }
+        applyConditions(cached)
+        conditionsStatus = "Using conditions saved earlier."
+    }
+
+    @ViewBuilder
+    var fetchRow: some View {
+        #if canImport(WeatherKit) && canImport(CoreLocation) && os(iOS)
+        Button(isFetchingConditions ? "Checking…" : "Fill from my location") {
+            isFetchingConditions = true
+            Task {
+                let provider = ConditionsProvider(fetcher: LiveConditionsFetcher(), store: HeatCoachConditionsStore())
+                if let result = await provider.refresh() {
+                    applyConditions(result.conditions)
+                    conditionsStatus =
+                        result.isFresh ? "Updated just now." : "No signal. Using conditions saved earlier."
+                } else {
+                    conditionsStatus = "Couldn't get conditions. Enter them below."
+                }
+                isFetchingConditions = false
+            }
+        }
+        .disabled(isFetchingConditions)
+        .accessibilityIdentifier("heat-coach-fill-location")
+        #endif
+        if let conditionsStatus {
+            Text(conditionsStatus)
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+        }
     }
 }

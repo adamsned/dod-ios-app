@@ -61,6 +61,8 @@ struct CookJournalEntryView: View {
     /// DUT — bumped on a successful save to fire the `.success` haptic before the
     /// page pops (mirrors `ProfileEditView`'s `saveSuccessTick`).
     @State var saveSuccessTick = 0
+    /// DUT-966 — the rendered capability-story card awaiting the share sheet.
+    @State var shareItem: CookWinShareItem?
 
     init(
         entry: CookLogEntry,
@@ -109,6 +111,14 @@ extension CookJournalEntryView {
             Text("This removes \"\(entry.recipeTitle)\" and its photo from your journal. This can't be undone.")
         }
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    shareWin()
+                } label: {
+                    Label("Share Your Win", systemImage: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("journal-entry-share")
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { Task { await save() } }
                     .tint(DODColor.burntOrange)
@@ -140,6 +150,11 @@ extension CookJournalEntryView {
                 photoCleared = false
             }
             .ignoresSafeArea()
+        }
+        .sheet(item: $shareItem) { item in
+            if let image = UIImage(data: item.pngData) {
+                ExportShareSheet(items: [image, item.caption])
+            }
         }
         #endif
     }
@@ -333,6 +348,24 @@ extension CookJournalEntryView {
         await onSave(updated)
         saveSuccessTick &+= 1  // DUT — fire the success haptic before the page pops.
         dismiss()
+    }
+
+    /// DUT-966 — render the card from the CURRENT note + photo and present the share sheet.
+    @MainActor
+    private func shareWin() {
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let live = CookLogEntry(
+            id: entry.id,
+            recipeID: entry.recipeID,
+            recipeTitle: entry.recipeTitle,
+            cookedAt: entry.cookedAt,
+            note: trimmed.isEmpty ? nil : trimmed,
+            personalRating: entry.personalRating,
+            photoLocalID: entry.photoLocalID
+        )
+        let content = CookWinCardContent(entry: live)
+        guard let data = CookWinCardRenderer.pngData(content: content, photo: displayImage) else { return }
+        shareItem = CookWinShareItem(pngData: data, caption: content.shareCaption)
     }
 
     /// DUT-514 — delete this entry, then pop back to the journal (which reloads +

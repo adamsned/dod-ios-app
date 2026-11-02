@@ -167,16 +167,6 @@ struct DODShortcuts: AppShortcutsProvider {
             systemImageName: "magnifyingglass"
         )
         AppShortcut(
-            intent: SaveRecipeIntent(),
-            phrases: [
-                "Save \(\.$recipe) in \(.applicationName)",
-                "Save this recipe in \(.applicationName)",
-                "Save this in \(.applicationName)",
-            ],
-            shortTitle: "Save Recipe",
-            systemImageName: "bookmark"
-        )
-        AppShortcut(
             intent: AddRecipeToShoppingListIntent(),
             phrases: [
                 "Add \(\.$recipe) to my shopping list in \(.applicationName)",
@@ -185,6 +175,16 @@ struct DODShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Add to Shopping List",
             systemImageName: "cart.badge.plus"
+        )
+        AppShortcut(
+            intent: ScaleServingsIntent(),
+            phrases: [
+                "Scale \(\.$recipe) in \(.applicationName)",
+                "Scale this recipe in \(.applicationName)",
+                "Change servings in \(.applicationName)",
+            ],
+            shortTitle: "Scale Servings",
+            systemImageName: "person.2"
         )
         AppShortcut(
             intent: OpenCollectionIntent(),
@@ -196,6 +196,26 @@ struct DODShortcuts: AppShortcutsProvider {
             shortTitle: "Open Collection",
             systemImageName: "folder"
         )
+        // DUT-1015 - the shopping list as its own Siri target.
+        AppShortcut(
+            intent: ReadShoppingListIntent(),
+            phrases: [
+                "What's on my shopping list in \(.applicationName)",
+                "Read my shopping list in \(.applicationName)",
+                "What's left on my \(.applicationName) list",
+            ],
+            shortTitle: "Read Shopping List",
+            systemImageName: "cart"
+        )
+        AppShortcut(
+            intent: AddShoppingListItemIntent(),
+            phrases: [
+                "Add an item to my shopping list in \(.applicationName)",
+                "Add to my \(.applicationName) list",
+            ],
+            shortTitle: "Add List Item",
+            systemImageName: "cart.badge.plus"
+        )
         // Voice Mode hands-free commands (US-40 / AC-40.5, CL-83). The
         // AppIntents metadata processor requires **every** utterance to contain
         // `\(.applicationName)` (not just phrases that interpolate a
@@ -204,6 +224,7 @@ struct DODShortcuts: AppShortcutsProvider {
         // `CookModeCommandOption` case titles + synonyms expand this phrase into
         // the same utterances the five separate shortcuts had ("Next step in",
         // "Go back in", "Say that again in", "Pause in", "Continue reading in").
+        // The list is at the cap; adding a shortcut means removing one.
         AppShortcut(
             intent: CookModeCommandIntent(),
             phrases: [

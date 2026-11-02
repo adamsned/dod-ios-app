@@ -227,6 +227,60 @@ struct ContentStateEquatableHashableTests {
     }
 }
 
+// MARK: - ContentState coachNudge (DUT-967)
+
+/// L1 tests for the new `coachNudge` field on ``CookActivityAttributes/ContentState``.
+@Suite("ContentState coachNudge (DUT-967)")
+struct ContentStateCoachNudgeTests {
+
+    @Test("roundTripsCoachNudge")
+    func roundTripsCoachNudge() throws {
+        let original = CookActivityAttributes.ContentState(
+            remainingSeconds: 120,
+            stepText: "Sear",
+            isPaused: false,
+            endDate: nil,
+            isCompleted: false,
+            coachNudge: "You're doing great"
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(
+            CookActivityAttributes.ContentState.self,
+            from: data
+        )
+        #expect(decoded == original)
+    }
+
+    @Test("omittedCoachNudgeDecodesNil")
+    func omittedCoachNudgeDecodesNil() throws {
+        // Pre-DUT-967 payload: no coachNudge key → must decode with coachNudge == nil.
+        let json = "{\"remainingSeconds\":120,\"stepText\":\"Sear\",\"isPaused\":false}"
+        let decoded = try JSONDecoder().decode(
+            CookActivityAttributes.ContentState.self,
+            from: Data(json.utf8)
+        )
+        #expect(decoded.coachNudge == nil)
+    }
+}
+
+// MARK: - CookActivityIslandLayout
+
+/// L1 tests for the Dynamic Island layout helpers.
+@Suite("CookActivityIslandLayout")
+struct CookActivityIslandLayoutTests {
+    @Test func limitedWidthPicksLandscape() {
+        #expect(cookActivityIslandLayout(isLimitedInWidth: true) == .landscape)
+    }
+    @Test func normalWidthPicksStandard() {
+        #expect(cookActivityIslandLayout(isLimitedInWidth: false) == .standard)
+    }
+    @Test func statusLabelPrecedence() {
+        #expect(cookActivityStatusLabel(isCompleted: true, isPaused: true) == "Done")
+        #expect(cookActivityStatusLabel(isCompleted: false, isPaused: true) == "Paused")
+        #expect(cookActivityStatusLabel(isCompleted: false, isPaused: false) == nil)
+    }
+}
+
 // MARK: - CookActivityAttributes Equatable
 
 /// L1 tests for the synthesized ``Equatable`` conformance on
@@ -246,5 +300,20 @@ struct CookActivityAttributesEquatableTests {
         let lhs = CookActivityAttributes(recipeTitle: "Chili", recipeID: 7, totalSeconds: 3600)
         let rhs = CookActivityAttributes(recipeTitle: "Chili", recipeID: 8, totalSeconds: 3600)
         #expect(lhs != rhs)
+    }
+}
+
+// MARK: - CookActivityLandscapeExpandedView
+
+/// L1 tests for the new landscape-expanded Dynamic Island view.
+@Suite("CookActivityLandscapeExpandedView")
+struct CookActivityLandscapeExpandedViewTests {
+    @Test func completedShowsDone() {
+        let view = CookActivityLandscapeExpandedView(remainingSeconds: 0, isPaused: true, isCompleted: true)
+        #expect(view.statusLabel == "Done")
+    }
+    @Test func runningHasNoStatus() {
+        let view = CookActivityLandscapeExpandedView(remainingSeconds: 90)
+        #expect(view.statusLabel == nil)
     }
 }

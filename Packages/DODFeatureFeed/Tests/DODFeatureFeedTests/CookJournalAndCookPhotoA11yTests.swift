@@ -114,4 +114,74 @@ struct CookJournalAndCookPhotoA11yTests {
         )
         #expect(text == "4,7")
     }
+
+    // MARK: - DUT-966 — Share Your Win button
+
+    @Test func journalEntryViewInitializesWithNilShareItem() {
+        let entry = CookLogEntry(
+            id: UUID(),
+            recipeID: 12345,
+            recipeTitle: "Test Recipe",
+            cookedAt: Date(),
+            note: "This is a test note.",
+            personalRating: 5,
+            photoLocalID: nil
+        )
+        let view = CookJournalEntryView(entry: entry, onSave: { _ in })
+        // Test that the view builds successfully and shareItem is initially nil
+        _ = view.body
+        #expect(view.shareItem == nil)
+    }
+
+    // MARK: - DUT-976 — recap entry point
+
+    @Test func recapGroupsOnlyIncludesMultiDishDays() {
+        let now = Date()
+        let earlier = now.addingTimeInterval(-3 * 24 * 60 * 60)
+        let entries = [
+            CookLogEntry(
+                id: UUID(),
+                recipeID: 1,
+                recipeTitle: "A",
+                cookedAt: now,
+                note: "",
+                personalRating: 5,
+                photoLocalID: nil
+            ),
+            CookLogEntry(
+                id: UUID(),
+                recipeID: 2,
+                recipeTitle: "B",
+                cookedAt: now,
+                note: "",
+                personalRating: 4,
+                photoLocalID: nil
+            ),
+            CookLogEntry(
+                id: UUID(),
+                recipeID: 3,
+                recipeTitle: "C",
+                cookedAt: earlier,
+                note: "",
+                personalRating: 3,
+                photoLocalID: nil
+            ),
+        ]
+        let groups = CookJournalView.recapGroups(entries)
+        #expect(groups.count == 1)
+        #expect(groups.first?.dishCount == 2)
+    }
+
+    @Test func recapGroupsEmptyForSingleDishHistory() {
+        let entry = CookLogEntry(
+            id: UUID(),
+            recipeID: 1,
+            recipeTitle: "A",
+            cookedAt: Date(),
+            note: "",
+            personalRating: 5,
+            photoLocalID: nil
+        )
+        #expect(CookJournalView.recapGroups([entry]).isEmpty)
+    }
 }

@@ -44,6 +44,14 @@ final class NotificationCoordinatorRoutingTests: XCTestCase {
         )
     }
 
+    // DUT-2039 — the streak-nudge notification carries `dod://feed`.
+    func testStreakNudgeFeedLinkIsRoutable() {
+        XCTAssertEqual(
+            NotificationCoordinator.intent(fromDeepLink: "dod://feed"),
+            .openFeed
+        )
+    }
+
     func testMalformedDeepLinkReturnsNil() {
         XCTAssertNil(NotificationCoordinator.intent(fromDeepLink: "dod://article/abc"))
         XCTAssertNil(NotificationCoordinator.intent(fromDeepLink: "https://example.com/1"))
