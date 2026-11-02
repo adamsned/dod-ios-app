@@ -270,6 +270,8 @@ struct RootView: View {
         // sidebar row both flip `showSettingsSheet`. Content in
         // `RootView+Settings.swift` (file_length split, DUT-941).
         .sheet(isPresented: $showSettingsSheet) { settingsSheet }
+        // DUT-174 — post-update "What's New" sheet, once per version (`RootView+WhatsNew.swift`).
+        .whatsNewOnUpdate()
         .modifier(ShakeToReport(currentScreen: selectedTab.shakeScreenID))
         // DUT-549 — transient "couldn't open that recipe" toast for a failed
         // deep-link resolve (modifier + copy in `RootView+LinkRouting.swift`).
