@@ -1,3 +1,4 @@
+import AudioToolbox
 import Combine
 import DODDesignSystem
 import DODDomain
@@ -241,6 +242,7 @@ public struct CookModeView: View {
                 )
             }
         }
+        .overlay(alignment: .bottom) { autoAdvanceBanner }  // DUT-173
         .sheet(isPresented: $ingredientsDrawerVisible) {
             ingredientsDrawer
                 .presentationDetents([.medium, .large])
@@ -297,6 +299,7 @@ public struct CookModeView: View {
         // DUT-401 — announce timer completion (skip the initial 0 so mounting is silent).
         .onChange(of: viewModel.timerCompletionTick) { _, tick in
             if tick > 0 { announce("Timer complete.") }
+            if tick > 0, autoAdvanceOnTimer { AudioServicesPlaySystemSound(1007) }
         }
         // DUT-401 — announce the new step so VoiceOver users aren't left hunting for it.
         .onChange(of: viewModel.currentStepIndex) { _, _ in announceCurrentStep() }
