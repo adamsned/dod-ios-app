@@ -47,6 +47,13 @@ import Testing
 
         view.handleLoadStateChange(.ready)
 
+        // DUT-985 — requestCookMode() is now async, so we need to await the state change
+        // Poll for isCookModePresented to become true (as done in other nearby tests)
+        let startTime = Date()
+        while !fired && Date().timeIntervalSince(startTime) < 5 {
+            try? await Task.sleep(nanoseconds: 10_000_000)  // 10ms sleep
+        }
+
         #expect(fired, "the host must be told the instant Cook Mode auto-presents")
     }
 
