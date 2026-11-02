@@ -23,6 +23,11 @@ extension RecipeDetailView {
                 onLogCook: { entry in
                     Task { await viewModel.logCook(entry) }
                 },
+                // DUT-981 — post a guest's in-person praise as a public recipe
+                // comment/review (host identity, guest attributed in the body).
+                onPostGuestReaction: { quote, guest, rating in
+                    await viewModel.submitGuestReaction(quote: quote, guestName: guest, rating: rating)
+                },
                 // T-912 / DUT-551 — forward the Heat Coach sheet builder so a
                 // heat-related Cook Mode step can present Heat Coach OVER the
                 // cover (a tab switch would be invisible under the full-screen
