@@ -37,15 +37,14 @@ public struct RecipeDetailView: View {
     /// `.sensoryFeedback` trigger, bumped in the ShareLink tap gesture (see
     /// `RecipeDetailView+Toolbar.swift`). `internal` so the extension bumps it.
     @State var shareTapCount: Int = 0
-    // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
-    // extension's relocated Cook Mode CTA tap can present the cover (DUT-631).
+    // `internal` so `+Sections.swift`'s Cook Mode CTA can present the cover (DUT-631).
     @State var isCookModePresented: Bool = false
+    @State var isGearCheckPresented: Bool = false  // DUT-984 gear checklist before Cook Mode
     /// True when the screen was entered via the StartCookModeIntent deep
     /// link (US-10). We watch the load state and flip the cover open as
     /// soon as the recipe has instructions to render. Resets to false
     /// after firing so a manual exit + re-entry behaves normally.
-    /// `internal` (not `private`) so `RecipeDetailView+LoadStateChange.swift`
-    /// (split out for the file-length cap, DUT-1240) can consume it.
+    /// `internal` so `RecipeDetailView+LoadStateChange.swift` (DUT-1240) can consume it.
     @State var pendingAutoCookMode: Bool
     /// DUT-47 (temperature half) — the user's recipe-step temperature unit
     /// preference, read from the same `UserDefaults` key Settings writes
@@ -175,10 +174,8 @@ public struct RecipeDetailView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         #endif
         .toolbar { toolbarItems }
-        // Note: T-302 originally added a sticky `RecipeDetailFloatingActions`
-        // overlay anchored to `.bottomTrailing` here. Removed by T-410 /
-        // CL-42 — the nav-bar Save + Share (AC-4.7 + AC-4.8) are the
-        // single in-recipe affordance for both actions. See US-26 / AC-26.1.
+        // T-302's sticky `RecipeDetailFloatingActions` overlay was removed by T-410 / CL-42;
+        // nav-bar Save + Share are the single in-recipe affordance (US-26 / AC-26.1).
         // Toolbar haptics: Save + Download success ticks; Share light tick (DUT).
         .sensoryFeedback(.success, trigger: viewModel.isSaved)
         .sensoryFeedback(.success, trigger: viewModel.isDownloaded)
@@ -193,11 +190,18 @@ public struct RecipeDetailView: View {
             cookModeCover
         }
         #endif
-        // DUT-535 — the ingredient-selection sheet. Presented when the toolbar
-        // `cart.badge.plus` is tapped (see `RecipeDetailView+Toolbar.swift`),
-        // built by the App-injected `addToShoppingListSheet` closure (the sheet
-        // type lives in `DODFeatureSaved`). On the sheet's "Add N items" the
-        // completion routes the result to the view model for the Snackbar.
+        .sheet(isPresented: $isGearCheckPresented) {
+            GearReadyCheckView(
+                equipment: viewModel.recipe?.equipment ?? [],
+                onStart: {
+                    isGearCheckPresented = false
+                    isCookModePresented = true
+                },
+                onCancel: { isGearCheckPresented = false }
+            )
+        }
+        // DUT-535 — ingredient-selection sheet, opened from the toolbar `cart.badge.plus`
+        // (see +Toolbar); built by the App-injected `addToShoppingListSheet` closure.
         .sheet(item: $recipeForShoppingListSheet) { wrapper in
             addToShoppingListSheet?(wrapper.recipe) { result in
                 viewModel.showAddToShoppingListSnackbar(for: result)
