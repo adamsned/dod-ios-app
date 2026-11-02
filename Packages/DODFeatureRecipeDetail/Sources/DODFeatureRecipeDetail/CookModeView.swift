@@ -110,6 +110,10 @@ public struct CookModeView: View {
     @AppStorage(CookModeControlsAutoMinimize.preferenceKey)
     var autoMinimizeSeconds: Int = CookModeControlsAutoMinimize.defaultSeconds
 
+    /// DUT-173 — opt-in auto-advance when a step timer finishes.
+    @AppStorage(CookModeAutoAdvance.preferenceKey)
+    var autoAdvanceOnTimer: Bool = CookModeAutoAdvance.defaultEnabled
+
     /// DUT-596 — whether the player control panel is currently expanded. Flips to
     /// `false` after `autoMinimizeSeconds` of no interaction (never while
     /// finished); ANY interaction restores it via ``wakeControls()``. `internal`
@@ -279,6 +283,7 @@ public struct CookModeView: View {
             viewModel.beginCookMode()
             // DUT-596 — start visible, then arm the idle-minimize timer.
             wakeControls()
+            viewModel.autoAdvanceEnabled = autoAdvanceOnTimer
         }
         .onReceive(timerTicker) { _ in viewModel.tickTimers() }
         .sensoryFeedback(.success, trigger: viewModel.timerCompletionTick)
@@ -295,6 +300,7 @@ public struct CookModeView: View {
         }
         // DUT-401 — announce the new step so VoiceOver users aren't left hunting for it.
         .onChange(of: viewModel.currentStepIndex) { _, _ in announceCurrentStep() }
+        .onChange(of: autoAdvanceOnTimer) { _, new in viewModel.autoAdvanceEnabled = new }
         .onChange(of: viewModel.isFinished) { _, _ in
             announceCurrentStep()
             // DUT-596 — the Done card must stay fully visible: expand and keep
