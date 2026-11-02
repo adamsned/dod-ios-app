@@ -32,4 +32,38 @@ struct EquipmentTests {
     @Test func emptyNameIsKept() {
         #expect(Equipment(name: "").name.isEmpty)
     }
+
+    @Test func equalWhenAllFieldsIncludingIDMatch() throws {
+        let id = try #require(UUID(uuidString: "22222222-2222-2222-2222-222222222222"))
+        let first = Equipment(id: id, name: "Tongs")
+        let second = Equipment(id: id, name: "Tongs")
+        #expect(first == second)
+    }
+
+    @Test func notEqualWhenOnlyTheIDDiffers() {
+        #expect(Equipment(name: "Tongs") != Equipment(name: "Tongs"))
+    }
+
+    @Test func notEqualWhenTheLinkDiffers() throws {
+        let id = try #require(UUID(uuidString: "33333333-3333-3333-3333-333333333333"))
+        let link = try #require(URL(string: "https://example.com/a"))
+        #expect(Equipment(id: id, name: "X") != Equipment(id: id, name: "X", link: link))
+    }
+
+    @Test func identifiableIDIsTheUUID() {
+        let item = Equipment(name: "Trivet")
+        #expect(item.id == item.id)
+        let identified: any Identifiable = item
+        #expect(identified.id as? UUID == item.id)
+    }
+
+    @Test func setDeduplicatesIdenticalValues() throws {
+        let id = try #require(UUID(uuidString: "44444444-4444-4444-4444-444444444444"))
+        let set: Set<Equipment> = [
+            Equipment(id: id, name: "Trivet"),
+            Equipment(id: id, name: "Trivet"),
+            Equipment(name: "Trivet"),
+        ]
+        #expect(set.count == 2)
+    }
 }
