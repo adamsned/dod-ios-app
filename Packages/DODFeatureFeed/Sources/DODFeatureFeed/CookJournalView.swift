@@ -25,14 +25,20 @@ public struct CookJournalView: View {
     /// "deleted" entry silently reappearing on reload. Defaults to a success no-op
     /// so previews / tests that only pass `load` keep compiling.
     private let delete: (CookLogEntry) async -> Bool
+    /// DUT-199 — clear the whole journal (cooks + photos); returns success. `nil`
+    /// (the default) hides the Clear History action, so call sites that don't wire
+    /// it keep their old behaviour.
+    private let clearAll: (() async -> Bool)?
     /// DUT-588 — off-main, downsampled, id-cached thumbnail loader. Replaces the
     /// old synchronous full-res `photoStore.data(forID:)` + `UIImage(data:)`
     /// decode that ran per row in the view body.
     @State private var thumbnails = CookThumbnailLoader()
-    @State private var cooks: [CookLogEntry] = []
+    @State var cooks: [CookLogEntry] = []
     @State private var loaded = false
     /// DUT-514 — the entry the user is confirming a delete for (drives the alert).
     @State private var pendingDelete: CookLogEntry?
+    /// DUT-199 — drives the "Clear All Logged Cooks?" confirmation alert.
+    @State private var confirmingClear = false
     /// DUT-694 (PR-D) — a failed delete/edit surfaces here (was swallowed by a
     /// `try?` in the view-model). Drives a failure alert mirroring the DUT-340
     /// photo-save alert in ``CookJournalEntryView``, so the user learns why the
@@ -72,11 +78,18 @@ public struct CookJournalView: View {
     /// assertable in tests without rendering the view.
     static let photoThumbnailAccessibilityLabel = "Photo of this cook"
 
+    /// DUT-199 — Clear History copy, static so tests can assert it.
+    static let clearHistoryTitle = "Clear All Logged Cooks?"
+    static let clearHistoryMessage =
+        "This removes every logged cook and its photo from your journal. This can't be undone."
+
     public init(
         load: @escaping () async -> [CookLogEntry],
         update: @escaping (CookLogEntry) async -> Bool = { _ in true },
-        delete: @escaping (CookLogEntry) async -> Bool = { _ in true }
+        delete: @escaping (CookLogEntry) async -> Bool = { _ in true },
+        clearAll: (() async -> Bool)? = nil
     ) {
+        self.clearAll = clearAll
         self.load = load
         self.update = update
         self.delete = delete
@@ -104,6 +117,12 @@ public struct CookJournalView: View {
             .background(DODColor.surface)
             .navigationTitle("Cooking Journal")
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if clearAll != nil && !cooks.isEmpty {
+                        Button("Clear History", role: .destructive) { confirmingClear = true }
+                            .accessibilityIdentifier("journal-clear-history")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .tint(DODColor.burntOrange)
@@ -125,6 +144,14 @@ public struct CookJournalView: View {
                 Button("Cancel", role: .cancel) {}
             } message: { entry in
                 Text("This removes \"\(entry.recipeTitle)\" and its photo from your journal. This can't be undone.")
+            }
+            .alert(Self.clearHistoryTitle, isPresented: $confirmingClear) {
+                Button("Clear History", role: .destructive) {
+                    Task { await performClear() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(Self.clearHistoryMessage)
             }
             // DUT-694 (PR-D) — surface a swallowed delete/edit failure (mirrors the
             // DUT-340 photo-save alert in CookJournalEntryView) so the reload's
@@ -178,6 +205,11 @@ public struct CookJournalView: View {
 // `private` state (`cooks`, `thumbnails`) stays reachable.
 extension CookJournalView {
 
+    /// DUT-976 — cookouts (same-day groups of 2+ dishes) shown as recap rows, newest first.
+    static func recapGroups(_ cooks: [CookLogEntry]) -> [CookoutGroup] {
+        CookLogStats.cookouts(cooks)
+    }
+
     private var emptyState: some View {
         VStack(spacing: DODSpacing.md) {
             Image(systemName: "book.closed")
@@ -196,6 +228,20 @@ extension CookJournalView {
         .padding(DODSpacing.xl)
     }
 
+    /// DUT-199 — run the clear, then reload. Reloading yields `[]`, which flips the
+    /// view to the empty state; `.onChange(of: cooks)` recomputes the stats header.
+    fileprivate func performClear() async {
+        guard let clearAll else { return }
+        let didClear = await clearAll()
+        cooks = await load()
+        if !didClear {
+            actionError = JournalActionError(
+                title: "Couldn't Clear History",
+                message: "We couldn't clear your journal. Please try again."
+            )
+        }
+    }
+
     private var journalList: some View {
         ScrollView {
             // DUT-588 — LazyVStack so off-screen rows aren't built (and their
@@ -209,6 +255,7 @@ extension CookJournalView {
                 // last 30 days), derived from the same `stats` (recomputed in
                 // `.onChange(of: cooks)`) the header above already reads.
                 statsSummaryCard(stats: stats)
+                cookoutRecapRows
                 ForEach(cooks) { cook in
                     // CL-273 — tap an entry to open its personal page (write a
                     // reflection, add a photo). Reload after a save so the row
@@ -250,53 +297,6 @@ extension CookJournalView {
             }
             .padding(DODSpacing.md)
         }
-    }
-
-    /// Transformation header (North Star): the cook's identity rank + the next
-    /// rung pulling them forward, so the journal opens with how far they've come,
-    /// not just a count. Only rendered with >= 1 cook (journalList is gated on a
-    /// non-empty list), so `currentRank` is non-nil — the fallbacks are defensive.
-    private var journeyHeader: some View {
-        // DUT-685 — the RANK must count the SAME path-only population the rank-up
-        // celebration counts (journal minus off-path dump cakes), not the raw
-        // `totalCooks`. Both now go through `CookLogStats.rankLadderCookCount`, so
-        // the visible rank and the next celebration can never contradict. The
-        // "total cooks" stat tile in `statsHeader` still uses `totalCooks`.
-        let rankCooks = CookLogStats.rankLadderCookCount(cooks)
-        let current = CookProgression.currentRank(totalCooks: rankCooks)
-        let next = CookProgression.nextRank(totalCooks: rankCooks)
-        let toNext = CookProgression.cooksToNextRank(totalCooks: rankCooks)
-        let progress = CookProgression.progressToNextRank(totalCooks: rankCooks)
-        return VStack(spacing: DODSpacing.xs) {
-            Text(current?.emoji ?? "🔥")
-                .font(.system(size: 44))
-                .accessibilityHidden(true)
-            Text("You're a \(current?.title ?? "Fire Starter")")
-                .dodFont(DODType.heading)
-                .foregroundStyle(DODColor.label)
-                .multilineTextAlignment(.center)
-            if let next, let toNext {
-                ProgressView(value: progress)
-                    .tint(DODColor.burntOrange)
-                    .padding(.horizontal, DODSpacing.md)
-                Text("\(toNext) more cook\(toNext == 1 ? "" : "s") to \(next.emoji) \(next.title)")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
-                    .multilineTextAlignment(.center)
-            } else {
-                Text("Top of the path. You're a certified Cast Iron Legend. 🏆")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.burntOrange)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(DODSpacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
-                .fill(DODColor.surfaceElevated)
-        )
-        .accessibilityElement(children: .combine)
     }
 
     private var statsHeader: some View {

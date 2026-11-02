@@ -91,6 +91,11 @@ targets:
         # tag Dutch Oven Daddy. iOS requires this key — without it the app
         # crashes the instant the camera is accessed.
         NSCameraUsageDescription: Take a photo to share your cook or to get cooking help from Dutch Oven Daddy.
+        # ITMS-90683: Heat Coach weather uses Core Location and the thermometer
+        # probe uses Core Bluetooth. Without these, App Store Connect warns on
+        # every upload.
+        NSLocationWhenInUseUsageDescription: Dutch Oven Daddy uses your approximate location to fill in local weather conditions for the Heat Coach.
+        NSBluetoothAlwaysUsageDescription: Dutch Oven Daddy connects to your Bluetooth thermometer probe to show live temperatures while you cook.
         # DUT-23: app-identity key for anonymous comment POSTs. The app sends it
         # as the `X-DOD-App-Key` header so WordPress's
         # `rest_allow_anonymous_comments` filter accepts comment creation from
@@ -116,6 +121,12 @@ targets:
         # transport no-ops and sends NOTHING to Google.
         GA4MeasurementID: "$(GA4_MEASUREMENT_ID)"
         GA4APISecret: "$(GA4_API_SECRET)"
+        # DUT-1397: remote-push backend. Read by `PushConfig.load()`. Both come
+        # from build settings, blank in the committed App/DODApp.xcconfig (no
+        # secret in this public repo); blank = the push uploader is a logged
+        # no-op. CI injects them at archive time (release.yml).
+        DODPushBaseURL: "$(DOD_PUSH_BASE_URL)"
+        DODPushSharedSecret: "$(DOD_PUSH_APP_SECRET)"
         # Export-compliance self-classification. `false` declares the app
         # uses ONLY exempt encryption — i.e. TLS via URLSession, SHA-256
         # hashing via CryptoKit, Keychain via Security framework. Apple
@@ -196,6 +207,7 @@ targets:
         UIBackgroundModes:
           - remote-notification
           - fetch
+          - audio      # DUT-1961: Now Playing / CarPlay controls for recipe video audio keep working on lock (owner OK 2026-10-27)
         # DUT-938 — must list every identifier passed to
         # `BGTaskScheduler.shared.register(forTaskWithIdentifier:...)`
         # (App/DODApp.swift `AppDelegate`) or registration is refused at
@@ -307,6 +319,8 @@ targets:
     platform: iOS
     sources:
       - path: LiveActivity
+      # DUT-1534 — the Live Activity's buttons use the same intents as the app.
+      - path: Shared/CookActivityIntents.swift
     info:
       path: LiveActivity/Info.plist
       properties:

@@ -10,6 +10,22 @@ import Testing
         let decoded = try JSONDecoder().decode(Category.self, from: data)
         #expect(decoded == original)
     }
+
+    @Test func categoryDecodesLegacyJSONWithoutDescription() throws {
+        let json = """
+            {"id":1,"name":"A","slug":"a","count":2}
+            """
+        let data = Data(json.utf8)
+        let category = try JSONDecoder().decode(Category.self, from: data)
+        #expect(category.description.isEmpty)
+    }
+
+    @Test func categoryRoundTripKeepsDescription() throws {
+        let original = Category(id: 1, name: "A", slug: "a", count: 2, description: "Hi")
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Category.self, from: data)
+        #expect(decoded == original)
+    }
 }
 
 @Suite("RecipeIngredient value type") struct RecipeIngredientTests {
@@ -42,6 +58,27 @@ import Testing
     @Test func stepNumberIsPreserved() {
         let step = RecipeInstruction(step: 3, text: "Stir vigorously.")
         #expect(step.step == 3)
+    }
+
+    @Test func stageDefaultsToNil() {
+        let instruction = RecipeInstruction(step: 1, text: "x")
+        #expect(instruction.stage == nil)
+    }
+
+    @Test func stageRoundTripsThroughCodable() throws {
+        let original = RecipeInstruction(step: 1, text: "x", stage: .kitchenPrep)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(RecipeInstruction.self, from: data)
+        #expect(decoded.stage == .kitchenPrep)
+    }
+
+    @Test func legacyPayloadWithoutStageDecodes() throws {
+        let json = """
+            {"id":"00000000-0000-0000-0000-000000000001","step":1,"text":"Stir"}
+            """
+        let data = Data(json.utf8)
+        let decoded = try JSONDecoder().decode(RecipeInstruction.self, from: data)
+        #expect(decoded.stage == nil)
     }
 }
 

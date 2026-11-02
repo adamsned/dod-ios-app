@@ -28,6 +28,14 @@ extension RecipeDetailViewModel {
         userServings = clampToRange(count)
     }
 
+    /// DUT-1016 - voice-driven scale. Same clamp as the stepper; returns the
+    /// count that was actually applied so the caller can speak it.
+    @discardableResult
+    public func scaleServings(to count: Int) -> Int {
+        setUserServings(count)
+        return userServings
+    }
+
     /// Sync ``userServings`` to source on the first `.ready` only (DUT-357) — a
     /// late refresh must not clobber the user's deliberate manual stepper choice.
     public func resetServingsToSourceIfFirstLoad() {

@@ -1,3 +1,4 @@
+import DODDomain
 import DODFeatureProfile
 import DODPersistence
 import DODSupport
@@ -40,6 +41,31 @@ struct SettingsViewModelStatsTests {
         let displayRank = CookProgression.currentRank(totalCooks: stats.rankLadderCooks)
         #expect(displayRank?.title == "Fire Starter")
         #expect(CookProgression.currentRank(totalCooks: stats.totalCooks)?.title == "Lid Lifter")
+    }
+
+    @Test func profileStatsTechniqueSummary() async throws {
+        let logs = [
+            CookLogEntry(id: UUID(), recipeID: 1, recipeTitle: "Seared Chicken", cookedAt: .now),
+            CookLogEntry(id: UUID(), recipeID: 2, recipeTitle: "Seared Chicken", cookedAt: .now),
+        ]
+        let deps = StatsSettingsDependencies(logs: logs)
+        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults(), dependencies: deps)
+
+        let stats = await viewModel.loadProfileStats()
+
+        #expect(stats.techniqueSummary == "You've now seared in cast iron.")
+    }
+
+    @Test func profileStatsTechniqueSummaryEmpty() async throws {
+        let logs = [
+            CookLogEntry(id: UUID(), recipeID: 1, recipeTitle: "Seared Chicken", cookedAt: .now)
+        ]
+        let deps = StatsSettingsDependencies(logs: logs)
+        let viewModel = SettingsViewModel(defaults: Self.isolatedDefaults(), dependencies: deps)
+
+        let stats = await viewModel.loadProfileStats()
+
+        #expect(stats.techniqueSummary == nil)
     }
 
     static func isolatedDefaults() -> UserDefaults {

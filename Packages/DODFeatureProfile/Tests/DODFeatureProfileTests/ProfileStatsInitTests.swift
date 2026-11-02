@@ -123,4 +123,27 @@ struct ProfileStatsInitTests {
         #expect(stats1 == stats2)
         #expect(stats1 != stats3)
     }
+
+    @Test func techniqueSummaryNilByDefault() {
+        let stats = ProfileStats(
+            totalCooks: 1,
+            weeklyStreak: 0,
+            savedRecipes: 0,
+            reviewsWritten: nil
+        )
+
+        #expect(stats.techniqueSummary == nil)
+    }
+
+    @Test func techniqueSummaryRoundTrips() {
+        let stats = ProfileStats(
+            totalCooks: 1,
+            weeklyStreak: 0,
+            savedRecipes: 0,
+            reviewsWritten: nil,
+            techniqueSummary: "x"
+        )
+
+        #expect(stats.techniqueSummary == "x")
+    }
 }

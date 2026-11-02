@@ -19,9 +19,10 @@ import Foundation
 /// - "Braise for 2½ hours" → 9000s (digit + attached Unicode vulgar
 ///   fraction, no space — the shape produced by decoding `&frac12;` right
 ///   after a digit)
+/// - "Rest half an hour" → 1800s
 ///
 /// Out of scope (returns `nil`):
-/// - Word numerals: "ten minutes", "half an hour"
+/// - Word numerals other than "half an hour": "ten minutes"
 /// - Time-of-day or temperatures: "350°F"
 /// - Bare numbers with no unit: "stir 3 times"
 public enum StepTimerParser {
@@ -104,6 +105,7 @@ public enum StepTimerParser {
     ) -> QuantityUnit? {
         var cursor = index
         while cursor < text.endIndex {
+            if let half = readHalfAnHour(in: text, from: cursor) { return half }
             if let quantity = readQuantity(in: text, from: cursor) {
                 let afterSpace = skipWhitespace(in: text, from: quantity.after)
                 if let unit = readUnit(in: text, from: afterSpace) {
@@ -317,5 +319,33 @@ public enum StepTimerParser {
             cursor = skipWhitespace(in: text, from: cursor)
         }
         return cursor
+    }
+}
+
+// MARK: - Word numerals (DUT-1869)
+
+extension StepTimerParser {
+
+    /// True when `index` starts a word (start of string or preceded by a non-letter).
+    private static func isWordStart(in text: String, at index: String.Index) -> Bool {
+        index == text.startIndex || !text[text.index(before: index)].isLetter
+    }
+
+    /// "half an hour" / "half a hour" → 0.5 hours.
+    private static func readHalfAnHour(in text: String, from index: String.Index) -> QuantityUnit? {
+        guard isWordStart(in: text, at: index) else { return nil }
+        let lower = String(text[index...]).lowercased()
+        for phrase in ["half an hour", "half a hour"] where lower.hasPrefix(phrase) {
+            let end = lower.index(lower.startIndex, offsetBy: phrase.count)
+            if end < lower.endIndex, lower[end].isLetter {
+                continue
+            }
+            return QuantityUnit(
+                quantity: 0.5,
+                unit: .hours,
+                afterIndex: text.index(index, offsetBy: phrase.count)
+            )
+        }
+        return nil
     }
 }

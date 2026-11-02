@@ -264,6 +264,7 @@ public struct SettingsView: View {
                 VoiceRows(viewModel: viewModel)
 
                 CookModeControlsPicker()  // DUT-596
+                CookModeAutoAdvanceToggle()  // DUT-173
             } header: {
                 sectionHeader("Customization")
             } footer: {
