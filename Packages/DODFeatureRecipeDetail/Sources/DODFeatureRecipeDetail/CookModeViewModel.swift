@@ -100,6 +100,8 @@ public final class CookModeViewModel {
     /// Bumped each time a step timer reaches zero so the view can fire the
     /// completion haptic (a changing value, not a Bool).
     public internal(set) var timerCompletionTick: Int = 0
+    public var autoAdvanceEnabled = false  // DUT-173: pref pushed in by the view; off by default
+    public internal(set) var pendingAutoAdvanceFromStep: Int?  // DUT-173: step advanced FROM while Undo shows
     /// Which step's timer is currently driving the Live Activity card (`nil` =
     /// none). Lets `reconcileLiveActivity` know when to (re)start vs update.
     var liveActivityStepKey: Int?
@@ -213,6 +215,7 @@ public final class CookModeViewModel {
         liveActivityStepKey = nil
         liveActivityShowingCompleted = false  // DUT-354
         liveActivityUnavailable = false  // DUT-558: a re-entry starts clean
+        pendingAutoAdvanceFromStep = nil  // DUT-173: no banner survives the session
         // AC-7.6 / AC-40.1 — stop any in-flight utterance and release the
         // ducked audio session so the user's music returns to full volume
         // the moment they leave Cook Mode. Bug fix: drop the DUT-390 session
@@ -376,8 +379,7 @@ public final class CookModeViewModel {
         voiceFollowStepChange()
     }
 
-    /// DUT-1392 — jump straight to a step (the tool dock's "timer running on
-    /// Step N" row). Leaves the Done state; the voice follows like Next / Back.
+    /// DUT-1392 — jump to a step (tool dock "timer running on Step N" row); leaves Done.
     public func goToStep(_ index: Int) {
         guard recipe.instructions.indices.contains(index) else { return }
         isFinished = false
@@ -388,11 +390,7 @@ public final class CookModeViewModel {
     // MARK: - Ingredient state
 
     public func toggleIngredient(_ id: UUID) {
-        if checkedIngredientIDs.contains(id) {
-            checkedIngredientIDs.remove(id)
-        } else {
-            checkedIngredientIDs.insert(id)
-        }
+        if !checkedIngredientIDs.insert(id).inserted { checkedIngredientIDs.remove(id) }
     }
 }
 
