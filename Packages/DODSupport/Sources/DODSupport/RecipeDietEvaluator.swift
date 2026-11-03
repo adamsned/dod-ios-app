@@ -37,4 +37,18 @@ public enum RecipeDietEvaluator {
     static func declaresLowSodium(_ declared: [String]) -> Bool {
         declared.contains { $0.contains("lowsalt") || $0.contains("lowsodium") }
     }
+
+    /// True when the profile selects patterns and every one is affirmed.
+    static func fitsPatterns(
+        _ patterns: Set<DietaryPattern>,
+        lines: [String],
+        declared: [String]
+    ) -> Bool {
+        guard !patterns.isEmpty else { return false }
+        return patterns.allSatisfy { pattern in
+            if pattern == .lowSodium { return declaresLowSodium(declared) }
+            if lines.isEmpty { return false }
+            return !matches(lines, anyOf: patternViolations[pattern] ?? [])
+        }
+    }
 }
