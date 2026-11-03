@@ -41,4 +41,13 @@ struct RecipeOfTheDayModelTests {
         await model.resolve(pool: [], lookup: { _ in [] })
         #expect(model.item == nil)
     }
+
+    @Test func pickIsStableAcrossResolvesEvenWhenPoolChanges() async {
+        let model = Self.makeModel(defaults: Self.freshDefaults())
+        await model.resolve(pool: Self.items(1...10), lookup: { _ in [] })
+        let firstID = model.item?.id
+        #expect(firstID != nil)
+        await model.resolve(pool: Self.items(11...20), lookup: { _ in [] })
+        #expect(model.item?.id == firstID)
+    }
 }
