@@ -74,4 +74,16 @@ public enum RecipeDietEvaluator {
             isIncomplete: incomplete
         )
     }
+
+    /// Filter used by the opt-in toggle. An empty profile or a disabled toggle returns the input unchanged.
+    /// Recipes with allergen hits are dropped. Recipes with incomplete data are dropped when allergens are flagged.
+    public static func filter(_ recipes: [Recipe], profile: DietaryProfile) -> [Recipe] {
+        guard profile.onlyShowFitting, !profile.isEmpty else { return recipes }
+        return recipes.filter { recipe in
+            let result = evaluate(recipe, against: profile)
+            if !result.allergenHits.isEmpty { return false }
+            if !profile.allergens.isEmpty && result.isIncomplete { return false }
+            return profile.patterns.isEmpty || result.fitsDiet
+        }
+    }
 }
