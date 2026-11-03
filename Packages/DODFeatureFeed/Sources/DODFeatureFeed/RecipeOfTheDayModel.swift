@@ -47,5 +47,11 @@ public final class RecipeOfTheDayModel {
             }
             return  // a pick already exists for today: never re-pick
         }
+        guard let pick = RecipeOfTheDayPicker.pick(from: pool, dayKey: key, excluding: store.recentIDs()) else {
+            item = nil
+            return
+        }
+        store.record(id: pick.id, dayKey: key)
+        item = pick
     }
 }
