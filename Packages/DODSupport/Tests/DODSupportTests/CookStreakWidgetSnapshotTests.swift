@@ -43,4 +43,11 @@ import Testing
         let result = CookStreakStats.streak(days: days, now: Self.date(4), calendar: cal)
         #expect(result == 1)
     }
+
+    @Test func weekDotsMarkOnlyCookedDays() {
+        let cal = Self.calendar
+        let days = Set([2, 4].map { cal.startOfDay(for: Self.date($0)) })
+        let dots = CookStreakStats.weekDots(days: days, now: Self.date(4), calendar: cal)
+        #expect(dots == [false, true, false, true, false, false, false])
+    }
 }

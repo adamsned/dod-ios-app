@@ -29,6 +29,17 @@ public struct CookStreakStats: Equatable, Sendable {
         return count
     }
 
+    /// Seven flags, first weekday of `calendar` first; true where that day has a cook.
+    static func weekDots(days: Set<Date>, now: Date, calendar: Calendar) -> [Bool] {
+        guard let week = calendar.dateInterval(of: .weekOfYear, for: now) else {
+            return Array(repeating: false, count: 7)
+        }
+        return (0..<7).map { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: week.start) else { return false }
+            return days.contains(calendar.startOfDay(for: day))
+        }
+    }
+
     public static let empty = CookStreakStats(
         streakDays: 0,
         weekDots: Array(repeating: false, count: 7),
