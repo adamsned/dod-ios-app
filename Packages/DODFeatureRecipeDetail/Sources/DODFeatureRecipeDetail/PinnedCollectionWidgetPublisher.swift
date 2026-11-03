@@ -20,4 +20,23 @@ public struct PinnedCollectionWidgetPublisher: Sendable {
         self.widgetStore = widgetStore
         self.reload = reload
     }
+
+    static func toSnapshotCollection(
+        _ collection: RecipeCollection,
+        recipes: [Recipe]
+    ) -> PinnedCollectionsWidgetSnapshot.Collection {
+        let top = recipes.prefix(PinnedCollectionsWidgetSnapshotConfig.maxRecipesPerCollection).map {
+            PinnedCollectionsWidgetSnapshot.Recipe(
+                recipeID: $0.id,
+                title: $0.title,
+                heroImageFilename: $0.heroImage.map { WidgetImageBridge.filename(for: $0) }
+            )
+        }
+        return .init(
+            id: collection.id,
+            name: collection.name,
+            totalCount: recipes.count,
+            recipes: Array(top)
+        )
+    }
 }
