@@ -1,3 +1,5 @@
+import DODDomain
+
 public struct DietEvaluation: Sendable, Equatable {
     /// Flagged allergens found in the ingredient text.
     public let allergenHits: Set<Allergen>
@@ -59,5 +61,17 @@ public enum RecipeDietEvaluator {
             if lines.isEmpty { return false }
             return !matches(lines, anyOf: patternViolations[pattern] ?? [])
         }
+    }
+
+    public static func evaluate(_ recipe: Recipe, against profile: DietaryProfile) -> DietEvaluation {
+        let lines = recipe.ingredients.map { $0.text.lowercased() }
+        let declared = recipe.suitableForDiet.map { $0.lowercased() }
+        let incomplete = lines.isEmpty
+        let fits = fitsPatterns(profile.patterns, lines: lines, declared: declared)
+        return DietEvaluation(
+            allergenHits: allergenHits(in: lines, for: profile.allergens),
+            fitsDiet: fits && !incomplete,
+            isIncomplete: incomplete
+        )
     }
 }
