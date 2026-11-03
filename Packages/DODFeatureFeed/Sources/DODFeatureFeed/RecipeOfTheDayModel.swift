@@ -31,4 +31,21 @@ public final class RecipeOfTheDayModel {
     }
 
     private var todayKey: String { RecipeOfTheDayStore.dayKey(for: now()) }
+
+    /// Resolve today's recipe. `pool` is the feed's loaded (or cache-hydrated) items;
+    /// `lookup` fetches already-picked ids that aren't in `pool` (e.g. from the list cache).
+    public func resolve(
+        pool: [RecipeListItem],
+        lookup: ([Int]) async -> [RecipeListItem]
+    ) async {
+        let key = todayKey
+        if let id = store.pickedID(forDayKey: key) {
+            if let hit = pool.first(where: { $0.id == id }) {
+                item = hit
+            } else if let hit = await lookup([id]).first {
+                item = hit
+            }
+            return  // a pick already exists for today: never re-pick
+        }
+    }
 }
