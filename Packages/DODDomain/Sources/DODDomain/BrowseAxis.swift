@@ -38,4 +38,14 @@ public struct BrowseAxesConfig: Sendable, Equatable, Codable {
     public init(axes: [BrowseAxis]) {
         self.axes = axes
     }
+
+    /// Decodes remote-config JSON. Drops axes with no values and values with no tag ids.
+    public static func decode(from data: Data) throws -> BrowseAxesConfig {
+        let raw = try JSONDecoder().decode(BrowseAxesConfig.self, from: data)
+        let cleaned = raw.axes.compactMap { axis -> BrowseAxis? in
+            let values = axis.values.filter { !$0.tagIDs.isEmpty }
+            return values.isEmpty ? nil : BrowseAxis(slug: axis.slug, title: axis.title, values: values)
+        }
+        return BrowseAxesConfig(axes: cleaned)
+    }
 }
