@@ -37,4 +37,28 @@ public enum ShoppingListWidgetBridge {
         let checkedIDs: [UUID]
         let alreadyHaveIDs: [UUID]
     }
+
+    /// nil when no list is stored, it cannot be decoded, or it has no visible rows.
+    public static func read(defaults: UserDefaults) -> ShoppingListWidgetState? {
+        guard let data = defaults.data(forKey: storageKey),
+            let blob = try? JSONDecoder().decode(Blob.self, from: data)
+        else { return nil }
+        let hidden = Set(blob.alreadyHaveIDs)
+        let visible = blob.items.filter { !hidden.contains($0.id) }
+        guard !visible.isEmpty else { return nil }
+        let titles = Set(visible.map(\.recipeTitle))
+        var listName = "Shopping List"
+        if titles.count == 1, let only = titles.first { listName = only }
+        let checked = Set(blob.checkedIDs)
+        let unchecked =
+            visible
+            .filter { !checked.contains($0.id) }
+            .map { ShoppingListWidgetItem(id: $0.id, text: $0.ingredientText) }
+        return ShoppingListWidgetState(
+            listName: listName,
+            total: visible.count,
+            remaining: unchecked.count,
+            unchecked: unchecked
+        )
+    }
 }
