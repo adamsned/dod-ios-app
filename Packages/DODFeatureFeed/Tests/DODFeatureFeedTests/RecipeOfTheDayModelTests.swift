@@ -62,4 +62,19 @@ struct RecipeOfTheDayModelTests {
         await second.resolve(pool: [], lookup: { ids in ids.map(Self.makeItem) })
         #expect(second.item?.id == firstID)
     }
+
+    @Test func nextDayPicksAgainAndAvoidsYesterday() async {
+        let defaults = Self.freshDefaults()
+        let day1 = Date(timeIntervalSince1970: 1_800_000_000)
+        let day2 = day1.addingTimeInterval(86_400)
+        let first = Self.makeModel(defaults: defaults, now: day1)
+        await first.resolve(pool: Self.items(1...3), lookup: { _ in [] })
+        let firstID = first.item?.id
+        #expect(firstID != nil)
+
+        let second = Self.makeModel(defaults: defaults, now: day2)
+        await second.resolve(pool: Self.items(1...3), lookup: { _ in [] })
+        #expect(second.item != nil)
+        #expect(second.item?.id != firstID)
+    }
 }
