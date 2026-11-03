@@ -14,6 +14,21 @@ public struct CookStreakStats: Equatable, Sendable {
         self.hasAnyCooks = hasAnyCooks
     }
 
+    /// Consecutive cooked days ending today, or yesterday if today has no cook yet.
+    static func streak(days: Set<Date>, now: Date, calendar: Calendar) -> Int {
+        var cursor = calendar.startOfDay(for: now)
+        if !days.contains(cursor), let prev = calendar.date(byAdding: .day, value: -1, to: cursor) {
+            cursor = prev
+        }
+        var count = 0
+        while days.contains(cursor) {
+            count += 1
+            guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+            cursor = prev
+        }
+        return count
+    }
+
     public static let empty = CookStreakStats(
         streakDays: 0,
         weekDots: Array(repeating: false, count: 7),

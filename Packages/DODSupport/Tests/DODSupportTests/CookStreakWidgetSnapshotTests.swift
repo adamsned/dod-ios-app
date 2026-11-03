@@ -22,4 +22,11 @@ import Testing
         #expect(CookStreakStats.empty.streakDays == 0)
         #expect(CookStreakStats.empty.hasAnyCooks == false)
     }
+
+    @Test func streakCountsConsecutiveDaysEndingToday() {
+        let cal = Self.calendar
+        let days = Set([2, 3, 4].map { cal.startOfDay(for: Self.date($0)) })
+        let result = CookStreakStats.streak(days: days, now: Self.date(4, hour: 20), calendar: cal)
+        #expect(result == 3)
+    }
 }
