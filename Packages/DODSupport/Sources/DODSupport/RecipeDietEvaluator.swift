@@ -27,4 +27,9 @@ public enum RecipeDietEvaluator {
     static func matches(_ lines: [String], anyOf words: [String]) -> Bool {
         lines.contains { line in words.contains { line.contains($0) } }
     }
+
+    /// The flagged allergens whose keywords appear in any ingredient line.
+    static func allergenHits(in lines: [String], for allergens: Set<Allergen>) -> Set<Allergen> {
+        allergens.filter { matches(lines, anyOf: allergenKeywords[$0] ?? []) }
+    }
 }
