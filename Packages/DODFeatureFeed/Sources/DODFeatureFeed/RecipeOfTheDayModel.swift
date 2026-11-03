@@ -62,4 +62,9 @@ public final class RecipeOfTheDayModel {
         impressionDayKey = key
         send(.recipeOfTheDayShown(recipeID: item.id))
     }
+
+    public func recordTap() {
+        guard let item else { return }
+        send(.recipeOfTheDayTapped(recipeID: item.id))
+    }
 }
