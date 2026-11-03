@@ -77,4 +77,18 @@ struct RecipeOfTheDayModelTests {
         #expect(second.item != nil)
         #expect(second.item?.id != firstID)
     }
+
+    @Test func impressionSendsOncePerDayAndTapSendsOnce() async {
+        let sent = RecipeOfTheDayEventBox()
+        let model = Self.makeModel(defaults: Self.freshDefaults(), sent: sent)
+        await model.resolve(pool: Self.items(1...10), lookup: { _ in [] })
+        guard let id = model.item?.id else {
+            Issue.record("expected a pick")
+            return
+        }
+        model.recordImpressionIfNeeded()
+        model.recordImpressionIfNeeded()
+        model.recordTap()
+        #expect(sent.events == [.recipeOfTheDayShown(recipeID: id), .recipeOfTheDayTapped(recipeID: id)])
+    }
 }
