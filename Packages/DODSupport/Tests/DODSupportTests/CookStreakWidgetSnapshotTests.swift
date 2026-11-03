@@ -50,4 +50,13 @@ import Testing
         let dots = CookStreakStats.weekDots(days: days, now: Self.date(4), calendar: cal)
         #expect(dots == [false, true, false, true, false, false, false])
     }
+
+    @Test func cooksThisWeekCountsEventsInWeekOnly() {
+        let oct28 =
+            Self.calendar.date(from: DateComponents(year: 2026, month: 10, day: 28, hour: 12))
+            ?? Date(timeIntervalSince1970: 0)
+        let dates = [Self.date(4, hour: 8), Self.date(4, hour: 19), oct28]
+        let count = CookStreakStats.cooksThisWeek(cookDates: dates, now: Self.date(4), calendar: Self.calendar)
+        #expect(count == 2)
+    }
 }

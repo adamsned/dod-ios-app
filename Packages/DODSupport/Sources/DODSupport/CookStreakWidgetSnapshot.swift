@@ -40,6 +40,12 @@ public struct CookStreakStats: Equatable, Sendable {
         }
     }
 
+    /// Total cook events inside the calendar week containing `now`.
+    static func cooksThisWeek(cookDates: [Date], now: Date, calendar: Calendar) -> Int {
+        guard let week = calendar.dateInterval(of: .weekOfYear, for: now) else { return 0 }
+        return cookDates.filter { week.contains($0) }.count
+    }
+
     public static let empty = CookStreakStats(
         streakDays: 0,
         weekDots: Array(repeating: false, count: 7),
