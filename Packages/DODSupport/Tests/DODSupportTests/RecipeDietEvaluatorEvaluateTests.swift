@@ -29,4 +29,31 @@ final class RecipeDietEvaluatorEvaluateTests: XCTestCase {
         let result = RecipeDietEvaluator.evaluate(makeRecipe(ingredients: ["1 tbsp BUTTER"]), against: profile)
         XCTAssertEqual(result.allergenHits, [.dairy])
     }
+
+    func testVeganFitsWhenNoViolatingIngredient() {
+        let result = RecipeDietEvaluator.evaluate(
+            makeRecipe(ingredients: ["1 cup rice", "2 carrots"]),
+            against: DietaryProfile(patterns: [.vegan])
+        )
+        XCTAssertTrue(result.fitsDiet)
+    }
+
+    func testVeganDoesNotFitWithButter() {
+        let result = RecipeDietEvaluator.evaluate(
+            makeRecipe(ingredients: ["1 cup rice", "2 tbsp Butter"]),
+            against: DietaryProfile(patterns: [.vegan])
+        )
+        XCTAssertFalse(result.fitsDiet)
+    }
+
+    func testLowSodiumNeedsDeclaredDiet() {
+        let profile = DietaryProfile(patterns: [.lowSodium])
+        let plain = RecipeDietEvaluator.evaluate(makeRecipe(ingredients: ["1 cup rice"]), against: profile)
+        let declared = RecipeDietEvaluator.evaluate(
+            makeRecipe(ingredients: ["1 cup rice"], diet: ["https://schema.org/LowSaltDiet"]),
+            against: profile
+        )
+        XCTAssertFalse(plain.fitsDiet)
+        XCTAssertTrue(declared.fitsDiet)
+    }
 }
