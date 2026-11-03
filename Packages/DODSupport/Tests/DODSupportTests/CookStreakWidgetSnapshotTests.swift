@@ -59,4 +59,19 @@ import Testing
         let count = CookStreakStats.cooksThisWeek(cookDates: dates, now: Self.date(4), calendar: Self.calendar)
         #expect(count == 2)
     }
+
+    @Test func emptyDatesGivesEmpty() {
+        let stats = CookStreakStats.compute(cookDates: [], now: Self.date(4), calendar: Self.calendar)
+        #expect(stats == .empty)
+    }
+
+    @Test func weekDotsAndCountMarkOnlyCookedDays() {
+        let dates = [Self.date(4, hour: 8), Self.date(4, hour: 19)]
+        let stats = CookStreakStats.compute(cookDates: dates, now: Self.date(4), calendar: Self.calendar)
+        #expect(stats.weekDots == [false, false, false, true, false, false, false])
+        #expect(stats.weekDots.filter { $0 }.count == 1)
+        #expect(stats.cooksThisWeek == 2)
+        #expect(stats.streakDays == 1)
+        #expect(stats.hasAnyCooks)
+    }
 }
