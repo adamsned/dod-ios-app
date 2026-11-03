@@ -21,6 +21,35 @@ public struct PinnedCollectionWidgetPublisher: Sendable {
         self.reload = reload
     }
 
+    public func publish() async {
+        guard let widgetStore else { return }
+        let collections: [RecipeCollection]
+        do {
+            collections = try await store.collections()
+        } catch {
+            DODLog.persistence.error(
+                "pinned-collection publish: read failed: \(String(describing: error))"
+            )
+            return
+        }
+        var out: [PinnedCollectionsWidgetSnapshot.Collection] = []
+        for collection in collections {
+            let recipes = (try? await store.recipes(inCollection: collection.id)) ?? []
+            out.append(Self.toSnapshotCollection(collection, recipes: recipes))
+        }
+        do {
+            try widgetStore.writePinnedCollections(
+                PinnedCollectionsWidgetSnapshot(writtenAt: Date(), collections: out)
+            )
+        } catch {
+            DODLog.app.error(
+                "pinned-collection snapshot write failed: \(String(describing: error))"
+            )
+            return
+        }
+        reload?()
+    }
+
     static func toSnapshotCollection(
         _ collection: RecipeCollection,
         recipes: [Recipe]
