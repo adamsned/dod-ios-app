@@ -54,4 +54,12 @@ public final class RecipeOfTheDayModel {
         store.record(id: pick.id, dayKey: key)
         item = pick
     }
+
+    /// Sends `recipeOfTheDayShown` at most once per calendar day per model instance.
+    public func recordImpressionIfNeeded() {
+        let key = todayKey
+        guard let item, impressionDayKey != key else { return }
+        impressionDayKey = key
+        send(.recipeOfTheDayShown(recipeID: item.id))
+    }
 }
