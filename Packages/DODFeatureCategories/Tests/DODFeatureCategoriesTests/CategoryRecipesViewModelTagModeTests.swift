@@ -38,3 +38,24 @@ final class TagModeFakeDependencies: CategoriesDependencies, @unchecked Sendable
         return ids.compactMap { byID[$0] }
     }
 }
+
+@MainActor
+@Suite("CategoryRecipesViewModel tag mode (DUT-166)") struct CategoryRecipesViewModelTagModeTests {
+
+    @Test func tagModeCallsTagFetch() async {
+        let fake = TagModeFakeDependencies()
+        fake.tagItems = [
+            CategoryRecipesViewModelTests.makeItem(1),
+            CategoryRecipesViewModelTests.makeItem(2),
+        ]
+        let category = DODDomain.Category(id: 0, name: "Dinner", slug: "dinner", count: 0)
+        let viewModel = CategoryRecipesViewModel(
+            category: category,
+            dependencies: fake
+        )
+        await viewModel.onAppear()
+        #expect(viewModel.items.count == 2)
+        #expect(fake.tagIDsRequested == [[12]])
+        #expect(fake.categoryIDsRequested.isEmpty)
+    }
+}
