@@ -56,4 +56,21 @@ final class RecipeDietEvaluatorEvaluateTests: XCTestCase {
         XCTAssertFalse(plain.fitsDiet)
         XCTAssertTrue(declared.fitsDiet)
     }
+
+    func testRecipeWithoutIngredientsIsIncompleteAndNeverFits() {
+        let profile = DietaryProfile(patterns: [.lowSodium], allergens: [.nuts])
+        let result = RecipeDietEvaluator.evaluate(
+            makeRecipe(ingredients: [], diet: ["LowSaltDiet"]),
+            against: profile
+        )
+        XCTAssertTrue(result.isIncomplete)
+        XCTAssertFalse(result.fitsDiet)
+        XCTAssertTrue(result.allergenHits.isEmpty)
+    }
+
+    func testAllPatternsMustBeAffirmed() {
+        let profile = DietaryProfile(patterns: [.vegetarian, .glutenFree])
+        let result = RecipeDietEvaluator.evaluate(makeRecipe(ingredients: ["2 cups flour"]), against: profile)
+        XCTAssertFalse(result.fitsDiet)
+    }
 }
