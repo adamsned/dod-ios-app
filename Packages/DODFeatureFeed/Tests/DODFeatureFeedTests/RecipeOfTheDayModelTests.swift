@@ -50,4 +50,16 @@ struct RecipeOfTheDayModelTests {
         await model.resolve(pool: Self.items(11...20), lookup: { _ in [] })
         #expect(model.item?.id == firstID)
     }
+
+    @Test func usesLookupWhenStoredPickIsNotInPool() async {
+        let defaults = Self.freshDefaults()
+        let first = Self.makeModel(defaults: defaults)
+        await first.resolve(pool: Self.items(1...10), lookup: { _ in [] })
+        let firstID = first.item?.id
+        #expect(firstID != nil)
+
+        let second = Self.makeModel(defaults: defaults)
+        await second.resolve(pool: [], lookup: { ids in ids.map(Self.makeItem) })
+        #expect(second.item?.id == firstID)
+    }
 }
