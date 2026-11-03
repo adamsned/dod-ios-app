@@ -32,4 +32,9 @@ public enum RecipeDietEvaluator {
     static func allergenHits(in lines: [String], for allergens: Set<Allergen>) -> Set<Allergen> {
         allergens.filter { matches(lines, anyOf: allergenKeywords[$0] ?? []) }
     }
+
+    /// `declared` is `Recipe.suitableForDiet` lowercased.
+    static func declaresLowSodium(_ declared: [String]) -> Bool {
+        declared.contains { $0.contains("lowsalt") || $0.contains("lowsodium") }
+    }
 }
