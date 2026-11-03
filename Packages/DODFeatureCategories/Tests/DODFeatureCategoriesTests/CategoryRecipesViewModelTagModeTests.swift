@@ -23,6 +23,14 @@ final class TagModeFakeDependencies: CategoriesDependencies, @unchecked Sendable
         return (categoryItems, 1)
     }
 
+    func fetchPosts(
+        tagIDs: [Int],
+        page: Int
+    ) async throws -> (items: [RecipeListItem], totalPages: Int) {
+        tagIDsRequested.append(tagIDs)
+        return (tagItems, 1)
+    }
+
     func cache(listItems: [RecipeListItem]) async throws {}
 
     func cachedListItems(forIDs ids: [Int]) async throws -> [RecipeListItem] {
