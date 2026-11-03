@@ -22,4 +22,9 @@ public enum RecipeDietEvaluator {
         .keto: ["sugar", "flour", "pasta", "rice", "potato", "bread"],
         .lowSodium: [],
     ]
+
+    /// True when any line contains any of the words (callers pass lowercased lines).
+    static func matches(_ lines: [String], anyOf words: [String]) -> Bool {
+        lines.contains { line in words.contains { line.contains($0) } }
+    }
 }
