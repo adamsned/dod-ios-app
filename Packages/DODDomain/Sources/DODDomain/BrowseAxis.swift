@@ -31,3 +31,11 @@ public struct BrowseAxis: Sendable, Hashable, Identifiable, Codable {
         self.values = values
     }
 }
+
+public struct BrowseAxesConfig: Sendable, Equatable, Codable {
+    public let axes: [BrowseAxis]
+
+    public init(axes: [BrowseAxis]) {
+        self.axes = axes
+    }
+}
