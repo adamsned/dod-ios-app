@@ -32,4 +32,11 @@ struct BrowseAxisTests {
         #expect(config.axes.map(\.slug) == ["course"])
         #expect(config.axes.first?.values.map(\.slug) == ["dinner"])
     }
+
+    @Test func malformedJSONThrows() {
+        let data = Data("{not json".utf8)
+        #expect(throws: (any Error).self) {
+            try BrowseAxesConfig.decode(from: data)
+        }
+    }
 }
