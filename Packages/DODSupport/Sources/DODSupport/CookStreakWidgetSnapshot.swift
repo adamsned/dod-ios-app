@@ -46,6 +46,22 @@ public struct CookStreakStats: Equatable, Sendable {
         return cookDates.filter { week.contains($0) }.count
     }
 
+    /// Compute stats from raw cook dates.
+    public static func compute(
+        cookDates: [Date],
+        now: Date,
+        calendar: Calendar = .current
+    ) -> CookStreakStats {
+        guard !cookDates.isEmpty else { return .empty }
+        let days = Set(cookDates.map { calendar.startOfDay(for: $0) })
+        return CookStreakStats(
+            streakDays: streak(days: days, now: now, calendar: calendar),
+            weekDots: weekDots(days: days, now: now, calendar: calendar),
+            cooksThisWeek: cooksThisWeek(cookDates: cookDates, now: now, calendar: calendar),
+            hasAnyCooks: true
+        )
+    }
+
     public static let empty = CookStreakStats(
         streakDays: 0,
         weekDots: Array(repeating: false, count: 7),
