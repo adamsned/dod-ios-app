@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 
 /// A deterministic ``DODIntelligenceService`` for L1 tests, SwiftUI previews,
@@ -20,6 +21,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedSubstitution: SubstitutionResult?
     private let cannedSummary: String?
     private let cannedAnswer: String?
+    private let cannedIntake: CookIntakeProfile?
     private let cannedDoneness: DonenessCheckResult?
     private let cannedExplanation: StepExplanation?
     private let cannedRecipeAnswer: String?
@@ -38,6 +40,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     the graceful no-result path.
     ///   - answer: What ``answer(_:)`` returns when available. `nil` models the
     ///     graceful no-result path.
+    ///   - intake: What `extractIntakeProfile(from:)` returns when available; nil models the skip path.
     ///   - doneness: What ``checkDoneness(photo:stepText:)`` returns when available. `nil` models
     ///     the graceful no-result path.
     ///   - recipeCard: What ``scanRecipeCard(imageData:)`` returns when available and image input is supported. `nil` models the graceful no-result path.
@@ -57,6 +60,12 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         substitution: SubstitutionResult? = .cannedButtermilkOptions,
         summary: String? = "A quick, weeknight-friendly cast-iron recipe with simple pantry ingredients.",
         answer: String? = "Warm the pan gradually, add a thin layer of oil, and wipe out any excess before cooking.",
+        intake: CookIntakeProfile? = CookIntakeProfile(
+            fearLevel: .nervous,
+            occasion: .weeknightDinner,
+            householdSize: 4,
+            biggestWorry: "ruining the seasoning"
+        ),
         doneness: DonenessCheckResult? = DonenessCheckResult(
             verdict: .looksDone,
             confidence: 0.9,
@@ -75,6 +84,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         self.cannedSubstitution = substitution
         self.cannedSummary = summary
         self.cannedAnswer = answer
+        self.cannedIntake = intake
         self.cannedDoneness = doneness
         self.cannedExplanation = explanation
         self.cannedRecipeAnswer = recipeAnswer
