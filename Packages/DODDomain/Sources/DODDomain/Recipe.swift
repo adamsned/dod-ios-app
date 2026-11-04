@@ -70,6 +70,8 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
     public let suitableForDiet: [String]
     /// Author name from JSON-LD `author` (Person/Organization). Nil when absent.
     public let author: String?
+    /// DUT-1024: labelled ingredient/step groups. Empty = no sections (flat list).
+    public let sections: [RecipeSection]
     /// DUT-984 — equipment from the WPRM card. Empty when absent.
     public let equipment: [Equipment]
     /// DUT-1022: auto/manual catalog tags (difficulty, technique, occasion).
@@ -107,6 +109,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         recipeCuisine: [String] = [],
         suitableForDiet: [String] = [],
         author: String? = nil,
+        sections: [RecipeSection] = [],
         equipment: [Equipment] = [],
         tags: RecipeTags? = nil,
         difficulty: Difficulty? = nil
@@ -135,6 +138,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.recipeCuisine = recipeCuisine
         self.suitableForDiet = suitableForDiet
         self.author = author
+        self.sections = sections
         self.equipment = equipment
         self.tags = tags
         self.difficulty = difficulty
@@ -151,7 +155,7 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         case categoryIDs, publishedAt, updatedAt, ingredients, instructions
         case prepTime, cookTime, totalTime, servings, nutrition, video
         case kind, articleBodyHTML
-        case recipeCategory, recipeCuisine, suitableForDiet, author, equipment, tags, difficulty
+        case recipeCategory, recipeCuisine, suitableForDiet, author, sections, equipment, tags, difficulty
     }
 
     public init(from decoder: Decoder) throws {
@@ -185,6 +189,8 @@ public struct Recipe: Sendable, Hashable, Identifiable, Codable {
         self.recipeCuisine = try container.decodeIfPresent([String].self, forKey: .recipeCuisine) ?? []
         self.suitableForDiet = try container.decodeIfPresent([String].self, forKey: .suitableForDiet) ?? []
         self.author = try container.decodeIfPresent(String.self, forKey: .author)
+        // DUT-1024: labelled ingredient/step groups. Empty when absent.
+        self.sections = try container.decodeIfPresent([RecipeSection].self, forKey: .sections) ?? []
         // DUT-984 — equipment from the WPRM card. Empty when absent.
         self.equipment = try container.decodeIfPresent([Equipment].self, forKey: .equipment) ?? []
         // DUT-1022: back-compat — older payloads predate `tags`.

@@ -29,4 +29,22 @@ extension CookLogStats {
             remaining: max(0, ownItThreshold - count)
         )
     }
+
+    /// DUT-974 — gateway dishes in progress (cooked, not yet owned), closest to
+    /// owned first. Ties: most recently cooked, then lower recipe id.
+    public static func onYourWayToOwning(_ entries: [CookLogEntry], limit: Int = 3) -> [OwnItProgress] {
+        let ids = Set(entries.map(\.recipeID))
+        let lastCooked: [Int: Date] = Dictionary(grouping: entries, by: \.recipeID)
+            .mapValues { $0.map(\.cookedAt).max() ?? .distantPast }
+        let inProgress = ids.compactMap { ownItProgress(recipeID: $0, in: entries) }
+            .filter { !$0.isOwned }
+        let sorted = inProgress.sorted { lhs, rhs in
+            if lhs.remaining != rhs.remaining { return lhs.remaining < rhs.remaining }
+            let lhsDate = lastCooked[lhs.recipeID] ?? .distantPast
+            let rhsDate = lastCooked[rhs.recipeID] ?? .distantPast
+            if lhsDate != rhsDate { return lhsDate > rhsDate }
+            return lhs.recipeID < rhs.recipeID
+        }
+        return Array(sorted.prefix(max(0, limit)))
+    }
 }

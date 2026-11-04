@@ -15,9 +15,9 @@ public struct RecipeSection: Sendable, Hashable, Identifiable, Codable {
     }
 
     /// Build sections from ordered (label, ingredientCount) groups over a flat list.
-    /// Groups with a blank label or count 0 are skipped; counts past the end are clamped.
+    /// Groups with a nil/blank label or count 0 are skipped; counts past the end are clamped.
     public static func make(
-        groups: [(label: String, count: Int)],
+        groups: [(label: String?, count: Int)],
         ingredients: [RecipeIngredient]
     ) -> [RecipeSection] {
         var cursor = 0
@@ -26,7 +26,7 @@ public struct RecipeSection: Sendable, Hashable, Identifiable, Codable {
             let end = min(cursor + max(group.count, 0), ingredients.count)
             let ids = ingredients[cursor..<end].map(\.id)
             cursor = end
-            let label = group.label.trimmingCharacters(in: .whitespacesAndNewlines)
+            let label = (group.label ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if !label.isEmpty, !ids.isEmpty {
                 result.append(RecipeSection(label: label, ingredientIDs: ids))
             }
