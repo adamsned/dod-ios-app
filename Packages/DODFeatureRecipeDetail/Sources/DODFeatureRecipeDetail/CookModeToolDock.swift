@@ -58,6 +58,29 @@ struct CookModeToolDockContent: Equatable {
     }
 }
 
+/// DUT-137 — contents of the iPad pinned right pane. Unlike the compact dock, it
+/// lists every running timer (soonest first) and always offers Heat Coach when wired.
+struct CookModePinnedPaneContent: Equatable {
+    /// Step indices with a running timer, soonest-finishing first.
+    var runningTimerStepIndices: [Int]
+    var showsHeatCoach: Bool
+
+    static func resolve(
+        heatCoachAvailable: Bool,
+        timers: [Int: CookStepTimer],
+        now: Date
+    ) -> CookModePinnedPaneContent {
+        let running =
+            timers
+            .filter { $0.value.isRunning }
+            .sorted { lhs, rhs in
+                (lhs.value.remaining(at: now), lhs.key) < (rhs.value.remaining(at: now), rhs.key)
+            }
+            .map(\.key)
+        return CookModePinnedPaneContent(runningTimerStepIndices: running, showsHeatCoach: heatCoachAvailable)
+    }
+}
+
 /// DUT-1392 — "Step 4 Timer 03:12 · Go to Step", for a timer still running on a
 /// step the cook has moved past. The whole row jumps back to that step.
 struct CookModeRunningTimerRow: View {

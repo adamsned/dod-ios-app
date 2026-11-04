@@ -184,4 +184,15 @@ struct CookJournalAndCookPhotoA11yTests {
         )
         #expect(CookJournalView.recapGroups([entry]).isEmpty)
     }
+
+    // DUT-199 — the clear confirmation must warn it is irreversible.
+    @Test func clearHistoryConfirmationWarnsItCannotBeUndone() {
+        #expect(CookJournalView.clearHistoryTitle == "Clear All Logged Cooks?")
+        #expect(CookJournalView.clearHistoryMessage.contains("can't be undone"))
+    }
+
+    // DUT-199 — after a clear the reload is empty, which maps to the empty state.
+    @Test func journalShowsEmptyStateAfterClear() {
+        #expect(CookJournalView.contentState(loaded: true, isEmpty: true) == .empty)
+    }
 }

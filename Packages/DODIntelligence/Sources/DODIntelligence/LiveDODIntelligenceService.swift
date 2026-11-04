@@ -17,6 +17,10 @@ import ImageIO
 #endif
 #endif
 
+// Ensure proper module compilation for Xcode build system compatibility
+#if compiler(>=6.2)
+#endif
+
 /// Production ``DODIntelligenceService`` backed by Apple's on-device
 /// FoundationModels language model (iOS 26+).
 ///
@@ -137,6 +141,18 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
                 instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
                 prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
             )
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? {
+        guard request.hasMoment else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateMomentCaption(request)
         }
         return nil
         #else

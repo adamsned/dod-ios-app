@@ -181,6 +181,45 @@ import Testing
         #expect(viewModel.celebration != .firstCookEver)
     }
 
+    /// DUT-974 — a recipe that crosses the 3-cook threshold fires .ownedIt
+    @Test func loggingThirdCookFiresOwnedIt() async {
+        let dependencies = FakeFeedDependencies()
+        // History already holds 2 cooks of recipe X
+        dependencies.cooks = [makeCook(9001), makeCook(9001)]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        // Log a 3rd cook -> should fire .ownedIt
+        await viewModel.logCook(makeCook(9001))
+
+        #expect(viewModel.celebration == .ownedIt(title: "R9001"))
+    }
+
+    /// DUT-974 — a recipe that does not cross the 3-cook threshold does not fire .ownedIt
+    @Test func loggingSecondCookDoesNotFireOwnedIt() async {
+        let dependencies = FakeFeedDependencies()
+        // History holds 1 cook of recipe X
+        dependencies.cooks = [makeCook(9001)]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        // Log a 2nd cook -> should not fire .ownedIt
+        await viewModel.logCook(makeCook(9001))
+
+        #expect(viewModel.celebration != .ownedIt(title: "R9001"))
+    }
+
+    /// DUT-974 — a recipe that was already owned does not re-fire .ownedIt
+    @Test func loggingFourthCookOfAlreadyOwnedRecipeDoesNotFireOwnedIt() async {
+        let dependencies = FakeFeedDependencies()
+        // History holds 3 cooks of recipe X (already owned)
+        dependencies.cooks = [makeCook(9001), makeCook(9001), makeCook(9001)]
+        let viewModel = FeedViewModel(dependencies: dependencies)
+
+        // Log a 4th cook -> should not fire .ownedIt
+        await viewModel.logCook(makeCook(9001))
+
+        #expect(viewModel.celebration != .ownedIt(title: "R9001"))
+    }
+
     @Test func dismissingClearsTheCelebration() async {
         let dependencies = FakeFeedDependencies()
         dependencies.cooks = [makeCook(9001), makeCook(9002)]

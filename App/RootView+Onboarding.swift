@@ -31,6 +31,7 @@ extension RootView {
                     Task { await runFirstRunSetup() }
                 }
                 showOnboarding = false
+                showFirstCookQuiz = true
             }
         )
     }

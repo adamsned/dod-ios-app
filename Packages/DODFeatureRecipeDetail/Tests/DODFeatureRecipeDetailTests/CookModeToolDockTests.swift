@@ -89,4 +89,33 @@ struct CookModeToolDockTests {
         viewModel.goToStep(99)  // out of range: ignored
         #expect(viewModel.currentStepIndex == 1)
     }
+
+    @Test func pinnedPaneListsAllRunningTimersSoonestFirst() {
+        let timers = [0: running(600), 2: running(120), 3: CookStepTimer(totalSeconds: 60)]
+        let content = CookModePinnedPaneContent.resolve(
+            heatCoachAvailable: true,
+            timers: timers,
+            now: now
+        )
+        #expect(content.runningTimerStepIndices == [2, 0])
+    }
+
+    @Test func pinnedPaneIncludesCurrentStepTimer() {
+        let timers = [1: running(60)]
+        let content = CookModePinnedPaneContent.resolve(
+            heatCoachAvailable: true,
+            timers: timers,
+            now: now
+        )
+        #expect(content.runningTimerStepIndices == [1])
+    }
+
+    @Test func pinnedPaneHeatCoachFollowsAvailability() {
+        let content = CookModePinnedPaneContent.resolve(
+            heatCoachAvailable: false,
+            timers: [:],
+            now: now
+        )
+        #expect(!content.showsHeatCoach)
+    }
 }
