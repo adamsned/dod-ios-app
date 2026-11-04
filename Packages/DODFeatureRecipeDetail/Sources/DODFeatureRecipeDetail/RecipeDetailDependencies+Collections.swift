@@ -46,5 +46,7 @@ extension LiveRecipeDetailDependencies {
 
     public func setCollections(forRecipe recipeID: Int, to collectionIDs: Set<UUID>) async throws {
         try await store.setCollections(forRecipe: recipeID, to: collectionIDs)
+        // DUT-172 — refresh the Pinned Collection widget.
+        await publishSavedWidgetSnapshot()
     }
 }

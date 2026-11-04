@@ -76,6 +76,18 @@ public protocol DODIntelligenceService: Sendable {
     /// treats the text as its source of truth; `nil` is the general helper.
     func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String?
 
+    /// DUT-1007 — Heat Coach follow-up ("what if it's windy and I'm at 6000ft?").
+    /// The model CALLS the pure `DutchOvenHeatCoach` functions as tools, so the coal
+    /// numbers are grounded, then wraps them in a short reassuring sentence.
+    /// `ovenDiameterInches` and `isBaking` give the baseline. Returns `nil` — never
+    /// throws — when unavailable, the question is empty, the model errors, or a
+    /// guardrail rejects it.
+    func askHeatCoach(_ question: String, ovenDiameterInches: Int, isBaking: Bool) async -> String?
+
+    /// DUT-1028 — answer a question about the loaded recipe by letting the model call
+    /// tools over `toolbox` (no prompt-stuffing). Returns nil on unavailability/error.
+    func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String?
+
     /// DUT-1008 — draft a short, celebratory caption for a personal cook-log
     /// moment from its photo + note, entirely on-device. Returns `nil` (never
     /// throws) when unavailable, when `request.hasMoment` is false, on model
@@ -118,14 +130,28 @@ public protocol DODIntelligenceService: Sendable {
     /// Returns `nil` — never throws — on unavailability, empty input, model error
     /// or guardrail rejection.
     func summarizeComments(_ comments: [String]) async -> CommentDigest?
+
+    /// DUT-1009 — identify the food items visible in a fridge/pantry photo.
+    /// `imageData` is JPEG/PNG bytes (`Data` stays Sendable across the actor
+    /// hop). Returns ingredient names (lowercase, singular-ish, e.g. "eggs",
+    /// "cheddar"). Returns `[]` — never throws — when unavailable, the image is
+    /// undecodable, the model errors, or a guardrail rejects it.
+    func identifyIngredients(imageData: Data) async -> [String]
 }
 
 extension DODIntelligenceService {
+
+    public func askHeatCoach(_ question: String, ovenDiameterInches: Int, isBaking: Bool) async -> String? {
+        nil
+    }
 
     /// DUT-1005 — the tier this service runs on. Defaults to on-device, the
     /// cost-free architecture default. A conformer that routes to Private Cloud
     /// Compute must override this explicitly, never implicitly.
     public var tier: IntelligenceTier { .default }
+
+    /// DUT-1028 — conformers that cannot run the tool-calling session answer nil.
+    public func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String? { nil }
 
     /// Convenience for a context- and reason-free substitution, so previews and
     /// call sites that don't model either stay terse.
@@ -164,6 +190,15 @@ extension DODIntelligenceService {
     /// Default so older conformers (test doubles) need not implement it.
     public func summarizeComments(_ comments: [String]) async -> CommentDigest? { nil }
 
+    /// DUT-1009 — default implementation for older conformers to keep compiling.
+    public func identifyIngredients(imageData: Data) async -> [String] { [] }
+
     /// Default for conformers that don't implement Hero Moment captions.
     public func captionMoment(_ request: MomentCaptionRequest) async -> String? { nil }
+
+    /// DUT-1032 — turn the (2–4) onboarding intake exchanges into a typed
+    /// ``CookIntakeProfile`` via constrained generation. Returns `nil` — never
+    /// throws — when unavailable, `answers` is empty, the model errors, or a
+    /// guardrail rejects it, so onboarding simply skips the personalization.
+    public func extractIntakeProfile(from answers: [IntakeAnswer]) async -> CookIntakeProfile? { nil }
 }

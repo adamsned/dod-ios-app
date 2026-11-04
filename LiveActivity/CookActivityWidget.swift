@@ -18,19 +18,40 @@ private struct CookActivityPresentationView: View {
                 model: CookActivityStandByModel(state: state)
             )
         } else {
-            CookActivityLockScreenView(
-                recipeTitle: attributes.recipeTitle,
-                stepText: state.stepText,
-                remainingSeconds: state.remainingSeconds,
-                totalSeconds: attributes.totalSeconds,
-                isPaused: state.isPaused,
-                endDate: state.endDate,
-                isCompleted: state.isCompleted,
-                coachNudge: state.coachNudge
-            )
+            VStack(spacing: 0) {
+                CookActivityLockScreenView(
+                    recipeTitle: attributes.recipeTitle,
+                    stepText: state.stepText,
+                    remainingSeconds: state.remainingSeconds,
+                    totalSeconds: attributes.totalSeconds,
+                    isPaused: state.isPaused,
+                    endDate: state.endDate,
+                    isCompleted: state.isCompleted,
+                    coachNudge: state.coachNudge
+                )
+                if state.isCompleted { CookActivityBuzzerButtons() }
+            }
             .padding(.horizontal, DODSpacing.sm)
             .padding(.vertical, DODSpacing.xs)
         }
+    }
+}
+
+/// DUT-988 — one-tap buzzer actions. Only shown on the completed (buzzer) card.
+@available(iOS 17.0, *)
+private struct CookActivityBuzzerButtons: View {
+    var body: some View {
+        HStack(spacing: DODSpacing.sm) {
+            Button(intent: PulledItIntent()) {
+                Text("Pulled It").frame(maxWidth: .infinity)
+            }
+            .tint(DODColor.accent)
+            Button(intent: SnoozeTimerIntent()) {
+                Text("2 More Min").frame(maxWidth: .infinity)
+            }
+            .tint(DODColor.burntOrange)
+        }
+        .buttonStyle(.borderedProminent)
     }
 }
 
@@ -67,15 +88,18 @@ struct CookActivityWidget: Widget {
                     .padding(.trailing, DODSpacing.xs)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    CookActivityLockScreenView(
-                        recipeTitle: context.attributes.recipeTitle,
-                        stepText: context.state.stepText,
-                        remainingSeconds: context.state.remainingSeconds,
-                        totalSeconds: context.attributes.totalSeconds,
-                        isPaused: context.state.isPaused,
-                        endDate: context.state.endDate,
-                        isCompleted: context.state.isCompleted
-                    )
+                    VStack(spacing: 0) {
+                        CookActivityLockScreenView(
+                            recipeTitle: context.attributes.recipeTitle,
+                            stepText: context.state.stepText,
+                            remainingSeconds: context.state.remainingSeconds,
+                            totalSeconds: context.attributes.totalSeconds,
+                            isPaused: context.state.isPaused,
+                            endDate: context.state.endDate,
+                            isCompleted: context.state.isCompleted
+                        )
+                        if context.state.isCompleted { CookActivityBuzzerButtons() }
+                    }
                 }
             } compactLeading: {
                 CookActivityCompactLeadingView()
