@@ -1,3 +1,4 @@
+import DODAnalytics
 import DODDesignSystem
 import SwiftUI
 
@@ -41,6 +42,31 @@ extension SettingsView {
             urlString: SettingsViewModel.contactSupportURLString,
             identifier: "settings-contact-support-link"
         )
+    }
+
+    /// DUT-157 — App Store write-review deep link. REPLACE the placeholder with the real numeric App Store ID before release (look in `project.yml`, `Marketing/`, or `docs/` for the existing store URL; if none is found, keep the constant but note it in the PR).
+    static let appStoreID = "0000000000"
+    static var rateAppURLString: String {
+        "https://apps.apple.com/app/id\(appStoreID)?action=write-review"
+    }
+
+    /// Manual "Rate Dutch Oven Daddy" row for the "About" section. Always available.
+    @ViewBuilder
+    var rateAppLink: some View {
+        if let url = URL(string: Self.rateAppURLString) {
+            Link(destination: url) {
+                Text("Rate Dutch Oven Daddy")
+                    .dodFont(DODType.body)
+                    .foregroundStyle(DODColor.accent)
+            }
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    Telemetry.shared.send(.reviewManualRateTapped)
+                }
+            )
+            .accessibilityIdentifier("settings-rate-app-link")
+            .accessibilityLabel("Rate Dutch Oven Daddy, opens the App Store")
+        }
     }
 
     /// A single external-policy `Link` row: accent-tinted body text, a VoiceOver

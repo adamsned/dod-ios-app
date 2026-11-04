@@ -61,6 +61,12 @@ extension RecipeDetailView {
                     guard (note.object as? Int) == viewModel.listItem.id else { return }
                     Task { await viewModel.refreshSavedState() }
                 }
+                // DUT-1016 - a Siri "scale this to serve N" for THIS recipe moves the stepper.
+                .onReceive(NotificationCenter.default.publisher(for: .dodServingsScaleRequested)) { note in
+                    guard let count = ServingsScaleRequest.servings(from: note, forRecipeID: viewModel.listItem.id)
+                    else { return }
+                    viewModel.scaleServings(to: count)
+                }
 
                 // US-39 / DUT-534 / DUT-535 — "Add to Shopping List" from ANY
                 // recipe (not just saved). DUT-535: tapping now PRESENTS the

@@ -64,6 +64,9 @@ import Testing
             .syncDisabled,
             .syncCompletedSuccessfully,
             .syncFailed(errorCategory: .network),
+            .reviewPromptEligible,
+            .reviewPromptShown,
+            .reviewManualRateTapped,
         ]
 
         for event in allCases {
