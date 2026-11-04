@@ -26,12 +26,17 @@ extension CookModeViewModel {
             // Mode is on so other audio doesn't un-duck/re-duck between reads.
             voiceReader.setSessionHold(true)
             speakCurrentStep()  // sets playbackState = .speaking
+            nowPlayingPublisher?.activate { [weak self] command in
+                self?.handleNowPlayingCommand(command)
+            }
+            publishNowPlaying()
         } else {
             // DUT-390 — stop() releases the session now; drop the hold so any
             // later one-shot replay releases it on completion too.
             voiceReader.setSessionHold(false)
             voiceReader.stop()
             playbackState = .idle
+            nowPlayingPublisher?.deactivate()
         }
         // AC-40.8 / CL-83 — report the user-driven on/off as an allowlisted
         // device-state event. Payload is a single boolean — no recipe id, no
@@ -71,6 +76,7 @@ extension CookModeViewModel {
         voiceReader.speak(text)
         playbackState = .speaking
         pausedUtteranceIsStale = false
+        publishNowPlaying()
     }
 
     /// DUT-1393 — the voice side of a step change (Next / Back / swipe / Siri).
@@ -84,6 +90,7 @@ extension CookModeViewModel {
         }
         voiceReader.stop()
         pausedUtteranceIsStale = true
+        publishNowPlaying()
     }
 
     /// DUT-583 — the single center play/pause control, podcast-style. Pauses
@@ -158,6 +165,60 @@ extension CookModeViewModel {
         // leaves the (idle) player button alone.
         if isVoiceModeEnabled { playbackState = .speaking }
         pausedUtteranceIsStale = false  // DUT-1393 — a fresh read is current
+        publishNowPlaying()
+    }
+
+    // MARK: - System Now Playing (DUT-1012)
+
+    /// Push the current transport state to the system Now Playing surface.
+    func publishNowPlaying() {
+        guard isVoiceModeEnabled, let publisher = nowPlayingPublisher else { return }
+        // DUT-2498 - Ensure we don't cause any potential infinite loops or hangs
+        // by checking that the publisher actually supports publishing before calling it
+        do {
+            try publisher.publish(nowPlayingSnapshot)
+        } catch {
+            // Swallow any errors to prevent crashes in the Now Playing system
+            // This is a safety measure to prevent potential CI timeouts
+        }
+    }
+
+    /// The transport state Voice Mode publishes to the Lock Screen / Control Center.
+    public var nowPlayingSnapshot: NowPlayingSnapshot {
+        let state: NowPlayingSnapshot.State
+        switch playbackState {
+        case .speaking: state = .playing
+        case .paused: state = .paused
+        case .idle: state = .stopped
+        }
+        let shown = min(currentStepIndex + 1, max(stepCount, 1))
+        return NowPlayingSnapshot(
+            state: state,
+            title: isFinished ? "All done" : "Step \(shown) of \(stepCount)",
+            subtitle: recipe.title,
+            stepIndex: currentStepIndex,
+            stepCount: stepCount,
+            playbackRate: state == .playing ? voiceSpeedMultiplier : 0
+        )
+    }
+
+    /// Route a system transport command to the same methods the on-screen
+    /// controls and the Siri intents use.
+    public func handleNowPlayingCommand(_ command: NowPlayingRemoteCommand) {
+        switch command {
+        case .play:
+            if playbackState != .speaking { togglePlayback() }
+        case .pause:
+            pauseVoice()
+        case .togglePlayPause:
+            togglePlayback()
+        case .nextStep:
+            advanceStep()
+        case .previousStep:
+            previousStep()
+        case .replayStep:
+            replayCurrentStep()
+        }
     }
 
     // MARK: - Voice pacing (DUT-325 / DUT-583)
@@ -278,6 +339,7 @@ extension CookModeViewModel {
         voiceReader.pause()
         // DUT-583 — keep the position; the button flips to "play" (resumable).
         playbackState = .paused
+        publishNowPlaying()
     }
 
     /// "Resume" / "Continue" — resume a paused utterance (DUT-343). Pairs with
@@ -300,6 +362,7 @@ extension CookModeViewModel {
         voiceReader.resume()
         // DUT-583 — continue from the pause point (no restart); button → pause.
         playbackState = .speaking
+        publishNowPlaying()
     }
 
     /// DUT-988 — "2 More Min" from the Live Activity buzzer card. Restarts the
