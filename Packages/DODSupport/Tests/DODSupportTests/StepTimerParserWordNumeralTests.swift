@@ -10,4 +10,8 @@ import Testing
         // "often" contains "ten" but is not a numeral.
         #expect(StepTimerParser.firstDuration(in: "Stir often, minutes later") == nil)
     }
+
+    @Test func wordNumeralFortyFiveHyphenated() {
+        #expect(StepTimerParser.firstDuration(in: "Simmer forty-five minutes") == .seconds(2700))
+    }
 }
