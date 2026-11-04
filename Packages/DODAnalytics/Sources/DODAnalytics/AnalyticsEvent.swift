@@ -122,6 +122,14 @@ public enum AnalyticsEvent: Sendable, Hashable {
 
     /// DUT-178 — a recipe problem report was handed off for sending. Payload: recipe id + closed-set problem type, never the note.
     case recipeProblemReported(recipeID: Int, problemType: String)
+
+    /// DUT-174 — the post-update "What's New" sheet auto-presented. The payload is the
+    /// app version string (e.g. "2.1"), which is not PII.
+    case changelogShown(version: String)
+    /// DUT-174 — the user dismissed the "What's New" sheet ("Got it" or swipe).
+    case changelogDismissed(version: String)
+    /// DUT-174 — the user opened "What's New" from Settings.
+    case changelogOpenedFromSettings
 }
 
 /// The closed set of Siri voice commands Cook Mode exposes (US-40 / AC-40.5).
@@ -219,6 +227,9 @@ extension AnalyticsEvent {
         case .feedbackStarted: "feedback_started"
         case .feedbackSent: "feedback_sent"
         case .recipeProblemReported: "recipe_problem_reported"
+        case .changelogShown: "changelog_shown"
+        case .changelogDismissed: "changelog_dismissed"
+        case .changelogOpenedFromSettings: "changelog_opened_from_settings"
         }
     }
 
@@ -283,6 +294,12 @@ extension AnalyticsEvent {
             ["category": category]
         case .recipeProblemReported(let recipeID, let problemType):
             ["recipe_id": String(recipeID), "problem_type": problemType]
+        case .changelogShown(let version):
+            ["version": version]
+        case .changelogDismissed(let version):
+            ["version": version]
+        case .changelogOpenedFromSettings:
+            [:]
         }
     }
 }

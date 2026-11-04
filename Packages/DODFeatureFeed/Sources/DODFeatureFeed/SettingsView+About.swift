@@ -34,6 +34,9 @@ extension SettingsView {
         // MARK: US-32 About + version
 
         Section {
+            // DUT-174 — always-available release-notes history.
+            whatsNewLink
+
             FromNedSettingsLink(unreadCount: fromNedUnreadCount)
 
             NavigationLink {

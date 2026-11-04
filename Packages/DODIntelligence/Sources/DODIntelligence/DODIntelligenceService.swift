@@ -195,4 +195,10 @@ extension DODIntelligenceService {
 
     /// Default for conformers that don't implement Hero Moment captions.
     public func captionMoment(_ request: MomentCaptionRequest) async -> String? { nil }
+
+    /// DUT-1032 — turn the (2–4) onboarding intake exchanges into a typed
+    /// ``CookIntakeProfile`` via constrained generation. Returns `nil` — never
+    /// throws — when unavailable, `answers` is empty, the model errors, or a
+    /// guardrail rejects it, so onboarding simply skips the personalization.
+    public func extractIntakeProfile(from answers: [IntakeAnswer]) async -> CookIntakeProfile? { nil }
 }
