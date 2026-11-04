@@ -85,7 +85,7 @@ struct PinnedCollectionWidgetEntryView: View {
         }
     }
 
-    private func recipeLink(recipe: PinnedCollectionsWidgetSnapshot.Collection.Recipe) -> some View {
+    private func recipeLink(recipe: PinnedCollectionsWidgetSnapshot.Recipe) -> some View {
         Link(destination: recipe.deepLinkURL ?? Self.collectionURL) {
             VStack(spacing: DODSpacing.xs) {
                 WidgetCard.Hero(
