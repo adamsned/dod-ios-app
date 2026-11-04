@@ -26,21 +26,13 @@ public struct CookModeView: View {
     /// DUT-599 — `internal` so `CookModeView+Controls.swift` can open the drawer
     /// from the carrot button wired into the transport's secondary row.
     @State var ingredientsDrawerVisible: Bool = false
-    /// DUT-529 — belt-and-suspenders idle-timer safety net. `.onDisappear`
-    /// already restores the idle timer on a normal teardown; this observer also
-    /// restores it when the app backgrounds (so an atypical teardown that never
-    /// fires `.onDisappear` can't leave `isIdleTimerDisabled` stuck on), and
-    /// re-arms it on return to `.active` if the session is still up. Both
-    /// `begin`/`endCookMode` are idempotent, so this never double-restores.
+    /// DUT-529 — restores the idle timer when the app backgrounds and re-arms it on `.active`
+    /// (begin/endCookMode are idempotent).
     @Environment(\.scenePhase) private var scenePhase
     /// DUT-137 — re-evaluated live on Stage Manager / Split View resize; state in
     /// `viewModel` is untouched so no cook state is lost.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    /// DUT-529 — when Reduce Motion is on, drop the step-change slide/scale
-    /// animation (constitution §7); the step swap still happens, just without the
-    /// motion. Mirrors the `LoadingSkeleton` shimmer guard.
-    /// `internal` (not `private`) so `CookModeView+Controls.swift` can gate the
-    /// panel's collapse/expand animation on Reduce Motion (constitution §7).
+    /// DUT-529 — Reduce Motion drops the step-change animation; `internal` for `CookModeView+Controls.swift`.
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     /// DUT-116 — VoiceOver-aware layout switch; `internal` for the extension files.
     @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
