@@ -57,6 +57,7 @@ final class CookJournalJourneyE2ETests: XCTestCase {
         let cookCTA = app.buttons["recipe.cookMode.cta"]
         XCTAssertTrue(cookCTA.waitForExistence(timeout: 8), "the recipe detail should offer the Cook Mode CTA")
         cookCTA.tap()
+        app.startCookingPastPepTalk()
         let stepOne = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Step 1 of'")).firstMatch
         XCTAssertTrue(stepOne.waitForExistence(timeout: 10), "Cook Mode should open on 'Step 1 of N'")
 

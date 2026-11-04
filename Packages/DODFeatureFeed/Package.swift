@@ -47,6 +47,7 @@ let package = Package(
             name: "DODFeatureFeedTests",
             dependencies: [
                 "DODFeatureFeed",
+                "DODDomain",
                 "DODSupport",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             ],

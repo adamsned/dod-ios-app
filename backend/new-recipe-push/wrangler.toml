@@ -1,0 +1,25 @@
+name = "dod-new-recipe-push"
+main = "src/index.ts"
+compatibility_date = "2026-06-20"
+
+# Poll the site every 2 minutes for new posts.
+[triggers]
+crons = ["*/2 * * * *"]
+
+# Device registry + last-seen post id + sent markers.
+# Create it with:  npx wrangler kv namespace create DEVICES
+# then paste the printed id below.
+[[kv_namespaces]]
+binding = "DEVICES"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Non-secret config. Secrets (APNS_PRIVATE_KEY, APP_SHARED_SECRET) are NOT here:
+# set them with `wrangler secret put <NAME>`.
+[vars]
+APNS_KEY_ID = "REPLACE_WITH_YOUR_APNS_KEY_ID"
+APNS_TEAM_ID = "REPLACE_WITH_YOUR_APPLE_TEAM_ID"
+APNS_TOPIC = "com.dutchovendaddy.DODApp"
+
+# Secrets to set after first deploy (encrypted, prompt for the value):
+#   wrangler secret put APNS_PRIVATE_KEY   # paste the full .p8 contents
+#   wrangler secret put APP_SHARED_SECRET  # a long random string; the iOS app sends it as X-App-Secret
