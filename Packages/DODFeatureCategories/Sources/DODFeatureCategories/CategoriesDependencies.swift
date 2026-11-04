@@ -12,6 +12,11 @@ public protocol CategoriesDependencies: Sendable {
         categoryID: Int,
         page: Int
     ) async throws -> (items: [RecipeListItem], totalPages: Int)
+    /// DUT-166: posts carrying any of the given WP tag ids (Browse-by axis value).
+    func fetchPosts(
+        tagIDs: [Int],
+        page: Int
+    ) async throws -> (items: [RecipeListItem], totalPages: Int)
     func cache(listItems: [RecipeListItem]) async throws
     func cachedListItems(forIDs ids: [Int]) async throws -> [RecipeListItem]
     /// T-765 / CL-162 (DUT-71) — saved recipe id set for the card long-press
@@ -21,6 +26,13 @@ public protocol CategoriesDependencies: Sendable {
 
 extension CategoriesDependencies {
     public func savedRecipeIDs() async throws -> Set<Int> { [] }
+
+    public func fetchPosts(
+        tagIDs: [Int],
+        page: Int
+    ) async throws -> (items: [RecipeListItem], totalPages: Int) {
+        (items: [], totalPages: 1)
+    }
 }
 
 public struct LiveCategoriesDependencies: CategoriesDependencies {
@@ -41,6 +53,13 @@ public struct LiveCategoriesDependencies: CategoriesDependencies {
         page: Int
     ) async throws -> (items: [RecipeListItem], totalPages: Int) {
         try await client.postsPage(categoryID: categoryID, page: page)
+    }
+
+    public func fetchPosts(
+        tagIDs: [Int],
+        page: Int
+    ) async throws -> (items: [RecipeListItem], totalPages: Int) {
+        try await client.postsPage(tagIDs: tagIDs, page: page)
     }
 
     public func cache(listItems: [RecipeListItem]) async throws {

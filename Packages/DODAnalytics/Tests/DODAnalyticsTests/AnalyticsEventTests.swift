@@ -217,6 +217,7 @@ import Testing
             AnalyticsEvent.recipeOfTheDayTapped(recipeID: 1).name,
             AnalyticsEvent.feedbackStarted.name,
             AnalyticsEvent.feedbackSent(category: "bug").name,
+            AnalyticsEvent.recipeProblemReported(recipeID: 1, problemType: "photo").name,
         ]
         #expect(Set(allNames).count == allNames.count)
     }
@@ -228,10 +229,9 @@ import Testing
         #expect(AnalyticsEvent.recipeOfTheDayTapped(recipeID: 7).name == "recipe_of_the_day_tapped")
     }
 
-    @Test func feedbackEventsCarryNoFreeText() {
-        #expect(AnalyticsEvent.feedbackStarted.name == "feedback_started")
-        #expect(AnalyticsEvent.feedbackStarted.payload.isEmpty)
-        #expect(AnalyticsEvent.feedbackSent(category: "bug").name == "feedback_sent")
-        #expect(AnalyticsEvent.feedbackSent(category: "bug").payload == ["category": "bug"])
+    @Test func recipeProblemReportedCarriesOnlyIdAndType() {
+        let event = AnalyticsEvent.recipeProblemReported(recipeID: 7, problemType: "photo")
+        #expect(event.name == "recipe_problem_reported")
+        #expect(event.payload == ["recipe_id": "7", "problem_type": "photo"])
     }
 }

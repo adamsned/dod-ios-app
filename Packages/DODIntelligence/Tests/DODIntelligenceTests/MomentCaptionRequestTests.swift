@@ -2,11 +2,9 @@ import DODIntelligence
 import DODSupport
 import XCTest
 
-@Suite
-struct MomentCaptionRequestTests {
+final class MomentCaptionRequestTests: XCTestCase {
 
-    @Test
-    func entryInitCopiesFieldsAndClampsRating() {
+    func testEntryInitCopiesFieldsAndClampsRating() {
         let entry = CookLogEntry(
             id: UUID(),
             recipeID: 1,
@@ -24,14 +22,12 @@ struct MomentCaptionRequestTests {
         XCTAssertEqual(request.personalRating, 5)
     }
 
-    @Test
-    func hasMomentFalseForTitleOnly() {
+    func testHasMomentFalseForTitleOnly() {
         let request = MomentCaptionRequest(recipeTitle: "X")
         XCTAssertFalse(request.hasMoment)
     }
 
-    @Test
-    func hasMomentTrueForNoteOrImage() {
+    func testHasMomentTrueForNoteOrImage() {
         // Non-blank note gives true
         let requestWithNote = MomentCaptionRequest(recipeTitle: "Test", note: "Great recipe!")
         XCTAssertTrue(requestWithNote.hasMoment)

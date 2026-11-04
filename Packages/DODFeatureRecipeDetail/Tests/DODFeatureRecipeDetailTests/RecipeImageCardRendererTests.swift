@@ -42,6 +42,7 @@ struct RecipeImageCardRendererTests {
         )
     }
 
+    @MainActor
     @Test func testRenderProducesCardResolution() {
         let recipe = recipe(ingredients: 5, steps: 4)
         let image = RecipeImageCardRenderer.render(
@@ -56,6 +57,7 @@ struct RecipeImageCardRendererTests {
         #expect(image.scale == 1)
     }
 
+    @MainActor
     @Test func testWritePNGCreatesFile() {
         let recipe = recipe(ingredients: 5, steps: 4)
         let image = RecipeImageCardRenderer.render(
@@ -79,6 +81,7 @@ struct RecipeImageCardRendererTests {
         try? FileManager.default.removeItem(at: url)
     }
 
+    @MainActor
     @Test func testWritePNGUsesFallbackNameForEmptySlug() {
         let recipe = recipe(ingredients: 5, steps: 4)
         let image = RecipeImageCardRenderer.render(

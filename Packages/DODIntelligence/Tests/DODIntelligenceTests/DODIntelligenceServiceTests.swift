@@ -283,6 +283,11 @@ struct DODIntelligenceServiceTests {
         #expect(await service.summarizeComments(["a"]) == nil)
     }
 
+    @Test func liveIdentifyIngredientsIsEmptyWithoutModel() async {
+        let result = await LiveDODIntelligenceService().identifyIngredients(imageData: Data([0x00]))
+        #expect(result.isEmpty)
+    }
+
     @Test func captionMomentDefaultsToNil() async {
         let request = MomentCaptionRequest(recipeTitle: "X", note: "n")
         #expect(await makeBareService().captionMoment(request) == nil)
@@ -318,12 +323,20 @@ struct DODIntelligenceServiceTests {
         )
         #expect(await FakeIntelligenceService().askHeatCoach("   ", ovenDiameterInches: 12, isBaking: false) == nil)
     }
+
+    @Test func liveCaptionMomentNilOnTestHost() async {
+        #expect(await LiveDODIntelligenceService().captionMoment(.init(recipeTitle: "X", note: "great")) == nil)
+    }
+
+    @Test func liveCaptionMomentNilWithoutMoment() async {
+        #expect(await LiveDODIntelligenceService().captionMoment(.init(recipeTitle: "X", note: "")) == nil)
+    }
 }
 
 // MARK: - Helper functions
 
 extension DODIntelligenceServiceTests {
-    fileprivate func makeBareService() -> some DODIntelligenceService {
+    private func makeBareService() -> some DODIntelligenceService {
         struct Bare: DODIntelligenceService {
             var isAvailable: Bool { true }
             var supportsImageInput: Bool { true }
@@ -338,7 +351,7 @@ extension DODIntelligenceServiceTests {
         return Bare()
     }
 
-    fileprivate func makeLegacyService() -> some DODIntelligenceService {
+    private func makeLegacyService() -> some DODIntelligenceService {
         struct LegacyService: DODIntelligenceService {
             var isAvailable: Bool { true }
             var supportsImageInput: Bool { true }

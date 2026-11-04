@@ -51,6 +51,8 @@ struct RootView: View {
     /// Non-private so the `+Onboarding.swift` extension's `onboardingCover`
     /// (extracted for file_length) can read/flip it (DUT-529).
     @State var showOnboarding: Bool
+    /// DUT-982 — flag to control when the first-cook quiz appears after onboarding
+    @State var showFirstCookQuiz = false
     /// US-36 AC-36.2 — user-selected appearance preference (key
     /// `dod.settings.appearance`), applied to the root `Group` via
     /// `.preferredColorScheme(...)`; `.system` yields `nil` (OS drives it).
@@ -244,6 +246,7 @@ struct RootView: View {
             // foregrounds us here; drain the pending-route flag and route.
             if $1 == .active {
                 consumePendingControlRoute()
+                PushRuntime.start()  // DUT-1397: token refresh + failed-upload retry
                 // DUT-635 (wire) — re-poll the Apple credential on foreground.
                 Task { await validateAppleCredentialOnForeground() }
             }
@@ -261,6 +264,13 @@ struct RootView: View {
         // resolved at launch and disclosed by the welcome screen's standing
         // disclosure line (pinned above the CTA, not a scrollable bullet).
         .fullScreenCover(isPresented: $showOnboarding) { onboardingCover }
+        // DUT-982 — show the first-cook quiz after onboarding is complete
+        .sheet(isPresented: $showFirstCookQuiz) {
+            FirstCookQuizView { intake in
+                CookerIntakeStore.save(intake)
+                showFirstCookQuiz = false
+            }
+        }
         // ⚠️ DEV DEBUG (strip before public release) — fires the Dev Debug
         // "Testing" popups (Snackbar / OfflineBanner / App Welcome) over the app.
         // Inert unless Dev Debug is unlocked. See `RootView+DevHarness.swift`.
@@ -269,6 +279,8 @@ struct RootView: View {
         // sidebar row both flip `showSettingsSheet`. Content in
         // `RootView+Settings.swift` (file_length split, DUT-941).
         .sheet(isPresented: $showSettingsSheet) { settingsSheet }
+        // DUT-174 — post-update "What's New" sheet, once per version (`RootView+WhatsNew.swift`).
+        .whatsNewOnUpdate()
         .modifier(ShakeToReport(currentScreen: selectedTab.shakeScreenID))
         // DUT-549 — transient "couldn't open that recipe" toast for a failed
         // deep-link resolve (modifier + copy in `RootView+LinkRouting.swift`).

@@ -324,6 +324,26 @@ public struct CookActivityCompactLeadingView: View {
     }
 }
 
+/// DUT-1011: which Dynamic Island expanded layout to render. `landscape` is
+/// chosen when the system reports the island is width-limited (iOS 27+
+/// `isDynamicIslandLimitedInWidth`, e.g. phone propped sideways).
+public enum CookActivityIslandLayout: Equatable, Sendable {
+    case standard
+    case landscape
+}
+
+public func cookActivityIslandLayout(isLimitedInWidth: Bool) -> CookActivityIslandLayout {
+    isLimitedInWidth ? .landscape : .standard
+}
+
+/// DUT-1011: status pill text shared by the lock-screen card and the landscape
+/// layout. Completed wins over paused; running has no pill.
+public func cookActivityStatusLabel(isCompleted: Bool, isPaused: Bool) -> String? {
+    if isCompleted { return "Done" }
+    if isPaused { return "Paused" }
+    return nil
+}
+
 /// Internal helper — `mm:ss` countdown formatter shared across surfaces.
 @inlinable
 internal func formattedCookActivityCountdown(_ seconds: Int) -> String {

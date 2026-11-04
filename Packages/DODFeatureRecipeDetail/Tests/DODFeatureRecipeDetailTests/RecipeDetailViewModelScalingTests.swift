@@ -265,6 +265,37 @@ import Testing
         #expect(viewModel.recipe?.ingredients[1].text == "1 tablespoon salt")
     }
 
+    @Test func scaleServingsAppliesAndReturnsCount() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 409,
+            withDetail: true,
+            servings: 4
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 409)
+        await viewModel.onAppear()
+
+        #expect(viewModel.scaleServings(to: 12) == 12)
+        #expect(viewModel.userServings == 12)
+    }
+
+    @Test func scaleServingsClampsToRange() async throws {
+        let dependencies = FakeRecipeDetailDependencies()
+        dependencies.parsedRecipe = RecipeDetailTestFixtures.makeRecipe(
+            id: 410,
+            withDetail: true,
+            servings: 4
+        )
+        let viewModel = Self.makeViewModel(dependencies: dependencies, listItemID: 410)
+        await viewModel.onAppear()
+
+        #expect(viewModel.scaleServings(to: 99) == 24)
+        #expect(viewModel.userServings == 24)
+
+        #expect(viewModel.scaleServings(to: 0) == 1)
+        #expect(viewModel.userServings == 1)
+    }
+
     // MARK: - Helpers
 
     static func makeViewModel(
