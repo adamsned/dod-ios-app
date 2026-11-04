@@ -446,6 +446,10 @@ final class SmokeTests: XCTestCase {
         )
         cookMode.tap()
 
+        // DUT-985: with an empty journal, Cook Mode opens on a one-time pep talk.
+        let startCooking = app.buttons["Start cooking"]
+        if startCooking.waitForExistence(timeout: 3) { startCooking.tap() }
+
         // Step 3: full-screen cover with "Step 1 of M" — AC-7.2.
         let stepOnePredicate = NSPredicate(format: "label BEGINSWITH 'Step 1 of'")
         let stepOne = app.staticTexts.matching(stepOnePredicate).firstMatch

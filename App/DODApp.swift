@@ -1,6 +1,7 @@
 import BackgroundTasks
 import DODDesignSystem
 import DODFeatureFeed
+import DODFeatureRecipeDetail
 import DODNetworking
 import DODPersistence
 import DODSupport
@@ -43,6 +44,14 @@ struct DODApp: App {
         //    in the scene `.task`: a background intent launch has no scene.
         dependencies.registerAppIntents()
         _dependencies = State(initialValue: dependencies)
+
+        // DUT-988 — Live Activity buzzer buttons route into the live Cook Mode session.
+        CookActivityIntentRouter.handler = { command in
+            switch command {
+            case .pulledIt: VoiceCommandBus.shared.dispatch(.next)
+            case .snooze: VoiceCommandBus.shared.dispatch(.snooze)
+            }
+        }
     }
 
     /// One-time resolution of the iCloud-Sync opt-in default (fresh installs ON,
@@ -248,6 +257,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             self?.handleNewPostsRefresh(refreshTask)
         }
         scheduleAppRefresh()
+        PushRuntime.start()  // DUT-1397: (re)register for remote push every launch
         return true
     }
 
@@ -290,12 +300,27 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             restClient: WPRestClient(httpClient: AppDependencies.makeHTTPClient()),
             notificationService: NotificationService()
         )
-        let pollTask = Task {
+        let pollTask = Task { @MainActor in
             await poller.poll()
+            if let entries = try? await Self.loadCookLogEntries() {
+                await StreakNudgeNotifier().evaluateAndSchedule(entries: entries)
+            }
             task.setTaskCompleted(success: true)
         }
         task.expirationHandler = {
             pollTask.cancel()
         }
+    }
+
+    /// Opens the SwiftData store directly (no `AppDependencies()`) and reads
+    /// every cook-log entry for the streak-nudge evaluation. Mirrors the
+    /// in-memory seam `AppDependencies.init` uses so the L5 harness never
+    /// touches the on-disk store.
+    private static func loadCookLogEntries() async throws -> [CookLogEntry] {
+        let container =
+            AppDependencies.useInMemoryStore()
+            ? try RecipeStore.inMemoryContainer()
+            : try RecipeStore.productionContainer()
+        return try await RecipeStore(modelContainer: container).allCookLogs()
     }
 }

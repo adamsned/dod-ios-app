@@ -44,6 +44,18 @@ final class FakeRecipeDetailDependencies: RecipeDetailDependencies, @unchecked S
     var downloadShouldFail = false
     var toggleSavedShouldFail = false
 
+    /// DUT-985 — canned journal total returned by `loadTotalCookCount()`.
+    /// Defaults to `1` (matches the protocol default) so existing tests never
+    /// see the first-cook pep talk.
+    var totalCookCount = 1
+
+    func loadTotalCookCount() async -> Int { totalCookCount }
+
+    /// DUT-986 — canned rank-ladder cook count returned by `loadRankLadderCookCount()`.
+    var rankLadderCount = 0
+
+    func loadRankLadderCookCount() async -> Int { rankLadderCount }
+
     // MARK: - Article-classification test surface (US-37 / CL-63 / T-640)
 
     /// Canned article body returned by `extractArticleBody(html:)`. Empty by

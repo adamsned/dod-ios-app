@@ -23,8 +23,8 @@ extension RecipeDetailView {
         guard newValue == .ready, pendingAutoCookMode else { return }
         guard let recipe = viewModel.recipe, !recipe.instructions.isEmpty else { return }
         pendingAutoCookMode = false
-        Task { await viewModel.didTapCookMode() }
-        isCookModePresented = true
+        // DUT-985 — first-ever cook still gets the pep talk, even via deep link.
+        requestCookMode()
         onAutoCookModeStarted?()  // DUT-1240 — intent fulfilled; let the host disarm.
     }
 }
