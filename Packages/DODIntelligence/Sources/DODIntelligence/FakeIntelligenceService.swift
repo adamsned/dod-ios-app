@@ -148,4 +148,9 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         guard !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         return cannedHeatCoachAnswer
     }
+
+    public func extractIntakeProfile(from answers: [IntakeAnswer]) async -> CookIntakeProfile? {
+        guard isAvailable, !answers.isEmpty else { return nil }
+        return cannedIntake
+    }
 }
