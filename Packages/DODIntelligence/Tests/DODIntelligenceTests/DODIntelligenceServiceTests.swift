@@ -181,6 +181,21 @@ struct DODIntelligenceServiceTests {
         #expect(await bare.checkDoneness(photo: Data([1]), stepText: "Bake until golden") == nil)
     }
 
+    @Test func defaultAskHeatCoachReturnsNil() async {
+        struct Bare: DODIntelligenceService {
+            var isAvailable: Bool { true }
+            var supportsImageInput: Bool { false }
+            func suggestSubstitution(
+                for ingredient: String,
+                in context: RecipeContext?,
+                reason: SubstitutionReason?
+            ) async -> SubstitutionResult? { nil }
+            func summarize(_ text: String) async -> String? { nil }
+            func answer(_ question: String, imageData: Data?, recipeContext: String?) async -> String? { nil }
+        }
+        #expect(await Bare().askHeatCoach("windy?", ovenDiameterInches: 12, isBaking: false) == nil)
+    }
+
     @Test func scanRecipeCardDefaultsToNil() async {
         #expect(await makeLegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
     }
@@ -268,6 +283,11 @@ struct DODIntelligenceServiceTests {
         #expect(await service.summarizeComments(["a"]) == nil)
     }
 
+    @Test func liveIdentifyIngredientsIsEmptyWithoutModel() async {
+        let result = await LiveDODIntelligenceService().identifyIngredients(imageData: Data([0x00]))
+        #expect(result.isEmpty)
+    }
+
     @Test func captionMomentDefaultsToNil() async {
         let request = MomentCaptionRequest(recipeTitle: "X", note: "n")
         #expect(await makeBareService().captionMoment(request) == nil)
@@ -291,8 +311,31 @@ struct DODIntelligenceServiceTests {
         #expect(await service.captionMoment(emptyRequest) == nil)
     }
 
-    // MARK: - Helper functions
+    @Test func fakeHeatCoachReturnsCannedWhenAvailable() async {
+        let service = FakeIntelligenceService()
+        #expect(await service.askHeatCoach("windy at 6000ft?", ovenDiameterInches: 12, isBaking: false) != nil)
+    }
 
+    @Test func fakeHeatCoachNilWhenUnavailableOrEmpty() async {
+        #expect(
+            await FakeIntelligenceService(isAvailable: false).askHeatCoach("x", ovenDiameterInches: 12, isBaking: false)
+                == nil
+        )
+        #expect(await FakeIntelligenceService().askHeatCoach("   ", ovenDiameterInches: 12, isBaking: false) == nil)
+    }
+
+    @Test func liveCaptionMomentNilOnTestHost() async {
+        #expect(await LiveDODIntelligenceService().captionMoment(.init(recipeTitle: "X", note: "great")) == nil)
+    }
+
+    @Test func liveCaptionMomentNilWithoutMoment() async {
+        #expect(await LiveDODIntelligenceService().captionMoment(.init(recipeTitle: "X", note: "")) == nil)
+    }
+}
+
+// MARK: - Helper functions
+
+extension DODIntelligenceServiceTests {
     private func makeBareService() -> some DODIntelligenceService {
         struct Bare: DODIntelligenceService {
             var isAvailable: Bool { true }

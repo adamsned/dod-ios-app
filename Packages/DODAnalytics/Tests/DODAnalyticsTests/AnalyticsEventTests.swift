@@ -215,6 +215,9 @@ import Testing
             AnalyticsEvent.reviewManualRateTapped.name,
             AnalyticsEvent.recipeOfTheDayShown(recipeID: 1).name,
             AnalyticsEvent.recipeOfTheDayTapped(recipeID: 1).name,
+            AnalyticsEvent.feedbackStarted.name,
+            AnalyticsEvent.feedbackSent(category: "bug").name,
+            AnalyticsEvent.recipeProblemReported(recipeID: 1, problemType: "photo").name,
         ]
         #expect(Set(allNames).count == allNames.count)
     }
@@ -224,5 +227,11 @@ import Testing
         #expect(AnalyticsEvent.recipeOfTheDayTapped(recipeID: 7).payload == ["recipe_id": "7"])
         #expect(AnalyticsEvent.recipeOfTheDayShown(recipeID: 7).name == "recipe_of_the_day_shown")
         #expect(AnalyticsEvent.recipeOfTheDayTapped(recipeID: 7).name == "recipe_of_the_day_tapped")
+    }
+
+    @Test func recipeProblemReportedCarriesOnlyIdAndType() {
+        let event = AnalyticsEvent.recipeProblemReported(recipeID: 7, problemType: "photo")
+        #expect(event.name == "recipe_problem_reported")
+        #expect(event.payload == ["recipe_id": "7", "problem_type": "photo"])
     }
 }

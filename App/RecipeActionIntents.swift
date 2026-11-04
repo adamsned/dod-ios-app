@@ -1,5 +1,6 @@
 import AppIntents
 import DODDomain
+import DODFeatureRecipeDetail
 import DODSupport
 import Foundation
 
@@ -118,6 +119,52 @@ struct AddRecipeToShoppingListIntent: AppIntent {
             "Added \(count) ingredients from \(title) to your Shopping List."
         case .couldntLoad:
             "I couldn't load the ingredients for \(title). Open the recipe and try again."
+        }
+    }
+}
+
+/// DUT-1014 — "Add that to my list": adds ONE on-screen ingredient.
+struct AddIngredientToShoppingListIntent: AppIntent {
+
+    static let title: LocalizedStringResource = "Add Ingredient to Shopping List"
+    static let description = IntentDescription(
+        "Adds an ingredient you're looking at to your Shopping List."
+    )
+
+    /// nil = "that": the most recent on-screen ingredient.
+    @Parameter(title: "Ingredient")
+    var ingredient: IngredientEntity?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Add \(\.$ingredient) to the Shopping List")
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let entry = Self.entry(for: ingredient) else {
+            throw $ingredient.needsValueError("Which ingredient do you want to add?")
+        }
+        guard let actions = AppIntentEnvironment.actions else { throw RecipeActionError.notReady }
+        // entry.recipe is a one-ingredient copy, so the appender skips hydration.
+        let result = await actions.addToShoppingList(entry.recipe)
+        return .result(dialog: IntentDialog(stringLiteral: Self.dialogText(result, ingredient: entry.displayText)))
+    }
+
+    /// Named entity wins; else the latest on-screen ingredient.
+    @MainActor
+    static func entry(
+        for named: IngredientEntity?,
+        registry: OnscreenIngredients = .shared
+    ) -> OnscreenIngredients.Entry? {
+        if let named { return registry.entries.first { $0.id == named.id } }
+        return registry.resolve(nil)
+    }
+
+    /// Pure dialog copy (unit-tested).
+    static func dialogText(_ result: AddToShoppingListResult, ingredient: String) -> String {
+        switch result {
+        case .added: "Added \(ingredient) to your Shopping List."
+        case .couldntLoad: "I couldn't add \(ingredient). Open the recipe and try again."
         }
     }
 }
