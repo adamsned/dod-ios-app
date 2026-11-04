@@ -66,6 +66,7 @@ struct PinnedCollectionWidgetEntryView: View {
         .widgetURL(Self.collectionURL)
     }
 
+    @ViewBuilder
     private func recipeGrid(collection: PinnedCollectionsWidgetSnapshot.Collection) -> some View {
         if family == .systemLarge {
             LazyVGrid(
@@ -85,11 +86,11 @@ struct PinnedCollectionWidgetEntryView: View {
         }
     }
 
-    private func recipeLink(recipe: PinnedCollectionsWidgetSnapshot.Collection.Recipe) -> some View {
+    private func recipeLink(recipe: PinnedCollectionsWidgetSnapshot.Recipe) -> some View {
         Link(destination: recipe.deepLinkURL ?? Self.collectionURL) {
             VStack(spacing: DODSpacing.xs) {
                 WidgetCard.Hero(
-                    url: recipe.heroImageFilename.flatMap(WidgetImageBridge.fileURL(forFilename:))
+                    url: recipe.heroImageFilename.flatMap { WidgetImageBridge.fileURL(forFilename: $0) }
                 )
                 .aspectRatio(1, contentMode: .fill)
                 .clipShape(
