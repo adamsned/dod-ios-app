@@ -106,7 +106,7 @@ public enum StepTimerParser {
         var cursor = index
         while cursor < text.endIndex {
             if let half = readHalfAnHour(in: text, from: cursor) { return half }
-            if let quantity = readQuantity(in: text, from: cursor) {
+            if let quantity = readQuantity(in: text, from: cursor) ?? readWordQuantity(in: text, from: cursor) {
                 let afterSpace = skipWhitespace(in: text, from: quantity.after)
                 if let unit = readUnit(in: text, from: afterSpace) {
                     return QuantityUnit(quantity: quantity.value, unit: unit.unit, afterIndex: unit.after)
