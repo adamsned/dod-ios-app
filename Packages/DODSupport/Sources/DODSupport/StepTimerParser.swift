@@ -348,4 +348,11 @@ extension StepTimerParser {
         }
         return nil
     }
+
+    private static let wordNumerals: [String: Double] = [
+        "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+        "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+        "fifteen": 15, "twenty": 20, "thirty": 30, "forty-five": 45, "forty five": 45,
+        "sixty": 60, "a": 1, "an": 1,
+    ]
 }
