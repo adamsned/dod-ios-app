@@ -14,6 +14,24 @@ public struct CookActivityIslandAdaptiveView: View {
     public let endDate: Date?
     public let isCompleted: Bool
 
+    public init(
+        recipeTitle: String,
+        stepText: String,
+        remainingSeconds: Int,
+        totalSeconds: Int,
+        isPaused: Bool,
+        endDate: Date? = nil,
+        isCompleted: Bool = false
+    ) {
+        self.recipeTitle = recipeTitle
+        self.stepText = stepText
+        self.remainingSeconds = remainingSeconds
+        self.totalSeconds = totalSeconds
+        self.isPaused = isPaused
+        self.endDate = endDate
+        self.isCompleted = isCompleted
+    }
+
     public var body: some View {
         CookActivityLockScreenView(
             recipeTitle: recipeTitle,
