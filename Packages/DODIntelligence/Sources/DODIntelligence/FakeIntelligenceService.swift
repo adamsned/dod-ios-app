@@ -29,6 +29,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedDigest: CommentDigest?
     private let cannedMomentCaption: String?
     private let cannedHeatCoachAnswer: String?
+    private let cannedIngredients: [String]?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
@@ -54,6 +55,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     the graceful no-result path.
     ///   - recipeAnswer: What ``askRecipe(_:toolbox:)`` returns when available. nil models the no-result path.
     ///   - heatCoachAnswer: What ``askHeatCoach(_:ovenDiameterInches:isBaking:)`` returns when available. `nil` models the graceful no-result path.
+    ///   - ingredients: What ``identifyIngredients(imageData:)`` returns when available and image-capable.
     public init(
         isAvailable: Bool = true,
         supportsImageInput: Bool = true,
@@ -77,7 +79,8 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         commentDigest: CommentDigest? = .canned,
         momentCaption: String? = "Look at that golden crust — you made this, and everyone is going to ask for seconds.",
         heatCoachAnswer: String? =
-            "Add about 5 coals for the wind and altitude, keep an eye on the lid, and you're golden."
+            "Add about 5 coals for the wind and altitude, keep an eye on the lid, and you're golden.",
+        ingredients: [String] = ["eggs", "cheddar", "spinach", "butter"]
     ) {
         self.isAvailable = isAvailable
         self.supportsImageInput = supportsImageInput
@@ -92,6 +95,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         self.cannedDigest = commentDigest
         self.cannedMomentCaption = momentCaption
         self.cannedHeatCoachAnswer = heatCoachAnswer
+        self.cannedIngredients = ingredients
     }
 
     public func suggestSubstitution(
@@ -152,5 +156,10 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     public func extractIntakeProfile(from answers: [IntakeAnswer]) async -> CookIntakeProfile? {
         guard isAvailable, !answers.isEmpty else { return nil }
         return cannedIntake
+    }
+
+    public func identifyIngredients(imageData: Data) async -> [String] {
+        guard isAvailable, supportsImageInput else { return [] }
+        return cannedIngredients ?? []
     }
 }
