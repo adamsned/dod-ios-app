@@ -13,4 +13,10 @@ import Testing
             #expect(!BringListPresentation.displayName(category).isEmpty)
         }
     }
+
+    @Test func everyCategoryHasAGlyph() {
+        for category in BringListCategory.allCases {
+            #expect(!BringListPresentation.glyph(category).isEmpty)
+        }
+    }
 }
