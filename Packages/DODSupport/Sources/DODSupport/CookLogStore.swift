@@ -16,6 +16,9 @@ extension WidgetSnapshotStore {
     public func recordCook(at date: Date = Date(), calendar: Calendar = .current) {
         var dates = readCookDates()
         dates.append(date)
+        if let cutoff = calendar.date(byAdding: .day, value: -CookLogConfig.retentionDays, to: date) {
+            dates = dates.filter { $0 >= cutoff }
+        }
         defaults.set(dates.map { $0.timeIntervalSince1970 }, forKey: CookLogConfig.userDefaultsKey)
     }
 }
