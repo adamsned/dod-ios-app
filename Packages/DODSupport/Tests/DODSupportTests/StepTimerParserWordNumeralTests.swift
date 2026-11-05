@@ -14,4 +14,8 @@ import Testing
     @Test func wordNumeralFortyFiveHyphenated() {
         #expect(StepTimerParser.firstDuration(in: "Simmer forty-five minutes") == .seconds(2700))
     }
+
+    @Test func articleAnHour() {
+        #expect(StepTimerParser.firstDuration(in: "Rest an hour") == .seconds(3600))
+    }
 }
