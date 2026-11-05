@@ -57,8 +57,11 @@ struct CookModeToolDockContent: Equatable {
                 (lhs.value.remaining(at: now), lhs.key) < (rhs.value.remaining(at: now), rhs.key)
             }?
             .key
+        let extraction = StepTimerExtraction.heuristic(from: stepText)
         return CookModeToolDockContent(
-            stepTimerDuration: StepTimerParser.firstDuration(in: stepText),
+            stepTimerDuration: extraction.timers.first.map { .seconds($0.seconds) },
+            secondTimerDuration: extraction.timers.dropFirst().first.map { .seconds($0.seconds) },
+            stepTemperatureF: extraction.temperatureF,
             runningTimerStepIndex: otherRunning,
             showsHeatCoach: heatCoachAvailable && CookModeView.stepIsHeatRelated(stepText)
         )
