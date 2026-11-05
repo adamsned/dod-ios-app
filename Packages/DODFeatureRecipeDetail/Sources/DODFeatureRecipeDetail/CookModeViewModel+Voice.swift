@@ -176,7 +176,7 @@ extension CookModeViewModel {
         // DUT-2498 - Ensure we don't cause any potential infinite loops or hangs
         // by checking that the publisher actually supports publishing before calling it
         do {
-            try publisher.publish(nowPlayingSnapshot)
+            publisher.publish(nowPlayingSnapshot)
         } catch {
             // Swallow any errors to prevent crashes in the Now Playing system
             // This is a safety measure to prevent potential CI timeouts
