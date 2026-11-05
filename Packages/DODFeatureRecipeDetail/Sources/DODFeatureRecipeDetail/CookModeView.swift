@@ -41,6 +41,10 @@ public struct CookModeView: View {
     // `internal` so `CookModeView+StepBody.swift` can present the journal-log sheet.
     /// DUT-326 — drives the "Add to Cooking Journal" sheet on the Done card.
     @State var isJournalLogPresented: Bool = false
+    /// DUT-987 — drives the Ready-to-Serve check sheet that precedes the journal sheet.
+    @State var isReadyToServePresented: Bool = false
+    /// DUT-987 — set on confirm so the journal sheet opens once the check sheet has dismissed.
+    @State var openJournalAfterReadyCheck: Bool = false
     /// DUT-981 — drives the "Share the Praise" sheet; `internal` for `CookModeView+StepBody.swift`.
     @State var isGuestReactionPresented: Bool = false
     /// T-912 / DUT-551 — Heat Coach sheet over the cover; `internal` for `CookModeView+StepBody`.
