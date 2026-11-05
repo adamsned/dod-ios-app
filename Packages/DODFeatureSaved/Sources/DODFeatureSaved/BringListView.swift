@@ -11,4 +11,14 @@ enum BringListPresentation {
         case .other: "Other Gear"
         }
     }
+
+    static func glyph(_ category: BringListCategory) -> String {
+        switch category {
+        case .ovens: "frying.pan"
+        case .fuel: "flame"
+        case .tools: "wrench.and.screwdriver"
+        case .transport: "shippingbox"
+        case .other: "bag"
+        }
+    }
 }
