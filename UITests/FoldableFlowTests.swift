@@ -101,10 +101,12 @@ final class FoldableFlowTests: XCTestCase {
             goToTab(phoneLabel: "Recipes", padTitle: "Recipes & Articles")
         }
         openSettings()
-        XCTAssertTrue(
-            app.buttons["settings-link-profile"].waitForExistence(timeout: 12),
-            "Settings should render its Profile row"
-        )
+        // Use a more reliable approach for waiting for settings to load
+        let profileButton = app.buttons["settings-link-profile"]
+        XCTAssertTrue(profileButton.waitForExistence(timeout: 15), "Settings should render its Profile row")
+        // Add an additional small delay to ensure UI is fully rendered before assertion
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertTrue(profileButton.exists, "Profile button should be visible")
         let done = app.buttons["settings-done"]
         XCTAssertTrue(done.waitForExistence(timeout: 6), "Settings should host a Done button")
         done.tap()

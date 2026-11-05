@@ -91,6 +91,11 @@ targets:
         # tag Dutch Oven Daddy. iOS requires this key — without it the app
         # crashes the instant the camera is accessed.
         NSCameraUsageDescription: Take a photo to share your cook or to get cooking help from Dutch Oven Daddy.
+        # ITMS-90683: Heat Coach weather uses Core Location and the thermometer
+        # probe uses Core Bluetooth. Without these, App Store Connect warns on
+        # every upload.
+        NSLocationWhenInUseUsageDescription: Dutch Oven Daddy uses your approximate location to fill in local weather conditions for the Heat Coach.
+        NSBluetoothAlwaysUsageDescription: Dutch Oven Daddy connects to your Bluetooth thermometer probe to show live temperatures while you cook.
         # DUT-23: app-identity key for anonymous comment POSTs. The app sends it
         # as the `X-DOD-App-Key` header so WordPress's
         # `rest_allow_anonymous_comments` filter accepts comment creation from

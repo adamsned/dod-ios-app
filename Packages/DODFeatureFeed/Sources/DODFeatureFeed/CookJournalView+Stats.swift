@@ -149,4 +149,51 @@ extension CookJournalView {
         formatter.locale = locale
         return formatter.string(from: NSNumber(value: average)) ?? String(average)
     }
+
+    /// Transformation header (North Star): the cook's identity rank + the next
+    /// rung pulling them forward, so the journal opens with how far they've come,
+    /// not just a count. Only rendered with >= 1 cook (journalList is gated on a
+    /// non-empty list), so `currentRank` is non-nil — the fallbacks are defensive.
+    var journeyHeader: some View {
+        // DUT-685 — the RANK must count the SAME path-only population the rank-up
+        // celebration counts (journal minus off-path dump cakes), not the raw
+        // `totalCooks`. Both now go through `CookLogStats.rankLadderCookCount`, so
+        // the visible rank and the next celebration can never contradict. The
+        // "total cooks" stat tile in `statsHeader` still uses `totalCooks`.
+        let rankCooks = CookLogStats.rankLadderCookCount(cooks)
+        let current = CookProgression.currentRank(totalCooks: rankCooks)
+        let next = CookProgression.nextRank(totalCooks: rankCooks)
+        let toNext = CookProgression.cooksToNextRank(totalCooks: rankCooks)
+        let progress = CookProgression.progressToNextRank(totalCooks: rankCooks)
+        return VStack(spacing: DODSpacing.xs) {
+            Text(current?.emoji ?? "🔥")
+                .font(.system(size: 44))
+                .accessibilityHidden(true)
+            Text("You're a \(current?.title ?? "Fire Starter")")
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.label)
+                .multilineTextAlignment(.center)
+            if let next, let toNext {
+                ProgressView(value: progress)
+                    .tint(DODColor.burntOrange)
+                    .padding(.horizontal, DODSpacing.md)
+                Text("\(toNext) more cook\(toNext == 1 ? "" : "s") to \(next.emoji) \(next.title)")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("Top of the path. You're a certified Cast Iron Legend. 🏆")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.burntOrange)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(DODSpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                .fill(DODColor.surfaceElevated)
+        )
+        .accessibilityElement(children: .combine)
+    }
 }

@@ -86,16 +86,22 @@ public enum IngredientAggregator {
     /// Aggregate a flat ingredient list into combined, aisle-tagged items.
     ///
     /// - Parameter ingredients: Raw ingredient lines (the ``RecipeIngredient``
-    ///   `text` is all that's read; the `id` is ignored — merging is by
-    ///   parsed unit + name, not by source identity).
+    ///   `text` is read for the heuristic parse; the `id` is only used to look
+    ///   up `resolved` — merging is by parsed unit + name, not by source identity).
+    /// - Parameter resolved: DUT-1020 — per-ingredient parses (from
+    ///   `IngredientParseGate.resolve`) that replace the heuristic parse for
+    ///   that `RecipeIngredient.id`. Missing ids fall back to `IngredientLineParser`.
     /// - Returns: One ``AggregatedItem`` per distinct mergeable group, plus one
     ///   per unparseable line, ordered by aisle then first-seen.
-    public static func aggregate(_ ingredients: [RecipeIngredient]) -> [AggregatedItem] {
+    public static func aggregate(
+        _ ingredients: [RecipeIngredient],
+        resolved: [UUID: ParsedIngredientLine] = [:]
+    ) -> [AggregatedItem] {
         var order: [String] = []
         var groups: [String: MutableGroup] = [:]
 
         for (index, ingredient) in ingredients.enumerated() {
-            let parsed = IngredientLineParser.parse(ingredient.text)
+            let parsed = resolved[ingredient.id] ?? IngredientLineParser.parse(ingredient.text)
             let key = mergeKey(for: parsed, fallback: ingredient.text)
             if var existing = groups[key] {
                 existing.add(parsed)
