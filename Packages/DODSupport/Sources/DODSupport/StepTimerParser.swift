@@ -20,9 +20,11 @@ import Foundation
 ///   fraction, no space — the shape produced by decoding `&frac12;` right
 ///   after a digit)
 /// - "Rest half an hour" → 1800s
+/// - "Boil ten minutes" → 600s
 ///
 /// Out of scope (returns `nil`):
-/// - Word numerals other than "half an hour": "ten minutes"
+/// - Time-of-day or temperatures: "350°F"
+/// - Bare numbers with no unit: "stir 3 times"
 /// - Time-of-day or temperatures: "350°F"
 /// - Bare numbers with no unit: "stir 3 times"
 public enum StepTimerParser {
