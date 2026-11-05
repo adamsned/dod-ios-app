@@ -14,33 +14,38 @@ extension CookModeView {
     // `CookModePlayerControls`), wired via `openIngredients()` in
     // `CookModeView+Controls.swift`. The drawer itself is unchanged.
 
+    /// DUT-1017 — shared by the drawer sheet and the tent-mode lower pane.
+    var ingredientsList: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DODSpacing.sm) {
+                ForEach(viewModel.recipe.ingredients) { ingredient in
+                    ingredientRow(for: ingredient)
+                }
+            }
+            .padding(.horizontal, DODSpacing.md)
+            .padding(.vertical, DODSpacing.md)
+        }
+    }
+
     var ingredientsDrawer: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: DODSpacing.sm) {
-                    ForEach(viewModel.recipe.ingredients) { ingredient in
-                        ingredientRow(for: ingredient)
-                    }
-                }
-                .padding(.horizontal, DODSpacing.md)
-                .padding(.vertical, DODSpacing.md)
-            }
-            .navigationTitle("Ingredients")
-            #if os(iOS)
+            ingredientsList
+                .navigationTitle("Ingredients")
+                #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
-            // Nav-consistency sweep: the drawer is a sheet, so it gets the app's
-            // standard trailing "Done" dismissal (plus a drag indicator on the
-            // sheet itself) instead of being a swipe-only dead end.
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        ingredientsDrawerVisible = false
+                #endif
+                // Nav-consistency sweep: the drawer is a sheet, so it gets the app's
+                // standard trailing "Done" dismissal (plus a drag indicator on the
+                // sheet itself) instead of being a swipe-only dead end.
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            ingredientsDrawerVisible = false
+                        }
+                        .tint(DODColor.burntOrange)
+                        .accessibilityIdentifier("cook-mode-ingredients-done")
                     }
-                    .tint(DODColor.burntOrange)
-                    .accessibilityIdentifier("cook-mode-ingredients-done")
                 }
-            }
         }
     }
 }

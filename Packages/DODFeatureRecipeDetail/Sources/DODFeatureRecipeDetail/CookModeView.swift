@@ -41,13 +41,13 @@ public struct CookModeView: View {
     // `internal` so `CookModeView+StepBody.swift` can present the journal-log sheet.
     /// DUT-326 — drives the "Add to Cooking Journal" sheet on the Done card.
     @State var isJournalLogPresented: Bool = false
+    /// DUT-987 — drives the Ready-to-Serve check sheet that precedes the journal sheet.
+    @State var isReadyToServePresented: Bool = false
+    /// DUT-987 — set on confirm so the journal sheet opens once the check sheet has dismissed.
+    @State var openJournalAfterReadyCheck: Bool = false
     /// DUT-981 — drives the "Share the Praise" sheet; `internal` for `CookModeView+StepBody.swift`.
     @State var isGuestReactionPresented: Bool = false
-    /// T-912 / DUT-551 (CL-306) — drives the Heat Coach sheet presented OVER
-    /// Cook Mode's full-screen cover from a heat-related step's shortcut. Cook
-    /// Mode is a `.fullScreenCover`, so a tab switch would be invisible under it;
-    /// a `.sheet` layers on top instead. `internal` so `CookModeView+StepBody`
-    /// can flip it. Only shown when `heatCoachSheet != nil`.
+    /// T-912 / DUT-551 — Heat Coach sheet over the cover; `internal` for `CookModeView+StepBody`.
     @State var isHeatCoachPresented: Bool = false
     /// DUT-1385 — drives the "Ask About This Recipe" sheet over the cover.
     @State var isAskPresented: Bool = false
@@ -267,10 +267,7 @@ public struct CookModeView: View {
             CookModeRescueSheet(heatProfile: viewModel.rescueHeatProfile)
                 .presentationDetents([.medium, .large])
         }
-        // DUT-328 — one-time "this may sound robotic, get a better voice" prompt
-        // when Voice Mode turns on with only a robotic voice installed. Owns its
-        // own state (in `CookModeView+VoicePrompt.swift`) so this body stays one
-        // line and under the SwiftLint type_body_length cap.
+        // DUT-328 — one-time better-voice prompt; state lives in `CookModeView+VoicePrompt.swift`.
         .cookModeVoiceUpgradePrompt(viewModel: viewModel)
         .task {
             // Idempotent — see CookModeViewModel.beginCookMode().
