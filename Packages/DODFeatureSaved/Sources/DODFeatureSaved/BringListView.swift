@@ -1,3 +1,4 @@
+import DODDesignSystem
 import DODSupport
 import SwiftUI
 
@@ -24,5 +25,22 @@ enum BringListPresentation {
 
     static func rowLabel(_ item: BringListItem) -> String {
         item.quantity > 1 ? "\(item.quantity) x \(item.name)" : item.name
+    }
+}
+
+struct BringListGearHeader: View {
+    let category: BringListCategory
+
+    var body: some View {
+        Label {
+            Text(BringListPresentation.displayName(category))
+                .dodFont(DODType.bodyEmphasized)
+                .foregroundStyle(DODColor.label)
+        } icon: {
+            Image(systemName: BringListPresentation.glyph(category))
+                .foregroundStyle(DODColor.accent)
+        }
+        .textCase(nil)
+        .accessibilityAddTraits(.isHeader)
     }
 }
