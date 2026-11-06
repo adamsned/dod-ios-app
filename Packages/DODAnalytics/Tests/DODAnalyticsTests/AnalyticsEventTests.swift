@@ -243,4 +243,16 @@ import Testing
         #expect(shared.name == "cooking_wrapped_shared")
         #expect(shared.payload == ["period": "year_so_far"])
     }
+
+    @Test func digestDeliveredNameAndPayload() {
+        let event = AnalyticsEvent.digestDelivered(recipeCount: 5)
+        #expect(event.name == "digest_delivered")
+        #expect(event.payload == ["recipe_count": "5"])
+    }
+
+    @Test func digestOpenedIsNameOnlyWithEmptyPayload() {
+        let event = AnalyticsEvent.digestOpened
+        #expect(event.name == "digest_opened")
+        #expect(event.payload.isEmpty)
+    }
 }
