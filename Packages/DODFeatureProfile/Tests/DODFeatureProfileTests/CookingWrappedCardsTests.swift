@@ -56,4 +56,11 @@ import Testing
         #expect(ids.contains("most-cooked"))
         #expect(cards.first?.headline == "5 meals on the table")
     }
+
+    @Test func busiestMonthUsesMonthName() {
+        let entries = (1...4).map { Self.entry(recipeID: $0, month: 3, day: $0) }
+        let cards = CookingWrappedCards.cards(for: Self.wrapped(entries), calendar: Self.calendar)
+        let busiest = cards.first { $0.id == "busiest" }
+        #expect(busiest?.headline == "March")
+    }
 }
