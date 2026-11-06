@@ -26,10 +26,22 @@ struct RecipeOfTheDayCard: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            heroImageLayer
-            textOverlay
+        Button(action: onTap) {
+            ZStack(alignment: .bottomLeading) {
+                heroImageLayer
+                textOverlay
+            }
+            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                    .stroke(DODColor.burntOrange, lineWidth: 2)
+            )
         }
+        .buttonStyle(.dodPressable)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Recipe of the Day: \(item.title). \(Self.hook(for: item))")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("dod.feed.recipe-of-the-day")
     }
 }
 
