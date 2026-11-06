@@ -38,7 +38,7 @@ public enum CookingWrappedCards {
         if wrapped.totalCooks < lowDataThreshold {
             return [lowDataCard(totalCooks: wrapped.totalCooks)]
         }
-        let cards = [
+        var cards = [
             CookingWrappedCard(
                 id: "total",
                 emoji: "🍽️",
@@ -46,6 +46,26 @@ public enum CookingWrappedCards {
                 detail: "Thank you for cooking with us."
             )
         ]
+        if let top = wrapped.mostCooked {
+            cards.append(
+                CookingWrappedCard(
+                    id: "most-cooked",
+                    emoji: "🏆",
+                    headline: top.title,
+                    detail: "Your go-to, cooked \(top.count) times."
+                )
+            )
+        }
+        if let category = wrapped.topCategory {
+            cards.append(
+                CookingWrappedCard(
+                    id: "category",
+                    emoji: "🥘",
+                    headline: category,
+                    detail: "Your favorite kind of cooking this year."
+                )
+            )
+        }
         return cards
     }
 }
