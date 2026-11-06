@@ -81,4 +81,14 @@ struct FakeAxesProvider: BrowseAxesProviding {
         await viewModel.onAppear()
         #expect(viewModel.axes.first?.values.map(\.slug) == ["dinner"])
     }
+
+    @Test func providerFailureSetsErrorState() async {
+        let viewModel = BrowseByViewModel(
+            provider: FakeAxesProvider(result: .failure(BrowseTestError())),
+            dependencies: FakeCategoriesDependencies()
+        )
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .error)
+        #expect(viewModel.axes.isEmpty)
+    }
 }
