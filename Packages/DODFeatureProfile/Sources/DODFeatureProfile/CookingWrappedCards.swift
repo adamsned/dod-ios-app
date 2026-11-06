@@ -29,4 +29,23 @@ public enum CookingWrappedCards {
             detail: "Every meal you log adds to your story. Cook something tasty and it will show up here."
         )
     }
+
+    /// Returns the appropriate cards for a given wrapped data.
+    public static func cards(
+        for wrapped: CookingWrapped,
+        calendar: Calendar = .current
+    ) -> [CookingWrappedCard] {
+        if wrapped.totalCooks < lowDataThreshold {
+            return [lowDataCard(totalCooks: wrapped.totalCooks)]
+        }
+        let cards = [
+            CookingWrappedCard(
+                id: "total",
+                emoji: "🍽️",
+                headline: "\(wrapped.totalCooks) meals on the table",
+                detail: "Thank you for cooking with us."
+            )
+        ]
+        return cards
+    }
 }
