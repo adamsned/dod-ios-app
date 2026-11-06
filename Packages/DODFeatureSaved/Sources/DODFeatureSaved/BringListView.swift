@@ -21,4 +21,8 @@ enum BringListPresentation {
         case .other: "bag"
         }
     }
+
+    static func rowLabel(_ item: BringListItem) -> String {
+        item.quantity > 1 ? "\(item.quantity) x \(item.name)" : item.name
+    }
 }
