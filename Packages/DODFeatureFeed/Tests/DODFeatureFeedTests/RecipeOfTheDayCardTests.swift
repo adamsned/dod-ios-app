@@ -30,4 +30,12 @@ struct RecipeOfTheDayCardTests {
         let hook = RecipeOfTheDayCard.hook(for: item(excerpt: String(repeating: "a", count: 100)))
         #expect(hook == RecipeOfTheDayCard.fallbackHook)
     }
+
+    @MainActor @Test func cardStoresItemAndTapHandler() {
+        var tapped = false
+        let card = RecipeOfTheDayCard(item: item(excerpt: "Smoky.")) { tapped = true }
+        card.onTap()
+        #expect(tapped)
+        #expect(card.item.title == "Skillet Corn")
+    }
 }
