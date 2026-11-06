@@ -234,4 +234,13 @@ import Testing
         #expect(event.name == "recipe_problem_reported")
         #expect(event.payload == ["recipe_id": "7", "problem_type": "photo"])
     }
+
+    @Test func cookingWrappedEventsCarryOnlyPeriod() {
+        let viewed = AnalyticsEvent.cookingWrappedViewed(period: "year")
+        #expect(viewed.name == "cooking_wrapped_viewed")
+        #expect(viewed.payload == ["period": "year"])
+        let shared = AnalyticsEvent.cookingWrappedShared(period: "year_so_far")
+        #expect(shared.name == "cooking_wrapped_shared")
+        #expect(shared.payload == ["period": "year_so_far"])
+    }
 }
