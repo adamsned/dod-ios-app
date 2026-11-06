@@ -44,3 +44,30 @@ struct BringListGearHeader: View {
         .accessibilityAddTraits(.isHeader)
     }
 }
+
+struct BringListView: View {
+    @Binding var list: BringList
+
+    var body: some View {
+        List {
+            ForEach(list.grouped(), id: \.category) { group in
+                Section {
+                    ForEach(group.items) { item in
+                        Button {
+                            list.togglePacked(id: item.id)
+                        } label: {
+                            Label(
+                                BringListPresentation.rowLabel(item),
+                                systemImage: item.isPacked ? "checkmark.circle.fill" : "circle"
+                            )
+                        }
+                        .accessibilityValue(item.isPacked ? "Packed" : "Not packed")
+                    }
+                } header: {
+                    BringListGearHeader(category: group.category)
+                }
+            }
+        }
+        .navigationTitle("The Bring List")
+    }
+}
