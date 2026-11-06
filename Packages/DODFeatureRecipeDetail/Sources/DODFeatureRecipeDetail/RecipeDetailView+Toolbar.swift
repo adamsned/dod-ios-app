@@ -230,6 +230,22 @@ extension RecipeDetailView {
     nonisolated static func prefersImageCard(_ defaults: UserDefaults = .standard) -> Bool {
         defaults.string(forKey: "dod.settings.shareFormat") == "imageCard"
     }
+
+    /// DUT-1634: renders the branded PNG card and returns its temp-file URL,
+    /// or nil when rendering/writing fails (caller falls back to the PDF).
+    /// Fixed light scheme: the image is shared outside the app.
+    @MainActor
+    static func imageCardShareURL(recipe: Recipe, heroImage: UIImage?) -> URL? {
+        guard
+            let card = RecipeImageCardRenderer.render(
+                recipe: recipe,
+                heroImage: heroImage,
+                logo: DODBrandAsset.logoBadge,
+                scheme: .light
+            )
+        else { return nil }
+        return RecipeImageCardRenderer.writePNG(card, slug: recipe.slug)
+    }
     #endif
 
     // MARK: - Add to Shopping List (DUT-535)
