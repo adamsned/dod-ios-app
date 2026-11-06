@@ -63,4 +63,39 @@ struct WeeklyDigestGateTests {
             )
         )
     }
+
+    @Test func neverSentAllowsSendWhenRecipesExist() {
+        let now = Self.date(day: 20, hour: 10)
+        #expect(
+            WeeklyDigestGate.shouldSend(
+                newRecipeCount: 1,
+                lastSentAt: nil,
+                now: now,
+                calendar: Self.utc
+            )
+        )
+    }
+
+    @Test func quietHourBlocks() {
+        for hour in [22, 3] {
+            let now = Self.date(day: 20, hour: hour)
+            #expect(
+                !WeeklyDigestGate.shouldSend(
+                    newRecipeCount: 2,
+                    lastSentAt: nil,
+                    now: now,
+                    calendar: Self.utc
+                )
+            )
+        }
+        let daytime = Self.date(day: 20, hour: 10)
+        #expect(
+            WeeklyDigestGate.shouldSend(
+                newRecipeCount: 2,
+                lastSentAt: nil,
+                now: daytime,
+                calendar: Self.utc
+            )
+        )
+    }
 }
