@@ -27,4 +27,8 @@ import Testing
     @Test func dateEqualToNowReturnsNil() {
         #expect(SystemBringListReminder.interval(until: now, now: now) == nil)
     }
+
+    @Test func identifierIsStable() {
+        #expect(SystemBringListReminder.identifier == "dod.bringList.packTheTruck")
+    }
 }
