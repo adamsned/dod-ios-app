@@ -23,6 +23,8 @@ public final class CategoryRecipesViewModel {
     /// T-765 / CL-162 (DUT-71) — saved recipe ids for the card long-press
     /// Save/Unsave label (hydrated on appear; optimistic flip on toggle).
     public private(set) var savedRecipeIDs: Set<Int> = []
+    /// DUT-161 — curated lead order for this category (empty = none).
+    public private(set) var pinnedIDs: [Int] = []
     /// DUT-693 (PR6) — bumped after every clean reload (pull-to-refresh or a
     /// successful retry) so the view can fire a `.sensoryFeedback(.success,
     /// trigger:)` haptic. Not part of any AC — UX polish mirroring
@@ -53,6 +55,7 @@ public final class CategoryRecipesViewModel {
         // Refresh first (ungated) so a save made on another surface reflects
         // in the card long-press menu even when items are already loaded.
         await refreshSavedRecipeIDs()
+        pinnedIDs = await dependencies.pinnedRecipeIDs(forCategoryID: category.id)
         guard items.isEmpty else { return }
 
         // DUT-166: Support tag mode by checking if category ID is 0, which indicates
