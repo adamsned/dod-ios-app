@@ -18,3 +18,11 @@ public struct BrowseByView: View {
             .task { await viewModel.onAppear() }
     }
 }
+
+extension BrowseByView {
+    func chip(axis: BrowseAxis, value: BrowseAxisValue) -> some View {
+        Button(value.title) { onSelect(axis, value) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("browse.\(axis.slug).\(value.slug)")
+    }
+}
