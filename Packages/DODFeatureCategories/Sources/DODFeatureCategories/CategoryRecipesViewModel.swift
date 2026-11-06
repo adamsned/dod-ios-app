@@ -81,6 +81,11 @@ public final class CategoryRecipesViewModel {
         return lead + items.filter { !seen.contains($0.id) }
     }
 
+    /// First loaded recipe with a hero image; `nil` shows a plain header.
+    public var heroImageURL: URL? {
+        displayItems.compactMap(\.heroImage).first
+    }
+
     /// T-765 / CL-162 (DUT-71) — reload the saved-id set from the store (cheap
     /// id projection); called on every appear so a save made on another surface
     /// reflects in the card long-press menu's Save/Unsave label.
