@@ -47,4 +47,13 @@ import Testing
         #expect(cards.count == 1)
         #expect(cards.first?.id == "low-data")
     }
+
+    @Test func fiveCooksShowsTotalAndMostCooked() {
+        let entries = (1...5).map { Self.entry(recipeID: $0 % 2, day: $0) }
+        let cards = CookingWrappedCards.cards(for: Self.wrapped(entries), calendar: Self.calendar)
+        let ids = cards.map(\.id)
+        #expect(ids.contains("total"))
+        #expect(ids.contains("most-cooked"))
+        #expect(cards.first?.headline == "5 meals on the table")
+    }
 }
