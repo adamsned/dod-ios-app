@@ -255,7 +255,8 @@ struct TabStack: View {
                 // stack. Slides up from the bottom; dismisses via its "Done".
                 // `DODFeatureFeed` can't import `DODFeatureSearch` (CL-122), so the
                 // header calls this injected closure and the App shell presents it.
-                onOpenSearch: { showSearch = true }
+                onOpenSearch: { showSearch = true },
+                recipeOfTheDay: RecipeOfTheDayModel()
             )
         case .saved:
             SavedView(
