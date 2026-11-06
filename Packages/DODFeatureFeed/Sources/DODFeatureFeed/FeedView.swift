@@ -67,6 +67,8 @@ public struct FeedView: View {
     /// recompute). Gates the owner-only compose button; OFF for everyone until
     /// Dad's real `sub` is configured in `OwnerGate`.
     @State private var isOwnerComposer = false
+    /// DUT-117 — Recipe of the Day shelf model. nil (default) renders no card.
+    @State private var recipeOfTheDay: RecipeOfTheDayModel?
     /// ⚠️ DEV DEBUG (strip before public release — see DevDebug.swift) — the
     /// Settings "Dev Debug" toggle force-shows this owner UI for design review.
     @AppStorage(DevDebug.forceShowOwnerUIKey) private var devForceShowOwnerUI = false
@@ -79,7 +81,8 @@ public struct FeedView: View {
         onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         openShoppingList: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
-        onOpenSearch: (() -> Void)? = nil
+        onOpenSearch: (() -> Void)? = nil,
+        recipeOfTheDay: RecipeOfTheDayModel? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
@@ -87,6 +90,7 @@ public struct FeedView: View {
         self.openShoppingList = openShoppingList
         self.onOpenSettings = onOpenSettings
         self.onOpenSearch = onOpenSearch
+        _recipeOfTheDay = State(initialValue: recipeOfTheDay)
     }
 
     public var body: some View {
@@ -318,6 +322,15 @@ public struct FeedView: View {
             // cook. It's now a slim overlay callout hosted by the App shell (see
             // `RootView+FirstCookoutCallout.swift`) so it displaces nothing and can
             // point at the Tools tab, which this view doesn't own.
+            if let recipeOfTheDay, let pick = recipeOfTheDay.item {
+                RecipeOfTheDayCard(item: pick) {
+                    recipeOfTheDay.recordTap()
+                    onSelect(pick, viewModel.items)
+                }
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.top, DODSpacing.md)
+                .onAppear { recipeOfTheDay.recordImpressionIfNeeded() }
+            }
             Group {
                 switch layout {
                 case .gallery:
@@ -333,6 +346,12 @@ public struct FeedView: View {
                 ProgressView()
                     .padding(.vertical, DODSpacing.lg)
             }
+        }
+        .task(id: viewModel.items.map(\.id)) {
+            await recipeOfTheDay?.resolve(
+                pool: viewModel.items,
+                lookup: { ids in (try? await viewModel.dependencies.cachedListItems(forIDs: ids)) ?? [] }
+            )
         }
     }
 
