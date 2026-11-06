@@ -91,4 +91,15 @@ struct FakeAxesProvider: BrowseAxesProviding {
         #expect(viewModel.loadState == .error)
         #expect(viewModel.axes.isEmpty)
     }
+
+    @Test func resolvesDeepLinkValue() async {
+        let deps = BrowseByFakeCategoriesDependencies()
+        deps.itemsByTagIDs[[12]] = [CategoryRecipesViewModelTests.makeItem(1)]
+        let config = BrowseAxesConfig(axes: [Self.axis("course", [("dinner", [12])])])
+        let viewModel = BrowseByViewModel(provider: FakeAxesProvider(result: .success(config)), dependencies: deps)
+        await viewModel.onAppear()
+        #expect(viewModel.value(axisSlug: "course", valueSlug: "dinner")?.tagIDs == [12])
+        #expect(viewModel.value(axisSlug: "course", valueSlug: "nope") == nil)
+        #expect(viewModel.value(axisSlug: "nope", valueSlug: "dinner") == nil)
+    }
 }
