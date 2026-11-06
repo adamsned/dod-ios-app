@@ -14,4 +14,19 @@ public enum WeeklyDigestGate {
     public static func isQuietHour(_ hour: Int) -> Bool {
         hour >= quietStartHour || hour < quietEndHour
     }
+
+    /// True when a digest may be sent now.
+    /// - `newRecipeCount == 0` -> false (no empty digests).
+    /// - `lastSentAt` within `minimumInterval` of `now` -> false (never double-fires).
+    /// - `now` inside quiet hours (in `calendar`) -> false.
+    public static func shouldSend(
+        newRecipeCount: Int,
+        lastSentAt: Date?,
+        now: Date,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard newRecipeCount > 0 else { return false }
+        if let lastSentAt, now.timeIntervalSince(lastSentAt) < minimumInterval { return false }
+        return !isQuietHour(calendar.component(.hour, from: now))
+    }
 }
