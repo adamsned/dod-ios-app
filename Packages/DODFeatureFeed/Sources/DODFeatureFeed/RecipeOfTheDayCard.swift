@@ -1,3 +1,4 @@
+import DODDesignSystem
 import DODDomain
 import SwiftUI
 
@@ -25,6 +26,28 @@ struct RecipeOfTheDayCard: View {
     }
 
     var body: some View {
-        Text(item.title)
+        heroImageLayer
+    }
+}
+
+extension RecipeOfTheDayCard {
+    fileprivate var heroImageLayer: some View {
+        ReliableImage(url: item.heroImage) { phase in
+            switch phase {
+            case .empty:
+                LoadingSkeleton(cornerRadius: 0)
+            case .success(let image):
+                image.resizable().scaledToFill()
+            case .failure:
+                Image(systemName: "photo")
+                    .font(.system(size: 40))
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(DODColor.surface)
+            }
+        }
+        .frame(height: 220)
+        .frame(maxWidth: .infinity)
+        .clipped()
     }
 }
