@@ -15,7 +15,7 @@ public protocol BringListReminding: Sendable {
 /// `UNUserNotificationCenter`-backed implementation. The notifications
 /// toggle is injected as a closure so this package need not import the
 /// Settings module.
-public struct SystemBringListReminder {
+public struct SystemBringListReminder: BringListReminding {
     static let identifier = "dod.bringList.packTheTruck"
     static let title = "Pack the truck"
     static let body = "Check your Bring List - tongs, chimney, coals and Dutch ovens."
@@ -50,6 +50,15 @@ extension SystemBringListReminder {
             trigger: trigger
         )
         try? await UNUserNotificationCenter.current().add(request)
+        #endif
+    }
+
+    public func cancelPackReminder() async {
+        #if canImport(UserNotifications)
+        let ids = [Self.identifier]
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+        center.removeDeliveredNotifications(withIdentifiers: ids)
         #endif
     }
 }

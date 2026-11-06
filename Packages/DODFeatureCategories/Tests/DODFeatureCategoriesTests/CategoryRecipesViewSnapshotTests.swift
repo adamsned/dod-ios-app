@@ -67,6 +67,42 @@ final class CategoryRecipesViewSnapshotTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func test_loadedRecipesWithDescription_light_defaultDynamicType() async {
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.posts[1] = (1...5).map(Self.makeItem)
+        let category = DODDomain.Category(
+            id: 336,
+            name: "Desserts",
+            slug: "desserts",
+            count: 5,
+            description: "Sweet cast iron bakes"
+        )
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+        let view = CategoryRecipesStatefulHost(viewModel: viewModel)
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .failed
+        )
+    }
+
+    @MainActor
+    func test_loadedRecipesWithEmptyDescription_light_defaultDynamicType() async {
+        let dependencies = FakeCategoriesDependencies()
+        dependencies.posts[1] = (1...5).map(Self.makeItem)
+        let category = DODDomain.Category(id: 336, name: "Desserts", slug: "desserts", count: 5, description: "")
+        let viewModel = CategoryRecipesViewModel(category: category, dependencies: dependencies)
+        await viewModel.onAppear()
+        let view = CategoryRecipesStatefulHost(viewModel: viewModel)
+        assertSnapshot(
+            of: view,
+            as: .image(layout: .fixed(width: 390, height: 844), traits: Self.lightTraits()),
+            record: .failed
+        )
+    }
+
     // MARK: - Fixtures
 
     /// Drives a `CategoryRecipesViewModel` into `.loaded` with 8

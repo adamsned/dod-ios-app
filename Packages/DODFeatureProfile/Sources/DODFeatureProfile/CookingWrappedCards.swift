@@ -76,6 +76,24 @@ public enum CookingWrappedCards {
                 )
             )
         }
+        appendBusiestMonthCard(to: &cards, wrapped: wrapped, calendar: calendar)
         return cards
+    }
+
+    private static func appendBusiestMonthCard(
+        to cards: inout [CookingWrappedCard],
+        wrapped: CookingWrapped,
+        calendar: Calendar
+    ) {
+        if let month = wrapped.busiestMonth, (1...12).contains(month.month) {
+            cards.append(
+                CookingWrappedCard(
+                    id: "busiest",
+                    emoji: "🔥",
+                    headline: calendar.monthSymbols[month.month - 1],
+                    detail: "Your busiest month, with \(month.count) cooks."
+                )
+            )
+        }
     }
 }
