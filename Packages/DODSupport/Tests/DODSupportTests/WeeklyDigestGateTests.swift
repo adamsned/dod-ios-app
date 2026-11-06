@@ -37,4 +37,30 @@ struct WeeklyDigestGateTests {
             )
         )
     }
+
+    @Test func sentSixDaysAgoBlocksSend() {
+        let now = Self.date(day: 20, hour: 10)
+        let last = Self.date(day: 14, hour: 10)
+        #expect(
+            !WeeklyDigestGate.shouldSend(
+                newRecipeCount: 3,
+                lastSentAt: last,
+                now: now,
+                calendar: Self.utc
+            )
+        )
+    }
+
+    @Test func sentEightDaysAgoAllows() {
+        let now = Self.date(day: 20, hour: 10)
+        let last = Self.date(day: 12, hour: 10)
+        #expect(
+            WeeklyDigestGate.shouldSend(
+                newRecipeCount: 3,
+                lastSentAt: last,
+                now: now,
+                calendar: Self.utc
+            )
+        )
+    }
 }
