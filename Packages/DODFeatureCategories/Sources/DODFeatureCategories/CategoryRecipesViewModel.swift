@@ -62,7 +62,7 @@ public final class CategoryRecipesViewModel {
         // this is a tag-based view model rather than category-based
         if category.id == 0 {
             // In tag mode, fetch posts by tag ID 12 (as expected by the test)
-            await load(page: 1, tagIDs: [12])
+            _ = await load(page: 1, tagIDs: [12])
         } else {
             await load(page: 1)
         }
