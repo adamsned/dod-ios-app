@@ -22,6 +22,18 @@ public final class BrowseByViewModel {
         self.dependencies = dependencies
     }
 
+    public func onAppear() async {
+        guard loadState == .idle || loadState == .error else { return }
+        loadState = .loading
+        do {
+            let config = try await provider.loadAxes()
+            axes = await Self.pruneEmpty(config.axes, dependencies: dependencies)
+            loadState = .loaded
+        } catch {
+            loadState = .error
+        }
+    }
+
     /// A value is kept when a 1-item probe of its tags returns items; a failed probe keeps it
     /// (fail open) so a flaky network never hides content.
     nonisolated static func pruneEmpty(
