@@ -32,4 +32,24 @@ extension SystemBringListReminder {
         let seconds = date.timeIntervalSince(now)
         return seconds > 0 ? seconds : nil
     }
+
+    public func schedulePackReminder(at date: Date) async {
+        #if canImport(UserNotifications)
+        guard isEnabled(), let seconds = Self.interval(until: date) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = Self.title
+        content.body = Self.body
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: seconds,
+            repeats: false
+        )
+        let request = UNNotificationRequest(
+            identifier: Self.identifier,
+            content: content,
+            trigger: trigger
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+        #endif
+    }
 }
