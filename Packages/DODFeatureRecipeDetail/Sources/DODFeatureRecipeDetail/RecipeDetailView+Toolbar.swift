@@ -223,6 +223,13 @@ extension RecipeDetailView {
         let base = recipe.slug.isEmpty ? "recipe" : recipe.slug
         return "\(base).pdf"
     }
+
+    /// DUT-1634: true when the user's shareFormat preference is "imageCard".
+    /// Same key/raw value as DODFeatureFeed's ShareFormatPreference (which this
+    /// package cannot import).
+    nonisolated static func prefersImageCard(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.string(forKey: "dod.settings.shareFormat") == "imageCard"
+    }
     #endif
 
     // MARK: - Add to Shopping List (DUT-535)
