@@ -72,4 +72,13 @@ struct FakeAxesProvider: BrowseAxesProviding {
         await viewModel.onAppear()
         #expect(viewModel.axes.map(\.slug) == ["course"])
     }
+
+    @Test func failedProbeKeepsValue() async {
+        let deps = BrowseByFakeCategoriesDependencies()
+        deps.failingTagIDs = [[12]]
+        let config = BrowseAxesConfig(axes: [Self.axis("course", [("dinner", [12])])])
+        let viewModel = BrowseByViewModel(provider: FakeAxesProvider(result: .success(config)), dependencies: deps)
+        await viewModel.onAppear()
+        #expect(viewModel.axes.first?.values.map(\.slug) == ["dinner"])
+    }
 }
