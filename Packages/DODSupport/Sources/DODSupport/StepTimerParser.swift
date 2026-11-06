@@ -20,9 +20,11 @@ import Foundation
 ///   fraction, no space — the shape produced by decoding `&frac12;` right
 ///   after a digit)
 /// - "Rest half an hour" → 1800s
+/// - "Boil ten minutes" → 600s
 ///
 /// Out of scope (returns `nil`):
-/// - Word numerals other than "half an hour": "ten minutes"
+/// - Time-of-day or temperatures: "350°F"
+/// - Bare numbers with no unit: "stir 3 times"
 /// - Time-of-day or temperatures: "350°F"
 /// - Bare numbers with no unit: "stir 3 times"
 public enum StepTimerParser {
@@ -106,7 +108,7 @@ public enum StepTimerParser {
         var cursor = index
         while cursor < text.endIndex {
             if let half = readHalfAnHour(in: text, from: cursor) { return half }
-            if let quantity = readQuantity(in: text, from: cursor) {
+            if let quantity = readQuantity(in: text, from: cursor) ?? readWordQuantity(in: text, from: cursor) {
                 let afterSpace = skipWhitespace(in: text, from: quantity.after)
                 if let unit = readUnit(in: text, from: afterSpace) {
                     return QuantityUnit(quantity: quantity.value, unit: unit.unit, afterIndex: unit.after)
@@ -347,5 +349,29 @@ extension StepTimerParser {
             )
         }
         return nil
+    }
+
+    private static let wordNumerals: [String: Double] = [
+        "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+        "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+        "fifteen": 15, "twenty": 20, "thirty": 30, "forty-five": 45, "forty five": 45,
+        "sixty": 60, "a": 1, "an": 1,
+    ]
+
+    /// Longest `wordNumerals` key that is a prefix of `text[index...]`, starts at a
+    /// word start, and ends on a non-letter boundary (same rule as `readUnit`).
+    private static func readWordQuantity(in text: String, from index: String.Index) -> Quantity? {
+        guard isWordStart(in: text, at: index) else { return nil }
+        let lower = String(text[index...]).lowercased()
+        var best: (key: String, value: Double)?
+        for (key, value) in wordNumerals where lower.hasPrefix(key) && key.count > (best?.key.count ?? 0) {
+            let end = lower.index(lower.startIndex, offsetBy: key.count)
+            if end < lower.endIndex, lower[end].isLetter {
+                continue
+            }
+            best = (key, value)
+        }
+        guard let match = best else { return nil }
+        return Quantity(value: match.value, after: text.index(index, offsetBy: match.key.count))
     }
 }
