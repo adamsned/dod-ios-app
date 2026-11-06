@@ -21,4 +21,8 @@ extension WidgetSnapshotStore {
         }
         defaults.set(dates.map { $0.timeIntervalSince1970 }, forKey: CookLogConfig.userDefaultsKey)
     }
+
+    public func readCookStreakStats(now: Date = Date(), calendar: Calendar = .current) -> CookStreakStats {
+        CookStreakStats.compute(cookDates: readCookDates(), now: now, calendar: calendar)
+    }
 }
