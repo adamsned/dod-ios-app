@@ -62,10 +62,28 @@ public final class CategoryRecipesViewModel {
         // this is a tag-based view model rather than category-based
         if category.id == 0 {
             // In tag mode, fetch posts by tag ID 12 (as expected by the test)
-            await load(page: 1, tagIDs: [12])
+            _ = await load(page: 1, tagIDs: [12])
         } else {
             await load(page: 1)
         }
+    }
+
+    /// Pinned recipes (in curated order, only those loaded) then the rest
+    /// in their existing chronological order.
+    public var displayItems: [RecipeListItem] {
+        guard !pinnedIDs.isEmpty else { return items }
+        let byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<Int>()
+        let lead = pinnedIDs.compactMap { id -> RecipeListItem? in
+            guard seen.insert(id).inserted else { return nil }
+            return byID[id]
+        }
+        return lead + items.filter { !seen.contains($0.id) }
+    }
+
+    /// First loaded recipe with a hero image; `nil` shows a plain header.
+    public var heroImageURL: URL? {
+        displayItems.compactMap(\.heroImage).first
     }
 
     /// T-765 / CL-162 (DUT-71) — reload the saved-id set from the store (cheap
