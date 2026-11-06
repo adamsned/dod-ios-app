@@ -60,4 +60,16 @@ struct FakeAxesProvider: BrowseAxesProviding {
         #expect(viewModel.loadState == .loaded)
         #expect(viewModel.axes.first?.values.map(\.slug) == ["dinner"])
     }
+
+    @Test func dropsAxisWhenAllValuesEmpty() async {
+        let deps = BrowseByFakeCategoriesDependencies()
+        deps.itemsByTagIDs[[12]] = [CategoryRecipesViewModelTests.makeItem(1)]
+        let config = BrowseAxesConfig(axes: [
+            Self.axis("course", [("dinner", [12])]),
+            Self.axis("protein", [("beef", [30]), ("pork", [31])]),
+        ])
+        let viewModel = BrowseByViewModel(provider: FakeAxesProvider(result: .success(config)), dependencies: deps)
+        await viewModel.onAppear()
+        #expect(viewModel.axes.map(\.slug) == ["course"])
+    }
 }
