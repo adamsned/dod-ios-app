@@ -39,3 +39,25 @@ struct FakeAxesProvider: BrowseAxesProviding {
         try result.get()
     }
 }
+
+@MainActor
+@Suite("BrowseByViewModel (DUT-2140)") struct BrowseByViewModelTests {
+    static func axis(_ slug: String, _ values: [(String, [Int])]) -> BrowseAxis {
+        BrowseAxis(
+            slug: slug,
+            title: slug.capitalized,
+            values: values.map { BrowseAxisValue(slug: $0.0, title: $0.0.capitalized, tagIDs: $0.1) }
+        )
+    }
+
+    @Test func hidesValuesWithZeroResults() async {
+        let deps = BrowseByFakeCategoriesDependencies()
+        deps.itemsByTagIDs[[12]] = [CategoryRecipesViewModelTests.makeItem(1)]
+        deps.itemsByTagIDs[[13]] = []
+        let config = BrowseAxesConfig(axes: [Self.axis("course", [("dinner", [12]), ("lunch", [13])])])
+        let viewModel = BrowseByViewModel(provider: FakeAxesProvider(result: .success(config)), dependencies: deps)
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .loaded)
+        #expect(viewModel.axes.first?.values.map(\.slug) == ["dinner"])
+    }
+}
