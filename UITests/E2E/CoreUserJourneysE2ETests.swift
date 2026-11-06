@@ -670,6 +670,7 @@ final class CoreUserJourneysE2ETests: XCTestCase {
         let cookMode = app.buttons["recipe.cookMode.cta"]
         XCTAssertTrue(cookMode.waitForExistence(timeout: 5), "Cook Mode CTA should be visible")
         cookMode.tap()
+        app.startCookingPastPepTalk()
 
         // AC-7.2: "Step 1 of M" appears in the top bar.
         let stepOne = app.staticTexts.matching(

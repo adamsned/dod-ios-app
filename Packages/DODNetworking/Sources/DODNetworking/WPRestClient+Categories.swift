@@ -9,7 +9,7 @@ extension WPRestClient {
         let queryItems: [URLQueryItem] = [
             URLQueryItem(name: "per_page", value: "100"),
             URLQueryItem(name: "hide_empty", value: "true"),
-            URLQueryItem(name: "_fields", value: "id,name,slug,count"),
+            URLQueryItem(name: "_fields", value: "id,name,slug,count,description"),
         ]
         // A single malformed row (e.g. a taxonomy entry missing a required
         // field) otherwise fails the ENTIRE `[WPDTO.Category]` decode,

@@ -10,6 +10,22 @@ import Testing
         let decoded = try JSONDecoder().decode(Category.self, from: data)
         #expect(decoded == original)
     }
+
+    @Test func categoryDecodesLegacyJSONWithoutDescription() throws {
+        let json = """
+            {"id":1,"name":"A","slug":"a","count":2}
+            """
+        let data = Data(json.utf8)
+        let category = try JSONDecoder().decode(Category.self, from: data)
+        #expect(category.description.isEmpty)
+    }
+
+    @Test func categoryRoundTripKeepsDescription() throws {
+        let original = Category(id: 1, name: "A", slug: "a", count: 2, description: "Hi")
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Category.self, from: data)
+        #expect(decoded == original)
+    }
 }
 
 @Suite("RecipeIngredient value type") struct RecipeIngredientTests {

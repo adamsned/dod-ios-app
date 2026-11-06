@@ -1,3 +1,4 @@
+import AudioToolbox
 import Combine
 import DODDesignSystem
 import DODDomain
@@ -25,21 +26,13 @@ public struct CookModeView: View {
     /// DUT-599 — `internal` so `CookModeView+Controls.swift` can open the drawer
     /// from the carrot button wired into the transport's secondary row.
     @State var ingredientsDrawerVisible: Bool = false
-    /// DUT-529 — belt-and-suspenders idle-timer safety net. `.onDisappear`
-    /// already restores the idle timer on a normal teardown; this observer also
-    /// restores it when the app backgrounds (so an atypical teardown that never
-    /// fires `.onDisappear` can't leave `isIdleTimerDisabled` stuck on), and
-    /// re-arms it on return to `.active` if the session is still up. Both
-    /// `begin`/`endCookMode` are idempotent, so this never double-restores.
+    /// DUT-529 — restores the idle timer when the app backgrounds and re-arms it on `.active`
+    /// (begin/endCookMode are idempotent).
     @Environment(\.scenePhase) private var scenePhase
     /// DUT-137 — re-evaluated live on Stage Manager / Split View resize; state in
     /// `viewModel` is untouched so no cook state is lost.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    /// DUT-529 — when Reduce Motion is on, drop the step-change slide/scale
-    /// animation (constitution §7); the step swap still happens, just without the
-    /// motion. Mirrors the `LoadingSkeleton` shimmer guard.
-    /// `internal` (not `private`) so `CookModeView+Controls.swift` can gate the
-    /// panel's collapse/expand animation on Reduce Motion (constitution §7).
+    /// DUT-529 — Reduce Motion drops the step-change animation; `internal` for `CookModeView+Controls.swift`.
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     /// DUT-116 — VoiceOver-aware layout switch; `internal` for the extension files.
     @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
@@ -48,13 +41,13 @@ public struct CookModeView: View {
     // `internal` so `CookModeView+StepBody.swift` can present the journal-log sheet.
     /// DUT-326 — drives the "Add to Cooking Journal" sheet on the Done card.
     @State var isJournalLogPresented: Bool = false
+    /// DUT-987 — drives the Ready-to-Serve check sheet that precedes the journal sheet.
+    @State var isReadyToServePresented: Bool = false
+    /// DUT-987 — set on confirm so the journal sheet opens once the check sheet has dismissed.
+    @State var openJournalAfterReadyCheck: Bool = false
     /// DUT-981 — drives the "Share the Praise" sheet; `internal` for `CookModeView+StepBody.swift`.
     @State var isGuestReactionPresented: Bool = false
-    /// T-912 / DUT-551 (CL-306) — drives the Heat Coach sheet presented OVER
-    /// Cook Mode's full-screen cover from a heat-related step's shortcut. Cook
-    /// Mode is a `.fullScreenCover`, so a tab switch would be invisible under it;
-    /// a `.sheet` layers on top instead. `internal` so `CookModeView+StepBody`
-    /// can flip it. Only shown when `heatCoachSheet != nil`.
+    /// T-912 / DUT-551 — Heat Coach sheet over the cover; `internal` for `CookModeView+StepBody`.
     @State var isHeatCoachPresented: Bool = false
     /// DUT-1385 — drives the "Ask About This Recipe" sheet over the cover.
     @State var isAskPresented: Bool = false
@@ -109,6 +102,10 @@ public struct CookModeView: View {
     /// `CookModeView+Controls.swift` can read the delay.
     @AppStorage(CookModeControlsAutoMinimize.preferenceKey)
     var autoMinimizeSeconds: Int = CookModeControlsAutoMinimize.defaultSeconds
+
+    /// DUT-173 — opt-in auto-advance when a step timer finishes.
+    @AppStorage(CookModeAutoAdvance.preferenceKey)
+    var autoAdvanceOnTimer: Bool = CookModeAutoAdvance.defaultEnabled
 
     /// DUT-596 — whether the player control panel is currently expanded. Flips to
     /// `false` after `autoMinimizeSeconds` of no interaction (never while
@@ -237,6 +234,7 @@ public struct CookModeView: View {
                 )
             }
         }
+        .overlay(alignment: .bottom) { autoAdvanceBanner }  // DUT-173
         .sheet(isPresented: $ingredientsDrawerVisible) {
             ingredientsDrawer
                 .presentationDetents([.medium, .large])
@@ -269,16 +267,14 @@ public struct CookModeView: View {
             CookModeRescueSheet(heatProfile: viewModel.rescueHeatProfile)
                 .presentationDetents([.medium, .large])
         }
-        // DUT-328 — one-time "this may sound robotic, get a better voice" prompt
-        // when Voice Mode turns on with only a robotic voice installed. Owns its
-        // own state (in `CookModeView+VoicePrompt.swift`) so this body stays one
-        // line and under the SwiftLint type_body_length cap.
+        // DUT-328 — one-time better-voice prompt; state lives in `CookModeView+VoicePrompt.swift`.
         .cookModeVoiceUpgradePrompt(viewModel: viewModel)
         .task {
             // Idempotent — see CookModeViewModel.beginCookMode().
             viewModel.beginCookMode()
             // DUT-596 — start visible, then arm the idle-minimize timer.
             wakeControls()
+            viewModel.autoAdvanceEnabled = autoAdvanceOnTimer
         }
         .onReceive(timerTicker) { _ in viewModel.tickTimers() }
         .sensoryFeedback(.success, trigger: viewModel.timerCompletionTick)
@@ -292,9 +288,11 @@ public struct CookModeView: View {
         // DUT-401 — announce timer completion (skip the initial 0 so mounting is silent).
         .onChange(of: viewModel.timerCompletionTick) { _, tick in
             if tick > 0 { announce("Timer complete.") }
+            if tick > 0, autoAdvanceOnTimer { AudioServicesPlaySystemSound(1007) }
         }
         // DUT-401 — announce the new step so VoiceOver users aren't left hunting for it.
         .onChange(of: viewModel.currentStepIndex) { _, _ in announceCurrentStep() }
+        .onChange(of: autoAdvanceOnTimer) { _, new in viewModel.autoAdvanceEnabled = new }
         .onChange(of: viewModel.isFinished) { _, _ in
             announceCurrentStep()
             // DUT-596 — the Done card must stay fully visible: expand and keep
