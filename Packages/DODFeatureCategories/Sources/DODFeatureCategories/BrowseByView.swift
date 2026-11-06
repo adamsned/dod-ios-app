@@ -1,3 +1,4 @@
+import DODDesignSystem
 import DODDomain
 import SwiftUI
 
@@ -24,5 +25,18 @@ extension BrowseByView {
         Button(value.title) { onSelect(axis, value) }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("browse.\(axis.slug).\(value.slug)")
+    }
+
+    func section(_ axis: BrowseAxis) -> some View {
+        VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            Text(axis.title).font(.headline)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack {
+                    ForEach(axis.values) { value in
+                        chip(axis: axis, value: value)
+                    }
+                }
+            }
+        }
     }
 }
