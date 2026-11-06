@@ -66,6 +66,16 @@ public enum CookingWrappedCards {
                 )
             )
         }
+        if wrapped.newRecipesTried > 0 {
+            cards.append(
+                CookingWrappedCard(
+                    id: "new",
+                    emoji: "✨",
+                    headline: "\(wrapped.newRecipesTried) new recipes tried",
+                    detail: "You kept exploring."
+                )
+            )
+        }
         return cards
     }
 }
