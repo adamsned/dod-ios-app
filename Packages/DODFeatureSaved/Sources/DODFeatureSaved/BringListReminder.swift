@@ -25,3 +25,11 @@ public struct SystemBringListReminder {
         self.isEnabled = isEnabled
     }
 }
+
+extension SystemBringListReminder {
+    /// Seconds until `date`, or nil if it is not in the future.
+    static func interval(until date: Date, now: Date = Date()) -> TimeInterval? {
+        let seconds = date.timeIntervalSince(now)
+        return seconds > 0 ? seconds : nil
+    }
+}
