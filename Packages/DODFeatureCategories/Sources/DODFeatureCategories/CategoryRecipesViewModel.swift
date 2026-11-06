@@ -68,6 +68,19 @@ public final class CategoryRecipesViewModel {
         }
     }
 
+    /// Pinned recipes (in curated order, only those loaded) then the rest
+    /// in their existing chronological order.
+    public var displayItems: [RecipeListItem] {
+        guard !pinnedIDs.isEmpty else { return items }
+        let byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<Int>()
+        let lead = pinnedIDs.compactMap { id -> RecipeListItem? in
+            guard seen.insert(id).inserted else { return nil }
+            return byID[id]
+        }
+        return lead + items.filter { !seen.contains($0.id) }
+    }
+
     /// T-765 / CL-162 (DUT-71) — reload the saved-id set from the store (cheap
     /// id projection); called on every appear so a save made on another surface
     /// reflects in the card long-press menu's Save/Unsave label.
