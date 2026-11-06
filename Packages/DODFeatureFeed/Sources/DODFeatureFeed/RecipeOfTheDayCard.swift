@@ -26,7 +26,10 @@ struct RecipeOfTheDayCard: View {
     }
 
     var body: some View {
-        heroImageLayer
+        ZStack(alignment: .bottomLeading) {
+            heroImageLayer
+            textOverlay
+        }
     }
 }
 
@@ -49,5 +52,26 @@ extension RecipeOfTheDayCard {
         .frame(height: 220)
         .frame(maxWidth: .infinity)
         .clipped()
+    }
+}
+
+extension RecipeOfTheDayCard {
+    fileprivate var textOverlay: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+            Text("RECIPE OF THE DAY")
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.burntOrange)
+            Text(item.title)
+                .dodFont(DODType.displayMedium)
+                .foregroundStyle(DODColor.label)
+                .lineLimit(2)
+            Text(Self.hook(for: item))
+                .dodFont(DODType.body)
+                .foregroundStyle(DODColor.labelSecondary)
+                .lineLimit(2)
+        }
+        .padding(DODSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DODColor.surfaceElevated.opacity(0.92))
     }
 }
