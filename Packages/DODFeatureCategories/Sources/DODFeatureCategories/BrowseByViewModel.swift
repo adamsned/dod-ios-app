@@ -60,4 +60,9 @@ public final class BrowseByViewModel {
         }
         return result
     }
+
+    /// Deep-link resolution: tag ids come from config, never from free text.
+    public func value(axisSlug: String, valueSlug: String) -> BrowseAxisValue? {
+        axes.first { $0.slug == axisSlug }?.values.first { $0.slug == valueSlug }
+    }
 }
