@@ -25,4 +25,9 @@ struct SandingGuardTests {
     func ignoresLookalikes(_ text: String) {
         #expect(!SandingGuard.containsSandingMention(text))
     }
+
+    @Test func sanitizeReplacesSandingAnswer() {
+        #expect(SandingGuard.sanitize("Just sand it down.") == SandingGuard.fallback)
+        #expect(SandingGuard.sanitize("Scrub it with chainmail.") == "Scrub it with chainmail.")
+    }
 }
