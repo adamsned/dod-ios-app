@@ -30,4 +30,9 @@ struct SandingGuardTests {
         #expect(SandingGuard.sanitize("Just sand it down.") == SandingGuard.fallback)
         #expect(SandingGuard.sanitize("Scrub it with chainmail.") == "Scrub it with chainmail.")
     }
+
+    @Test func sanitizeOptionalPassesThroughNilAndSanitizesValue() {
+        #expect(SandingGuard.sanitize(nil as String?) == nil)
+        #expect(SandingGuard.sanitize("sand it" as String?) == SandingGuard.fallback)
+    }
 }
