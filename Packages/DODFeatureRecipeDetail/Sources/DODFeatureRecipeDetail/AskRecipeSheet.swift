@@ -4,11 +4,26 @@ import SwiftUI
 /// DUT-1862 — chat sheet for "Ask the Recipe" (grounded Q&A over the open recipe).
 struct AskRecipeSheet: View {
     @Bindable var viewModel: RecipeDetailViewModel
+    @State var draft = ""
+    @State var isAsking = false
+    let suggestions = ["Can I make this ahead?", "How do I double it?", "Can I substitute an ingredient?"]
+
+    func send(_ text: String) {
+        draft = ""
+        isAsking = true
+        Task {
+            await viewModel.askRecipe(text)
+            isAsking = false
+        }
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                messageList
+            VStack(spacing: DODSpacing.xs) {
+                ScrollView {
+                    messageList
+                }
+                suggestionRow
             }
             .navigationTitle("Ask the Recipe")
             #if os(iOS)
@@ -29,5 +44,20 @@ struct AskRecipeSheet: View {
             }
         }
         .padding(.horizontal, DODSpacing.md)
+    }
+}
+
+extension AskRecipeSheet {
+    var suggestionRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DODSpacing.xs) {
+                ForEach(suggestions, id: \.self) { suggestion in
+                    Button(suggestion) { send(suggestion) }
+                        .buttonStyle(.bordered)
+                        .disabled(isAsking)
+                }
+            }
+            .padding(.horizontal, DODSpacing.md)
+        }
     }
 }
