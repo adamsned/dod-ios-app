@@ -38,6 +38,8 @@ public struct RecipeDetailView: View {
     // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
     // extension's relocated Cook Mode CTA tap can present the cover (DUT-631).
     @State var isCookModePresented: Bool = false
+    /// DUT-984 gear checklist before Cook Mode
+    @State var isGearCheckPresented: Bool = false
     /// True when the screen was entered via the StartCookModeIntent deep
     /// link (US-10). We watch the load state and flip the cover open as
     /// soon as the recipe has instructions to render. Resets to false
