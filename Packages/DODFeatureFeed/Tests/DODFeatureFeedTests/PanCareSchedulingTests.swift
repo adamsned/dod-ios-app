@@ -27,4 +27,18 @@ final class PanCareSchedulingTests: XCTestCase {
     private func makeCook(at date: Date) -> CookLogEntry {
         CookLogEntry(id: UUID(), recipeID: 1, recipeTitle: "T", cookedAt: date)
     }
+
+    func testOneCookSchedulesOnceWithCookDate() async throws {
+        let notifier = FakePanCareNotifier()
+        let cook = makeCook(at: Date(timeIntervalSince1970: 1_000))
+        await PanCareScheduling.reschedule(
+            notifier: notifier,
+            store: try makeStore(),
+            cooks: [cook],
+            now: Date(timeIntervalSince1970: 2_000)
+        )
+        XCTAssertEqual(notifier.scheduled.count, 1)
+        XCTAssertEqual(notifier.scheduled.first?.0, cook.cookedAt)
+        XCTAssertEqual(notifier.cancelCount, 0)
+    }
 }
