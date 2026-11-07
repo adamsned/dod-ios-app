@@ -12,4 +12,21 @@ enum HeatCoachToolCore {
         default: return .mild
         }
     }
+
+    static func adjustment(
+        ovenDiameterInches: Int,
+        isBaking: Bool,
+        ambient: String,
+        windy: Bool,
+        elevationFeet: Int,
+        publishedAt: Date = Date()
+    ) -> String {
+        DutchOvenHeatCoach.groundedFacts(
+            ovenDiameterInches: ovenDiameterInches,
+            style: isBaking ? .baking : .even,
+            ambient: ambientCondition(from: ambient),
+            windy: windy,
+            elevationFeet: elevationFeet
+        ).summary
+    }
 }
