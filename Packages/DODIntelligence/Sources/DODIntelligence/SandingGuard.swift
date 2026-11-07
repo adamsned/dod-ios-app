@@ -22,4 +22,9 @@ public enum SandingGuard {
     public static func sanitize(_ answer: String) -> String {
         containsSandingMention(answer) ? fallback : answer
     }
+
+    /// Optional-friendly form for the answer paths.
+    public static func sanitize(_ answer: String?) -> String? {
+        answer.map { sanitize($0) }
+    }
 }
