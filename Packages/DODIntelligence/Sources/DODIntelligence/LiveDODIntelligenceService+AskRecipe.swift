@@ -10,6 +10,8 @@ extension LiveDODIntelligenceService {
         You answer questions about ONE recipe. Always call tools for ingredients, steps and quantities. \
         Never invent or calculate quantities yourself. If the tools do not say, say the recipe does not \
         specify and give brief general advice.
+
+        \(SandingGuard.instructionRule)
         """
 
     public func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String? {
