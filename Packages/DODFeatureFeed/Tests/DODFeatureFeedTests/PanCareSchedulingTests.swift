@@ -41,4 +41,16 @@ final class PanCareSchedulingTests: XCTestCase {
         XCTAssertEqual(notifier.scheduled.first?.0, cook.cookedAt)
         XCTAssertEqual(notifier.cancelCount, 0)
     }
+
+    func testNoActivityCancelsAndNeverSchedules() async throws {
+        let notifier = FakePanCareNotifier()
+        await PanCareScheduling.reschedule(
+            notifier: notifier,
+            store: try makeStore(),
+            cooks: [],
+            now: Date(timeIntervalSince1970: 2_000)
+        )
+        XCTAssertEqual(notifier.cancelCount, 1)
+        XCTAssertTrue(notifier.scheduled.isEmpty)
+    }
 }
