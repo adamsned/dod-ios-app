@@ -12,4 +12,14 @@ extension LiveDODIntelligenceService {
             raw.split(whereSeparator: { ",\n;".contains($0) }).map(String.init)
         )
     }
+
+    #if os(iOS)
+    /// System instructions for the fridge/pantry photo turn.
+    static let ingredientInstructions = """
+        You identify food in photos of a fridge or pantry. Reply with ONLY a \
+        comma-separated list of distinct edible ingredients you can clearly see, \
+        using short generic names like eggs, cheddar, spinach. No quantities, \
+        no sentences. If you see no food, reply with nothing.
+        """
+    #endif
 }
