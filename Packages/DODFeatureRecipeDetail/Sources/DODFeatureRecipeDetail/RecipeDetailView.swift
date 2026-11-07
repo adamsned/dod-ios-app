@@ -27,10 +27,8 @@ public struct RecipeDetailView: View {
         let recipe: Recipe
     }
 
-    // `internal` (default) access so the `RecipeDetailView+Blurb.swift`
-    // extension can read `viewModel` to render the full-description surface
-    // (Swift extensions don't see `private`/`fileprivate` declarations from a
-    // sibling file).
+    // `internal` so the `RecipeDetailView+Blurb.swift` extension can read `viewModel`
+    // (extensions in sibling files can't see `private` members).
     @State var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
     /// Share has no toggle state (unlike Save / Download), so this counter is the
@@ -40,6 +38,8 @@ public struct RecipeDetailView: View {
     // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
     // extension's relocated Cook Mode CTA tap can present the cover (DUT-631).
     @State var isCookModePresented: Bool = false
+    /// DUT-984 gear checklist before Cook Mode
+    @State var isGearCheckPresented: Bool = false
     /// True when the screen was entered via the StartCookModeIntent deep
     /// link (US-10). We watch the load state and flip the cover open as
     /// soon as the recipe has instructions to render. Resets to false
