@@ -24,6 +24,7 @@ struct AskRecipeSheet: View {
                     messageList
                 }
                 suggestionRow
+                composerRow
             }
             .navigationTitle("Ask the Recipe")
             #if os(iOS)
@@ -48,6 +49,16 @@ struct AskRecipeSheet: View {
 }
 
 extension AskRecipeSheet {
+    var composerRow: some View {
+        HStack(spacing: DODSpacing.xs) {
+            TextField("Ask about this recipe", text: $draft)
+                .textFieldStyle(.roundedBorder)
+            Button("Send") { send(draft) }
+                .disabled(isAsking || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(DODSpacing.md)
+    }
+
     var suggestionRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DODSpacing.xs) {
