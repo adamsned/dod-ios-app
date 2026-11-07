@@ -148,6 +148,15 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #endif
     }
 
+    public func identifyIngredients(imageData: Data) async -> [String] {
+        #if os(iOS) && compiler(>=6.4)
+        if #available(iOS 27, *) {
+            return await Self.generateIngredients(imageData: imageData)
+        }
+        #endif
+        return []
+    }
+
     public func captionMoment(_ request: MomentCaptionRequest) async -> String? {
         guard request.hasMoment else { return nil }
         #if os(iOS)
