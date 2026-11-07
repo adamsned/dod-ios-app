@@ -13,6 +13,13 @@ public enum SandingGuard {
         "Scrub off the rust with steel wool or a chainmail scrubber, rinse, dry it on the stove, "
         + "then re-season with a thin coat of oil."
 
+    /// Rule appended to every assistant instruction string.
+    public static let instructionRule = """
+        Never, ever mention, suggest or describe sanding, sandpaper, sanders, \
+        flap discs or grinding cast iron. For rust, rough surfaces or stripping, \
+        suggest scrubbing with a scraper, chainmail or steel wool, then re-seasoning.
+        """
+
     /// True when the text mentions sanding or grinding a cooking surface.
     public static func containsSandingMention(_ text: String) -> Bool {
         text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
