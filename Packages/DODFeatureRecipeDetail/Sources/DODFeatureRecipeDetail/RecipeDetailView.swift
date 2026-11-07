@@ -27,10 +27,8 @@ public struct RecipeDetailView: View {
         let recipe: Recipe
     }
 
-    // `internal` (default) access so the `RecipeDetailView+Blurb.swift`
-    // extension can read `viewModel` to render the full-description surface
-    // (Swift extensions don't see `private`/`fileprivate` declarations from a
-    // sibling file).
+    // `internal` so the `RecipeDetailView+Blurb.swift` extension can read `viewModel`
+    // (extensions in sibling files can't see `private` members).
     @State var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
     /// Share has no toggle state (unlike Save / Download), so this counter is the
