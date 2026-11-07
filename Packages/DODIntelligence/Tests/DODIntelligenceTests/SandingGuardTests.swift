@@ -35,4 +35,10 @@ struct SandingGuardTests {
         #expect(SandingGuard.sanitize(nil as String?) == nil)
         #expect(SandingGuard.sanitize("sand it" as String?) == SandingGuard.fallback)
     }
+
+    @Test func instructionRuleForbidsSandingAndFallbackIsClean() {
+        #expect(SandingGuard.instructionRule.hasPrefix("Never, ever mention"))
+        #expect(SandingGuard.instructionRule.contains("chainmail"))
+        #expect(!SandingGuard.containsSandingMention(SandingGuard.fallback))
+    }
 }
