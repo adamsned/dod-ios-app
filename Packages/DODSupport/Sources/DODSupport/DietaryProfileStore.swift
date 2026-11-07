@@ -20,4 +20,9 @@ public struct DietaryProfileStore: @unchecked Sendable {
         else { return DietaryProfile() }
         return profile
     }
+
+    public func save(_ profile: DietaryProfile) {
+        guard let data = try? JSONEncoder().encode(profile) else { return }
+        defaults.set(data, forKey: Self.defaultsKey)
+    }
 }
