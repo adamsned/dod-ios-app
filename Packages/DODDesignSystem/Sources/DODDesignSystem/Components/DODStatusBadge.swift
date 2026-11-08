@@ -1,6 +1,5 @@
 import SwiftUI
 
-#if canImport(UIKit)
 /// DUT-121: status pill that always carries an icon AND a text label in
 /// addition to its color, and adds an outline under Differentiate Without Color.
 public struct DODStatusBadge: View {
@@ -38,4 +37,3 @@ public struct DODStatusBadge: View {
     }
     .padding(DODSpacing.md)
 }
-#endif

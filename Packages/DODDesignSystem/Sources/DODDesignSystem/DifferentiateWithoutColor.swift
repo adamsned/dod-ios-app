@@ -1,6 +1,5 @@
 import SwiftUI
 
-#if canImport(UIKit)
 /// DUT-121: when the system "Differentiate Without Color" setting is on, draw a
 /// border so a color-coded capsule is distinguishable by outline, not only fill.
 struct StatusOutlineModifier: ViewModifier {
@@ -25,4 +24,3 @@ extension View {
         modifier(StatusOutlineModifier(level: level, forceDifferentiate: nil))
     }
 }
-#endif
