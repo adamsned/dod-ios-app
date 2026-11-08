@@ -2,6 +2,7 @@ import SwiftUI
 
 #if canImport(UIKit)
 import UIKit
+#endif
 
 /// DUT-121: colorblind-safe semantic status tokens (Okabe-Ito hues).
 /// Views must use these instead of raw `.red` / `.green`.
@@ -16,6 +17,7 @@ extension DODColor {
     public static let statusInfo = statusColor(light: 0x0072B2, dark: 0x56B4E9)
 
     private static func statusColor(light: UInt32, dark: UInt32) -> Color {
+        #if canImport(UIKit)
         Color(
             UIColor { trait in
                 let hex = trait.userInterfaceStyle == .dark ? dark : light
@@ -27,6 +29,14 @@ extension DODColor {
                 )
             }
         )
+        #else
+        // DUT-2748: macOS test hosts get the light value, so shared components can use the tokens.
+        Color(
+            red: Double((light >> 16) & 0xFF) / 255,
+            green: Double((light >> 8) & 0xFF) / 255,
+            blue: Double(light & 0xFF) / 255
+        )
+        #endif
     }
 }
 
@@ -60,4 +70,3 @@ public enum StatusLevel: String, CaseIterable, Sendable {
         }
     }
 }
-#endif

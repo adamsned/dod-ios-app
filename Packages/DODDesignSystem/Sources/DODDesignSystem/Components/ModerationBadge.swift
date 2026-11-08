@@ -61,8 +61,8 @@ public struct ModerationBadge: View {
     private var foreground: Color {
         switch kind {
         case .awaitingApproval: .white
-        case .posted: .green
-        case .failed: .red
+        case .posted: DODColor.statusReady
+        case .failed: DODColor.statusDanger
         }
     }
 }
