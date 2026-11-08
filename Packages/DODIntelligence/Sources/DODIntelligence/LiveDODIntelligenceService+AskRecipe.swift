@@ -46,7 +46,7 @@ extension LiveDODIntelligenceService {
                 options: askRecipeOptions()
             )
             let answer = reply.content.answer.trimmingCharacters(in: .whitespacesAndNewlines)
-            return answer.isEmpty ? nil : answer
+            return answer.isEmpty ? nil : SandingGuard.sanitize(answer as String?)
         } catch {
             return nil
         }
