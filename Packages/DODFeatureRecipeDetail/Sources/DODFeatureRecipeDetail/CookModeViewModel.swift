@@ -43,6 +43,10 @@ public final class CookModeViewModel {
     /// can flip it; the public read-only contract is unchanged.
     public internal(set) var isVoiceModeEnabled: Bool = false
 
+    /// DUT-995 — Cook-With-Kids mode. Session-only (off on every Cook Mode entry),
+    /// like Voice Mode. When on, the view highlights steps a child can help with.
+    public var isKidModeEnabled: Bool = false
+
     /// DUT-583 — the voice player's transport state, driving the center
     /// play/pause button like a podcast player. `.idle` and `.paused` show a
     /// play glyph (nothing reading / resumable), `.speaking` shows pause.
@@ -65,11 +69,6 @@ public final class CookModeViewModel {
 
     /// DUT-986 — true only on the user's first-ever cook; set by the host, default false.
     public var isFirstCookEver: Bool = false
-    /// DUT-986 — first-cook reassurance + checkpoint for the current step, else nil.
-    public var trainingWheelsNote: TrainingWheels.Note? {
-        guard !isFinished, let step = currentStep else { return nil }
-        return TrainingWheels.note(forStepText: step.text, isFirstCookEver: isFirstCookEver)
-    }
 
     private let idleTimer: any IdleTimerController
     private let liveActivity: any CookLiveActivityController
@@ -354,9 +353,6 @@ public final class CookModeViewModel {
     public func endTimerLiveActivity() {
         liveActivity.end()
     }
-
-    /// Heat profile for the cast-iron rescue tips; `nil` without an explicit temperature.
-    public var rescueHeatProfile: RecipeHeatProfile.Derived? { RecipeHeatProfile.derive(from: recipe) }
 
     // MARK: - Navigation
 
