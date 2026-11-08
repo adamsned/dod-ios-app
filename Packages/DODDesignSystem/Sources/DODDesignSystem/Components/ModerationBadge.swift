@@ -31,6 +31,7 @@ public struct ModerationBadge: View {
         .padding(.horizontal, DODSpacing.xs)
         .padding(.vertical, DODSpacing.xxs)
         .background(Capsule().fill(background))
+        .dodStatusOutline(level)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)
     }
@@ -63,6 +64,14 @@ public struct ModerationBadge: View {
         case .awaitingApproval: .white
         case .posted: DODColor.statusReady
         case .failed: DODColor.statusDanger
+        }
+    }
+
+    private var level: StatusLevel {
+        switch kind {
+        case .awaitingApproval: .caution
+        case .posted: .ready
+        case .failed: .danger
         }
     }
 }
