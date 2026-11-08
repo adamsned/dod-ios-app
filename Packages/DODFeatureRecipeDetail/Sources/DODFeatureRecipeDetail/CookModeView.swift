@@ -240,6 +240,23 @@ public struct CookModeView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(
+            isPresented: $isReadyToServePresented,
+            onDismiss: {
+                // DUT-987 — chain into the journal sheet only after the check sheet is gone.
+                if openJournalAfterReadyCheck {
+                    openJournalAfterReadyCheck = false
+                    isJournalLogPresented = true
+                }
+            },
+            content: { () in
+                ReadyToServeCheckView(content: ReadyToServeContent.make(for: viewModel.recipe)) {
+                    openJournalAfterReadyCheck = true
+                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
+        )
         .sheet(isPresented: $isJournalLogPresented) {
             // DUT-326 — self-contained capture sheet (equivalent to the Feed
             // package's CookJournalEntryView, which this package can't import).
