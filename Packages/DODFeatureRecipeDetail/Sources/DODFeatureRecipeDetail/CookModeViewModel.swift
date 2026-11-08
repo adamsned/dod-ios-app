@@ -47,15 +47,6 @@ public final class CookModeViewModel {
     /// like Voice Mode. When on, the view highlights steps a child can help with.
     public var isKidModeEnabled: Bool = false
 
-    /// DUT-583 — the voice player's transport state, driving the center
-    /// play/pause button like a podcast player. `.idle` and `.paused` show a
-    /// play glyph (nothing reading / resumable), `.speaking` shows pause.
-    /// Maintained by the Voice methods in `CookModeViewModel+Voice.swift`;
-    /// `internal(set)` so those siblings can flip it. Reset to `.idle` when a
-    /// step finishes reading on its own (via the reader's finish callback) or
-    /// when Cook Mode ends.
-    public enum VoicePlaybackState: Sendable { case idle, speaking, paused }
-
     /// DUT-583 — current transport state for the center play/pause button.
     public internal(set) var playbackState: VoicePlaybackState = .idle
 
@@ -66,6 +57,21 @@ public final class CookModeViewModel {
     /// rate, always one of ``VoiceReader/speedMultipliers``. Session-only; not
     /// persisted (resets to 1× each Cook Mode entry, like Voice Mode itself).
     public internal(set) var voiceSpeedMultiplier: Double = 1.0
+
+    /// DUT-1029 — true while push-to-talk is capturing a spoken question.
+    /// Driven by `beginListening()` / `endListening()` in `CookModeViewModel+Ask.swift`.
+    public internal(set) var isListening: Bool = false
+
+    /// DUT-1029 — latest partial transcript while listening (for on-screen captions).
+    public internal(set) var liveTranscript: String = ""
+
+    /// DUT-1029 — the on-device speech-to-text seam. Defaults to the unavailable
+    /// fallback so tests/macOS never touch the mic; the app injects the real one.
+    /// `var` (not an init param) so no existing `CookModeViewModel(...)` call site changes.
+    public var transcriber: any SpeechTranscribing = UnavailableSpeechTranscriber()
+
+    /// DUT-1029 — the in-flight listen task, cancelled by `endListening()` / `endCookMode`.
+    var listenTask: Task<Void, Never>?
 
     /// DUT-986 — true only on the user's first-ever cook; set by the host, default false.
     public var isFirstCookEver: Bool = false
@@ -267,12 +273,7 @@ public final class CookModeViewModel {
     }
 
     // MARK: - Voice Mode (US-40 / DUT-325)
-    //
-    // The Voice Mode toggle, the dessert-aware spoken-completion line, the
-    // one-shot replay, the session pacing controls, and the AC-40.5 voice-
-    // command surface live in `CookModeViewModel+Voice.swift` so this type
-    // body stays under the SwiftLint `type_body_length` cap. `goNext`/`goBack`
-    // call the (internal) `speakCurrentStep()` declared there.
+    // Lives in `CookModeViewModel+Voice.swift` (type_body_length); `goNext`/`goBack` call its `speakCurrentStep()`.
 
     // MARK: - Live Activity (US-11)
 
