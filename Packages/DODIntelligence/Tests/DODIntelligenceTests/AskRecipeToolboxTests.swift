@@ -1,5 +1,7 @@
 import Testing
 
+@testable import DODIntelligence
+
 @Suite struct AskRecipeToolboxTests {
     private let toolbox = AskRecipeToolbox(
         title: "Test Recipe",
