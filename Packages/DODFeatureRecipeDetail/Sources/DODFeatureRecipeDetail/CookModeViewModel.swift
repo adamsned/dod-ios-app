@@ -230,6 +230,7 @@ public final class CookModeViewModel {
         voiceReader.setSessionHold(false)
         voiceReader.stop()
         isVoiceModeEnabled = false
+        isKidModeEnabled = false
         // DUT-583 — a re-entry starts clean: idle transport + natural pace.
         playbackState = .idle
         nowPlayingPublisher?.deactivate()
