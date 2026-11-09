@@ -194,6 +194,7 @@ public struct RecipeDetailView: View {
             content: { pepTalkCover }
         )
         #endif
+        .sheet(isPresented: $isGearCheckPresented) { gearCheckSheet }  // DUT-1559 (see +CookModeCover)
         // DUT-535 — the ingredient-selection sheet. Presented when the toolbar
         // `cart.badge.plus` is tapped (see `RecipeDetailView+Toolbar.swift`),
         // built by the App-injected `addToShoppingListSheet` closure (the sheet
