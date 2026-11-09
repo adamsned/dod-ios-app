@@ -14,6 +14,15 @@ import Foundation
 /// - the AC-40.5 voice-command surface the T-690c App Intents call.
 extension CookModeViewModel {
 
+    /// DUT-583 — the voice player's transport state, driving the center
+    /// play/pause button like a podcast player. `.idle` and `.paused` show a
+    /// play glyph (nothing reading / resumable), `.speaking` shows pause.
+    /// Maintained by the Voice methods in `CookModeViewModel+Voice.swift`;
+    /// `internal(set)` so those siblings can flip it. Reset to `.idle` when a
+    /// step finishes reading on its own (via the reader's finish callback) or
+    /// when Cook Mode ends.
+    public enum VoicePlaybackState: Sendable { case idle, speaking, paused }
+
     /// Flip Voice Mode on or off (AC-40.1). Turning it **on** immediately reads
     /// the current step (AC-40.2); turning it **off** stops reading and releases
     /// the audio session. Idempotent — setting the same value re-reads the
@@ -175,12 +184,7 @@ extension CookModeViewModel {
         guard isVoiceModeEnabled, let publisher = nowPlayingPublisher else { return }
         // DUT-2498 - Ensure we don't cause any potential infinite loops or hangs
         // by checking that the publisher actually supports publishing before calling it
-        do {
-            try publisher.publish(nowPlayingSnapshot)
-        } catch {
-            // Swallow any errors to prevent crashes in the Now Playing system
-            // This is a safety measure to prevent potential CI timeouts
-        }
+        publisher.publish(nowPlayingSnapshot)
     }
 
     /// The transport state Voice Mode publishes to the Lock Screen / Control Center.

@@ -40,6 +40,18 @@ extension RecipeDetailView {
         }
     }
 
+    /// DUT-1559 — the solo first-cook gear check; "Start" opens Cook Mode.
+    var gearCheckSheet: some View {
+        GearReadyCheckView(
+            equipment: viewModel.recipe?.equipment ?? [],
+            onStart: {
+                isGearCheckPresented = false
+                isCookModePresented = true
+            },
+            onCancel: { isGearCheckPresented = false }
+        )
+    }
+
     /// DUT-985 — the one-time first-cook expectation screen.
     @ViewBuilder
     var pepTalkCover: some View {

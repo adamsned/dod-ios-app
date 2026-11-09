@@ -38,6 +38,12 @@ extension CookModeView {
                 .lineSpacing(DODSpacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityLabel("Step \(step.step). \(displayText)")
+            if let nudge = viewModel.currentCoachNudge {
+                Text(nudge)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.accent)
+                    .accessibilityIdentifier("cookMode.coachNudge")
+            }
             if let note = viewModel.trainingWheelsNote {
                 trainingWheelsCard(note)
             }
@@ -105,11 +111,13 @@ extension CookModeView {
     /// the Cooking Journal (photo + caption). Hidden when no `onLogCook` sink
     /// is wired (e.g. previews / hosts that haven't opted in). Logging here
     /// records a real completed cook and counts toward rank — intentional.
+    /// DUT-987 — opens the Ready-to-Serve check first.
     @ViewBuilder
     private var logCookButton: some View {
         if onLogCook != nil {
             Button {
-                isJournalLogPresented = true
+                // DUT-987 — last-mile check first; it chains into the journal sheet on confirm.
+                isReadyToServePresented = true
             } label: {
                 // DUT-596 — skinnier/taller: a constrained centered width (not
                 // full-bleed) with extra vertical padding so the CTA reads as a
@@ -123,7 +131,7 @@ extension CookModeView {
             .tint(DODColor.accent)
             .padding(.top, DODSpacing.sm)
             .accessibilityIdentifier("cook-mode-log-cook")
-            .accessibilityLabel("Add this cook to your Cooking Journal")
+            .accessibilityLabel("Check it's ready to serve, then add this cook to your Cooking Journal")
         }
     }
 
