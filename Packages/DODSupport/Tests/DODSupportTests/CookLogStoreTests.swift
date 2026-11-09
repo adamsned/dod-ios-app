@@ -27,4 +27,9 @@ import Testing
         store.recordCook(at: now)
         #expect(store.readCookDates() == [now])
     }
+
+    @Test func emptyStoreGivesEmptyStats() throws {
+        let store = WidgetSnapshotStore(defaults: try Self.freshDefaults())
+        #expect(store.readCookStreakStats() == .empty)
+    }
 }
