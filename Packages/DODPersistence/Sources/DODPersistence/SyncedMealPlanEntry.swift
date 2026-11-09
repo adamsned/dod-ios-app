@@ -7,7 +7,7 @@ import SwiftData
 @Model
 public final class SyncedMealPlanEntry {
     /// Stable identity (CloudKit can't enforce uniqueness, so dedupe by this).
-    public var entryID: UUID = UUID()
+    public var entryID = UUID()
     /// WordPress post id of the planned recipe.
     public var recipeID: Int = 0
     /// Display fields so the week view renders offline / on another device.
