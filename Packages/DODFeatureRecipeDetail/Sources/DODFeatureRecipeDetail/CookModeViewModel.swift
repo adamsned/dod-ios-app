@@ -319,7 +319,8 @@ public final class CookModeViewModel {
             isPaused: false,
             // DUT-218: the live deadline so the Lock Screen countdown self-ticks
             // (via `Text(timerInterval:)`) even while the app is backgrounded.
-            endDate: Date(timeIntervalSinceNow: TimeInterval(totalSeconds))
+            endDate: Date(timeIntervalSinceNow: TimeInterval(totalSeconds)),
+            coachNudge: currentCoachNudge
         )
         liveActivity.start(attributes: attributes, initialState: initial)
     }
@@ -345,7 +346,8 @@ public final class CookModeViewModel {
             // paused / completed → nil so the views show the frozen snapshot.
             endDate: isPaused
                 ? nil : Date(timeIntervalSinceNow: TimeInterval(max(remainingSeconds, 0))),
-            isCompleted: isCompleted
+            isCompleted: isCompleted,
+            coachNudge: currentCoachNudge
         )
         liveActivity.update(state: state)
     }
