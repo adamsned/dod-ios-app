@@ -35,6 +35,11 @@ public final class SettingsViewModel {
     public nonisolated static let articleNotificationsEnabledKey =
         "dod.settings.articleNotificationsEnabled"
 
+    /// DUT-152 — opt-in weekly digest toggle. Defaults OFF.
+    public nonisolated static let weeklyDigestEnabledKey = "dod.settings.weeklyDigestEnabled"
+    /// DUT-152 — Date of the last digest sent; guards against double-firing.
+    public nonisolated static let weeklyDigestLastSentKey = "dod.settings.weeklyDigestLastSent"
+
     /// DUT-972 — streak reminders toggle key (default OFF).
     public nonisolated static let streakNudgesEnabledKey = "dod.settings.streakNudgesEnabled"
     /// DUT-972 — `Date` of the last streak nudge (frequency cap).
@@ -153,6 +158,11 @@ public final class SettingsViewModel {
         didSet {
             defaults.set(articleNotificationsEnabled, forKey: Self.articleNotificationsEnabledKey)
         }
+    }
+
+    /// DUT-152. Written via the async `setWeeklyDigestEnabled(_:)` (ticket 5).
+    public var weeklyDigestEnabled: Bool {
+        didSet { defaults.set(weeklyDigestEnabled, forKey: Self.weeklyDigestEnabledKey) }
     }
 
     /// AC-36.2. **T-756 / CL-153 — observable stored property** (was
@@ -275,6 +285,7 @@ public final class SettingsViewModel {
         // DUT-430 — seed observable notification flags (didSet doesn't fire in init).
         self.notificationsEnabled = defaults.bool(forKey: Self.notificationsEnabledKey)
         self.articleNotificationsEnabled = defaults.bool(forKey: Self.articleNotificationsEnabledKey)
+        self.weeklyDigestEnabled = defaults.bool(forKey: Self.weeklyDigestEnabledKey)
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies
