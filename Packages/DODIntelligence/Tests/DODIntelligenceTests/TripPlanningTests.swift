@@ -1,4 +1,6 @@
+import DODDomain
 import DODSupport
+import Foundation
 import Testing
 
 @testable import DODIntelligence
@@ -48,25 +50,7 @@ struct TripPlanningTests {
     @Test func makesSlotWithScalingAndCharcoal() {
         // Recipe with servings: 4, a step saying "bake at 350°F", and headcount 8
         // should give scaleFactor == 2.0 and charcoal?.totalBriquettes == 24 for a 12" oven
-        let recipe = Recipe(
-            id: 1,
-            title: "Test Recipe",
-            servings: 4,
-            steps: [
-                RecipeStep(
-                    text: "bake at 350°F",
-                    duration: nil,
-                    temperature: nil,
-                    equipment: nil
-                )
-            ],
-            ingredients: [],
-            prepTime: nil,
-            cookTime: nil,
-            totalTime: nil,
-            difficulty: .easy,
-            tags: []
-        )
+        let recipe = makeRecipe(id: 1, title: "Test Recipe", servings: 4, steps: ["bake at 350°F"])
 
         let constraints = TripPlanConstraints(headcount: 8, days: 1, mealsPerDay: 1, ovenDiameterInches: 12)
         let slot = TripSlotBuilder.makeSlot(day: 1, meal: 1, recipe: recipe, constraints: constraints)
@@ -77,25 +61,7 @@ struct TripPlanningTests {
 
     @Test func makesSlotWithNilCharcoalWhenNoTemperature() {
         // Recipe with no temperature should give charcoal == nil
-        let recipe = Recipe(
-            id: 1,
-            title: "Test Recipe",
-            servings: 4,
-            steps: [
-                RecipeStep(
-                    text: "mix ingredients",
-                    duration: nil,
-                    temperature: nil,
-                    equipment: nil
-                )
-            ],
-            ingredients: [],
-            prepTime: nil,
-            cookTime: nil,
-            totalTime: nil,
-            difficulty: .easy,
-            tags: []
-        )
+        let recipe = makeRecipe(id: 1, title: "Test Recipe", servings: 4, steps: ["mix ingredients"])
 
         let constraints = TripPlanConstraints(headcount: 8, days: 1, mealsPerDay: 1, ovenDiameterInches: 12)
         let slot = TripSlotBuilder.makeSlot(day: 1, meal: 1, recipe: recipe, constraints: constraints)
@@ -152,71 +118,15 @@ struct TripPlanningTests {
 
     private func makeTestRecipes() -> [Recipe] {
         [
-            Recipe(
-                id: 1,
-                title: "Gluten Free Cake",
-                suitableForDiet: ["GlutenFreeDiet"],
-                ingredients: [],
-                steps: [],
-                prepTime: nil,
-                cookTime: nil,
-                totalTime: nil,
-                difficulty: .easy,
-                tags: []
-            ),
-            Recipe(
-                id: 2,
-                title: "Vegan Smoothie",
-                suitableForDiet: ["VeganDiet"],
-                ingredients: [],
-                steps: [],
-                prepTime: nil,
-                cookTime: nil,
-                totalTime: nil,
-                difficulty: .easy,
-                tags: []
-            ),
-            Recipe(
-                id: 3,
-                title: "Gluten Free Vegan Cake",
-                suitableForDiet: ["GlutenFreeDiet", "VeganDiet"],
-                ingredients: [],
-                steps: [],
-                prepTime: nil,
-                cookTime: nil,
-                totalTime: nil,
-                difficulty: .easy,
-                tags: []
-            ),
-            Recipe(
-                id: 4,
-                title: "Regular Cake",
-                suitableForDiet: [],
-                ingredients: [],
-                steps: [],
-                prepTime: nil,
-                cookTime: nil,
-                totalTime: nil,
-                difficulty: .easy,
-                tags: []
-            ),
+            makeRecipe(id: 1, title: "Gluten Free Cake", diet: ["GlutenFreeDiet"]),
+            makeRecipe(id: 2, title: "Vegan Smoothie", diet: ["VeganDiet"]),
+            makeRecipe(id: 3, title: "Gluten Free Vegan Cake", diet: ["GlutenFreeDiet", "VeganDiet"]),
+            makeRecipe(id: 4, title: "Regular Cake", diet: []),
         ]
     }
 
     private func testArticleExclusion(recipes: [Recipe], constraints: TripPlanConstraints) {
-        let articleRecipe = Recipe(
-            id: 5,
-            title: "Article",
-            kind: .article,
-            suitableForDiet: ["GlutenFreeDiet"],
-            ingredients: [],
-            steps: [],
-            prepTime: nil,
-            cookTime: nil,
-            totalTime: nil,
-            difficulty: .easy,
-            tags: []
-        )
+        let articleRecipe = makeRecipe(id: 5, title: "Article", kind: .article, diet: ["GlutenFreeDiet"])
         let withArticle = recipes + [articleRecipe]
         let candidatesWithArticle = TripCandidateFilter.candidates(from: withArticle, constraints: constraints)
         #expect(candidatesWithArticle.count == 2)  // Article should be excluded
@@ -229,9 +139,9 @@ struct TripPlanningTests {
     @Test func needsEscalationWithShortCandidates() {
         // With 3 short candidates and `slotCount: 2`, `needsEscalation` is false.
         let recipes = [
-            Recipe(id: 1, title: "A", suitableForDiet: []),
-            Recipe(id: 2, title: "B", suitableForDiet: []),
-            Recipe(id: 3, title: "C", suitableForDiet: []),
+            makeRecipe(id: 1, title: "A"),
+            makeRecipe(id: 2, title: "B"),
+            makeRecipe(id: 3, title: "C"),
         ]
         #expect(!TripTokenBudget.needsEscalation(candidates: recipes, slotCount: 2))
     }
@@ -239,7 +149,7 @@ struct TripPlanningTests {
     @Test func needsEscalationWithLargeSlotCount() {
         // With `slotCount: 400`, `needsEscalation` is true.
         let recipes = [
-            Recipe(id: 1, title: "A", suitableForDiet: [])
+            makeRecipe(id: 1, title: "A")
         ]
         #expect(TripTokenBudget.needsEscalation(candidates: recipes, slotCount: 400))
     }
@@ -247,9 +157,69 @@ struct TripPlanningTests {
     @Test func needsEscalationWithManyLongCandidates() {
         // With 200 candidates carrying very long titles and `slotCount: 1`, `needsEscalation` is true.
         let recipes = Array(
-            repeating: Recipe(id: 1, title: String(repeating: "A", count: 100), suitableForDiet: []),
+            repeating: makeRecipe(id: 1, title: String(repeating: "A", count: 100)),
             count: 200
         )
         #expect(TripTokenBudget.needsEscalation(candidates: recipes, slotCount: 1))
+    }
+
+    // MARK: - Fixtures
+
+    private func makeRecipe(
+        id: Int,
+        title: String,
+        servings: Int? = nil,
+        steps: [String] = [],
+        kind: PostKind = .recipe,
+        diet: [String] = []
+    ) -> Recipe {
+        Recipe(
+            id: id,
+            slug: "recipe-\(id)",
+            title: title,
+            excerpt: "",
+            canonicalURL: URL(fileURLWithPath: "/recipes/\(id)"),
+            publishedAt: Date(timeIntervalSince1970: 0),
+            instructions: steps.enumerated().map { RecipeInstruction(step: $0.offset + 1, text: $0.element) },
+            servings: servings,
+            kind: kind,
+            suitableForDiet: diet
+        )
+    }
+
+    private func slot(day: Int, briquettes: Int?) -> TripMealSlot {
+        TripMealSlot(
+            day: day,
+            meal: 1,
+            recipeID: day,
+            recipeTitle: "R",
+            servings: 4,
+            scaleFactor: 1,
+            charcoal: briquettes.map {
+                CharcoalRecommendation(
+                    totalBriquettes: $0,
+                    bottom: $0 / 3,
+                    top: $0 - $0 / 3,
+                    refreshIntervalMinutes: 45
+                )
+            }
+        )
+    }
+
+    private func makeFuelLedgerWithTestData() -> TripFuelLedger {
+        let slots = [
+            slot(day: 1, briquettes: 24),
+            slot(day: 1, briquettes: 28),
+            slot(day: 2, briquettes: 24),
+        ]
+        return TripFuelLedger(plan: TripPlan(slots: slots), days: 2)
+    }
+
+    private func makeFuelLedgerWithNoCharcoal() -> TripFuelLedger {
+        TripFuelLedger(plan: TripPlan(slots: [slot(day: 1, briquettes: nil)]), days: 1)
+    }
+
+    private func makeFuelLedgerWithClampedDay() -> TripFuelLedger {
+        TripFuelLedger(plan: TripPlan(slots: [slot(day: 5, briquettes: 24)]), days: 2)
     }
 }

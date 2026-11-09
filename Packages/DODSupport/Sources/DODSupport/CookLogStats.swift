@@ -176,6 +176,25 @@ public enum CookLogStats {
         var lastCooked: Date
     }
 
+    /// DUT-975 — confidence reads in chronological order (oldest first), skipping
+    /// cooks with no confidence. Backs the journal's "felt hard → felt easy" chart.
+    public static func confidenceTrajectory(_ entries: [CookLogEntry]) -> [(date: Date, confidence: Int)] {
+        entries
+            .compactMap { entry in entry.confidence.map { (date: entry.cookedAt, confidence: $0) } }
+            .sorted { $0.date < $1.date }
+    }
+
+    /// DUT-975 — recent confidence minus early confidence. Compares the average of
+    /// the last 3 reads with the average of the first 3. Needs at least 4 reads, else nil.
+    /// Positive means the user is feeling more capable over time.
+    public static func confidenceTrend(_ entries: [CookLogEntry]) -> Double? {
+        let reads = confidenceTrajectory(entries).map { Double($0.confidence) }
+        guard reads.count >= 4 else { return nil }
+        let early = reads.prefix(3).reduce(0, +) / 3
+        let recent = reads.suffix(3).reduce(0, +) / 3
+        return recent - early
+    }
+
     /// Start-of-week date for a given instant, used to bucket entries by week.
     private static func weekStart(of date: Date, calendar: Calendar) -> Date {
         calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? date
