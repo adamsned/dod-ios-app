@@ -23,22 +23,15 @@ public final class SettingsViewModel {
 
     // MARK: - UserDefaults keys
     //
-    // Keys are declared `nonisolated` so the enum-side `fromDefaults(_:)`
-    // helpers + `@AppStorage` literals (which run outside the MainActor
-    // context) can reference them without an actor hop. The keys are
-    // pure compile-time constants — no MainActor isolation is needed.
+    // Keys are nonisolated compile-time constants — no MainActor isolation needed.
 
     /// AC-32.4 — "Use metric units" toggle key.
     public nonisolated static let useMetricUnitsKey = "dod.settings.useMetricUnits"
 
-    /// AC-36.1 — "When New Recipes Drop" toggle key (renamed in T-750 /
-    /// CL-147; key unchanged so the preference survives). Defaults OFF;
-    /// T-631 follow-up wires APNs authorization when flipped ON.
+    /// AC-36.1 — "When New Recipes Drop" toggle key (T-750 / CL-147). Defaults OFF.
     public nonisolated static let notificationsEnabledKey = "dod.settings.notificationsEnabled"
 
     /// DUT-1333 — "When a New Article Drops" toggle key. Defaults OFF.
-    /// Secures notification permission on enable like
-    /// ``notificationsEnabledKey``; delivery follows the DUT-1332 APNs trigger.
     public nonisolated static let articleNotificationsEnabledKey =
         "dod.settings.articleNotificationsEnabled"
 
@@ -154,11 +147,8 @@ public final class SettingsViewModel {
         didSet { defaults.set(notificationsEnabled, forKey: Self.notificationsEnabledKey) }
     }
 
-    /// DUT-1333. The "When a New Article Drops" preference (replaces the
-    /// comment-reply toggle). **DUT-430 — observable stored property**.
-    /// Seeded in `init`, `didSet`-persisted; defaults false. Written through
-    /// the async ``setArticleNotificationsEnabled(_:)`` so an enable requests
-    /// system authorization, mirroring ``notificationsEnabled``.
+    /// DUT-1333. "When a New Article Drops" preference (DUT-430 observable, `didSet`-persisted).
+    /// Written via async ``setArticleNotificationsEnabled(_:)``.
     public var articleNotificationsEnabled: Bool {
         didSet {
             defaults.set(articleNotificationsEnabled, forKey: Self.articleNotificationsEnabledKey)
@@ -282,8 +272,7 @@ public final class SettingsViewModel {
         // doesn't fire for these initial-in-init assignments).
         self.appearance = AppearancePreference.fromDefaults(defaults)
         self.temperaturePreference = TemperaturePreference.fromDefaults(defaults)
-        // DUT-430 — seed the observable notification flags from defaults
-        // (didSet doesn't fire for these initial-in-init assignments).
+        // DUT-430 — seed observable notification flags (didSet doesn't fire in init).
         self.notificationsEnabled = defaults.bool(forKey: Self.notificationsEnabledKey)
         self.articleNotificationsEnabled = defaults.bool(forKey: Self.articleNotificationsEnabledKey)
         self.voicePreviewer = voicePreviewer
