@@ -35,6 +35,11 @@ public final class SettingsViewModel {
     public nonisolated static let articleNotificationsEnabledKey =
         "dod.settings.articleNotificationsEnabled"
 
+    /// DUT-152 — opt-in weekly digest toggle. Defaults OFF.
+    public nonisolated static let weeklyDigestEnabledKey = "dod.settings.weeklyDigestEnabled"
+    /// DUT-152 — Date of the last digest sent; guards against double-firing.
+    public nonisolated static let weeklyDigestLastSentKey = "dod.settings.weeklyDigestLastSent"
+
     /// DUT-972 — streak reminders toggle key (default OFF).
     public nonisolated static let streakNudgesEnabledKey = "dod.settings.streakNudgesEnabled"
     /// DUT-972 — `Date` of the last streak nudge (frequency cap).
