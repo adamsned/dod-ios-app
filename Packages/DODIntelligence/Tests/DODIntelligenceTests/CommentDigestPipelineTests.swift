@@ -28,11 +28,12 @@ import XCTest
     }
 
     @Test func runReducesMultiplePartials() async {
-        var callCount = 0
-        let bodies = Array(repeating: String(repeating: "a", count: 1000), count: 20)
+        let counter = CallCounter()
+        // 12 grounded ~1,000-char bodies pack into 2 chunks of 6.
+        let bodies = Array(repeating: String(repeating: "summary gotcha ", count: 66), count: 12)
 
         let result = await CommentDigestPipeline.run(bodies: bodies) { _ in
-            callCount += 1
+            let callCount = await counter.increment()
             return CommentDigest(
                 summary: "Summary \(callCount)",
                 tips: ["Tip \(callCount)"],
@@ -40,7 +41,7 @@ import XCTest
             )
         }
 
-        #expect(callCount == 2)  // 1 for first chunk, 1 for reduced result
+        #expect(await counter.count == 3)  // 2 chunks + 1 reduce
         #expect(result != nil)
     }
 
@@ -68,5 +69,13 @@ import XCTest
         }
 
         #expect(result == nil)
+    }
+}
+
+private actor CallCounter {
+    private(set) var count = 0
+    func increment() -> Int {
+        count += 1
+        return count
     }
 }

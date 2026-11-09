@@ -201,6 +201,7 @@ public final class CookModeViewModel {
     /// and ends any in-flight Live Activity (AC-11.3). Symmetric with
     /// `beginCookMode` (AC-7.3, AC-7.6).
     public func endCookMode() {
+        cancelListening()  // before the guard: a pending listen is cancelled even if Cook Mode never began
         guard didBegin else { return }
         idleTimer.isDisabled = priorIdleTimerDisabled
         didBegin = false
