@@ -46,6 +46,7 @@ public final class CommentDigestStore {
             state = .unavailable
             return
         }
+        if case .loaded = state, bodies.count - digestedCount < Self.regenerationThreshold { return }
         state = .loading
         if let digest = await intelligence.summarizeComments(bodies) {
             digestedCount = bodies.count
