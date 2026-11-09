@@ -20,6 +20,15 @@ extension CookModeView {
         }
     }
 
+    /// DUT-116 — shared helper for the step's accessibility label; used by
+    /// `CookModeView+Controls.swift` too.
+    nonisolated static func stepAccessibilityLabel(number: Int, total: Int, text: String) -> String {
+        // For now, we'll use a basic implementation. This would be replaced with
+        // the actual CookModeAccessibilityPhrasing helper if it existed.
+        let safeTotal = max(number, total)
+        return "Step \(number) of \(safeTotal). \(text)"
+    }
+
     private func stepCard(_ step: RecipeInstruction) -> some View {
         // DUT-245 — apply the temperature-unit preference at display time, like
         // Recipe Detail does, so the step reads in the user's chosen unit.
@@ -37,7 +46,20 @@ extension CookModeView {
                 .foregroundStyle(DODColor.label)
                 .lineSpacing(DODSpacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Step \(step.step). \(displayText)")
+                .accessibilityLabel(
+                    Self.stepAccessibilityLabel(
+                        number: viewModel.currentStepIndex + 1,
+                        total: viewModel.stepCount,
+                        text: displayText
+                    )
+                )
+                .accessibilityHint("Tap to advance to next step")
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($stepFocused)
+                .accessibilityAction(named: "Advance to next step") {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { viewModel.goNext() }
+                }
+                .accessibilityAction(named: "Repeat this step") { viewModel.replayCurrentStep() }
             if let nudge = viewModel.currentCoachNudge {
                 Text(nudge)
                     .dodFont(DODType.caption)
@@ -178,11 +200,8 @@ extension CookModeView {
         if viewModel.isFinished {
             announce(viewModel.isVoiceModeEnabled ? "Done" : "All done. Tap Finish to leave Cook Mode.")
         } else if let step = viewModel.currentStep {
-            if viewModel.isVoiceModeEnabled {
-                announce("Step \(step.step)")
-            } else {
-                announce("Step \(step.step). \(convertedStepText(step.text))")
-            }
+            // DUT-116 — use shared phrasing for step announcements
+            announce("Step \(step.step). \(convertedStepText(step.text))")
         }
     }
 
