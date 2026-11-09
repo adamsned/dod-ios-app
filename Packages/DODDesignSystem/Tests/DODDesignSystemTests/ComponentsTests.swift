@@ -267,6 +267,13 @@ import Testing
         #expect(unsavedToggleCount == 1)
     }
 
+    /// DUT-121 — test that the CommentComposer correctly identifies when
+    /// the character count is at or over the limit.
+    @Test func composerCounterFlagsLimit() {
+        #expect(CommentComposer.isAtLimit(count: 500, limit: 500))
+        #expect(!CommentComposer.isAtLimit(count: 10, limit: 500))
+    }
+
     /// DUT-534 Part 2 — the opt-in "Add to Shopping List" item. Like the
     /// Save/Unsave label, the `.contextMenu` content materializes as a system
     /// overlay outside the snapshot host, so a unit test cannot inspect whether

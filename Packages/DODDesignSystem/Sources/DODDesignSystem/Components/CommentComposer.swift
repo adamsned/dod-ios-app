@@ -107,8 +107,11 @@ public struct CommentComposer: View {
     }
 
     private var counter: some View {
-        HStack {
-            Spacer()
+        HStack(spacing: DODSpacing.xxs) {
+            if isAtLimit {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .accessibilityHidden(true)
+            }
             Text("\(text.count) / \(maxCharacters)")
                 .dodFont(DODType.caption)
                 .foregroundStyle(counterColor)
@@ -149,9 +152,19 @@ public struct CommentComposer: View {
 
     /// Threshold at which the counter flips to red — 95% of max, per
     /// task spec ("turns red at 95%").
-    private var counterColor: Color {
+    private var isAtLimit: Bool {
         let limit = Double(maxCharacters) * 0.95
-        return Double(text.count) >= limit ? .red : DODColor.labelSecondary
+        return Double(text.count) >= limit
+    }
+
+    /// Static helper to determine if a given count is at or over the limit.
+    /// Used for testing purposes.
+    static func isAtLimit(count: Int, limit: Double) -> Bool {
+        Double(count) >= limit
+    }
+
+    private var counterColor: Color {
+        isAtLimit ? DODColor.statusDanger : DODColor.labelSecondary
     }
 
     /// DUT-694 — the visible counter signals "approaching the limit" with red
