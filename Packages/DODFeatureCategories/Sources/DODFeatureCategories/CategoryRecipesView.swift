@@ -40,6 +40,39 @@ public struct CategoryRecipesView: View {
             .sensoryFeedback(.selection, trigger: viewModel.saveToggleCount)
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            ZStack(alignment: .bottomLeading) {
+                ReliableImage(url: viewModel.heroImageURL) { phase in
+                    switch phase {
+                    case .success(let image): image.resizable().scaledToFill()
+                    default: DODColor.castIronBrown
+                    }
+                }
+                .frame(height: 200)
+                .clipped()
+                LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+                Text(viewModel.category.name)
+                    .font(DODType.displayLarge)
+                    .foregroundStyle(.white)
+                    .padding(DODSpacing.md)
+            }
+            .frame(height: 200)
+            .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
+            if !viewModel.category.description.isEmpty {
+                Text(viewModel.category.description)
+                    .font(DODType.body)
+                    .foregroundStyle(DODColor.label)
+            }
+            Text("\(viewModel.category.count) recipes")
+                .font(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
+        }
+        .padding([.horizontal, .top], DODSpacing.md)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("dod.category.header")
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.loadState {
@@ -80,30 +113,34 @@ public struct CategoryRecipesView: View {
             // mirroring `FeedView` / `SavedView`.
             let layout = RecipeListLayout(rawValue: layoutRaw) ?? .gallery
             ScrollView {
-                Group {
-                    switch layout {
-                    case .gallery:
-                        LazyVGrid(
-                            columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
-                            spacing: DODSpacing.md
-                        ) {
-                            ForEach(viewModel.items) { item in
-                                recipeCard(item)
+                VStack(spacing: 0) {
+                    header
+
+                    Group {
+                        switch layout {
+                        case .gallery:
+                            LazyVGrid(
+                                columns: recipeGridColumns(horizontalSizeClass: horizontalSizeClass),
+                                spacing: DODSpacing.md
+                            ) {
+                                ForEach(viewModel.displayItems) { item in
+                                    recipeCard(item)
+                                }
                             }
-                        }
-                    case .list:
-                        adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
-                            ForEach(viewModel.items) { item in
-                                recipeListRow(item)
+                        case .list:
+                            adaptiveListRows(horizontalSizeClass: horizontalSizeClass) {
+                                ForEach(viewModel.displayItems) { item in
+                                    recipeListRow(item)
+                                }
                             }
                         }
                     }
-                }
-                .padding(DODSpacing.md)
+                    .padding(DODSpacing.md)
 
-                if viewModel.loadState == .loadingMore {
-                    ProgressView()
-                        .padding(.vertical, DODSpacing.lg)
+                    if viewModel.loadState == .loadingMore {
+                        ProgressView()
+                            .padding(.vertical, DODSpacing.lg)
+                    }
                 }
             }
             // DUT-693 (PR6) — pull-to-refresh parity with Feed / Saved. Reloads

@@ -38,7 +38,7 @@ public enum CookingWrappedCards {
         if wrapped.totalCooks < lowDataThreshold {
             return [lowDataCard(totalCooks: wrapped.totalCooks)]
         }
-        let cards = [
+        var cards = [
             CookingWrappedCard(
                 id: "total",
                 emoji: "🍽️",
@@ -46,6 +46,54 @@ public enum CookingWrappedCards {
                 detail: "Thank you for cooking with us."
             )
         ]
+        if let top = wrapped.mostCooked {
+            cards.append(
+                CookingWrappedCard(
+                    id: "most-cooked",
+                    emoji: "🏆",
+                    headline: top.title,
+                    detail: "Your go-to, cooked \(top.count) times."
+                )
+            )
+        }
+        if let category = wrapped.topCategory {
+            cards.append(
+                CookingWrappedCard(
+                    id: "category",
+                    emoji: "🥘",
+                    headline: category,
+                    detail: "Your favorite kind of cooking this year."
+                )
+            )
+        }
+        if wrapped.newRecipesTried > 0 {
+            cards.append(
+                CookingWrappedCard(
+                    id: "new",
+                    emoji: "✨",
+                    headline: "\(wrapped.newRecipesTried) new recipes tried",
+                    detail: "You kept exploring."
+                )
+            )
+        }
+        appendBusiestMonthCard(to: &cards, wrapped: wrapped, calendar: calendar)
         return cards
+    }
+
+    private static func appendBusiestMonthCard(
+        to cards: inout [CookingWrappedCard],
+        wrapped: CookingWrapped,
+        calendar: Calendar
+    ) {
+        if let month = wrapped.busiestMonth, (1...12).contains(month.month) {
+            cards.append(
+                CookingWrappedCard(
+                    id: "busiest",
+                    emoji: "🔥",
+                    headline: calendar.monthSymbols[month.month - 1],
+                    detail: "Your busiest month, with \(month.count) cooks."
+                )
+            )
+        }
     }
 }
