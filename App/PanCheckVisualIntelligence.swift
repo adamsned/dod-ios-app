@@ -1,6 +1,9 @@
 import AppIntents
+import CoreGraphics
+import CoreVideo
 import DODSupport
 import Foundation
+import VideoToolbox
 
 /// DUT-1826 — one pan-check result, surfaced to Visual Intelligence. `id` is `PanCheck.Verdict.rawValue`.
 @available(iOS 26.0, *)
@@ -24,6 +27,12 @@ struct PanCheckQuery: EntityQuery {
     }
 
     func suggestedEntities() async throws -> [PanCheckEntity] { [] }
+
+    nonisolated static func cgImage(from buffer: CVPixelBuffer) -> CGImage? {
+        var image: CGImage?
+        VTCreateCGImageFromCVPixelBuffer(buffer, options: nil, imageOut: &image)
+        return image
+    }
 }
 
 /// DUT-1826 — opens DOD on a pan-check result chosen from Visual Intelligence.
