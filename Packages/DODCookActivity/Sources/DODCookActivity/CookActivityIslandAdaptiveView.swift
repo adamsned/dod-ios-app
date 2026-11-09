@@ -33,14 +33,29 @@ public struct CookActivityIslandAdaptiveView: View {
     }
 
     public var body: some View {
-        CookActivityLockScreenView(
-            recipeTitle: recipeTitle,
-            stepText: stepText,
-            remainingSeconds: remainingSeconds,
-            totalSeconds: totalSeconds,
-            isPaused: isPaused,
-            endDate: endDate,
-            isCompleted: isCompleted
-        )
+        layout(isLimitedInWidth: false)
+    }
+
+    @ViewBuilder
+    func layout(isLimitedInWidth: Bool) -> some View {
+        switch cookActivityIslandLayout(isLimitedInWidth: isLimitedInWidth) {
+        case .landscape:
+            CookActivityLandscapeExpandedView(
+                remainingSeconds: remainingSeconds,
+                endDate: endDate,
+                isPaused: isPaused,
+                isCompleted: isCompleted
+            )
+        case .standard:
+            CookActivityLockScreenView(
+                recipeTitle: recipeTitle,
+                stepText: stepText,
+                remainingSeconds: remainingSeconds,
+                totalSeconds: totalSeconds,
+                isPaused: isPaused,
+                endDate: endDate,
+                isCompleted: isCompleted
+            )
+        }
     }
 }

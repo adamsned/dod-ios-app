@@ -46,6 +46,17 @@ extension SettingsView {
         )
     }
 
+    /// DUT-152 — opt-in weekly digest toggle. Mirrors `articleNotificationsBinding`:
+    /// ON requests system authorization; a denied prompt leaves the flag OFF.
+    var weeklyDigestBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.weeklyDigestEnabled },
+            set: { newValue in
+                Task { await viewModel.setWeeklyDigestEnabled(newValue) }
+            }
+        )
+    }
+
     var appearanceBinding: Binding<AppearancePreference> {
         Binding(
             get: { viewModel.appearance },
