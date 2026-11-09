@@ -5,6 +5,11 @@ import DODSupport
 import Foundation
 import VideoToolbox
 
+// VisualIntelligence ships in the iOS device SDK only, not the simulator SDK.
+#if canImport(VisualIntelligence)
+import VisualIntelligence
+#endif
+
 /// DUT-1826 — one pan-check result, surfaced to Visual Intelligence. `id` is `PanCheck.Verdict.rawValue`.
 @available(iOS 26.0, *)
 struct PanCheckEntity: AppEntity {
