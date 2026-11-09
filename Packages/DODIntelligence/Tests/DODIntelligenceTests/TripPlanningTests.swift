@@ -178,7 +178,7 @@ struct TripPlanningTests {
             slug: "recipe-\(id)",
             title: title,
             excerpt: "",
-            canonicalURL: URL(string: "https://example.com/\(id)")!,
+            canonicalURL: URL(fileURLWithPath: "/recipes/\(id)"),
             publishedAt: Date(timeIntervalSince1970: 0),
             instructions: steps.enumerated().map { RecipeInstruction(step: $0.offset + 1, text: $0.element) },
             servings: servings,
@@ -196,13 +196,23 @@ struct TripPlanningTests {
             servings: 4,
             scaleFactor: 1,
             charcoal: briquettes.map {
-                CharcoalRecommendation(totalBriquettes: $0, bottom: $0 / 3, top: $0 - $0 / 3, refreshIntervalMinutes: 45)
+                CharcoalRecommendation(
+                    totalBriquettes: $0,
+                    bottom: $0 / 3,
+                    top: $0 - $0 / 3,
+                    refreshIntervalMinutes: 45
+                )
             }
         )
     }
 
     private func makeFuelLedgerWithTestData() -> TripFuelLedger {
-        TripFuelLedger(plan: TripPlan(slots: [slot(day: 1, briquettes: 24), slot(day: 1, briquettes: 28), slot(day: 2, briquettes: 24)]), days: 2)
+        let slots = [
+            slot(day: 1, briquettes: 24),
+            slot(day: 1, briquettes: 28),
+            slot(day: 2, briquettes: 24),
+        ]
+        return TripFuelLedger(plan: TripPlan(slots: slots), days: 2)
     }
 
     private func makeFuelLedgerWithNoCharcoal() -> TripFuelLedger {
