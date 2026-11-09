@@ -18,6 +18,7 @@ final class PantryMatcherTests: XCTestCase {
             title: "Recipe 1",
             excerpt: "Excerpt 1",
             canonicalURL: URL(string: "https://example.com/1")!,
+            publishedAt: Date(timeIntervalSince1970: 0),
             ingredients: [
                 RecipeIngredient(text: "2 cups flour"),
                 RecipeIngredient(text: "1 cup sugar"),
@@ -31,6 +32,7 @@ final class PantryMatcherTests: XCTestCase {
             title: "Recipe 2",
             excerpt: "Excerpt 2",
             canonicalURL: URL(string: "https://example.com/2")!,
+            publishedAt: Date(timeIntervalSince1970: 0),
             ingredients: [
                 RecipeIngredient(text: "1 cup flour"),
                 RecipeIngredient(text: "1 cup sugar"),
@@ -57,6 +59,7 @@ final class PantryMatcherTests: XCTestCase {
             title: "Recipe 1",
             excerpt: "Excerpt 1",
             canonicalURL: URL(string: "https://example.com/1")!,
+            publishedAt: Date(timeIntervalSince1970: 0),
             ingredients: [
                 RecipeIngredient(text: "2 cups flour"),
                 RecipeIngredient(text: "1 cup sugar"),
@@ -70,6 +73,7 @@ final class PantryMatcherTests: XCTestCase {
             title: "Article 1",
             excerpt: "Excerpt 1",
             canonicalURL: URL(string: "https://example.com/2")!,
+            publishedAt: Date(timeIntervalSince1970: 0),
             ingredients: [],
             kind: .article
         )
@@ -80,20 +84,20 @@ final class PantryMatcherTests: XCTestCase {
             title: "Recipe 2",
             excerpt: "Excerpt 2",
             canonicalURL: URL(string: "https://example.com/3")!,
+            publishedAt: Date(timeIntervalSince1970: 0),
             ingredients: [
-                RecipeIngredient(text: "1 cup flour")
+                RecipeIngredient(text: "2 tbsp butter")
             ],
             kind: .recipe
         )
 
         let recipes = [recipeWithNoMatch, article, recipeWithMatch]
-        let pantry = ["butter"]  // No matches
+        let pantry = ["butter"]  // only recipe 3 has butter
 
         let result = PantryMatcher.rank(recipes: recipes, pantry: pantry)
 
         // Should only return the recipe with match, not the article or recipe with no matches
-        XCTAssertEqual(result.count, 1)
-        XCTAssertEqual(result[0].recipeID, 3)
+        XCTAssertEqual(result.map(\.recipeID), [3])
     }
 
     func testRankEmptyPantryReturnsEmpty() {
@@ -103,6 +107,7 @@ final class PantryMatcherTests: XCTestCase {
             title: "Recipe 1",
             excerpt: "Excerpt 1",
             canonicalURL: URL(string: "https://example.com/1")!,
+            publishedAt: Date(timeIntervalSince1970: 0),
             ingredients: [
                 RecipeIngredient(text: "2 cups flour"),
                 RecipeIngredient(text: "1 cup sugar"),
