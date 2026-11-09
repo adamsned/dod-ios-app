@@ -53,8 +53,7 @@ extension LiveDODIntelligenceService {
 
     @available(iOS 26, *)
     public static func extractRecipe(fromBody body: String) async -> ExtractedRecipe? {
-        guard #available(iOS 26, *),
-            !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             case .available = SystemLanguageModel.default.availability
         else { return nil }
 
