@@ -156,8 +156,13 @@ extension RecipeDetailView {
                 displayText: { convertedStepText($0.text, to: temperatureUnit) },
                 horizontalSizeClass: horizontalSizeClass,
                 onCookMode: {
-                    // DUT-985 — pep talk first on the very first cook; telemetry is sent inside.
-                    requestCookMode()
+                    Task { await viewModel.didTapCookMode() }
+                    // DUT-984 — gear checklist first when the recipe lists equipment.
+                    if GearReadyCheck(items: viewModel.recipe?.equipment ?? []).isNeeded {
+                        isGearCheckPresented = true
+                    } else {
+                        isCookModePresented = true
+                    }
                 },
                 load: { await viewModel.loadAnnotation() },
                 save: { await viewModel.saveAnnotation($0) }
