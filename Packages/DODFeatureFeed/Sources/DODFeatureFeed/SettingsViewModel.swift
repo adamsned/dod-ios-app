@@ -160,6 +160,11 @@ public final class SettingsViewModel {
         }
     }
 
+    /// DUT-152. Written via the async `setWeeklyDigestEnabled(_:)` (ticket 5).
+    public var weeklyDigestEnabled: Bool {
+        didSet { defaults.set(weeklyDigestEnabled, forKey: Self.weeklyDigestEnabledKey) }
+    }
+
     /// AC-36.2. **T-756 / CL-153 — observable stored property** (was
     /// computed-over-`defaults`, which `@Observable` can't track → the App
     /// Appearance picker label + sheet theme never updated live). Seeded
@@ -280,6 +285,7 @@ public final class SettingsViewModel {
         // DUT-430 — seed observable notification flags (didSet doesn't fire in init).
         self.notificationsEnabled = defaults.bool(forKey: Self.notificationsEnabledKey)
         self.articleNotificationsEnabled = defaults.bool(forKey: Self.articleNotificationsEnabledKey)
+        self.weeklyDigestEnabled = defaults.bool(forKey: Self.weeklyDigestEnabledKey)
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies
