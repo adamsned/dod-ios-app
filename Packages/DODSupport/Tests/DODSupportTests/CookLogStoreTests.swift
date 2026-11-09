@@ -18,4 +18,13 @@ import Testing
         store.recordCook(at: when)
         #expect(store.readCookDates() == [when])
     }
+
+    @Test func oldEventsArePruned() throws {
+        let store = WidgetSnapshotStore(defaults: try Self.freshDefaults())
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let old = now.addingTimeInterval(-400 * 86_400)
+        store.recordCook(at: old)
+        store.recordCook(at: now)
+        #expect(store.readCookDates() == [now])
+    }
 }
