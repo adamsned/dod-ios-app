@@ -129,4 +129,13 @@ struct SettingsViewModelNotificationsTests {
         #expect(result == false)
         #expect(viewModel.articleNotificationsEnabled == false)
     }
+
+    @Test func weeklyDigestDefaultsOffAndRoundTrips() async throws {
+        let defaults = Self.isolatedDefaults()
+        let viewModel = SettingsViewModel(defaults: defaults)
+        #expect(viewModel.weeklyDigestEnabled == false)
+        viewModel.weeklyDigestEnabled = true
+        #expect(defaults.bool(forKey: SettingsViewModel.weeklyDigestEnabledKey) == true)
+        #expect(SettingsViewModel(defaults: defaults).weeklyDigestEnabled == true)
+    }
 }
