@@ -28,4 +28,9 @@ public final class FridgeFinderViewModel {
 
     public var isAvailable: Bool { intelligence?.isAvailable ?? false }
     public var supportsImageInput: Bool { intelligence?.supportsImageInput ?? false }
+
+    private func rematch() async {
+        matches = PantryMatcher.rank(recipes: await loadRecipes(), pantry: ingredients)
+        phase = ingredients.isEmpty ? .noIngredients : .results
+    }
 }
