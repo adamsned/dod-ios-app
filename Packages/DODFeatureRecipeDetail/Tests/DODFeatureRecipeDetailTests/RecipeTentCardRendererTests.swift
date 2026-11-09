@@ -8,12 +8,12 @@ final class RecipeTentCardRendererTests: XCTestCase {
 
     private func makeRecipe(slug: String) -> Recipe {
         Recipe(
-            id: 1,
+            id: 42,
             slug: slug,
             title: "Test Recipe",
-            excerpt: "",
-            canonicalURL: URL(string: "https://example.com/test-recipe")!,
-            publishedAt: Date(timeIntervalSince1970: 0)
+            excerpt: "Test excerpt",
+            canonicalURL: try XCTUnwrap(URL(string: "https://example.com/recipe")),
+            publishedAt: Date()
         )
     }
 
@@ -52,6 +52,7 @@ final class RecipeTentCardRendererTests: XCTestCase {
         // Verify the file exists and clean up
         if let url = url {
             XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+            XCTAssertEqual(url.lastPathComponent, RecipeTentCardRenderer.filename(for: recipe))
             try? FileManager.default.removeItem(at: url)
         }
     }
