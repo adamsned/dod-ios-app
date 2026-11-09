@@ -15,8 +15,17 @@ public struct BrowseByView: View {
     }
 
     public var body: some View {
-        Group { EmptyView() }
-            .task { await viewModel.onAppear() }
+        Group {
+            if !viewModel.axes.isEmpty {
+                VStack(alignment: .leading, spacing: DODSpacing.md) {
+                    ForEach(viewModel.axes) { axis in
+                        section(axis)
+                    }
+                }
+                .accessibilityIdentifier("browse.hub")
+            }
+        }
+        .task { await viewModel.onAppear() }
     }
 }
 
