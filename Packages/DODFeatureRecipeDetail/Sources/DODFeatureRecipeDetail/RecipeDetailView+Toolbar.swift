@@ -174,6 +174,12 @@ extension RecipeDetailView {
         await viewModel.didShare()
 
         let heroImage = await Self.loadShareImage(recipe.heroImageLargeURL ?? recipe.heroImage)
+        let imageCardURL = Self.prefersImageCard() ? Self.imageCardShareURL(recipe: recipe, heroImage: heroImage) : nil
+        if let url = imageCardURL {
+            sharePDF = SharePDFItem(pdfURL: url, linkURL: recipe.canonicalURL)
+            return
+        }
+        // Preference is not imageCard, or rendering failed: fall through to the PDF.
         let data = Self.recipePDFData(
             recipe: recipe,
             servingsScaleFactor: viewModel.servingsScaleFactor,
