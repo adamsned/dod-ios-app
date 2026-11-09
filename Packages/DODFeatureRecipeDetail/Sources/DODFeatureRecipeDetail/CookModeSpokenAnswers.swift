@@ -12,4 +12,22 @@ public enum CookModeSpokenAnswers {
         }
         return "Next: \(steps[nextIndex].text)"
     }
+
+    /// Deterministic answer for "how much / how many X" using the recipe's own ingredient lines.
+    /// Returns nil when the question is not a quantity question or no line matches.
+    public static func ingredientAnswer(question: String, ingredientLines: [String]) -> String? {
+        let lower = question.lowercased()
+        guard lower.contains("how much") || lower.contains("how many") else { return nil }
+        let stop: Set<String> = [
+            "how", "much", "many", "the", "need", "does", "this", "recipe", "use", "for", "are", "there",
+        ]
+        let words = lower.components(separatedBy: CharacterSet.letters.inverted)
+            .filter { $0.count > 2 && !stop.contains($0) }
+        let match = ingredientLines.first { line in
+            let text = line.lowercased()
+            return words.contains { text.contains($0) }
+        }
+        guard let match else { return nil }
+        return "The recipe lists \(match)."
+    }
 }
