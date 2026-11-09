@@ -1,3 +1,4 @@
+import CoreVideo
 import DODSupport
 import XCTest
 
@@ -22,5 +23,13 @@ final class PanCheckVisualIntelligenceTests: XCTestCase {
         var intent = OpenPanCheckIntent()
         intent.target = PanCheckEntity(id: "wellSeasoned")
         XCTAssertEqual(intent.target.verdict, .wellSeasoned)
+    }
+
+    func testCGImageConversionFromPixelBuffer() {
+        var buffer: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 8, 8, kCVPixelFormatType_32BGRA, nil, &buffer)
+        guard let buffer else { return XCTFail("no buffer") }
+        let image = PanCheckQuery.cgImage(from: buffer)
+        XCTAssertEqual(image?.width, 8)
     }
 }
