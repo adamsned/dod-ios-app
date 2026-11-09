@@ -59,3 +59,15 @@ public struct CookActivityIslandAdaptiveView: View {
         }
     }
 }
+
+#if os(iOS)
+@available(iOS 27.0, *)
+private struct CookActivityLimitedWidthReader: View {
+    let content: CookActivityIslandAdaptiveView
+    @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
+
+    var body: some View {
+        content.layout(isLimitedInWidth: isLimitedInWidth)
+    }
+}
+#endif
