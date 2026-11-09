@@ -38,4 +38,9 @@ public final class FridgeFinderViewModel {
         ingredients = PantryMatcher.normalize(ingredients + [name])
         await rematch()
     }
+
+    public func removeIngredient(_ name: String) async {
+        ingredients.removeAll { $0 == name.lowercased() }
+        await rematch()
+    }
 }
