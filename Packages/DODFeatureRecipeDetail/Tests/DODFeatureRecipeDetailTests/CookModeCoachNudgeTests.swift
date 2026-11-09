@@ -24,4 +24,9 @@ struct CookModeCoachNudgeTests {
         #expect(vm.currentStepIndex == 1)
         #expect(vm.currentCoachNudge?.contains("coals") == true)
     }
+
+    @Test func nudgeIsNilWhenRecipeHasNoSteps() {
+        let vm = CookModeViewModelTests.makeViewModel(stepCount: 0)
+        #expect(vm.currentCoachNudge == nil)
+    }
 }
