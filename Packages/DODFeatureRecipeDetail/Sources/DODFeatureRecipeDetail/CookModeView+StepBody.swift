@@ -38,6 +38,12 @@ extension CookModeView {
                 .lineSpacing(DODSpacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityLabel("Step \(step.step). \(displayText)")
+            if let nudge = viewModel.currentCoachNudge {
+                Text(nudge)
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.accent)
+                    .accessibilityIdentifier("cookMode.coachNudge")
+            }
             if let note = viewModel.trainingWheelsNote {
                 trainingWheelsCard(note)
             }
