@@ -106,3 +106,20 @@ extension FeedViewModel {
         cookLogFailureMessage = nil
     }
 }
+
+/// DUT-971 — keeps the idle re-seasoning reminder 21 days out from the latest
+/// cook or care entry. Free-standing so it can be tested with a fake notifier.
+enum PanCareScheduling {
+    static func reschedule(
+        notifier: PanCareNotifying,
+        store: PanCareStore,
+        cooks: [CookLogEntry],
+        now: Date
+    ) async {
+        guard let last = PanCare.lastActivity(cooks: cooks, cares: store.entries()) else {
+            await notifier.cancelIdleReminder()
+            return
+        }
+        await notifier.scheduleIdleReminder(lastActivity: last, now: now)
+    }
+}
