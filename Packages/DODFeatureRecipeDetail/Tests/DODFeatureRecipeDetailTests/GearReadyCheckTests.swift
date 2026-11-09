@@ -59,4 +59,14 @@ struct GearReadyCheckTests {
         )
         _ = view
     }
+
+    @Test
+    func gateSkippedForRecipeWithoutEquipment() {
+        #expect(GearReadyCheck(items: []).isNeeded == false)
+    }
+
+    @Test
+    func gateShownWhenEquipmentPresent() {
+        #expect(GearReadyCheck(items: [Equipment(name: "Trivet")]).isNeeded == true)
+    }
 }
