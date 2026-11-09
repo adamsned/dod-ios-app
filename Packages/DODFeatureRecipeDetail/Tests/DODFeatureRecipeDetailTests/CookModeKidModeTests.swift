@@ -19,4 +19,14 @@ import Testing
         viewModel.endCookMode()
         #expect(viewModel.isKidModeEnabled == false)
     }
+
+    @Test func isKidSafeFalseForKnifeStep() {
+        let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
+        #expect(viewModel.isKidSafe(RecipeInstruction(step: 1, text: "Chop the onion.")) == false)
+    }
+
+    @Test func isKidSafeTrueForPlainStep() {
+        let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
+        #expect(viewModel.isKidSafe(RecipeInstruction(step: 1, text: "Stir the sauce.")) == true)
+    }
 }
