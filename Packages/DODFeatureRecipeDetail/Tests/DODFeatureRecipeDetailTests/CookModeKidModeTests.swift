@@ -29,4 +29,15 @@ import Testing
         let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
         #expect(viewModel.isKidSafe(RecipeInstruction(step: 1, text: "Stir the sauce.")) == true)
     }
+
+    @Test func currentStepIsKidSafeFalseWhenModeOff() {
+        let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
+        #expect(viewModel.currentStepIsKidSafe == false)
+    }
+
+    @Test func currentStepIsKidSafeTrueWhenModeOnAndStepSafe() {
+        let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
+        viewModel.isKidModeEnabled = true
+        #expect(viewModel.currentStepIsKidSafe == true)
+    }
 }
