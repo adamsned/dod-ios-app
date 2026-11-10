@@ -16,8 +16,19 @@ public struct FridgeFinderView: View {
         self.onSelect = onSelect
     }
 
+    private var photoSection: some View {
+        Section {
+            PhotosPicker(selection: $pickerItem, matching: .images) {
+                Label("Photograph your fridge", systemImage: "camera")
+            }
+            .accessibilityIdentifier("fridgeFinder.photoPicker")
+        }
+    }
+
     public var body: some View {
-        List {}
-            .navigationTitle("What Can I Cook Tonight?")
+        List {
+            photoSection
+        }
+        .navigationTitle("What Can I Cook Tonight?")
     }
 }
