@@ -28,4 +28,12 @@ struct CookJournalConfidenceStatsTests {
         #expect(stats.confidenceReads == [1, 3, 5])
         #expect(stats.confidenceTrend == nil)
     }
+
+    @Test func risingSeriesGivesPositiveTrend() {
+        let cooks = [1, 2, 4, 5].enumerated().map { Self.entry($1, day: $0) }
+        let stats = CookJournalView.computeStats(cooks)
+        #expect(stats.confidenceReads == [1, 2, 4, 5])
+        let trend = stats.confidenceTrend ?? 0
+        #expect(trend > 0)
+    }
 }
