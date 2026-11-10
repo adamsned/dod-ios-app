@@ -217,7 +217,8 @@ public struct CookModeView: View {
             // Iron OLED #000000), not the old mismatched `surfaceWarm` panel.
             .background(DODColor.surface.ignoresSafeArea())
         }
-        .gesture(swipeGesture)
+        .gesture(swipeGesture, including: Self.swipeGestureMask(voiceOverEnabled: voiceOverEnabled))
+        .cookModeRotor(items: rotorItems) { handleRotor($0) }
         .overlay {
             if campfire.isActive {
                 CampfireModeView(
@@ -304,11 +305,11 @@ public struct CookModeView: View {
         .sensoryFeedback(.selection, trigger: viewModel.isPlaying)
         // DUT-401 — announce timer completion (skip the initial 0 so mounting is silent).
         .onChange(of: viewModel.timerCompletionTick) { _, tick in
-            if tick > 0 { announce("Timer complete.") }
+            if tick > 0 { announceTimerComplete() }
             if tick > 0, autoAdvanceOnTimer { AudioServicesPlaySystemSound(1007) }
         }
         // DUT-401 — announce the new step so VoiceOver users aren't left hunting for it.
-        .onChange(of: viewModel.currentStepIndex) { _, _ in announceCurrentStep() }
+        .onChange(of: viewModel.currentStepIndex) { _, _ in handleStepChange() }
         .onChange(of: autoAdvanceOnTimer) { _, new in viewModel.autoAdvanceEnabled = new }
         .onChange(of: viewModel.isFinished) { _, _ in
             announceCurrentStep()

@@ -59,3 +59,15 @@ public struct CookActivityIslandAdaptiveView: View {
         }
     }
 }
+
+#if os(iOS) && compiler(>=6.4)  // isDynamicIslandLimitedInWidth is iOS 27 SDK only; CI builds with Xcode 26
+@available(iOS 27.0, *)
+private struct CookActivityLimitedWidthReader: View {
+    let content: CookActivityIslandAdaptiveView
+    @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
+
+    var body: some View {
+        content.layout(isLimitedInWidth: isLimitedInWidth)
+    }
+}
+#endif
