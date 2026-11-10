@@ -287,14 +287,9 @@ public struct FeedView: View {
             // Hosted in a ScrollView so the pull-to-refresh gesture works here
             // too (a bounce-to-refresh alongside the explicit Retry button).
             ScrollView {
-                EmptyState(
-                    systemImage: "exclamationmark.arrow.triangle.2.circlepath",
-                    title: "Couldn't load recipes",
-                    message: "Something went wrong loading the feed. Please try again.",
-                    action: .init(title: "Retry") {
-                        Task { await viewModel.refresh() }
-                    }
-                )
+                RetryStateView(kind: viewModel.loadFailureKind) {
+                    Task { await viewModel.refresh() }
+                }
                 .frame(maxWidth: .infinity, minHeight: 400)
             }
         case .empty:
