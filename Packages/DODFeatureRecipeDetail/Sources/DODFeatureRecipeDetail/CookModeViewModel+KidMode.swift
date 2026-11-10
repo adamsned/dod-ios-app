@@ -15,4 +15,8 @@ extension CookModeViewModel {
         guard isKidModeEnabled, let step = currentStep else { return false }
         return isKidSafe(step)
     }
+
+    public func toggleKidMode() {
+        isKidModeEnabled.toggle()
+    }
 }
