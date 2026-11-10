@@ -40,4 +40,17 @@ struct FridgeFinderViewModelTests {
         #expect(viewModel.ingredients == ["eggs"])
         #expect(viewModel.matches.count == 1)
     }
+
+    @Test func analyzeUnavailableGoesToNoIngredients() async {
+        let recipes = [Self.recipe(lines: ["2 eggs"])]
+        let viewModel = FridgeFinderViewModel(
+            intelligence: FakeIntelligenceService(isAvailable: false),
+            loadRecipes: { recipes }
+        )
+        await viewModel.analyze(imageData: Data([0x01]))
+
+        #expect(viewModel.phase == .noIngredients)
+        #expect(viewModel.ingredients.isEmpty)
+        #expect(viewModel.matches.isEmpty)
+    }
 }
