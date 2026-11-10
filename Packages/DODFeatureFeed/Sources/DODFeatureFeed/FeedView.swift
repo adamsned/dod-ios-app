@@ -253,23 +253,20 @@ public struct FeedView: View {
             // plus a pointer to the Saved tab for downloaded recipes, so the
             // offline state reads unambiguously — especially for less technical
             // cooks who need to know Saved is where offline recipes live.
-            offlineBlock
+            offlineRetryBlock
         } else {
             loadStateContent
         }
     }
 
-    /// Full-page offline block. Supersedes the old `OfflineBanner` strip.
-    private var offlineBlock: some View {
-        EmptyState(
-            systemImage: "wifi.slash",
-            title: "You're Offline",
-            message:
-                "The Recipes page couldn't load without an internet connection. If you've downloaded recipes for offline use, open the Saved tab to cook from them.",
-            action: .init(title: "Retry") {
+    /// DUT-134 — shared retry block (scrollable so pull-to-refresh still works).
+    private var offlineRetryBlock: some View {
+        ScrollView {
+            RetryStateView(kind: .noConnection) {
                 Task { await viewModel.refresh() }
             }
-        )
+            .frame(maxWidth: .infinity, minHeight: 400)
+        }
     }
 
     @ViewBuilder
@@ -280,21 +277,16 @@ public struct FeedView: View {
         case .firstLaunchOffline:
             // Unreachable while `isOffline` is the precedence gate above, but
             // kept as a defensive fallback for the first-launch-no-cache path.
-            offlineBlock
+            offlineRetryBlock
         case .firstLaunchFailed:
             // DUT-621 — an ONLINE first-launch failure: a real failure message
             // + a Retry wired to `refresh()`, NOT the dead-end "No recipes."
             // Hosted in a ScrollView so the pull-to-refresh gesture works here
             // too (a bounce-to-refresh alongside the explicit Retry button).
             ScrollView {
-                EmptyState(
-                    systemImage: "exclamationmark.arrow.triangle.2.circlepath",
-                    title: "Couldn't load recipes",
-                    message: "Something went wrong loading the feed. Please try again.",
-                    action: .init(title: "Retry") {
-                        Task { await viewModel.refresh() }
-                    }
-                )
+                RetryStateView(kind: viewModel.loadFailureKind) {
+                    Task { await viewModel.refresh() }
+                }
                 .frame(maxWidth: .infinity, minHeight: 400)
             }
         case .empty:
@@ -368,4 +360,9 @@ public struct FeedView: View {
             .accessibilityLabel("Loading recipes")
         }
     }
+}
+
+extension FeedViewModel {
+    /// DUT-134 — offline → no-connection copy; anything else → request-failed copy.
+    var loadFailureKind: LoadFailureKind { isOffline ? .noConnection : .requestFailed }
 }

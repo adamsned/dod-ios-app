@@ -48,4 +48,11 @@ import Testing
         viewModel.toggleKidMode()
         #expect(viewModel.isKidModeEnabled == false)
     }
+
+    @Test func toggleTwiceReturnsToOff() {
+        let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
+        viewModel.toggleKidMode()
+        viewModel.toggleKidMode()
+        #expect(viewModel.isKidModeEnabled == false)
+    }
 }
