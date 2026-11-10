@@ -15,7 +15,7 @@ import Testing
     @Test func endCookModeResetsKidMode() {
         let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
         viewModel.beginCookMode()
-        viewModel.isKidModeEnabled = true
+        viewModel.toggleKidMode()
         viewModel.endCookMode()
         #expect(viewModel.isKidModeEnabled == false)
     }
@@ -28,5 +28,24 @@ import Testing
     @Test func isKidSafeTrueForPlainStep() {
         let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
         #expect(viewModel.isKidSafe(RecipeInstruction(step: 1, text: "Stir the sauce.")) == true)
+    }
+
+    @Test func currentStepIsKidSafeFalseWhenModeOff() {
+        let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
+        #expect(viewModel.currentStepIsKidSafe == false)
+    }
+
+    @Test func currentStepIsKidSafeTrueWhenModeOnAndStepSafe() {
+        let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
+        viewModel.toggleKidMode()
+        #expect(viewModel.currentStepIsKidSafe == true)
+    }
+
+    @Test func toggleFlipsKidMode() {
+        let viewModel = CookModeViewModelTests.makeViewModel(stepCount: 2)
+        viewModel.toggleKidMode()
+        #expect(viewModel.isKidModeEnabled == true)
+        viewModel.toggleKidMode()
+        #expect(viewModel.isKidModeEnabled == false)
     }
 }

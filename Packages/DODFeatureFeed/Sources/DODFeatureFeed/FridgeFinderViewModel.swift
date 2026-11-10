@@ -33,4 +33,27 @@ public final class FridgeFinderViewModel {
         matches = PantryMatcher.rank(recipes: await loadRecipes(), pantry: ingredients)
         phase = ingredients.isEmpty ? .noIngredients : .results
     }
+
+    public func addIngredient(_ name: String) async {
+        ingredients = PantryMatcher.normalize(ingredients + [name])
+        await rematch()
+    }
+
+    public func removeIngredient(_ name: String) async {
+        ingredients.removeAll { $0 == name.lowercased() }
+        await rematch()
+    }
+
+    public func analyze(imageData: Data) async {
+        guard let intelligence, phase != .identifying else { return }
+        phase = .identifying
+        let found = await intelligence.identifyIngredients(imageData: imageData)
+        ingredients = PantryMatcher.normalize(found)
+        guard !ingredients.isEmpty else {
+            matches = []
+            phase = .noIngredients
+            return
+        }
+        await rematch()
+    }
 }

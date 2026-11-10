@@ -9,4 +9,14 @@ extension CookModeViewModel {
     public func isKidSafe(_ step: RecipeInstruction) -> Bool {
         KidSafeStepClassifier.isKidSafe(step.text)
     }
+
+    /// True when kid mode is on and the step on screen is kid-safe.
+    public var currentStepIsKidSafe: Bool {
+        guard isKidModeEnabled, let step = currentStep else { return false }
+        return isKidSafe(step)
+    }
+
+    public func toggleKidMode() {
+        isKidModeEnabled.toggle()
+    }
 }
