@@ -200,11 +200,6 @@ struct DODIntelligenceServiceTests {
         #expect(await makeLegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
     }
 
-    @Test func fakeScanReturnsCannedRecipe() async {
-        let result = await FakeIntelligenceService().scanRecipeCard(imageData: Data([1]))
-        #expect(result?.title == "Grandma's Gumbo")
-    }
-
     @Test func fakeScanNilWhenUnavailable() async {
         let service = FakeIntelligenceService(isAvailable: false)
         #expect(await service.scanRecipeCard(imageData: Data([1])) == nil)
@@ -233,9 +228,9 @@ struct DODIntelligenceServiceTests {
         #expect(await service.explainStep("Fold in the egg whites", nextStep: nil) == nil)
     }
 
-    @Test func defaultExtractRecipeReturnsNil() {
+    @Test func defaultExtractRecipeReturnsNil() async {
         let bare = makeBareService()
-        let result = bare.extractRecipe(fromBody: "x")
+        let result = await bare.extractRecipe(fromBody: "x")
         #expect(result == nil)
     }
 

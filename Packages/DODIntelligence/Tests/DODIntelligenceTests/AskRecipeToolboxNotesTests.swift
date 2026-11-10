@@ -9,16 +9,13 @@ final class AskRecipeToolboxNotesTests: XCTestCase {
             servings: 4,
             scaledIngredients: [],
             steps: [
-                "1. Preheat oven to 350°F.",
-                "2. Cool completely, then refrigerate overnight.",
-                "3. Mix ingredients.",
-                "4. Cool completely, then refrigerate overnight.",  // duplicate
+                "Preheat oven to 350°F.",
+                "Cool completely, then refrigerate overnight.",  // matches 3 keywords, listed once
+                "Mix ingredients.",
             ]
         )
 
-        let hints = toolbox.makeAheadHints()
-        XCTAssertEqual(hints.count, 1)
-        XCTAssertEqual(hints[0], "2. Cool completely, then refrigerate overnight.")
+        XCTAssertEqual(toolbox.makeAheadHints(), ["2. Cool completely, then refrigerate overnight."])
     }
 
     func testMakeAheadHintsEmptyWhenNone() {

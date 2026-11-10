@@ -260,4 +260,12 @@ import Testing
         let url = try #require(URL(string: "dod://bogus"))
         #expect(WidgetDeepLinkParser.parse(url) == nil)
     }
+
+    // MARK: - DUT-989 `dod://tonights-rung` (Tonight's Rung control)
+
+    /// DUT-989 — the "Tonight's Rung" control opens `dod://tonights-rung`.
+    @Test func tonightsRungHostParsesToCookingTool() {
+        #expect(WidgetDeepLinkParser.parse(URL(string: "dod://tonights-rung")!) == .cookingTool(.tonightsRung))
+        #expect(WidgetDeepLinkParser.parse(URL(string: "dod://tonights-rung/x")!) == nil)
+    }
 }

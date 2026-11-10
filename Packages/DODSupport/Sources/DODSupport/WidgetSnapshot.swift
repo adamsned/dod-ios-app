@@ -228,7 +228,7 @@ public enum WidgetDeepLinkParser {
     /// only (mirrors `.shoppingList`); an unknown host or any path returns `nil`.
     private static func parseCookingTool(host: String, url: URL) -> Route? {
         switch host {
-        case "heat-coach", "journal", "first-cookout", "cook-mode", "buzzywaxx":
+        case "heat-coach", "journal", "first-cookout", "cook-mode", "buzzywaxx", "tonights-rung":
             guard isBare(url), let route = ControlRouteStore.Route(rawValue: host) else { return nil }
             return .cookingTool(route)
         default:
