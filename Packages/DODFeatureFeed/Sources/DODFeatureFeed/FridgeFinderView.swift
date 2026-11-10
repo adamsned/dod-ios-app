@@ -74,11 +74,34 @@ public struct FridgeFinderView: View {
         }
     }
 
+    private var resultsSection: some View {
+        Section("Recipes you can make") {
+            ForEach(viewModel.matches) { match in
+                Button {
+                    onSelect(match.recipeID)
+                } label: {
+                    VStack(alignment: .leading, spacing: DODSpacing.xxs) {
+                        Text(match.title)
+                            .dodFont(DODType.body)
+                        Text(
+                            "\(match.matchedLines.count) of "
+                                + "\(match.matchedLines.count + match.missingLines.count) ingredients on hand"
+                        )
+                        .dodFont(DODType.caption)
+                        .foregroundStyle(DODColor.labelSecondary)
+                    }
+                }
+                .accessibilityIdentifier("fridgeFinder.match.\(match.recipeID)")
+            }
+        }
+    }
+
     public var body: some View {
         List {
             photoSection
             statusSection
             if !viewModel.ingredients.isEmpty { ingredientsSection }
+            if !viewModel.matches.isEmpty { resultsSection }
         }
         .navigationTitle("What Can I Cook Tonight?")
         .onChange(of: pickerItem) { _, item in
