@@ -34,4 +34,12 @@ import Testing
             ) == false
         )
     }
+
+    @Test func accessibilityLabelIncludesBadgeOnlyWhenShown() {
+        #expect(CookModeView.stepAccessibilityLabel(step: 2, text: "Stir.", showBadge: false) == "Step 2. Stir.")
+        #expect(
+            CookModeView.stepAccessibilityLabel(step: 2, text: "Stir.", showBadge: true)
+                == "Step 2. Kids can help with this one. Stir."
+        )
+    }
 }
