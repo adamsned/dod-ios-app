@@ -26,6 +26,10 @@ extension CookJournalView {
         var last30Days = 0
         /// DUT-974 — gateway dishes on their way to being owned (closest first).
         var ownIt: [CookLogStats.OwnItProgress] = []
+        /// DUT-975 — chronological confidence reads (1–5), oldest first.
+        var confidenceReads: [Int] = []
+        /// DUT-975 — recent-minus-early confidence delta; nil with < 4 reads.
+        var confidenceTrend: Double?
     }
 
     /// Derive the header stats from a cook history. Pure + static so the
