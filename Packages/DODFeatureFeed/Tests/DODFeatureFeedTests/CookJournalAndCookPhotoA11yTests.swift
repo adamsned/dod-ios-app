@@ -195,4 +195,15 @@ struct CookJournalAndCookPhotoA11yTests {
     @Test func journalShowsEmptyStateAfterClear() {
         #expect(CookJournalView.contentState(loaded: true, isEmpty: true) == .empty)
     }
+
+    @Test func confidenceTrajectoryKeepsEntryConfidence() {
+        let entry = CookLogEntry(
+            id: UUID(),
+            recipeID: 1,
+            recipeTitle: "Pasta",
+            cookedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            confidence: 4
+        )
+        #expect(CookLogStats.confidenceTrajectory([entry]).first?.confidence == 4)
+    }
 }

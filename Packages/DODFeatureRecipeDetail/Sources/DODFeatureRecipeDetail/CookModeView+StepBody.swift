@@ -51,6 +51,14 @@ extension CookModeView {
         .padding(.horizontal, DODSpacing.md)
     }
 
+    /// DUT-2044 — badge copy shown on kid-safe steps while Kid Mode is on.
+    nonisolated static let kidSafeBadgeText = "Kids can help with this one"
+
+    /// DUT-2044 — the badge shows only when Kid Mode is on AND the step is kid-safe.
+    nonisolated static func showsKidBadge(isKidModeEnabled: Bool, isKidSafe: Bool) -> Bool {
+        isKidModeEnabled && isKidSafe
+    }
+
     /// T-912 / DUT-551 — whether a step's text is about heat (drives the tool
     /// dock's Heat Coach row): it carries an explicit-unit
     /// temperature (via ``TemperatureConverter/fahrenheitValues(in:)``) OR one of

@@ -343,7 +343,8 @@ extension CookJournalEntryView {
             cookedAt: entry.cookedAt,
             note: trimmed.isEmpty ? nil : trimmed,
             personalRating: entry.personalRating,
-            photoLocalID: photoID
+            photoLocalID: photoID,
+            confidence: entry.confidence
         )
         await onSave(updated)
         saveSuccessTick &+= 1  // DUT — fire the success haptic before the page pops.
