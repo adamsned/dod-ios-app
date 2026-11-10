@@ -242,7 +242,9 @@ public struct RecipeDetailView: View {
                 Task { await viewModel.retryLoad() }
             }
         case .ready:
-            readyBody
+            readyBody.overlay(alignment: .top) {
+                AvailabilityBadge(Self.availability(isDownloaded: viewModel.isDownloaded)).padding(DODSpacing.sm)
+            }
         // US-37 / CL-63 / AC-37.3 (T-640): article rendering branch.
         // Posts that lack parseable JSON-LD but have an extractable HTML
         // body render via `ArticleDetailView` with the carried `Recipe`
@@ -390,4 +392,8 @@ public struct RecipeDetailView: View {
     //
     // `handleLoadStateChange(_:)` lives in
     // `RecipeDetailView+LoadStateChange.swift` for the same reason.
+
+    nonisolated static func availability(isDownloaded: Bool) -> OfflineAvailability {
+        isDownloaded ? .worksOffline : .needsNetwork
+    }
 }
