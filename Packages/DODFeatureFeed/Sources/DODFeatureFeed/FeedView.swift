@@ -369,3 +369,8 @@ public struct FeedView: View {
         }
     }
 }
+
+extension FeedViewModel {
+    /// DUT-134 — offline → no-connection copy; anything else → request-failed copy.
+    var loadFailureKind: LoadFailureKind { isOffline ? .noConnection : .requestFailed }
+}
