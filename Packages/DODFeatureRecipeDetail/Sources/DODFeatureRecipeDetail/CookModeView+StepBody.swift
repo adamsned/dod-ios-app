@@ -59,6 +59,13 @@ extension CookModeView {
         isKidModeEnabled && isKidSafe
     }
 
+    /// DUT-2044 — VoiceOver label for a step; includes the kid badge copy when shown.
+    nonisolated static func stepAccessibilityLabel(step: Int, text: String, showBadge: Bool) -> String {
+        showBadge
+            ? "Step \(step). \(kidSafeBadgeText). \(text)"
+            : "Step \(step). \(text)"
+    }
+
     /// T-912 / DUT-551 — whether a step's text is about heat (drives the tool
     /// dock's Heat Coach row): it carries an explicit-unit
     /// temperature (via ``TemperatureConverter/fahrenheitValues(in:)``) OR one of
