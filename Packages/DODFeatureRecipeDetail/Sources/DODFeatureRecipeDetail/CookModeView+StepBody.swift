@@ -51,6 +51,15 @@ extension CookModeView {
         .padding(.horizontal, DODSpacing.md)
     }
 
+    /// DUT-2044 — the "kids can help" badge above a kid-safe step's text.
+    private var kidBadge: some View {
+        Label(Self.kidSafeBadgeText, systemImage: "hand.raised.fingers.spread.fill")
+            .dodFont(DODType.body)
+            .foregroundStyle(DODColor.accent)
+            .accessibilityHidden(true)
+            .accessibilityIdentifier("cook-mode-kid-badge")
+    }
+
     /// DUT-2044 — badge copy shown on kid-safe steps while Kid Mode is on.
     nonisolated static let kidSafeBadgeText = "Kids can help with this one"
 
