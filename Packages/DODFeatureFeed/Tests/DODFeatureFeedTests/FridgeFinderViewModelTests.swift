@@ -53,4 +53,26 @@ struct FridgeFinderViewModelTests {
         #expect(viewModel.ingredients.isEmpty)
         #expect(viewModel.matches.isEmpty)
     }
+
+    @Test func removeIngredientRematches() async {
+        let recipes = [
+            Self.recipe(id: 1, lines: ["2 eggs"]),
+            Self.recipe(id: 2, lines: ["1 cup spinach"]),
+        ]
+        let viewModel = FridgeFinderViewModel(
+            intelligence: FakeIntelligenceService(isAvailable: true, ingredients: ["eggs", "spinach"]),
+            loadRecipes: { recipes }
+        )
+        await viewModel.analyze(imageData: Data([0x01]))
+        #expect(viewModel.matches.count == 2)
+
+        await viewModel.removeIngredient("Eggs")
+        #expect(viewModel.ingredients == ["spinach"])
+        #expect(viewModel.matches.map(\.recipeID) == [2])
+        #expect(viewModel.phase == .results)
+
+        await viewModel.removeIngredient("spinach")
+        #expect(viewModel.phase == .noIngredients)
+        #expect(viewModel.matches.isEmpty)
+    }
 }
