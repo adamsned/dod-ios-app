@@ -390,4 +390,8 @@ public struct RecipeDetailView: View {
     //
     // `handleLoadStateChange(_:)` lives in
     // `RecipeDetailView+LoadStateChange.swift` for the same reason.
+
+    nonisolated static func availability(isDownloaded: Bool) -> OfflineAvailability {
+        isDownloaded ? .worksOffline : .needsNetwork
+    }
 }
