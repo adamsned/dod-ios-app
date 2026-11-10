@@ -37,4 +37,16 @@ import Testing
         #expect(captured?.0.slug == "occasion")
         #expect(captured?.1.tagIDs == [20])
     }
+
+    @Test func viewBuildsWithNoAxesOnProviderError() async {
+        let viewModel = BrowseByViewModel(
+            provider: FakeAxesProvider(result: .failure(BrowseTestError())),
+            dependencies: BrowseByFakeCategoriesDependencies()
+        )
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .error)
+        #expect(viewModel.axes.isEmpty)
+        let view = BrowseByView(viewModel: viewModel, onSelect: { _, _ in })
+        _ = view.body
+    }
 }
