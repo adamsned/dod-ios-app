@@ -27,20 +27,29 @@ extension CookModeView {
 
             Spacer()
 
-            // DUT-1392 — "Ask About This Recipe" moved from a sparkles button
-            // here to a labeled link under the recipe name (`askAboutRecipeLink`).
+            // DUT-995 — Cook-With-Kids toggle. Filled glyph = on.
+            HStack(spacing: DODSpacing.xs) {
+                floatingButton(
+                    systemName: viewModel.isKidModeEnabled
+                        ? "figure.and.child.holdinghands" : "figure.2.and.child.holdinghands",
+                    label: viewModel.isKidModeEnabled ? "Turn off Cook With Kids" : "Turn on Cook With Kids",
+                    action: { viewModel.toggleKidMode() }
+                )
+                .accessibilityIdentifier("cook-mode-kid-toggle")
+                .accessibilityValue(viewModel.isKidModeEnabled ? "On" : "Off")
 
-            // DUT-599 successor — ingredients moved off the transport's carrot
-            // button up here so the transport's play/pause can sit dead-center.
-            floatingButton(
-                systemName: "carrot.fill",
-                label: "Show ingredients",
-                action: { openIngredients() }
-            )
-            .accessibilityIdentifier("cook-mode-ingredients")
-            .accessibilityValue(
-                "\(viewModel.checkedIngredientIDs.count) of \(viewModel.recipe.ingredients.count) checked"
-            )
+                // DUT-599 successor — ingredients moved off the transport's carrot
+                // button up here so the transport's play/pause can sit dead-center.
+                floatingButton(
+                    systemName: "carrot.fill",
+                    label: "Show ingredients",
+                    action: { openIngredients() }
+                )
+                .accessibilityIdentifier("cook-mode-ingredients")
+                .accessibilityValue(
+                    "\(viewModel.checkedIngredientIDs.count) of \(viewModel.recipe.ingredients.count) checked"
+                )
+            }
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.top, DODSpacing.xs)
