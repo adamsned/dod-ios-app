@@ -42,6 +42,7 @@ public struct ShoppingListStore: @unchecked Sendable {
     }
 
     /// UserDefaults key under the App Group suite for the persisted list.
+    /// Must stay equal to `ShoppingListWidgetBridge.storageKey`.
     public static let key = "dod.shoppingList.v1"
 
     private let defaults: UserDefaults
