@@ -23,6 +23,13 @@ public struct FridgeFinderView: View {
         await viewModel.analyze(imageData: data)
     }
 
+    private func submitNewItem() {
+        let name = newItem.trimmingCharacters(in: .whitespacesAndNewlines)
+        newItem = ""
+        guard !name.isEmpty else { return }
+        Task { await viewModel.addIngredient(name) }
+    }
+
     private var photoSection: some View {
         Section {
             PhotosPicker(selection: $pickerItem, matching: .images) {
@@ -44,10 +51,34 @@ public struct FridgeFinderView: View {
         }
     }
 
+    private var ingredientsSection: some View {
+        Section("Ingredients") {
+            ForEach(viewModel.ingredients, id: \.self) { name in
+                HStack {
+                    Text(name)
+                        .dodFont(DODType.body)
+                    Spacer()
+                    Button {
+                        Task { await viewModel.removeIngredient(name) }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove \(name)")
+                    .accessibilityIdentifier("fridgeFinder.remove.\(name)")
+                }
+            }
+            TextField("Add item", text: $newItem)
+                .onSubmit { submitNewItem() }
+                .accessibilityIdentifier("fridgeFinder.addItem")
+        }
+    }
+
     public var body: some View {
         List {
             photoSection
             statusSection
+            if !viewModel.ingredients.isEmpty { ingredientsSection }
         }
         .navigationTitle("What Can I Cook Tonight?")
         .onChange(of: pickerItem) { _, item in
