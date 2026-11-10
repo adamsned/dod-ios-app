@@ -82,6 +82,20 @@ final class CookLiveActivitySnapshotTests: XCTestCase {
         assertSnapshot(of: view, as: .image(layout: .fixed(width: 360, height: 140)))
     }
 
+    /// DUT-967 — test the coach nudge rendering
+    func test_lockScreen_withCoachNudge() {
+        let view = CookActivityLockScreenView(
+            recipeTitle: "Dutch Oven Pot Roast",
+            stepText: "Cover and braise for 2 hours, basting every 30 min.",
+            remainingSeconds: 900,
+            totalSeconds: 1_800,
+            isPaused: false,
+            coachNudge: "You're doing great — rotate the lid a quarter turn."
+        )
+        .frame(width: 360, height: 160)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 360, height: 160)))
+    }
+
     func test_dynamicIsland_compactLeading() {
         let view = CookActivityCompactLeadingView()
             .frame(width: 30, height: 30)
@@ -92,6 +106,65 @@ final class CookLiveActivitySnapshotTests: XCTestCase {
         let view = CookActivityCompactTrailingView(remainingSeconds: 75)
             .frame(width: 60, height: 30)
         assertSnapshot(of: view, as: .image(layout: .fixed(width: 60, height: 30)))
+    }
+
+    /// DUT-991 — StandBy mode states
+    func test_standByRunningStatic() {
+        let model = CookActivityStandByModel(
+            state: .init(
+                remainingSeconds: 754,
+                stepText: "Simmer until thickened",
+                isPaused: false,
+                endDate: nil
+            )
+        )
+        let view = CookActivityStandByView(recipeTitle: "Dutch Oven Pot Roast", model: model)
+            .frame(width: 320, height: 160)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 320, height: 160)))
+    }
+
+    func test_standByPaused() {
+        let model = CookActivityStandByModel(
+            state: .init(
+                remainingSeconds: 754,
+                stepText: "Simmer until thickened",
+                isPaused: true,
+                endDate: nil
+            )
+        )
+        let view = CookActivityStandByView(recipeTitle: "Dutch Oven Pot Roast", model: model)
+            .frame(width: 320, height: 160)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 320, height: 160)))
+    }
+
+    func test_standByDone() {
+        let model = CookActivityStandByModel(
+            state: .init(
+                remainingSeconds: 0,
+                stepText: "Simmer until thickened",
+                isPaused: true,
+                endDate: nil,
+                isCompleted: true
+            )
+        )
+        let view = CookActivityStandByView(recipeTitle: "Dutch Oven Pot Roast", model: model)
+            .frame(width: 320, height: 160)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 320, height: 160)))
+    }
+
+    func test_standByLongStep() {
+        let longStepText = String(repeating: "x", count: 120)
+        let model = CookActivityStandByModel(
+            state: .init(
+                remainingSeconds: 4500,
+                stepText: longStepText,
+                isPaused: false,
+                endDate: nil
+            )
+        )
+        let view = CookActivityStandByView(recipeTitle: "Dutch Oven Pot Roast", model: model)
+            .frame(width: 320, height: 160)
+        assertSnapshot(of: view, as: .image(layout: .fixed(width: 320, height: 160)))
     }
 }
 #endif

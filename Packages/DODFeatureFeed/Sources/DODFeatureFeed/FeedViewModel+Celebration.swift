@@ -43,12 +43,20 @@ extension FeedViewModel {
         let wasGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedBefore) == nil
         let isGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedAfter) == nil
         let isFirstCookEver = logsBefore.isEmpty && !logsAfter.isEmpty
+        // DUT-974 — fire .ownedIt when a recipe crosses the threshold
+        let ownedBefore =
+            CookLogStats.timesCooked(recipeID: entry.recipeID, in: logsBefore) >= CookLogStats.ownItThreshold
+        let ownedAfter =
+            CookLogStats.timesCooked(recipeID: entry.recipeID, in: logsAfter) >= CookLogStats.ownItThreshold
+        let justOwnedIt = ownedAfter && !ownedBefore
         if isGraduate && !wasGraduate {
             pendingCelebration = .graduatedFirstCookout
         } else if OwnerGate.isCurrentUserOwner() {
             // Daddy Mode (owner rank) — the owner's rank is fixed at "The Dutch Oven
             // Daddy", so he never "ranks up". Suppress the rank-up celebration for
             // him (a "You're a Cast Iron Legend" beat would contradict his rank).
+        } else if justOwnedIt {
+            pendingCelebration = .ownedIt(title: entry.recipeTitle)
         } else if isFirstCookEver {
             // DUT-983: any recipe, including off-path ones. Replaces the
             // Fire Starter rank-up a first path cook would otherwise earn.
@@ -96,5 +104,22 @@ extension FeedViewModel {
     /// mirrors `dismissShoppingListSnackbar()` in `FeedViewModel+ShoppingList`.
     public func dismissCookLogFailureMessage() {
         cookLogFailureMessage = nil
+    }
+}
+
+/// DUT-971 — keeps the idle re-seasoning reminder 21 days out from the latest
+/// cook or care entry. Free-standing so it can be tested with a fake notifier.
+enum PanCareScheduling {
+    static func reschedule(
+        notifier: PanCareNotifying,
+        store: PanCareStore,
+        cooks: [CookLogEntry],
+        now: Date
+    ) async {
+        guard let last = PanCare.lastActivity(cooks: cooks, cares: store.entries()) else {
+            await notifier.cancelIdleReminder()
+            return
+        }
+        await notifier.scheduleIdleReminder(lastActivity: last, now: now)
     }
 }

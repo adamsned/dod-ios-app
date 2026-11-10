@@ -21,4 +21,7 @@ struct CookWinCardContent: Equatable {
 
     /// Big line on the card: the win if the cook wrote one, else "I made <dish>!".
     var headline: String { win ?? "I made \(dishTitle)!" }
+
+    /// Text sent alongside the image in the share sheet.
+    var shareCaption: String { "\(headline) — \(Self.attribution)" }
 }

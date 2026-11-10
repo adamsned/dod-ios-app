@@ -1,3 +1,4 @@
+import AudioToolbox
 import Combine
 import DODDesignSystem
 import DODDomain
@@ -25,32 +26,33 @@ public struct CookModeView: View {
     /// DUT-599 — `internal` so `CookModeView+Controls.swift` can open the drawer
     /// from the carrot button wired into the transport's secondary row.
     @State var ingredientsDrawerVisible: Bool = false
-    /// DUT-529 — belt-and-suspenders idle-timer safety net. `.onDisappear`
-    /// already restores the idle timer on a normal teardown; this observer also
-    /// restores it when the app backgrounds (so an atypical teardown that never
-    /// fires `.onDisappear` can't leave `isIdleTimerDisabled` stuck on), and
-    /// re-arms it on return to `.active` if the session is still up. Both
-    /// `begin`/`endCookMode` are idempotent, so this never double-restores.
+    /// DUT-529 — restores the idle timer when the app backgrounds and re-arms it on `.active`
+    /// (begin/endCookMode are idempotent).
     @Environment(\.scenePhase) private var scenePhase
-    /// DUT-529 — when Reduce Motion is on, drop the step-change slide/scale
-    /// animation (constitution §7); the step swap still happens, just without the
-    /// motion. Mirrors the `LoadingSkeleton` shimmer guard.
-    /// `internal` (not `private`) so `CookModeView+Controls.swift` can gate the
-    /// panel's collapse/expand animation on Reduce Motion (constitution §7).
+    /// DUT-137 — re-evaluated live on Stage Manager / Split View resize; state in
+    /// `viewModel` is untouched so no cook state is lost.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// DUT-529 — Reduce Motion drops the step-change animation; `internal` for `CookModeView+Controls.swift`.
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    // `internal` (not `private`) so the step-body composition in
-    // `CookModeView+StepBody.swift` can present the journal-log sheet.
-    /// DUT-326 — drives the "Add to Cooking Journal" capture sheet on the
-    /// Done card.
+    /// DUT-116 — VoiceOver-aware layout switch; `internal` for the extension files.
+    @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
+    /// DUT-116 — lets the step card take VoiceOver focus when the step changes.
+    @AccessibilityFocusState var stepFocused: Bool
+    // `internal` so `CookModeView+StepBody.swift` can present the journal-log sheet.
+    /// DUT-326 — drives the "Add to Cooking Journal" sheet on the Done card.
     @State var isJournalLogPresented: Bool = false
-    /// T-912 / DUT-551 (CL-306) — drives the Heat Coach sheet presented OVER
-    /// Cook Mode's full-screen cover from a heat-related step's shortcut. Cook
-    /// Mode is a `.fullScreenCover`, so a tab switch would be invisible under it;
-    /// a `.sheet` layers on top instead. `internal` so `CookModeView+StepBody`
-    /// can flip it. Only shown when `heatCoachSheet != nil`.
+    /// DUT-987 — drives the Ready-to-Serve check sheet that precedes the journal sheet.
+    @State var isReadyToServePresented: Bool = false
+    /// DUT-987 — set on confirm so the journal sheet opens once the check sheet has dismissed.
+    @State var openJournalAfterReadyCheck: Bool = false
+    /// DUT-981 — drives the "Share the Praise" sheet; `internal` for `CookModeView+StepBody.swift`.
+    @State var isGuestReactionPresented: Bool = false
+    /// T-912 / DUT-551 — Heat Coach sheet over the cover; `internal` for `CookModeView+StepBody`.
     @State var isHeatCoachPresented: Bool = false
     /// DUT-1385 — drives the "Ask About This Recipe" sheet over the cover.
     @State var isAskPresented: Bool = false
+    /// DUT-970 — drives the Cast-Iron Rescue sheet.
+    @State var isRescuePresented: Bool = false
     /// DUT-293/294 — ticks the VM's step timers ~1×/s while Cook Mode is on
     /// screen, regardless of which step is shown, so a running timer on a step
     /// you've navigated away from still counts down + completes.
@@ -63,21 +65,16 @@ public struct CookModeView: View {
     /// default) hides the CTA entirely — previews and hosts that don't wire
     /// persistence stay unaffected.
     public let onLogCook: ((CookLogEntry) -> Void)?
-    /// T-912 / DUT-551 (CL-306) — builds the Heat Coach surface for the
-    /// heat-step shortcut. Presented as a `.sheet` OVER this full-screen cover
-    /// (see `isHeatCoachPresented`). The `HeatCoachView` lives in
-    /// `DODFeatureFeed`, which this package must not import, so the host injects
-    /// a type-erased `AnyView` builder. `nil` (the default) hides the shortcut on
-    /// every step — previews and hosts that don't wire hub routing stay
-    /// unaffected (same seam as `onLogCook`). `internal` (not `private`) so
-    /// `CookModeView+StepBody.swift` can gate the shortcut on it.
+    /// DUT-981 — posts (quote, guest name, rating) as a public comment; `nil` hides the CTA.
+    public let onPostGuestReaction: ((String, String, Int?) async -> Bool)?
+    /// T-912 / DUT-551 — host-injected `AnyView` builder for the Heat Coach sheet
+    /// (`HeatCoachView` lives in `DODFeatureFeed`, which this package can't import).
+    /// `nil` hides the heat shortcut. `internal` so `CookModeView+StepBody.swift` can gate on it.
     let heatCoachSheet: (() -> AnyView)?
     /// DUT-1385 — builds the "Ask About This Recipe" chat (title, recipe text);
     /// `nil` hides the top-bar sparkle button. See `CookModeView+Ask.swift`.
     let askSheet: ((String, String) -> AnyView)?
-    /// Scale factor inherited from the host detail screen so the drawer
-    /// ingredient rows agree with the scaled list the user just left. AC-7.5
-    /// + US-31 carry-over.
+    /// Scale factor from the host detail screen so drawer rows match the scaled list (AC-7.5 / US-31).
     let ingredientScaleFactor: Double
 
     // `internal` (not `private`) so `CookModeView+StepBody.swift` can resolve
@@ -106,6 +103,10 @@ public struct CookModeView: View {
     @AppStorage(CookModeControlsAutoMinimize.preferenceKey)
     var autoMinimizeSeconds: Int = CookModeControlsAutoMinimize.defaultSeconds
 
+    /// DUT-173 — opt-in auto-advance when a step timer finishes.
+    @AppStorage(CookModeAutoAdvance.preferenceKey)
+    var autoAdvanceOnTimer: Bool = CookModeAutoAdvance.defaultEnabled
+
     /// DUT-596 — whether the player control panel is currently expanded. Flips to
     /// `false` after `autoMinimizeSeconds` of no interaction (never while
     /// finished); ANY interaction restores it via ``wakeControls()``. `internal`
@@ -117,24 +118,38 @@ public struct CookModeView: View {
     /// `CookModeView+Controls.swift` owns its lifecycle.
     @State var minimizeTask: Task<Void, Never>?
 
+    /// DUT-102 - Campfire Mode (max brightness, XXL text, Day/Night).
+    @State private var campfire = CampfireSession()
+
     public init(
         recipe: Recipe,
         initialCheckedIngredients: Set<UUID>,
         ingredientScaleFactor: Double = 1.0,
         onClose: @escaping (Set<UUID>) -> Void,
         onLogCook: ((CookLogEntry) -> Void)? = nil,
+        onPostGuestReaction: ((String, String, Int?) async -> Bool)? = nil,
         heatCoachSheet: (() -> AnyView)? = nil,
-        askSheet: ((String, String) -> AnyView)? = nil
+        askSheet: ((String, String) -> AnyView)? = nil,
+        isFirstCookEver: Bool = false
     ) {
-        _viewModel = State(
-            initialValue: CookModeViewModel(
-                recipe: recipe,
-                initialCheckedIngredients: initialCheckedIngredients
-            )
+        #if canImport(MediaPlayer)
+        let model = CookModeViewModel(
+            recipe: recipe,
+            initialCheckedIngredients: initialCheckedIngredients,
+            nowPlayingPublisher: SystemNowPlayingPublisher()
         )
+        #else
+        let model = CookModeViewModel(
+            recipe: recipe,
+            initialCheckedIngredients: initialCheckedIngredients
+        )
+        #endif
+        model.isFirstCookEver = isFirstCookEver
+        _viewModel = State(initialValue: model)
         self.ingredientScaleFactor = ingredientScaleFactor
         self.onClose = onClose
         self.onLogCook = onLogCook
+        self.onPostGuestReaction = onPostGuestReaction
         self.heatCoachSheet = heatCoachSheet
         self.askSheet = askSheet
     }
@@ -163,29 +178,14 @@ public struct CookModeView: View {
                             Spacer(minLength: 0)
                         }
                         .ignoresSafeArea(.container, edges: .top)
-                    } else {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                                // DUT-1392 — "Ask About This Recipe" sits right under
-                                // the recipe name (which is on the hero).
-                                VStack(alignment: .leading, spacing: DODSpacing.xs) {
-                                    heroView(topInset: topInset)
-                                    askAboutRecipeLink
-                                }
-                                stepBody
-                            }
-                            .padding(.bottom, DODSpacing.md)
+                    } else if CookModeLayout.resolve(horizontalSizeClass: horizontalSizeClass) == .twoPane {
+                        HStack(spacing: 0) {
+                            stepScroll(topInset: topInset, showsToolDock: false)
+                            pinnedPane
+                                .frame(width: CookModeLayout.clampedPinnedPaneWidth(containerWidth: geo.size.width))
                         }
-                        .ignoresSafeArea(.container, edges: .top)
-                        // DUT-1392 — the floating tool dock (timer / Heat Coach),
-                        // riding just above the player panel as it minimizes.
-                        .safeAreaInset(edge: .bottom, spacing: 0) { toolDock }
-                        .animation(controlsAnimation, value: toolDockContent)
-                        // DUT-596/599 — a tap in the collapsed step area brings the
-                        // controls back; a no-op while expanded so it never fights
-                        // reading.
-                        .contentShape(Rectangle())
-                        .onTapGesture { if !controlsExpanded { wakeControls() } }
+                    } else {
+                        stepScroll(topInset: topInset, showsToolDock: true)
                     }
                     // DUT-596 — the auto-minimizing player panel + the progress
                     // footer (bar + counter, which becomes the star on Done).
@@ -195,24 +195,80 @@ public struct CookModeView: View {
                 }
                 // Floating back + ingredients controls over the hero's blur strip.
                 cookModeTopBar()
+                // DUT-102 - one-tap Campfire Mode entry, below the top bar.
+                if !campfire.isActive && !viewModel.isFinished {
+                    Button {
+                        campfire.enter()
+                    } label: {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(DODColor.burntOrange)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Campfire Mode")
+                    .accessibilityIdentifier("cook-mode-campfire")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.top, 56)
+                    .padding(.trailing, DODSpacing.md + 48)
+                }
             }
-            // The whole Cook Mode surface uses `surface` — the SAME token the
-            // player panel + the rest of the app use — so it reads as one uniform
+            // The whole Cook Mode surface uses the shared `surface` token.
             // color per appearance (Flour #F2F1EC, Cocoa #1B140E, Seasoned Cast
             // Iron OLED #000000), not the old mismatched `surfaceWarm` panel.
             .background(DODColor.surface.ignoresSafeArea())
         }
-        .gesture(swipeGesture)
+        .gesture(swipeGesture, including: Self.swipeGestureMask(voiceOverEnabled: voiceOverEnabled))
+        .cookModeRotor(items: rotorItems) { handleRotor($0) }
+        .overlay {
+            if campfire.isActive {
+                CampfireModeView(
+                    variant: campfire.variant,
+                    stepText: viewModel.currentStep.map { convertedStepText($0.text) } ?? "",
+                    stepLabel: stepCounterLabel,
+                    isFinished: viewModel.isFinished,
+                    timers: viewModel.stepTimers,
+                    currentStepIndex: viewModel.currentStepIndex,
+                    onPrev: { viewModel.goBack() },
+                    onNext: { advance() },
+                    onToggleVariant: { campfire.toggleVariant() },
+                    onExit: { campfire.exit() }
+                )
+            }
+        }
+        .overlay(alignment: .bottom) { autoAdvanceBanner }  // DUT-173
         .sheet(isPresented: $ingredientsDrawerVisible) {
             ingredientsDrawer
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(
+            isPresented: $isReadyToServePresented,
+            onDismiss: {
+                // DUT-987 — chain into the journal sheet only after the check sheet is gone.
+                if openJournalAfterReadyCheck {
+                    openJournalAfterReadyCheck = false
+                    isJournalLogPresented = true
+                }
+            },
+            content: { () in
+                ReadyToServeCheckView(content: ReadyToServeContent.make(for: viewModel.recipe)) {
+                    openJournalAfterReadyCheck = true
+                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
+        )
         .sheet(isPresented: $isJournalLogPresented) {
             // DUT-326 — self-contained capture sheet (equivalent to the Feed
             // package's CookJournalEntryView, which this package can't import).
             CookModeJournalLogSheet(recipe: viewModel.recipe) { entry in
+                viewModel.isFirstCookEver = false
                 onLogCook?(entry)
+            }
+        }
+        .sheet(isPresented: $isGuestReactionPresented) {
+            if let onPostGuestReaction {
+                GuestReactionSheet(onPost: onPostGuestReaction)
             }
         }
         // T-912 / DUT-551 — Heat Coach, presented as a sheet OVER this
@@ -225,39 +281,36 @@ public struct CookModeView: View {
             }
         }
         .sheet(isPresented: $isAskPresented) { askSheetContent }  // DUT-1385
-        // DUT-328 — one-time "this may sound robotic, get a better voice" prompt
-        // when Voice Mode turns on with only a robotic voice installed. Owns its
-        // own state (in `CookModeView+VoicePrompt.swift`) so this body stays one
-        // line and under the SwiftLint type_body_length cap.
+        .sheet(isPresented: $isRescuePresented) {  // DUT-970
+            CookModeRescueSheet(heatProfile: viewModel.rescueHeatProfile)
+                .presentationDetents([.medium, .large])
+        }
+        // DUT-328 — one-time better-voice prompt; state lives in `CookModeView+VoicePrompt.swift`.
         .cookModeVoiceUpgradePrompt(viewModel: viewModel)
         .task {
             // Idempotent — see CookModeViewModel.beginCookMode().
             viewModel.beginCookMode()
             // DUT-596 — start visible, then arm the idle-minimize timer.
             wakeControls()
+            viewModel.autoAdvanceEnabled = autoAdvanceOnTimer
         }
         .onReceive(timerTicker) { _ in viewModel.tickTimers() }
         .sensoryFeedback(.success, trigger: viewModel.timerCompletionTick)
         // DUT-693 (PR3) — buzz when the cook completes (Done card flip).
         .sensoryFeedback(.success, trigger: viewModel.isFinished)
-        // DUT-693 (PR3) — light selection tick on every step change; keyed on
-        // the current-step index so it covers the Next/Back buttons, the swipe
-        // gesture, and the mini-nav arrows with one modifier.
+        // DUT-693 (PR3) — light selection tick on every step change.
         .sensoryFeedback(.selection, trigger: viewModel.currentStepIndex)
         // DUT — Cook Mode haptics: ingredient check/uncheck impact + play/pause tick.
         .sensoryFeedback(.impact(weight: .light), trigger: viewModel.checkedIngredientIDs.count)
         .sensoryFeedback(.selection, trigger: viewModel.isPlaying)
-        // DUT-401 — a step timer reaching 00:00 had only visual + haptic
-        // feedback; announce it so a cook who set the phone down (or a
-        // VoiceOver user) hears it. Paired with the same completion trigger the
-        // haptic uses. Skip the initial 0 so mounting doesn't announce.
+        // DUT-401 — announce timer completion (skip the initial 0 so mounting is silent).
         .onChange(of: viewModel.timerCompletionTick) { _, tick in
-            if tick > 0 { announce("Timer complete.") }
+            if tick > 0 { announceTimerComplete() }
+            if tick > 0, autoAdvanceOnTimer { AudioServicesPlaySystemSound(1007) }
         }
-        // DUT-401 — advancing/going back swaps the step silently; announce the
-        // new step (or the completion state) so VoiceOver users aren't left
-        // hunting for the changed text after tapping Next.
-        .onChange(of: viewModel.currentStepIndex) { _, _ in announceCurrentStep() }
+        // DUT-401 — announce the new step so VoiceOver users aren't left hunting for it.
+        .onChange(of: viewModel.currentStepIndex) { _, _ in handleStepChange() }
+        .onChange(of: autoAdvanceOnTimer) { _, new in viewModel.autoAdvanceEnabled = new }
         .onChange(of: viewModel.isFinished) { _, _ in
             announceCurrentStep()
             // DUT-596 — the Done card must stay fully visible: expand and keep
@@ -265,8 +318,8 @@ public struct CookModeView: View {
             wakeControls()
         }
         .onDisappear {
-            // DUT-596 — cancel the in-flight minimize task so it can't fire into
-            // a torn-down view.
+            campfire.exit()
+            // DUT-596 — cancel the in-flight minimize task ...
             minimizeTask?.cancel()
             minimizeTask = nil
             viewModel.endCookMode()
@@ -278,6 +331,7 @@ public struct CookModeView: View {
         // the `didBegin` / `priorIdleTimerDisabled` symmetry, so they never
         // double-restore against the `.onDisappear` `endCookMode` above.
         .onChange(of: scenePhase) { _, newPhase in
+            if newPhase != .active { campfire.exit() }
             Self.handleScenePhaseChange(newPhase, viewModel: viewModel)
         }
     }
@@ -299,7 +353,7 @@ public struct CookModeView: View {
 
     /// The immersive hero, shared by the scrolling step layout and the centered
     /// Done layout.
-    private func heroView(topInset: CGFloat) -> some View {
+    func heroView(topInset: CGFloat) -> some View {
         CookModeHero(
             url: viewModel.recipe.heroImageLargeURL ?? viewModel.recipe.heroImage,
             title: viewModel.recipe.title,
@@ -326,7 +380,6 @@ public struct CookModeView: View {
     }
 
     // MARK: - Helpers
-
     private func advance() {
         if viewModel.isFinished {
             close()
@@ -338,6 +391,7 @@ public struct CookModeView: View {
     /// `internal` (not `private`) so the header's Done button in
     /// `CookModeView+Header.swift` can call it.
     func close() {
+        campfire.exit()
         viewModel.endCookMode()
         onClose(viewModel.checkedIngredientIDs)
     }

@@ -170,6 +170,50 @@ import Testing
         #expect(!recipe.isDessert)
     }
 
+    @Test func tagsDefaultToNil() {
+        #expect(Self.makeRecipe(id: 1).tags == nil)
+    }
+
+    @Test func tagsRoundTripThroughCodable() throws {
+        let original = Self.makeRecipe(id: 1, tags: RecipeTags(difficulty: .intermediate, techniques: [.bake]))
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Recipe.self, from: encoded)
+        #expect(decoded.tags == original.tags)
+    }
+
+    @Test func payloadWithoutTagsKeyStillDecodes() throws {
+        let recipe = Self.makeRecipe(id: 2)
+        let encoded = try JSONEncoder().encode(recipe)
+        let jsonDict = try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        var mutableJsonDict = jsonDict ?? [:]
+        mutableJsonDict.removeValue(forKey: "tags")
+        let reencoded = try JSONSerialization.data(withJSONObject: mutableJsonDict)
+        let decoded = try JSONDecoder().decode(Recipe.self, from: reencoded)
+        #expect(decoded.tags == nil)
+    }
+
+    @Test func sectionsDefaultToEmpty() {
+        #expect(Self.makeRecipe(id: 1).sections.isEmpty)
+    }
+
+    @Test func sectionsDecodeFromOldPayloads() throws {
+        let recipe = Self.makeRecipe(id: 2)
+        let encoded = try JSONEncoder().encode(recipe)
+        let jsonDict = try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        var mutableJsonDict = jsonDict ?? [:]
+        mutableJsonDict.removeValue(forKey: "sections")
+        let reencoded = try JSONSerialization.data(withJSONObject: mutableJsonDict)
+        let decoded = try JSONDecoder().decode(Recipe.self, from: reencoded)
+        #expect(decoded.sections.isEmpty)
+    }
+
+    @Test func sectionsRoundTrip() throws {
+        let original = Self.makeRecipe(id: 3, sections: [RecipeSection(label: "Test Section", ingredientIDs: [])])
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Recipe.self, from: encoded)
+        #expect(decoded.sections == original.sections)
+    }
+
     private static func makeRecipe(
         id: Int,
         ingredients: [RecipeIngredient] = [],
@@ -177,7 +221,9 @@ import Testing
         kind: PostKind = .recipe,
         articleBodyHTML: String? = nil,
         categoryIDs: [Int] = [],
-        recipeCategory: [String] = []
+        recipeCategory: [String] = [],
+        tags: RecipeTags? = nil,
+        sections: [RecipeSection] = []
     ) -> Recipe {
         Recipe(
             id: id,
@@ -191,7 +237,9 @@ import Testing
             instructions: instructions,
             kind: kind,
             articleBodyHTML: articleBodyHTML,
-            recipeCategory: recipeCategory
+            recipeCategory: recipeCategory,
+            sections: sections,
+            tags: tags
         )
     }
 }

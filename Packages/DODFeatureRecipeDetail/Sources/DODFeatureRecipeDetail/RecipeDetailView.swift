@@ -27,10 +27,8 @@ public struct RecipeDetailView: View {
         let recipe: Recipe
     }
 
-    // `internal` (default) access so the `RecipeDetailView+Blurb.swift`
-    // extension can read `viewModel` to render the full-description surface
-    // (Swift extensions don't see `private`/`fileprivate` declarations from a
-    // sibling file).
+    // `internal` so the `RecipeDetailView+Blurb.swift` extension can read `viewModel`
+    // (extensions in sibling files can't see `private` members).
     @State var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
     /// Share has no toggle state (unlike Save / Download), so this counter is the
@@ -40,6 +38,8 @@ public struct RecipeDetailView: View {
     // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
     // extension's relocated Cook Mode CTA tap can present the cover (DUT-631).
     @State var isCookModePresented: Bool = false
+    /// DUT-984 gear checklist before Cook Mode
+    @State var isGearCheckPresented: Bool = false
     /// True when the screen was entered via the StartCookModeIntent deep
     /// link (US-10). We watch the load state and flip the cover open as
     /// soon as the recipe has instructions to render. Resets to false
@@ -160,25 +160,16 @@ public struct RecipeDetailView: View {
             content
             snackbar
         }
-        // DUT-1335 — fill the bottom safe area (home-indicator strip below the
-        // floating tab bar) with the brand surface. The ScrollView only ignores
-        // the TOP safe area for the immersive hero, so without this the bottom
-        // inset was left unpainted and read as a black bar. Matches CookModeView.
+        // DUT-1335 — paint the bottom safe area with the brand surface (matches CookModeView).
         .background(DODColor.surface.ignoresSafeArea())
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        // DUT-572 / CL-312 — full-bleed hero: hide the nav-bar background so the
-        // hero photo reaches the top of the screen, and force a dark color
-        // scheme so the system chrome (back chevron + our glyphs) renders light
-        // over the photo.
+        // DUT-572 / CL-312 — full-bleed hero: hide the nav-bar background and force a
+        // dark color scheme so the chrome renders light over the hero photo.
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         #endif
         .toolbar { toolbarItems }
-        // Note: T-302 originally added a sticky `RecipeDetailFloatingActions`
-        // overlay anchored to `.bottomTrailing` here. Removed by T-410 /
-        // CL-42 — the nav-bar Save + Share (AC-4.7 + AC-4.8) are the
-        // single in-recipe affordance for both actions. See US-26 / AC-26.1.
         // Toolbar haptics: Save + Download success ticks; Share light tick (DUT).
         .sensoryFeedback(.success, trigger: viewModel.isSaved)
         .sensoryFeedback(.success, trigger: viewModel.isDownloaded)
@@ -188,11 +179,22 @@ public struct RecipeDetailView: View {
         .fullScreenCover(isPresented: $isCookModePresented) {
             cookModeCover
         }
+        .fullScreenCover(  // DUT-985 — one-time first-cook pep talk
+            isPresented: Bindable(viewModel).isPepTalkPresented,
+            onDismiss: { pepTalkDidDismiss() },
+            content: { pepTalkCover }
+        )
         #else
         .sheet(isPresented: $isCookModePresented) {
             cookModeCover
         }
+        .sheet(
+            isPresented: Bindable(viewModel).isPepTalkPresented,
+            onDismiss: { pepTalkDidDismiss() },
+            content: { pepTalkCover }
+        )
         #endif
+        .sheet(isPresented: $isGearCheckPresented) { gearCheckSheet }  // DUT-1559 (see +CookModeCover)
         // DUT-535 — the ingredient-selection sheet. Presented when the toolbar
         // `cart.badge.plus` is tapped (see `RecipeDetailView+Toolbar.swift`),
         // built by the App-injected `addToShoppingListSheet` closure (the sheet
@@ -304,8 +306,12 @@ public struct RecipeDetailView: View {
                                 showsServingWarning: viewModel.shouldShowServingWarning
                             )
                             heatCoachNudge
-                            if let video = viewModel.recipe?.video {
-                                RecipeDetailVideoSection(video: video, isOfflineSnapshot: isOfflineSnapshot)
+                            if let recipe = viewModel.recipe, let video = recipe.video {
+                                RecipeDetailVideoSection(
+                                    video: video,
+                                    isOfflineSnapshot: isOfflineSnapshot,
+                                    title: recipe.title
+                                )
                             }
                         }
                         .readableContentColumn(horizontalSizeClass)
@@ -317,6 +323,11 @@ public struct RecipeDetailView: View {
                                 onSelect: onSelectRelated
                             )
                             RecipeDetailRatingsSection(viewModel: viewModel)
+                            // DUT-178 — private problem report, pre-scoped to this recipe.
+                            ReportRecipeProblemButton(
+                                recipeID: viewModel.listItem.id,
+                                recipeTitle: viewModel.recipe?.title ?? viewModel.listItem.title
+                            )
                         }
                         .readableContentColumn(horizontalSizeClass)
                     }

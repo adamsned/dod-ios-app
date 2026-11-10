@@ -3,6 +3,33 @@ import DODDomain
 import DODSupport
 import SwiftUI
 
+/// DUT-1903: one row of the detail ingredient list — either a section header
+/// or an ingredient. Pure layout so it can be unit tested without a view.
+enum IngredientListItem: Equatable {
+    case header(String)
+    case ingredient(RecipeIngredient)
+
+    /// Interleave section headers before the first ingredient of each section.
+    /// With no sections, returns the flat list unchanged.
+    static func layout(
+        ingredients: [RecipeIngredient],
+        sections: [RecipeSection]
+    ) -> [IngredientListItem] {
+        var headerBefore: [UUID: String] = [:]
+        for section in sections {
+            if let first = section.ingredientIDs.first {
+                headerBefore[first] = section.label
+            }
+        }
+        return ingredients.flatMap { ingredient -> [IngredientListItem] in
+            if let label = headerBefore[ingredient.id] {
+                return [.header(label), .ingredient(ingredient)]
+            }
+            return [.ingredient(ingredient)]
+        }
+    }
+}
+
 extension RecipeDetailView {
 
     // MARK: - Ingredients + Instructions layout
@@ -54,17 +81,50 @@ extension RecipeDetailView {
                 // US-31 / AC-31.4 + AC-31.5: scale at render time.
                 // Source recipe `ingredient.text` stays untouched (AC-31.8).
                 let factor = viewModel.servingsScaleFactor
-                ForEach(ingredients) { ingredient in
-                    IngredientCheckRow(
-                        ingredient: ingredient,
-                        displayText: displayIngredientText(ingredient.text, scaledBy: factor),
-                        isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
-                        onToggle: { viewModel.toggleIngredient(ingredient.id) }
-                    )
+                let items = IngredientListItem.layout(
+                    ingredients: ingredients,
+                    sections: viewModel.recipe?.sections ?? []
+                )
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    switch item {
+                    case .header(let label):
+                        Text(label)
+                            .dodFont(DODType.heading)
+                            .foregroundStyle(DODColor.label)
+                    case .ingredient(let ingredient):
+                        let shown = displayIngredientText(ingredient.text, scaledBy: factor)
+                        annotated(
+                            IngredientCheckRow(
+                                ingredient: ingredient,
+                                displayText: shown,
+                                isChecked: viewModel.checkedIngredientIDs.contains(ingredient.id),
+                                onToggle: { viewModel.toggleIngredient(ingredient.id) }
+                            ),
+                            ingredient: ingredient,
+                            displayText: shown
+                        )
+                    }
                 }
             }
         }
         .padding(.horizontal, DODSpacing.md)
+    }
+
+    /// DUT-1014: applies the on-screen ingredient annotation once the recipe is
+    /// loaded; passes the row through untouched while it is nil.
+    @ViewBuilder
+    private func annotated<V: View>(
+        _ row: V,
+        ingredient: RecipeIngredient,
+        displayText: String
+    ) -> some View {
+        if let recipe = viewModel.recipe {
+            row.ingredientAnnotation(
+                .make(recipe: recipe, ingredient: ingredient, displayText: displayText)
+            )
+        } else {
+            row
+        }
     }
 
     /// The display string for one ingredient row: scale the source text for the
@@ -97,7 +157,12 @@ extension RecipeDetailView {
                 horizontalSizeClass: horizontalSizeClass,
                 onCookMode: {
                     Task { await viewModel.didTapCookMode() }
-                    isCookModePresented = true
+                    // DUT-984 — gear checklist first when the recipe lists equipment.
+                    if GearReadyCheck(items: viewModel.recipe?.equipment ?? []).isNeeded {
+                        isGearCheckPresented = true
+                    } else {
+                        isCookModePresented = true
+                    }
                 },
                 load: { await viewModel.loadAnnotation() },
                 save: { await viewModel.saveAnnotation($0) }

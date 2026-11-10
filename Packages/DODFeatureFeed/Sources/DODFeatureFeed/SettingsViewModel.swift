@@ -23,32 +23,30 @@ public final class SettingsViewModel {
 
     // MARK: - UserDefaults keys
     //
-    // Keys are declared `nonisolated` so the enum-side `fromDefaults(_:)`
-    // helpers + `@AppStorage` literals (which run outside the MainActor
-    // context) can reference them without an actor hop. The keys are
-    // pure compile-time constants — no MainActor isolation is needed.
+    // Keys are nonisolated compile-time constants — no MainActor isolation needed.
 
     /// AC-32.4 — "Use metric units" toggle key.
     public nonisolated static let useMetricUnitsKey = "dod.settings.useMetricUnits"
 
-    /// AC-36.1 — "When New Recipes Drop" toggle key (the row was renamed
-    /// from "Notify me when new recipes drop" in T-750 / CL-147; the key
-    /// is unchanged so the persisted preference survives the rename).
-    /// Defaults OFF on first launch; T-631 follow-up wires APNs
-    /// authorization when the user flips it ON.
+    /// AC-36.1 — "When New Recipes Drop" toggle key (T-750 / CL-147). Defaults OFF.
     public nonisolated static let notificationsEnabledKey = "dod.settings.notificationsEnabled"
 
-    /// DUT-1333 — "When a New Article Drops" toggle key (replaces the
-    /// never-deliverable comment-reply toggle). Defaults OFF. Secures
-    /// notification permission on enable like ``notificationsEnabledKey``;
-    /// article-alert delivery follows the same DUT-1332 APNs trigger that
-    /// recipe alerts need.
+    /// DUT-1333 — "When a New Article Drops" toggle key. Defaults OFF.
     public nonisolated static let articleNotificationsEnabledKey =
         "dod.settings.articleNotificationsEnabled"
 
-    /// AC-36.2 — Appearance preference key. Value is the raw value of
-    /// ``AppearancePreference`` (`"system"` / `"light"` / `"dark"`).
-    /// Defaults to `.system` (no explicit preferredColorScheme override).
+    /// DUT-152 — opt-in weekly digest toggle. Defaults OFF.
+    public nonisolated static let weeklyDigestEnabledKey = "dod.settings.weeklyDigestEnabled"
+    /// DUT-152 — Date of the last digest sent; guards against double-firing.
+    public nonisolated static let weeklyDigestLastSentKey = "dod.settings.weeklyDigestLastSent"
+
+    /// DUT-972 — streak reminders toggle key (default OFF).
+    public nonisolated static let streakNudgesEnabledKey = "dod.settings.streakNudgesEnabled"
+    /// DUT-972 — `Date` of the last streak nudge (frequency cap).
+    public nonisolated static let streakNudgeLastSentKey = "dod.settings.streakNudgeLastSent"
+
+    /// AC-36.2 — Appearance preference key (raw ``AppearancePreference``:
+    /// `"system"` / `"light"` / `"dark"`). Defaults to `.system`.
     public nonisolated static let appearancePreferenceKey = "dod.settings.appearance"
 
     /// AC-36.3 — Default share format preference key. Value is the raw
@@ -154,15 +152,17 @@ public final class SettingsViewModel {
         didSet { defaults.set(notificationsEnabled, forKey: Self.notificationsEnabledKey) }
     }
 
-    /// DUT-1333. The "When a New Article Drops" preference (replaces the
-    /// comment-reply toggle). **DUT-430 — observable stored property**.
-    /// Seeded in `init`, `didSet`-persisted; defaults false. Written through
-    /// the async ``setArticleNotificationsEnabled(_:)`` so an enable requests
-    /// system authorization, mirroring ``notificationsEnabled``.
+    /// DUT-1333. "When a New Article Drops" preference (DUT-430 observable, `didSet`-persisted).
+    /// Written via async ``setArticleNotificationsEnabled(_:)``.
     public var articleNotificationsEnabled: Bool {
         didSet {
             defaults.set(articleNotificationsEnabled, forKey: Self.articleNotificationsEnabledKey)
         }
+    }
+
+    /// DUT-152. Written via the async `setWeeklyDigestEnabled(_:)` (ticket 5).
+    public var weeklyDigestEnabled: Bool {
+        didSet { defaults.set(weeklyDigestEnabled, forKey: Self.weeklyDigestEnabledKey) }
     }
 
     /// AC-36.2. **T-756 / CL-153 — observable stored property** (was
@@ -282,10 +282,10 @@ public final class SettingsViewModel {
         // doesn't fire for these initial-in-init assignments).
         self.appearance = AppearancePreference.fromDefaults(defaults)
         self.temperaturePreference = TemperaturePreference.fromDefaults(defaults)
-        // DUT-430 — seed the observable notification flags from defaults
-        // (didSet doesn't fire for these initial-in-init assignments).
+        // DUT-430 — seed observable notification flags (didSet doesn't fire in init).
         self.notificationsEnabled = defaults.bool(forKey: Self.notificationsEnabledKey)
         self.articleNotificationsEnabled = defaults.bool(forKey: Self.articleNotificationsEnabledKey)
+        self.weeklyDigestEnabled = defaults.bool(forKey: Self.weeklyDigestEnabledKey)
         self.voicePreviewer = voicePreviewer
         self.voiceLanguageCode = voiceLocale.language.languageCode?.identifier
         self.cloudSyncDependency = dependencies

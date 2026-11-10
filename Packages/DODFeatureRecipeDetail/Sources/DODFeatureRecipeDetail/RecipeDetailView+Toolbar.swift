@@ -61,6 +61,12 @@ extension RecipeDetailView {
                     guard (note.object as? Int) == viewModel.listItem.id else { return }
                     Task { await viewModel.refreshSavedState() }
                 }
+                // DUT-1016 - a Siri "scale this to serve N" for THIS recipe moves the stepper.
+                .onReceive(NotificationCenter.default.publisher(for: .dodServingsScaleRequested)) { note in
+                    guard let count = ServingsScaleRequest.servings(from: note, forRecipeID: viewModel.listItem.id)
+                    else { return }
+                    viewModel.scaleServings(to: count)
+                }
 
                 // US-39 / DUT-534 / DUT-535 — "Add to Shopping List" from ANY
                 // recipe (not just saved). DUT-535: tapping now PRESENTS the
@@ -235,6 +241,29 @@ extension RecipeDetailView {
     static func pdfFilename(for recipe: Recipe) -> String {
         let base = recipe.slug.isEmpty ? "recipe" : recipe.slug
         return "\(base).pdf"
+    }
+
+    /// DUT-1634: true when the user's shareFormat preference is "imageCard".
+    /// Same key/raw value as DODFeatureFeed's ShareFormatPreference (which this
+    /// package cannot import).
+    nonisolated static func prefersImageCard(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.string(forKey: "dod.settings.shareFormat") == "imageCard"
+    }
+
+    /// DUT-1634: renders the branded PNG card and returns its temp-file URL,
+    /// or nil when rendering/writing fails (caller falls back to the PDF).
+    /// Fixed light scheme: the image is shared outside the app.
+    @MainActor
+    static func imageCardShareURL(recipe: Recipe, heroImage: UIImage?) -> URL? {
+        guard
+            let card = RecipeImageCardRenderer.render(
+                recipe: recipe,
+                heroImage: heroImage,
+                logo: DODBrandAsset.logoBadge,
+                scheme: .light
+            )
+        else { return nil }
+        return RecipeImageCardRenderer.writePNG(card, slug: recipe.slug)
     }
     #endif
 

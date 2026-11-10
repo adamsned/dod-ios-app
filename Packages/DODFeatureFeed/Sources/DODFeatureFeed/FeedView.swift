@@ -67,6 +67,8 @@ public struct FeedView: View {
     /// recompute). Gates the owner-only compose button; OFF for everyone until
     /// Dad's real `sub` is configured in `OwnerGate`.
     @State private var isOwnerComposer = false
+    /// DUT-117 — Recipe of the Day shelf model. nil (default) renders no card.
+    @State private var recipeOfTheDay: RecipeOfTheDayModel?
     /// ⚠️ DEV DEBUG (strip before public release — see DevDebug.swift) — the
     /// Settings "Dev Debug" toggle force-shows this owner UI for design review.
     @AppStorage(DevDebug.forceShowOwnerUIKey) private var devForceShowOwnerUI = false
@@ -79,7 +81,8 @@ public struct FeedView: View {
         onSave: ((RecipeListItem, @escaping @MainActor (Bool) -> Void) -> Void)? = nil,
         openShoppingList: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
-        onOpenSearch: (() -> Void)? = nil
+        onOpenSearch: (() -> Void)? = nil,
+        recipeOfTheDay: RecipeOfTheDayModel? = nil
     ) {
         _viewModel = State(initialValue: viewModel)
         self.onSelect = onSelect
@@ -87,6 +90,7 @@ public struct FeedView: View {
         self.openShoppingList = openShoppingList
         self.onOpenSettings = onOpenSettings
         self.onOpenSearch = onOpenSearch
+        _recipeOfTheDay = State(initialValue: recipeOfTheDay)
     }
 
     public var body: some View {
@@ -249,23 +253,20 @@ public struct FeedView: View {
             // plus a pointer to the Saved tab for downloaded recipes, so the
             // offline state reads unambiguously — especially for less technical
             // cooks who need to know Saved is where offline recipes live.
-            offlineBlock
+            offlineRetryBlock
         } else {
             loadStateContent
         }
     }
 
-    /// Full-page offline block. Supersedes the old `OfflineBanner` strip.
-    private var offlineBlock: some View {
-        EmptyState(
-            systemImage: "wifi.slash",
-            title: "You're Offline",
-            message:
-                "The Recipes page couldn't load without an internet connection. If you've downloaded recipes for offline use, open the Saved tab to cook from them.",
-            action: .init(title: "Retry") {
+    /// DUT-134 — shared retry block (scrollable so pull-to-refresh still works).
+    private var offlineRetryBlock: some View {
+        ScrollView {
+            RetryStateView(kind: .noConnection) {
                 Task { await viewModel.refresh() }
             }
-        )
+            .frame(maxWidth: .infinity, minHeight: 400)
+        }
     }
 
     @ViewBuilder
@@ -276,21 +277,16 @@ public struct FeedView: View {
         case .firstLaunchOffline:
             // Unreachable while `isOffline` is the precedence gate above, but
             // kept as a defensive fallback for the first-launch-no-cache path.
-            offlineBlock
+            offlineRetryBlock
         case .firstLaunchFailed:
             // DUT-621 — an ONLINE first-launch failure: a real failure message
             // + a Retry wired to `refresh()`, NOT the dead-end "No recipes."
             // Hosted in a ScrollView so the pull-to-refresh gesture works here
             // too (a bounce-to-refresh alongside the explicit Retry button).
             ScrollView {
-                EmptyState(
-                    systemImage: "exclamationmark.arrow.triangle.2.circlepath",
-                    title: "Couldn't load recipes",
-                    message: "Something went wrong loading the feed. Please try again.",
-                    action: .init(title: "Retry") {
-                        Task { await viewModel.refresh() }
-                    }
-                )
+                RetryStateView(kind: viewModel.loadFailureKind) {
+                    Task { await viewModel.refresh() }
+                }
                 .frame(maxWidth: .infinity, minHeight: 400)
             }
         case .empty:
@@ -318,6 +314,15 @@ public struct FeedView: View {
             // cook. It's now a slim overlay callout hosted by the App shell (see
             // `RootView+FirstCookoutCallout.swift`) so it displaces nothing and can
             // point at the Tools tab, which this view doesn't own.
+            if let recipeOfTheDay, let pick = recipeOfTheDay.item {
+                RecipeOfTheDayCard(item: pick) {
+                    recipeOfTheDay.recordTap()
+                    onSelect(pick, viewModel.items)
+                }
+                .padding(.horizontal, DODSpacing.md)
+                .padding(.top, DODSpacing.md)
+                .onAppear { recipeOfTheDay.recordImpressionIfNeeded() }
+            }
             Group {
                 switch layout {
                 case .gallery:
@@ -334,6 +339,12 @@ public struct FeedView: View {
                     .padding(.vertical, DODSpacing.lg)
             }
         }
+        .task(id: viewModel.items.map(\.id)) {
+            await recipeOfTheDay?.resolve(
+                pool: viewModel.items,
+                lookup: { ids in (try? await viewModel.dependencies.cachedListItems(forIDs: ids)) ?? [] }
+            )
+        }
     }
 
     private var loadingSkeletons: some View {
@@ -349,4 +360,9 @@ public struct FeedView: View {
             .accessibilityLabel("Loading recipes")
         }
     }
+}
+
+extension FeedViewModel {
+    /// DUT-134 — offline → no-connection copy; anything else → request-failed copy.
+    var loadFailureKind: LoadFailureKind { isOffline ? .noConnection : .requestFailed }
 }

@@ -289,7 +289,10 @@ struct CookingToolsHubView: View {
                 // rung 1. `cookedRecipeIDs` is ALWAYS the real set so a fresh
                 // cook's rungs aren't all painted done (DUT-381).
                 recommended: cookStateLoaded
-                    ? GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedRecipeIDs)
+                    ? GuidedCookout.nextUncookedRung(
+                        cookedRecipeIDs: cookedRecipeIDs,
+                        intake: CookerIntakeStore.load()
+                    )
                     : nil,
                 cookedRecipeIDs: cookedRecipeIDs,
                 scrollToDumpCakes: scrollToDumpCakes,
@@ -311,7 +314,8 @@ struct CookingToolsHubView: View {
             CookJournalView(
                 load: { await feedViewModel.cookLogs() },
                 update: { await feedViewModel.updateCook($0) },
-                delete: { await feedViewModel.deleteCook($0) }
+                delete: { await feedViewModel.deleteCook($0) },
+                clearAll: { await feedViewModel.clearCookHistory() }  // DUT-199
             )
         case .cookModeExplainer:
             cookModeExplainer
@@ -320,8 +324,7 @@ struct CookingToolsHubView: View {
 
     // MARK: - The tool list
 
-    // The six tool cards + the `toolCard` builder live in
-    // `CookingToolsHubView+ToolCards.swift` to stay under `type_body_length`.
+    // The tool cards + `toolCard` builder live in `CookingToolsHubView+ToolCards.swift` (type_body_length).
 
     /// Cook Mode can't launch without a recipe, so this row's sheet explains the
     /// flow and routes the user to the Recipes tab to pick something to cook.
@@ -387,11 +390,8 @@ struct CookingToolsHubView: View {
         }
     }
 
-    /// DUT-559 — load the logged cooks (the DUT-104 journal) into `cookedRecipeIDs`
-    /// and flip `cookStateLoaded`, so the guided chooser recommends the cook's real
-    /// next rung and marks already-made rungs done. Reads through the same
-    /// `feedViewModel.cookLogs()` seam the Journal uses; a failure yields an empty
-    /// set (a brand-new cook), which recommends rung 1 once loaded.
+    /// DUT-559 — load the logged cooks into `cookedRecipeIDs` and flip `cookStateLoaded`.
+    /// Reads through `feedViewModel.cookLogs()` seam; a failure yields empty set.
     private func loadCookState() async {
         let logs = await feedViewModel.cookLogs()
         cookedRecipeIDs = Set(logs.map(\.recipeID))

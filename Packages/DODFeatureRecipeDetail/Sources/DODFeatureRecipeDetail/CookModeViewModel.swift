@@ -1,6 +1,7 @@
 import DODAnalytics
 import DODCookActivity
 import DODDomain
+import DODSupport
 import Foundation
 import Observation
 
@@ -42,21 +43,14 @@ public final class CookModeViewModel {
     /// can flip it; the public read-only contract is unchanged.
     public internal(set) var isVoiceModeEnabled: Bool = false
 
-    /// DUT-583 — the voice player's transport state, driving the center
-    /// play/pause button like a podcast player. `.idle` and `.paused` show a
-    /// play glyph (nothing reading / resumable), `.speaking` shows pause.
-    /// Maintained by the Voice methods in `CookModeViewModel+Voice.swift`;
-    /// `internal(set)` so those siblings can flip it. Reset to `.idle` when a
-    /// step finishes reading on its own (via the reader's finish callback) or
-    /// when Cook Mode ends.
-    public enum VoicePlaybackState: Sendable { case idle, speaking, paused }
+    /// DUT-995 — Cook-With-Kids mode. Session-only (off on every Cook Mode entry),
+    /// like Voice Mode. When on, the view highlights steps a child can help with.
+    public var isKidModeEnabled: Bool = false
 
     /// DUT-583 — current transport state for the center play/pause button.
     public internal(set) var playbackState: VoicePlaybackState = .idle
 
-    /// DUT-1393 — set when the step changes while the voice is PAUSED. The
-    /// paused utterance belongs to the old step, so the next resume must read
-    /// the step now on screen from the top instead of continuing it.
+    /// DUT-1393 — step changed while paused; next resume re-reads the new step from the top.
     var pausedUtteranceIsStale = false
 
     /// DUT-583 — the current voice speed as a multiplier of the natural 1×
@@ -64,19 +58,40 @@ public final class CookModeViewModel {
     /// persisted (resets to 1× each Cook Mode entry, like Voice Mode itself).
     public internal(set) var voiceSpeedMultiplier: Double = 1.0
 
+    /// DUT-1029 — true while push-to-talk is capturing a spoken question.
+    /// Driven by `beginListening()` / `endListening()` in `CookModeViewModel+Ask.swift`.
+    public internal(set) var isListening: Bool = false
+
+    /// DUT-1029 — latest partial transcript while listening (for on-screen captions).
+    public internal(set) var liveTranscript: String = ""
+
+    /// DUT-1029 — the on-device speech-to-text seam. Defaults to the unavailable
+    /// fallback so tests/macOS never touch the mic; the app injects the real one.
+    /// `var` (not an init param) so no existing `CookModeViewModel(...)` call site changes.
+    public var transcriber: any SpeechTranscribing = UnavailableSpeechTranscriber()
+
+    /// DUT-1029 — the in-flight listen task, cancelled by `endListening()` / `endCookMode`.
+    var listenTask: Task<Void, Never>?
+
+    /// DUT-986 — true only on the user's first-ever cook; set by the host, default false.
+    public var isFirstCookEver: Bool = false
+
     private let idleTimer: any IdleTimerController
     private let liveActivity: any CookLiveActivityController
     /// DUT-604 — schedules the "step timer done" local notification so a
     /// backgrounded step timer still alerts (the in-app buzzer only fires on the
     /// foreground tick). `internal` so the `+Timers` extension drives it.
     let stepTimerNotifier: any CookStepTimerNotifying
-    /// `internal` (not `private`) so the Voice Mode + pacing methods in
-    /// `CookModeViewModel+Voice.swift` can drive the reader from a sibling file.
+    /// `internal` so `CookModeViewModel+Voice.swift` can drive the reader.
     let voiceReader: VoiceReader
-    /// DUT-328 — the device language (captured at init, matching the reader's
-    /// default locale), for the "get a better voice" natural-voice check.
-    /// Internal (not private) so the `+Voice` extension can read it.
+    /// DUT-1012 - system Now Playing surface; nil in tests and previews.
+    let nowPlayingPublisher: (any NowPlayingPublishing)?
+    /// DUT-328 — device language captured at init, for the natural-voice check; read by `+Voice`.
     let voiceLanguageCode: String?
+    /// DUT-1003 — on-device "Is It Done?" photo check; driven by `CookModeViewModel+Doneness.swift`.
+    public let donenessCoach: DonenessCoach
+    /// DUT-135 — live meat-probe state (reading, target, banner); see `CookModeViewModel+Probe.swift`.
+    public let probe = ProbeSession()
     private var priorIdleTimerDisabled: Bool = false
     private var didBegin: Bool = false
 
@@ -90,6 +105,8 @@ public final class CookModeViewModel {
     /// Bumped each time a step timer reaches zero so the view can fire the
     /// completion haptic (a changing value, not a Bool).
     public internal(set) var timerCompletionTick: Int = 0
+    public var autoAdvanceEnabled = false  // DUT-173: pref pushed in by the view; off by default
+    public internal(set) var pendingAutoAdvanceFromStep: Int?  // DUT-173: step advanced FROM while Undo shows
     /// Which step's timer is currently driving the Live Activity card (`nil` =
     /// none). Lets `reconcileLiveActivity` know when to (re)start vs update.
     var liveActivityStepKey: Int?
@@ -98,11 +115,8 @@ public final class CookModeViewModel {
     /// while it lingers. Cleared when a running timer takes the card over or the
     /// activity ends.
     var liveActivityShowingCompleted = false
-    /// DUT-558: latched true once a `startTimerLiveActivity` attempt fails while
-    /// the controller reports Live Activities are unavailable (disabled in
-    /// Settings / over quota). While set, `reconcileLiveActivity` stops
-    /// re-attempting the start every ~1s tick (DUT-492 kept retrying forever).
-    /// Recheck on scene-activate via `revalidateLiveActivityAvailability()`.
+    /// DUT-558: latched when a Live Activity start fails as unavailable, so the ~1s tick stops retrying.
+    /// Rechecked on scene-activate via `revalidateLiveActivityAvailability()`.
     var liveActivityUnavailable = false
 
     public init(
@@ -112,6 +126,8 @@ public final class CookModeViewModel {
         liveActivity: any CookLiveActivityController = SystemCookLiveActivityController(),
         stepTimerNotifier: any CookStepTimerNotifying = SystemCookStepTimerNotifier(),
         voiceReader: VoiceReader = VoiceReader(),
+        nowPlayingPublisher: (any NowPlayingPublishing)? = nil,
+        donenessCoach: DonenessCoach = DonenessCoach(intelligence: nil),
         locale: Locale = .current
     ) {
         self.recipe = recipe
@@ -120,21 +136,20 @@ public final class CookModeViewModel {
         self.liveActivity = liveActivity
         self.stepTimerNotifier = stepTimerNotifier
         self.voiceReader = voiceReader
+        self.nowPlayingPublisher = nowPlayingPublisher
+        self.donenessCoach = donenessCoach
         self.voiceLanguageCode = locale.language.languageCode?.identifier
-        // DUT-583 — when a step finishes reading on its own, drop the play/pause
-        // button back to the idle "play" glyph. Guard on `.speaking` so a stale
-        // drain callback can't stomp a `.paused` state the user just set.
+        // DUT-583 — a step finishing on its own drops the transport to idle;
+        // guard on `.speaking` so a stale callback can't stomp `.paused`.
         voiceReader.onDidFinishSpeaking = { [weak self] in
             guard let self, self.playbackState == .speaking else { return }
             self.playbackState = .idle
         }
-        // DUT-595 — an audio interruption (call / Siri / timer alarm) ended
-        // WITHOUT `.shouldResume`, so the reader left playback parked and iOS
-        // cancelled the in-flight utterance. Drop the transport to idle so its
-        // glyph shows "play" (not a stuck "pause"), a single tap does a fresh
-        // `speakCurrentStep()` (not a no-op `pauseVoice()`), and VoiceOver stops
-        // mis-reporting "playing." Guard on `.speaking` so a stale callback
-        // can't stomp a `.paused`/idle state the user just set.
+        // DUT-595 — an audio interruption ended WITHOUT `.shouldResume`; iOS
+        // cancelled the utterance. Drop the transport to idle so the glyph shows
+        // "play", a tap does a fresh `speakCurrentStep()`, and VoiceOver stops
+        // reporting "playing." Guard on `.speaking` so a stale callback can't
+        // stomp a `.paused`/idle state the user just set.
         voiceReader.onDidPauseForInterruption = { [weak self] in
             guard let self, self.playbackState == .speaking else { return }
             self.playbackState = .idle
@@ -186,6 +201,7 @@ public final class CookModeViewModel {
     /// and ends any in-flight Live Activity (AC-11.3). Symmetric with
     /// `beginCookMode` (AC-7.3, AC-7.6).
     public func endCookMode() {
+        cancelListening()  // before the guard: a pending listen is cancelled even if Cook Mode never began
         guard didBegin else { return }
         idleTimer.isDisabled = priorIdleTimerDisabled
         didBegin = false
@@ -205,6 +221,7 @@ public final class CookModeViewModel {
         liveActivityStepKey = nil
         liveActivityShowingCompleted = false  // DUT-354
         liveActivityUnavailable = false  // DUT-558: a re-entry starts clean
+        pendingAutoAdvanceFromStep = nil  // DUT-173: no banner survives the session
         // AC-7.6 / AC-40.1 — stop any in-flight utterance and release the
         // ducked audio session so the user's music returns to full volume
         // the moment they leave Cook Mode. Bug fix: drop the DUT-390 session
@@ -220,8 +237,10 @@ public final class CookModeViewModel {
         voiceReader.setSessionHold(false)
         voiceReader.stop()
         isVoiceModeEnabled = false
+        isKidModeEnabled = false
         // DUT-583 — a re-entry starts clean: idle transport + natural pace.
         playbackState = .idle
+        nowPlayingPublisher?.deactivate()
         voiceSpeedMultiplier = 1.0
         // Unregister from the Voice Mode command bus so a Siri command fired
         // after Cook Mode closes is a no-op rather than driving a stale session
@@ -256,12 +275,7 @@ public final class CookModeViewModel {
     }
 
     // MARK: - Voice Mode (US-40 / DUT-325)
-    //
-    // The Voice Mode toggle, the dessert-aware spoken-completion line, the
-    // one-shot replay, the session pacing controls, and the AC-40.5 voice-
-    // command surface live in `CookModeViewModel+Voice.swift` so this type
-    // body stays under the SwiftLint `type_body_length` cap. `goNext`/`goBack`
-    // call the (internal) `speakCurrentStep()` declared there.
+    // Lives in `CookModeViewModel+Voice.swift` (type_body_length); `goNext`/`goBack` call its `speakCurrentStep()`.
 
     // MARK: - Live Activity (US-11)
 
@@ -306,7 +320,8 @@ public final class CookModeViewModel {
             isPaused: false,
             // DUT-218: the live deadline so the Lock Screen countdown self-ticks
             // (via `Text(timerInterval:)`) even while the app is backgrounded.
-            endDate: Date(timeIntervalSinceNow: TimeInterval(totalSeconds))
+            endDate: Date(timeIntervalSinceNow: TimeInterval(totalSeconds)),
+            coachNudge: currentCoachNudge
         )
         liveActivity.start(attributes: attributes, initialState: initial)
     }
@@ -332,7 +347,8 @@ public final class CookModeViewModel {
             // paused / completed → nil so the views show the frozen snapshot.
             endDate: isPaused
                 ? nil : Date(timeIntervalSinceNow: TimeInterval(max(remainingSeconds, 0))),
-            isCompleted: isCompleted
+            isCompleted: isCompleted,
+            coachNudge: currentCoachNudge
         )
         liveActivity.update(state: state)
     }
@@ -351,10 +367,7 @@ public final class CookModeViewModel {
         } else {
             isFinished = true
         }
-        // AC-40.3 — re-read whenever the step changes while Voice Mode is on,
-        // whether the change came from an on-screen tap, a swipe, or a voice
-        // command. A no-op when Voice Mode is off. DUT-1393 — stays silent
-        // while paused.
+        // AC-40.3 — re-read on any step change while Voice Mode is on; silent while paused (DUT-1393).
         voiceFollowStepChange()
     }
 
@@ -367,8 +380,7 @@ public final class CookModeViewModel {
         voiceFollowStepChange()
     }
 
-    /// DUT-1392 — jump straight to a step (the tool dock's "timer running on
-    /// Step N" row). Leaves the Done state; the voice follows like Next / Back.
+    /// DUT-1392 — jump to a step (tool dock "timer running on Step N" row); leaves Done.
     public func goToStep(_ index: Int) {
         guard recipe.instructions.indices.contains(index) else { return }
         isFinished = false
@@ -379,18 +391,9 @@ public final class CookModeViewModel {
     // MARK: - Ingredient state
 
     public func toggleIngredient(_ id: UUID) {
-        if checkedIngredientIDs.contains(id) {
-            checkedIngredientIDs.remove(id)
-        } else {
-            checkedIngredientIDs.insert(id)
-        }
+        if !checkedIngredientIDs.insert(id).inserted { checkedIngredientIDs.remove(id) }
     }
 }
 
-// MARK: - Voice command handler conformance (US-40 / AC-40.5)
-
-/// The four hands-free control methods (declared above for the in-app wiring
-/// in T-690b) *are* the ``VoiceCommandHandler`` surface — declaring the
-/// conformance lets ``VoiceCommandBus`` forward Siri commands straight into the
-/// live session with no adapter (CL-83).
+/// Voice command surface (US-40 / AC-40.5, CL-83): the hands-free control methods.
 extension CookModeViewModel: VoiceCommandHandler {}
