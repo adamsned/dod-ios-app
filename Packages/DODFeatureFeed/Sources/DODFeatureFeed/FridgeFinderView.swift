@@ -109,3 +109,15 @@ public struct FridgeFinderView: View {
         }
     }
 }
+
+#Preview {
+    NavigationStack {
+        FridgeFinderView(
+            viewModel: FridgeFinderViewModel(
+                intelligence: FakeIntelligenceService(),
+                loadRecipes: { [] }
+            ),
+            onSelect: { _ in }
+        )
+    }
+}
