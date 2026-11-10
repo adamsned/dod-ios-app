@@ -49,7 +49,9 @@ extension CookJournalView {
             mostCooked: CookLogStats.mostCooked(cooks),
             averageRating: CookLogStats.averageRating(cooks),
             last30Days: CookLogStats.cooksInLast30Days(cooks, asOf: .now, calendar: weekCalendar),
-            ownIt: CookLogStats.onYourWayToOwning(cooks)
+            ownIt: CookLogStats.onYourWayToOwning(cooks),
+            confidenceReads: CookLogStats.confidenceTrajectory(cooks).map(\.confidence),
+            confidenceTrend: CookLogStats.confidenceTrend(cooks)
         )
     }
 
