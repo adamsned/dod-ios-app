@@ -24,4 +24,29 @@ import Testing
         let view = BrowseByView(viewModel: viewModel, onSelect: { _, _ in })
         _ = view.body
     }
+
+    @Test func selectionClosureReceivesValueTagIDs() async throws {
+        let viewModel = Self.makeViewModel()
+        await viewModel.onAppear()
+        var captured: (BrowseAxis, BrowseAxisValue)?
+        let onSelect: @MainActor (BrowseAxis, BrowseAxisValue) -> Void = { captured = ($0, $1) }
+        _ = BrowseByView(viewModel: viewModel, onSelect: onSelect)
+        let axis = try #require(viewModel.axes.first { $0.slug == "occasion" })
+        let value = try #require(axis.values.first)
+        onSelect(axis, value)
+        #expect(captured?.0.slug == "occasion")
+        #expect(captured?.1.tagIDs == [20])
+    }
+
+    @Test func viewBuildsWithNoAxesOnProviderError() async {
+        let viewModel = BrowseByViewModel(
+            provider: FakeAxesProvider(result: .failure(BrowseTestError())),
+            dependencies: BrowseByFakeCategoriesDependencies()
+        )
+        await viewModel.onAppear()
+        #expect(viewModel.loadState == .error)
+        #expect(viewModel.axes.isEmpty)
+        let view = BrowseByView(viewModel: viewModel, onSelect: { _, _ in })
+        _ = view.body
+    }
 }

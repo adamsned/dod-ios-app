@@ -31,13 +31,22 @@ extension CookModeView {
         // DUT-1392 — the step's timer and the Heat Coach shortcut moved out of
         // the text into the floating tool dock above the controls
         // (`CookModeView+ToolDock.swift`).
+        let showBadge = Self.showsKidBadge(
+            isKidModeEnabled: viewModel.isKidModeEnabled,
+            isKidSafe: viewModel.isKidSafe(step)
+        )
         return VStack(alignment: .leading, spacing: DODSpacing.md) {
+            if showBadge {
+                kidBadge
+            }
             Text(displayText)
                 .dodFont(DODType.displayMedium)
                 .foregroundStyle(DODColor.label)
                 .lineSpacing(DODSpacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Step \(step.step). \(displayText)")
+                .accessibilityLabel(
+                    Self.stepAccessibilityLabel(step: step.step, text: displayText, showBadge: showBadge)
+                )
             if let nudge = viewModel.currentCoachNudge {
                 Text(nudge)
                     .dodFont(DODType.caption)
@@ -51,12 +60,28 @@ extension CookModeView {
         .padding(.horizontal, DODSpacing.md)
     }
 
+    /// DUT-2044 — the "kids can help" badge above a kid-safe step's text.
+    private var kidBadge: some View {
+        Label(Self.kidSafeBadgeText, systemImage: "hand.raised.fingers.spread.fill")
+            .dodFont(DODType.body)
+            .foregroundStyle(DODColor.accent)
+            .accessibilityHidden(true)
+            .accessibilityIdentifier("cook-mode-kid-badge")
+    }
+
     /// DUT-2044 — badge copy shown on kid-safe steps while Kid Mode is on.
     nonisolated static let kidSafeBadgeText = "Kids can help with this one"
 
     /// DUT-2044 — the badge shows only when Kid Mode is on AND the step is kid-safe.
     nonisolated static func showsKidBadge(isKidModeEnabled: Bool, isKidSafe: Bool) -> Bool {
         isKidModeEnabled && isKidSafe
+    }
+
+    /// DUT-2044 — VoiceOver label for a step; includes the kid badge copy when shown.
+    nonisolated static func stepAccessibilityLabel(step: Int, text: String, showBadge: Bool) -> String {
+        showBadge
+            ? "Step \(step). \(kidSafeBadgeText). \(text)"
+            : "Step \(step). \(text)"
     }
 
     /// T-912 / DUT-551 — whether a step's text is about heat (drives the tool
