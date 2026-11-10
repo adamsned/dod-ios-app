@@ -31,13 +31,22 @@ extension CookModeView {
         // DUT-1392 — the step's timer and the Heat Coach shortcut moved out of
         // the text into the floating tool dock above the controls
         // (`CookModeView+ToolDock.swift`).
+        let showBadge = Self.showsKidBadge(
+            isKidModeEnabled: viewModel.isKidModeEnabled,
+            isKidSafe: viewModel.isKidSafe(step)
+        )
         return VStack(alignment: .leading, spacing: DODSpacing.md) {
+            if showBadge {
+                kidBadge
+            }
             Text(displayText)
                 .dodFont(DODType.displayMedium)
                 .foregroundStyle(DODColor.label)
                 .lineSpacing(DODSpacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Step \(step.step). \(displayText)")
+                .accessibilityLabel(
+                    Self.stepAccessibilityLabel(step: step.step, text: displayText, showBadge: showBadge)
+                )
             if let nudge = viewModel.currentCoachNudge {
                 Text(nudge)
                     .dodFont(DODType.caption)
