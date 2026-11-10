@@ -50,6 +50,7 @@ extension WidgetCard {
     }
 
     public struct ShoppingListComplete: View {
+        public init() {}
         public var body: some View {
             VStack {
                 Text("All items checked! 🎉")
@@ -58,6 +59,7 @@ extension WidgetCard {
     }  // complete state
 
     public struct ShoppingListNoList: View {
+        public init() {}
         public var body: some View {
             VStack {
                 Text("No shopping list")
