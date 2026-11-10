@@ -16,6 +16,13 @@ public struct FridgeFinderView: View {
         self.onSelect = onSelect
     }
 
+    private func loadPickedImage(_ item: PhotosPickerItem?) async {
+        guard let item,
+            let data = try? await item.loadTransferable(type: Data.self)
+        else { return }
+        await viewModel.analyze(imageData: data)
+    }
+
     private var photoSection: some View {
         Section {
             PhotosPicker(selection: $pickerItem, matching: .images) {
@@ -30,5 +37,8 @@ public struct FridgeFinderView: View {
             photoSection
         }
         .navigationTitle("What Can I Cook Tonight?")
+        .onChange(of: pickerItem) { _, item in
+            Task { await loadPickedImage(item) }
+        }
     }
 }
