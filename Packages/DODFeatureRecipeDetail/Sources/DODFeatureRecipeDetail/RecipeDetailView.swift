@@ -238,14 +238,9 @@ public struct RecipeDetailView: View {
         // `.unavailable` (which auto-pops): keep the user here with a Retry
         // button so a flaky-connection open isn't mistaken for a dead recipe.
         case .retryableError:
-            EmptyState(
-                systemImage: "wifi.slash",
-                title: "Couldn't load recipe",
-                message: "Check your connection and try again.",
-                action: .init(title: "Retry") {
-                    Task { await viewModel.retryLoad() }
-                }
-            )
+            RetryStateView(kind: isOfflineSnapshot ? .noConnection : .requestFailed) {
+                Task { await viewModel.retryLoad() }
+            }
         case .ready:
             readyBody
         // US-37 / CL-63 / AC-37.3 (T-640): article rendering branch.
