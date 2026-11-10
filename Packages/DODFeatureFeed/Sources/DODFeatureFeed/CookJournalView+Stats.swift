@@ -101,6 +101,32 @@ extension CookJournalView {
         }
     }
 
+    /// DUT-975 — "that felt hard → that felt easy" bar strip. Hidden until 2+ reads.
+    @ViewBuilder
+    func confidenceTrajectoryCard(stats: JournalStats) -> some View {
+        if stats.confidenceReads.count >= 2 {
+            VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                Text("Your confidence").dodFont(DODType.heading).foregroundStyle(DODColor.label)
+                HStack(alignment: .bottom, spacing: DODSpacing.xxs) {
+                    ForEach(Array(stats.confidenceReads.suffix(12).enumerated()), id: \.offset) { _, level in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(DODColor.burntOrange)
+                            .frame(height: CGFloat(level) * 10)
+                    }
+                }
+                .frame(height: 50, alignment: .bottom)
+                .accessibilityHidden(true)
+            }
+            .padding(DODSpacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous).fill(DODColor.surfaceElevated)
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Your confidence over your last \(min(12, stats.confidenceReads.count)) cooks")
+        }
+    }
+
     /// DUT-974 — nudge copy for a recipe on its way to being owned.
     nonisolated static func ownItCaption(_ progress: CookLogStats.OwnItProgress) -> String {
         progress.remaining == 1
