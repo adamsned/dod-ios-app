@@ -32,9 +32,22 @@ public struct FridgeFinderView: View {
         }
     }
 
+    @ViewBuilder
+    private var statusSection: some View {
+        switch viewModel.phase {
+        case .identifying:
+            Section { ProgressView("Looking at your ingredients") }
+        case .noIngredients:
+            Section { Text("No ingredients spotted. Try a clearer photo.") }
+        case .results, .idle:
+            EmptyView()
+        }
+    }
+
     public var body: some View {
         List {
             photoSection
+            statusSection
         }
         .navigationTitle("What Can I Cook Tonight?")
         .onChange(of: pickerItem) { _, item in
