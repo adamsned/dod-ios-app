@@ -27,4 +27,17 @@ struct FridgeFinderViewModelTests {
         #expect(!viewModel.supportsImageInput)
         #expect(viewModel.phase == .idle)
     }
+
+    @Test func analyzeWithFakeProducesMatches() async {
+        let recipes = [Self.recipe(lines: ["2 eggs", "1 cup flour"])]
+        let viewModel = FridgeFinderViewModel(
+            intelligence: FakeIntelligenceService(isAvailable: true, ingredients: ["eggs"]),
+            loadRecipes: { recipes }
+        )
+        await viewModel.analyze(imageData: Data([0x01]))
+
+        #expect(viewModel.phase == .results)
+        #expect(viewModel.ingredients == ["eggs"])
+        #expect(viewModel.matches.count == 1)
+    }
 }
