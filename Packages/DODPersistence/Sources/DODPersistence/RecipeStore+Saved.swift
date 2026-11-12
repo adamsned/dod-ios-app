@@ -31,6 +31,7 @@ extension RecipeStore {
             try tearDownUnsavedPins(row)
         }
         try modelContext.save()
+        try mirrorSavedState(id: id)
         try evictIfNeeded()
         return row.isSaved
     }
@@ -64,6 +65,7 @@ extension RecipeStore {
         // DUT-292: pin the hero (download = save + pin) so it's offline-usable.
         try pinHeroImage(heroURLString: row.heroImageURLString, toRecipeID: id)
         try modelContext.save()
+        try mirrorSavedState(id: id)
         return true
     }
 }

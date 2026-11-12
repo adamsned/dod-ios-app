@@ -104,7 +104,8 @@ extension PrivacyBucket {
                 title: "Saved Recipes",
                 detail: countDetail(inventory.savedRecipes, singular: "recipe", plural: "recipes"),
                 explanation: "The recipes and articles you save stay on this iPhone. "
-                    + "They sync to your other Apple devices only when you turn on iCloud sync."
+                    + "With iCloud sync on, they sync to your other Apple devices, and if you sign in "
+                    + "with Apple or Google, to your Android devices too."
             ),
             PrivacyDataRow(
                 id: "onDevice.journal",

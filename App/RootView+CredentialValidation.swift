@@ -22,6 +22,7 @@ extension RootView {
             profileStore: dependencies.profileStore,
             onSessionCleared: {
                 DODLog.app.notice("Apple credential revoked; local session cleared.")
+                FirebaseAccount.signOut()
             }
         )
     }

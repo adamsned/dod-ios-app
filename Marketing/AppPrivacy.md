@@ -176,3 +176,60 @@ No IDFA, no cross-app/cross-company tracking, no data broker. Sign in with Apple
 Paste alongside the comments/ratings + iCloud-Sync paragraphs (a one-time gate, like CL-95's):
 
 > **Optional Sign in with Apple.** You can use Dutch Oven Daddy without an account. If you choose to sign in with Apple, we receive your Apple user identifier (kept only on your device) and, if you choose to share them, your name and email — which may be an Apple private-relay address if you select "Hide My Email." We use these only to show who you're signed in as and to attribute comments or ratings you post; we never share them with advertisers or analytics. When you delete your account in the app, we revoke your Sign in with Apple token so the app is removed from your Apple ID's "Sign in with Apple" list. You can sign out at any time to return to browsing as a guest.
+
+## What changes for saved-recipe sync with Android (Firebase, 2026-11-12)
+
+**Status:** For the build where Sign in with Apple / Google also signs in to Firebase (project `dutch-oven-daddy`) and saved recipes sync with the Android app through Firestore (`users/{uid}/saved/{recipeId}`). iCloud Sync is unchanged. Unlike iCloud, Firestore is our backend, so Apple's CloudKit exemption does not cover it: this data **is collected** and must be declared.
+
+### What leaves the device, and only when the user is signed in and sync is on
+
+- **Firebase Auth** (Google, as our processor): the Firebase user ID, the sign-in provider (Apple or Google), and the email and name that provider shares (Apple may share a private-relay email).
+- **Cloud Firestore** (Google, region `nam5`, US): one doc per saved recipe: recipe ID, title, excerpt, image URL, recipe URL, published date, total time, save time, and recipe-vs-article. Security rules let each user read and write only their own docs.
+- Not synced: cooking journal, shopping list, profile photo, offline copies, settings.
+- Profile ▸ Delete Profile deletes the user's Firestore docs and their Firebase account (after the user confirms with Apple or Google), then revokes the Apple token as before.
+
+### App Store Connect ▸ App Privacy: answer "Yes, changed" and update the table
+
+| Apple category | Specific type | Linked to user? | Used for tracking? | Purposes | Change |
+|---|---|---|---|---|---|
+| Identifiers | User ID | **Yes** | No | App Functionality | **New** (Firebase user ID) |
+| Contact Info | Email Address | Yes | No | App Functionality | Unchanged row; now also stored in Firebase Auth for signed-in users |
+| Contact Info | Name | Yes | No | App Functionality | Unchanged row; same note |
+| User Content | Other User Content | Yes | No | App Functionality | Confirm present; now covers the synced saved-recipe list |
+
+`App/PrivacyInfo.xcprivacy` gains the matching `NSPrivacyCollectedDataTypeUserID` entry. The Firebase SDKs ship their own privacy manifests. Tracking stays **No**; no ATT prompt. The "Identifiers — User ID: on-device only, do not declare" note in the Sign in with Apple section above no longer holds for signed-in users.
+
+### Privacy-policy changes for `dutchovendaddy.com/app-privacy/` (draft for Ned's approval)
+
+The live page (last updated 2026-11-12) says saved recipes stay on the device or in the user's own iCloud, and that the Android app has no sign-in or sync. Both stop being true with this build and Android PR #306 / #283. Proposed edits:
+
+1. **The Short Version**, replace the second bullet with:
+   > Your cooking journal, shopping list, and profile stay on your device. Saved recipes stay on your device too, unless you turn on sync: with iCloud Sync they go to your own private iCloud, and if you also sign in with Apple or Google, they sync between your iPhone, iPad, and Android devices through our sync service.
+
+2. **Data That Stays on Your Device**, change the first item to:
+   > Saved recipes and articles, including copies kept for offline reading (unless you sign in and sync them; see "Syncing Saved Recipes Across Devices").
+
+3. **New section after "Optional iCloud Sync":**
+   > **Syncing Saved Recipes Across Devices (Optional)**
+   >
+   > If you sign in with Apple or Google, the app keeps a copy of your saved recipes in Google Firebase, a service we use to sync them between your devices, including iPhone, iPad, and Android. Firebase stores your sign-in account (an account ID, whether you used Apple or Google, and the name and email address Apple or Google shares with us) and, for each saved recipe, its ID, title, short description, image link, web address, cooking time, and when you saved it. We use this only to sync your saved recipes, and only you can read them.
+   >
+   > Your cooking journal, shopping list, profile photo, and offline copies are not synced.
+   >
+   > To stop syncing, sign out, or turn off sync in Settings; the saves on your devices are kept. Deleting your profile in the app deletes your sync account and the saved recipes stored with it.
+
+4. **Signing In (Optional)**, replace the first paragraph with:
+   > Signing in is optional. If you choose to sign in, your sign-in details are stored on your device, and an account is created in Google Firebase so your saved recipes can sync between your devices (see "Syncing Saved Recipes Across Devices").
+
+5. **Android App**, replace the "No sign-in or sync." paragraph with:
+   > **Sign-in and sync.** You can sign in with Apple or Google to sync your saved recipes with your other devices, as described in "Syncing Saved Recipes Across Devices." Your cooking journal, shopping list, profile, and settings stay only on your phone.
+
+6. **Your Choices ▸ Delete your profile**, replace with:
+   > Delete your profile: open your profile and choose Delete Profile. This erases your profile and sign-in details from the device, deletes your sync account and the saved recipes stored in it, and, if you signed in with Apple or Google, cancels the app's authorization with that account. Comments and ratings you already posted remain on the website until you ask us to remove them.
+
+7. **How Long We Keep Information**, add:
+   > Your synced saved recipes and sync account are kept until you delete your profile in the app, or ask us to delete them.
+
+   and change the last line to: "Everything else stays on your device, or in your own iCloud, until you delete it."  (unchanged wording, still true)
+
+8. Update **Last updated**.
