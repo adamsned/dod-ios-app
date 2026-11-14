@@ -25,5 +25,12 @@ public final class SystemSpeechTranscriber: SpeechTranscribing {
     }
 
     public func stopListening() {}
+
+    /// Configure the shared audio session for mic capture, ducking other audio.
+    fileprivate func activateSession() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers])
+        try session.setActive(true)
+    }
 }
 #endif
