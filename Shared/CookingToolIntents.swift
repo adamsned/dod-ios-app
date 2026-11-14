@@ -118,3 +118,21 @@ struct OpenCookingToolIntent: AppIntent {
         return .result()
     }
 }
+
+/// DUT-989 — tap action for the "Tonight's Rung" control. Like
+/// ``OpenCookingToolIntent`` it must live in this shared file so the app binary
+/// contains it. It drops the one-shot `.tonightsRung` route; ``RootView`` then
+/// reads the TonightsRungSnapshot and opens Cook Mode for that recipe.
+@available(iOS 18.0, *)
+struct OpenTonightsRungIntent: AppIntent {
+    static let title: LocalizedStringResource = "Start Tonight's Rung"
+    static let openAppWhenRun = true
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        ControlRouteStore()?.setPending(.tonightsRung)
+        DODLog.app.notice("TonightsRungControl tapped; pending route = tonights-rung")
+        return .result()
+    }
+}
