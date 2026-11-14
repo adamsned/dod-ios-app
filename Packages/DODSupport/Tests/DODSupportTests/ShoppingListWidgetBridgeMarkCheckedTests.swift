@@ -4,7 +4,8 @@ import XCTest
 
 final class ShoppingListWidgetBridgeMarkCheckedTests: XCTestCase {
     private func freshDefaults() -> UserDefaults {
-        let defaults = UserDefaults(suiteName: "test-suite")
+        // A suite per test: a shared one races when `swift test --parallel` runs tests side by side.
+        let defaults = UserDefaults(suiteName: "test-suite-\(UUID().uuidString)")
         XCTAssertNotNil(defaults, "Failed to create UserDefaults with test suite")
         defaults?.removeObject(forKey: ShoppingListWidgetBridge.storageKey)
         return defaults ?? UserDefaults()
