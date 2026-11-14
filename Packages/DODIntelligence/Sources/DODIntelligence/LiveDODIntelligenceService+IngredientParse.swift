@@ -1,3 +1,4 @@
+import DODSupport
 import Foundation
 
 #if os(iOS)
@@ -33,5 +34,31 @@ extension LiveDODIntelligenceService {
         Never guess a quantity: if the line has no number (e.g. "salt to taste"), \
         leave quantity empty. Do not convert units.
         """
+
+    /// The single place that touches the model for ingredient parsing. Any error,
+    /// including a guardrail rejection, degrades to `nil`. The result is NOT trusted
+    /// directly: callers pass it through `IngredientParseGate.resolve`.
+    @available(iOS 26, *)
+    static func generateIngredientParse(_ line: String) async -> IngredientParse? {
+        guard case .available = SystemLanguageModel.default.availability else { return nil }
+        let session = LanguageModelSession(instructions: ingredientParseInstructions)
+        do {
+            let reply = try await session.respond(
+                to: line,
+                generating: GenerableIngredientParse.self
+            )
+            let content = reply.content
+            let item = content.item.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !item.isEmpty else { return nil }
+            return IngredientParse(
+                quantity: content.quantity,
+                unit: content.unit,
+                item: item,
+                prep: content.prep
+            )
+        } catch {
+            return nil
+        }
+    }
     #endif
 }
