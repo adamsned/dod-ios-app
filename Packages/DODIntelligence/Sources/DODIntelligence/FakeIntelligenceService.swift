@@ -30,6 +30,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedMomentCaption: String?
     private let cannedHeatCoachAnswer: String?
     private let cannedIngredients: [String]?
+    private let cannedIngredientParse: IngredientParse?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
@@ -55,7 +56,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     the graceful no-result path.
     ///   - recipeAnswer: What ``askRecipe(_:toolbox:)`` returns when available. nil models the no-result path.
     ///   - heatCoachAnswer: What ``askHeatCoach(_:ovenDiameterInches:isBaking:)`` returns when available. `nil` models the graceful no-result path.
-    ///   - ingredients: What ``identifyIngredients(imageData:)`` returns when available and image-capable.
+    ///   - ingredientParse: What ``parseIngredient(_:)`` returns when available. `nil` models the graceful no-result path.
     public init(
         isAvailable: Bool = true,
         supportsImageInput: Bool = true,
@@ -80,7 +81,8 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         momentCaption: String? = "Look at that golden crust — you made this, and everyone is going to ask for seconds.",
         heatCoachAnswer: String? =
             "Add about 5 coals for the wind and altitude, keep an eye on the lid, and you're golden.",
-        ingredients: [String] = ["eggs", "cheddar", "spinach", "butter"]
+        ingredients: [String] = ["eggs", "cheddar", "spinach", "butter"],
+        ingredientParse: IngredientParse? = IngredientParse(quantity: 2, unit: "cup", item: "flour", prep: nil)
     ) {
         self.isAvailable = isAvailable
         self.supportsImageInput = supportsImageInput
@@ -96,6 +98,7 @@ public struct FakeIntelligenceService: DODIntelligenceService {
         self.cannedMomentCaption = momentCaption
         self.cannedHeatCoachAnswer = heatCoachAnswer
         self.cannedIngredients = ingredients
+        self.cannedIngredientParse = ingredientParse
     }
 
     public func suggestSubstitution(
@@ -161,5 +164,10 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     public func identifyIngredients(imageData: Data) async -> [String] {
         guard isAvailable, supportsImageInput else { return [] }
         return cannedIngredients ?? []
+    }
+
+    public func parseIngredient(_ line: String) async -> IngredientParse? {
+        guard isAvailable else { return nil }
+        return cannedIngredientParse
     }
 }
