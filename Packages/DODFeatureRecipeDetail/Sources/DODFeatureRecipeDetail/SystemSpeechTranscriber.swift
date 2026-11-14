@@ -21,10 +21,20 @@ public final class SystemSpeechTranscriber: SpeechTranscribing {
     public var isAvailable: Bool { SpeechTranscriber.isAvailable }
 
     public func startListening() -> AsyncStream<String> {
-        AsyncStream { $0.finish() }
+        let (stream, continuation) = AsyncStream.makeStream(of: String.self)
+        task = Task { await run(continuation: continuation) }
+        return stream
     }
 
-    public func stopListening() {}
+    public func stopListening() {
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        inputBuilder?.finish()
+        inputBuilder = nil
+        let finishing = analyzer
+        analyzer = nil
+        Task { try? await finishing?.finalizeAndFinishThroughEndOfInput() }
+    }
 
     /// Configure the shared audio session for mic capture, ducking other audio.
     fileprivate func activateSession() throws {
@@ -78,6 +88,64 @@ extension SystemSpeechTranscriber {
             return buffer
         }
         return status == .error ? nil : out
+    }
+
+    /// Create a tap block for AVAudioNode that yields analyzer input.
+    nonisolated static func makeTapBlock(
+        builder: AsyncStream<AnalyzerInput>.Continuation,
+        converter: AVAudioConverter?,
+        format: AVAudioFormat
+    ) -> AVAudioNodeTapBlock {
+        { buffer, _ in
+            guard let converter else {
+                builder.yield(AnalyzerInput(buffer: buffer))
+                return
+            }
+            if let out = convert(buffer, with: converter, to: format) {
+                builder.yield(AnalyzerInput(buffer: out))
+            }
+        }
+    }
+
+    /// Install the mic tap (converting to the analyzer's format if needed) and start the engine.
+    fileprivate func startEngine(
+        format: AVAudioFormat,
+        builder: AsyncStream<AnalyzerInput>.Continuation
+    ) throws {
+        let input = engine.inputNode
+        let inputFormat = input.outputFormat(forBus: 0)
+        let converter = inputFormat == format ? nil : AVAudioConverter(from: inputFormat, to: format)
+        let block = Self.makeTapBlock(builder: builder, converter: converter, format: format)
+        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat, block: block)
+        engine.prepare()
+        try engine.start()
+    }
+
+    /// Full capture→transcribe pipeline. Never throws: any failure just ends the stream.
+    fileprivate func run(continuation: AsyncStream<String>.Continuation) async {
+        do {
+            let transcriber = makeTranscriber()
+            let analyzer = SpeechAnalyzer(modules: [transcriber])
+            self.analyzer = analyzer
+            let (sequence, builder) = AsyncStream.makeStream(of: AnalyzerInput.self)
+            inputBuilder = builder
+            try activateSession()
+            guard
+                let format = await SpeechAnalyzer.bestAvailableAudioFormat(
+                    compatibleWith: [transcriber]
+                )
+            else { throw CancellationError() }
+            try startEngine(format: format, builder: builder)
+            try await analyzer.start(inputSequence: sequence)
+            var finalized = ""
+            for try await result in transcriber.results {
+                let text = String(result.text.characters)
+                continuation.yield(Self.snapshot(finalized: &finalized, text: text, isFinal: result.isFinal))
+            }
+        } catch {
+            // Never crash Cook Mode: just end the stream.
+        }
+        continuation.finish()
     }
 }
 #endif
