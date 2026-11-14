@@ -5,6 +5,37 @@ import Foundation
 /// DUT-1029 — hands-free spoken questions for Cook Mode.
 extension CookModeViewModel {
 
+    /// Press-and-hold start. Silences read-aloud (barge-in) so the mic doesn't hear the TTS,
+    /// then streams partial transcripts into `liveTranscript`.
+    public func beginListening() {
+        guard transcriber.isAvailable, !isListening else { return }
+        voiceReader.stop()
+        playbackState = .idle
+        pausedUtteranceIsStale = true
+        liveTranscript = ""
+        isListening = true
+        let stream = transcriber.startListening()
+        listenTask = Task { [weak self] in
+            for await partial in stream {
+                guard let self, !Task.isCancelled else { return }
+                self.liveTranscript = partial
+            }
+        }
+    }
+
+    /// Release: stop capture, then answer whatever was heard.
+    public func endListening(intelligence: (any DODIntelligenceService)?) async {
+        guard isListening else { return }
+        transcriber.stopListening()
+        // Let the stream drain so `liveTranscript` holds the final text.
+        await listenTask?.value
+        listenTask = nil
+        isListening = false
+        let heard = liveTranscript
+        liveTranscript = ""
+        await handleSpokenQuestion(heard, intelligence: intelligence)
+    }
+
     /// Route a final transcript and speak the result. `intelligence` is nil when the
     /// on-device model is unavailable (then only the deterministic paths answer).
     public func handleSpokenQuestion(_ transcript: String, intelligence: (any DODIntelligenceService)?) async {
