@@ -23,5 +23,15 @@ extension LiveDODIntelligenceService {
         @Guide(description: "Preparation notes such as 'finely chopped' or 'to taste'. Omit if none.")
         var prep: String?
     }
+
+    /// System instructions for the single-line ingredient parse. The `@Generable`
+    /// schema carries the field contract; this carries the judgement.
+    @available(iOS 26, *)
+    static let ingredientParseInstructions = """
+        Split one recipe ingredient line into quantity, unit, item and prep. \
+        Copy numbers exactly as written; convert fractions to decimals. \
+        Never guess a quantity: if the line has no number (e.g. "salt to taste"), \
+        leave quantity empty. Do not convert units.
+        """
     #endif
 }
