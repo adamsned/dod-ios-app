@@ -96,5 +96,19 @@ extension SystemSpeechTranscriber {
             }
         }
     }
+
+    /// Install the mic tap (converting to the analyzer's format if needed) and start the engine.
+    fileprivate func startEngine(
+        format: AVAudioFormat,
+        builder: AsyncStream<AnalyzerInput>.Continuation
+    ) throws {
+        let input = engine.inputNode
+        let inputFormat = input.outputFormat(forBus: 0)
+        let converter = inputFormat == format ? nil : AVAudioConverter(from: inputFormat, to: format)
+        let block = Self.makeTapBlock(builder: builder, converter: converter, format: format)
+        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat, block: block)
+        engine.prepare()
+        try engine.start()
+    }
 }
 #endif
