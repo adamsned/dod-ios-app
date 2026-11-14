@@ -1,6 +1,6 @@
 import Foundation
 
-#if os(iOS) && canImport(Speech) && canImport(AVFoundation)
+#if os(iOS) && canImport(Speech) && canImport(AVFoundation) && compiler(>=6.4)
 import AVFoundation
 import Speech
 
@@ -41,6 +41,20 @@ public final class SystemSpeechTranscriber: SpeechTranscribing {
             reportingOptions: [.volatileResults],
             attributeOptions: []
         )
+    }
+}
+
+// MARK: - Helper Functions
+
+@available(iOS 26.0, *)
+extension SystemSpeechTranscriber {
+    /// Fold one recognizer result into the running full-transcript snapshot.
+    nonisolated static func snapshot(finalized: inout String, text: String, isFinal: Bool) -> String {
+        if isFinal {
+            finalized += text
+            return finalized
+        }
+        return finalized + text
     }
 }
 #endif
