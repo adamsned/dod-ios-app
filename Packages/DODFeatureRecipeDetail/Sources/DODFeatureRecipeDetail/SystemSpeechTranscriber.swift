@@ -32,5 +32,15 @@ public final class SystemSpeechTranscriber: SpeechTranscribing {
         try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers])
         try session.setActive(true)
     }
+
+    /// Build the on-device transcriber with volatile (partial) results.
+    fileprivate func makeTranscriber() -> SpeechTranscriber {
+        SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: []
+        )
+    }
 }
 #endif
