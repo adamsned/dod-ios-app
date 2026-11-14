@@ -21,10 +21,20 @@ public final class SystemSpeechTranscriber: SpeechTranscribing {
     public var isAvailable: Bool { SpeechTranscriber.isAvailable }
 
     public func startListening() -> AsyncStream<String> {
-        AsyncStream { $0.finish() }
+        let (stream, continuation) = AsyncStream.makeStream(of: String.self)
+        task = Task { await run(continuation: continuation) }
+        return stream
     }
 
-    public func stopListening() {}
+    public func stopListening() {
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        inputBuilder?.finish()
+        inputBuilder = nil
+        let finishing = analyzer
+        analyzer = nil
+        Task { try? await finishing?.finalizeAndFinishThroughEndOfInput() }
+    }
 
     /// Configure the shared audio session for mic capture, ducking other audio.
     fileprivate func activateSession() throws {
