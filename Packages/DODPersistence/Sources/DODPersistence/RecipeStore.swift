@@ -12,13 +12,13 @@ import SwiftData
 /// AC-5.4 (offline detail), NFR-1/NFR-2 (cache budgets).
 @ModelActor
 public actor RecipeStore {
-
     public static let unsavedLRUCap = 100
     public static let imageBudgetBytes: Int = 200 * 1_024 * 1_024
 
     /// DUT-242: flips true after the first ``backfillImageByteCountsIfNeeded()``
     /// so the one-time `byteCount` backfill faults image blobs once per launch.
     var didBackfillImageByteCounts = false
+    var savedMirror: (any SavedRecipeMirror)?  // cross-platform sync; see SavedRecipeMirror
 
     #if DEBUG
     /// DUT-473 test seam: when set, ``logCook`` throws this instead of saving so

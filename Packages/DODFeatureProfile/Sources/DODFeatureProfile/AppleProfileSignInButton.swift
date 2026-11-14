@@ -123,6 +123,8 @@ final class AppleSignInCoordinator: NSObject {
     /// the credential is silently dropped and the app never sees the sign-in
     /// ("signs in but never actually signed in"). Cleared when the flow ends.
     private var retainedSelf: AppleSignInCoordinator?
+    /// The raw nonce for this request's Firebase sign-in (Apple gets its hash).
+    private var rawNonce: String?
 
     func start(
         profileStore: any ProfileStoring,
@@ -134,6 +136,9 @@ final class AppleSignInCoordinator: NSObject {
         self.onError = onError
         let request = ASAuthorizationAppleIDProvider().createRequest()
         request.requestedScopes = [.fullName, .email]
+        let nonce = FirebaseAccount.makeNonce()
+        request.nonce = nonce.hashed
+        rawNonce = nonce.raw
         let controller = ASAuthorizationController(authorizationRequests: [request])
         controller.delegate = self
         controller.presentationContextProvider = self
@@ -184,6 +189,9 @@ extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
         let authorizationCode = credential.authorizationCode.flatMap {
             String(data: $0, encoding: .utf8)
         }
+        let idToken = credential.identityToken.flatMap { String(data: $0, encoding: .utf8) }
+        let fullName = credential.fullName
+        let rawNonce = rawNonce
         guard let profileStore, let onComplete else { return }
         let signIn = AppleProfileSignIn(profileStore: profileStore)
         Task { @MainActor in
@@ -194,6 +202,10 @@ extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
                 authorizationCode: authorizationCode
             )
             onComplete(outcome)
+            // Same Apple ID → same Firebase user as on Android, for saved-recipe sync.
+            if outcome.signedIn, let idToken, let rawNonce {
+                await FirebaseAccount.signInWithApple(idToken: idToken, rawNonce: rawNonce, fullName: fullName)
+            }
         }
     }
 

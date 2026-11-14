@@ -300,6 +300,7 @@ extension ProfileEditView {
                 return
             }
             hasSession = true  // DUT-281 — a session was persisted; keep Sign Out reachable
+            Task { await FirebaseAccount.signInWithCurrentGoogleUser() }  // saved-recipe sync with Android
             if let name = outcome.displayName { self.displayName = name }
             if let mail = outcome.email { self.email = mail }
             // DUT-891b — mirror the Apple handler: surface the error row ONLY on a
