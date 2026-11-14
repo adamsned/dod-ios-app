@@ -110,5 +110,32 @@ extension SystemSpeechTranscriber {
         engine.prepare()
         try engine.start()
     }
+
+    /// Full capture→transcribe pipeline. Never throws: any failure just ends the stream.
+    fileprivate func run(continuation: AsyncStream<String>.Continuation) async {
+        do {
+            let transcriber = makeTranscriber()
+            let analyzer = SpeechAnalyzer(modules: [transcriber])
+            self.analyzer = analyzer
+            let (sequence, builder) = AsyncStream.makeStream(of: AnalyzerInput.self)
+            inputBuilder = builder
+            try activateSession()
+            guard
+                let format = await SpeechAnalyzer.bestAvailableAudioFormat(
+                    compatibleWith: [transcriber]
+                )
+            else { throw CancellationError() }
+            try startEngine(format: format, builder: builder)
+            try await analyzer.start(inputSequence: sequence)
+            var finalized = ""
+            for try await result in transcriber.results {
+                let text = String(result.text.characters)
+                continuation.yield(Self.snapshot(finalized: &finalized, text: text, isFinal: result.isFinal))
+            }
+        } catch {
+            // Never crash Cook Mode: just end the stream.
+        }
+        continuation.finish()
+    }
 }
 #endif
