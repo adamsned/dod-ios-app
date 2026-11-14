@@ -1,3 +1,4 @@
+import DODSupport
 import Foundation
 
 #if os(iOS)
@@ -79,6 +80,19 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #if os(iOS)
         if #available(iOS 26, *) {
             return await Self.generateSubstitution(for: trimmed, context: context, reason: reason)
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
+    public func parseIngredient(_ line: String) async -> IngredientParse? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateIngredientParse(trimmed)
         }
         return nil
         #else

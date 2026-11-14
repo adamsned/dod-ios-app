@@ -24,6 +24,8 @@ import WidgetKit
 /// Center / Lock Screen control (user picks which cooking tool it opens),
 /// registered conditionally (see below).
 ///
+/// DUT-989 — plus the iOS 18-only ``TonightsRungControl`` (one-tap Cook Mode quick-start).
+///
 /// Spec trace: US-9, US-17 (AC-17.1), US-22 (AC-22.1, AC-22.7); DUT-454,
 /// DUT-459, DUT-480.
 @main
@@ -46,6 +48,8 @@ struct DODAppWidgetBundle: WidgetBundle {
         // contributes nothing and the five widgets above still register.
         if #available(iOS 18.0, *) {
             CookingToolControl()
+            // DUT-989 — Tonight's Rung quick-start control.
+            TonightsRungControl()
         }
     }
 }
