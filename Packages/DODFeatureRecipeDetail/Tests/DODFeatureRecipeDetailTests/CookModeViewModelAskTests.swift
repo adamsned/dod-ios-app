@@ -57,4 +57,65 @@ import Testing
         await viewModel.handleSpokenQuestion("Can I make this ahead?", intelligence: fake)
         #expect(mock.spokenTexts == ["Sorry, I can't answer that right now."])
     }
+
+    @Test func beginListeningStopsVoiceReaderAndSetsListeningState() async {
+        let mock = MockSpeechSynthesizer()
+        let viewModel = Self.makeVM(mock: mock)
+        let mockTranscriber = MockTranscriber(script: ["what's", "what's next"])
+        viewModel.transcriber = mockTranscriber
+        viewModel.voiceReader.speak("test")
+
+        viewModel.beginListening()
+
+        #expect(viewModel.isListening)
+        #expect(!viewModel.voiceReader.isSpeaking)
+        #expect(viewModel.liveTranscript.isEmpty)
+    }
+
+    @Test func beginListeningDoesNothingWhenUnavailable() async {
+        let mock = MockSpeechSynthesizer()
+        let viewModel = Self.makeVM(mock: mock)
+        let mockTranscriber = MockTranscriber(isAvailable: false)
+        viewModel.transcriber = mockTranscriber
+
+        viewModel.beginListening()
+
+        #expect(!viewModel.isListening)
+    }
+
+    @Test func beginListeningStopsVoiceReaderBeforeAnswer() async {
+        let mock = MockSpeechSynthesizer()
+        let viewModel = Self.makeVM(mock: mock)
+        let mockTranscriber = MockTranscriber(script: ["what's next"])
+        viewModel.transcriber = mockTranscriber
+        viewModel.voiceReader.speak("test")
+
+        viewModel.beginListening()
+        await viewModel.endListening(intelligence: nil)
+
+        #expect(!viewModel.isListening)
+        #expect(viewModel.voiceReader.isSpeaking)
+    }
+}
+
+@MainActor final class MockTranscriber: SpeechTranscribing {
+    var isAvailable = true
+    var script: [String] = []
+    private var continuation: AsyncStream<String>.Continuation?
+
+    init(isAvailable: Bool = true, script: [String] = []) {
+        self.isAvailable = isAvailable
+        self.script = script
+    }
+
+    func startListening() -> AsyncStream<String> {
+        AsyncStream { continuation in
+            script.forEach { continuation.yield($0) }
+            self.continuation = continuation
+        }
+    }
+
+    func stopListening() {
+        continuation?.finish()
+    }
 }
