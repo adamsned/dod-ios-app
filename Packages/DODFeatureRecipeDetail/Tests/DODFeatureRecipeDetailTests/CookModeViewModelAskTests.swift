@@ -1,4 +1,5 @@
 import DODDomain
+import DODIntelligence
 import Testing
 
 @testable import DODFeatureRecipeDetail
@@ -38,6 +39,22 @@ import Testing
         let mock = MockSpeechSynthesizer()
         let viewModel = Self.makeVM(mock: mock)
         await viewModel.handleSpokenQuestion("Can I use a grill?", intelligence: nil)
+        #expect(mock.spokenTexts == ["Sorry, I can't answer that right now."])
+    }
+
+    @Test func openQuestionSpeaksModelAnswer() async {
+        let mock = MockSpeechSynthesizer()
+        let viewModel = Self.makeVM(mock: mock)
+        let fake = FakeIntelligenceService(answer: "Yes, chill it first.")
+        await viewModel.handleSpokenQuestion("Can I make this ahead?", intelligence: fake)
+        #expect(mock.spokenTexts == ["Yes, chill it first."])
+    }
+
+    @Test func unavailableModelSaysSorry() async {
+        let mock = MockSpeechSynthesizer()
+        let viewModel = Self.makeVM(mock: mock)
+        let fake = FakeIntelligenceService(isAvailable: false)
+        await viewModel.handleSpokenQuestion("Can I make this ahead?", intelligence: fake)
         #expect(mock.spokenTexts == ["Sorry, I can't answer that right now."])
     }
 }
