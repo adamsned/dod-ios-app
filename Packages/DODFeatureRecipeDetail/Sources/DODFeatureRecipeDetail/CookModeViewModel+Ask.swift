@@ -20,8 +20,19 @@ extension CookModeViewModel {
         case .repeatStep:
             replayCurrentStep()
         case .ask(let question):
-            let quick = CookModeSpokenAnswers.ingredientAnswer(question: question, ingredientLines: ingredientLines)
-            speakAnswer(quick ?? "Sorry, I can't answer that right now.")
+            guard let intelligence, intelligence.isAvailable else {
+                speakAnswer("Sorry, I can't answer that right now.")
+                return
+            }
+            let context = CookModeView.recipeChatContext(
+                recipe: recipe,
+                ingredientLines: ingredientLines,
+                scaleFactor: 1,
+                currentStepIndex: currentStepIndex,
+                isFinished: isFinished
+            )
+            let answer = await intelligence.answer(question, imageData: nil, recipeContext: context)
+            speakAnswer(answer ?? "Sorry, I don't have an answer for that.")
         }
     }
 
