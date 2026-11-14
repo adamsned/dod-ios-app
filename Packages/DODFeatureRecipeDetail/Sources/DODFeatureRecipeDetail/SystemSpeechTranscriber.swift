@@ -79,5 +79,22 @@ extension SystemSpeechTranscriber {
         }
         return status == .error ? nil : out
     }
+
+    /// Create a tap block for AVAudioNode that yields analyzer input.
+    nonisolated static func makeTapBlock(
+        builder: AsyncStream<AnalyzerInput>.Continuation,
+        converter: AVAudioConverter?,
+        format: AVAudioFormat
+    ) -> AVAudioNodeTapBlock {
+        { buffer, _ in
+            guard let converter else {
+                builder.yield(AnalyzerInput(buffer: buffer))
+                return
+            }
+            if let out = convert(buffer, with: converter, to: format) {
+                builder.yield(AnalyzerInput(buffer: out))
+            }
+        }
+    }
 }
 #endif
