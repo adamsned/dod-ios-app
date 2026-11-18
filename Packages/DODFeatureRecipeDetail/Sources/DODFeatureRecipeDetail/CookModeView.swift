@@ -29,6 +29,8 @@ public struct CookModeView: View {
     /// DUT-529 — restores the idle timer when the app backgrounds and re-arms it on `.active`
     /// (begin/endCookMode are idempotent).
     @Environment(\.scenePhase) private var scenePhase
+    /// DUT-1017 — foldable posture; `.tent` swaps in the two-pane layout.
+    @Environment(\.cookModePosture) var cookModePosture
     /// DUT-137 — re-evaluated live on Stage Manager / Split View resize; state in
     /// `viewModel` is untouched so no cook state is lost.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
