@@ -24,6 +24,8 @@ import Testing
     @Test func runClearedIdUsesRecipeID() {
         let cleared = GuidedCookout.italianChicken
         let next = GuidedCookout.campfire
-        #expect(CookCelebration.rungMilestone(.rungCleared(cleared: cleared, next: next)).id == "rung-683")
+        #expect(
+            CookCelebration.rungMilestone(.rungCleared(cleared: cleared, next: next)).id == "rung-\(cleared.recipeID)"
+        )
     }
 }

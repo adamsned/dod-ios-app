@@ -194,14 +194,9 @@ public struct SavedView: View {
             .accessibilityIdentifier("saved.emptyState")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .error:
-            EmptyState(
-                systemImage: "exclamationmark.triangle",
-                title: "Couldn't Load Saved Recipes",
-                message: "Try again in a moment.",
-                action: .init(title: "Retry") {
-                    Task { await viewModel.refresh() }
-                }
-            )
+            RetryStateView(kind: .requestFailed) {
+                Task { await viewModel.refresh() }
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded where viewModel.displayedRecipes.isEmpty && viewModel.isFilteringActive:
             // DUT-1339 — search and/or a type filter narrowed the set to nothing.
