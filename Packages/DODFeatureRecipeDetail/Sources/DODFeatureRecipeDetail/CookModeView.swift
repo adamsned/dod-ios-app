@@ -162,12 +162,8 @@ public struct CookModeView: View {
             let topInset = geo.safeAreaInsets.top
             ZStack(alignment: .top) {
                 VStack(spacing: 0) {
-                    // Immersive full-bleed hero (blur strip + overlaid title)
-                    // replaces the old title bar + inset card, reclaiming the
-                    // header height for the step text. `.ignoresSafeArea(top)` lets
-                    // the hero sit under the floating controls; only the TOP is
-                    // ignored so the player + counter still clear the home
-                    // indicator.
+                    // Immersive full-bleed hero under the floating controls; only the
+                    // TOP safe area is ignored so the player + counter clear the home indicator.
                     if viewModel.isFinished {
                         // Done: hero pinned, celebratory card centered in the
                         // space above the controls (Spacers, no scroll needed).
