@@ -21,4 +21,13 @@ struct HeatCoachGroundednessEvalTests {
         let query = HeatCoachQuery(ovenDiameterInches: 12, style: .even, answer: "")
         #expect(!HeatCoachGroundednessEval.allowedNumbers(for: query).contains(99))
     }
+
+    @Test func groundedAnswerPasses() {
+        let query = HeatCoachQuery(
+            ovenDiameterInches: 12,
+            style: .even,
+            answer: "Start with 24 coals: 12 on the lid, 12 underneath, for about 350 degrees."
+        )
+        #expect(HeatCoachGroundednessEval.grade(query).isEmpty)
+    }
 }
