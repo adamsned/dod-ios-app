@@ -70,6 +70,13 @@ extension FeedViewModel {
                 pendingCelebration = .rankUp(reached)
             }
         }
+        // DUT-971 — keep the idle re-seasoning reminder 21 days out from this cook.
+        await PanCareScheduling.reschedule(
+            notifier: SystemPanCareNotifier(),
+            store: PanCareStore(),
+            cooks: logsAfter,
+            now: entry.cookedAt
+        )
         promoteCelebrationIfReady()
     }
 
