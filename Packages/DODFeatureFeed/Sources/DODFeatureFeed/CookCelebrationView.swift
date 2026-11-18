@@ -15,6 +15,8 @@ public enum CookCelebration: Equatable, Identifiable, Sendable {
     case firstCookEver
     /// DUT-974 — a recipe was cooked its 3rd time: it's the user's own.
     case ownedIt(title: String)
+    /// DUT-964: a logged cook cleared a ladder rung (or unlocked the campfire).
+    case rungMilestone(RungMilestone)
 
     public var id: String {
         switch self {
@@ -22,6 +24,9 @@ public enum CookCelebration: Equatable, Identifiable, Sendable {
         case .graduatedFirstCookout: return "graduated"
         case .firstCookEver: return "first-cook-ever"
         case .ownedIt(let title): return "owned-\(title)"
+        case .rungMilestone(.campfireUnlocked): return "rung-campfire-unlocked"
+        case .rungMilestone(.graduated): return "rung-graduated"
+        case .rungMilestone(.rungCleared(let cleared, _)): return "rung-\(cleared.recipeID)"
         }
     }
 }
@@ -90,6 +95,7 @@ public struct CookCelebrationView: View {
         case .graduatedFirstCookout: return "🎓"
         case .firstCookEver: return "🔥"
         case .ownedIt: return "🏆"
+        case .rungMilestone: return "🪜"
         }
     }
 
@@ -99,6 +105,7 @@ public struct CookCelebrationView: View {
         case .graduatedFirstCookout: return "Path complete"
         case .firstCookEver: return "First cook ever"
         case .ownedIt: return "You own it"
+        case .rungMilestone: return "Level up"
         }
     }
 
@@ -108,6 +115,12 @@ public struct CookCelebrationView: View {
         case .graduatedFirstCookout: return "You're a Dutch Oven Cook"
         case .firstCookEver: return "You're one of us now"
         case .ownedIt(let name): return "\(name) is yours now"
+        case .rungMilestone(let milestone):
+            switch milestone {
+            case .rungCleared(let cleared, _): return "\(cleared.dishTitle) cleared"
+            case .campfireUnlocked: return "The campfire is unlocked"
+            case .graduated: return "You finished the path"
+            }
         }
     }
 
@@ -127,6 +140,12 @@ public struct CookCelebrationView: View {
             return "You just fed someone in cast iron. You're one of us now."
         case .ownedIt:
             return "Three cooks in. You can pull this off relaxed on a busy Tuesday, no recipe open."
+        case .rungMilestone(let milestone):
+            switch milestone {
+            case .rungCleared(_, let next): return "Next rung: \(next.dishTitle). \(next.forgivingNote)"
+            case .campfireUnlocked: return "You've got a win at home. Now take it outdoors when you're ready."
+            case .graduated: return "Every rung cooked, from home to the campfire."
+            }
         }
     }
 
@@ -136,6 +155,7 @@ public struct CookCelebrationView: View {
         case .graduatedFirstCookout: return "What's Next"
         case .firstCookEver: return "Keep Cooking"
         case .ownedIt: return "Keep Cooking"
+        case .rungMilestone: return "Keep Climbing"
         }
     }
 }
