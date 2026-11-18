@@ -30,4 +30,13 @@ struct HeatCoachGroundednessEvalTests {
         )
         #expect(HeatCoachGroundednessEval.grade(query).isEmpty)
     }
+
+    @Test func bakingSplitIsGrounded() {
+        let query = HeatCoachQuery(
+            ovenDiameterInches: 12,
+            style: .baking,
+            answer: "Use 24 coals: 18 on the lid and 6 on the bottom."
+        )
+        #expect(HeatCoachGroundednessEval.grade(query).isEmpty)
+    }
 }
