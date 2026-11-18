@@ -48,3 +48,19 @@ final class CookModeHingeMonitor {
     }
     #endif
 }
+
+/// DUT-1017 — owns the hinge monitor and injects the resolved posture below it.
+struct CookModePostureModifier: ViewModifier {
+    @State private var hingeMonitor = CookModeHingeMonitor()
+
+    func body(content: Content) -> some View {
+        content.cookModePosture(hingeAngle: hingeMonitor.hingeAngle)
+    }
+}
+
+extension View {
+    /// Applies a `CookModeHingeMonitor`-driven posture to this view's subtree.
+    func hingeDrivenCookModePosture() -> some View {
+        modifier(CookModePostureModifier())
+    }
+}
