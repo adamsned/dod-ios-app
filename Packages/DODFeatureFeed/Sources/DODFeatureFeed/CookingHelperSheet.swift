@@ -37,10 +37,11 @@ public struct CookingHelperSheet: View {
             )
         }
 
-        /// Cook Mode's chat about the one recipe being cooked.
+        /// Cook Mode's chat about the one recipe being cooked. DUT-2895 — titled
+        /// "Ask the Recipe" to match the recipe page's chat.
         public static func recipe(_ recipeTitle: String, suggestions: [String] = []) -> Configuration {
             Configuration(
-                title: "Ask About This Recipe",
+                title: "Ask the Recipe",
                 emptyTitle: recipeTitle,
                 emptyMessage: "Ask anything about this recipe while you cook: amounts, steps, timing, or what to do "
                     + "if something looks off.",
