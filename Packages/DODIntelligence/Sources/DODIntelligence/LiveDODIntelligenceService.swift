@@ -151,9 +151,11 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         }
         #endif
         if #available(iOS 26, *), !trimmed.isEmpty {
-            return await Self.generateText(
-                instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
-                prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
+            return SandingGuard.sanitize(
+                await Self.generateText(
+                    instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
+                    prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
+                )
             )
         }
         return nil
