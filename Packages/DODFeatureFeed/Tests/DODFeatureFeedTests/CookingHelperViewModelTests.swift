@@ -150,7 +150,7 @@ struct CookingHelperViewModelTests {
 
     @Test func recipeConfigurationUsesRecipeCopy() {
         let config = CookingHelperSheet.Configuration.recipe("Skillet Chili")
-        #expect(config.title == "Ask About This Recipe")
+        #expect(config.title == "Ask the Recipe")
         #expect(config.emptyTitle == "Skillet Chili")
         #expect(config.placeholder == "Ask about this recipe")
         #expect(CookingHelperSheet.Configuration.general.title == "Ask Dutch Oven Daddy")
