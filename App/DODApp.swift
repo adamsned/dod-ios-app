@@ -5,6 +5,7 @@ import DODFeatureRecipeDetail
 import DODNetworking
 import DODPersistence
 import DODSupport
+import FirebaseCore
 import Foundation
 import SwiftUI
 import UserNotifications
@@ -43,6 +44,12 @@ struct DODApp: App {
         // 4. DUT-1388 — hand the Siri / Shortcuts intents their services now, not
         //    in the scene `.task`: a background intent launch has no scene.
         dependencies.registerAppIntents()
+        // 5. Saved-recipe sync with the Android app. Builds without
+        //    GoogleService-Info.plist (CI, fresh clones) just skip it.
+        if Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil {
+            FirebaseApp.configure()
+            FirestoreSavedSync.start(store: dependencies.store)
+        }
         _dependencies = State(initialValue: dependencies)
 
         // DUT-988 — Live Activity buzzer buttons route into the live Cook Mode session.

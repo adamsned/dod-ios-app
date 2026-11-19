@@ -39,6 +39,17 @@ extension ProfileEditView {
             let provider = GIDSignInProvider()
             googleTeardown = { await provider.teardown(revoke: $0) }
         }
+        // Delete the synced saved recipes + Firebase account first: it needs the
+        // provider's confirmation, and backing out of that cancels the whole delete.
+        if revoke {
+            do {
+                try await FirebaseAccount.deleteAccount()
+            } catch {
+                if !FirebaseAccount.isCancellation(error) { saveError = failureMessage }
+                return
+            }
+        }
+        defer { FirebaseAccount.signOut() }
         #endif
         do {
             try await Self.performAccountTeardown(
