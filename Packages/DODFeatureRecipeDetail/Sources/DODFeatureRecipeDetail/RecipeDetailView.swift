@@ -100,7 +100,7 @@ public struct RecipeDetailView: View {
     /// nudge opens the coach pre-answered from the recipe's own heat profile.
     public let openHeatCoach: ((HeatCoachSeed?) -> Void)?
     /// T-912 / DUT-551 (CL-306) + DUT-1385 — the sheets presented OVER Cook
-    /// Mode's full-screen cover (Heat Coach, Ask About This Recipe). Their views
+    /// Mode's full-screen cover (Heat Coach, Ask the Recipe). Their views
     /// live in `DODFeatureFeed` (not importable here), so the App root injects
     /// type-erased builders, forwarded to `CookModeView`. A `nil` builder
     /// (previews / unwired hosts / no on-device model) hides that affordance.

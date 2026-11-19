@@ -51,7 +51,7 @@ public struct CookModeView: View {
     @State var isGuestReactionPresented: Bool = false
     /// T-912 / DUT-551 — Heat Coach sheet over the cover; `internal` for `CookModeView+StepBody`.
     @State var isHeatCoachPresented: Bool = false
-    /// DUT-1385 — drives the "Ask About This Recipe" sheet over the cover.
+    /// DUT-1385 — drives the "Ask the Recipe" sheet over the cover.
     @State var isAskPresented: Bool = false
     /// DUT-970 — drives the Cast-Iron Rescue sheet.
     @State var isRescuePresented: Bool = false
@@ -73,9 +73,9 @@ public struct CookModeView: View {
     /// (`HeatCoachView` lives in `DODFeatureFeed`, which this package can't import).
     /// `nil` hides the heat shortcut. `internal` so `CookModeView+StepBody.swift` can gate on it.
     let heatCoachSheet: (() -> AnyView)?
-    /// DUT-1385 — builds the "Ask About This Recipe" chat (title, recipe text);
-    /// `nil` hides the top-bar sparkle button. See `CookModeView+Ask.swift`.
-    let askSheet: ((String, String) -> AnyView)?
+    /// DUT-1385 — builds the "Ask the Recipe" chat (title, recipe text, chips);
+    /// `nil` hides the sparkle link. See `CookModeView+Ask.swift`.
+    let askSheet: CookModeSheets.AskRecipeBuilder?
     /// Scale factor from the host detail screen so drawer rows match the scaled list (AC-7.5 / US-31).
     let ingredientScaleFactor: Double
 
@@ -131,7 +131,7 @@ public struct CookModeView: View {
         onLogCook: ((CookLogEntry) -> Void)? = nil,
         onPostGuestReaction: ((String, String, Int?) async -> Bool)? = nil,
         heatCoachSheet: (() -> AnyView)? = nil,
-        askSheet: ((String, String) -> AnyView)? = nil,
+        askSheet: CookModeSheets.AskRecipeBuilder? = nil,
         isFirstCookEver: Bool = false
     ) {
         #if canImport(MediaPlayer)
@@ -166,7 +166,9 @@ public struct CookModeView: View {
                 VStack(spacing: 0) {
                     // Immersive full-bleed hero under the floating controls; only the
                     // TOP safe area is ignored so the player + counter clear the home indicator.
-                    if viewModel.isFinished {
+                    if cookModePosture.usesTwoPane(isFinished: viewModel.isFinished) {
+                        tentLayout
+                    } else if viewModel.isFinished {
                         // Done: hero pinned, celebratory card centered in the
                         // space above the controls (Spacers, no scroll needed).
                         VStack(spacing: 0) {

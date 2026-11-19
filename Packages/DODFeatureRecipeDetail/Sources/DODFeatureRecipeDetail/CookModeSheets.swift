@@ -11,14 +11,18 @@ public struct CookModeSheets {
     /// hides the shortcut.
     public let heatCoach: (() -> AnyView)?
 
-    /// DUT-1385 — the "Ask About This Recipe" chat, built from the recipe title
-    /// and its plain-text context. `nil` (no usable on-device model) hides the
-    /// Cook Mode sparkle button.
-    public let askAboutRecipe: ((_ recipeTitle: String, _ recipeContext: String) -> AnyView)?
+    /// DUT-1385 / DUT-2895 — builds the "Ask the Recipe" chat from the recipe
+    /// title, its plain-text context, and the suggested-question chips.
+    public typealias AskRecipeBuilder =
+        (_ recipeTitle: String, _ recipeContext: String, _ suggestions: [String]) -> AnyView
+
+    /// DUT-1385 — the "Ask the Recipe" chat over Cook Mode. `nil` (no usable
+    /// on-device model) hides the Cook Mode sparkle link.
+    public let askAboutRecipe: AskRecipeBuilder?
 
     public init(
         heatCoach: (() -> AnyView)? = nil,
-        askAboutRecipe: ((_ recipeTitle: String, _ recipeContext: String) -> AnyView)? = nil
+        askAboutRecipe: AskRecipeBuilder? = nil
     ) {
         self.heatCoach = heatCoach
         self.askAboutRecipe = askAboutRecipe
