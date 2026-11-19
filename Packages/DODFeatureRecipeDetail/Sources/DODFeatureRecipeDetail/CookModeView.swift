@@ -166,7 +166,9 @@ public struct CookModeView: View {
                 VStack(spacing: 0) {
                     // Immersive full-bleed hero under the floating controls; only the
                     // TOP safe area is ignored so the player + counter clear the home indicator.
-                    if viewModel.isFinished {
+                    if cookModePosture.usesTwoPane(isFinished: viewModel.isFinished) {
+                        tentLayout
+                    } else if viewModel.isFinished {
                         // Done: hero pinned, celebratory card centered in the
                         // space above the controls (Spacers, no scroll needed).
                         VStack(spacing: 0) {
