@@ -151,9 +151,11 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         }
         #endif
         if #available(iOS 26, *), !trimmed.isEmpty {
-            return await Self.generateText(
-                instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
-                prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
+            return SandingGuard.sanitize(
+                await Self.generateText(
+                    instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
+                    prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
+                )
             )
         }
         return nil
@@ -296,7 +298,7 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
     /// answers stay scoped to the one recipe, and the recipe text is the source
     /// of truth for amounts and times.
     @available(iOS 26, *)
-    private static let recipeChatInstructions = """
+    static let recipeChatInstructions = """
         You are Dutch Oven Daddy's cooking assistant, helping someone who is \
         cooking the recipe they give you right now. Answer questions about this \
         recipe only: its ingredients and amounts, steps, timing, doneness, prep \
@@ -309,6 +311,8 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         Answer in a short, practical paragraph. Do not use em dashes; use periods \
         or commas instead. When a photo is attached, relate what you see to this \
         recipe.
+
+        \(SandingGuard.instructionRule)
         """
     #endif
 }
