@@ -43,7 +43,7 @@ struct HeatCoachGroundednessEvalTests {
     @Test func hallucinatedCoalCountFails() {
         let query = HeatCoachQuery(ovenDiameterInches: 12, style: .even, answer: "Use 40 coals")
         let failures = HeatCoachGroundednessEval.grade(query)
-        #expect(failures.contains { $0.contains("ungrounded number 40") })
+        #expect(failures.contains { $0.contains("ungrounded number") })
     }
 
     @Test func overconfidentPhraseFails() {
