@@ -315,7 +315,7 @@ public struct FeedView: View {
             // `RootView+FirstCookoutCallout.swift`) so it displaces nothing and can
             // point at the Tools tab, which this view doesn't own.
             if let recipeOfTheDay, let pick = recipeOfTheDay.item {
-                RecipeOfTheDayCard(item: pick) {
+                RecipeOfTheDayCard(item: pick, isArticle: recipeOfTheDay.isArticle) {
                     recipeOfTheDay.recordTap()
                     onSelect(pick, viewModel.items)
                 }
