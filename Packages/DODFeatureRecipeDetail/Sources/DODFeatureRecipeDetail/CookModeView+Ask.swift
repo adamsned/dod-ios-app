@@ -3,13 +3,14 @@ import DODDomain
 import DODSupport
 import SwiftUI
 
-// DUT-1385 — Cook Mode's "Ask About This Recipe" chat. The chat view lives in
-// `DODFeatureFeed` and arrives as the injected `askSheet` builder; this file
-// supplies what it needs: the recipe title and the recipe as plain text, built
-// at the moment the sheet opens so "this step" means the step on screen.
+// DUT-1385 — Cook Mode's "Ask the Recipe" chat (DUT-2895 unified the name with
+// the recipe page's chat). The chat view lives in `DODFeatureFeed` and arrives
+// as the injected `askSheet` builder; this file supplies what it needs: the
+// recipe title, the recipe as plain text, and the suggested-question chips,
+// built at the moment the sheet opens so "this step" means the step on screen.
 extension CookModeView {
 
-    /// DUT-1392 — the "Ask About This Recipe" entry point: a plain orange label
+    /// DUT-1392 — the "Ask the Recipe" entry point: a plain orange label
     /// with sparkles directly under the recipe name (no pill), matching the
     /// Summarize link on recipe and article pages. Absent when no chat builder
     /// was injected (model unavailable), like the old top-bar button.
@@ -20,7 +21,7 @@ extension CookModeView {
                 wakeControls()
                 isAskPresented = true
             } label: {
-                Label("Ask About This Recipe", systemImage: "sparkles")
+                Label("Ask the Recipe", systemImage: "sparkles")
                     .dodFont(DODType.bodyEmphasized)
                     .foregroundStyle(DODColor.accent)
                     .frame(minHeight: 44)
@@ -37,8 +38,25 @@ extension CookModeView {
     @ViewBuilder
     var askSheetContent: some View {
         if let askSheet {
-            askSheet(viewModel.recipe.title, recipeChatContext)
+            askSheet(viewModel.recipe.title, recipeChatContext, recipeChatSuggestions)
         }
+    }
+
+    /// DUT-2895 — the same recipe-aware chips as the recipe page's chat, with
+    /// servings scaled to what Cook Mode shows (so "double" vs "halve" fits).
+    var recipeChatSuggestions: [String] {
+        Self.recipeChatSuggestions(recipe: viewModel.recipe, scaleFactor: ingredientScaleFactor)
+    }
+
+    /// Pure builder (unit-tested) for ``recipeChatSuggestions``.
+    nonisolated static func recipeChatSuggestions(recipe: Recipe, scaleFactor: Double) -> [String] {
+        let servings = recipe.servings.map { Int(exactly: (Double($0) * scaleFactor).rounded()) ?? $0 }
+        return ChatSuggestions.forRecipe(
+            title: recipe.title,
+            ingredients: recipe.ingredients.map(\.text),
+            steps: recipe.instructions.sorted { $0.step < $1.step }.map(\.text),
+            servings: servings
+        )
     }
 
     /// The open recipe as plain text, with ingredient amounts exactly as Cook
