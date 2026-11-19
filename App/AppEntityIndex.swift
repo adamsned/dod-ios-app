@@ -51,7 +51,7 @@ enum AppEntityIndex {
     }
 
     /// Unchecked, not-already-have list rows as entities (pure over the snapshot).
-    static func shoppingEntities(
+    nonisolated static func shoppingEntities(
         from snapshot: ShoppingListStore.Snapshot? = ShoppingListStore()?.load()
     ) -> [ShoppingListItemEntity] {
         ShoppingListItemEntityQuery.payloads(from: snapshot)
