@@ -292,7 +292,7 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         \(SandingGuard.instructionRule)
         """
 
-    /// DUT-1385 — instructions for Cook Mode's "Ask About This Recipe" chat:
+    /// DUT-1385 — instructions for Cook Mode's "Ask the Recipe" chat:
     /// answers stay scoped to the one recipe, and the recipe text is the source
     /// of truth for amounts and times.
     @available(iOS 26, *)

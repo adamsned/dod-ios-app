@@ -77,36 +77,16 @@ struct CookingHelperInputBar: View {
 
     // MARK: - Field + send
 
+    // DUT-2893 — the shared ``DODChatField`` (same field as Ask the Recipe).
     private var inputField: some View {
-        HStack(alignment: .bottom, spacing: DODSpacing.xxs) {
-            TextField(placeholder, text: $viewModel.question, axis: .vertical)
-                .lineLimit(1...5)
-                .dodFont(DODType.body)
-                .textFieldStyle(.plain)
-                .padding(.leading, DODSpacing.md)
-                .padding(.vertical, DODSpacing.sm)
-                .accessibilityIdentifier("dod.cookingTools.helper.questionField")
-
-            sendButton
-        }
-        .background(DODColor.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous))
-    }
-
-    private var sendButton: some View {
-        Button {
-            send()
-        } label: {
-            Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 30))
-                .foregroundStyle(canSend ? DODColor.accent : DODColor.labelSecondary.opacity(0.4))
-        }
-        .buttonStyle(.plain)
-        .disabled(!canSend)
-        .padding(.trailing, DODSpacing.xxs)
-        .padding(.bottom, DODSpacing.xxs)
-        .accessibilityIdentifier("dod.cookingTools.helper.send")
-        .accessibilityLabel("Send")
+        DODChatField(
+            placeholder: placeholder,
+            text: $viewModel.question,
+            canSend: canSend,
+            fieldIdentifier: "dod.cookingTools.helper.questionField",
+            sendIdentifier: "dod.cookingTools.helper.send",
+            onSend: send
+        )
     }
 
     private var canSend: Bool {
