@@ -29,6 +29,8 @@ public struct CookModeView: View {
     /// DUT-529 — restores the idle timer when the app backgrounds and re-arms it on `.active`
     /// (begin/endCookMode are idempotent).
     @Environment(\.scenePhase) private var scenePhase
+    /// DUT-1017 — foldable posture; `.tent` swaps in the two-pane layout.
+    @Environment(\.cookModePosture) var cookModePosture
     /// DUT-137 — re-evaluated live on Stage Manager / Split View resize; state in
     /// `viewModel` is untouched so no cook state is lost.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -162,12 +164,8 @@ public struct CookModeView: View {
             let topInset = geo.safeAreaInsets.top
             ZStack(alignment: .top) {
                 VStack(spacing: 0) {
-                    // Immersive full-bleed hero (blur strip + overlaid title)
-                    // replaces the old title bar + inset card, reclaiming the
-                    // header height for the step text. `.ignoresSafeArea(top)` lets
-                    // the hero sit under the floating controls; only the TOP is
-                    // ignored so the player + counter still clear the home
-                    // indicator.
+                    // Immersive full-bleed hero under the floating controls; only the
+                    // TOP safe area is ignored so the player + counter clear the home indicator.
                     if viewModel.isFinished {
                         // Done: hero pinned, celebratory card centered in the
                         // space above the controls (Spacers, no scroll needed).
