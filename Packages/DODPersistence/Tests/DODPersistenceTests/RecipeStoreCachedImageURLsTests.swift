@@ -12,4 +12,10 @@ import Testing
         let found = try await store.cachedImageURLs(among: [cachedURL, missingURL])
         #expect(found == [cachedURL])
     }
+
+    @Test func emptyInputReturnsEmpty() async throws {
+        let store = RecipeStore(modelContainer: try RecipeStore.inMemoryContainer())
+        let found = try await store.cachedImageURLs(among: [])
+        #expect(found.isEmpty)
+    }
 }
