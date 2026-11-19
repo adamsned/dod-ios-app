@@ -32,4 +32,19 @@ import Testing
         let store = WidgetSnapshotStore(defaults: try Self.freshDefaults())
         #expect(store.readCookStreakStats() == .empty)
     }
+
+    @Test func statsReflectRecordedCooks() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        func day(_ dayOfMonth: Int) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 11, day: dayOfMonth, hour: 12)) ?? Date()
+        }
+        let store = WidgetSnapshotStore(defaults: try Self.freshDefaults())
+        store.recordCook(at: day(3), calendar: calendar)
+        store.recordCook(at: day(4), calendar: calendar)
+        let stats = store.readCookStreakStats(now: day(4), calendar: calendar)
+        #expect(stats.hasAnyCooks)
+        #expect(stats.streakDays == 2)
+        #expect(stats.cooksThisWeek == 2)
+    }
 }
