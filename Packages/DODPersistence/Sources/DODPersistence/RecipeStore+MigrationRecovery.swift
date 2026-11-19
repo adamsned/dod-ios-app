@@ -1,4 +1,5 @@
 import CoreData
+import DODSupport
 import Foundation
 import SwiftData
 
@@ -26,6 +27,28 @@ import SwiftData
 // SwiftLint 400-line file_length cap.
 
 extension RecipeStore {
+
+    /// Opens with the staged `MigrationPlan`; if that throws, retries once with
+    /// SwiftData's automatic lightweight migration. Every stage is lightweight,
+    /// so this is equivalent, and it also opens a store whose fingerprint matches
+    /// no listed version (2026-11-10: DUT-2060 added two optional fields to
+    /// `CachedCookLogEntry`, every existing V6 store threw `unknownDataStoreSchema`
+    /// and the app crashed on launch). A second failure rethrows to the recovery seam.
+    static func openContainer(
+        schema: Schema,
+        inMemory: Bool,
+        configurations: [ModelConfiguration]
+    ) throws -> ModelContainer {
+        guard !inMemory else {
+            return try ModelContainer(for: schema, configurations: configurations)
+        }
+        do {
+            return try ModelContainer(for: schema, migrationPlan: MigrationPlan.self, configurations: configurations)
+        } catch {
+            DODLog.persistence.error("Staged migration failed (\(error)); retrying with lightweight inference.")
+            return try ModelContainer(for: schema, configurations: configurations)
+        }
+    }
 
     /// `UserDefaults` key for the DUT-552 consecutive-failed-open counter. A
     /// successful open clears it; each failed open increments it. The destructive

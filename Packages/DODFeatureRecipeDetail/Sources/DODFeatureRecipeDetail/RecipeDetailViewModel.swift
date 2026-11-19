@@ -59,7 +59,7 @@ public final class RecipeDetailViewModel {
     // T-761 / CL-158: `isSaved` is `internal(set)` too so `+Download` can flip it (download also saves).
     public internal(set) var isSaved: Bool = false
     public internal(set) var isDownloaded: Bool = false
-    public private(set) var checkedIngredientIDs: Set<UUID> = []
+    public internal(set) var checkedIngredientIDs: Set<UUID> = []
     public internal(set) var snackbarMessage: String?
     /// DUT-534 — when non-nil, the current snackbar carries a trailing action
     /// button with this title (e.g. "View" → open the Shopping List). The view
@@ -172,6 +172,10 @@ public final class RecipeDetailViewModel {
     /// (`OwnerGate`); gates the owner badge on their own comment rows. `false`
     /// until Dad's real `sub` is set. Both set by the `+Profile` extension.
     public internal(set) var isCurrentUserOwner: Bool = false
+    /// DUT-986 — true when the on-device journal has no cooks yet (so Cook Mode
+    /// shows first-cook training wheels). Refreshed in `refreshProfile()`
+    /// (RecipeDetailViewModel+Profile.swift). Defaults false, so it is off until known.
+    public internal(set) var isFirstCookEver: Bool = false
 
     /// US-44 / CL-138 — derived from ``profile``. `true` when the user
     /// has set up a profile and the Ratings & Reviews WRITE composer is
@@ -187,6 +191,11 @@ public final class RecipeDetailViewModel {
     /// for this recipe, so re-entering Cook Mode in the same view session
     /// fires at most one telemetry event (spec AC-7.7).
     private var cookModeTelemetrySentThisSession: Bool = false
+
+    /// DUT-985 — drives the first-cook pep talk cover.
+    public var isPepTalkPresented: Bool = false
+    /// DUT-985 — set when the user taps 'Start cooking' on the pep talk; consumed by the cover's onDismiss.
+    public var pepTalkStartRequested: Bool = false
 
     /// DUT-634 — tracks whether `offlineRead` has already been sent this session
     /// for this recipe, so a re-appear (deep-link push, background→foreground)
@@ -227,6 +236,9 @@ public final class RecipeDetailViewModel {
     /// summary sheet. `internal(set)` so the same-module `+Summary` extension
     /// drives the state machine.
     public internal(set) var summary: SummaryState = .idle
+
+    /// DUT-1028 — Ask-The-Recipe chat transcript. Driven by `+AskRecipe`.
+    public var askMessages: [AskRecipeMessage] = []
 
     public init(
         listItem: RecipeListItem,
@@ -334,12 +346,6 @@ public final class RecipeDetailViewModel {
         guard await isOffline else { return }
         offlineReadTelemetrySentThisSession = true
         await dependencies.sendTelemetry(.offlineRead(recipeID: listItem.id))
-    }
-
-    /// Merges back the ingredient check set from Cook Mode's drawer so
-    /// state round-trips into the underlying detail screen (AC-7.5).
-    public func mergeIngredientChecks(_ ids: Set<UUID>) {
-        checkedIngredientIDs = ids
     }
 
     // MARK: - Servings scaler (US-31)

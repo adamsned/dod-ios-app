@@ -12,7 +12,8 @@ extension FeedView {
         CookJournalView(
             load: { await viewModel.cookLogs() },
             update: { await viewModel.updateCook($0) },
-            delete: { await viewModel.deleteCook($0) }  // DUT-514
+            delete: { await viewModel.deleteCook($0) },  // DUT-514
+            clearAll: { await viewModel.clearCookHistory() }  // DUT-199
         )
     }
 

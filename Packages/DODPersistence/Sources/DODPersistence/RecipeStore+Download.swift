@@ -34,4 +34,20 @@ extension RecipeStore {
         try modelContext.save()
         return true
     }
+
+    /// DUT-999 — which of `urls` already have a cached image row. Read-only:
+    /// does not bump `lastUsedAt` and does not fault the byte blobs.
+    public func cachedImageURLs(among urls: [URL]) throws -> Set<URL> {
+        var found = Set<URL>()
+        for url in urls {
+            let urlString = url.absoluteString
+            var descriptor = FetchDescriptor<CachedImage>(
+                predicate: #Predicate { $0.urlString == urlString }
+            )
+            descriptor.propertiesToFetch = [\.urlString]
+            descriptor.fetchLimit = 1
+            if try !modelContext.fetch(descriptor).isEmpty { found.insert(url) }
+        }
+        return found
+    }
 }

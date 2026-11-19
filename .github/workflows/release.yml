@@ -255,6 +255,10 @@ jobs:
           # secrets are unset — the transport then no-ops and sends nothing.
           GA4_MEASUREMENT_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
           GA4_API_SECRET: ${{ secrets.GA4_API_SECRET }}
+          # DUT-1397: remote-push backend (DODPushBaseURL / DODPushSharedSecret).
+          # Empty when unset - the token uploader then no-ops.
+          DOD_PUSH_BASE_URL: ${{ secrets.DOD_PUSH_BASE_URL }}
+          DOD_PUSH_APP_SECRET: ${{ secrets.DOD_PUSH_APP_SECRET }}
           # DUT-98: baked into the archived Info.plist (SiwaRevokeBaseURL /
           # SiwaRevokeSharedSecret) so Delete Account revokes the Sign in with
           # Apple token (App Store 5.1.1(v)). See backend/siwa-revoke/README.md.
@@ -287,6 +291,8 @@ jobs:
             DOD_COMMENT_API_KEY="${DOD_COMMENT_API_KEY:-}" \
             GA4_MEASUREMENT_ID="${GA4_MEASUREMENT_ID:-}" \
             GA4_API_SECRET="${GA4_API_SECRET:-}" \
+            DOD_PUSH_BASE_URL="${DOD_PUSH_BASE_URL:-}" \
+            DOD_PUSH_APP_SECRET="${DOD_PUSH_APP_SECRET:-}" \
             SIWA_REVOKE_BASE_URL="$SIWA_REVOKE_BASE_URL" \
             SIWA_REVOKE_APP_SECRET="$SIWA_REVOKE_APP_SECRET" \
             archive

@@ -1,7 +1,7 @@
 import DODIntelligence
 import SwiftUI
 
-/// DUT-1385 — Cook Mode's "Ask About This Recipe" chat: the same ChatGPT-style
+/// DUT-1385 — Cook Mode's "Ask the Recipe" chat: the same ChatGPT-style
 /// conversation as the Ask Dutch Oven Daddy helper, scoped to the one recipe
 /// being cooked. The recipe text rides along with every question so the
 /// on-device model answers about THIS recipe.
@@ -14,21 +14,29 @@ public struct RecipeChatSheet: View {
     @State private var viewModel: CookingHelperViewModel
     @Environment(\.dismiss) private var dismiss
     private let recipeTitle: String
+    private let suggestions: [String]
 
     /// - Parameters:
     ///   - intelligence: The on-device AI seam (App-injected).
     ///   - recipeTitle: Shown as the empty-state title.
     ///   - recipeContext: The plain-text recipe (ingredients, steps, current
     ///     step) sent with each question.
-    public init(intelligence: (any DODIntelligenceService)?, recipeTitle: String, recipeContext: String) {
+    ///   - suggestions: DUT-2895 — recipe-aware question chips (asked ones drop away).
+    public init(
+        intelligence: (any DODIntelligenceService)?,
+        recipeTitle: String,
+        recipeContext: String,
+        suggestions: [String] = []
+    ) {
         _viewModel = State(
             initialValue: CookingHelperViewModel(intelligence: intelligence, recipeContext: recipeContext)
         )
         self.recipeTitle = recipeTitle
+        self.suggestions = suggestions
     }
 
     public var body: some View {
-        CookingHelperSheet(viewModel: viewModel, configuration: .recipe(recipeTitle)) {
+        CookingHelperSheet(viewModel: viewModel, configuration: .recipe(recipeTitle, suggestions: suggestions)) {
             dismiss()
         }
     }

@@ -38,7 +38,9 @@ extension SettingsViewModel {
                 calendar: Self.streakCalendar
             ),
             savedRecipes: saved,
-            reviewsWritten: reviews
+            reviewsWritten: reviews,
+            // DUT-973 — transferable-technique proof of mastery, from real logged cooks.
+            techniqueSummary: TechniqueMilestones.summary(TechniqueMilestones.earned(from: logs))
         )
     }
 

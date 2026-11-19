@@ -182,11 +182,15 @@ public enum WidgetCard {
     /// rather than fighting it.
     /// Spec trace: spec.md US-23 / AC-23.2 /
     /// `widget-appearance-audit.md`.
-    struct Hero: View {
+    public struct Hero: View {
 
         let url: URL?
 
-        var body: some View {
+        public init(url: URL?) {
+            self.url = url
+        }
+
+        public var body: some View {
             Group {
                 if let url {
                     if url.isFileURL {

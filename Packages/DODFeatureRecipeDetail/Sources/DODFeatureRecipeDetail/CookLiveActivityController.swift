@@ -53,9 +53,7 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
 
     public init() {
         #if os(iOS)
-        if #available(iOS 16.1, *) {
-            reconcileOrphans()
-        }
+        reconcileOrphans()
         #endif
     }
 
@@ -69,12 +67,11 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
         // longer registered by any live controller) and reconciles it away —
         // whereas the old once-per-process flag could never end an in-process
         // orphan. `deinit` is nonisolated; the registry is lock-guarded.
-        if #available(iOS 16.1, *), let id = registeredActivityID {
+        if let id = registeredActivityID {
             CookLiveActivityOrphanRegistry.shared.unregister(id)
         }
     }
 
-    @available(iOS 16.1, *)
     private var activity: Activity<CookActivityAttributes>? {
         // Erased through Any storage so we don't have to leak the iOS-only
         // availability annotation to every property accessor.
@@ -93,10 +90,7 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
 
     public var isActive: Bool {
         #if os(iOS)
-        if #available(iOS 16.1, *) {
-            return activity != nil
-        }
-        return false
+        return activity != nil
         #else
         return false
         #endif
@@ -104,10 +98,7 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
 
     public var areActivitiesEnabled: Bool {
         #if os(iOS)
-        if #available(iOS 16.1, *) {
-            return ActivityAuthorizationInfo().areActivitiesEnabled
-        }
-        return false
+        return ActivityAuthorizationInfo().areActivitiesEnabled
         #else
         return false
         #endif
@@ -118,7 +109,6 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
         initialState: CookActivityAttributes.ContentState
     ) {
         #if os(iOS)
-        guard #available(iOS 16.1, *) else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         // Replace any in-flight activity so a new timer doesn't accumulate
         // multiple stacked Lock-Screen cards.
@@ -146,7 +136,7 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
 
     public func update(state: CookActivityAttributes.ContentState) {
         #if os(iOS)
-        guard #available(iOS 16.1, *), let activity else { return }
+        guard let activity else { return }
         let content = ActivityContent(state: state, staleDate: staleDate(for: state))
         Self.pushUpdate(activity: activity, content: content)
         #endif
@@ -154,7 +144,6 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
 
     public func end() {
         #if os(iOS)
-        guard #available(iOS 16.1, *) else { return }
         endExistingActivity()
         #endif
     }
@@ -169,7 +158,6 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     /// both a cross-process orphan (DUT-309) and an in-process scene orphan
     /// (DUT-474) are cleaned up. The registry membership check means the installed
     /// controller's own card is spared (DUT-431 no-kill guarantee).
-    @available(iOS 16.1, *)
     private func reconcileOrphans() {
         let existing = Activity<CookActivityAttributes>.activities
         let byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -178,7 +166,6 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
         }
     }
 
-    @available(iOS 16.1, *)
     nonisolated private static func pushEndOrphan(
         _ activity: Activity<CookActivityAttributes>
     ) {
@@ -186,7 +173,6 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
         Task { await box.activity.end(nil, dismissalPolicy: .immediate) }
     }
 
-    @available(iOS 16.1, *)
     private func endExistingActivity() {
         guard let activity else { return }
         self.activity = nil
@@ -207,7 +193,6 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     /// thread-safe per Apple's ActivityKit documentation but isn't
     /// formally Sendable in the SDK, so we wrap it in
     /// ``UncheckedSendableActivity`` for the hand-off.
-    @available(iOS 16.1, *)
     nonisolated private static func pushUpdate(
         activity: Activity<CookActivityAttributes>,
         content: ActivityContent<CookActivityAttributes.ContentState>
@@ -216,7 +201,6 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
         Task { await box.activity.update(content) }
     }
 
-    @available(iOS 16.1, *)
     nonisolated private static func pushEnd(
         activity: Activity<CookActivityAttributes>,
         content: ActivityContent<CookActivityAttributes.ContentState>
@@ -230,13 +214,11 @@ public final class SystemCookLiveActivityController: CookLiveActivityController 
     /// actor boundaries under Swift 6 strict concurrency without
     /// quieting unrelated diagnostics with a global `@unchecked` on
     /// the controller itself.
-    @available(iOS 16.1, *)
     private struct UncheckedSendableActivity: @unchecked Sendable {
         let activity: Activity<CookActivityAttributes>
         init(_ activity: Activity<CookActivityAttributes>) { self.activity = activity }
     }
 
-    @available(iOS 16.1, *)
     private func staleDate(for state: CookActivityAttributes.ContentState) -> Date {
         // DUT-490: the DUT-354 completed-linger is pushed exactly once (per-tick
         // re-pushes are suppressed while it lingers), so its stale date is never

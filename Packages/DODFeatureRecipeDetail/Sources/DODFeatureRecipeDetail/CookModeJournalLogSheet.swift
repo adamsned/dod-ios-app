@@ -33,6 +33,8 @@ struct CookModeJournalLogSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State var caption: String = ""
+    /// DUT-975 — optional one-tap "how did that feel?" read (1 hard … 5 easy).
+    @State var confidence: Int?
     /// What's shown in the photo slot (a freshly picked / snapped image).
     @State var displayImage: Image?
     /// Newly picked/snapped bytes, held until Save so a cancel leaves no orphan.
@@ -61,6 +63,7 @@ extension CookModeJournalLogSheet {
                     photoSection
                     headerSection
                     captionSection
+                    confidenceSection
                     reassurance
                 }
                 .padding(DODSpacing.md)
@@ -190,6 +193,39 @@ extension CookModeJournalLogSheet {
         }
     }
 
+    private var confidenceSection: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.sm) {
+            Text("How did that feel?")
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.label)
+            HStack(spacing: DODSpacing.sm) {
+                ForEach(1...5, id: \.self) { level in
+                    Button {
+                        confidence = (confidence == level) ? nil : level
+                    } label: {
+                        Text("\(level)")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous)
+                                    .fill(confidence == level ? DODColor.burntOrange : DODColor.surfaceElevated)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(level) of 5")
+                    .accessibilityAddTraits(confidence == level ? .isSelected : [])
+                    .accessibilityIdentifier("cook-mode-confidence-\(level)")
+                }
+            }
+            HStack {
+                Text("Felt hard")
+                Spacer()
+                Text("Felt easy")
+            }
+            .dodFont(DODType.caption)
+            .foregroundStyle(DODColor.labelSecondary)
+        }
+    }
+
     private var reassurance: some View {
         HStack(spacing: DODSpacing.xs) {
             Image(systemName: "lock.fill")
@@ -244,7 +280,8 @@ extension CookModeJournalLogSheet {
             recipeTitle: recipe.title,
             cookedAt: .now,
             note: trimmed.isEmpty ? nil : trimmed,
-            photoLocalID: photoID
+            photoLocalID: photoID,
+            confidence: confidence
         )
         onSave(entry)
         dismiss()

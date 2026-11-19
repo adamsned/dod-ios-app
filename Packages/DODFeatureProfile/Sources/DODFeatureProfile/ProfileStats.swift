@@ -24,13 +24,16 @@ public struct ProfileStats: Equatable, Sendable {
     /// Star ratings the user has written; `nil` when not countable, which
     /// hides that one grid cell rather than showing a misleading zero.
     public let reviewsWritten: Int?
+    /// DUT-973 — one-line proof-of-mastery copy ("You've now seared, braised, and baked in cast iron."); nil until a technique is earned.
+    public let techniqueSummary: String?
 
     public init(
         totalCooks: Int,
         rankLadderCooks: Int? = nil,
         weeklyStreak: Int,
         savedRecipes: Int,
-        reviewsWritten: Int?
+        reviewsWritten: Int?,
+        techniqueSummary: String? = nil
     ) {
         self.totalCooks = totalCooks
         // Default the rank population to `totalCooks` so existing callers that
@@ -41,6 +44,7 @@ public struct ProfileStats: Equatable, Sendable {
         self.weeklyStreak = weeklyStreak
         self.savedRecipes = savedRecipes
         self.reviewsWritten = reviewsWritten
+        self.techniqueSummary = techniqueSummary
     }
 
     /// All-zero placeholder (no cooks yet / unwired host).

@@ -88,13 +88,19 @@ final class NewPostsPoller {
             latestPosts.map { ($0.id, $0.title) },
             uniquingKeysWith: { first, _ in first }
         )
-        for postID in diff.toNotify.prefix(Self.maxNotificationsPerPoll) {
+        // DUT-1397 — skip posts a remote push (or an earlier poll) already
+        // announced; the watermark below still advances past them.
+        let store = NotifiedPostsStore(defaults: defaults)
+        let delivered = await notificationService.deliveredPostIDs()
+        let fresh = store.unannounced(diff.toNotify, alreadyDelivered: delivered)
+        for postID in fresh.prefix(Self.maxNotificationsPerPoll) {
             guard let title = titlesByID[postID] else { continue }
-            await notificationService.scheduleNewPostNotification(
+            let scheduled = await notificationService.scheduleNewPostNotification(
                 title: title,
                 postKind: .recipe,
                 recipeID: postID
             )
+            if scheduled { store.record(postID) }
         }
 
         if let newLastSeen = diff.newLastSeen {

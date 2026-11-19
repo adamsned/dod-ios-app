@@ -58,6 +58,8 @@ extension RootView {
         // collections), so it runs ahead of the recipe dirty gate below, which
         // only tracks the recipe set.
         await AppEntityIndex.refresh()
+        // DUT-1018 — the user's own cook-journal entries join the semantic index; runs ahead of the recipe dirty gate, which only tracks the recipe set.
+        await CookJournalSpotlightBaseline.shared.reindex()
         do {
             let payloads = try await RecipeEntityQuery.suggestedPayloads()
             let newIdentifiers = Set(payloads.map { "dod.recipe.\($0.id)" })
@@ -139,5 +141,20 @@ extension RootView {
     static func cachedThumbnailBytes(for heroImage: URL?, store: RecipeStore?) async -> Data? {
         guard let heroImage, let store else { return nil }
         return try? await store.imageBytesWithoutTouching(url: heroImage)
+    }
+}
+
+/// DUT-1018 — process-lifetime baseline for the cook-journal Spotlight domain (kept out of RootView's @State so RootView.swift is untouched).
+actor CookJournalSpotlightBaseline {
+    static let shared = CookJournalSpotlightBaseline()
+    private var identifiers: Set<String> = []
+    private var purgedThisLaunch = false
+
+    func reindex() async {
+        let purge = !purgedThisLaunch
+        guard let next = await CookJournalSpotlightSync.syncFromStore(previous: identifiers, purgeDomainFirst: purge)
+        else { return }
+        identifiers = next
+        purgedThisLaunch = true
     }
 }

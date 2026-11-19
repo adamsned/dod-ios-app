@@ -105,3 +105,31 @@ public enum NotificationContentBuilder {
         toggleEnabled && systemAuthorized
     }
 }
+
+/// DUT-152 — copy + payload for the opt-in weekly digest notification.
+public enum WeeklyDigestContentBuilder {
+
+    /// Stable local-notification identifier, so a re-schedule replaces the pending request.
+    public static let identifier = "dod.weeklyDigest"
+
+    /// Deep link the tap handler routes to the digest list.
+    public static let deepLink = "dod://digest"
+
+    /// - Parameters:
+    ///   - titles: titles of recipes added since the last digest, newest first.
+    /// - Returns: `nil` when `titles` is empty (zero new recipes -> no notification).
+    public static func plan(titles: [String]) -> NotificationPlan? {
+        guard let first = titles.first else { return nil }
+        let body: String
+        if titles.count == 1 {
+            body = "1 new recipe this week: \(first)"
+        } else {
+            body = "\(titles.count) new recipes this week — including \(first)"
+        }
+        return NotificationPlan(
+            title: "Your Weekly Digest 🍳",
+            body: body,
+            userInfo: [NotificationPlan.deepLinkKey: deepLink]
+        )
+    }
+}

@@ -50,7 +50,6 @@ extension RecipeStore {
         return order.compactMap { lastByID[$0] }
     }
 
-    #if DEBUG
     /// DUT-556 test seam: the RAW number of `CachedRecipe` rows for an id (not
     /// deduped by the reader), so a test can prove `cache(listItems:)` never
     /// double-inserts on a duplicate id within one batch. Not for production —
@@ -60,5 +59,17 @@ extension RecipeStore {
             FetchDescriptor<CachedRecipe>(predicate: #Predicate { $0.id == id })
         ).count
     }
-    #endif
+
+    /// DUT-1027: ids of the newest cached recipes (by `publishedAt`, newest first),
+    /// capped at `limit`. Backs Search's on-device semantic candidate pool; the
+    /// caller hydrates them via `listItems(forIDs:)`. Empty on a cold cache.
+    public func recentCachedRecipeIDs(limit: Int) throws -> [Int] {
+        guard limit > 0 else { return [] }
+        var descriptor = FetchDescriptor<CachedRecipe>(
+            sortBy: [SortDescriptor(\.publishedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        var seen = Set<Int>()
+        return try modelContext.fetch(descriptor).map(\.id).filter { seen.insert($0).inserted }
+    }
 }

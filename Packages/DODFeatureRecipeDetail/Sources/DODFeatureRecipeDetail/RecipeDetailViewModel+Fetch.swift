@@ -300,4 +300,10 @@ extension RecipeDetailViewModel {
         // by one for exactly this reason.
         related = Array((fetched ?? []).filter { $0.id != listItem.id }.prefix(4))
     }
+
+    /// Merges back the ingredient check set from Cook Mode's drawer so
+    /// state round-trips into the underlying detail screen (AC-7.5).
+    public func mergeIngredientChecks(_ ids: Set<UUID>) {
+        checkedIngredientIDs = ids
+    }
 }

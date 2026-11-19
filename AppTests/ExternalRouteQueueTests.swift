@@ -118,4 +118,14 @@ final class ExternalRouteQueueTests: XCTestCase {
         XCTAssertTrue(queue.isEmpty)
         XCTAssertTrue(queue.drain().isEmpty)
     }
+
+    /// DUT-2449: a Universal Link cold-launch route is not dropped when drained within staleAfter.
+    func test_replaceStackRoute_drainedWithinStaleAfter_isDelivered() {
+        var queue = ExternalRouteQueue()
+        let now = Date()
+        let expected = route(id: 5)
+        queue.enqueue(expected, now: now)
+        let drained = queue.drain(now: now.addingTimeInterval(ExternalRouteQueue.staleAfter - 1))
+        XCTAssertEqual(drained, [expected])
+    }
 }

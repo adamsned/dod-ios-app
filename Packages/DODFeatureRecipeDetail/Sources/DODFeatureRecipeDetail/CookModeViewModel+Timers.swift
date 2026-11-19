@@ -127,11 +127,13 @@ extension CookModeViewModel {
     /// completes (DUT-293/294).
     public func tickTimers(now: Date = Date()) {
         var completedAny = false
+        var completedKeys: [Int] = []
         for (key, timer) in stepTimers where timer.isRunning && timer.remaining(at: now) <= 0 {
             var done = timer
             done.state = .completed
             stepTimers[key] = done
             completedAny = true
+            completedKeys.append(key)
             // DUT-604: this timer finished IN THE FOREGROUND (the tick loop only
             // runs while Cook Mode is on screen), so the in-app buzzer + Live
             // Activity "done" state cover it — cancel the pending system banner so
@@ -145,6 +147,10 @@ extension CookModeViewModel {
         }
         if completedAny { timerCompletionTick &+= 1 }
         reconcileLiveActivity(now: now)
+        // DUT-173 — auto-advance if the finished timer is the current step's.
+        if completedKeys.contains(currentStepIndex) {
+            autoAdvanceAfterTimer(completedStep: currentStepIndex)
+        }
     }
 
     /// DUT-294 — drive the single Live Activity to the soonest-finishing RUNNING

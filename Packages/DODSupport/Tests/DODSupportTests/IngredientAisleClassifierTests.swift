@@ -263,4 +263,24 @@ struct IngredientAisleClassifierTests {
         #expect(Aisle.allCases.count == 6)
         #expect(Set(Aisle.allCases.map(\.rawValue)).count == 6)
     }
+
+    // MARK: - DUT-1006 async fallback
+
+    @Test func fallbackNotCalledWhenKeywordMatches() async {
+        let result = await IngredientAisleClassifier.classify("2 cups diced yellow onion") { _ in
+            Issue.record("fallback must not run")
+            return .meat
+        }
+        #expect(result == .produce)
+    }
+
+    @Test func fallbackUsedWhenKeywordMapReturnsOther() async {
+        let result = await IngredientAisleClassifier.classify("1 tbsp gochujang") { _ in .pantry }
+        #expect(result == .pantry)
+    }
+
+    @Test func nilFallbackKeepsOther() async {
+        let result = await IngredientAisleClassifier.classify("1 tbsp gochujang") { _ in nil }
+        #expect(result == .other)
+    }
 }

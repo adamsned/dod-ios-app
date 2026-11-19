@@ -79,5 +79,10 @@ struct RecipeVideoAudioSessionTests {
                 == .waitingToPlay
         )
     }
+
+    @Test("paused now playing card advertises rate 0")
+    func pausedNowPlayingAdvertisesRateZero() {
+        #expect(RecipeVideoNowPlaying(title: "t", elapsed: 3, duration: 9, isPlaying: false).playbackRate == 0)
+    }
     #endif
 }

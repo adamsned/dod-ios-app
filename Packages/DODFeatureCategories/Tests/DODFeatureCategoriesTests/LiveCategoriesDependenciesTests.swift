@@ -153,6 +153,13 @@ private final class StubCategoriesHTTPClient: HTTPClient, @unchecked Sendable {
         #expect(query.contains("page=2"))
     }
 
+    @Test func liveFetchPostsByTagsRequestsTagsParam() async throws {
+        let (live, http) = try makeLive(json: "[]")
+        _ = try await live.fetchPosts(tagIDs: [3, 4], page: 1)
+        let query = http.requestedURLs.first?.query ?? ""
+        #expect(query.contains("tags=3,4"))
+    }
+
     @Test func fetchPostsPropagatesHTTPFailure() async throws {
         let (live, _) = try makeLive(json: "[]", status: 404)
         await #expect(throws: WPClientError.self) {

@@ -1,5 +1,6 @@
 import AppIntents
 import CoreSpotlight
+import DODFeatureSaved
 import Foundation
 
 /// DUT-1388 — keeps the App Intents side of search current: the collections in
@@ -30,6 +31,12 @@ enum AppEntityIndex {
             if !collections.isEmpty {
                 try? await index.indexAppEntities(collections)
             }
+            // DUT-1015 — shopping list items join the semantic index.
+            let items = AppEntityIndex.shoppingEntities()
+            try? await index.deleteAppEntities(ofType: ShoppingListItemEntity.self)
+            if !items.isEmpty {
+                try? await index.indexAppEntities(items)
+            }
         }
         DODShortcuts.updateAppShortcutParameters()
         lastSignature = current
@@ -41,5 +48,14 @@ enum AppEntityIndex {
         let recipes = recipeIDs.map(String.init).joined(separator: ",")
         let shelf = collections.map { "\($0.id.uuidString):\($0.name):\($0.recipeCount)" }.joined(separator: "|")
         return recipes + "#" + shelf
+    }
+
+    /// Unchecked, not-already-have list rows as entities (pure over the snapshot).
+    static func shoppingEntities(
+        from snapshot: ShoppingListStore.Snapshot? = ShoppingListStore()?.load()
+    ) -> [ShoppingListItemEntity] {
+        ShoppingListItemEntityQuery.payloads(from: snapshot)
+            .filter { !$0.isChecked }
+            .map(ShoppingListItemEntity.init(payload:))
     }
 }

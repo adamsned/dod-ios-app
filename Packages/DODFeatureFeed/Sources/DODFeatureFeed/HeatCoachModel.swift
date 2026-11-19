@@ -190,3 +190,29 @@ struct HeatCoachModel {
         return formatter
     }()
 }
+
+extension HeatCoachModel {
+    /// DUT-998 — build from fetched/cached conditions.
+    init(ovenDiameterInches: Int, style: CookingStyle, conditions: HeatCoachConditions) {
+        self.init(
+            ovenDiameterInches: ovenDiameterInches,
+            style: style,
+            elevationFeet: conditions.elevationFeet,
+            ambient: conditions.ambient,
+            windy: conditions.windy
+        )
+    }
+
+    /// DUT-998 Storm Reflex — signed change in the recommended coal total if the
+    /// cook toggles wind/ambient mid-cook.
+    func coalTotalChange(newAmbient: AmbientCondition, newWindy: Bool) -> Int {
+        let updated = HeatCoachModel(
+            ovenDiameterInches: ovenDiameterInches,
+            style: style,
+            elevationFeet: elevationFeet,
+            ambient: newAmbient,
+            windy: newWindy
+        )
+        return updated.adjustedCoalSplit.total - adjustedCoalSplit.total
+    }
+}

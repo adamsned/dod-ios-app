@@ -26,6 +26,7 @@ struct ShoppingListBuilderSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedIDs: Set<Recipe.ID> = []
+    @State private var planner = CrowdPlanner()
 
     var body: some View {
         NavigationStack {
@@ -82,6 +83,34 @@ struct ShoppingListBuilderSheet: View {
                 .foregroundStyle(DODColor.labelSecondary)
                 .textCase(nil)
             }
+
+            Section {
+                Stepper(value: $planner.headcount, in: 1...200) {
+                    Text("Feeding \(planner.headcount) people")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("shopping-builder-headcount")
+
+                if !planner.recipes.isEmpty {
+                    Text(planner.summaryText)
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                        .accessibilityIdentifier("shopping-builder-budget-summary")
+                    ForEach(planner.tips) { tip in
+                        Label(tip.text, systemImage: "lightbulb")
+                            .dodFont(DODType.caption)
+                            .foregroundStyle(DODColor.labelSecondary)
+                            .accessibilityIdentifier("shopping-builder-stretch-tip")
+                    }
+                }
+            } header: {
+                Text("Budget")
+                    .dodFont(DODType.caption)
+                    .foregroundStyle(DODColor.labelSecondary)
+                    .textCase(nil)
+            }
+            .listRowBackground(DODColor.surfaceElevated)
         }
         .scrollContentBackground(.hidden)
         .background(DODColor.surface)
@@ -143,6 +172,7 @@ struct ShoppingListBuilderSheet: View {
         } else {
             selectedIDs.insert(recipe.id)
         }
+        planner.recipes = recipes.filter { selectedIDs.contains($0.id) }
     }
 
     private func build() {

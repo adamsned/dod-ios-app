@@ -38,17 +38,22 @@ public struct SavedRecipesWidgetPublisher: Sendable {
     private let widgetStore: WidgetSnapshotStore?
     private let reload: ReloadHook?
     private let imagePrefetcher: ImagePrefetcher?
+    private let pinnedPublisher: PinnedCollectionWidgetPublisher
 
     public init(
         store: RecipeStore,
         widgetStore: WidgetSnapshotStore? = WidgetSnapshotStore(),
         reload: ReloadHook? = nil,
-        imagePrefetcher: ImagePrefetcher? = nil
+        imagePrefetcher: ImagePrefetcher? = nil,
+        pinnedPublisher: PinnedCollectionWidgetPublisher? = nil
     ) {
         self.store = store
         self.widgetStore = widgetStore
         self.reload = reload
         self.imagePrefetcher = imagePrefetcher
+        self.pinnedPublisher =
+            pinnedPublisher
+            ?? PinnedCollectionWidgetPublisher(store: store, widgetStore: widgetStore, reload: reload)
     }
 
     /// Re-read the current saved set, write a fresh snapshot to the App
@@ -101,6 +106,7 @@ public struct SavedRecipesWidgetPublisher: Sendable {
         }
 
         reload?()
+        await pinnedPublisher.publish()
 
         // T-770 / CL-167 (DUT-76) — bridge hero bytes for saved recipes whose
         // photos aren't cached yet (e.g. saved from the feed without ever

@@ -40,23 +40,28 @@ public struct CookActivityAttributes: Codable, Hashable, Sendable {
         /// the linger instead of dimming after ~15s. Defaults to `false` and
         /// decodes to `false` for older payloads (Codable back-compat).
         public var isCompleted: Bool
+        /// DUT-967: calm, reassuring coaching line for the current moment. `nil`
+        /// (and absent in older payloads) → the views show no coaching row.
+        public var coachNudge: String?
 
         public init(
             remainingSeconds: Int,
             stepText: String,
             isPaused: Bool,
             endDate: Date? = nil,
-            isCompleted: Bool = false
+            isCompleted: Bool = false,
+            coachNudge: String? = nil
         ) {
             self.remainingSeconds = remainingSeconds
             self.stepText = stepText
             self.isPaused = isPaused
             self.endDate = endDate
             self.isCompleted = isCompleted
+            self.coachNudge = coachNudge
         }
 
         private enum CodingKeys: String, CodingKey {
-            case remainingSeconds, stepText, isPaused, endDate, isCompleted
+            case remainingSeconds, stepText, isPaused, endDate, isCompleted, coachNudge
         }
 
         /// DUT-490 / DUT-491: tolerate payloads encoded before `isCompleted`
@@ -69,6 +74,7 @@ public struct CookActivityAttributes: Codable, Hashable, Sendable {
             isPaused = try container.decode(Bool.self, forKey: .isPaused)
             endDate = try container.decodeIfPresent(Date.self, forKey: .endDate)
             isCompleted = try container.decodeIfPresent(Bool.self, forKey: .isCompleted) ?? false
+            coachNudge = try container.decodeIfPresent(String.self, forKey: .coachNudge)
         }
     }
 

@@ -23,7 +23,7 @@ import Testing
         let snapshot = try #require(harness.widgetStore.readSavedRecipes())
         #expect(snapshot.entries.count == 1)
         #expect(snapshot.entries.first?.recipeID == 1)
-        #expect(harness.reloadCount.value == 1, "Reload hook must fire after a save")
+        #expect(harness.reloadCount.value == 2, "Reload hook must fire after a save")
     }
 
     @Test func writerInvokedOnUnsave() async throws {
@@ -38,7 +38,7 @@ import Testing
             "Empty-state path still writes a snapshot (empty entries)"
         )
         #expect(snapshot.entries.isEmpty)
-        #expect(harness.reloadCount.value == 2, "Both publish calls trigger a reload")
+        #expect(harness.reloadCount.value == 4, "Both publish calls trigger a reload")
     }
 
     @Test func payloadIsMostRecentlySavedFirst() async throws {
@@ -79,7 +79,7 @@ import Testing
         await harness.publisher.publish()
         let snapshot = try #require(harness.widgetStore.readSavedRecipes())
         #expect(snapshot.entries.isEmpty)
-        #expect(harness.reloadCount.value == 1)
+        #expect(harness.reloadCount.value == 2)
     }
 
     @Test func heroImageFilenameIsNilWhenThereIsNoHeroURL() async throws {
@@ -192,7 +192,17 @@ import Testing
         await harness.publisher.publish()
         let snapshot = try #require(harness.widgetStore.readSavedRecipes())
         #expect(snapshot.entries.isEmpty)
-        #expect(harness.reloadCount.value == 1, "Reload fires even for the empty-state write")
+        #expect(harness.reloadCount.value == 2, "Reload fires even for the empty-state write")
+    }
+
+    @Test func publishAlsoWritesPinnedCollectionsSnapshot() async throws {
+        let harness = try await Harness.make()
+        try await harness.saveRecipe(id: 1, title: "Bread")
+        let collection = try await harness.store.createCollection(name: "Weeknight")
+        try await harness.store.setCollections(forRecipe: 1, to: [collection.id])
+        await harness.publisher.publish()
+        let pinned = try #require(harness.widgetStore.readPinnedCollections())
+        #expect(pinned.collections.count == 1)
     }
 
     @Test func nilReloadHookIsToleratedSilently() async throws {
@@ -216,100 +226,6 @@ import Testing
         #expect(snapshot.entries.isEmpty)
     }
 
-    // MARK: - Helpers
-
-    /// Self-contained wiring for one test: an in-memory `RecipeStore`, a
-    /// `WidgetSnapshotStore` backed by an isolated `UserDefaults` suite, a
-    /// publisher that ties them together, and a counter for the reload
-    /// hook calls.
-    struct Harness: Sendable {
-        let store: RecipeStore
-        let widgetStore: WidgetSnapshotStore
-        let publisher: SavedRecipesWidgetPublisher
-        let reloadCount: ReloadCounter
-
-        static func make() async throws -> Harness {
-            let container = try RecipeStore.inMemoryContainer()
-            let store = RecipeStore(modelContainer: container)
-            // Use a per-test UserDefaults suite so the snapshot bytes
-            // don't bleed between tests. The harness is the only writer
-            // for the duration of the test.
-            let suiteName = "test.savedWidgetPublisher.\(UUID().uuidString)"
-            let defaults = try #require(UserDefaults(suiteName: suiteName))
-            defaults.removePersistentDomain(forName: suiteName)
-            let widgetStore = WidgetSnapshotStore(defaults: defaults)
-            let reloadCount = ReloadCounter()
-            let publisher = SavedRecipesWidgetPublisher(
-                store: store,
-                widgetStore: widgetStore,
-                reload: { reloadCount.increment() }
-            )
-            return Harness(
-                store: store,
-                widgetStore: widgetStore,
-                publisher: publisher,
-                reloadCount: reloadCount
-            )
-        }
-
-        /// Cache + save a recipe. Sleeps a millisecond after the toggle
-        /// so consecutive calls produce observably distinct
-        /// `lastViewedAt` stamps — `RecipeStore.cache(listItem:)` always
-        /// uses `.now`, and ordering assertions need monotonic timestamps.
-        func saveRecipe(id: Int, title: String) async throws {
-            let listItem = RecipeListItem(
-                id: id,
-                title: title,
-                excerpt: "Excerpt.",
-                heroImage: nil,
-                publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                totalTimeDisplay: nil,
-                canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
-            )
-            try await store.cache(listItem: listItem)
-            _ = try await store.toggleSaved(id: id)
-            try await Task.sleep(nanoseconds: 1_000_000)
-        }
-
-        /// Like `saveRecipe` but with a hero image URL whose bytes are cached
-        /// via `RecipeStore.cacheImage` — so `heroImageCached` is true and the
-        /// publisher emits the bridged filename. T-766 / CL-163.
-        func saveRecipeWithCachedImage(id: Int, title: String, heroURL: URL) async throws {
-            let listItem = RecipeListItem(
-                id: id,
-                title: title,
-                excerpt: "Excerpt.",
-                heroImage: heroURL,
-                publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                totalTimeDisplay: nil,
-                canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
-            )
-            try await store.cache(listItem: listItem)
-            try await store.cacheImage(url: heroURL, bytes: Data([0xFF, 0xD8, 0xFF]))
-            _ = try await store.toggleSaved(id: id)
-            try await Task.sleep(nanoseconds: 1_000_000)
-        }
-
-        /// Like `saveRecipeWithCachedImage` but WITHOUT caching the bytes — the
-        /// feed-save case (hero URL present, no cached photo) the T-770 prefetch
-        /// exists to fix. `heroImageCached` is false, so the publisher emits the
-        /// filename AND queues the URL for the detached prefetch.
-        func saveRecipeWithHeroURL(id: Int, title: String, heroURL: URL) async throws {
-            let listItem = RecipeListItem(
-                id: id,
-                title: title,
-                excerpt: "Excerpt.",
-                heroImage: heroURL,
-                publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                totalTimeDisplay: nil,
-                canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
-            )
-            try await store.cache(listItem: listItem)
-            _ = try await store.toggleSaved(id: id)
-            try await Task.sleep(nanoseconds: 1_000_000)
-        }
-    }
-
     /// Poll until `condition` holds or a short deadline passes — used to
     /// observe the detached prefetch Task that `publish()` spawns (the prefetch
     /// is fire-and-forget so `await publish()` returns before it runs).
@@ -319,42 +235,136 @@ import Testing
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
     }
+}
 
-    /// Thread-safe recorder of the URLs handed to the injected image
-    /// prefetcher, so tests can observe the detached prefetch without racing.
-    final class PrefetchRecorder: @unchecked Sendable {
-        private let lock = NSLock()
-        private var captured: [URL] = []
+// MARK: - Helpers
 
-        var urls: [URL] {
-            lock.lock()
-            defer { lock.unlock() }
-            return captured
-        }
+/// Self-contained wiring for one test: an in-memory `RecipeStore`, a
+/// `WidgetSnapshotStore` backed by an isolated `UserDefaults` suite, a
+/// publisher that ties them together, and a counter for the reload
+/// hook calls.
+struct Harness: Sendable {
+    let store: RecipeStore
+    let widgetStore: WidgetSnapshotStore
+    let publisher: SavedRecipesWidgetPublisher
+    let reloadCount: ReloadCounter
 
-        func record(_ newURLs: [URL]) {
-            lock.lock()
-            defer { lock.unlock() }
-            captured.append(contentsOf: newURLs)
-        }
+    static func make() async throws -> Harness {
+        let container = try RecipeStore.inMemoryContainer()
+        let store = RecipeStore(modelContainer: container)
+        // Use a per-test UserDefaults suite so the snapshot bytes
+        // don't bleed between tests. The harness is the only writer
+        // for the duration of the test.
+        let suiteName = "test.savedWidgetPublisher.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        let widgetStore = WidgetSnapshotStore(defaults: defaults)
+        let reloadCount = ReloadCounter()
+        let publisher = SavedRecipesWidgetPublisher(
+            store: store,
+            widgetStore: widgetStore,
+            reload: { reloadCount.increment() }
+        )
+        return Harness(
+            store: store,
+            widgetStore: widgetStore,
+            publisher: publisher,
+            reloadCount: reloadCount
+        )
     }
 
-    /// Thread-safe call counter for the reload hook so tests don't race
-    /// against `await publisher.publish()`.
-    final class ReloadCounter: @unchecked Sendable {
-        private let lock = NSLock()
-        private var count = 0
+    /// Cache + save a recipe. Sleeps a millisecond after the toggle
+    /// so consecutive calls produce observably distinct
+    /// `lastViewedAt` stamps — `RecipeStore.cache(listItem:)` always
+    /// uses `.now`, and ordering assertions need monotonic timestamps.
+    func saveRecipe(id: Int, title: String) async throws {
+        let listItem = RecipeListItem(
+            id: id,
+            title: title,
+            excerpt: "Excerpt.",
+            heroImage: nil,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            totalTimeDisplay: nil,
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
+        )
+        try await store.cache(listItem: listItem)
+        _ = try await store.toggleSaved(id: id)
+        try await Task.sleep(nanoseconds: 1_000_000)
+    }
 
-        var value: Int {
-            lock.lock()
-            defer { lock.unlock() }
-            return count
-        }
+    /// Like `saveRecipe` but with a hero image URL whose bytes are cached
+    /// via `RecipeStore.cacheImage` — so `heroImageCached` is true and the
+    /// publisher emits the bridged filename. T-766 / CL-163.
+    func saveRecipeWithCachedImage(id: Int, title: String, heroURL: URL) async throws {
+        let listItem = RecipeListItem(
+            id: id,
+            title: title,
+            excerpt: "Excerpt.",
+            heroImage: heroURL,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            totalTimeDisplay: nil,
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
+        )
+        try await store.cache(listItem: listItem)
+        try await store.cacheImage(url: heroURL, bytes: Data([0xFF, 0xD8, 0xFF]))
+        _ = try await store.toggleSaved(id: id)
+        try await Task.sleep(nanoseconds: 1_000_000)
+    }
 
-        func increment() {
-            lock.lock()
-            defer { lock.unlock() }
-            count += 1
-        }
+    /// Like `saveRecipeWithCachedImage` but WITHOUT caching the bytes — the
+    /// feed-save case (hero URL present, no cached photo) the T-770 prefetch
+    /// exists to fix. `heroImageCached` is false, so the publisher emits the
+    /// filename AND queues the URL for the detached prefetch.
+    func saveRecipeWithHeroURL(id: Int, title: String, heroURL: URL) async throws {
+        let listItem = RecipeListItem(
+            id: id,
+            title: title,
+            excerpt: "Excerpt.",
+            heroImage: heroURL,
+            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            totalTimeDisplay: nil,
+            canonicalURL: URL(string: "https://www.dutchovendaddy.com/r/\(id)/")
+        )
+        try await store.cache(listItem: listItem)
+        _ = try await store.toggleSaved(id: id)
+        try await Task.sleep(nanoseconds: 1_000_000)
+    }
+}
+
+/// Thread-safe recorder of the URLs handed to the injected image
+/// prefetcher, so tests can observe the detached prefetch without racing.
+final class PrefetchRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var captured: [URL] = []
+
+    var urls: [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return captured
+    }
+
+    func record(_ newURLs: [URL]) {
+        lock.lock()
+        defer { lock.unlock() }
+        captured.append(contentsOf: newURLs)
+    }
+}
+
+/// Thread-safe call counter for the reload hook so tests don't race
+/// against `await publisher.publish()`.
+final class ReloadCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func increment() {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
     }
 }

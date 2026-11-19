@@ -1,6 +1,10 @@
 import DODSupport
 import Foundation
 
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
+
 /// Persists the Shopping List across app close/reopen (DUT-488).
 ///
 /// Spec trace: US-39. CL-82 shipped the list as in-memory-only (checked +
@@ -42,6 +46,7 @@ public struct ShoppingListStore: @unchecked Sendable {
     }
 
     /// UserDefaults key under the App Group suite for the persisted list.
+    /// Must stay equal to `ShoppingListWidgetBridge.storageKey`.
     public static let key = "dod.shoppingList.v1"
 
     private let defaults: UserDefaults
@@ -90,6 +95,10 @@ public struct ShoppingListStore: @unchecked Sendable {
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(data, forKey: key)
+        #if canImport(WidgetKit)
+        // DUT-167 — keep the Shopping List widget in sync with in-app changes.
+        WidgetCenter.shared.reloadTimelines(ofKind: ShoppingListWidgetBridge.kind)
+        #endif
     }
 
     /// DUT-534 — append `rows` to the persisted list in one atomic load →
@@ -144,6 +153,20 @@ public struct ShoppingListStore: @unchecked Sendable {
             alreadyHave: maskedIDs
         )
         return newRows.count
+    }
+
+    /// DUT-1015 — add one free-text line (e.g. from Siri "add butter"). Same
+    /// dedup as `append(rows:)`. Returns true when a row was actually added.
+    @discardableResult
+    public func addItem(text: String, recipeTitle: String = "Siri") -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let row = ShoppingListViewModel.Item(
+            ingredientText: trimmed,
+            recipeTitle: recipeTitle,
+            aisle: IngredientAisleClassifier.classify(trimmed)
+        )
+        return append(rows: [row]) == 1
     }
 
     /// Test-only accessor for the backing `UserDefaults`, so tests can assert on

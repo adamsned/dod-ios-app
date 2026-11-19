@@ -1,3 +1,4 @@
+import DODSupport
 import Foundation
 
 #if os(iOS)
@@ -15,6 +16,10 @@ import FoundationModels
 import CoreGraphics
 import ImageIO
 #endif
+#endif
+
+// Ensure proper module compilation for Xcode build system compatibility
+#if compiler(>=6.2)
 #endif
 
 /// Production ``DODIntelligenceService`` backed by Apple's on-device
@@ -82,6 +87,19 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #endif
     }
 
+    public func parseIngredient(_ line: String) async -> IngredientParse? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateIngredientParse(trimmed)
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
     public func summarize(_ text: String) async -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -137,6 +155,27 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
                 instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
                 prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
             )
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
+    public func identifyIngredients(imageData: Data) async -> [String] {
+        #if os(iOS) && compiler(>=6.4)
+        if #available(iOS 27, *) {
+            return await Self.generateIngredients(imageData: imageData)
+        }
+        #endif
+        return []
+    }
+
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? {
+        guard request.hasMoment else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateMomentCaption(request)
         }
         return nil
         #else
@@ -231,7 +270,7 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
     /// up-to-date knowledge and is given the soap example explicitly, because the
     /// old prompt let it repeat the "never use soap on cast iron" myth.
     @available(iOS 26, *)
-    private static let helperInstructions = """
+    static let helperInstructions = """
         You are Dutch Oven Daddy's friendly cooking assistant. You know cast iron \
         and Dutch ovens deeply, but you help with ANY cooking or kitchen \
         question: techniques, recipes, ingredient swaps, measurement conversions \
@@ -249,9 +288,11 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         Answer in a short, practical paragraph a home cook can act on. Be warm \
         but concise. Do not use em dashes; use periods or commas instead. When a \
         photo is attached, look at it and base your help on what you actually see.
+
+        \(SandingGuard.instructionRule)
         """
 
-    /// DUT-1385 — instructions for Cook Mode's "Ask About This Recipe" chat:
+    /// DUT-1385 — instructions for Cook Mode's "Ask the Recipe" chat:
     /// answers stay scoped to the one recipe, and the recipe text is the source
     /// of truth for amounts and times.
     @available(iOS 26, *)

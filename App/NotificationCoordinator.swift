@@ -36,6 +36,10 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // DUT-1397 — a push shown in the foreground counts as announced.
+        if let id = Self.postID(fromUserInfo: notification.request.content.userInfo) {
+            NotifiedPostsStore().record(id)
+        }
         completionHandler([.banner, .sound, .list])
     }
 
@@ -47,10 +51,10 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
     ) {
         defer { completionHandler() }
         let userInfo = response.notification.request.content.userInfo
-        guard
-            let urlString = userInfo[NotificationPlan.deepLinkKey] as? String,
-            let intent = Self.intent(fromDeepLink: urlString)
-        else {
+        if let id = Self.postID(fromUserInfo: userInfo) {
+            NotifiedPostsStore().record(id)
+        }
+        guard let intent = Self.intent(fromUserInfo: userInfo) else {
             DODLog.app.error("notification tap: no routable deep link in userInfo")
             return
         }
@@ -58,6 +62,30 @@ final class NotificationCoordinator: NSObject, UNUserNotificationCenterDelegate 
         // `pending` and resolves the route from the cache. Works for both
         // recipe and article kinds (PostKind lives on Recipe).
         Task { @MainActor in DeepLinkDispatcher.shared.dispatch(intent) }
+    }
+
+    /// DUT-1397 — routes a tapped notification from its `userInfo`: a local
+    /// notification carries the `dod://` string under ``NotificationPlan/deepLinkKey``;
+    /// a remote push carries top-level `postId` (Int) + `postKind` ("recipe" |
+    /// "article"). The push form is rewritten to the same `dod://<kind>/<id>`
+    /// grammar so both go through ``intent(fromDeepLink:)``.
+    static func intent(fromUserInfo userInfo: [AnyHashable: Any]) -> DeepLinkIntent? {
+        if let urlString = userInfo[NotificationPlan.deepLinkKey] as? String {
+            return intent(fromDeepLink: urlString)
+        }
+        guard let id = postID(fromUserInfo: userInfo) else { return nil }
+        let kind = (userInfo["postKind"] as? String) == "article" ? "article" : "recipe"
+        return intent(fromDeepLink: "dod://\(kind)/\(id)")
+    }
+
+    /// The WP post id a notification announces: the remote `postId` (Int, or a
+    /// numeric string/NSNumber) or the id inside a local notification's deep link.
+    static func postID(fromUserInfo userInfo: [AnyHashable: Any]) -> Int? {
+        let raw = userInfo["postId"]
+        if let id = raw as? Int, id > 0 { return id }
+        if let text = raw as? String, let id = Int(text), id > 0 { return id }
+        if let link = userInfo[NotificationPlan.deepLinkKey] as? String { return postID(fromDeepLink: link) }
+        return nil
     }
 
     /// Maps a notification's `dod://…` deep-link string to the `DeepLinkIntent`

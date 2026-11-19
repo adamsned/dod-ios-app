@@ -66,6 +66,10 @@ extension RecipeDetailViewModel {
         // everyone else shows their earned ladder rank. Display-only; the populate
         // site (`RecipeDetailRatingsSection+PhaseD`) gates on own-comment.
         let rankCooks = await dependencies.loadRankLadderCookCount()
+        // DUT-986 — zero logged cooks means this is the user's first cook.
+        // Reuses the rank-ladder count (no new dependency seam); the only gap is
+        // a user whose sole logs are dump cakes, who still counts as a first cook.
+        isFirstCookEver = rankCooks == 0
         isCurrentUserOwner = OwnerGate.isOwner(dependencies.currentUserIdentifier)
         ownCommentRank = CookProgression.displayRank(totalCooks: rankCooks, isOwner: isCurrentUserOwner)
             .map { ($0.title, $0.emoji) }

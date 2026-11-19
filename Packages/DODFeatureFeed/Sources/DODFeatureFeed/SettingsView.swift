@@ -230,12 +230,23 @@ public struct SettingsView: View {
                         .foregroundStyle(DODColor.label)
                 }
                 .accessibilityIdentifier("settings-toggle-article-notifications")
+
+                Toggle(isOn: weeklyDigestBinding) {
+                    Text("Weekly Digest")
+                        .dodFont(DODType.body)
+                        .foregroundStyle(DODColor.label)
+                }
+                .accessibilityIdentifier("settings-toggle-weekly-digest")
             } header: {
                 sectionHeader("Notification Settings")
             } footer: {
-                Text("Alerts are delivered on this device only.")
-                    .dodFont(DODType.caption)
-                    .foregroundStyle(DODColor.labelSecondary)
+                Text(
+                    viewModel.shouldSuggestMutingRecipeDrops
+                        ? "Weekly Digest sends one roundup a week. Consider turning off \"When New Recipes Drop\" to avoid double alerts. Alerts are delivered on this device only."
+                        : "Prefer fewer pings? Weekly Digest sends one roundup a week instead of an alert per recipe. Alerts are delivered on this device only."
+                )
+                .dodFont(DODType.caption)
+                .foregroundStyle(DODColor.labelSecondary)
             }
             .listRowBackground(DODColor.surfaceElevated)
 
@@ -264,6 +275,7 @@ public struct SettingsView: View {
                 VoiceRows(viewModel: viewModel)
 
                 CookModeControlsPicker()  // DUT-596
+                CookModeAutoAdvanceToggle()  // DUT-173
             } header: {
                 sectionHeader("Customization")
             } footer: {

@@ -123,6 +123,8 @@ extension HeatCoachView {
     @ViewBuilder
     private func conditionsContent(_ coachModel: HeatCoachModel) -> some View {
         VStack(alignment: .leading, spacing: DODSpacing.md) {
+            fetchRow
+
             labeledRow("Elevation") {
                 Stepper(value: $elevationFeet, in: 0...15000, step: 500) {
                     Text(elevationFeet == 0 ? "Sea level" : "\(elevationFeet) ft")

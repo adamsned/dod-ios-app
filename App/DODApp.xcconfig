@@ -31,6 +31,14 @@ DOD_COMMENT_API_KEY =
 // DODApp.local.xcconfig override.
 GA4_MEASUREMENT_ID =
 GA4_API_SECRET =
+// DUT-1397: remote-push backend, surfaced as the DODPushBaseURL /
+// DODPushSharedSecret Info.plist values. BLANK on purpose (no secret in this
+// public repo); blank makes the token uploader a logged no-op. CI injects them
+// at archive time (release.yml); for a LOCAL build set them in the gitignored
+// DODApp.local.xcconfig. NOTE: xcconfig treats `//` as a comment, so write the
+// URL as `https:/$()/push.example.com`.
+DOD_PUSH_BASE_URL =
+DOD_PUSH_APP_SECRET =
 // DUT-98: Sign in with Apple revoke Worker, surfaced as the SiwaRevokeBaseURL /
 // SiwaRevokeSharedSecret Info.plist values. BLANK on purpose (no secret in this
 // public repo); blank makes account deletion skip the Apple token revoke. CI

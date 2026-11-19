@@ -8,10 +8,13 @@ public struct RecipeInstruction: Sendable, Hashable, Identifiable, Codable {
     /// 1-based step number.
     public let step: Int
     public let text: String
+    /// DUT-1002: nil = untagged (treated as campfire finish by consumers).
+    public let stage: CookStage?
 
-    public init(id: UUID = UUID(), step: Int, text: String) {
+    public init(id: UUID = UUID(), step: Int, text: String, stage: CookStage? = nil) {
         self.id = id
         self.step = step
         self.text = text
+        self.stage = stage
     }
 }

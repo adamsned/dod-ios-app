@@ -1,4 +1,5 @@
 import DODDomain
+import DODSupport
 import Foundation
 
 /// A deterministic ``DODIntelligenceService`` for L1 tests, SwiftUI previews,
@@ -20,8 +21,16 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     private let cannedSubstitution: SubstitutionResult?
     private let cannedSummary: String?
     private let cannedAnswer: String?
+    private let cannedIntake: CookIntakeProfile?
     private let cannedDoneness: DonenessCheckResult?
     private let cannedExplanation: StepExplanation?
+    private let cannedRecipeAnswer: String?
+    private let cannedExtraction: ExtractedRecipe?
+    private let cannedDigest: CommentDigest?
+    private let cannedMomentCaption: String?
+    private let cannedHeatCoachAnswer: String?
+    private let cannedIngredients: [String]?
+    private let cannedIngredientParse: IngredientParse?
 
     /// - Parameters:
     ///   - isAvailable: What ``isAvailable`` reports. Pass `false` to model an
@@ -33,31 +42,63 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     ///     the graceful no-result path.
     ///   - answer: What ``answer(_:)`` returns when available. `nil` models the
     ///     graceful no-result path.
+    ///   - intake: What `extractIntakeProfile(from:)` returns when available; nil models the skip path.
     ///   - doneness: What ``checkDoneness(photo:stepText:)`` returns when available. `nil` models
     ///     the graceful no-result path.
     ///   - recipeCard: What ``scanRecipeCard(imageData:)`` returns when available and image input is supported. `nil` models the graceful no-result path.
     ///   - explanation: What ``explainStep(_:)`` returns when available. `nil` models
     ///     the graceful no-result path. Defaults to ``StepExplanation/canned``.
+    ///   - extraction: What ``extractRecipe(fromBody:)`` returns when available. `nil` models
+    ///     the graceful no-result path.
+    ///   - commentDigest: What ``summarizeComments(_:)`` returns when available. `nil` models
+    ///     the graceful no-result path. Defaults to ``CommentDigest/canned``.
+    ///   - momentCaption: What ``captionMoment(_:)`` returns when available. `nil` models
+    ///     the graceful no-result path.
+    ///   - recipeAnswer: What ``askRecipe(_:toolbox:)`` returns when available. nil models the no-result path.
+    ///   - heatCoachAnswer: What ``askHeatCoach(_:ovenDiameterInches:isBaking:)`` returns when available. `nil` models the graceful no-result path.
+    ///   - ingredientParse: What ``parseIngredient(_:)`` returns when available. `nil` models the graceful no-result path.
     public init(
         isAvailable: Bool = true,
         supportsImageInput: Bool = true,
         substitution: SubstitutionResult? = .cannedButtermilkOptions,
         summary: String? = "A quick, weeknight-friendly cast-iron recipe with simple pantry ingredients.",
         answer: String? = "Warm the pan gradually, add a thin layer of oil, and wipe out any excess before cooking.",
+        intake: CookIntakeProfile? = CookIntakeProfile(
+            fearLevel: .nervous,
+            occasion: .weeknightDinner,
+            householdSize: 4,
+            biggestWorry: "ruining the seasoning"
+        ),
         doneness: DonenessCheckResult? = DonenessCheckResult(
             verdict: .looksDone,
             confidence: 0.9,
             reassurance: "The crust is an even golden brown and the edges look set."
         ),
-        explanation: StepExplanation? = .canned
+        explanation: StepExplanation? = .canned,
+        recipeAnswer: String? = "Yes. Chill it overnight and reheat gently.",
+        extraction: ExtractedRecipe? = nil,
+        commentDigest: CommentDigest? = .canned,
+        momentCaption: String? = "Look at that golden crust — you made this, and everyone is going to ask for seconds.",
+        heatCoachAnswer: String? =
+            "Add about 5 coals for the wind and altitude, keep an eye on the lid, and you're golden.",
+        ingredients: [String] = ["eggs", "cheddar", "spinach", "butter"],
+        ingredientParse: IngredientParse? = IngredientParse(quantity: 2, unit: "cup", item: "flour", prep: nil)
     ) {
         self.isAvailable = isAvailable
         self.supportsImageInput = supportsImageInput
         self.cannedSubstitution = substitution
         self.cannedSummary = summary
         self.cannedAnswer = answer
+        self.cannedIntake = intake
         self.cannedDoneness = doneness
         self.cannedExplanation = explanation
+        self.cannedRecipeAnswer = recipeAnswer
+        self.cannedExtraction = extraction
+        self.cannedDigest = commentDigest
+        self.cannedMomentCaption = momentCaption
+        self.cannedHeatCoachAnswer = heatCoachAnswer
+        self.cannedIngredients = ingredients
+        self.cannedIngredientParse = ingredientParse
     }
 
     public func suggestSubstitution(
@@ -87,5 +128,46 @@ public struct FakeIntelligenceService: DODIntelligenceService {
     public func explainStep(_ step: String, nextStep: String?) async -> StepExplanation? {
         guard isAvailable else { return nil }
         return cannedExplanation
+    }
+
+    public func extractRecipe(fromBody body: String) async -> ExtractedRecipe? {
+        guard isAvailable else { return nil }
+        return cannedExtraction
+    }
+
+    public func summarizeComments(_ comments: [String]) async -> CommentDigest? {
+        guard isAvailable else { return nil }
+        return cannedDigest
+    }
+
+    public func captionMoment(_ request: MomentCaptionRequest) async -> String? {
+        guard isAvailable, request.hasMoment else { return nil }
+        return cannedMomentCaption
+    }
+
+    public func askRecipe(_ question: String, toolbox: AskRecipeToolbox) async -> String? {
+        guard isAvailable else { return nil }
+        return cannedRecipeAnswer
+    }
+
+    public func askHeatCoach(_ question: String, ovenDiameterInches: Int, isBaking: Bool) async -> String? {
+        guard isAvailable else { return nil }
+        guard !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return cannedHeatCoachAnswer
+    }
+
+    public func extractIntakeProfile(from answers: [IntakeAnswer]) async -> CookIntakeProfile? {
+        guard isAvailable, !answers.isEmpty else { return nil }
+        return cannedIntake
+    }
+
+    public func identifyIngredients(imageData: Data) async -> [String] {
+        guard isAvailable, supportsImageInput else { return [] }
+        return cannedIngredients ?? []
+    }
+
+    public func parseIngredient(_ line: String) async -> IngredientParse? {
+        guard isAvailable else { return nil }
+        return cannedIngredientParse
     }
 }

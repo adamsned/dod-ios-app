@@ -148,6 +148,7 @@ public enum JSONLDRecipeParser {
         let recipeCuisine = mapStringOrArray(jsonLD["recipeCuisine"])
         let suitableForDiet = mapStringOrArray(jsonLD["suitableForDiet"])
         let author = mapAuthorName(jsonLD["author"])
+        let equipment = mapEquipment(html: html)
 
         return Recipe(
             id: listItem.id,
@@ -170,8 +171,14 @@ public enum JSONLDRecipeParser {
             recipeCategory: recipeCategory,
             recipeCuisine: recipeCuisine,
             suitableForDiet: suitableForDiet,
-            author: author
+            author: author,
+            equipment: equipment
         )
+    }
+
+    /// DUT-984 — equipment names from the WPRM card as domain `Equipment`.
+    static func mapEquipment(html: String) -> [Equipment] {
+        WPRMRecipeCardParser.parse(html: html).equipment.map { Equipment(name: $0) }
     }
 
     /// Resolve the ingredient + instruction lists, with the DUT-42 WPRM

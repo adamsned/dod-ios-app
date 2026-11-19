@@ -211,4 +211,24 @@ extension CookModeView {
         false
         #endif
     }
+
+    /// DUT-173 — "Advancing to step N…" banner with Undo; auto-dismisses after the undo window.
+    @ViewBuilder
+    var autoAdvanceBanner: some View {
+        if viewModel.pendingAutoAdvanceFromStep != nil {
+            HStack {
+                Text("Advancing to step \(viewModel.currentStepIndex + 1)…")
+                Spacer()
+                Button("Undo") { viewModel.undoAutoAdvance() }
+                    .accessibilityIdentifier("cook-mode-auto-advance-undo")
+            }
+            .padding()
+            .background(.thinMaterial, in: Capsule())
+            .padding()
+            .task(id: viewModel.pendingAutoAdvanceFromStep) {
+                try? await Task.sleep(for: .seconds(CookModeAutoAdvance.undoWindowSeconds))
+                if !Task.isCancelled { viewModel.dismissAutoAdvanceBanner() }
+            }
+        }
+    }
 }

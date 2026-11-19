@@ -58,7 +58,8 @@ extension RecipeStore {
             cookedAt: entry.cookedAt,
             note: entry.note,
             personalRating: entry.personalRating,
-            photoLocalID: entry.photoLocalID
+            photoLocalID: entry.photoLocalID,
+            confidence: entry.confidence
         )
         modelContext.insert(inserted)
         do {
@@ -110,6 +111,7 @@ extension RecipeStore {
         let previousPhotoID = row.photoLocalID
         row.note = entry.note
         row.personalRating = entry.personalRating
+        row.confidence = entry.confidence
         row.photoLocalID = entry.photoLocalID
         if let previousPhotoID, previousPhotoID != entry.photoLocalID {
             CookPhotoStore().delete(id: previousPhotoID)
@@ -173,7 +175,8 @@ extension RecipeStore {
             cookedAt: row.cookedAt,
             note: row.note,
             personalRating: row.personalRating,
-            photoLocalID: row.photoLocalID
+            photoLocalID: row.photoLocalID,
+            confidence: row.confidence
         )
     }
 }

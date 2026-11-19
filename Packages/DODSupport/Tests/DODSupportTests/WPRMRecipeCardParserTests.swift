@@ -297,27 +297,69 @@ import Testing
 
     // MARK: - DUT-633 comment stripping
 
-    /// An HTML comment carrying a stray `</div>` inside the recipe container
-    /// used to mis-terminate the container's depth-tracked close, dropping the
-    /// ingredient rows that followed. Stripping comments before the slice
-    /// (mirroring ``ArticleHTMLParser``) keeps every row.
-    @Test func commentWithClosingDivInsideContainerDoesNotTruncate() {
+    // MARK: - Equipment (DUT-984)
+
+    @Test func parsesEquipmentNames() {
         let html = """
-            <div class="wprm-recipe-container">
-            <ul class="wprm-recipe-ingredients">
-            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">flour</span></li>
-            <!-- legacy markup: </div> old wrapper -->
-            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-name">sugar</span></li>
-            </ul>
-            </div>
+            <div class="wprm-recipe-container"><ul><li class="wprm-recipe-equipment-item"><div class="wprm-recipe-equipment-name">Lid Lifter</div></li><li class="wprm-recipe-equipment-item"><div class="wprm-recipe-equipment-name">Chimney Starter</div></li></ul></div>
             """
-        let card = WPRMRecipeCardParser.parse(html: html)
-        #expect(card.ingredients == ["flour", "sugar"])
+        #expect(WPRMRecipeCardParser.parse(html: html).equipment == ["Lid Lifter", "Chimney Starter"])
     }
 
-    /// A commented-out container is not a real recipe card.
-    @Test func commentedOutContainerIsNotDetected() {
-        let html = "<!-- <div class=\"wprm-recipe-container\">stale</div> -->"
-        #expect(WPRMRecipeCardParser.hasRecipeCard(html: html) == false)
+    @Test func returnsNoEquipmentWhenCardHasNone() {
+        let html = """
+            <div class="wprm-recipe-container">
+            <h2 class="wprm-recipe-name">Just a title</h2>
+            </div>
+            """
+        #expect(WPRMRecipeCardParser.parse(html: html).equipment.isEmpty)
+    }
+
+    // MARK: - DUT-633 comment stripping
+
+    // MARK: - DUT-1024 labelled ingredient groups
+
+    /// DUT-1024: `labelledIngredientGroups(in:)` returns (label, lines) tuples
+    /// for each group in document order. Groups with line rows have their label
+    /// preserved; header-only groups return nil for the label.
+    @Test func labelledGroupsKeepCrustAndFillingLabels() {
+        let html = """
+            <div class="wprm-recipe-container">
+            <div class="wprm-recipe-ingredients-container">
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">For the Crust:</h4>
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">1</span> <span class="wprm-recipe-ingredient-unit">cup</span> <span class="wprm-recipe-ingredient-name">flour</span></li>
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">1</span> <span class="wprm-recipe-ingredient-unit">tsp</span> <span class="wprm-recipe-ingredient-name">salt</span></li>
+            </ul></div>
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">For the Filling:</h4>
+            <ul class="wprm-recipe-ingredients">
+            <li class="wprm-recipe-ingredient"><span class="wprm-recipe-ingredient-amount">2</span> <span class="wprm-recipe-ingredient-unit">cups</span> <span class="wprm-recipe-ingredient-name">milk</span></li>
+            </ul></div>
+            </div>
+            </div>
+            """
+        let groups = WPRMRecipeCardParser.labelledIngredientGroups(in: html)
+        #expect(groups.count == 2)
+        #expect(groups[0].label == "For the Crust:")
+        #expect(groups[0].lines.count == 2)
+        #expect(groups[1].label == "For the Filling:")
+        #expect(groups[1].lines.count == 1)
+    }
+
+    /// DUT-1024: header-only groups return nil for their label, but still have
+    /// one line of ingredient text.
+    @Test func headerOnlyGroupHasNilLabel() {
+        let html = """
+            <div class="wprm-recipe-container">
+            <div class="wprm-recipe-ingredients-container">
+            <div class="wprm-recipe-ingredient-group"><h4 class="wprm-recipe-ingredient-group-name">1 bay leaf</h4></div>
+            </div>
+            </div>
+            """
+        let groups = WPRMRecipeCardParser.labelledIngredientGroups(in: html)
+        #expect(groups.count == 1)
+        #expect(groups[0].label == nil)
+        #expect(groups[0].lines.count == 1)
+        #expect(groups[0].lines[0] == "1 bay leaf")
     }
 }

@@ -83,3 +83,35 @@ import Testing
         #expect(NotificationContentBuilder.shouldSchedule(toggleEnabled: false, systemAuthorized: false) == false)
     }
 }
+
+@Suite("WeeklyDigestContentBuilder (DUT-152)") struct WeeklyDigestContentBuilderTests {
+
+    @Test func emptyTitlesReturnsNil() {
+        let plan = WeeklyDigestContentBuilder.plan(titles: [])
+        #expect(plan == nil)
+    }
+
+    @Test func singleRecipeCopy() {
+        let plan = WeeklyDigestContentBuilder.plan(titles: ["Smoky Brisket Chili"])
+        #expect(plan?.title == "Your Weekly Digest 🍳")
+        #expect(plan?.body == "1 new recipe this week: Smoky Brisket Chili")
+    }
+
+    @Test func multipleRecipesCopy() {
+        let titles = [
+            "Smoky Brisket Chili",
+            "Classic Beef Lasagna",
+            "Creamy Mushroom Risotto",
+            "Spicy Thai Basil Chicken",
+            "Homemade Pizza Margherita",
+        ]
+        let plan = WeeklyDigestContentBuilder.plan(titles: titles)
+        #expect(plan?.title == "Your Weekly Digest 🍳")
+        #expect(plan?.body == "5 new recipes this week — including Smoky Brisket Chili")
+    }
+
+    @Test func planCarriesDigestDeepLink() {
+        let plan = WeeklyDigestContentBuilder.plan(titles: ["Smoky Brisket Chili"])
+        #expect(plan?.deepLink == "dod://digest")
+    }
+}

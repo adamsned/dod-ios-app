@@ -19,16 +19,23 @@ struct CookModeToolDockContent: Equatable {
 
     /// The current step's own timer duration, if its text names one.
     var stepTimerDuration: Duration?
+    /// DUT-1025 — a second timer for multi-timer steps ("sear 3 min per side", "X, then Y").
+    var secondTimerDuration: Duration?
+    /// DUT-1025 — oven/pan temperature named by the step, in °F.
+    var stepTemperatureF: Int?
     /// The index of the soonest-finishing timer running on a DIFFERENT step.
     var runningTimerStepIndex: Int?
     var showsHeatCoach: Bool
 
     var isEmpty: Bool {
-        stepTimerDuration == nil && runningTimerStepIndex == nil && !showsHeatCoach
+        stepTimerDuration == nil && secondTimerDuration == nil && stepTemperatureF == nil
+            && runningTimerStepIndex == nil && !showsHeatCoach
     }
 
     static let empty = CookModeToolDockContent(
         stepTimerDuration: nil,
+        secondTimerDuration: nil,
+        stepTemperatureF: nil,
         runningTimerStepIndex: nil,
         showsHeatCoach: false
     )
@@ -50,11 +57,37 @@ struct CookModeToolDockContent: Equatable {
                 (lhs.value.remaining(at: now), lhs.key) < (rhs.value.remaining(at: now), rhs.key)
             }?
             .key
+        let extraction = StepTimerExtraction.heuristic(from: stepText)
         return CookModeToolDockContent(
-            stepTimerDuration: StepTimerParser.firstDuration(in: stepText),
+            stepTimerDuration: extraction.timers.first.map { .seconds($0.seconds) },
+            secondTimerDuration: extraction.timers.dropFirst().first.map { .seconds($0.seconds) },
+            stepTemperatureF: extraction.temperatureF,
             runningTimerStepIndex: otherRunning,
             showsHeatCoach: heatCoachAvailable && CookModeView.stepIsHeatRelated(stepText)
         )
+    }
+}
+
+/// DUT-137 — contents of the iPad pinned right pane. Unlike the compact dock, it
+/// lists every running timer (soonest first) and always offers Heat Coach when wired.
+struct CookModePinnedPaneContent: Equatable {
+    /// Step indices with a running timer, soonest-finishing first.
+    var runningTimerStepIndices: [Int]
+    var showsHeatCoach: Bool
+
+    static func resolve(
+        heatCoachAvailable: Bool,
+        timers: [Int: CookStepTimer],
+        now: Date
+    ) -> CookModePinnedPaneContent {
+        let running =
+            timers
+            .filter { $0.value.isRunning }
+            .sorted { lhs, rhs in
+                (lhs.value.remaining(at: now), lhs.key) < (rhs.value.remaining(at: now), rhs.key)
+            }
+            .map(\.key)
+        return CookModePinnedPaneContent(runningTimerStepIndices: running, showsHeatCoach: heatCoachAvailable)
     }
 }
 

@@ -16,6 +16,10 @@ extension RecipeDetailView {
                 SummarizeButton(action: summarizeAction)
                     .padding(.horizontal, DODSpacing.md)
             }
+            if viewModel.isAskRecipeAvailable {
+                AskRecipeButton(viewModel: viewModel)
+                    .padding(.horizontal, DODSpacing.md)
+            }
             dateAndJumpRow(proxy: proxy)
         }
     }

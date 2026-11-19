@@ -223,6 +223,11 @@ import Testing
         #expect(viewModel.saveToggleCount == 2)
     }
 
+    @Test func defaultPinnedRecipeIDsIsEmpty() async {
+        let dependencies = FakeCategoriesDependencies()
+        #expect(await dependencies.pinnedRecipeIDs(forCategoryID: 336).isEmpty)
+    }
+
     static func makeItem(_ id: Int) -> RecipeListItem {
         RecipeListItem(
             id: id,
@@ -312,5 +317,9 @@ final class FakeCategoriesDependencies: CategoriesDependencies, @unchecked Senda
     /// empty via the protocol extension; overridden here to exercise a populated
     /// reconciliation that must NOT fire the save haptic).
     var savedIDs: Set<Int> = []
+    /// DUT-161: pinned recipe ids for a category
+    var pinned: [Int: [Int]] = [:]
     func savedRecipeIDs() async throws -> Set<Int> { savedIDs }
+
+    func pinnedRecipeIDs(forCategoryID id: Int) async -> [Int] { pinned[id] ?? [] }
 }

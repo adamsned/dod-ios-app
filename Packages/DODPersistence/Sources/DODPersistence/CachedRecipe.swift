@@ -88,6 +88,11 @@ public final class CachedRecipe {
     public var suitableForDiet: [String] = []
     public var author: String?
 
+    /// DUT-1022: Codable-encoded `RecipeTags` (difficulty / technique /
+    /// occasion). Nil until background tagging runs. Optional blob, so no
+    /// migration is needed.
+    public var tagsJSON: Data?
+
     public init(
         id: Int,
         slug: String,
@@ -107,7 +112,8 @@ public final class CachedRecipe {
         recipeCategory: [String] = [],
         recipeCuisine: [String] = [],
         suitableForDiet: [String] = [],
-        author: String? = nil
+        author: String? = nil,
+        tagsJSON: Data? = nil
     ) {
         self.id = id
         self.slug = slug
@@ -128,5 +134,6 @@ public final class CachedRecipe {
         self.recipeCuisine = recipeCuisine
         self.suitableForDiet = suitableForDiet
         self.author = author
+        self.tagsJSON = tagsJSON
     }
 }

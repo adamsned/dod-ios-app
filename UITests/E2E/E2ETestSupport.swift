@@ -45,6 +45,12 @@ enum E2ETestSupport {
 }
 
 extension XCUIApplication {
+    /// DUT-985: with an empty journal, Cook Mode opens on a one-time pep talk. Taps through it when it shows.
+    func startCookingPastPepTalk() {
+        let start = buttons["Start cooking"]
+        if start.waitForExistence(timeout: 3) { start.tap() }
+    }
+
 
     /// Launch the host into L5 E2E mode with the standard set of overrides
     /// every journey needs.

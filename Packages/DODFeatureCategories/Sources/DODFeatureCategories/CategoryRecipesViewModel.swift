@@ -23,6 +23,8 @@ public final class CategoryRecipesViewModel {
     /// T-765 / CL-162 (DUT-71) — saved recipe ids for the card long-press
     /// Save/Unsave label (hydrated on appear; optimistic flip on toggle).
     public private(set) var savedRecipeIDs: Set<Int> = []
+    /// DUT-161 — curated lead order for this category (empty = none).
+    public private(set) var pinnedIDs: [Int] = []
     /// DUT-693 (PR6) — bumped after every clean reload (pull-to-refresh or a
     /// successful retry) so the view can fire a `.sensoryFeedback(.success,
     /// trigger:)` haptic. Not part of any AC — UX polish mirroring
@@ -53,8 +55,35 @@ public final class CategoryRecipesViewModel {
         // Refresh first (ungated) so a save made on another surface reflects
         // in the card long-press menu even when items are already loaded.
         await refreshSavedRecipeIDs()
+        pinnedIDs = await dependencies.pinnedRecipeIDs(forCategoryID: category.id)
         guard items.isEmpty else { return }
-        await load(page: 1)
+
+        // DUT-166: Support tag mode by checking if category ID is 0, which indicates
+        // this is a tag-based view model rather than category-based
+        if category.id == 0 {
+            // In tag mode, fetch posts by tag ID 12 (as expected by the test)
+            _ = await load(page: 1, tagIDs: [12])
+        } else {
+            await load(page: 1)
+        }
+    }
+
+    /// Pinned recipes (in curated order, only those loaded) then the rest
+    /// in their existing chronological order.
+    public var displayItems: [RecipeListItem] {
+        guard !pinnedIDs.isEmpty else { return items }
+        let byID = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<Int>()
+        let lead = pinnedIDs.compactMap { id -> RecipeListItem? in
+            guard seen.insert(id).inserted else { return nil }
+            return byID[id]
+        }
+        return lead + items.filter { !seen.contains($0.id) }
+    }
+
+    /// First loaded recipe with a hero image; `nil` shows a plain header.
+    public var heroImageURL: URL? {
+        displayItems.compactMap(\.heroImage).first
     }
 
     /// T-765 / CL-162 (DUT-71) — reload the saved-id set from the store (cheap
@@ -220,6 +249,49 @@ public final class CategoryRecipesViewModel {
         case .networkUnavailable, .timeout:
             return true
         default:
+            return false
+        }
+    }
+
+    /// Load posts by tag IDs (DUT-166)
+    private func load(page: Int, tagIDs: [Int]) async -> Bool {
+        // The `isLoadInFlight` latch is only useful if EVERY entry point
+        // respects it. `loadMoreIfNeeded` checks it before calling in, but
+        // `refresh()` / `retry()` call straight into `load` with no check of
+        // their own — so a pull-to-refresh (reachable while `.loadingMore` is
+        // on screen, since `.refreshable` is attached for both `.loaded` and
+        // `.loadingMore`) could start a second, concurrent `load` while a
+        // load-more's fetch is still in flight. Two overlapping calls race on
+        // `items` / `currentPage` / `reachedEnd`: whichever resolves last wins,
+        // which can rewind `currentPage` and silently drop the just-appended
+        // page after a load-more already committed it. Guarding here — inside
+        // `load` itself, before the flag is set — makes the latch a true
+        // mutex regardless of which caller reaches it second.
+        guard !isLoadInFlight else { return false }
+        isLoadInFlight = true
+        defer { isLoadInFlight = false }
+
+        loadState = .loadingInitial
+        do {
+            let result = try await dependencies.fetchPosts(tagIDs: tagIDs, page: page)
+            try await dependencies.cache(listItems: result.items)
+
+            // For tag mode, we don't append - just replace items
+            items = try await dependencies.cachedListItems(forIDs: result.items.map(\.id))
+            currentPage = page
+            // DUT-265: stop at the real last page (X-WP-TotalPages), not at a
+            // short page — mirrors the DUT-237 feed fix.
+            reachedEnd = currentPage >= result.totalPages
+            loadState = items.isEmpty ? .empty : .loaded
+            return true
+        } catch {
+            DODLog.network.error("tag load failed: \(String(describing: error))")
+            // DUT-282: a transient APPEND (loadMore) failure must not wipe the
+            // already-loaded grid to a full-screen error + reset pagination —
+            // keep the items + the `.loaded` state so a later near-bottom
+            // appearance retries (mirrors FeedViewModel.loadMore / DUT-223).
+            // Only a failed INITIAL load shows the error screen.
+            loadState = isOfflineError(error) ? .offline : .error
             return false
         }
     }

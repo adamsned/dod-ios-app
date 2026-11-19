@@ -46,4 +46,12 @@ extension LiveRecipeDetailDependencies {
             isPendingFromThisDevice: false
         )
     }
+
+    /// Re-publish the saved-recipes home-screen widget snapshot (US-17 /
+    /// AC-17.3, AC-17.6). Called by the view model after every save /
+    /// unsave. Fire-and-forget — all error paths are logged inside
+    /// ``SavedRecipesWidgetPublisher.publish()``.
+    public func publishSavedWidgetSnapshot() async {
+        await savedWidgetPublisher?.publish()
+    }
 }
