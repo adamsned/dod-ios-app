@@ -61,4 +61,31 @@ public enum ShoppingListWidgetBridge {
             unchecked: unchecked
         )
     }
+
+    /// Adds `id` to `checkedIDs` without re-encoding items, so `aisle` and any future fields survive.
+    /// Idempotent; returns false if the blob is missing or invalid.
+    @discardableResult
+    public static func markChecked(_ id: UUID, defaults: UserDefaults) -> Bool {
+        guard let data = defaults.data(forKey: storageKey),
+            var dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else { return false }
+        var checked = dict["checkedIDs"] as? [String] ?? []
+        if checked.contains(where: { UUID(uuidString: $0) == id }) { return true }
+        checked.append(id.uuidString)
+        dict["checkedIDs"] = checked
+        guard let out = try? JSONSerialization.data(withJSONObject: dict) else { return false }
+        defaults.set(out, forKey: storageKey)
+        return true
+    }
+
+    public static func read() -> ShoppingListWidgetState? {
+        guard let defaults = UserDefaults(suiteName: WidgetSnapshotConfig.appGroupIdentifier) else { return nil }
+        return read(defaults: defaults)
+    }
+
+    @discardableResult
+    public static func markChecked(_ id: UUID) -> Bool {
+        guard let defaults = UserDefaults(suiteName: WidgetSnapshotConfig.appGroupIdentifier) else { return false }
+        return markChecked(id, defaults: defaults)
+    }
 }

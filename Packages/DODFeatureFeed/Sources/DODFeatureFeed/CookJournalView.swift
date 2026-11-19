@@ -255,6 +255,7 @@ extension CookJournalView {
                 // last 30 days), derived from the same `stats` (recomputed in
                 // `.onChange(of: cooks)`) the header above already reads.
                 statsSummaryCard(stats: stats)
+                confidenceTrajectoryCard(stats: stats)
                 cookoutRecapRows
                 ForEach(cooks) { cook in
                     // CL-273 — tap an entry to open its personal page (write a

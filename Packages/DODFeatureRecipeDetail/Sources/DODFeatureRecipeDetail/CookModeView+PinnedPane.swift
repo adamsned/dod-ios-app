@@ -28,7 +28,7 @@ extension CookModeView {
     func stepScroll(topInset: CGFloat, showsToolDock: Bool) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DODSpacing.lg) {
-                // DUT-1392 — "Ask About This Recipe" sits right under the recipe name.
+                // DUT-1392 — "Ask the Recipe" sits right under the recipe name.
                 VStack(alignment: .leading, spacing: DODSpacing.xs) {
                     heroView(topInset: topInset)
                     askAboutRecipeLink

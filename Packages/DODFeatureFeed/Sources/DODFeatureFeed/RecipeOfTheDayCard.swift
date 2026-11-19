@@ -3,9 +3,17 @@ import DODDomain
 import SwiftUI
 
 /// DUT-117 — the pinned "Recipe of the Day" hero card at the top of the feed.
+/// DUT-2894 — "Article of the Day" when the pick is an article.
 struct RecipeOfTheDayCard: View {
     let item: RecipeListItem
+    var isArticle = false
     let onTap: () -> Void
+
+    /// DUT-2894 — "Recipe of the Day" / "Article of the Day" (the eyebrow shows
+    /// it uppercased; VoiceOver reads it as written).
+    nonisolated static func label(isArticle: Bool) -> String {
+        isArticle ? "Article of the Day" : "Recipe of the Day"
+    }
 
     nonisolated static let fallbackHook = "Today's pick from the kitchen"
     nonisolated static let maxHookLength = 90
@@ -39,7 +47,7 @@ struct RecipeOfTheDayCard: View {
         }
         .buttonStyle(.dodPressable)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Recipe of the Day: \(item.title). \(Self.hook(for: item))")
+        .accessibilityLabel("\(Self.label(isArticle: isArticle)): \(item.title). \(Self.hook(for: item))")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("dod.feed.recipe-of-the-day")
     }
@@ -70,7 +78,7 @@ extension RecipeOfTheDayCard {
 extension RecipeOfTheDayCard {
     fileprivate var textOverlay: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xxs) {
-            Text("RECIPE OF THE DAY")
+            Text(Self.label(isArticle: isArticle).uppercased())
                 .dodFont(DODType.caption)
                 .foregroundStyle(DODColor.burntOrange)
             Text(item.title)

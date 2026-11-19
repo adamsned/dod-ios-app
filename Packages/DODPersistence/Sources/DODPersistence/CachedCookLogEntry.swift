@@ -39,6 +39,10 @@ public final class CachedCookLogEntry {
     public var photoLocalID: String?
     /// DUT-975 — optional private 1–5 "how did that feel?" confidence read.
     public var confidence: Int?
+    /// DUT-994: raw `CookOccasion` string; nil on pre-DUT-994 rows (reads as `.everyday`).
+    public var occasionRaw: String?
+    /// DUT-994: optional private recipient label for comfort cooks.
+    public var recipient: String?
 
     public init(
         id: UUID,
@@ -48,7 +52,9 @@ public final class CachedCookLogEntry {
         note: String? = nil,
         personalRating: Int? = nil,
         photoLocalID: String? = nil,
-        confidence: Int? = nil
+        confidence: Int? = nil,
+        occasionRaw: String? = nil,
+        recipient: String? = nil
     ) {
         self.id = id
         self.recipeID = recipeID
@@ -58,5 +64,7 @@ public final class CachedCookLogEntry {
         self.personalRating = personalRating
         self.photoLocalID = photoLocalID
         self.confidence = confidence
+        self.occasionRaw = occasionRaw
+        self.recipient = recipient
     }
 }
