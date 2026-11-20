@@ -10,6 +10,12 @@ import Testing
 /// path. Graduation supersedes a rank-up; an in-rank cook celebrates nothing.
 @MainActor
 @Suite("FeedViewModel cook celebration (DUT-323)") struct FeedViewModelCelebrationTests {
+    /// DUT-2899 — `logCook` asks `OwnerGate` (the real Keychain) whether the
+    /// user is the owner, and an owner never ranks up. Pin it to "not the owner"
+    /// so these tests don't pass or fail depending on the machine's Keychain.
+    init() {
+        FeedViewModel.isOwnerCheck = { false }
+    }
 
     // IDs well clear of the path rungs (1459 / 683 / 22294) so these never
     // accidentally graduate — they isolate the rank-up path.
