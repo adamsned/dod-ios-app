@@ -9,6 +9,10 @@ import Foundation
 /// file (extensions can't add stored properties); those were widened to
 /// `internal` so this extension can reach them.
 extension FeedViewModel {
+    /// Decides whether the current user is the app owner (Daddy Mode suppresses
+    /// the rank-up beat). Defaults to the real Keychain-backed gate; tests
+    /// replace it so the result never depends on the machine's Keychain.
+    static var isOwnerCheck: @MainActor () -> Bool = { OwnerGate.isCurrentUserOwner() }
 
     /// DUT-104 — record a completed cook in the private journal (called when the
     /// "Your First Cookout" flow reaches "Done"). A failed write must never
@@ -44,7 +48,7 @@ extension FeedViewModel {
         let isGraduate = GuidedCookout.nextUncookedRung(cookedRecipeIDs: cookedAfter) == nil
         if isGraduate && !wasGraduate {
             pendingCelebration = .graduatedFirstCookout
-        } else if !OwnerGate.isCurrentUserOwner() {
+        } else if !Self.isOwnerCheck() {
             // Daddy Mode (owner rank) — the owner's rank is fixed at "The Dutch Oven
             // Daddy", so he never "ranks up". Suppress the rank-up celebration for
             // him (a "You're a Cast Iron Legend" beat would contradict his rank).
