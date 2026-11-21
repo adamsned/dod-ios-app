@@ -7,7 +7,7 @@
 - [ ] `xcodebuild` Debug builds cleanly on iPhone 17 simulator (validated by CI).
 - [ ] All package tests pass (validated by CI).
 - [ ] App icon installed at `App/Assets.xcassets/AppIcon.appiconset/` (T-180).
-- [ ] Screenshots captured per `Screenshots/README.md` (T-181).
+- [x] Screenshots captured per `Screenshots/README.md` (T-181, DUT-1210).
 - [ ] App Privacy questionnaire answered per `AppPrivacy.md` (T-182).
 - [ ] Marketing copy reviewed in `AppStoreCopy.md` (T-183).
 - [ ] Privacy policy URL is live at `https://www.dutchovendaddy.com/app-privacy/`.
