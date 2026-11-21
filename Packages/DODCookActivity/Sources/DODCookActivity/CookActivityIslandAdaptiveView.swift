@@ -33,7 +33,15 @@ public struct CookActivityIslandAdaptiveView: View {
     }
 
     public var body: some View {
+        #if os(iOS)
+        if #available(iOS 27.0, *) {
+            CookActivityLimitedWidthReader(content: self)
+        } else {
+            layout(isLimitedInWidth: false)
+        }
+        #else
         layout(isLimitedInWidth: false)
+        #endif
     }
 
     @ViewBuilder
