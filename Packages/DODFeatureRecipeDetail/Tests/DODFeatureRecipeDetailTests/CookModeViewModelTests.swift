@@ -376,3 +376,16 @@ final class FakeLiveActivityController: CookLiveActivityController {
         isActive = false
     }
 }
+
+extension CookModeViewModelTests {
+    /// DUT-168 — the step-ingredient mapping is computed once at init; navigating
+    /// steps reads the cached mapping and never changes it.
+    @Test func stepIngredientsAreComputedOncePerViewModel() {
+        let viewModel = CookModeViewModelStepIngredientsTests.makeViewModel()
+        let before = viewModel.stepIngredients
+        #expect(before.contains { !$0.isEmpty })
+        viewModel.goNext()
+        viewModel.goBack()
+        #expect(viewModel.stepIngredients == before)
+    }
+}

@@ -31,6 +31,7 @@ extension CookModeView {
         // DUT-1392 — the step's timer and the Heat Coach shortcut moved out of
         // the text into the floating tool dock above the controls
         // (`CookModeView+ToolDock.swift`).
+        // DUT-168 — the matched ingredients for this step sit under its text.
         return VStack(alignment: .leading, spacing: DODSpacing.sm) {
             if let imageURL = step.imageURL {
                 CookModeStepImage(url: imageURL)
@@ -41,6 +42,13 @@ extension CookModeView {
                 .lineSpacing(DODSpacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityLabel("Step \(step.step). \(displayText)")
+            // DUT-168 — "For this step" sub-list; renders nothing when the step has no
+            // matched ingredients. The mapping is cached in the view model at init.
+            CookModeStepIngredientsList(
+                ingredients: viewModel.currentStepIngredients,
+                scaleFactor: ingredientScaleFactor,
+                useMetricUnits: useMetricUnits
+            )
         }
         .padding(.horizontal, DODSpacing.md)
     }
