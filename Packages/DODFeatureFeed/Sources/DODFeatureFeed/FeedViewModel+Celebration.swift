@@ -61,14 +61,17 @@ extension FeedViewModel {
             // DUT-983: any recipe, including off-path ones. Replaces the
             // Fire Starter rank-up a first path cook would otherwise earn.
             pendingCelebration = .firstCookEver
-        } else {
-            let reached = CookProgression.rankUp(
-                from: Self.rankLadderCookCount(logsBefore),
-                to: Self.rankLadderCookCount(logsAfter)
-            )
-            if let reached {
-                pendingCelebration = .rankUp(reached)
-            }
+        } else if let rung = GuidedCookout.milestone(from: cookedBefore, to: cookedAfter), rung != .graduated {
+            // DUT-964: a ladder beat outranks a plain rank-up. A rank-up that
+            // lands on the same cook is deliberately shadowed by this branch.
+            // `.graduated` is excluded because the first branch already handles it.
+            pendingCelebration = .rungMilestone(rung)
+        } else if let reached = CookProgression.rankUp(
+            from: Self.rankLadderCookCount(logsBefore),
+            to: Self.rankLadderCookCount(logsAfter)
+        ) {
+            // DUT-964: ensure rank-up is only considered when no rung milestone was found
+            pendingCelebration = .rankUp(reached)
         }
         // DUT-971 — keep the idle re-seasoning reminder 21 days out from this cook.
         await PanCareScheduling.reschedule(
