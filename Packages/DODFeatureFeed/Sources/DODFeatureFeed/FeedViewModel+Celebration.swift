@@ -61,8 +61,7 @@ extension FeedViewModel {
             // DUT-983: any recipe, including off-path ones. Replaces the
             // Fire Starter rank-up a first path cook would otherwise earn.
             pendingCelebration = .firstCookEver
-        } else if let rung = GuidedCookout.milestone(from: cookedBefore, to: cookedAfter),
-            rung != .graduated {
+        } else if let rung = GuidedCookout.milestone(from: cookedBefore, to: cookedAfter), rung != .graduated {
             // DUT-964: a ladder beat outranks a plain rank-up. A rank-up that
             // lands on the same cook is deliberately shadowed by this branch.
             // `.graduated` is excluded because the first branch already handles it.
