@@ -144,7 +144,7 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
                 imageData: imageData,
                 recipeContext: recipeContext
             ) {
-                return withImage
+                return SandingGuard.sanitize(withImage as String?)
             }
             // The image path yielded nothing (decode or model error); fall back
             // to a text-only answer when there's still a question to answer.
