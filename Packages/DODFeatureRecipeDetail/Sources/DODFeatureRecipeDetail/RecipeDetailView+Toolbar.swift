@@ -137,6 +137,16 @@ extension RecipeDetailView {
                 }
                 .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Share table tent card")
+
+                // DUT-968 — "Pass it down": share the recipe as hand-off text.
+                Button {
+                    prepareLegacyHandoffShare(logs: [])
+                } label: {
+                    Image(systemName: "person.2")
+                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
+                }
+                .disabled(viewModel.recipe == nil)
+                .accessibilityLabel("Pass it down to family")
                 #else
                 // macOS `swift test` slice: no UIKit share sheet — keep a plain
                 // URL ShareLink so the toolbar still compiles cross-platform.
@@ -157,6 +167,7 @@ extension RecipeDetailView {
                     viewModel.dismissSummary()
                 }
             }
+            .legacyHandoffShareSheet($legacyHandoffText)  // DUT-968 (iOS-only)
         }
     }
 
