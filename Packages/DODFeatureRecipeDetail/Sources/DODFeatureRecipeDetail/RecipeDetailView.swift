@@ -128,6 +128,7 @@ public struct RecipeDetailView: View {
 
     /// DUT-1324 — non-nil drives the PDF share sheet; set by the toolbar.
     @State var sharePDF: SharePDFItem?
+    @State var legacyHandoffText: String?  // DUT-968 — drives the "Pass it down" sheet
 
     /// DUT-1340 — drives the "Add to Collection" picker from the bookmark's
     /// press-and-hold menu. `internal` so the `+Toolbar` extension flips it.

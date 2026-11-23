@@ -143,21 +143,18 @@ import Testing
 
     /// DUT-625 — dump-cake cooks are excluded from the rank ladder, so they
     /// don't inflate the count that a later PATH cook's rank-up is measured
-    /// against: a first path cook still earns Fire Starter even after dump cakes.
+    /// against. The first path cook's Fire Starter rank-up is now shadowed by
+    /// the campfire-unlocked rung milestone (DUT-964).
     @Test func dumpCakesDoNotInflateTheRankLadderForPathCooks() async {
         let dependencies = FakeFeedDependencies()
         // Two dump cakes already logged — off-path, so the rank count is still 0.
         dependencies.cooks = DumpCake.all.prefix(2).map { makeCook($0.id) }
         let viewModel = FeedViewModel(dependencies: dependencies)
 
-        // The first PATH cook is rank-ladder cook #1 -> Fire Starter (threshold 1).
+        // The first PATH cook unlocks the campfire rung, which outranks Fire Starter.
         await viewModel.logCook(makeCook(GuidedCookout.firstCookout.recipeID))
 
-        if case .rankUp(let rank) = viewModel.celebration {
-            #expect(rank.title == "Fire Starter")
-        } else {
-            Issue.record("expected Fire Starter rank-up, got \(String(describing: viewModel.celebration))")
-        }
+        #expect(viewModel.celebration == .rungMilestone(.campfireUnlocked))
     }
 
     /// DUT-983: the first cook on the guided path is the first-ever moment, not a Fire Starter rank-up.
