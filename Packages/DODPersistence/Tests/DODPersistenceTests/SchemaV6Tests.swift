@@ -88,4 +88,51 @@ import Testing
         let logs = try await store.allCookLogs()
         #expect(logs.isEmpty)
     }
+
+    @Test func cookLogOccasionColumnsRoundTrip() throws {
+        let container = try RecipeStore.inMemoryContainer()
+        let context = ModelContext(container)
+
+        // Insert a row with the new occasion and recipient values
+        let id1 = UUID()
+        context.insert(
+            CachedCookLogEntry(
+                id: id1,
+                recipeID: 42,
+                recipeTitle: "Dutch Oven Lasagna",
+                cookedAt: Date(timeIntervalSince1970: 1000),
+                occasionRaw: "comfort",
+                recipient: "Mom"
+            )
+        )
+
+        // Insert a row without the new values (should be nil)
+        let id2 = UUID()
+        context.insert(
+            CachedCookLogEntry(
+                id: id2,
+                recipeID: 43,
+                recipeTitle: "Chicken Soup",
+                cookedAt: Date(timeIntervalSince1970: 2000)
+            )
+        )
+
+        try context.save()
+
+        // Fetch and verify the first row
+        let rows1 = try context.fetch(
+            FetchDescriptor<CachedCookLogEntry>(predicate: #Predicate { $0.id == id1 })
+        )
+        #expect(rows1.count == 1)
+        #expect(rows1.first?.occasionRaw == "comfort")
+        #expect(rows1.first?.recipient == "Mom")
+
+        // Fetch and verify the second row (should have nil values)
+        let rows2 = try context.fetch(
+            FetchDescriptor<CachedCookLogEntry>(predicate: #Predicate { $0.id == id2 })
+        )
+        #expect(rows2.count == 1)
+        #expect(rows2.first?.occasionRaw == nil)
+        #expect(rows2.first?.recipient == nil)
+    }
 }

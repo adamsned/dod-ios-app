@@ -1,3 +1,5 @@
+// LiveDODIntelligenceService is iOS-only (FoundationModels).
+#if os(iOS)
 import XCTest
 
 @testable import DODIntelligence
@@ -39,12 +41,5 @@ final class RecipeExtractionGroundingTests: XCTestCase {
 
         XCTAssertTrue(prompt.contains(chunk))
     }
-
-    func testExtractRecipeReturnsNilOnMacOS() {
-        // This test should run on macOS where iOS availability checks would fail
-        #if os(macOS)
-        let result = LiveDODIntelligenceService.extractRecipe(fromBody: "x")
-        XCTAssertNil(result)
-        #endif
-    }
 }
+#endif

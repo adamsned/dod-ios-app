@@ -374,4 +374,13 @@ extension CookModeViewModel {
     public func snoozeTimer() {
         snoozeCompletedTimer(minutes: 2)
     }
+
+    /// DUT-1029 — stops the transcriber and clears every bit of listening state.
+    func cancelListening() {
+        listenTask?.cancel()
+        listenTask = nil
+        transcriber.stopListening()
+        isListening = false
+        liveTranscript = ""
+    }
 }

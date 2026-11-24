@@ -165,11 +165,10 @@ extension RecipeStore {
         // diagnostics stay honest (same as a real CloudKit-open failure).
         guard optedIn, cloudKitAvailable else {
             // A failure here is a real migration error and must propagate.
-            let container = try ModelContainer(
-                for: schema,
-                migrationPlan: inMemory ? nil : MigrationPlan.self,
-                configurations: local,
-                syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)
+            let container = try openContainer(
+                schema: schema,
+                inMemory: inMemory,
+                configurations: [local, syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)]
             )
             return ContainerBuildResult(container: container, usedCloudKitFallback: optedIn)
         }
@@ -177,19 +176,17 @@ extension RecipeStore {
         // falling back to an all-local layout if the `.private` open throws.
         return try buildCloudKitWithFallback(
             cloudKitBuild: {
-                try ModelContainer(
-                    for: schema,
-                    migrationPlan: inMemory ? nil : MigrationPlan.self,
-                    configurations: local,
-                    syncedSavedConfiguration(inMemory: inMemory, cloudKit: true)
+                try openContainer(
+                    schema: schema,
+                    inMemory: inMemory,
+                    configurations: [local, syncedSavedConfiguration(inMemory: inMemory, cloudKit: true)]
                 )
             },
             localBuild: {
-                try ModelContainer(
-                    for: schema,
-                    migrationPlan: inMemory ? nil : MigrationPlan.self,
-                    configurations: local,
-                    syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)
+                try openContainer(
+                    schema: schema,
+                    inMemory: inMemory,
+                    configurations: [local, syncedSavedConfiguration(inMemory: inMemory, cloudKit: false)]
                 )
             }
         )
