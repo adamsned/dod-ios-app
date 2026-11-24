@@ -232,7 +232,11 @@ public final class GA4Transport: TelemetryTransport, @unchecked Sendable {
     /// up in tests.
     static func pseudonymousClientID() -> String {
         #if canImport(UIKit)
+        #if compiler(>=6.4)
         let vendorID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        #else
+        let vendorID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        #endif
         #else
         let vendorID = UUID().uuidString
         #endif

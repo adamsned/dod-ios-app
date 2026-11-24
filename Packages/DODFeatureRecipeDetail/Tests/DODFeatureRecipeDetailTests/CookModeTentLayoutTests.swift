@@ -15,4 +15,9 @@ struct CookModeTentLayoutTests {
         while !vm.isFinished { vm.goNext() }
         #expect(!CookModePosture.tent.usesTwoPane(isFinished: vm.isFinished))
     }
+
+    @Test func hingeAngleDrivesTwoPane() {
+        #expect(CookModePosture.resolve(hingeAngle: 90).usesTwoPane(isFinished: false))
+        #expect(!CookModePosture.resolve(hingeAngle: nil).usesTwoPane(isFinished: false))
+    }
 }

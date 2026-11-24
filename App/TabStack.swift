@@ -256,7 +256,8 @@ struct TabStack: View {
                 // `DODFeatureFeed` can't import `DODFeatureSearch` (CL-122), so the
                 // header calls this injected closure and the App shell presents it.
                 onOpenSearch: { showSearch = true },
-                recipeOfTheDay: RecipeOfTheDayModel()
+                // DUT-2894 — the widget's JSON-LD classifier labels article picks.
+                recipeOfTheDay: RecipeOfTheDayModel(classifier: dependencies.makeLatestKindClassifier())
             )
         case .saved:
             SavedView(

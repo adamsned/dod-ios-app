@@ -21,4 +21,42 @@ struct HeatCoachGroundednessEvalTests {
         let query = HeatCoachQuery(ovenDiameterInches: 12, style: .even, answer: "")
         #expect(!HeatCoachGroundednessEval.allowedNumbers(for: query).contains(99))
     }
+
+    @Test func groundedAnswerPasses() {
+        let query = HeatCoachQuery(
+            ovenDiameterInches: 12,
+            style: .even,
+            answer: "Start with 24 coals: 12 on the lid, 12 underneath, for about 350 degrees."
+        )
+        #expect(HeatCoachGroundednessEval.grade(query).isEmpty)
+    }
+
+    @Test func bakingSplitIsGrounded() {
+        let query = HeatCoachQuery(
+            ovenDiameterInches: 12,
+            style: .baking,
+            answer: "Use 24 coals: 18 on the lid and 6 on the bottom."
+        )
+        #expect(HeatCoachGroundednessEval.grade(query).isEmpty)
+    }
+
+    @Test func hallucinatedCoalCountFails() {
+        let query = HeatCoachQuery(ovenDiameterInches: 12, style: .even, answer: "Use 40 coals")
+        let failures = HeatCoachGroundednessEval.grade(query)
+        #expect(failures.contains { $0.contains("ungrounded number") })
+    }
+
+    @Test func overconfidentPhraseFails() {
+        let query = HeatCoachQuery(
+            ovenDiameterInches: 12,
+            style: .even,
+            answer: "24 coals is guaranteed to work"
+        )
+        #expect(!HeatCoachGroundednessEval.grade(query).isEmpty)
+    }
+
+    @Test func emptyAnswerFails() {
+        let query = HeatCoachQuery(ovenDiameterInches: 12, style: .even, answer: "")
+        #expect(!HeatCoachGroundednessEval.grade(query).isEmpty)
+    }
 }
