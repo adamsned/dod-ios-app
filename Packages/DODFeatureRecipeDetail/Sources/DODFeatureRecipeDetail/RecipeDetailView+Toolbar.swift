@@ -125,6 +125,28 @@ extension RecipeDetailView {
                 }
                 .disabled(viewModel.recipe == nil)
                 .accessibilityLabel("Share recipe")
+
+                // DUT-977 — the tent card glyph opens the full iOS share sheet with
+                // the QR tent card. This reuses the existing share sheet, so the
+                // card can go to Print or AirDrop.
+                Button {
+                    prepareTentCardShare()
+                } label: {
+                    Image(systemName: "qrcode")
+                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
+                }
+                .disabled(viewModel.recipe == nil)
+                .accessibilityLabel("Share table tent card")
+
+                // DUT-968 — "Pass it down": share the recipe as hand-off text.
+                Button {
+                    prepareLegacyHandoffShare(logs: [])
+                } label: {
+                    Image(systemName: "person.2")
+                        .toolbarGlyphChip(foreground: ToolbarGlyphForeground.neutral)
+                }
+                .disabled(viewModel.recipe == nil)
+                .accessibilityLabel("Pass it down to family")
                 #else
                 // macOS `swift test` slice: no UIKit share sheet — keep a plain
                 // URL ShareLink so the toolbar still compiles cross-platform.
@@ -145,6 +167,7 @@ extension RecipeDetailView {
                     viewModel.dismissSummary()
                 }
             }
+            .legacyHandoffShareSheet($legacyHandoffText)  // DUT-968 (iOS-only)
         }
     }
 
@@ -189,6 +212,13 @@ extension RecipeDetailView {
         } catch {
             // Best-effort: temp dir is writable in practice; if not, no sheet.
         }
+    }
+
+    /// DUT-977 — render the at-the-table QR tent card and present the share sheet over it.
+    func prepareTentCardShare() {
+        guard let recipe = viewModel.recipe else { return }
+        guard let fileURL = RecipeTentCardRenderer.writeFile(recipe: recipe, hostName: nil) else { return }
+        sharePDF = SharePDFItem(pdfURL: fileURL, linkURL: recipe.canonicalURL)
     }
 
     /// Pure PDF bytes for a recipe at the current servings/units. `static` +

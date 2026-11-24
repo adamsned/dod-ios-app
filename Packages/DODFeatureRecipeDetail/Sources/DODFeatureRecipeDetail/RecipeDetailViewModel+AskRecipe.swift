@@ -44,4 +44,17 @@ extension RecipeDetailViewModel {
     }
 
     public func clearAskRecipe() { askMessages = [] }
+
+    /// DUT-2893 — suggested questions built from this recipe (swaps, coals vs
+    /// oven, doneness, scaling at the servings the cook picked, make-ahead,
+    /// leftovers). Empty until the recipe has loaded.
+    public var askRecipeSuggestions: [String] {
+        guard let recipe else { return [] }
+        return ChatSuggestions.forRecipe(
+            title: recipe.title,
+            ingredients: recipe.ingredients.map(\.text),
+            steps: recipe.instructions.sorted { $0.step < $1.step }.map(\.text),
+            servings: recipe.servings == nil ? nil : userServings
+        )
+    }
 }

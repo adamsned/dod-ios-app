@@ -37,6 +37,7 @@ extension RecipeDetailView {
                 // DUT-986 — first-cook-only training wheels (off once any cook is logged)
                 isFirstCookEver: viewModel.isFirstCookEver
             )
+            .hingeDrivenCookModePosture()
         }
     }
 

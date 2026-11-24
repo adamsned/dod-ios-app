@@ -18,4 +18,10 @@ enum HeatCoachGroundednessEval {
         )
         return [query.ovenDiameterInches, split.lid, split.bottom, split.total, 350]
     }
+
+    static func grade(_ query: HeatCoachQuery) -> [String] {
+        EvalGraders.nonEmpty(query.answer)
+            + EvalGraders.numbersGrounded(in: query.answer, allowed: allowedNumbers(for: query))
+            + EvalGraders.forbids(["guaranteed", "never fails"], in: query.answer)
+    }
 }

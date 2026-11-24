@@ -1,3 +1,4 @@
+import DODSupport
 import Foundation
 
 #if os(iOS)
@@ -86,6 +87,19 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         #endif
     }
 
+    public func parseIngredient(_ line: String) async -> IngredientParse? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            return await Self.generateIngredientParse(trimmed)
+        }
+        return nil
+        #else
+        return nil
+        #endif
+    }
+
     public func summarize(_ text: String) async -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -130,16 +144,18 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
                 imageData: imageData,
                 recipeContext: recipeContext
             ) {
-                return withImage
+                return SandingGuard.sanitize(withImage as String?)
             }
             // The image path yielded nothing (decode or model error); fall back
             // to a text-only answer when there's still a question to answer.
         }
         #endif
         if #available(iOS 26, *), !trimmed.isEmpty {
-            return await Self.generateText(
-                instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
-                prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
+            return SandingGuard.sanitize(
+                await Self.generateText(
+                    instructions: recipeContext == nil ? Self.helperInstructions : Self.recipeChatInstructions,
+                    prompt: Self.chatPrompt(question: trimmed, recipeContext: recipeContext)
+                )
             )
         }
         return nil
@@ -278,11 +294,11 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         \(SandingGuard.instructionRule)
         """
 
-    /// DUT-1385 — instructions for Cook Mode's "Ask About This Recipe" chat:
+    /// DUT-1385 — instructions for Cook Mode's "Ask the Recipe" chat:
     /// answers stay scoped to the one recipe, and the recipe text is the source
     /// of truth for amounts and times.
     @available(iOS 26, *)
-    private static let recipeChatInstructions = """
+    static let recipeChatInstructions = """
         You are Dutch Oven Daddy's cooking assistant, helping someone who is \
         cooking the recipe they give you right now. Answer questions about this \
         recipe only: its ingredients and amounts, steps, timing, doneness, prep \
@@ -295,6 +311,8 @@ public final class LiveDODIntelligenceService: DODIntelligenceService {
         Answer in a short, practical paragraph. Do not use em dashes; use periods \
         or commas instead. When a photo is attached, relate what you see to this \
         recipe.
+
+        \(SandingGuard.instructionRule)
         """
     #endif
 }
