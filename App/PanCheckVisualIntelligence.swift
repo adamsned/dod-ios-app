@@ -1,6 +1,14 @@
 import AppIntents
+import CoreGraphics
+import CoreVideo
 import DODSupport
 import Foundation
+import VideoToolbox
+
+// VisualIntelligence ships in the iOS device SDK only, not the simulator SDK.
+#if canImport(VisualIntelligence)
+import VisualIntelligence
+#endif
 
 /// DUT-1826 — one pan-check result, surfaced to Visual Intelligence. `id` is `PanCheck.Verdict.rawValue`.
 @available(iOS 26.0, *)
@@ -24,6 +32,22 @@ struct PanCheckQuery: EntityQuery {
     }
 
     func suggestedEntities() async throws -> [PanCheckEntity] { [] }
+
+    #if canImport(VisualIntelligence)
+    /// Visual Intelligence calls this with the camera frame.
+    func values(for input: SemanticContentDescriptor) async throws -> [PanCheckEntity] {
+        // `pixelBuffer` is a CVReadOnlyPixelBuffer; borrow its CVPixelBuffer for the conversion.
+        guard let image = input.pixelBuffer?.withUnsafeBuffer({ Self.cgImage(from: $0) }) else { return [] }
+        let verdict = await VisionPanCheckClassifier().verdict(for: image)
+        return [PanCheckEntity(id: verdict.rawValue)]
+    }
+    #endif
+
+    nonisolated static func cgImage(from buffer: CVPixelBuffer) -> CGImage? {
+        var image: CGImage?
+        VTCreateCGImageFromCVPixelBuffer(buffer, options: nil, imageOut: &image)
+        return image
+    }
 }
 
 /// DUT-1826 — opens DOD on a pan-check result chosen from Visual Intelligence.

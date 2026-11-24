@@ -137,6 +137,12 @@ public protocol DODIntelligenceService: Sendable {
     /// "cheddar"). Returns `[]` — never throws — when unavailable, the image is
     /// undecodable, the model errors, or a guardrail rejects it.
     func identifyIngredients(imageData: Data) async -> [String]
+
+    /// DUT-1020 — parse one ingredient line into `(quantity, unit, item, prep)`
+    /// with on-device guided generation. Returns `nil` — never throws — when
+    /// unavailable, the line is blank, the model errors, or a guardrail rejects
+    /// it; callers then keep the heuristic `IngredientLineParser` result.
+    func parseIngredient(_ line: String) async -> IngredientParse?
 }
 
 extension DODIntelligenceService {
@@ -201,4 +207,7 @@ extension DODIntelligenceService {
     /// throws — when unavailable, `answers` is empty, the model errors, or a
     /// guardrail rejects it, so onboarding simply skips the personalization.
     public func extractIntakeProfile(from answers: [IntakeAnswer]) async -> CookIntakeProfile? { nil }
+
+    /// DUT-1020 — default so existing conformers/mocks keep compiling.
+    public func parseIngredient(_ line: String) async -> IngredientParse? { nil }
 }

@@ -26,6 +26,10 @@ extension CookJournalView {
         var last30Days = 0
         /// DUT-974 — gateway dishes on their way to being owned (closest first).
         var ownIt: [CookLogStats.OwnItProgress] = []
+        /// DUT-975 — chronological confidence reads (1–5), oldest first.
+        var confidenceReads: [Int] = []
+        /// DUT-975 — recent-minus-early confidence delta; nil with < 4 reads.
+        var confidenceTrend: Double?
     }
 
     /// Derive the header stats from a cook history. Pure + static so the
@@ -45,7 +49,9 @@ extension CookJournalView {
             mostCooked: CookLogStats.mostCooked(cooks),
             averageRating: CookLogStats.averageRating(cooks),
             last30Days: CookLogStats.cooksInLast30Days(cooks, asOf: .now, calendar: weekCalendar),
-            ownIt: CookLogStats.onYourWayToOwning(cooks)
+            ownIt: CookLogStats.onYourWayToOwning(cooks),
+            confidenceReads: CookLogStats.confidenceTrajectory(cooks).map(\.confidence),
+            confidenceTrend: CookLogStats.confidenceTrend(cooks)
         )
     }
 
@@ -92,6 +98,32 @@ extension CookJournalView {
                 statTile("\(stats.last30Days)", "cooks (30d)")
             }
             if !stats.ownIt.isEmpty { ownItCard(stats.ownIt) }
+        }
+    }
+
+    /// DUT-975 — "that felt hard → that felt easy" bar strip. Hidden until 2+ reads.
+    @ViewBuilder
+    func confidenceTrajectoryCard(stats: JournalStats) -> some View {
+        if stats.confidenceReads.count >= 2 {
+            VStack(alignment: .leading, spacing: DODSpacing.xs) {
+                Text("Your confidence").dodFont(DODType.heading).foregroundStyle(DODColor.label)
+                HStack(alignment: .bottom, spacing: DODSpacing.xxs) {
+                    ForEach(Array(stats.confidenceReads.suffix(12).enumerated()), id: \.offset) { _, level in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(DODColor.burntOrange)
+                            .frame(height: CGFloat(level) * 10)
+                    }
+                }
+                .frame(height: 50, alignment: .bottom)
+                .accessibilityHidden(true)
+            }
+            .padding(DODSpacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: DODRadius.standard, style: .continuous).fill(DODColor.surfaceElevated)
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Your confidence over your last \(min(12, stats.confidenceReads.count)) cooks")
         }
     }
 

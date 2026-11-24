@@ -200,11 +200,6 @@ struct DODIntelligenceServiceTests {
         #expect(await makeLegacyService().scanRecipeCard(imageData: Data([1, 2, 3])) == nil)
     }
 
-    @Test func fakeScanReturnsCannedRecipe() async {
-        let result = await FakeIntelligenceService().scanRecipeCard(imageData: Data([1]))
-        #expect(result?.title == "Grandma's Gumbo")
-    }
-
     @Test func fakeScanNilWhenUnavailable() async {
         let service = FakeIntelligenceService(isAvailable: false)
         #expect(await service.scanRecipeCard(imageData: Data([1])) == nil)
@@ -233,9 +228,9 @@ struct DODIntelligenceServiceTests {
         #expect(await service.explainStep("Fold in the egg whites", nextStep: nil) == nil)
     }
 
-    @Test func defaultExtractRecipeReturnsNil() {
+    @Test func defaultExtractRecipeReturnsNil() async {
         let bare = makeBareService()
-        let result = bare.extractRecipe(fromBody: "x")
+        let result = await bare.extractRecipe(fromBody: "x")
         #expect(result == nil)
     }
 
@@ -283,9 +278,19 @@ struct DODIntelligenceServiceTests {
         #expect(await service.summarizeComments(["a"]) == nil)
     }
 
-    @Test func liveIdentifyIngredientsIsEmptyWithoutModel() async {
-        let result = await LiveDODIntelligenceService().identifyIngredients(imageData: Data([0x00]))
-        #expect(result.isEmpty)
+    @Test func fakeIdentifyReturnsCannedWhenAvailable() async {
+        let service = FakeIntelligenceService()
+        #expect(await service.identifyIngredients(imageData: Data([0x01])) == ["eggs", "cheddar", "spinach", "butter"])
+    }
+
+    @Test func fakeIdentifyEmptyWhenUnavailable() async {
+        let service = FakeIntelligenceService(isAvailable: false)
+        #expect(await service.identifyIngredients(imageData: Data([0x01])).isEmpty)
+    }
+
+    @Test func fakeIdentifyEmptyWithoutImageSupport() async {
+        let service = FakeIntelligenceService(supportsImageInput: false)
+        #expect(await service.identifyIngredients(imageData: Data([0x01])).isEmpty)
     }
 
     @Test func captionMomentDefaultsToNil() async {

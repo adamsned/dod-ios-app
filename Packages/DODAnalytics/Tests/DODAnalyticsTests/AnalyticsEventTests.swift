@@ -234,4 +234,25 @@ import Testing
         #expect(event.name == "recipe_problem_reported")
         #expect(event.payload == ["recipe_id": "7", "problem_type": "photo"])
     }
+
+    @Test func cookingWrappedEventsCarryOnlyPeriod() {
+        let viewed = AnalyticsEvent.cookingWrappedViewed(period: "year")
+        #expect(viewed.name == "cooking_wrapped_viewed")
+        #expect(viewed.payload == ["period": "year"])
+        let shared = AnalyticsEvent.cookingWrappedShared(period: "year_so_far")
+        #expect(shared.name == "cooking_wrapped_shared")
+        #expect(shared.payload == ["period": "year_so_far"])
+    }
+
+    @Test func digestDeliveredNameAndPayload() {
+        let event = AnalyticsEvent.digestDelivered(recipeCount: 5)
+        #expect(event.name == "digest_delivered")
+        #expect(event.payload == ["recipe_count": "5"])
+    }
+
+    @Test func digestOpenedIsNameOnlyWithEmptyPayload() {
+        let event = AnalyticsEvent.digestOpened
+        #expect(event.name == "digest_opened")
+        #expect(event.payload.isEmpty)
+    }
 }

@@ -129,4 +129,64 @@ struct SettingsViewModelNotificationsTests {
         #expect(result == false)
         #expect(viewModel.articleNotificationsEnabled == false)
     }
+
+    @Test func weeklyDigestDefaultsOffAndRoundTrips() async throws {
+        let defaults = Self.isolatedDefaults()
+        let viewModel = SettingsViewModel(defaults: defaults)
+        #expect(viewModel.weeklyDigestEnabled == false)
+        viewModel.weeklyDigestEnabled = true
+        #expect(defaults.bool(forKey: SettingsViewModel.weeklyDigestEnabledKey) == true)
+        #expect(SettingsViewModel(defaults: defaults).weeklyDigestEnabled == true)
+    }
+
+    @Test func setWeeklyDigestEnabledOnGrantPersistsTrue() async throws {
+        let defaults = Self.isolatedDefaults()
+        // Inject an auth closure that GRANTS.
+        let viewModel = SettingsViewModel(
+            defaults: defaults,
+            requestNotificationAuthorization: { true }
+        )
+
+        let granted = await viewModel.setWeeklyDigestEnabled(true)
+        #expect(granted == true)
+        #expect(viewModel.weeklyDigestEnabled == true)
+        #expect(viewModel.snackbarMessage == nil)
+    }
+
+    @Test func setWeeklyDigestEnabledOnDenyStaysOffWithSnackbar() async throws {
+        let defaults = Self.isolatedDefaults()
+        // Inject an auth closure that DENIES (the default, made explicit).
+        let viewModel = SettingsViewModel(
+            defaults: defaults,
+            requestNotificationAuthorization: { false }
+        )
+
+        let granted = await viewModel.setWeeklyDigestEnabled(true)
+        #expect(granted == false)
+        // Persisted intent stays OFF so the UI never claims it's on while
+        // the OS suppresses delivery (mirrors AC-42.1).
+        #expect(viewModel.weeklyDigestEnabled == false)
+        #expect(viewModel.snackbarMessage != nil)
+    }
+
+    @Test func suggestMutingOnlyWhenBothOn() async throws {
+        let defaults = Self.isolatedDefaults()
+        let viewModel = SettingsViewModel(defaults: defaults)
+
+        // Both OFF
+        #expect(viewModel.shouldSuggestMutingRecipeDrops == false)
+
+        // Digest ON, Recipe OFF
+        viewModel.weeklyDigestEnabled = true
+        #expect(viewModel.shouldSuggestMutingRecipeDrops == false)
+
+        // Digest OFF, Recipe ON
+        viewModel.weeklyDigestEnabled = false
+        viewModel.notificationsEnabled = true
+        #expect(viewModel.shouldSuggestMutingRecipeDrops == false)
+
+        // Both ON
+        viewModel.weeklyDigestEnabled = true
+        #expect(viewModel.shouldSuggestMutingRecipeDrops == true)
+    }
 }

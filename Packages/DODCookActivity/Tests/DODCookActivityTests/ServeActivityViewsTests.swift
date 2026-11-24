@@ -1,10 +1,8 @@
-import SwiftTesting
 import SwiftUI
-import XCTest
+import Testing
 
 @testable import DODCookActivity
 
-@available(iOS 16.1, *)
 struct ServeActivityViewsTests {
 
     @Test

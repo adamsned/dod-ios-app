@@ -73,6 +73,28 @@ extension SettingsViewModel {
         return granted
     }
 
+    /// DUT-152 — drives the opt-in "Weekly Digest" toggle. ON requests system
+    /// authorization (persist on grant; revert + snackbar on deny); OFF persists false.
+    @discardableResult
+    public func setWeeklyDigestEnabled(_ enabled: Bool) async -> Bool {
+        guard enabled else {
+            weeklyDigestEnabled = false
+            return false
+        }
+        let granted = await requestNotificationAuthorization()
+        weeklyDigestEnabled = granted
+        if !granted {
+            snackbarMessage = "Enable notifications in iOS Settings → DOD to get the weekly digest."
+        }
+        return granted
+    }
+
+    /// DUT-152 — true when both the digest and per-recipe drops are on, so the
+    /// Settings footer should suggest turning one off to avoid double-notifying.
+    public var shouldSuggestMutingRecipeDrops: Bool {
+        weeklyDigestEnabled && notificationsEnabled
+    }
+
     // MARK: - DUT-1181 — Cook Mode step-timer opt-out flush
 
     /// Base identifier `SystemCookStepTimerNotifier` (DODFeatureRecipeDetail)

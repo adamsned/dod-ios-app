@@ -67,6 +67,8 @@ import Testing
             .reviewPromptEligible,
             .reviewPromptShown,
             .reviewManualRateTapped,
+            .digestDelivered(recipeCount: 3),
+            .digestOpened,
         ]
 
         for event in allCases {

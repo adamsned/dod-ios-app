@@ -22,10 +22,15 @@ public protocol CategoriesDependencies: Sendable {
     /// T-765 / CL-162 (DUT-71) — saved recipe id set for the card long-press
     /// Save/Unsave label. Default `[]` keeps existing fake conformers compiling.
     func savedRecipeIDs() async throws -> Set<Int>
+    /// DUT-161 — editor-curated ordered recipe ids to lead a category with.
+    /// Empty means no curation (chronological only).
+    func pinnedRecipeIDs(forCategoryID categoryID: Int) async -> [Int]
 }
 
 extension CategoriesDependencies {
     public func savedRecipeIDs() async throws -> Set<Int> { [] }
+
+    public func pinnedRecipeIDs(forCategoryID categoryID: Int) async -> [Int] { [] }
 
     public func fetchPosts(
         tagIDs: [Int],

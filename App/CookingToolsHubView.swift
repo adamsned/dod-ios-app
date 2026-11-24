@@ -314,7 +314,8 @@ struct CookingToolsHubView: View {
             CookJournalView(
                 load: { await feedViewModel.cookLogs() },
                 update: { await feedViewModel.updateCook($0) },
-                delete: { await feedViewModel.deleteCook($0) }
+                delete: { await feedViewModel.deleteCook($0) },
+                clearAll: { await feedViewModel.clearCookHistory() }  // DUT-199
             )
         case .cookModeExplainer:
             cookModeExplainer
@@ -323,8 +324,7 @@ struct CookingToolsHubView: View {
 
     // MARK: - The tool list
 
-    // The six tool cards + the `toolCard` builder live in
-    // `CookingToolsHubView+ToolCards.swift` to stay under `type_body_length`.
+    // The tool cards + `toolCard` builder live in `CookingToolsHubView+ToolCards.swift` (type_body_length).
 
     /// Cook Mode can't launch without a recipe, so this row's sheet explains the
     /// flow and routes the user to the Recipes tab to pick something to cook.

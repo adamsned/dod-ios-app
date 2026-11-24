@@ -37,7 +37,20 @@ extension RecipeDetailView {
                 // DUT-986 — first-cook-only training wheels (off once any cook is logged)
                 isFirstCookEver: viewModel.isFirstCookEver
             )
+            .hingeDrivenCookModePosture()
         }
+    }
+
+    /// DUT-1559 — the solo first-cook gear check; "Start" opens Cook Mode.
+    var gearCheckSheet: some View {
+        GearReadyCheckView(
+            equipment: viewModel.recipe?.equipment ?? [],
+            onStart: {
+                isGearCheckPresented = false
+                isCookModePresented = true
+            },
+            onCancel: { isGearCheckPresented = false }
+        )
     }
 
     /// DUT-985 — the one-time first-cook expectation screen.

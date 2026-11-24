@@ -103,6 +103,19 @@ public enum AnalyticsEvent: Sendable, Hashable {
     /// text / no PII). Authorized by CL-124. Dispatch lands with T-705.
     case syncFailed(errorCategory: SyncErrorCategory)
 
+    /// DUT-152 — weekly digest scheduled/delivered. Count only; never titles (constitution §9).
+    case digestDelivered(recipeCount: Int)
+
+    /// DUT-152 — user tapped the weekly digest notification.
+    case digestOpened
+
+    /// DUT-177 — the Cooking Wrapped recap was opened. `period` is the closed
+    /// strings "year" or "year_so_far"; never any cook-log content.
+    case cookingWrappedViewed(period: String)
+
+    /// DUT-177 — the user explicitly exported/shared the recap image.
+    case cookingWrappedShared(period: String)
+
     /// DUT-157 — the engagement gate passed and the app is eligible to ask for a review. Counts only.
     case reviewPromptEligible
     /// DUT-157 — the system review request was issued. Counts only.
@@ -219,6 +232,10 @@ extension AnalyticsEvent {
         case .syncDisabled: "sync_disabled"
         case .syncCompletedSuccessfully: "sync_completed_successfully"
         case .syncFailed: "sync_failed"
+        case .digestDelivered: "digest_delivered"
+        case .digestOpened: "digest_opened"
+        case .cookingWrappedViewed: "cooking_wrapped_viewed"
+        case .cookingWrappedShared: "cooking_wrapped_shared"
         case .reviewPromptEligible: "review_prompt_eligible"
         case .reviewPromptShown: "review_prompt_shown"
         case .reviewManualRateTapped: "review_manual_rate_tapped"
@@ -284,6 +301,14 @@ extension AnalyticsEvent {
         case .syncFailed(let errorCategory):
             // Closed-set category only — never the raw CKError. Constitution §9.
             ["error_category": errorCategory.rawValue]
+        case .digestDelivered(let recipeCount):
+            ["recipe_count": String(recipeCount)]
+        case .digestOpened:
+            [:]
+        case .cookingWrappedViewed(let period):
+            ["period": period]
+        case .cookingWrappedShared(let period):
+            ["period": period]
         case .reviewPromptEligible, .reviewPromptShown, .reviewManualRateTapped:
             [:]
         case .recipeOfTheDayShown(let recipeID), .recipeOfTheDayTapped(let recipeID):

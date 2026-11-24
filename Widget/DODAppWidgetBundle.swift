@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 
 /// Extension entry point. WidgetKit discovers widgets by enumerating
-/// types declared on the bundle's `body` property. Six widget kinds:
+/// types declared on the bundle's `body` property. six widget kinds:
 /// ``FeaturedRecipeWidget`` (US-9, home-screen small / medium / large),
 /// ``SavedRecipesWidget`` (US-17, home-screen small / medium / large),
 /// ``LatestRecipeLockScreenWidget`` (US-22, lock-screen
@@ -24,6 +24,8 @@ import WidgetKit
 /// Center / Lock Screen control (user picks which cooking tool it opens),
 /// registered conditionally (see below).
 ///
+/// DUT-989 — plus the iOS 18-only ``TonightsRungControl`` (one-tap Cook Mode quick-start).
+///
 /// Spec trace: US-9, US-17 (AC-17.1), US-22 (AC-22.1, AC-22.7); DUT-454,
 /// DUT-459, DUT-480.
 @main
@@ -36,6 +38,7 @@ struct DODAppWidgetBundle: WidgetBundle {
         LatestRecipeLockScreenWidget()
         SavedLockScreenWidget()
         CookingTipWidget()
+        ShoppingListWidget()
         PinnedCollectionWidget()  // DUT-172 — configurable collection widget
         // DUT-560 (was DUT-480) — the configurable Control Center / Lock Screen
         // control is iOS 18+ only (`ControlWidget` is unavailable on the iOS 17
@@ -45,6 +48,8 @@ struct DODAppWidgetBundle: WidgetBundle {
         // contributes nothing and the five widgets above still register.
         if #available(iOS 18.0, *) {
             CookingToolControl()
+            // DUT-989 — Tonight's Rung quick-start control.
+            TonightsRungControl()
         }
     }
 }

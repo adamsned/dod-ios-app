@@ -61,15 +61,25 @@ extension FeedViewModel {
             // DUT-983: any recipe, including off-path ones. Replaces the
             // Fire Starter rank-up a first path cook would otherwise earn.
             pendingCelebration = .firstCookEver
-        } else {
-            let reached = CookProgression.rankUp(
-                from: Self.rankLadderCookCount(logsBefore),
-                to: Self.rankLadderCookCount(logsAfter)
-            )
-            if let reached {
-                pendingCelebration = .rankUp(reached)
-            }
+        } else if let rung = GuidedCookout.milestone(from: cookedBefore, to: cookedAfter), rung != .graduated {
+            // DUT-964: a ladder beat outranks a plain rank-up. A rank-up that
+            // lands on the same cook is deliberately shadowed by this branch.
+            // `.graduated` is excluded because the first branch already handles it.
+            pendingCelebration = .rungMilestone(rung)
+        } else if let reached = CookProgression.rankUp(
+            from: Self.rankLadderCookCount(logsBefore),
+            to: Self.rankLadderCookCount(logsAfter)
+        ) {
+            // DUT-964: ensure rank-up is only considered when no rung milestone was found
+            pendingCelebration = .rankUp(reached)
         }
+        // DUT-971 — keep the idle re-seasoning reminder 21 days out from this cook.
+        await PanCareScheduling.reschedule(
+            notifier: SystemPanCareNotifier(),
+            store: PanCareStore(),
+            cooks: logsAfter,
+            now: entry.cookedAt
+        )
         promoteCelebrationIfReady()
     }
 
@@ -104,5 +114,22 @@ extension FeedViewModel {
     /// mirrors `dismissShoppingListSnackbar()` in `FeedViewModel+ShoppingList`.
     public func dismissCookLogFailureMessage() {
         cookLogFailureMessage = nil
+    }
+}
+
+/// DUT-971 — keeps the idle re-seasoning reminder 21 days out from the latest
+/// cook or care entry. Free-standing so it can be tested with a fake notifier.
+enum PanCareScheduling {
+    static func reschedule(
+        notifier: PanCareNotifying,
+        store: PanCareStore,
+        cooks: [CookLogEntry],
+        now: Date
+    ) async {
+        guard let last = PanCare.lastActivity(cooks: cooks, cares: store.entries()) else {
+            await notifier.cancelIdleReminder()
+            return
+        }
+        await notifier.scheduleIdleReminder(lastActivity: last, now: now)
     }
 }

@@ -39,6 +39,7 @@ import Testing
         (.firstCookout, "first-cookout"),
         (.cookMode, "cook-mode"),
         (.buyBuzzyWaxx, "buzzywaxx"),
+        (.tonightsRung, "tonights-rung"),
     ])
     func routeRoundTrips(route: ControlRouteStore.Route, rawValue: String) throws {
         #expect(route.rawValue == rawValue)

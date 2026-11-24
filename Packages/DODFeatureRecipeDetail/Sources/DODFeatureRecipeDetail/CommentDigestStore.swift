@@ -35,4 +35,23 @@ public final class CommentDigestStore {
             .sorted { $0.dateGMT > $1.dateGMT }
             .map(\.body)
     }
+
+    public func refresh(comments: [RecipeComment]) async {
+        guard let intelligence, intelligence.isAvailable else {
+            state = .unavailable
+            return
+        }
+        let bodies = Self.approvedBodies(comments)
+        guard bodies.count >= Self.minimumComments else {
+            state = .unavailable
+            return
+        }
+        state = .loading
+        if let digest = await intelligence.summarizeComments(bodies) {
+            digestedCount = bodies.count
+            state = .loaded(digest)
+        } else {
+            state = .unavailable
+        }
+    }
 }

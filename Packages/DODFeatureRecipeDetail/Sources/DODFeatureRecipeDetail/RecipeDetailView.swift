@@ -27,10 +27,8 @@ public struct RecipeDetailView: View {
         let recipe: Recipe
     }
 
-    // `internal` (default) access so the `RecipeDetailView+Blurb.swift`
-    // extension can read `viewModel` to render the full-description surface
-    // (Swift extensions don't see `private`/`fileprivate` declarations from a
-    // sibling file).
+    // `internal` so the `RecipeDetailView+Blurb.swift` extension can read `viewModel`
+    // (extensions in sibling files can't see `private` members).
     @State var viewModel: RecipeDetailViewModel
     @State private var isOfflineSnapshot: Bool = false
     /// Share has no toggle state (unlike Save / Download), so this counter is the
@@ -40,6 +38,8 @@ public struct RecipeDetailView: View {
     // `internal` (not `private`) so the `RecipeDetailView+Sections.swift`
     // extension's relocated Cook Mode CTA tap can present the cover (DUT-631).
     @State var isCookModePresented: Bool = false
+    /// DUT-984 gear checklist before Cook Mode
+    @State var isGearCheckPresented: Bool = false
     /// True when the screen was entered via the StartCookModeIntent deep
     /// link (US-10). We watch the load state and flip the cover open as
     /// soon as the recipe has instructions to render. Resets to false
@@ -100,7 +100,7 @@ public struct RecipeDetailView: View {
     /// nudge opens the coach pre-answered from the recipe's own heat profile.
     public let openHeatCoach: ((HeatCoachSeed?) -> Void)?
     /// T-912 / DUT-551 (CL-306) + DUT-1385 — the sheets presented OVER Cook
-    /// Mode's full-screen cover (Heat Coach, Ask About This Recipe). Their views
+    /// Mode's full-screen cover (Heat Coach, Ask the Recipe). Their views
     /// live in `DODFeatureFeed` (not importable here), so the App root injects
     /// type-erased builders, forwarded to `CookModeView`. A `nil` builder
     /// (previews / unwired hosts / no on-device model) hides that affordance.
@@ -128,6 +128,7 @@ public struct RecipeDetailView: View {
 
     /// DUT-1324 — non-nil drives the PDF share sheet; set by the toolbar.
     @State var sharePDF: SharePDFItem?
+    @State var legacyHandoffText: String?  // DUT-968 — drives the "Pass it down" sheet
 
     /// DUT-1340 — drives the "Add to Collection" picker from the bookmark's
     /// press-and-hold menu. `internal` so the `+Toolbar` extension flips it.
@@ -194,6 +195,7 @@ public struct RecipeDetailView: View {
             content: { pepTalkCover }
         )
         #endif
+        .sheet(isPresented: $isGearCheckPresented) { gearCheckSheet }  // DUT-1559 (see +CookModeCover)
         // DUT-535 — the ingredient-selection sheet. Presented when the toolbar
         // `cart.badge.plus` is tapped (see `RecipeDetailView+Toolbar.swift`),
         // built by the App-injected `addToShoppingListSheet` closure (the sheet
@@ -237,16 +239,13 @@ public struct RecipeDetailView: View {
         // `.unavailable` (which auto-pops): keep the user here with a Retry
         // button so a flaky-connection open isn't mistaken for a dead recipe.
         case .retryableError:
-            EmptyState(
-                systemImage: "wifi.slash",
-                title: "Couldn't load recipe",
-                message: "Check your connection and try again.",
-                action: .init(title: "Retry") {
-                    Task { await viewModel.retryLoad() }
-                }
-            )
+            RetryStateView(kind: isOfflineSnapshot ? .noConnection : .requestFailed) {
+                Task { await viewModel.retryLoad() }
+            }
         case .ready:
-            readyBody
+            readyBody.overlay(alignment: .top) {
+                AvailabilityBadge(Self.availability(isDownloaded: viewModel.isDownloaded)).padding(DODSpacing.sm)
+            }
         // US-37 / CL-63 / AC-37.3 (T-640): article rendering branch.
         // Posts that lack parseable JSON-LD but have an extractable HTML
         // body render via `ArticleDetailView` with the carried `Recipe`
@@ -394,4 +393,8 @@ public struct RecipeDetailView: View {
     //
     // `handleLoadStateChange(_:)` lives in
     // `RecipeDetailView+LoadStateChange.swift` for the same reason.
+
+    nonisolated static func availability(isDownloaded: Bool) -> OfflineAvailability {
+        isDownloaded ? .worksOffline : .needsNetwork
+    }
 }

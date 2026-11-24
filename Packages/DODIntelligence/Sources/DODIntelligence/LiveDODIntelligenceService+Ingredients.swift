@@ -1,0 +1,54 @@
+import Foundation
+
+#if os(iOS)
+import FoundationModels
+
+#if compiler(>=6.4)
+import CoreGraphics
+import ImageIO
+#endif
+#endif
+
+// DUT-1977 — on-device fridge-photo ingredient identification, split out of
+// `LiveDODIntelligenceService.swift` to keep that file under the SwiftLint
+// 400-line cap. The pure parser lives here so it is testable on macOS.
+extension LiveDODIntelligenceService {
+
+    /// Comma/semicolon/newline separated names -> lowercased, trimmed,
+    /// de-duplicated list (via ``PantryMatcher/normalize(_:)``).
+    static func parseIngredientList(_ raw: String) -> [String] {
+        PantryMatcher.normalize(
+            raw.split(whereSeparator: { ",\n;".contains($0) }).map(String.init)
+        )
+    }
+
+    #if os(iOS)
+    /// System instructions for the fridge/pantry photo turn.
+    static let ingredientInstructions = """
+        You identify food in photos of a fridge or pantry. Reply with ONLY a \
+        comma-separated list of distinct edible ingredients you can clearly see, \
+        using short generic names like eggs, cheddar, spinach. No quantities, \
+        no sentences. If you see no food, reply with nothing.
+        """
+
+    #if compiler(>=6.4)
+    /// One multimodal turn: photo in, cleaned ingredient names out. Any decode,
+    /// guardrail or model error is swallowed to `[]` so the UI just shows nothing.
+    @available(iOS 27, *)
+    static func generateIngredients(imageData: Data) async -> [String] {
+        guard case .available = SystemLanguageModel.default.availability else { return [] }
+        guard let cgImage = decodeCGImage(from: imageData) else { return [] }
+        let session = LanguageModelSession(instructions: ingredientInstructions)
+        do {
+            let reply = try await session.respond {
+                "List the ingredients visible in this photo."
+                Attachment(cgImage)
+            }
+            return Array(parseIngredientList(reply.content).prefix(40))
+        } catch {
+            return []
+        }
+    }
+    #endif
+    #endif
+}
