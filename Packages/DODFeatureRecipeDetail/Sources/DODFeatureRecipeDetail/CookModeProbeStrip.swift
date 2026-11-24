@@ -9,6 +9,12 @@ enum CookModeProbeStripText {
         return "\(Int(exactly: fahrenheit.rounded()) ?? 0)°F"
     }
 
+    /// "Target 165°F", or "No target set" before one is chosen.
+    static func targetLabel(_ targetF: Double?) -> String {
+        guard let targetF else { return "No target set" }
+        return "Target \(temperature(targetF))"
+    }
+
     /// One status line per connection state.
     static func connectionLine(_ state: ProbeConnectionState) -> String {
         switch state {

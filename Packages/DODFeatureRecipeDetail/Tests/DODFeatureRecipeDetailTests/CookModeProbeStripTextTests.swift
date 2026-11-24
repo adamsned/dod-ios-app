@@ -14,6 +14,14 @@ import Testing
         #expect(CookModeProbeStripText.temperature(.nan) == "--")
     }
 
+    @Test func targetLabelSet() {
+        #expect(CookModeProbeStripText.targetLabel(165) == "Target 165°F")
+    }
+
+    @Test func targetLabelUnset() {
+        #expect(CookModeProbeStripText.targetLabel(nil) == "No target set")
+    }
+
     @Test func connectedLine() {
         #expect(CookModeProbeStripText.connectionLine(.connected) == "Probe connected")
     }
