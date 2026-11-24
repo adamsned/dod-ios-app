@@ -21,4 +21,14 @@ import Testing
     @Test func lostLineMentionsManual() {
         #expect(CookModeProbeStripText.connectionLine(.lost).contains("manually"))
     }
+
+    @Test func parseManualAccepts() {
+        #expect(CookModeProbeStripText.parseManual(" 142.5 ") == 142.5)
+    }
+
+    @Test func parseManualRejects() {
+        #expect(CookModeProbeStripText.parseManual("abc") == nil)
+        #expect(CookModeProbeStripText.parseManual("-5") == nil)
+        #expect(CookModeProbeStripText.parseManual("900") == nil)
+    }
 }

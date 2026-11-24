@@ -21,4 +21,11 @@ enum CookModeProbeStripText {
         case .unauthorized: return "Bluetooth access is off — enter temperature manually"
         }
     }
+
+    /// Parses the manual-entry field; nil unless it is a plausible °F value (0 < value < 600).
+    static func parseManual(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard let value = Double(trimmed), value.isFinite, value > 0, value < 600 else { return nil }
+        return value
+    }
 }
