@@ -8,4 +8,17 @@ enum CookModeProbeStripText {
         guard let fahrenheit, fahrenheit.isFinite else { return "--" }
         return "\(Int(exactly: fahrenheit.rounded()) ?? 0)°F"
     }
+
+    /// One status line per connection state.
+    static func connectionLine(_ state: ProbeConnectionState) -> String {
+        switch state {
+        case .idle: return "Probe not connected"
+        case .scanning: return "Looking for your probe…"
+        case .connecting: return "Connecting to probe…"
+        case .connected: return "Probe connected"
+        case .outOfRange: return "Probe out of range — move closer"
+        case .lost: return "Probe connection lost — enter temperature manually"
+        case .unauthorized: return "Bluetooth access is off — enter temperature manually"
+        }
+    }
 }
