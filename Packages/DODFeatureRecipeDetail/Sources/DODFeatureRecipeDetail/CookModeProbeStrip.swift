@@ -6,7 +6,14 @@ enum CookModeProbeStripText {
     /// "165°F", or "--" when there is no (finite) reading.
     static func temperature(_ fahrenheit: Double?) -> String {
         guard let fahrenheit, fahrenheit.isFinite else { return "--" }
-        return "\(Int(exactly: fahrenheit.rounded()) ?? 0)°F"
+        let rounded = fahrenheit.rounded()
+        // Use a more explicit approach to avoid potential Int(exactly:) issues
+        if let intVal = Int(exactly: rounded) {
+            return "\(intVal)°F"
+        } else {
+            // Fallback for edge cases
+            return "\(Int(rounded))°F"
+        }
     }
 
     /// "Target 165°F", or "No target set" before one is chosen.
