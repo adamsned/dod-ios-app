@@ -29,4 +29,12 @@ struct DietaryProfileStoreTests {
         store.save(profile)
         #expect(store.load() == profile)
     }
+
+    @Test("corrupt data loads the empty profile")
+    func corruptDataLoadsDefaultProfile() throws {
+        let defaults = try makeDefaults()
+        defaults.set(Data("nope".utf8), forKey: DietaryProfileStore.defaultsKey)
+        let store = DietaryProfileStore(defaults: defaults)
+        #expect(store.load() == DietaryProfile())
+    }
 }
