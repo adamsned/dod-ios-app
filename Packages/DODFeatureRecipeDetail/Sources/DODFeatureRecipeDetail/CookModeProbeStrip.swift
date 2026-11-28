@@ -12,10 +12,20 @@ struct CookModeProbeStrip: View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             readout
             statusLine
+            banner
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var banner: some View {
+        if let text = session.bannerText {
+            Text(text)
+                .dodFont(DODType.detail)
+                .foregroundStyle(DODColor.burntOrange)
+        }
     }
 
     private var statusLine: some View {
