@@ -17,4 +17,16 @@ struct DietaryProfileStoreTests {
         let store = DietaryProfileStore(defaults: try makeDefaults())
         #expect(store.load() == DietaryProfile())
     }
+
+    @Test("saved profile round-trips through load")
+    func saveThenLoadRoundTrips() throws {
+        let store = DietaryProfileStore(defaults: try makeDefaults())
+        let profile = DietaryProfile(
+            patterns: [.vegan],
+            allergens: [.nuts],
+            onlyShowFitting: true
+        )
+        store.save(profile)
+        #expect(store.load() == profile)
+    }
 }
