@@ -11,10 +11,17 @@ struct CookModeProbeStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             readout
+            statusLine
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var statusLine: some View {
+        Text(CookModeProbeStripText.connectionLine(session.connection))
+            .dodFont(DODType.caption)
+            .foregroundStyle(DODColor.labelSecondary)
     }
 
     private var readout: some View {
