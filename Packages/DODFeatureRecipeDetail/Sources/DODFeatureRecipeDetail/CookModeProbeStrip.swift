@@ -1,5 +1,34 @@
+import DODDesignSystem
 import DODSupport
 import Foundation
+import SwiftUI
+
+/// DUT-2903 — Cook Mode's Bluetooth meat-probe strip (view only).
+struct CookModeProbeStrip: View {
+    let session: ProbeSession
+    let recipeID: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DODSpacing.xs) {
+            readout
+        }
+        .padding(.horizontal, DODSpacing.md)
+        .padding(.vertical, DODSpacing.xs)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var readout: some View {
+        HStack(spacing: DODSpacing.md) {
+            Text("Internal \(CookModeProbeStripText.temperature(session.reading?.internalF))")
+                .dodFont(DODType.heading)
+                .foregroundStyle(DODColor.burntOrange)
+            Text("Ambient \(CookModeProbeStripText.temperature(session.reading?.ambientF))")
+                .dodFont(DODType.detail)
+                .foregroundStyle(DODColor.labelSecondary)
+        }
+        .monospacedDigit()
+    }
+}
 
 /// DUT-2903 — pure copy helpers for ``CookModeProbeStrip``.
 enum CookModeProbeStripText {
