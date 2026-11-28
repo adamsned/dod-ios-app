@@ -15,6 +15,9 @@ let package = Package(
         // only; the macOS slice (L1 `swift test`) never pulls it. Config (client
         // ID + reversed-client-ID URL scheme) lives in the app Info.plist.
         .package(url: "https://github.com/google/GoogleSignIn-iOS", from: "8.0.0"),
+        // Signs the profile in to Firebase too, so saved recipes sync with the
+        // Android app for the same Apple or Google account (iOS only, like GoogleSignIn).
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", from: "12.0.0"),
         // Test-only — L4 visual regression for the avatar + Settings row
         // surfaces (US-44 / T-739). Pin matches `DODDesignSystem/Package.swift`
         // so the package graph resolves a single `swift-snapshot-testing`
@@ -30,6 +33,16 @@ let package = Package(
                 .product(
                     name: "GoogleSignIn",
                     package: "GoogleSignIn-iOS",
+                    condition: .when(platforms: [.iOS])
+                ),
+                .product(
+                    name: "FirebaseAuth",
+                    package: "firebase-ios-sdk",
+                    condition: .when(platforms: [.iOS])
+                ),
+                .product(
+                    name: "FirebaseFirestore",
+                    package: "firebase-ios-sdk",
                     condition: .when(platforms: [.iOS])
                 ),
             ]

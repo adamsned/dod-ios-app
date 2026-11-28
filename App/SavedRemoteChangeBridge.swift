@@ -95,6 +95,17 @@ enum SavedRemoteChangeBridge {
                 }
             )
 
+            // Saves and removals from the Android app (Firestore).
+            box.tokens.append(
+                center.addObserver(
+                    forName: FirestoreSavedSync.changedNotification,
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    continuation.yield(())
+                }
+            )
+
             continuation.onTermination = { _ in
                 for token in box.tokens {
                     center.removeObserver(token)
