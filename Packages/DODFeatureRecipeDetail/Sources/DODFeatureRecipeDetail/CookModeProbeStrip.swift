@@ -8,11 +8,26 @@ struct CookModeProbeStrip: View {
     let session: ProbeSession
     let recipeID: Int
 
+    private var targetBinding: Binding<Double> {
+        Binding(
+            get: { session.targetF ?? 165 },
+            set: { session.setTarget($0, recipeID: recipeID) }
+        )
+    }
+
+    private var targetStepper: some View {
+        Stepper(value: targetBinding, in: 100...250, step: 5) {
+            Text(CookModeProbeStripText.targetLabel(session.targetF))
+                .dodFont(DODType.detail)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             readout
             statusLine
             banner
+            targetStepper
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.xs)
