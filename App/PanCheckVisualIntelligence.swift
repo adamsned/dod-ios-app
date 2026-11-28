@@ -50,6 +50,10 @@ struct PanCheckQuery: EntityQuery {
     }
 }
 
+#if canImport(VisualIntelligence)
+extension PanCheckQuery: IntentValueQuery {}
+#endif
+
 /// DUT-1826 — opens DOD on a pan-check result chosen from Visual Intelligence.
 @available(iOS 26.0, *)
 struct OpenPanCheckIntent: AppIntent, OpenIntent, TargetContentProvidingIntent {
