@@ -7,6 +7,7 @@ import SwiftUI
 struct CookModeProbeStrip: View {
     let session: ProbeSession
     let recipeID: Int
+    @State private var manualText = ""
 
     private var targetBinding: Binding<Double> {
         Binding(
@@ -22,12 +23,30 @@ struct CookModeProbeStrip: View {
         }
     }
 
+    private var manualEntry: some View {
+        HStack(spacing: DODSpacing.sm) {
+            TextField("Internal °F", text: $manualText)
+                #if canImport(UIKit)
+            .keyboardType(.decimalPad)
+                #endif
+                .onSubmit(submitManual)
+            Button("Log", action: submitManual)
+        }
+    }
+
+    private func submitManual() {
+        guard let value = CookModeProbeStripText.parseManual(manualText) else { return }
+        session.ingestManual(value)
+        manualText = ""
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: DODSpacing.xs) {
             readout
             statusLine
             banner
             targetStepper
+            manualEntry
         }
         .padding(.horizontal, DODSpacing.md)
         .padding(.vertical, DODSpacing.xs)
